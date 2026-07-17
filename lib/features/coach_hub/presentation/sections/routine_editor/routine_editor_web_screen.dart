@@ -26,27 +26,20 @@ import '../../../../workout/domain/routine_visibility.dart';
 import '../../../../workout/domain/set_enums.dart';
 import '../../../../workout/domain/set_spec.dart';
 import '../../widgets/exercise_picker_dialog.dart';
-import 'routine_web_editability.dart';
 
 /// Editor de rutinas web — crea o edita la rutina de UN alumno (mirrors
 /// mobile's `RoutineEditorScreen(TrainerAssigning)`). Soporta, por ejercicio:
-/// reps fijas o rango (mín–máx), duración (por tiempo), notas para el alumno,
-/// supersets y N semanas, cada una con SU PROPIA prescripción de sets
-/// (`weeklySets`, Fase 4b) mediante el selector "Sem 1..N". Todavía NO:
-/// máscara de presencia por semana (Fase 4c) — esas rutinas se siguen editando
-/// en mobile.
+/// reps fijas o rango (mín–máx), duración (por tiempo), peso, descanso, notas
+/// para el alumno, supersets, N semanas con prescripción propia por semana
+/// (`weeklySets`, Fase 4b, selector "Sem 1..N") y máscara de presencia por
+/// semana (`activeWeeks`, Fase 4c, chips "Semanas:"). Paridad completa con el
+/// modelo de dominio y con el editor mobile — ya no hay ningún campo de
+/// [RoutineSlot] que este editor no pueda representar.
 ///
 /// **Modo edición** (`routineId != null`): carga la rutina y la abre en el
-/// form. Como `updateAssigned` pisa el array `days` entero, editar una rutina
-/// con máscara de presencia desde acá la truncaría silenciosamente — por eso
-/// [isRoutineWebEditable] actúa de compuerta: si la rutina usa un campo aún no
-/// soportado, el editor NO la carga y muestra un aviso para editarla en mobile.
-/// Las rutinas creadas en web están siempre dentro de scope, así que
-/// round-tripean sin drama.
-///
-/// La `Routine` que este editor escribe es 100% válida para el modelo de
-/// dominio completo (weeklySets/activeWeeks vacíos = "misma prescripción todas
-/// las semanas") — mobile puede leerla y editarla sin problema.
+/// form. `updateAssigned` pisa el array `days` entero en cada guardado, pero
+/// como el form modela el 100% del esquema, ninguna rutina asignada —sea cual
+/// sea su origen (mobile o web)— pierde información al re-guardarse.
 class RoutineEditorWebScreen extends ConsumerStatefulWidget {
   const RoutineEditorWebScreen({
     super.key,
@@ -57,8 +50,7 @@ class RoutineEditorWebScreen extends ConsumerStatefulWidget {
   final String athleteId;
 
   /// When non-null, the editor loads this existing routine and saves via
-  /// `updateAssigned` instead of `createAssigned`. Only routines that pass
-  /// [isRoutineWebEditable] are loaded; advanced ones are refused.
+  /// `updateAssigned` instead of `createAssigned`.
   final String? routineId;
 
   @override
@@ -69,6 +61,11 @@ class RoutineEditorWebScreen extends ConsumerStatefulWidget {
 // ── Mutable editor state (web MVP) ────────────────────────────────────────────
 
 class _EditorSet {
+  /// Warm-up / normal / drop / failure. The web editor has no UI to CHANGE
+  /// this yet, but it must round-trip: plans authored in the mobile app carry
+  /// typed sets, and silently rewriting them to [SetType.normal] on save would
+  /// destroy the trainer's prescription without asking.
+  SetType type = SetType.normal;
   double? weightKg;
   int? reps; // used when repMode == single
   int? repsMin; // used when repMode == range
@@ -76,8 +73,11 @@ class _EditorSet {
   int? durationSeconds; // used when exerciseMode == duration
 
   /// Deep copy — used when padding a slot's `weeklySets` to a new week count
-  /// ([_RoutineEditorWebScreenState._normalizeSlotWeeks]).
+  /// ([_RoutineEditorWebScreenState._normalizeSlotWeeks]). Preserves [type],
+  /// like mobile's `_EditableSet.copy()`: replicating a week must replicate
+  /// its warm-ups and failure sets too.
   _EditorSet copy() => _EditorSet()
+    ..type = type
     ..weightKg = weightKg
     ..reps = reps
     ..repsMin = repsMin
@@ -87,6 +87,7 @@ class _EditorSet {
 
 /// Maps a persisted [SetSpec] into its mutable editor row.
 _EditorSet _editorSetFromSpec(SetSpec spec) => _EditorSet()
+  ..type = spec.type
   ..reps = spec.reps
   ..repsMin = spec.repsMin
   ..repsMax = spec.repsMax
@@ -110,6 +111,15 @@ class _EditorSlot {
   List<List<_EditorSet>> weeklySets = [
     [_EditorSet()],
   ];
+
+  /// 0-based weeks in which this slot is present. Empty = present in ALL
+  /// weeks (back-compat default — legacy/single-week docs have no mask).
+  /// Mirrors mobile's `_EditableSlot.activeWeeks` (Fase 4c).
+  Set<int> activeWeeks = <int>{};
+
+  /// Whether this slot is present in 0-based [w].
+  /// Rule: `activeWeeks.isEmpty || activeWeeks.contains(w)`.
+  bool isPresentInWeek(int w) => activeWeeks.isEmpty || activeWeeks.contains(w);
 }
 
 class _EditorDay {
@@ -149,8 +159,8 @@ class _RoutineEditorWebScreenState
   /// True while the existing routine is being fetched (edit mode only).
   bool _loading = false;
 
-  /// Non-null when the form can't be shown: routine not found, or it uses
-  /// advanced fields the web editor would truncate ([isRoutineWebEditable]).
+  /// Non-null when the form can't be shown: routine not found, or it failed
+  /// to load.
   String? _fatalMessage;
 
   @override
@@ -171,15 +181,6 @@ class _RoutineEditorWebScreenState
         setState(() {
           _loading = false;
           _fatalMessage = 'No encontramos la rutina.'; // i18n
-        });
-        return;
-      }
-      // GATE: refuse to load a routine we'd silently truncate on save.
-      if (!isRoutineWebEditable(routine)) {
-        setState(() {
-          _loading = false;
-          _fatalMessage =
-              'Esta rutina tiene periodización o supersets. Editala desde la app mobile para no perder esa configuración.'; // i18n
         });
         return;
       }
@@ -255,7 +256,10 @@ class _RoutineEditorWebScreenState
       ..exerciseMode = isDuration ? ExerciseMode.duration : ExerciseMode.reps
       ..repMode = isRange ? RepMode.range : RepMode.single
       ..notes = slot.notes ?? ''
-      ..weeklySets = weeklySets;
+      ..weeklySets = weeklySets
+      // Hydrate presence mask from the domain slot (Fase 4c). Legacy docs
+      // have empty activeWeeks → empty set → all weeks.
+      ..activeWeeks = slot.activeWeeks.toSet();
     // Pad/truncate to _numWeeks (already set by _populate before this runs)
     // and guard against an authored-empty week 0 (deload) leaving a blank
     // editor slot with 0 sets.
@@ -280,7 +284,8 @@ class _RoutineEditorWebScreenState
   /// Padding appends a DEEP COPY of the last week's sets (via
   /// [_EditorSet.copy]) so a newly-added week starts from the trainer's most
   /// recent prescription instead of a blank set. Never leaves a slot with 0
-  /// weeks or a week with 0 sets.
+  /// weeks or a week with 0 sets. Also clamps the presence mask (Fase 4c) to
+  /// the valid week range, mirroring mobile's own normalize.
   void _normalizeSlotWeeks(_EditorSlot slot) {
     if (slot.weeklySets.isEmpty) {
       slot.weeklySets.add([_EditorSet()]);
@@ -296,6 +301,7 @@ class _RoutineEditorWebScreenState
         slot.weeklySets[w] = [_EditorSet()];
       }
     }
+    slot.activeWeeks.removeWhere((w) => w < 0 || w >= _numWeeks);
   }
 
   void _setNumWeeks(int value) {
@@ -390,6 +396,35 @@ class _RoutineEditorWebScreenState
     });
   }
 
+  /// Toggles [week]'s presence for one slot (Fase 4c, "Semanas:" chips).
+  ///
+  /// An EMPTY mask means "present in all weeks" — so removing a week from an
+  /// all-present slot first MATERIALIZES the mask to every week index, then
+  /// removes the toggled one. Conversely, once a mask ends up covering EVERY
+  /// week again it collapses back to EMPTY (the canonical "all weeks" form) —
+  /// this keeps `[0, 1]` on a 2-week plan indistinguishable from "no mask" on
+  /// save, matching mobile's own round-trip. A removal that would empty the
+  /// mask is refused outright: a slot must stay present in at least one week
+  /// (`_firstValidationError`'s mask check is only a backstop for this).
+  void _toggleSlotWeekPresence(int dayIndex, int slotIndex, int week) {
+    final slot = _days[dayIndex].slots[slotIndex];
+    final mask = slot.activeWeeks.isEmpty
+        ? {for (var w = 0; w < _numWeeks; w++) w}
+        : Set<int>.from(slot.activeWeeks);
+    if (mask.contains(week)) {
+      if (mask.length <= 1) return; // never let a removal empty the mask
+      mask.remove(week);
+    } else {
+      mask.add(week);
+    }
+    // Covers every week again → canonicalize back to empty ("all weeks").
+    if (mask.length == _numWeeks) {
+      mask.clear();
+    }
+    _markDirty();
+    setState(() => slot.activeWeeks = mask);
+  }
+
   void _onRestChanged(int dayIndex, int slotIndex, String value) {
     final seconds = int.tryParse(value.trim());
     _markDirty();
@@ -403,6 +438,9 @@ class _RoutineEditorWebScreenState
     setState(() {
       final sets = _days[dayIndex].slots[slotIndex].weeklySets[_selectedWeek];
       // Duplicate the last row's values — same "+ Agregar set" UX as mobile.
+      // `type` is deliberately NOT carried over (it stays SetType.normal),
+      // matching mobile's `clone()`: adding a set after a warm-up should give
+      // you a working set, not a second warm-up.
       final last = sets.isEmpty ? null : sets.last;
       sets.add(_EditorSet()
         ..reps = last?.reps
@@ -524,23 +562,39 @@ class _RoutineEditorWebScreenState
         return 'El día "${day.name}" necesita al menos un ejercicio.'; // i18n
       }
       for (final slot in day.slots) {
+        // Presence-mask backstop (Fase 4c): with the toggle's canonicalization
+        // rules this should be unreachable, but a non-empty mask that names no
+        // valid week would create an invisible ghost slot — refuse it.
+        if (_numWeeks > 1 &&
+            slot.activeWeeks.isNotEmpty &&
+            !slot.activeWeeks.any((w) => w >= 0 && w < _numWeeks)) {
+          final name = slot.exercise?.name ?? 'Un ejercicio'; // i18n
+          return '$name no está en ninguna semana.'; // i18n
+        }
         // Every week's sets must be complete (not just the currently viewed
         // one) — otherwise a trainer could save with an incomplete week
-        // hidden behind an unvisited "Sem N" tab (Fase 4b).
-        for (final week in slot.weeklySets) {
-          for (final set in week) {
-            final name = slot.exercise?.name ?? 'Un ejercicio'; // i18n
+        // hidden behind an unvisited "Sem N" tab (Fase 4b). Weeks where the
+        // exercise isn't scheduled are SKIPPED: those rows never get executed,
+        // so demanding reps for them would block a perfectly valid plan
+        // (Fase 4c presence mask; mirrors mobile's isPresentInWeek guard).
+        for (var w = 0; w < slot.weeklySets.length; w++) {
+          if (!slot.isPresentInWeek(w)) continue;
+          final name = slot.exercise?.name ?? 'Un ejercicio'; // i18n
+          // Name the offending week so the trainer knows where to look — only
+          // meaningful once there's more than one week.
+          final wk = _numWeeks > 1 ? ' en la Semana ${w + 1}' : ''; // i18n
+          for (final set in slot.weeklySets[w]) {
             if (slot.exerciseMode == ExerciseMode.duration) {
               if (set.durationSeconds == null || set.durationSeconds! <= 0) {
-                return '$name tiene una serie sin duración.'; // i18n
+                return '$name tiene una serie sin duración$wk.'; // i18n
               }
             } else if (slot.repMode == RepMode.range) {
               final min = set.repsMin, max = set.repsMax;
               if (min == null || min <= 0 || max == null || max < min) {
-                return '$name tiene un rango de reps inválido (mín ≤ máx).'; // i18n
+                return '$name tiene un rango de reps inválido (mín ≤ máx)$wk.'; // i18n
               }
             } else if (set.reps == null || set.reps! <= 0) {
-              return '$name tiene una serie sin reps.'; // i18n
+              return '$name tiene una serie sin reps$wk.'; // i18n
             }
           }
         }
@@ -614,12 +668,17 @@ class _RoutineEditorWebScreenState
     // Mode is per-slot (not per-week), so the SAME conversion applies to
     // every week's rows.
     SetSpec toSpec(_EditorSet s) {
-      if (isDuration) return SetSpec(durationSeconds: s.durationSeconds);
+      if (isDuration) {
+        return SetSpec(type: s.type, durationSeconds: s.durationSeconds);
+      }
       if (isRange) {
         return SetSpec(
-            repsMin: s.repsMin, repsMax: s.repsMax, weightKg: s.weightKg);
+            type: s.type,
+            repsMin: s.repsMin,
+            repsMax: s.repsMax,
+            weightKg: s.weightKg);
       }
-      return SetSpec(reps: s.reps, weightKg: s.weightKg);
+      return SetSpec(type: s.type, reps: s.reps, weightKg: s.weightKg);
     }
 
     final week0Specs = week0.map(toSpec).toList();
@@ -649,7 +708,9 @@ class _RoutineEditorWebScreenState
       weeklySets: _numWeeks > 1
           ? slot.weeklySets.map((wk) => wk.map(toSpec).toList()).toList()
           : const [],
-      // activeWeeks stays empty (presence mask) — Fase 4c, still out of scope.
+      // Presence mask: sorted for deterministic wire output. Empty stays
+      // empty — present in all (the only) week (Fase 4c).
+      activeWeeks: slot.activeWeeks.toList()..sort(),
     );
   }
 
@@ -688,8 +749,8 @@ class _RoutineEditorWebScreenState
       if (_isEditing) {
         // Preserve the loaded routine's identity (id, assignedBy/To, source,
         // createdAt, …). updateAssigned only writes name/split/level/days/
-        // numWeeks — the guard [isRoutineWebEditable] already ensured the plan
-        // had no advanced `days` data to lose.
+        // numWeeks — `days` is rebuilt from a form that models 100% of
+        // RoutineSlot's schema, so nothing is lost on re-save (Fase 4c).
         final draft = _loadedRoutine!.copyWith(
           name: _nameCtrl.text.trim(),
           split: _splitCtrl.text.trim(),
@@ -910,6 +971,7 @@ class _RoutineEditorWebScreenState
                                     day: _days[i],
                                     palette: palette,
                                     selectedWeek: _selectedWeek,
+                                    numWeeks: _numWeeks,
                                     canRemove: _days.length > 1,
                                     onNameChanged: (v) =>
                                         _onDayNameChanged(i, v),
@@ -938,6 +1000,8 @@ class _RoutineEditorWebScreenState
                                     onNotesChanged: (s, v) =>
                                         _onNotesChanged(i, s, v),
                                     onToggleLink: (s) => _toggleSlotLink(i, s),
+                                    onTogglePresence: (s, w) =>
+                                        _toggleSlotWeekPresence(i, s, w),
                                   ),
                                   const SizedBox(height: 12),
                                 ],
@@ -1169,7 +1233,9 @@ class _WeeksStepper extends StatelessWidget {
         if (numWeeks > 1)
           Expanded(
             child: Text(
-              'Misma rutina cada semana.', // i18n
+              // Fase 4b hizo cada semana independiente — el cartel viejo
+              // ("misma rutina cada semana") ya no era cierto.
+              'Cada semana se carga por separado.', // i18n
               style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 12),
             ),
           ),
@@ -1271,6 +1337,7 @@ class _DayCard extends StatelessWidget {
     required this.day,
     required this.palette,
     required this.selectedWeek,
+    required this.numWeeks,
     required this.canRemove,
     required this.onNameChanged,
     required this.onRemove,
@@ -1288,6 +1355,7 @@ class _DayCard extends StatelessWidget {
     required this.onModeChanged,
     required this.onNotesChanged,
     required this.onToggleLink,
+    required this.onTogglePresence,
   });
 
   final _EditorDay day;
@@ -1296,6 +1364,10 @@ class _DayCard extends StatelessWidget {
   /// 0-based week whose `weeklySets` entry each slot card should render
   /// (Fase 4b) — threaded down to [_SlotCard].
   final int selectedWeek;
+
+  /// Total plan weeks — threaded down to [_SlotCard] so it knows whether to
+  /// render the presence chips row and whether to dim (Fase 4c).
+  final int numWeeks;
   final bool canRemove;
   final ValueChanged<String> onNameChanged;
   final VoidCallback onRemove;
@@ -1319,6 +1391,7 @@ class _DayCard extends StatelessWidget {
       onModeChanged;
   final void Function(int slotIndex, String value) onNotesChanged;
   final void Function(int slotIndex) onToggleLink;
+  final void Function(int slotIndex, int week) onTogglePresence;
 
   @override
   Widget build(BuildContext context) {
@@ -1364,6 +1437,7 @@ class _DayCard extends StatelessWidget {
               slot: day.slots[i],
               palette: palette,
               selectedWeek: selectedWeek,
+              numWeeks: numWeeks,
               canMoveUp: i > 0,
               canMoveDown: i < day.slots.length - 1,
               canLink: i < day.slots.length - 1,
@@ -1385,6 +1459,7 @@ class _DayCard extends StatelessWidget {
               onModeChanged: (em, rm) => onModeChanged(i, em, rm),
               onNotesChanged: (v) => onNotesChanged(i, v),
               onToggleLink: () => onToggleLink(i),
+              onTogglePresence: (w) => onTogglePresence(i, w),
             ),
           ],
           const SizedBox(height: 10),
@@ -1414,6 +1489,7 @@ class _SlotCard extends StatelessWidget {
     required this.slot,
     required this.palette,
     required this.selectedWeek,
+    required this.numWeeks,
     required this.canMoveUp,
     required this.canMoveDown,
     required this.canLink,
@@ -1433,6 +1509,7 @@ class _SlotCard extends StatelessWidget {
     required this.onModeChanged,
     required this.onNotesChanged,
     required this.onToggleLink,
+    required this.onTogglePresence,
   });
 
   final _EditorSlot slot;
@@ -1440,6 +1517,11 @@ class _SlotCard extends StatelessWidget {
 
   /// 0-based week whose `slot.weeklySets` entry this card renders (Fase 4b).
   final int selectedWeek;
+
+  /// Total plan weeks. The presence chips row ("Semanas:") and the dimming of
+  /// exercises absent from [selectedWeek] only apply when this is > 1
+  /// (Fase 4c).
+  final int numWeeks;
   final bool canMoveUp;
   final bool canMoveDown;
   final bool canLink; // false for the last slot of a day (nothing to link to)
@@ -1459,6 +1541,7 @@ class _SlotCard extends StatelessWidget {
   final void Function(ExerciseMode exerciseMode, RepMode repMode) onModeChanged;
   final ValueChanged<String> onNotesChanged;
   final VoidCallback onToggleLink;
+  final ValueChanged<int> onTogglePresence;
 
   @override
   Widget build(BuildContext context) {
@@ -1466,7 +1549,7 @@ class _SlotCard extends StatelessWidget {
     // The sets for the currently-viewed week only — other weeks' rows aren't
     // rendered while a different tab is selected (Fase 4b).
     final weekSets = slot.weeklySets[selectedWeek];
-    return Container(
+    final card = Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: palette.bg,
@@ -1545,6 +1628,34 @@ class _SlotCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 6),
+          // Presence mask (Fase 4c): which weeks this exercise is present in.
+          // Only meaningful for multi-week plans.
+          if (numWeeks > 1) ...[
+            Row(
+              children: [
+                Text('Semanas:', // i18n
+                    style: GoogleFonts.barlow(
+                        color: palette.textMuted, fontSize: 12)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (var w = 0; w < numWeeks; w++)
+                        _PresenceChip(
+                          index: w,
+                          present: slot.isPresentInWeek(w),
+                          palette: palette,
+                          onTap: () => onTogglePresence(w),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+          ],
           Row(
             children: [
               Text('Descanso (seg)', // i18n
@@ -1640,6 +1751,14 @@ class _SlotCard extends StatelessWidget {
         ],
       ),
     );
+    // Dim (not hide) an exercise absent from the currently-viewed week so the
+    // trainer still sees it and can re-add it via the presence chips above
+    // (Fase 4c). Opacity alone doesn't block hit-testing, so the chips stay
+    // tappable while dimmed.
+    if (numWeeks > 1 && !slot.isPresentInWeek(selectedWeek)) {
+      return Opacity(opacity: 0.45, child: card);
+    }
+    return card;
   }
 }
 
@@ -1874,6 +1993,53 @@ class _WeekChip extends StatelessWidget {
             color: selected ? palette.bg : palette.textMuted,
             fontWeight: FontWeight.w700,
             fontSize: 12,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Presence chips (máscara de presencia por semana, Fase 4c) ───────────────
+
+/// One per-exercise week-presence toggle — filled/accent when the slot is
+/// present in that week ([_SlotCard.slot.isPresentInWeek]), outlined/muted
+/// otherwise. Visually mirrors [_WeekChip]/[_ModeChip], just more compact
+/// since up to `_kMaxWeeks` (16) of these can render per exercise.
+class _PresenceChip extends StatelessWidget {
+  const _PresenceChip({
+    required this.index,
+    required this.present,
+    required this.palette,
+    required this.onTap,
+  });
+
+  /// 0-based week — rendered 1-based ("1".."N").
+  final int index;
+  final bool present;
+  final AppPalette palette;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      key: Key('presence_chip_$index'),
+      onTap: onTap,
+      child: Container(
+        width: 26,
+        height: 26,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: present ? palette.accent : palette.bgCard,
+          borderRadius: BorderRadius.circular(9999),
+          border: Border.all(color: present ? palette.accent : palette.border),
+        ),
+        child: Text(
+          '${index + 1}',
+          style: GoogleFonts.barlowCondensed(
+            color: present ? palette.bg : palette.textMuted,
+            fontWeight: FontWeight.w700,
+            fontSize: 11,
           ),
         ),
       ),
