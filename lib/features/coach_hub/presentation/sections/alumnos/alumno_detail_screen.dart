@@ -1046,28 +1046,32 @@ class _MostFrequentExercisesTabSectionState
   Widget build(BuildContext context) {
     final entriesAsync = ref.watch(exerciseFrequencyProvider(
         (athleteUid: widget.athleteId, period: _selectedPeriod)));
+    final stateKey = _asyncStateKeyOf(entriesAsync);
 
-    return entriesAsync.when(
-      loading: () => const SizedBox.shrink(),
-      error: (e, _) => const SizedBox.shrink(),
-      data: (entries) => MostFrequentExercisesList(
-        entries: entries,
-        selectedPeriod: _selectedPeriod,
-        onSelectExercise: widget.onSelectExercise,
-        onSelectPeriod: (p) => setState(() => _selectedPeriod = p),
-        labels: MostFrequentExercisesListLabels(
-          sectionTitle: 'EJERCICIOS MÁS FRECUENTES', // i18n: Fase W2
-          sessionCountLabel: (n) => n == 1
-              ? '1 sesión' // i18n: Fase W2
-              : '$n sesiones', // i18n: Fase W2
-          emptyText: 'No hay datos todavía.', // i18n: Fase W2
-          periodLabels: const ChartPeriodLabels(
-            last30dLabel: 'Últimos 30 días', // i18n: Fase W2
-            thisWeekLabel: 'Esta semana', // i18n: Fase W2
-            monthLabel: 'Este mes', // i18n: Fase W2
+    return TreinoStateSwitcher(
+      childKey: ValueKey('most_frequent_exercises_$stateKey'),
+      child: switch (stateKey) {
+        'loading' => const SizedBox.shrink(),
+        'error' => const SizedBox.shrink(),
+        _ => MostFrequentExercisesList(
+            entries: entriesAsync.requireValue,
+            selectedPeriod: _selectedPeriod,
+            onSelectExercise: widget.onSelectExercise,
+            onSelectPeriod: (p) => setState(() => _selectedPeriod = p),
+            labels: MostFrequentExercisesListLabels(
+              sectionTitle: 'EJERCICIOS MÁS FRECUENTES', // i18n: Fase W2
+              sessionCountLabel: (n) => n == 1
+                  ? '1 sesión' // i18n: Fase W2
+                  : '$n sesiones', // i18n: Fase W2
+              emptyText: 'No hay datos todavía.', // i18n: Fase W2
+              periodLabels: const ChartPeriodLabels(
+                last30dLabel: 'Últimos 30 días', // i18n: Fase W2
+                thisWeekLabel: 'Esta semana', // i18n: Fase W2
+                monthLabel: 'Este mes', // i18n: Fase W2
+              ),
+            ),
           ),
-        ),
-      ),
+      },
     );
   }
 }
