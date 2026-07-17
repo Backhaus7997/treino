@@ -63,13 +63,45 @@ class ChatRepository {
       return _chatFromDoc(existing)!;
     }
     final members = [selfId, otherId]..sort();
+    // QA-CHAT-004: firestore.rules only allows the chat when the two members
+    // have a real relationship. A friendship is checked by the doc id; a
+    // coach↔athlete chat instead needs the id of their active trainer_link
+    // stamped on the doc so the rule can verify it. Resolve it once, on create.
+    final linkId = await _activeLinkIdBetween(selfId, otherId);
     await ref.set({
       'chatId': id,
       'members': members,
       'createdAt': FieldValue.serverTimestamp(),
+      if (linkId != null) 'linkId': linkId,
     });
     final created = await ref.get();
     return _chatFromDoc(created)!;
+  }
+
+  /// Returns the id of the active [TrainerLink] between [self] and [other], or
+  /// null if there is none. Queries are self-constrained (athleteId/trainerId ==
+  /// self) so they satisfy the trainer_links read rule; status and the other
+  /// member are filtered in memory (mirrors TrainerLinkRepository's approach,
+  /// so no composite index is needed).
+  Future<String?> _activeLinkIdBetween(String self, String other) async {
+    Future<String?> scan(Query<Map<String, dynamic>> query) async {
+      final snap = await query.get();
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        if (data['status'] != 'active') continue;
+        final trainerId = data['trainerId'] as String?;
+        final athleteId = data['athleteId'] as String?;
+        if ((trainerId == self && athleteId == other) ||
+            (trainerId == other && athleteId == self)) {
+          return doc.id;
+        }
+      }
+      return null;
+    }
+
+    final links = _firestore.collection('trainer_links');
+    return await scan(links.where('athleteId', isEqualTo: self)) ??
+        await scan(links.where('trainerId', isEqualTo: self));
   }
 
   // ─── sendMessage ────────────────────────────────────────────────────────
