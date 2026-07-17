@@ -11,13 +11,12 @@ import '../../domain/performance_test.dart';
 
 /// Short date label, e.g. '7 abr' (es) / '7 Apr' (en).
 ///
-/// Uses the same UTC convention as every reader of
-/// [PerformanceTest.recordedAt] (see `log_performance_test_screen`): the stored
-/// UTC instant is rendered as-is, with no `.toLocal()`. [intl.DateFormat.format]
-/// reads the [DateTime]'s own calendar fields directly, localizing the month
-/// name via [localeName].
+/// [PerformanceTest.recordedAt] is a real instant, so it's localized before
+/// formatting (#392) — a raw UTC value reads +3h in Argentina and shifts the
+/// day near midnight. [intl.DateFormat.format] reads the [DateTime]'s calendar
+/// fields directly, so we convert first.
 String _shortDate(DateTime dt, String localeName) =>
-    intl.DateFormat('d MMM', localeName).format(dt);
+    intl.DateFormat('d MMM', localeName).format(dt.toLocal());
 
 // ── Metric descriptor ─────────────────────────────────────────────────────────
 

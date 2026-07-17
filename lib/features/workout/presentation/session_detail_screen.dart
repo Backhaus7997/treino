@@ -89,9 +89,11 @@ class _DetailLoaded extends StatelessWidget {
           ),
           const SizedBox(height: 8),
 
-          // Header: date + time + routineName
+          // Header: date + time + routineName. startedAt is a real instant
+          // (UTC via TimestampConverter) — convert to the viewer's local time
+          // before formatting, or it reads +3h in Argentina (#380).
           Text(
-            formatSessionDate(session.startedAt),
+            formatSessionDate(session.startedAt.toLocal()),
             textAlign: TextAlign.center,
             style: GoogleFonts.barlowCondensed(
               fontWeight: FontWeight.w600,
@@ -102,7 +104,7 @@ class _DetailLoaded extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(
-            _formatTime(session.startedAt),
+            _formatTime(session.startedAt.toLocal()),
             textAlign: TextAlign.center,
             style: GoogleFonts.barlowCondensed(
               fontWeight: FontWeight.w600,

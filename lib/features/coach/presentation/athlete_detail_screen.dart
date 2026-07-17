@@ -453,9 +453,12 @@ class _AthleteHeader extends StatelessWidget {
 // ── Antropometría section ─────────────────────────────────────────────────────
 
 String _formatMeasurementDate(DateTime dt, String localeName) {
-  // Dates are stored UTC; display as-is (no .toLocal()) — same UTC convention
-  // used across the dashboard (see appointment_detail_sheet.dart).
-  return '${dt.day} ${monthAbbrev(dt, localeName)} ${dt.year}';
+  // Measurement/PerformanceTest recordedAt are real instants (UTC), NOT
+  // appointment wall-clock — localize before formatting or they read +3h in
+  // Argentina and shift the day near midnight (#392). Both call sites here pass
+  // a real instant, so converting inside the helper is safe.
+  final local = dt.toLocal();
+  return '${local.day} ${monthAbbrev(local, localeName)} ${local.year}';
 }
 
 /// Formats a metric double for the summary cards. Mirrors the chart header
