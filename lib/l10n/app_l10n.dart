@@ -1784,12 +1784,6 @@ abstract class AppL10n {
   /// **'+ Cobro'**
   String get dashboardCobroTrailingLabel;
 
-  /// No description provided for @dashboardInvitarAlumnoLabel.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'+ INVITAR ALUMNO'**
-  String get dashboardInvitarAlumnoLabel;
-
   /// No description provided for @dashboardAsignarRutinaLabel.
   ///
   /// In es_AR, this message translates to:
@@ -2017,12 +2011,6 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'HOLA'**
   String get dashboardHolaSinNombre;
-
-  /// No description provided for @dashboardInvitarProximamente.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'Invitar alumno — próximamente.'**
-  String get dashboardInvitarProximamente;
 
   /// No description provided for @dashboardSolicitudesPendientesTitle.
   ///

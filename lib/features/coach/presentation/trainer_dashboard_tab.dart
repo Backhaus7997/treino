@@ -1735,58 +1735,32 @@ class _BottomActions extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    return Row(
-      children: [
-        Expanded(
-          child: OutlinedButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(l10n.dashboardInvitarProximamente),
-                ),
-              );
-            },
-            style: OutlinedButton.styleFrom(
-              side: BorderSide(color: palette.border, width: 1),
-              foregroundColor: palette.textPrimary,
-              minimumSize: const Size.fromHeight(48),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(9999),
-              ),
-            ),
-            child: Text(
-              l10n.dashboardInvitarAlumnoLabel,
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
-                letterSpacing: 0.8,
-              ),
-            ),
+    // "Invitar alumno" removed (#397): the trainer↔athlete link is
+    // athlete-initiated only (trainer_link_repository.dart product convention),
+    // there is no invite infra, and the web equivalent was already removed. The
+    // stub only showed a "próximamente" SnackBar, so it's dropped rather than
+    // left as a dead CTA. "Asignar rutina" now spans the full width.
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: () => context.go('/coach?tab=alumnos'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: palette.accent,
+          foregroundColor: palette.bg,
+          minimumSize: const Size.fromHeight(48),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(9999),
           ),
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: ElevatedButton(
-            onPressed: () => context.go('/coach?tab=alumnos'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: palette.accent,
-              foregroundColor: palette.bg,
-              minimumSize: const Size.fromHeight(48),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(9999),
-              ),
-            ),
-            child: Text(
-              l10n.dashboardAsignarRutinaLabel,
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
-                letterSpacing: 0.8,
-              ),
-            ),
+        child: Text(
+          l10n.dashboardAsignarRutinaLabel,
+          style: GoogleFonts.barlowCondensed(
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
+            letterSpacing: 0.8,
           ),
         ),
-      ],
+      ),
     );
   }
 }

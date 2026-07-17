@@ -1,3 +1,4 @@
+import '../../../core/utils/argentina_time.dart';
 import '../../workout/domain/session.dart';
 import '../../workout/domain/set_log.dart';
 import '../domain/day_insights.dart';
@@ -9,7 +10,7 @@ import '../domain/muscle_group.dart';
 /// old `weeklyInsightsProvider` accumulated the whole current week).
 ///
 /// [sessions] may span multiple days (e.g. the full last-7-days scan) — this
-/// function filters to the ones whose `startedAt.toLocal()` calendar day
+/// function filters to the ones whose `toArgentina(startedAt)` calendar day
 /// equals [day] AND `status == finished`, then sums their setLogs (looked up
 /// via [setLogsBySessionId]) into display-group buckets.
 ///
@@ -28,7 +29,7 @@ DayInsights aggregateDayInsights({
 
   final daySessions = sessions.where((s) {
     if (!s.countsAsWorkout) return false;
-    final started = s.startedAt.toLocal();
+    final started = toArgentina(s.startedAt);
     return started.year == dayOnly.year &&
         started.month == dayOnly.month &&
         started.day == dayOnly.day;

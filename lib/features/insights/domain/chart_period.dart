@@ -62,12 +62,12 @@ enum ChartPeriod {
 /// (non-overlapping — `previousEnd` is the day BEFORE `currentStart`, same
 /// non-overlapping convention as [_thisWeekWindow]/[_monthWindow]).
 ChartPeriodWindow _last30dWindow(DateTime now) {
-  final today = DateTime(now.year, now.month, now.day);
-  final currentStart = DateTime(today.year, today.month, today.day - 29);
+  final today = DateTime.utc(now.year, now.month, now.day);
+  final currentStart = DateTime.utc(today.year, today.month, today.day - 29);
   final previousEnd =
-      DateTime(currentStart.year, currentStart.month, currentStart.day - 1);
+      DateTime.utc(currentStart.year, currentStart.month, currentStart.day - 1);
   final previousStart =
-      DateTime(previousEnd.year, previousEnd.month, previousEnd.day - 29);
+      DateTime.utc(previousEnd.year, previousEnd.month, previousEnd.day - 29);
 
   return ChartPeriodWindow(
     currentStart: currentStart,
@@ -80,16 +80,16 @@ ChartPeriodWindow _last30dWindow(DateTime now) {
 /// Calendar week (Monday..Sunday) containing [now], previous window is the
 /// preceding Monday..Sunday week.
 ChartPeriodWindow _thisWeekWindow(DateTime now) {
-  final today = DateTime(now.year, now.month, now.day);
+  final today = DateTime.utc(now.year, now.month, now.day);
   final daysFromMonday = today.weekday - DateTime.monday;
   final currentStart =
-      DateTime(today.year, today.month, today.day - daysFromMonday);
+      DateTime.utc(today.year, today.month, today.day - daysFromMonday);
   final currentEnd =
-      DateTime(currentStart.year, currentStart.month, currentStart.day + 6);
+      DateTime.utc(currentStart.year, currentStart.month, currentStart.day + 6);
   final previousStart =
-      DateTime(currentStart.year, currentStart.month, currentStart.day - 7);
+      DateTime.utc(currentStart.year, currentStart.month, currentStart.day - 7);
   final previousEnd =
-      DateTime(currentStart.year, currentStart.month, currentStart.day - 1);
+      DateTime.utc(currentStart.year, currentStart.month, currentStart.day - 1);
 
   return ChartPeriodWindow(
     currentStart: currentStart,
@@ -104,12 +104,12 @@ ChartPeriodWindow _thisWeekWindow(DateTime now) {
 /// and year rollover (January → previous December) via calendar-constructor
 /// arithmetic: `DateTime(y, m+1, 0)` yields the last day of month `m`.
 ChartPeriodWindow _monthWindow(DateTime now) {
-  final currentStart = DateTime(now.year, now.month, 1);
+  final currentStart = DateTime.utc(now.year, now.month, 1);
   // Day 0 of next month == last day of this month.
-  final currentEnd = DateTime(now.year, now.month + 1, 0);
+  final currentEnd = DateTime.utc(now.year, now.month + 1, 0);
 
-  final previousStart = DateTime(now.year, now.month - 1, 1);
-  final previousEnd = DateTime(now.year, now.month, 0);
+  final previousStart = DateTime.utc(now.year, now.month - 1, 1);
+  final previousEnd = DateTime.utc(now.year, now.month, 0);
 
   return ChartPeriodWindow(
     currentStart: currentStart,

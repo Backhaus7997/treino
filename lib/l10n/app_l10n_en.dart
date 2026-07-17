@@ -899,9 +899,6 @@ class AppL10nEn extends AppL10n {
   String get dashboardCobroTrailingLabel => '+ Cobro';
 
   @override
-  String get dashboardInvitarAlumnoLabel => '+ INVITAR ALUMNO';
-
-  @override
   String get dashboardAsignarRutinaLabel => '+ ASIGNAR RUTINA';
 
   @override
@@ -1019,9 +1016,6 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get dashboardHolaSinNombre => 'HOLA';
-
-  @override
-  String get dashboardInvitarProximamente => 'Invitar alumno — próximamente.';
 
   @override
   String dashboardSolicitudesPendientesTitle(int count) {

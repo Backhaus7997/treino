@@ -1,3 +1,4 @@
+import '../../../core/utils/argentina_time.dart';
 import '../../insights/domain/chart_period.dart';
 import '../domain/exercise_frequency.dart';
 import '../domain/session.dart';
@@ -30,14 +31,15 @@ List<ExerciseFrequencyEntry> aggregateExerciseFrequency({
 
   if (periodWindow != null) {
     final start = periodWindow.currentStart;
-    final endExclusive = DateTime(
+    final endExclusive = DateTime.utc(
       periodWindow.currentEnd.year,
       periodWindow.currentEnd.month,
       periodWindow.currentEnd.day + 1,
     );
     scoped = scoped
         .where((s) =>
-            !s.startedAt.isBefore(start) && s.startedAt.isBefore(endExclusive))
+            !toArgentina(s.startedAt).isBefore(start) &&
+            toArgentina(s.startedAt).isBefore(endExclusive))
         .toList();
   }
 

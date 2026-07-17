@@ -41,7 +41,7 @@ final athleteMonthRadarInsightsProvider = FutureProvider.autoDispose
     .family<MuscleDistributionInsights, MonthRadarKey>((ref, key) async {
   if (key.uid.isEmpty) return MuscleDistributionInsights.empty;
 
-  final anchor = DateTime(key.month.year, key.month.month, 1);
+  final anchor = DateTime.utc(key.month.year, key.month.month, 1);
   final window = ChartPeriod.month.windowFor(anchor);
 
   final sessions = await ref.watch(sessionsByUidProvider(key.uid).future);

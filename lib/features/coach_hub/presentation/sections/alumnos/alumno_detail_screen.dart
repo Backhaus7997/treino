@@ -1051,12 +1051,15 @@ class _ProxSesionCard extends ConsumerWidget {
   final String athleteId;
 
   String _fmtDate(DateTime dt) {
-    final local = dt.toLocal();
-    final d = local.day.toString().padLeft(2, '0');
-    final m = local.month.toString().padLeft(2, '0');
-    final y = local.year.toString();
-    final hh = local.hour.toString().padLeft(2, '0');
-    final mm = local.minute.toString().padLeft(2, '0');
+    // [dt] is an appointment.startsAt: wall-clock UTC per ADR-7 (the UTC fields
+    // already REPRESENT Argentina local time). Read them raw — a `.toLocal()`
+    // here would wrongly subtract 3h and show the turno earlier than it is
+    // (#403). Same convention as the agenda / appointment_detail_sheet.
+    final d = dt.day.toString().padLeft(2, '0');
+    final m = dt.month.toString().padLeft(2, '0');
+    final y = dt.year.toString();
+    final hh = dt.hour.toString().padLeft(2, '0');
+    final mm = dt.minute.toString().padLeft(2, '0');
     return '$d/$m/$y · $hh:$mm';
   }
 

@@ -1,3 +1,4 @@
+import '../../../core/utils/argentina_time.dart';
 import '../../insights/domain/chart_period.dart';
 import '../domain/exercise_progression.dart';
 import '../domain/session.dart';
@@ -108,14 +109,15 @@ ExerciseProgression aggregateExerciseProgression({
   // logged later that same day (any time-of-day) is still included.
   if (periodWindow != null) {
     final start = periodWindow.currentStart;
-    final endExclusive = DateTime(
+    final endExclusive = DateTime.utc(
       periodWindow.currentEnd.year,
       periodWindow.currentEnd.month,
       periodWindow.currentEnd.day + 1,
     );
     sessionsAsc = sessionsAsc
         .where((s) =>
-            !s.startedAt.isBefore(start) && s.startedAt.isBefore(endExclusive))
+            !toArgentina(s.startedAt).isBefore(start) &&
+            toArgentina(s.startedAt).isBefore(endExclusive))
         .toList();
   }
 
@@ -189,7 +191,7 @@ ExerciseProgression aggregateExerciseProgression({
     final logs = logsBySession[session.id] ?? const [];
     final hasExerciseLog = logs.any((l) => l.exerciseId == exerciseId);
     if (!hasExerciseLog) continue;
-    if (!session.startedAt.isBefore(cutoff)) {
+    if (!toArgentina(session.startedAt).isBefore(cutoff)) {
       frecuencia++;
     }
   }

@@ -38,15 +38,18 @@ void main() {
     test('marks exactly the trained days of the selected month', () async {
       final repo = MockSessionRepository();
       when(() => repo.listByUid('u1')).thenAnswer((_) async => [
+            // [#379] Real UTC instants at NOON → unambiguous Argentina days
+            // (Jun 1 / Jun 30); day-boundary LOCAL midnights would shift −3h
+            // into the previous day/month under toArgentina.
             makeSession(
               id: 's1',
-              startedAt: DateTime(2026, 6, 1),
+              startedAt: DateTime.utc(2026, 6, 1, 12),
               status: SessionStatus.finished,
               wasFullyCompleted: true,
             ),
             makeSession(
               id: 's2',
-              startedAt: DateTime(2026, 6, 30),
+              startedAt: DateTime.utc(2026, 6, 30, 12),
               status: SessionStatus.finished,
               wasFullyCompleted: true,
             ),

@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/utils/argentina_time.dart';
 import '../../workout/application/exercise_providers.dart';
 import '../../workout/application/routine_providers.dart';
 import '../../workout/application/session_providers.dart';
@@ -35,7 +36,7 @@ final athleteDayInsightsProvider = FutureProvider.autoDispose
 
   final daySessions = allSessions.where((s) {
     if (!s.countsAsWorkout) return false;
-    final started = s.startedAt.toLocal();
+    final started = toArgentina(s.startedAt);
     return started.year == key.day.year &&
         started.month == key.day.month &&
         started.day == key.day.day;
@@ -110,7 +111,7 @@ final athleteDayInsightsProvider = FutureProvider.autoDispose
 /// coach's alumno-detail view can reuse it.
 final athleteLast7DaysInsightsProvider = FutureProvider.autoDispose
     .family<List<DayInsights>, String>((ref, uid) async {
-  final today = DateTime.now().toLocal();
+  final today = argentinaNow();
   final days = lastNDays(today, 7);
 
   return Future.wait(

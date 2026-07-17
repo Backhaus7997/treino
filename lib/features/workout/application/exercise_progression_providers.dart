@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/utils/argentina_time.dart';
 import '../../insights/domain/chart_period.dart';
 import '../domain/exercise_progression.dart';
 import '../domain/set_log.dart';
@@ -45,7 +46,7 @@ final exerciseProgressionProvider = FutureProvider.autoDispose
     );
   }
 
-  final now = DateTime.now();
+  final now = argentinaNow();
   final window = key.period.windowFor(now);
 
   final sessions =

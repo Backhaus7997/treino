@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/utils/argentina_time.dart';
 import '../../workout/application/exercise_providers.dart';
 import '../../workout/application/routine_providers.dart';
 import '../../workout/application/session_providers.dart';
@@ -42,7 +43,7 @@ final muscleDistributionInsightsProvider = FutureProvider.autoDispose
         (ref, key) async {
   if (key.uid.isEmpty) return MuscleDistributionInsights.empty;
 
-  final now = DateTime.now();
+  final now = argentinaNow();
   final window = key.period.windowFor(now);
 
   final sessions = await ref.watch(sessionsByUidProvider(key.uid).future);
@@ -51,8 +52,13 @@ final muscleDistributionInsightsProvider = FutureProvider.autoDispose
   // Sessions strictly needed to cover the period window (current+previous)
   // — never truncated by the scan cap below (same rule as
   // exerciseProgressionProvider).
-  final neededForWindow =
-      sessions.where((s) => !s.startedAt.isBefore(window.previousStart)).length;
+  // toArgentina to match the aggregator's ART frame: window bounds are now
+  // DateTime.utc (ART calendar days), so the session must be compared in the
+  // same frame — a raw startedAt here would size the scan against a 3h-shifted
+  // cutoff (#379).
+  final neededForWindow = sessions
+      .where((s) => !toArgentina(s.startedAt).isBefore(window.previousStart))
+      .length;
   final scanCount = neededForWindow > kMuscleDistributionSessionScan
       ? neededForWindow
       : kMuscleDistributionSessionScan;
