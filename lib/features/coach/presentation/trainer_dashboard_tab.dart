@@ -402,7 +402,8 @@ class _ResumenDelDiaCard extends ConsumerWidget {
             trainerAppointmentsStreamProvider(_appointmentsKey(trainerId)));
 
     final all = apptAsync.valueOrNull ?? const <Appointment>[];
-    final now = DateTime.now().toUtc();
+    // QA-HOME-001: startsAt is Argentina wall-clock, so "now" must be too.
+    final now = argentinaNow();
     final counts = dashboardDayCounts(all, now);
     final pending = counts.pending;
     final done = counts.done;
@@ -603,7 +604,9 @@ class _ProximasSesionesList extends ConsumerWidget {
         message: l10n.dashboardErrorTurnos,
       ),
       data: (all) {
-        final now = DateTime.now().toUtc();
+        // QA-HOME-001: startsAt is Argentina wall-clock; compare against ART
+        // wall-clock "now" so the next few hours aren't dropped.
+        final now = argentinaNow();
         final upcoming = all
             .where((a) =>
                 a.status == AppointmentStatus.confirmed &&
