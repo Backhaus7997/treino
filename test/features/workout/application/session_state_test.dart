@@ -27,6 +27,23 @@ void main() {
       expect(state.isFullyCompleted, isFalse);
     });
 
+    // ── QA-WKT-005: un día sin trabajo NO es "completado" ────────────────────
+    test(
+        'QA-WKT-005: isFullyCompleted = false con día sin slots (0 sets no '
+        'debe contar como workout completado)', () {
+      final state = SessionState(
+        session: makeSession(),
+        day: makeDay(slots: const []),
+        setLogs: const [],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      );
+      // `every` sobre lista vacía da `true`; el guard de trabajo-planificado
+      // debe forzar `false` para que TERMINAR no quede habilitado al instante
+      // y la sesión de 0 sets no infle workoutsCount/racha.
+      expect(state.isFullyCompleted, isFalse);
+    });
+
     // ── SCENARIO-251: isFullyCompleted = false con completado parcial ────────
     test('SCENARIO-251: isFullyCompleted = false con progreso parcial', () {
       final day = makeDay(slots: [
