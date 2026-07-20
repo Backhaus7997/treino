@@ -19,6 +19,14 @@ import '../domain/set_log.dart';
 ///                 `[currentStart, currentEnd]` (inclusive, by calendar day)
 ///                 are excluded. When null, ALL sessions are considered.
 ///
+/// #372: only sessions with [SessionCounting.countsAsWorkout] (finished AND
+/// fully completed) are counted — abandoned sessions (`wasFullyCompleted=false`)
+/// and
+/// in-progress `active` sessions are excluded, matching the criterion the other
+/// Insights screens already use (muscle distribution, monthly report, volume by
+/// group). Without this, a half-abandoned session inflated the frequency
+/// ranking while the same session was absent from the radar/monthly report.
+///
 /// Ties (same session count) are broken by which exercise was logged in the
 /// more-recently-started session — i.e. the first session (in [sessions]'
 /// DESC order) that contains the exercise determines tie precedence.
@@ -27,7 +35,7 @@ List<ExerciseFrequencyEntry> aggregateExerciseFrequency({
   required Map<String, List<SetLog>> logsBySession,
   ChartPeriodWindow? periodWindow,
 }) {
-  var scoped = sessions;
+  var scoped = sessions.where((s) => s.countsAsWorkout).toList();
 
   if (periodWindow != null) {
     final start = periodWindow.currentStart;
