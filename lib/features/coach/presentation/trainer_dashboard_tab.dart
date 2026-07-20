@@ -62,7 +62,9 @@ class TrainerDashboardTab extends ConsumerWidget {
       children: [
         const _DashboardHeader(),
         const SizedBox(height: 18),
-        const _SolicitudesPendientesSection(),
+        // #393: pending requests are NOT shown inline here anymore — they live
+        // in the bell modal (_showPendingRequestsSheet) so they don't clutter
+        // the dashboard.
         const _ResumenDelDiaCard(),
         const SizedBox(height: 20),
         _SectionHeader(
@@ -142,7 +144,11 @@ class _DashboardHeader extends ConsumerWidget {
                 ),
               ),
             ),
-            _BellWithBadge(badgeCount: pendingCount, palette: palette),
+            _BellWithBadge(
+              badgeCount: pendingCount,
+              palette: palette,
+              onTap: () => _showPendingRequestsSheet(context),
+            ),
             const SizedBox(width: 12),
             _AvatarInitials(
               initials: initials.isEmpty ? '·' : initials,
@@ -156,47 +162,87 @@ class _DashboardHeader extends ConsumerWidget {
 }
 
 class _BellWithBadge extends StatelessWidget {
-  const _BellWithBadge({required this.badgeCount, required this.palette});
+  const _BellWithBadge({
+    required this.badgeCount,
+    required this.palette,
+    required this.onTap,
+  });
   final int badgeCount;
   final AppPalette palette;
+
+  /// Fires when tapped. Only wired when [badgeCount] > 0 — a zero badge has no
+  /// pending requests to show, so the bell stays inert (#393).
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
+    // #393: the bell was a bare Icon with no tap handler. It now opens a modal
+    // sheet listing the pending link requests (accept/decline) — but only when
+    // there IS at least one (badgeCount > 0); with a zero badge it stays inert.
+    final actionable = badgeCount > 0;
     return Semantics(
       label: l10n.homePendingRequestsA11y(badgeCount),
-      child: ExcludeSemantics(
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Icon(TreinoIcon.bell, size: 22, color: palette.textPrimary),
-            if (badgeCount > 0)
-              Positioned(
-                right: -4,
-                top: -4,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: palette.accent,
-                    borderRadius: BorderRadius.circular(9999),
-                    border: Border.all(color: palette.bg, width: 1),
-                  ),
-                  child: Text(
-                    badgeCount > 9 ? '9+' : '$badgeCount',
-                    style: GoogleFonts.barlowCondensed(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 10,
-                      color: palette.bg,
+      button: actionable,
+      child: GestureDetector(
+        onTap: actionable ? onTap : null,
+        behavior: HitTestBehavior.opaque,
+        child: ExcludeSemantics(
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Icon(TreinoIcon.bell, size: 22, color: palette.textPrimary),
+              if (badgeCount > 0)
+                Positioned(
+                  right: -4,
+                  top: -4,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: palette.accent,
+                      borderRadius: BorderRadius.circular(9999),
+                      border: Border.all(color: palette.bg, width: 1),
+                    ),
+                    child: Text(
+                      badgeCount > 9 ? '9+' : '$badgeCount',
+                      style: GoogleFonts.barlowCondensed(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 10,
+                        color: palette.bg,
+                      ),
                     ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
+}
+
+/// Test-only harness that renders `_BellWithBadge` directly, so the #393
+/// tap/inert behaviour is unit-testable without the full dashboard's provider
+/// graph (mirrors [AddSueltoSheetTestHarness]).
+///
+/// @visibleForTesting
+class BellWithBadgeTestHarness extends StatelessWidget {
+  const BellWithBadgeTestHarness({
+    super.key,
+    required this.badgeCount,
+    required this.onTap,
+  });
+
+  final int badgeCount;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => _BellWithBadge(
+        badgeCount: badgeCount,
+        palette: AppPalette.of(context),
+        onTap: onTap,
+      );
 }
 
 class _AvatarInitials extends StatelessWidget {
@@ -228,35 +274,7 @@ class _AvatarInitials extends StatelessWidget {
   }
 }
 
-// ── Solicitudes pendientes (only when count > 0) ──────────────────────────────
-
-class _SolicitudesPendientesSection extends ConsumerWidget {
-  const _SolicitudesPendientesSection();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final linksAsync = ref.watch(trainerLinksStreamProvider);
-    final pending = (linksAsync.valueOrNull ?? const <TrainerLink>[])
-        .where((l) => l.status == TrainerLinkStatus.pending)
-        .toList();
-    if (pending.isEmpty) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _SectionHeader(
-            label: AppL10n.of(context)
-                .dashboardSolicitudesPendientesTitle(pending.length)),
-        const SizedBox(height: 8),
-        for (final link in pending) ...[
-          _PendingRequestCard(link: link),
-          const SizedBox(height: 8),
-        ],
-        const SizedBox(height: 12),
-      ],
-    );
-  }
-}
+// ── Pending request card (used by the bell modal, #393) ───────────────────────
 
 class _PendingRequestCard extends ConsumerStatefulWidget {
   const _PendingRequestCard({required this.link});
@@ -386,6 +404,93 @@ class _PendingRequestCardState extends ConsumerState<_PendingRequestCard> {
       ),
     );
   }
+}
+
+// ── Pending-requests modal (opened from the header bell, #393) ────────────────
+
+/// #393: the header bell opens this sheet listing the trainer's pending link
+/// requests (accept/decline). There is no separate requests screen and no
+/// in-app notification centre (only push FCM), so this modal is the single
+/// place the trainer reviews them. (The requests used to also render inline in
+/// the dashboard, but that duplicated the modal and cluttered the home.)
+void _showPendingRequestsSheet(BuildContext context) {
+  final palette = AppPalette.of(context);
+  showModalBottomSheet<void>(
+    context: context,
+    useRootNavigator: true,
+    backgroundColor: palette.bgCard,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (_) => const _PendingRequestsSheet(),
+  );
+}
+
+class _PendingRequestsSheet extends ConsumerWidget {
+  const _PendingRequestsSheet();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    final linksAsync = ref.watch(trainerLinksStreamProvider);
+    final pending = (linksAsync.valueOrNull ?? const <TrainerLink>[])
+        .where((l) => l.status == TrainerLinkStatus.pending)
+        .toList();
+
+    // The bell only opens this when there ARE pending requests. If the trainer
+    // accepts/declines the last one while the sheet is open, the stream empties
+    // → auto-close, so the sheet never sits there with nothing in it.
+    if (pending.isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) Navigator.of(context).maybePop();
+      });
+    }
+
+    return SingleChildScrollView(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: 20 + MediaQuery.paddingOf(context).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l10n.dashboardSolicitudesPendientesTitle(pending.length),
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 18,
+                letterSpacing: 1.2,
+                color: palette.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            for (final link in pending) ...[
+              _PendingRequestCard(link: link),
+              const SizedBox(height: 8),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Test-only harness that renders the #393 pending-requests modal content
+/// directly, so its list behaviour is testable without driving the bell +
+/// bottom-sheet plumbing (mirrors [AddSueltoSheetTestHarness]).
+///
+/// @visibleForTesting
+class PendingRequestsSheetTestHarness extends StatelessWidget {
+  const PendingRequestsSheetTestHarness({super.key});
+
+  @override
+  Widget build(BuildContext context) => const _PendingRequestsSheet();
 }
 
 // ── Resumen del día (3 stat columns) ──────────────────────────────────────────
