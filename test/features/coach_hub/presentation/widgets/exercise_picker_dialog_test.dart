@@ -6,13 +6,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/exercise_picker_dialog.dart';
 import 'package:treino/features/workout/application/custom_exercise_providers.dart';
 import 'package:treino/features/workout/application/exercise_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
+import 'package:treino/features/workout/data/custom_exercise_repository.dart';
 import 'package:treino/features/workout/domain/custom_exercise.dart';
+import 'package:treino/features/workout/domain/equipment_type.dart';
 import 'package:treino/features/workout/domain/exercise.dart';
 
 import '../../../../fixtures/exercises.dart';
@@ -26,18 +29,19 @@ final _kExercises = [
 ];
 
 List<Override> _overrides({List<Exercise>? exercises}) => [
-      currentUidProvider.overrideWithValue('u1'),
-      exercisesProvider.overrideWith((ref) async => exercises ?? _kExercises),
-      customExercisesForTrainerStreamProvider('u1').overrideWith(
-        (ref) => Stream<List<CustomExercise>>.value(const []),
-      ),
-    ];
+  currentUidProvider.overrideWithValue('u1'),
+  exercisesProvider.overrideWith((ref) async => exercises ?? _kExercises),
+  customExercisesForTrainerStreamProvider(
+    'u1',
+  ).overrideWith((ref) => Stream<List<CustomExercise>>.value(const [])),
+];
 
 Future<void> _openPicker(
   WidgetTester tester, {
   List<Exercise>? exercises,
   Set<String> alreadySelectedIds = const {},
   void Function(List<Exercise>?)? onResult,
+  List<Override> extraOverrides = const [],
 }) async {
   // Coach Hub web dialogs assume a desktop viewport; the picker's 640px
   // height overflows the flutter_test default 800x600 surface.
@@ -48,7 +52,10 @@ Future<void> _openPicker(
 
   await tester.pumpWidget(
     ProviderScope(
-      overrides: _overrides(exercises: exercises),
+      overrides: [
+        ..._overrides(exercises: exercises),
+        ...extraOverrides,
+      ],
       child: MaterialApp(
         theme: AppTheme.dark(),
         home: Scaffold(
@@ -72,7 +79,12 @@ Future<void> _openPicker(
   await tester.pumpAndSettle();
 }
 
+class _MockCustomExerciseRepository extends Mock
+    implements CustomExerciseRepository {}
+
 void main() {
+  setUpAll(() => registerFallbackValue(EquipmentType.mancuerna));
+
   group('ExercisePickerDialog (web) — core selection', () {
     testWidgets('empty selection: CTA shows "Agregar" without a count', (
       tester,
@@ -159,7 +171,8 @@ void main() {
       await _openPicker(tester);
 
       final button = tester.widget<ElevatedButton>(
-          find.widgetWithText(ElevatedButton, 'Agregar'));
+        find.widgetWithText(ElevatedButton, 'Agregar'),
+      );
       expect(button.onPressed, isNull);
     });
   });
@@ -183,27 +196,29 @@ void main() {
       expect(find.text('Press de Banca'), findsNothing);
     });
 
-    testWidgets('inline muscle chip filters by muscle group (no bottom sheet)',
-        (tester) async {
-      await _openPicker(tester);
+    testWidgets(
+      'inline muscle chip filters by muscle group (no bottom sheet)',
+      (tester) async {
+        await _openPicker(tester);
 
-      // Both chest exercises + the quads one are visible before filtering.
-      expect(find.text('Press de Banca'), findsOneWidget);
-      expect(find.text('Sentadilla con Barra'), findsOneWidget);
+        // Both chest exercises + the quads one are visible before filtering.
+        expect(find.text('Press de Banca'), findsOneWidget);
+        expect(find.text('Sentadilla con Barra'), findsOneWidget);
 
-      // Tap the PECHO muscle chip — filters to chest-only.
-      await tester.tap(find.text('PECHO'));
-      await tester.pumpAndSettle();
+        // Tap the PECHO muscle chip — filters to chest-only.
+        await tester.tap(find.text('PECHO'));
+        await tester.pumpAndSettle();
 
-      expect(find.text('Press de Banca'), findsOneWidget);
-      expect(find.text('Sentadilla con Barra'), findsNothing);
+        expect(find.text('Press de Banca'), findsOneWidget);
+        expect(find.text('Sentadilla con Barra'), findsNothing);
 
-      // Tapping PECHO again toggles it off — back to the unfiltered list.
-      await tester.tap(find.text('PECHO'));
-      await tester.pumpAndSettle();
+        // Tapping PECHO again toggles it off — back to the unfiltered list.
+        await tester.tap(find.text('PECHO'));
+        await tester.pumpAndSettle();
 
-      expect(find.text('Sentadilla con Barra'), findsOneWidget);
-    });
+        expect(find.text('Sentadilla con Barra'), findsOneWidget);
+      },
+    );
 
     testWidgets('no-match filters show the empty-state message', (
       tester,
@@ -217,6 +232,124 @@ void main() {
         find.text('No encontramos ejercicios con esos filtros.'),
         findsOneWidget,
       );
+    });
+  });
+
+  group('ExercisePickerDialog (web) — crear ejercicio nuevo (inline)', () {
+    testWidgets('muestra el botón "+ Crear ejercicio nuevo"', (tester) async {
+      await _openPicker(tester);
+
+      expect(
+        find.byKey(const Key('create_new_exercise_button')),
+        findsOneWidget,
+      );
+      expect(find.text('Crear ejercicio nuevo'), findsOneWidget);
+    });
+
+    testWidgets('tocarlo abre el formulario de nuevo ejercicio', (
+      tester,
+    ) async {
+      await _openPicker(tester);
+
+      await tester.tap(find.byKey(const Key('create_new_exercise_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Nuevo ejercicio'), findsOneWidget);
+      expect(
+        find.byKey(const Key('create_exercise_name_field')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('sin nombre no llama al repo y muestra el error', (
+      tester,
+    ) async {
+      final repo = _MockCustomExerciseRepository();
+      await _openPicker(
+        tester,
+        extraOverrides: [
+          customExerciseRepositoryProvider.overrideWithValue(repo),
+        ],
+      );
+
+      await tester.tap(find.byKey(const Key('create_new_exercise_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('create_exercise_submit_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Poné un nombre al ejercicio.'), findsOneWidget);
+      verifyNever(
+        () => repo.create(
+          trainerId: any(named: 'trainerId'),
+          name: any(named: 'name'),
+          muscleGroup: any(named: 'muscleGroup'),
+          secondaryMuscleGroup: any(named: 'secondaryMuscleGroup'),
+          description: any(named: 'description'),
+          videoUrl: any(named: 'videoUrl'),
+          defaultRestSeconds: any(named: 'defaultRestSeconds'),
+          equipment: any(named: 'equipment'),
+        ),
+      );
+    });
+
+    testWidgets('crear un ejercicio lo persiste y lo autoselecciona', (
+      tester,
+    ) async {
+      final repo = _MockCustomExerciseRepository();
+      when(
+        () => repo.create(
+          trainerId: any(named: 'trainerId'),
+          name: any(named: 'name'),
+          muscleGroup: any(named: 'muscleGroup'),
+          secondaryMuscleGroup: any(named: 'secondaryMuscleGroup'),
+          description: any(named: 'description'),
+          videoUrl: any(named: 'videoUrl'),
+          defaultRestSeconds: any(named: 'defaultRestSeconds'),
+          equipment: any(named: 'equipment'),
+        ),
+      ).thenAnswer(
+        (inv) async => CustomExercise(
+          id: 'new-ex-1',
+          ownerId: inv.namedArguments[#trainerId] as String,
+          name: inv.namedArguments[#name] as String,
+          createdAt: DateTime(2024, 1, 1),
+          updatedAt: DateTime(2024, 1, 1),
+        ),
+      );
+
+      await _openPicker(
+        tester,
+        extraOverrides: [
+          customExerciseRepositoryProvider.overrideWithValue(repo),
+        ],
+      );
+
+      await tester.tap(find.byKey(const Key('create_new_exercise_button')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('create_exercise_name_field')),
+        'Sentadilla búlgara',
+      );
+      await tester.tap(find.byKey(const Key('create_exercise_submit_button')));
+      await tester.pumpAndSettle();
+
+      // Repo persisted it with the trainer uid + trimmed name.
+      final captured = verify(
+        () => repo.create(
+          trainerId: captureAny(named: 'trainerId'),
+          name: captureAny(named: 'name'),
+          muscleGroup: any(named: 'muscleGroup'),
+          secondaryMuscleGroup: any(named: 'secondaryMuscleGroup'),
+          description: any(named: 'description'),
+          videoUrl: any(named: 'videoUrl'),
+          defaultRestSeconds: any(named: 'defaultRestSeconds'),
+          equipment: any(named: 'equipment'),
+        ),
+      ).captured;
+      expect(captured, ['u1', 'Sentadilla búlgara']);
+
+      // Back in the picker, the new exercise is pre-selected → CTA count = 1.
+      expect(find.text('Agregar (1)'), findsOneWidget);
     });
   });
 }
