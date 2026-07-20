@@ -13,6 +13,7 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/chat/domain/chat.dart';
 import 'package:treino/features/coach_hub/presentation/sections/chat/chat_section_screen.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
@@ -77,6 +78,41 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.text('Seleccioná una conversación'), findsOneWidget);
+        expect(find.byType(TreinoEmptyState), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'renders empty pane via TreinoEmptyState in both dark and light themes',
+      (tester) async {
+        for (final theme in [AppTheme.dark(), AppTheme.light()]) {
+          await tester.pumpWidget(
+            MediaQuery(
+              data: const MediaQueryData(size: Size(1200, 800)),
+              child: ProviderScope(
+                overrides: [
+                  currentUidProvider.overrideWithValue(_pfUid),
+                  chatsForCurrentUserProvider.overrideWith(
+                    (ref) => Stream<List<Chat>>.value(const []),
+                  ),
+                ],
+                child: MaterialApp(
+                  theme: theme,
+                  localizationsDelegates: AppL10n.localizationsDelegates,
+                  supportedLocales: AppL10n.supportedLocales,
+                  locale: const Locale('es', 'AR'),
+                  home: const Scaffold(
+                    body: ChatSectionScreen(),
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          expect(find.byType(TreinoEmptyState), findsOneWidget);
+          expect(find.text('Seleccioná una conversación'), findsOneWidget);
+        }
       },
     );
 
