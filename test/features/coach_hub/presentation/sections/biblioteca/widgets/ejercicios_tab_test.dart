@@ -11,7 +11,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/widgets/motion/treino_shimmer.dart';
 import 'package:treino/features/coach_hub/presentation/sections/biblioteca/widgets/ejercicios_tab.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/empty_state/empty_state.dart';
 import 'package:treino/features/workout/application/custom_exercise_providers.dart';
 import 'package:treino/features/workout/application/exercise_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
@@ -91,7 +93,7 @@ void main() {
   });
 
   group('EjerciciosTab — smoke renders', () {
-    testWidgets('shows CircularProgressIndicator when AsyncLoading',
+    testWidgets('shows TreinoShimmer skeleton when AsyncLoading',
         (tester) async {
       tester.view.physicalSize = const Size(1280, 900);
       tester.view.devicePixelRatio = 1.0;
@@ -103,7 +105,8 @@ void main() {
       );
       await tester.pump(); // single frame — catalog future still pending
 
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.byType(TreinoShimmer), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
     });
 
     testWidgets('shows error text when catalog AsyncError', (tester) async {
@@ -150,8 +153,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Should NOT show a grid, should show an empty-state cue
+      // Should NOT show a grid, should show the kit's empty-state widget.
       expect(find.byType(GridView), findsNothing);
+      expect(find.byType(TreinoEmptyState), findsOneWidget);
       expect(find.textContaining('ejercicio'), findsWidgets);
     });
   });
