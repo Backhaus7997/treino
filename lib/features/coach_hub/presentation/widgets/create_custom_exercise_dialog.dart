@@ -29,25 +29,55 @@ import '../../../workout/domain/muscle_group.dart';
 Future<CustomExercise?> showCreateCustomExerciseDialog(BuildContext context) {
   return showDialog<CustomExercise>(
     context: context,
-    builder: (_) => const _CreateCustomExerciseDialog(),
+    builder: (_) => const _CustomExerciseFormDialog(),
   );
 }
 
-class _CreateCustomExerciseDialog extends ConsumerStatefulWidget {
-  const _CreateCustomExerciseDialog();
-
-  @override
-  ConsumerState<_CreateCustomExerciseDialog> createState() =>
-      _CreateCustomExerciseDialogState();
+/// Edit an existing custom exercise (name / muscle / equipment). Preserves the
+/// fields the web form doesn't surface — video, description, secondary muscle —
+/// by writing back through `existing.copyWith`. Returns the updated exercise,
+/// or null on cancel.
+Future<CustomExercise?> showEditCustomExerciseDialog(
+  BuildContext context,
+  CustomExercise existing,
+) {
+  return showDialog<CustomExercise>(
+    context: context,
+    builder: (_) => _CustomExerciseFormDialog(existing: existing),
+  );
 }
 
-class _CreateCustomExerciseDialogState
-    extends ConsumerState<_CreateCustomExerciseDialog> {
+class _CustomExerciseFormDialog extends ConsumerStatefulWidget {
+  const _CustomExerciseFormDialog({this.existing});
+
+  /// Non-null → edit mode (pre-fills the form and updates); null → create mode.
+  final CustomExercise? existing;
+
+  @override
+  ConsumerState<_CustomExerciseFormDialog> createState() =>
+      _CustomExerciseFormDialogState();
+}
+
+class _CustomExerciseFormDialogState
+    extends ConsumerState<_CustomExerciseFormDialog> {
   final TextEditingController _nameCtrl = TextEditingController();
   MuscleGroup? _muscle;
   EquipmentType? _equipment;
   bool _saving = false;
   String? _error;
+
+  bool get _isEdit => widget.existing != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final ex = widget.existing;
+    if (ex != null) {
+      _nameCtrl.text = ex.name;
+      _muscle = MuscleGroup.fromKey(ex.muscleGroup);
+      _equipment = ex.equipment;
+    }
+  }
 
   @override
   void dispose() {
@@ -72,16 +102,28 @@ class _CreateCustomExerciseDialogState
       _error = null;
     });
     try {
-      final created = await ref
-          .read(customExerciseRepositoryProvider)
-          .create(
-            trainerId: uid,
-            name: name,
-            muscleGroup: _muscle?.key ?? '',
-            equipment: _equipment,
-          );
+      final repo = ref.read(customExerciseRepositoryProvider);
+      final existing = widget.existing;
+      final CustomExercise result;
+      if (existing != null) {
+        // copyWith keeps video / description / secondary muscle intact — the
+        // web form only edits the three fields it surfaces.
+        result = existing.copyWith(
+          name: name,
+          muscleGroup: _muscle?.key ?? '',
+          equipment: _equipment,
+        );
+        await repo.update(result);
+      } else {
+        result = await repo.create(
+          trainerId: uid,
+          name: name,
+          muscleGroup: _muscle?.key ?? '',
+          equipment: _equipment,
+        );
+      }
       if (!mounted) return;
-      Navigator.of(context).pop(created);
+      Navigator.of(context).pop(result);
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -113,7 +155,7 @@ class _CreateCustomExerciseDialogState
                 children: [
                   Expanded(
                     child: Text(
-                      'Nuevo ejercicio', // i18n
+                      _isEdit ? 'Editar ejercicio' : 'Nuevo ejercicio', // i18n
                       style: GoogleFonts.barlowCondensed(
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
@@ -221,7 +263,7 @@ class _CreateCustomExerciseDialogState
                             ),
                           )
                         : Text(
-                            'Crear', // i18n
+                            _isEdit ? 'Guardar' : 'Crear', // i18n
                             style: GoogleFonts.barlowCondensed(
                               fontWeight: FontWeight.w700,
                               fontSize: 14,
