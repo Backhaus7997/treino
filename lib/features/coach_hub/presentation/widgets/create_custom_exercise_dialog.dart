@@ -15,17 +15,18 @@ import '../../../workout/application/session_providers.dart'
 import '../../../workout/domain/custom_exercise.dart';
 import '../../../workout/domain/equipment_type.dart';
 import '../../../workout/domain/muscle_group.dart';
+import '../../../workout/presentation/widgets/exercise_video_player.dart';
+import 'custom_exercise_video_web_uploader.dart';
 
 /// Web-native "crear ejercicio nuevo" form for the Coach Hub exercise picker.
 ///
-/// MVP scope — name (required), muscle group, equipment — persisted as a
-/// [CustomExercise] via [CustomExerciseRepository.create]. Returns the created
-/// exercise so the picker can auto-select it, or `null` if the trainer cancels.
+/// Captures name (required), muscle group, equipment, and a video (a pasted
+/// YouTube link OR an uploaded MP4 via [CustomExerciseVideoWebUploader]'s
+/// web-safe putData) — persisted via [CustomExerciseRepository.create]. Returns
+/// the created exercise so the picker can auto-select it, or `null` on cancel.
 ///
-/// Parity note: mobile's `CustomExerciseEditorScreen` also captures a
-/// description and a validated YouTube video (that URL validation + embed
-/// preview is the bulk of its 892 lines). Those richer fields stay on the app
-/// for now — a trainer can add them later by editing the exercise there.
+/// Description + secondary muscle still live only on mobile's editor; `copyWith`
+/// on edit preserves them so a web save never strips them.
 Future<CustomExercise?> showCreateCustomExerciseDialog(BuildContext context) {
   return showDialog<CustomExercise>(
     context: context,
@@ -65,6 +66,9 @@ class _CustomExerciseFormDialogState
   EquipmentType? _equipment;
   bool _saving = false;
   String? _error;
+  final TextEditingController _videoCtrl = TextEditingController();
+  bool _uploadingVideo = false;
+  double _uploadProgress = 0;
 
   bool get _isEdit => widget.existing != null;
 
@@ -76,12 +80,14 @@ class _CustomExerciseFormDialogState
       _nameCtrl.text = ex.name;
       _muscle = MuscleGroup.fromKey(ex.muscleGroup);
       _equipment = ex.equipment;
+      _videoCtrl.text = ex.videoUrl ?? '';
     }
   }
 
   @override
   void dispose() {
     _nameCtrl.dispose();
+    _videoCtrl.dispose();
     super.dispose();
   }
 
@@ -97,6 +103,7 @@ class _CustomExerciseFormDialogState
       return;
     }
 
+    final videoUrl = _videoCtrl.text.trim();
     setState(() {
       _saving = true;
       _error = null;
@@ -112,6 +119,7 @@ class _CustomExerciseFormDialogState
           name: name,
           muscleGroup: _muscle?.key ?? '',
           equipment: _equipment,
+          videoUrl: videoUrl.isEmpty ? null : videoUrl,
         );
         await repo.update(result);
       } else {
@@ -120,6 +128,7 @@ class _CustomExerciseFormDialogState
           name: name,
           muscleGroup: _muscle?.key ?? '',
           equipment: _equipment,
+          videoUrl: videoUrl.isEmpty ? null : videoUrl,
         );
       }
       if (!mounted) return;
@@ -130,6 +139,34 @@ class _CustomExerciseFormDialogState
         _saving = false;
         _error = 'No pudimos guardar el ejercicio.'; // i18n
       });
+    }
+  }
+
+  Future<void> _onPickAndUpload() async {
+    setState(() {
+      _uploadingVideo = true;
+      _uploadProgress = 0;
+    });
+    try {
+      final url = await ref
+          .read(customExerciseVideoWebUploaderProvider)
+          .pickAndUpload(
+            onProgress: (f) {
+              if (mounted) setState(() => _uploadProgress = f);
+            },
+          );
+      if (!mounted) return;
+      if (url != null) setState(() => _videoCtrl.text = url);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _error = 'No pudimos subir el video.'); // i18n
+    } finally {
+      if (mounted) {
+        setState(() {
+          _uploadingVideo = false;
+          _uploadProgress = 0;
+        });
+      }
     }
   }
 
@@ -214,6 +251,62 @@ class _CustomExerciseFormDialogState
                 onChanged: (e) => setState(() => _equipment = e),
                 palette: palette,
               ),
+              const SizedBox(height: 16),
+              // ── Video (opcional): link de YouTube o subir MP4 propio ──────
+              _FieldLabel('VIDEO (opcional)', palette: palette), // i18n
+              const SizedBox(height: 6),
+              TextField(
+                key: const Key('create_exercise_video_field'),
+                controller: _videoCtrl,
+                enabled: !_saving && !_uploadingVideo,
+                style: GoogleFonts.barlow(
+                  color: palette.textPrimary,
+                  fontSize: 14,
+                ),
+                decoration: _inputDecoration(
+                  palette,
+                  'Pegá un link de YouTube', // i18n
+                ),
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                key: const Key('create_exercise_upload_video_button'),
+                onPressed: (_saving || _uploadingVideo)
+                    ? null
+                    : _onPickAndUpload,
+                icon: _uploadingVideo
+                    ? SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: palette.accent,
+                        ),
+                      )
+                    : Icon(TreinoIcon.plus, size: 16, color: palette.accent),
+                label: Text(
+                  _uploadingVideo
+                      ? 'Subiendo video — ${(_uploadProgress * 100).clamp(0, 100).toInt()}%' // i18n
+                      : 'Subir mi propio video', // i18n
+                  style: GoogleFonts.barlowCondensed(
+                    color: palette.accent,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: palette.border),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+              ),
+              if (_videoCtrl.text.trim().isNotEmpty) ...[
+                const SizedBox(height: 12),
+                ExerciseVideoPlayer(
+                  key: ValueKey(_videoCtrl.text.trim()),
+                  videoUrl: _videoCtrl.text.trim(),
+                ),
+              ],
               if (_error != null) ...[
                 const SizedBox(height: 14),
                 Text(
