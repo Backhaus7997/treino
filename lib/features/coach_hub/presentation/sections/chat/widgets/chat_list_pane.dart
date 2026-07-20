@@ -3,12 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../../../app/theme/app_motion.dart';
 import '../../../../../../app/theme/app_palette.dart';
+import '../../../../../../app/theme/tokens/primitives.dart';
 import '../../../../../chat/application/chat_providers.dart';
 import '../../../../../chat/domain/chat.dart';
 import '../../../../../profile/application/user_public_profile_providers.dart';
 import '../../../../../workout/application/session_providers.dart'
     show currentUidProvider;
+import '../../../widgets/coach_hub_widgets.dart';
 import '../chat_section_screen.dart' show selectedChatIdProvider;
 
 /// Panel izquierdo del split-pane: lista de conversaciones del PF.
@@ -103,128 +106,157 @@ class _ChatRow extends ConsumerWidget {
     final otherUid = _otherUidOf(chat, currentUid);
     final pubAsync = ref.watch(userPublicProfileProvider(otherUid));
     final hasUnread = chatHasUnread(chat, currentUid);
+    final transparent = palette.bgCard.withValues(alpha: 0);
 
-    return InkWell(
+    return TreinoInteractiveState(
       key: Key('chat_row_${chat.chatId}'),
       onTap: () {
         ref.read(selectedChatIdProvider.notifier).state = chat.chatId;
       },
-      child: Container(
-        decoration: BoxDecoration(
-          color: isSelected ? palette.bg : Colors.transparent,
-          border: Border(
-            left: BorderSide(
-              color: isSelected ? palette.accent : Colors.transparent,
-              width: 3,
+      builder: (ctx, states) {
+        // Selección gana sobre hover/pressed; hover reusa `borderHover`
+        // (token ya pensado para overlays sutiles de interacción).
+        final Color bg;
+        if (isSelected) {
+          bg = palette.bg;
+        } else if (states.hovered || states.pressed) {
+          bg = palette.borderHover;
+        } else {
+          bg = transparent;
+        }
+
+        return AnimatedContainer(
+          key: Key('chat_row_container_${chat.chatId}'),
+          duration: AppMotion.resolve(ctx, AppMotion.fast),
+          curve: AppMotion.standard,
+          decoration: BoxDecoration(
+            color: bg,
+            border: Border(
+              left: BorderSide(
+                color: isSelected ? palette.accent : transparent,
+                width: 3,
+              ),
             ),
           ),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 14),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            CircleAvatar(
-              radius: 22,
-              backgroundColor: palette.bgCard,
-              backgroundImage: pubAsync.maybeWhen(
-                data: (p) => (p?.avatarUrl != null && p!.avatarUrl!.isNotEmpty)
-                    ? NetworkImage(p.avatarUrl!)
-                    : null,
-                orElse: () => null,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.s18,
+            vertical: AppSpacing.s14,
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              CircleAvatar(
+                radius: 22,
+                backgroundColor: palette.bgCard,
+                backgroundImage: pubAsync.maybeWhen(
+                  data: (p) =>
+                      (p?.avatarUrl != null && p!.avatarUrl!.isNotEmpty)
+                          ? NetworkImage(p.avatarUrl!)
+                          : null,
+                  orElse: () => null,
+                ),
+                child: pubAsync.maybeWhen(
+                  data: (p) =>
+                      (p?.avatarUrl == null || (p?.avatarUrl ?? '').isEmpty)
+                          ? Text(
+                              (p?.displayName ?? '?').isNotEmpty
+                                  ? (p?.displayName ?? '?')[0].toUpperCase()
+                                  : '?',
+                              style: TextStyle(
+                                fontFamily: AppFonts.barlowCondensed,
+                                fontWeight: AppFonts.w700,
+                                fontSize: 16,
+                                color: palette.textMuted,
+                              ),
+                            )
+                          : null,
+                  orElse: () => const SizedBox.shrink(),
+                ),
               ),
-              child: pubAsync.maybeWhen(
-                data: (p) =>
-                    (p?.avatarUrl == null || (p?.avatarUrl ?? '').isEmpty)
-                        ? Text(
-                            (p?.displayName ?? '?').isNotEmpty
-                                ? (p?.displayName ?? '?')[0].toUpperCase()
-                                : '?',
-                            style: GoogleFonts.barlowCondensed(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 16,
-                              color: palette.textMuted,
+              const SizedBox(width: AppSpacing.s12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            pubAsync.maybeWhen(
+                              data: (p) =>
+                                  p?.displayName ?? 'Usuario eliminado',
+                              orElse: () => '…',
                             ),
-                          )
-                        : null,
-                orElse: () => const SizedBox.shrink(),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          pubAsync.maybeWhen(
-                            data: (p) => p?.displayName ?? 'Usuario eliminado',
-                            orElse: () => '…',
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.barlow(
-                            fontWeight:
-                                hasUnread ? FontWeight.w700 : FontWeight.w600,
-                            fontSize: 14,
-                            color: palette.textPrimary,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontFamily: AppFonts.barlow,
+                              fontWeight:
+                                  hasUnread ? AppFonts.w700 : AppFonts.w600,
+                              fontSize: 14,
+                              color: palette.textPrimary,
+                            ),
                           ),
                         ),
-                      ),
-                      if (chat.lastMessageAt != null) ...[
-                        const SizedBox(width: 6),
-                        Text(
-                          _formatTimestamp(chat.lastMessageAt!),
-                          style: GoogleFonts.barlow(
-                            fontWeight: FontWeight.w400,
-                            fontSize: 11,
-                            color:
-                                hasUnread ? palette.accent : palette.textMuted,
+                        if (chat.lastMessageAt != null) ...[
+                          const SizedBox(width: AppSpacing.hairline),
+                          Text(
+                            _formatTimestamp(chat.lastMessageAt!),
+                            style: TextStyle(
+                              fontFamily: AppFonts.barlow,
+                              fontWeight: AppFonts.w400,
+                              fontSize: 11,
+                              color: hasUnread
+                                  ? palette.accent
+                                  : palette.textMuted,
+                            ),
                           ),
-                        ),
+                        ],
                       ],
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          (chat.lastMessageText ?? '').isEmpty
-                              ? 'Sin mensajes todavía' // i18n: Fase W2
-                              : chat.lastMessageText!,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.barlow(
-                            fontWeight:
-                                hasUnread ? FontWeight.w600 : FontWeight.w400,
-                            fontSize: 12,
-                            color: hasUnread
-                                ? palette.textPrimary
-                                : palette.textMuted,
+                    ),
+                    const SizedBox(height: AppSpacing.hairline),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            (chat.lastMessageText ?? '').isEmpty
+                                ? 'Sin mensajes todavía' // i18n: Fase W2
+                                : chat.lastMessageText!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontFamily: AppFonts.barlow,
+                              fontWeight:
+                                  hasUnread ? AppFonts.w600 : AppFonts.w400,
+                              fontSize: 12,
+                              color: hasUnread
+                                  ? palette.textPrimary
+                                  : palette.textMuted,
+                            ),
                           ),
                         ),
-                      ),
-                      if (hasUnread) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: palette.accent,
-                            shape: BoxShape.circle,
+                        if (hasUnread) ...[
+                          const SizedBox(width: AppSpacing.hairline),
+                          Container(
+                            key: Key('chat_row_unread_badge_${chat.chatId}'),
+                            width: AppSpacing.s8,
+                            height: AppSpacing.s8,
+                            decoration: BoxDecoration(
+                              color: palette.accent,
+                              borderRadius:
+                                  BorderRadius.circular(AppRadius.full),
+                            ),
                           ),
-                        ),
+                        ],
                       ],
-                    ],
-                  ),
-                ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
-      ),
+            ],
+          ),
+        );
+      },
     );
   }
 
