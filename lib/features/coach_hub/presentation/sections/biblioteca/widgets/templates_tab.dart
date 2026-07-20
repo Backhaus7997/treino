@@ -97,6 +97,7 @@ class TemplatesTab extends ConsumerWidget {
                           context.push('/template-editor/${routine.id}'),
                       onUse: () =>
                           _assignTemplateToAthlete(context, ref, routine),
+                      onDelete: () => _deleteTemplate(context, ref, routine),
                     ),
                   );
                 },
@@ -134,6 +135,69 @@ Future<void> _assignTemplateToAthlete(
   } catch (_) {
     messenger.showSnackBar(
       const SnackBar(content: Text('No pudimos asignar la plantilla.')), // i18n
+    );
+  }
+}
+
+/// Confirms, then deletes [template] via the repository's `deleteRoutine`.
+/// Mirrors mobile's template-card delete (trainer_workout_view.dart _onDelete):
+/// same confirmation, same repo call, same success/error copy. Routines already
+/// assigned from this template keep working (slots denormalize name/group).
+Future<void> _deleteTemplate(
+  BuildContext context,
+  WidgetRef ref,
+  Routine template,
+) async {
+  final palette = AppPalette.of(context);
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: palette.bgCard,
+      title: Text(
+        'Eliminar plantilla', // i18n
+        style: GoogleFonts.barlowCondensed(
+          fontWeight: FontWeight.w700,
+          fontSize: 18,
+          color: palette.textPrimary,
+        ),
+      ),
+      content: Text(
+        '¿Eliminar "${template.name}"? No se puede deshacer. Las rutinas ya '
+        'asignadas a partir de ella no se tocan.', // i18n
+        style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 13),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(false),
+          child: Text(
+            'Cancelar', // i18n
+            style: GoogleFonts.barlow(color: palette.textMuted),
+          ),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(true),
+          child: Text(
+            'Eliminar', // i18n
+            style: GoogleFonts.barlow(
+              color: palette.danger,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true || !context.mounted) return;
+  // Capture the messenger before the async gap — context may unmount.
+  final messenger = ScaffoldMessenger.of(context);
+  try {
+    await ref.read(routineRepositoryProvider).deleteRoutine(template.id);
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Plantilla eliminada.')), // i18n
+    );
+  } catch (_) {
+    messenger.showSnackBar(
+      const SnackBar(content: Text('No pudimos eliminar la plantilla.')), // i18n
     );
   }
 }

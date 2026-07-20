@@ -531,4 +531,65 @@ void main() {
       expect(find.text('No pudimos asignar la plantilla.'), findsOneWidget);
     });
   });
+
+  group('TemplatesTab — borrar plantilla', () {
+    testWidgets('el detalle ofrece "Eliminar"', (tester) async {
+      final repo = _MockRoutineRepository();
+      await _pumpAssignable(tester, repo: repo, templates: [_templateA]);
+
+      await tester.tap(find.text('Fuerza Total'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('template_detail_delete_button')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('confirmar borra la plantilla vía deleteRoutine', (
+      tester,
+    ) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.deleteRoutine(any())).thenAnswer((_) async {});
+      await _pumpAssignable(tester, repo: repo, templates: [_templateA]);
+
+      await tester.tap(find.text('Fuerza Total'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('template_detail_delete_button')));
+      await tester.pumpAndSettle();
+
+      // Diálogo de confirmación → el botón "Eliminar" (scopeado; el título dice
+      // "Eliminar plantilla" y no matchea exacto).
+      expect(find.text('Eliminar plantilla'), findsOneWidget);
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Eliminar'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      verify(() => repo.deleteRoutine('tpl-a')).called(1);
+      expect(find.text('Plantilla eliminada.'), findsOneWidget);
+    });
+
+    testWidgets('cancelar la confirmación no borra', (tester) async {
+      final repo = _MockRoutineRepository();
+      await _pumpAssignable(tester, repo: repo, templates: [_templateA]);
+
+      await tester.tap(find.text('Fuerza Total'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('template_detail_delete_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Cancelar'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      verifyNever(() => repo.deleteRoutine(any()));
+    });
+  });
 }
