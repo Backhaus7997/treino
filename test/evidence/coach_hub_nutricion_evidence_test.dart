@@ -27,12 +27,15 @@
 //
 // Matriz: (dark, light) × (1440x900, 420x900) = 4 goldens.
 //
-// Guard laxo (WU-01): la sección todavía es `ProximamenteScreen`
-// (`nutricion/routes.dart`) — la screen real llega en WU-04. El guard acepta
-// el título del placeholder ("NUTRICIÓN", `TreinoSectionHeader` UPPERCASE) O
-// el texto "Próximamente." — cualquiera de los dos confirma que la ruta
-// montó el placeholder real, no un error. Se endurece en WU-07 cuando la
-// screen real reemplace al placeholder.
+// Guard ENDURECIDO (WU-07): la screen real (`NutricionScreen`, WU-04)
+// reemplazó al placeholder — el guard ahora exige, a >=768px, las tres
+// señales de que la overview real montó con data: (1) título "NUTRICIÓN"
+// (`TreinoSectionHeader` UPPERCASE), (2) el nombre de un alumno fake del
+// roster poblado (p.ej. "Ana López"), y (3) evidencia de estado de plan por
+// fila ("Sin plan" o "comidas", según `NutricionPlanRow._subtitle`). Las
+// tres deben aparecer juntas — la screen anterior (guard laxo de WU-01)
+// solo exigía título O "Próximamente.", suficiente para el placeholder pero
+// insuficiente ahora que hay data real que puede regresionar en silencio.
 
 import 'dart:convert';
 import 'dart:io';
@@ -509,19 +512,34 @@ Future<void> _pumpNutricion(
     return;
   }
 
-  // Guard LAXO (WU-01): la sección todavía es `ProximamenteScreen` — acepta
-  // el título "NUTRICIÓN" (`TreinoSectionHeader`, UPPERCASE) O el texto
-  // "Próximamente." Se endurece en WU-07 cuando la screen real (WU-04)
-  // reemplace al placeholder.
+  // Guard ENDURECIDO (WU-07): la screen real reemplazó al placeholder —
+  // exigimos las tres señales de que la overview montó con data real, no
+  // un error/empty silencioso.
   final hasTitle = find.text('NUTRICIÓN').evaluate().isNotEmpty;
-  final hasPlaceholderCopy =
-      find.textContaining('Próximamente.').evaluate().isNotEmpty;
   expect(
-    hasTitle || hasPlaceholderCopy,
+    hasTitle,
     isTrue,
-    reason: 'Ni el título "NUTRICIÓN" ni el texto "Próximamente." '
-        'aparecieron — la ruta /nutricion no montó el placeholder '
-        'esperado (regresión o l10n español ausente).',
+    reason: 'El título "NUTRICIÓN" no apareció — la ruta /nutricion no '
+        'montó la screen real (regresión o l10n español ausente).',
+  );
+
+  final hasAthleteName = find.textContaining('Ana López').evaluate().isNotEmpty;
+  expect(
+    hasAthleteName,
+    isTrue,
+    reason: 'El nombre del alumno fake "Ana López" no apareció — el '
+        'roster (trainerLinksStreamProvider + userPublicProfileProvider) '
+        'no se renderizó como filas reales.',
+  );
+
+  final hasSinPlan = find.textContaining('Sin plan').evaluate().isNotEmpty;
+  final hasComidas = find.textContaining('comidas').evaluate().isNotEmpty;
+  expect(
+    hasSinPlan || hasComidas,
+    isTrue,
+    reason: 'Ni "Sin plan" ni "comidas" aparecieron — ninguna fila '
+        'muestra el estado real del plan (NutricionPlanRow no está '
+        'resolviendo nutritionPlanProvider).',
   );
 }
 
