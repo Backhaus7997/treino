@@ -10,6 +10,7 @@ import '../../../../../../app/theme/app_palette.dart';
 import '../../../../../../app/theme/tokens/primitives.dart';
 import '../../../../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../../../../core/widgets/motion/treino_state_switcher.dart';
+import '../../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../../../core/widgets/treino_icon.dart';
 import '../../../../../chat/application/chat_media_send_controller.dart';
 import '../../../../../chat/application/chat_providers.dart';
@@ -635,6 +636,11 @@ class _Composer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Único gate de estado del composer: `sending` llega ya combinado
+    // (`_sending || _uploading`) desde `_ChatDetailPaneState.build` — acá
+    // solo lo traducimos a los tres widgets interactivos (adjuntar, campo,
+    // enviar).
+    final fieldEnabled = !sending;
     return Container(
       color: palette.bgCard,
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
@@ -667,7 +673,7 @@ class _Composer extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: AppSpacing.hairline),
           Expanded(
             child: TextField(
               key: const Key('chat_composer_field'),
@@ -676,64 +682,77 @@ class _Composer extends StatelessWidget {
               maxLines: 6,
               textInputAction: TextInputAction.send,
               onSubmitted: (_) => onSend(),
-              enabled: !sending,
-              style: GoogleFonts.barlow(
+              enabled: fieldEnabled,
+              style: TextStyle(
+                fontFamily: AppFonts.barlow,
                 fontWeight: FontWeight.w400,
                 fontSize: 14,
                 color: palette.textPrimary,
               ),
               decoration: InputDecoration(
                 hintText: 'Escribí un mensaje…', // i18n: Fase W2
-                hintStyle: GoogleFonts.barlow(
+                hintStyle: TextStyle(
+                  fontFamily: AppFonts.barlow,
                   fontWeight: FontWeight.w400,
                   fontSize: 14,
                   color: palette.textMuted,
                 ),
                 filled: true,
-                fillColor: palette.bg,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                // Apagado con tokens mientras sending: fill semitransparente
+                // en vez de un segundo color hardcodeado.
+                fillColor: fieldEnabled
+                    ? palette.bg
+                    : palette.bg.withValues(alpha: 0.6),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.s14,
+                  vertical: AppSpacing.s12,
+                ),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
                   borderSide: BorderSide(color: palette.border),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
                   borderSide: BorderSide(color: palette.border),
                 ),
+                disabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                  borderSide: BorderSide(
+                    color: palette.border.withValues(alpha: 0.5),
+                  ),
+                ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
                   borderSide: BorderSide(color: palette.accent),
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 8),
-          // Botón enviar — mockup: cuadro mint sólido con el avión en el
-          // color de fondo. Redondeado, no un IconButton suelto.
+          const SizedBox(width: AppSpacing.hairline),
+          // TreinoTappable REEMPLAZA el IconButton (no lo envuelve): con
+          // `onTap: null` (sending) devuelve el child pelado sin gesture —
+          // mismo comportamiento disabled que `onPressed: null` antes, más
+          // el feedback de escala 0.97 al presionar cuando está habilitado.
           TreinoTappable(
             key: const Key('chat_send_button'),
             onTap: sending ? null : onSend,
             child: Container(
-              width: 44,
-              height: 44,
+              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
               alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: sending
-                    ? palette.accent.withValues(alpha: 0.5)
-                    : palette.accent,
-                borderRadius: BorderRadius.circular(12),
-              ),
               child: sending
                   ? SizedBox(
                       width: 18,
                       height: 18,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: palette.bg,
+                        color: palette.accent,
                       ),
                     )
-                  : Icon(TreinoIcon.send, size: 20, color: palette.bg),
+                  : Icon(
+                      TreinoIcon.send,
+                      size: 20,
+                      color: palette.accent,
+                    ),
             ),
           ),
         ],
@@ -741,3 +760,22 @@ class _Composer extends StatelessWidget {
     );
   }
 }
+
+/// Expone [_Composer] a tests de widget (WU-08) sin hacerlo público — el
+/// resto del árbol de `chat_detail_pane.dart` sigue armándolo desde
+/// `_ChatDetailPaneState.build`, este helper es solo para tests.
+@visibleForTesting
+Widget chatDetailPaneComposerForTest({
+  required TextEditingController controller,
+  required bool sending,
+  required VoidCallback onSend,
+  required VoidCallback onAttach,
+  required AppPalette palette,
+}) =>
+    _Composer(
+      controller: controller,
+      sending: sending,
+      onSend: onSend,
+      onAttach: onAttach,
+      palette: palette,
+    );
