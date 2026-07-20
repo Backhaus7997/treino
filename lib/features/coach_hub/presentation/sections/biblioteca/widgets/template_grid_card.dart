@@ -4,11 +4,13 @@
 library;
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
+import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach_hub/presentation/sections/biblioteca/widgets/template_format.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/treino_interactive_state.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 
@@ -20,6 +22,11 @@ import 'package:treino/features/workout/domain/routine.dart';
 /// - "N días/sem · N semanas" subtitle (from routine.days.length + numWeeks).
 /// - Level chip (routine.level.displayNameEs).
 /// - NO "alumnos" count (not denormalized — REQ-BIBW-09).
+///
+/// Hover/press vía [TreinoInteractiveState] (fuente única de verdad,
+/// ADR-SH-002): borde + tinte de fondo sutiles en hover; el feedback de
+/// presión lo hereda de `TreinoTappable`. Sin `GestureDetector` crudo — el
+/// resolver del kit centraliza mouse/foco/teclado.
 ///
 /// Tap → [showTemplateDetailDialog].
 ///
@@ -36,67 +43,81 @@ class TemplateGridCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-
-    return GestureDetector(
+    return TreinoInteractiveState(
       onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: palette.bgCard,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: palette.border),
-        ),
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Icon header ──────────────────────────────────────────────────
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: palette.accent.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              alignment: Alignment.center,
-              child: Icon(
-                TreinoIcon.tabWorkout,
-                size: 24,
-                color: palette.accent,
-              ),
+      builder: (ctx, states) {
+        final palette = AppPalette.of(ctx);
+        final highlighted = states.hovered || states.pressed;
+
+        return AnimatedContainer(
+          key: const Key('template_grid_card_root'),
+          duration: AppMotion.resolve(ctx, AppMotion.micro),
+          curve: AppMotion.standard,
+          decoration: BoxDecoration(
+            color: highlighted
+                ? palette.accent.withValues(alpha: 0.06)
+                : palette.bgCard,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(
+              color: highlighted
+                  ? palette.accent.withValues(alpha: 0.5)
+                  : palette.border,
             ),
-            const SizedBox(height: 12),
-            // ── Name ─────────────────────────────────────────────────────────
-            Text(
-              routine.name,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.barlow(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: palette.textPrimary,
-                height: 1.25,
+          ),
+          padding: const EdgeInsets.all(AppSpacing.s12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Icon header ──────────────────────────────────────────────────
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: palette.accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                ),
+                alignment: Alignment.center,
+                child: Icon(
+                  TreinoIcon.tabWorkout,
+                  size: 24,
+                  color: palette.accent,
+                ),
               ),
-            ),
-            const SizedBox(height: 6),
-            // ── "N días/sem · N semanas" subtitle ────────────────────────────
-            // days.length = days-per-week (each RoutineDay is one training day).
-            // numWeeks = periodization weeks on the Routine (routine.dart:42).
-            Text(
-              routineCadenceLabel(routine), // i18n
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.barlow(
-                fontSize: 12,
-                color: palette.textMuted,
+              const SizedBox(height: AppSpacing.s12),
+              // ── Name ─────────────────────────────────────────────────────────
+              Text(
+                routine.name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontFamily: AppFonts.barlow,
+                  fontWeight: AppFonts.w700,
+                  fontSize: 14,
+                  color: palette.textPrimary,
+                  height: 1.25,
+                ),
               ),
-            ),
-            const Spacer(),
-            // ── Level chip ───────────────────────────────────────────────────
-            _LevelChip(label: routine.level.displayNameEs, palette: palette),
-          ],
-        ),
-      ),
+              const SizedBox(height: AppSpacing.hairline),
+              // ── "N días/sem · N semanas" subtitle ────────────────────────────
+              // days.length = days-per-week (each RoutineDay is one training day).
+              // numWeeks = periodization weeks on the Routine (routine.dart:42).
+              Text(
+                routineCadenceLabel(routine), // i18n
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontFamily: AppFonts.barlow,
+                  fontSize: 12,
+                  color: palette.textMuted,
+                ),
+              ),
+              const Spacer(),
+              // ── Level chip ───────────────────────────────────────────────────
+              _LevelChip(label: routine.level.displayNameEs, palette: palette),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -111,17 +132,21 @@ class _LevelChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.s8,
+        vertical: AppSpacing.hairline - 1,
+      ),
       decoration: BoxDecoration(
         color: palette.accent.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         border: Border.all(color: palette.accent.withValues(alpha: 0.3)),
       ),
       child: Text(
         label.toUpperCase(), // i18n
-        style: GoogleFonts.barlowCondensed(
+        style: TextStyle(
+          fontFamily: AppFonts.barlowCondensed,
+          fontWeight: AppFonts.w700,
           fontSize: 10,
-          fontWeight: FontWeight.w700,
           color: palette.accent,
           letterSpacing: 0.8,
         ),
