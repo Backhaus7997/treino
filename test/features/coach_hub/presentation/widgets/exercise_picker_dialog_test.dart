@@ -28,6 +28,17 @@ final _kExercises = [
   kExerciseSeed[6], // back-squat (quads/barra)
 ];
 
+/// One custom exercise owned by 'u1' — used by the edit/delete tests.
+final _customBench = CustomExercise(
+  id: 'cx-1',
+  ownerId: 'u1',
+  name: 'Press plano casero',
+  muscleGroup: 'chest',
+  equipment: EquipmentType.mancuerna,
+  createdAt: DateTime(2024, 1, 1),
+  updatedAt: DateTime(2024, 1, 1),
+);
+
 List<Override> _overrides({List<Exercise>? exercises}) => [
   currentUidProvider.overrideWithValue('u1'),
   exercisesProvider.overrideWith((ref) async => exercises ?? _kExercises),
@@ -83,7 +94,10 @@ class _MockCustomExerciseRepository extends Mock
     implements CustomExerciseRepository {}
 
 void main() {
-  setUpAll(() => registerFallbackValue(EquipmentType.mancuerna));
+  setUpAll(() {
+    registerFallbackValue(EquipmentType.mancuerna);
+    registerFallbackValue(_customBench);
+  });
 
   group('ExercisePickerDialog (web) — core selection', () {
     testWidgets('empty selection: CTA shows "Agregar" without a count', (
@@ -350,6 +364,89 @@ void main() {
 
       // Back in the picker, the new exercise is pre-selected → CTA count = 1.
       expect(find.text('Agregar (1)'), findsOneWidget);
+    });
+  });
+
+  group('ExercisePickerDialog (web) — editar/borrar ejercicio custom', () {
+    List<Override> withCustom(CustomExerciseRepository repo) => [
+      customExercisesForTrainerStreamProvider(
+        'u1',
+      ).overrideWith((ref) => Stream.value([_customBench])),
+      customExerciseRepositoryProvider.overrideWithValue(repo),
+    ];
+
+    testWidgets('editar abre el form pre-cargado y guarda vía update', (
+      tester,
+    ) async {
+      final repo = _MockCustomExerciseRepository();
+      when(() => repo.update(any())).thenAnswer((_) async {});
+      await _openPicker(tester, extraOverrides: withCustom(repo));
+
+      expect(find.text('Press plano casero'), findsOneWidget);
+      await tester.tap(find.byTooltip('Editar'));
+      await tester.pumpAndSettle();
+
+      // Modo edición, pre-cargado.
+      expect(find.text('Editar ejercicio'), findsOneWidget);
+      await tester.enterText(
+        find.byKey(const Key('create_exercise_name_field')),
+        'Press plano en casa',
+      );
+      await tester.tap(find.byKey(const Key('create_exercise_submit_button')));
+      await tester.pumpAndSettle();
+
+      // update conserva el id (mismo doc) y toma el nombre nuevo.
+      final updated =
+          verify(() => repo.update(captureAny())).captured.single
+              as CustomExercise;
+      expect(updated.id, 'cx-1');
+      expect(updated.name, 'Press plano en casa');
+    });
+
+    testWidgets('borrar pide confirmación y llama a delete', (tester) async {
+      final repo = _MockCustomExerciseRepository();
+      when(
+        () => repo.delete(
+          trainerId: any(named: 'trainerId'),
+          id: any(named: 'id'),
+        ),
+      ).thenAnswer((_) async {});
+      await _openPicker(tester, extraOverrides: withCustom(repo));
+
+      await tester.tap(find.byTooltip('Eliminar'));
+      await tester.pumpAndSettle();
+
+      // Confirmación → el botón "Eliminar" del diálogo (no el ícono).
+      expect(find.text('¿Eliminar ejercicio?'), findsOneWidget);
+      await tester.tap(find.text('Eliminar'));
+      await tester.pumpAndSettle();
+
+      verify(() => repo.delete(trainerId: 'u1', id: 'cx-1')).called(1);
+      expect(find.text('Ejercicio eliminado.'), findsOneWidget);
+    });
+
+    testWidgets('cancelar la confirmación no borra', (tester) async {
+      final repo = _MockCustomExerciseRepository();
+      await _openPicker(tester, extraOverrides: withCustom(repo));
+
+      await tester.tap(find.byTooltip('Eliminar'));
+      await tester.pumpAndSettle();
+      // El footer del picker también tiene "Cancelar" → scopear al diálogo de
+      // confirmación (AlertDialog; el picker es un Dialog).
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Cancelar'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      verifyNever(
+        () => repo.delete(
+          trainerId: any(named: 'trainerId'),
+          id: any(named: 'id'),
+        ),
+      );
     });
   });
 }

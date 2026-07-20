@@ -126,6 +126,75 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
     setState(() => _selected.add(created.id));
   }
 
+  Future<void> _editCustom(CustomExercise exercise) async {
+    // The custom stream is live and selection is keyed by id, so the edited row
+    // refreshes in place — nothing to reconcile here.
+    await showEditCustomExerciseDialog(context, exercise);
+  }
+
+  Future<void> _deleteCustom(CustomExercise exercise) async {
+    final uid = ref.read(currentUidProvider) ?? '';
+    if (uid.isEmpty) return;
+    final palette = AppPalette.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: palette.bgCard,
+        title: Text(
+          '¿Eliminar ejercicio?', // i18n
+          style: GoogleFonts.barlowCondensed(
+            color: palette.textPrimary,
+            fontWeight: FontWeight.w700,
+            fontSize: 18,
+          ),
+        ),
+        content: Text(
+          // Slots denormalize the name/group at assign time, so existing
+          // routines keep working after the library entry is gone.
+          'Se borra "${exercise.name}" de tu biblioteca. Las rutinas que ya lo '
+          'usan no se tocan.', // i18n
+          style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(
+              'Cancelar', // i18n
+              style: GoogleFonts.barlow(color: palette.textMuted),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(
+              'Eliminar', // i18n
+              style: GoogleFonts.barlow(
+                color: palette.danger,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref
+          .read(customExerciseRepositoryProvider)
+          .delete(trainerId: uid, id: exercise.id);
+      if (mounted) setState(() => _selected.remove(exercise.id));
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Ejercicio eliminado.')), // i18n
+      );
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('No pudimos eliminar el ejercicio.'), // i18n
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
@@ -362,6 +431,8 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
               selected: _selected.contains(c.id),
               palette: palette,
               onTap: () => _toggle(c.id),
+              onEdit: () => _editCustom(c),
+              onDelete: () => _deleteCustom(c),
             ),
         ],
         if (filteredDefaults.isNotEmpty) ...[
@@ -512,6 +583,8 @@ class _ExerciseRow extends StatelessWidget {
     required this.selected,
     required this.palette,
     required this.onTap,
+    this.onEdit,
+    this.onDelete,
   });
 
   final String id;
@@ -523,6 +596,10 @@ class _ExerciseRow extends StatelessWidget {
   final bool selected;
   final AppPalette palette;
   final VoidCallback onTap;
+
+  /// Present only for the trainer's own custom exercises → renders edit/delete.
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -594,6 +671,28 @@ class _ExerciseRow extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
               ],
+              if (onEdit != null)
+                IconButton(
+                  tooltip: 'Editar', // i18n
+                  icon: Icon(
+                    TreinoIcon.edit,
+                    size: 15,
+                    color: palette.textMuted,
+                  ),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: onEdit,
+                ),
+              if (onDelete != null)
+                IconButton(
+                  tooltip: 'Eliminar', // i18n
+                  icon: Icon(
+                    TreinoIcon.trash,
+                    size: 15,
+                    color: palette.textMuted,
+                  ),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: onDelete,
+                ),
               IconButton(
                 tooltip: 'Ver detalle', // i18n
                 icon: Icon(
