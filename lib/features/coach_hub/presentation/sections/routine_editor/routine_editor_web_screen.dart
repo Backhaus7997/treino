@@ -165,6 +165,10 @@ class _EditorDay {
 const _kMaxDays = 7; // mirrors mobile's _kMaxDays
 const _kMaxWeeks = 16; // mirrors mobile's _kMaxWeeks
 
+/// Scope choice when deleting an exercise from a multi-week plan (REQ-WPRES-010,
+/// mirrors mobile's `_DeleteScope`).
+enum _DeleteScope { thisWeek, allWeeks }
+
 class _RoutineEditorWebScreenState
     extends ConsumerState<RoutineEditorWebScreen> {
   final _nameCtrl = TextEditingController();
@@ -540,6 +544,92 @@ class _RoutineEditorWebScreenState
   void _removeSlot(int dayIndex, int slotIndex) {
     _markDirty();
     setState(() => _days[dayIndex].slots.removeAt(slotIndex));
+  }
+
+  /// Routes a slot delete through presence-aware scope, mirroring mobile's
+  /// `_onDeleteSlot` (REQ-WPRES-010, ADR-WPRES-03):
+  /// - single-week plan → structural delete, no dialog;
+  /// - multi-week → ask "solo esta semana" vs "todas las semanas". "Solo esta
+  ///   semana" materializes the presence mask and drops `_selectedWeek`; if that
+  ///   empties the mask (last present week), it falls back to a structural
+  ///   delete — a zero-presence slot is forbidden.
+  Future<void> _onDeleteSlot(int dayIndex, int slotIndex) async {
+    if (_numWeeks <= 1) {
+      _removeSlot(dayIndex, slotIndex);
+      return;
+    }
+
+    final palette = AppPalette.of(context);
+    final choice = await showDialog<_DeleteScope>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        backgroundColor: palette.bgCard,
+        title: Text(
+          '¿Eliminar ejercicio?', // i18n
+          style: GoogleFonts.barlowCondensed(
+            color: palette.textPrimary,
+            fontWeight: FontWeight.w700,
+            fontSize: 18,
+          ),
+        ),
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 10),
+            child: Text(
+              // i18n
+              'Está en varias semanas. ¿Lo sacás solo de esta semana o de todas?',
+              style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 13),
+            ),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.of(ctx).pop(_DeleteScope.thisWeek),
+            child: Text(
+              'Solo esta semana', // i18n
+              style: GoogleFonts.barlow(
+                color: palette.accent,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.of(ctx).pop(_DeleteScope.allWeeks),
+            child: Text(
+              'Todas las semanas', // i18n
+              style: GoogleFonts.barlow(
+                color: palette.danger,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (choice == null || !mounted) return;
+
+    if (choice == _DeleteScope.allWeeks) {
+      _removeSlot(dayIndex, slotIndex);
+      return;
+    }
+
+    // "Solo esta semana": materialize the mask and drop the current week.
+    final slot = _days[dayIndex].slots[slotIndex];
+    final newMask = slot.activeWeeks.isEmpty
+        ? {
+            for (var w = 0; w < _numWeeks; w++)
+              if (w != _selectedWeek) w,
+          }
+        : (Set<int>.from(slot.activeWeeks)..remove(_selectedWeek));
+
+    // Last present week → dropping it would leave a zero-presence ghost, so
+    // delete structurally instead (ADR-WPRES-03).
+    if (newMask.isEmpty) {
+      _removeSlot(dayIndex, slotIndex);
+      return;
+    }
+
+    _markDirty();
+    setState(() => slot.activeWeeks = newMask);
   }
 
   /// Swaps ONLY the exercise on a slot, keeping its sets, rest, notes,
@@ -1349,7 +1439,7 @@ class _RoutineEditorWebScreenState
                                 onNameChanged: (v) => _onDayNameChanged(i, v),
                                 onRemove: () => _removeDay(i),
                                 onAddExercises: () => _addExercisesToDay(i),
-                                onRemoveSlot: (s) => _removeSlot(i, s),
+                                onRemoveSlot: (s) => _onDeleteSlot(i, s),
                                 onReplaceSlot: (s) =>
                                     _replaceSlotExercise(i, s),
                                 onMoveSlot: (s, dir) => _moveSlot(i, s, dir),

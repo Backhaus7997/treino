@@ -151,140 +151,140 @@ Routine _simpleRoutine({String id = 'r1', String name = 'Fuerza base'}) =>
 /// A trainer TEMPLATE (no athlete) — `RoutineSource.trainerTemplate`,
 /// `assignedTo` null. The shape edit-mode template loading must accept.
 Routine _templateRoutine({String id = 't1'}) => Routine(
-      id: id,
-      name: 'Plantilla PPL',
-      split: 'PPL',
-      level: ExperienceLevel.intermediate,
-      source: RoutineSource.trainerTemplate,
-      assignedBy: _trainerId,
-      visibility: RoutineVisibility.private,
-      days: const [
-        RoutineDay(
-          dayNumber: 1,
-          name: 'Día A',
-          slots: [
-            RoutineSlot(
-              exerciseId: 'bench-press',
-              exerciseName: 'Press de Banca',
-              muscleGroup: 'chest',
-              targetSets: 1,
-              targetRepsMin: 8,
-              targetRepsMax: 8,
-              targetReps: [8],
-              targetWeightKg: 60,
-              restSeconds: 90,
-              sets: [SetSpec(reps: 8, weightKg: 60)],
-            ),
-          ],
+  id: id,
+  name: 'Plantilla PPL',
+  split: 'PPL',
+  level: ExperienceLevel.intermediate,
+  source: RoutineSource.trainerTemplate,
+  assignedBy: _trainerId,
+  visibility: RoutineVisibility.private,
+  days: const [
+    RoutineDay(
+      dayNumber: 1,
+      name: 'Día A',
+      slots: [
+        RoutineSlot(
+          exerciseId: 'bench-press',
+          exerciseName: 'Press de Banca',
+          muscleGroup: 'chest',
+          targetSets: 1,
+          targetRepsMin: 8,
+          targetRepsMax: 8,
+          targetReps: [8],
+          targetWeightKg: 60,
+          restSeconds: 90,
+          sets: [SetSpec(reps: 8, weightKg: 60)],
         ),
       ],
-    );
+    ),
+  ],
+);
 
 /// A web-editable routine that uses a rep RANGE + a coaching note (Fase 1).
 Routine _rangeRoutine({String id = 'r2'}) => Routine(
-      id: id,
-      name: 'Hipertrofia',
-      split: 'PPL',
-      level: ExperienceLevel.intermediate,
-      source: RoutineSource.trainerAssigned,
-      assignedBy: _trainerId,
-      assignedTo: _athleteId,
-      visibility: RoutineVisibility.private,
-      days: const [
-        RoutineDay(
-          dayNumber: 1,
-          name: 'Día A',
-          slots: [
-            RoutineSlot(
-              exerciseId: 'bench-press',
-              exerciseName: 'Press de Banca',
-              muscleGroup: 'chest',
-              targetSets: 1,
-              targetRepsMin: 8,
-              targetRepsMax: 12,
-              restSeconds: 90,
-              repMode: RepMode.range,
-              notes: 'Controlá la bajada',
-              sets: [SetSpec(repsMin: 8, repsMax: 12, weightKg: 60)],
-            ),
-          ],
+  id: id,
+  name: 'Hipertrofia',
+  split: 'PPL',
+  level: ExperienceLevel.intermediate,
+  source: RoutineSource.trainerAssigned,
+  assignedBy: _trainerId,
+  assignedTo: _athleteId,
+  visibility: RoutineVisibility.private,
+  days: const [
+    RoutineDay(
+      dayNumber: 1,
+      name: 'Día A',
+      slots: [
+        RoutineSlot(
+          exerciseId: 'bench-press',
+          exerciseName: 'Press de Banca',
+          muscleGroup: 'chest',
+          targetSets: 1,
+          targetRepsMin: 8,
+          targetRepsMax: 12,
+          restSeconds: 90,
+          repMode: RepMode.range,
+          notes: 'Controlá la bajada',
+          sets: [SetSpec(repsMin: 8, repsMax: 12, weightKg: 60)],
         ),
       ],
-    );
+    ),
+  ],
+);
 
 /// A web-editable routine that uses a DURATION exercise (Fase 2).
 Routine _durationRoutine({String id = 'r3'}) => Routine(
-      id: id,
-      name: 'Core',
-      split: 'Full Body',
-      level: ExperienceLevel.beginner,
-      source: RoutineSource.trainerAssigned,
-      assignedBy: _trainerId,
-      assignedTo: _athleteId,
-      visibility: RoutineVisibility.private,
-      days: const [
-        RoutineDay(
-          dayNumber: 1,
-          name: 'Día A',
-          slots: [
-            RoutineSlot(
-              exerciseId: 'plank',
-              exerciseName: 'Plancha',
-              muscleGroup: 'core',
-              targetSets: 1,
-              targetRepsMin: 0,
-              targetRepsMax: 0,
-              restSeconds: 30,
-              exerciseMode: ExerciseMode.duration,
-              durationSeconds: 60,
-              sets: [SetSpec(durationSeconds: 60)],
-            ),
-          ],
+  id: id,
+  name: 'Core',
+  split: 'Full Body',
+  level: ExperienceLevel.beginner,
+  source: RoutineSource.trainerAssigned,
+  assignedBy: _trainerId,
+  assignedTo: _athleteId,
+  visibility: RoutineVisibility.private,
+  days: const [
+    RoutineDay(
+      dayNumber: 1,
+      name: 'Día A',
+      slots: [
+        RoutineSlot(
+          exerciseId: 'plank',
+          exerciseName: 'Plancha',
+          muscleGroup: 'core',
+          targetSets: 1,
+          targetRepsMin: 0,
+          targetRepsMax: 0,
+          restSeconds: 30,
+          exerciseMode: ExerciseMode.duration,
+          durationSeconds: 60,
+          sets: [SetSpec(durationSeconds: 60)],
         ),
       ],
-    );
+    ),
+  ],
+);
 
 /// A web-editable routine with a 2-exercise superset (shared supersetGroup).
 Routine _supersetRoutine({String id = 'r4'}) => Routine(
-      id: id,
-      name: 'PPL',
-      split: 'PPL',
-      level: ExperienceLevel.advanced,
-      source: RoutineSource.trainerAssigned,
-      assignedBy: _trainerId,
-      assignedTo: _athleteId,
-      visibility: RoutineVisibility.private,
-      days: const [
-        RoutineDay(
-          dayNumber: 1,
-          name: 'Día A',
-          slots: [
-            RoutineSlot(
-              exerciseId: 'bench-press',
-              exerciseName: 'Press de Banca',
-              muscleGroup: 'chest',
-              targetSets: 1,
-              targetRepsMin: 10,
-              targetRepsMax: 10,
-              restSeconds: 60,
-              supersetGroup: 1,
-              sets: [SetSpec(reps: 10, weightKg: 40)],
-            ),
-            RoutineSlot(
-              exerciseId: 'cable-fly',
-              exerciseName: 'Aperturas con Cable',
-              muscleGroup: 'chest',
-              targetSets: 1,
-              targetRepsMin: 12,
-              targetRepsMax: 12,
-              restSeconds: 60,
-              supersetGroup: 1,
-              sets: [SetSpec(reps: 12, weightKg: 15)],
-            ),
-          ],
+  id: id,
+  name: 'PPL',
+  split: 'PPL',
+  level: ExperienceLevel.advanced,
+  source: RoutineSource.trainerAssigned,
+  assignedBy: _trainerId,
+  assignedTo: _athleteId,
+  visibility: RoutineVisibility.private,
+  days: const [
+    RoutineDay(
+      dayNumber: 1,
+      name: 'Día A',
+      slots: [
+        RoutineSlot(
+          exerciseId: 'bench-press',
+          exerciseName: 'Press de Banca',
+          muscleGroup: 'chest',
+          targetSets: 1,
+          targetRepsMin: 10,
+          targetRepsMax: 10,
+          restSeconds: 60,
+          supersetGroup: 1,
+          sets: [SetSpec(reps: 10, weightKg: 40)],
+        ),
+        RoutineSlot(
+          exerciseId: 'cable-fly',
+          exerciseName: 'Aperturas con Cable',
+          muscleGroup: 'chest',
+          targetSets: 1,
+          targetRepsMin: 12,
+          targetRepsMax: 12,
+          restSeconds: 60,
+          supersetGroup: 1,
+          sets: [SetSpec(reps: 12, weightKg: 15)],
         ),
       ],
-    );
+    ),
+  ],
+);
 
 /// A web-editable multi-week routine: N weeks sharing one prescription
 /// (weeklySets stays empty) — the Fase 4a shape.
@@ -295,38 +295,38 @@ Routine _multiWeekRoutine({String id = 'r5'}) =>
 /// DIFFERENT prescriptions) — web-editable since Fase 4b. Used by the
 /// edit-round-trip test to confirm weeklySets survives a save unchanged.
 Routine _perWeekRoutine({String id = 'r6'}) => Routine(
-      id: id,
-      name: 'Periodizada',
-      split: 'PPL',
-      level: ExperienceLevel.advanced,
-      source: RoutineSource.trainerAssigned,
-      assignedBy: _trainerId,
-      assignedTo: _athleteId,
-      visibility: RoutineVisibility.private,
-      numWeeks: 2,
-      days: const [
-        RoutineDay(
-          dayNumber: 1,
-          name: 'Día A',
-          slots: [
-            RoutineSlot(
-              exerciseId: 'bench-press',
-              exerciseName: 'Press de Banca',
-              muscleGroup: 'chest',
-              targetSets: 1,
-              targetRepsMin: 8,
-              targetRepsMax: 8,
-              restSeconds: 90,
-              sets: [SetSpec(reps: 8, weightKg: 60)],
-              weeklySets: [
-                [SetSpec(reps: 10, weightKg: 55)],
-                [SetSpec(reps: 8, weightKg: 60)],
-              ],
-            ),
+  id: id,
+  name: 'Periodizada',
+  split: 'PPL',
+  level: ExperienceLevel.advanced,
+  source: RoutineSource.trainerAssigned,
+  assignedBy: _trainerId,
+  assignedTo: _athleteId,
+  visibility: RoutineVisibility.private,
+  numWeeks: 2,
+  days: const [
+    RoutineDay(
+      dayNumber: 1,
+      name: 'Día A',
+      slots: [
+        RoutineSlot(
+          exerciseId: 'bench-press',
+          exerciseName: 'Press de Banca',
+          muscleGroup: 'chest',
+          targetSets: 1,
+          targetRepsMin: 8,
+          targetRepsMax: 8,
+          restSeconds: 90,
+          sets: [SetSpec(reps: 8, weightKg: 60)],
+          weeklySets: [
+            [SetSpec(reps: 10, weightKg: 55)],
+            [SetSpec(reps: 8, weightKg: 60)],
           ],
         ),
       ],
-    );
+    ),
+  ],
+);
 
 /// A per-week PRESENCE-masked routine (activeWeeks populated: present only in
 /// week 0 of 2) — web-editable since Fase 4c. Used by the edit round-trip
@@ -334,249 +334,246 @@ Routine _perWeekRoutine({String id = 'r6'}) => Routine(
 /// Two NORMAL sets (reps 8, 60kg), single week — for exercising set-type
 /// assignment and the running-number relabel.
 Routine _twoNormalSetsRoutine({String id = 'r13'}) => Routine(
-      id: id,
-      name: 'Dos series',
-      split: 'Full Body',
-      level: ExperienceLevel.intermediate,
-      source: RoutineSource.trainerAssigned,
-      assignedBy: _trainerId,
-      assignedTo: _athleteId,
-      visibility: RoutineVisibility.private,
-      days: const [
-        RoutineDay(
-          dayNumber: 1,
-          name: 'Día A',
-          slots: [
-            RoutineSlot(
-              exerciseId: 'bench-press',
-              exerciseName: 'Press de Banca',
-              muscleGroup: 'chest',
-              targetSets: 2,
-              targetRepsMin: 8,
-              targetRepsMax: 8,
-              targetReps: [8, 8],
-              targetWeightKg: 60,
-              restSeconds: 90,
-              sets: [
-                SetSpec(reps: 8, weightKg: 60),
-                SetSpec(reps: 8, weightKg: 60),
-              ],
-            ),
+  id: id,
+  name: 'Dos series',
+  split: 'Full Body',
+  level: ExperienceLevel.intermediate,
+  source: RoutineSource.trainerAssigned,
+  assignedBy: _trainerId,
+  assignedTo: _athleteId,
+  visibility: RoutineVisibility.private,
+  days: const [
+    RoutineDay(
+      dayNumber: 1,
+      name: 'Día A',
+      slots: [
+        RoutineSlot(
+          exerciseId: 'bench-press',
+          exerciseName: 'Press de Banca',
+          muscleGroup: 'chest',
+          targetSets: 2,
+          targetRepsMin: 8,
+          targetRepsMax: 8,
+          targetReps: [8, 8],
+          targetWeightKg: 60,
+          restSeconds: 90,
+          sets: [
+            SetSpec(reps: 8, weightKg: 60),
+            SetSpec(reps: 8, weightKg: 60),
           ],
         ),
       ],
-    );
+    ),
+  ],
+);
 
 /// A single FAILURE set with NO reps — the mobile-authored shape web must
 /// accept on save (a failure set works to failure; reps are optional).
 Routine _failureSetRoutine({String id = 'r14'}) => Routine(
-      id: id,
-      name: 'Al fallo',
-      split: 'Full Body',
-      level: ExperienceLevel.advanced,
-      source: RoutineSource.trainerAssigned,
-      assignedBy: _trainerId,
-      assignedTo: _athleteId,
-      visibility: RoutineVisibility.private,
-      days: const [
-        RoutineDay(
-          dayNumber: 1,
-          name: 'Día A',
-          slots: [
-            RoutineSlot(
-              exerciseId: 'bench-press',
-              exerciseName: 'Press de Banca',
-              muscleGroup: 'chest',
-              targetSets: 1,
-              targetRepsMin: 0,
-              targetRepsMax: 0,
-              restSeconds: 90,
-              sets: [SetSpec(type: SetType.failure, weightKg: 70)],
-            ),
-          ],
+  id: id,
+  name: 'Al fallo',
+  split: 'Full Body',
+  level: ExperienceLevel.advanced,
+  source: RoutineSource.trainerAssigned,
+  assignedBy: _trainerId,
+  assignedTo: _athleteId,
+  visibility: RoutineVisibility.private,
+  days: const [
+    RoutineDay(
+      dayNumber: 1,
+      name: 'Día A',
+      slots: [
+        RoutineSlot(
+          exerciseId: 'bench-press',
+          exerciseName: 'Press de Banca',
+          muscleGroup: 'chest',
+          targetSets: 1,
+          targetRepsMin: 0,
+          targetRepsMax: 0,
+          restSeconds: 90,
+          sets: [SetSpec(type: SetType.failure, weightKg: 70)],
         ),
       ],
-    );
+    ),
+  ],
+);
 
 /// Single week: Press+Sentadilla are ONE superset, Dominadas stands alone —
 /// the shape a reorder must never silently re-group.
 Routine _supersetOrderRoutine({String id = 'r12'}) => Routine(
-      id: id,
-      name: 'Orden con superserie',
-      split: 'Full Body',
-      level: ExperienceLevel.advanced,
-      source: RoutineSource.trainerAssigned,
-      assignedBy: _trainerId,
-      assignedTo: _athleteId,
-      visibility: RoutineVisibility.private,
-      days: const [
-        RoutineDay(
-          dayNumber: 1,
-          name: 'Día A',
-          slots: [
-            RoutineSlot(
-              exerciseId: 'bench-press',
-              exerciseName: 'Press de Banca',
-              muscleGroup: 'chest',
-              targetSets: 1,
-              targetRepsMin: 8,
-              targetRepsMax: 8,
-              targetReps: [8],
-              targetWeightKg: 60,
-              restSeconds: 90,
-              supersetGroup: 1,
-              sets: [SetSpec(reps: 8, weightKg: 60)],
-            ),
-            RoutineSlot(
-              exerciseId: 'squat',
-              exerciseName: 'Sentadilla',
-              muscleGroup: 'legs',
-              targetSets: 1,
-              targetRepsMin: 10,
-              targetRepsMax: 10,
-              targetReps: [10],
-              targetWeightKg: 80,
-              restSeconds: 120,
-              supersetGroup: 1,
-              sets: [SetSpec(reps: 10, weightKg: 80)],
-            ),
-            RoutineSlot(
-              exerciseId: 'pull-up',
-              exerciseName: 'Dominadas',
-              muscleGroup: 'back',
-              targetSets: 1,
-              targetRepsMin: 6,
-              targetRepsMax: 6,
-              targetReps: [6],
-              restSeconds: 60,
-              sets: [SetSpec(reps: 6)],
-            ),
-          ],
+  id: id,
+  name: 'Orden con superserie',
+  split: 'Full Body',
+  level: ExperienceLevel.advanced,
+  source: RoutineSource.trainerAssigned,
+  assignedBy: _trainerId,
+  assignedTo: _athleteId,
+  visibility: RoutineVisibility.private,
+  days: const [
+    RoutineDay(
+      dayNumber: 1,
+      name: 'Día A',
+      slots: [
+        RoutineSlot(
+          exerciseId: 'bench-press',
+          exerciseName: 'Press de Banca',
+          muscleGroup: 'chest',
+          targetSets: 1,
+          targetRepsMin: 8,
+          targetRepsMax: 8,
+          targetReps: [8],
+          targetWeightKg: 60,
+          restSeconds: 90,
+          supersetGroup: 1,
+          sets: [SetSpec(reps: 8, weightKg: 60)],
+        ),
+        RoutineSlot(
+          exerciseId: 'squat',
+          exerciseName: 'Sentadilla',
+          muscleGroup: 'legs',
+          targetSets: 1,
+          targetRepsMin: 10,
+          targetRepsMax: 10,
+          targetReps: [10],
+          targetWeightKg: 80,
+          restSeconds: 120,
+          supersetGroup: 1,
+          sets: [SetSpec(reps: 10, weightKg: 80)],
+        ),
+        RoutineSlot(
+          exerciseId: 'pull-up',
+          exerciseName: 'Dominadas',
+          muscleGroup: 'back',
+          targetSets: 1,
+          targetRepsMin: 6,
+          targetRepsMax: 6,
+          targetReps: [6],
+          restSeconds: 60,
+          sets: [SetSpec(reps: 6)],
         ),
       ],
-    );
+    ),
+  ],
+);
 
 /// 2-week plan whose week 1 carries typed sets and whose week 2 is plain —
 /// duplicating week 1 onto week 2 must carry the types across.
 Routine _twoWeekTypedRoutine({String id = 'r10'}) => Routine(
-      id: id,
-      name: 'Tipada 2 semanas',
-      split: 'Full Body',
-      level: ExperienceLevel.advanced,
-      source: RoutineSource.trainerAssigned,
-      assignedBy: _trainerId,
-      assignedTo: _athleteId,
-      visibility: RoutineVisibility.private,
-      numWeeks: 2,
-      days: const [
-        RoutineDay(
-          dayNumber: 1,
-          name: 'Día A',
-          slots: [
-            RoutineSlot(
-              exerciseId: 'bench-press',
-              exerciseName: 'Press de Banca',
-              muscleGroup: 'chest',
-              targetSets: 2,
-              targetRepsMin: 8,
-              targetRepsMax: 12,
-              targetReps: [12, 8],
-              targetWeightKg: 20,
-              restSeconds: 90,
-              sets: [
-                SetSpec(type: SetType.warmup, reps: 12, weightKg: 20),
-                SetSpec(reps: 8, weightKg: 60),
-              ],
-              weeklySets: [
-                [
-                  SetSpec(type: SetType.warmup, reps: 12, weightKg: 20),
-                  SetSpec(reps: 8, weightKg: 60),
-                ],
-                [
-                  SetSpec(reps: 10, weightKg: 50),
-                  SetSpec(reps: 10, weightKg: 50)
-                ],
-              ],
-            ),
+  id: id,
+  name: 'Tipada 2 semanas',
+  split: 'Full Body',
+  level: ExperienceLevel.advanced,
+  source: RoutineSource.trainerAssigned,
+  assignedBy: _trainerId,
+  assignedTo: _athleteId,
+  visibility: RoutineVisibility.private,
+  numWeeks: 2,
+  days: const [
+    RoutineDay(
+      dayNumber: 1,
+      name: 'Día A',
+      slots: [
+        RoutineSlot(
+          exerciseId: 'bench-press',
+          exerciseName: 'Press de Banca',
+          muscleGroup: 'chest',
+          targetSets: 2,
+          targetRepsMin: 8,
+          targetRepsMax: 12,
+          targetReps: [12, 8],
+          targetWeightKg: 20,
+          restSeconds: 90,
+          sets: [
+            SetSpec(type: SetType.warmup, reps: 12, weightKg: 20),
+            SetSpec(reps: 8, weightKg: 60),
+          ],
+          weeklySets: [
+            [
+              SetSpec(type: SetType.warmup, reps: 12, weightKg: 20),
+              SetSpec(reps: 8, weightKg: 60),
+            ],
+            [SetSpec(reps: 10, weightKg: 50), SetSpec(reps: 10, weightKg: 50)],
           ],
         ),
       ],
-    );
+    ),
+  ],
+);
 
 /// 2-week plan with a superset (Press+Sentadilla) followed by a standalone
 /// Dominadas, where the SECOND superset member lives only in week 2. Copying
 /// week 1 over week 2 evicts it — and must not leave Press linked to
 /// Dominadas.
 Routine _presenceDropRoutine({String id = 'r11'}) => Routine(
-      id: id,
-      name: 'Drop de presencia',
-      split: 'Full Body',
-      level: ExperienceLevel.advanced,
-      source: RoutineSource.trainerAssigned,
-      assignedBy: _trainerId,
-      assignedTo: _athleteId,
-      visibility: RoutineVisibility.private,
-      numWeeks: 2,
-      days: const [
-        RoutineDay(
-          dayNumber: 1,
-          name: 'Día A',
-          slots: [
-            RoutineSlot(
-              exerciseId: 'bench-press',
-              exerciseName: 'Press de Banca',
-              muscleGroup: 'chest',
-              targetSets: 1,
-              targetRepsMin: 8,
-              targetRepsMax: 8,
-              targetReps: [8],
-              targetWeightKg: 60,
-              restSeconds: 90,
-              supersetGroup: 1,
-              sets: [SetSpec(reps: 8, weightKg: 60)],
-              weeklySets: [
-                [SetSpec(reps: 8, weightKg: 60)],
-                [SetSpec(reps: 8, weightKg: 60)],
-              ],
-            ),
-            // Superset partner — scheduled ONLY in week 2.
-            RoutineSlot(
-              exerciseId: 'squat',
-              exerciseName: 'Sentadilla',
-              muscleGroup: 'legs',
-              targetSets: 1,
-              targetRepsMin: 10,
-              targetRepsMax: 10,
-              targetReps: [10],
-              targetWeightKg: 80,
-              restSeconds: 120,
-              supersetGroup: 1,
-              sets: [SetSpec(reps: 10, weightKg: 80)],
-              weeklySets: [
-                [SetSpec(reps: 10, weightKg: 80)],
-                [SetSpec(reps: 10, weightKg: 80)],
-              ],
-              activeWeeks: [1],
-            ),
-            RoutineSlot(
-              exerciseId: 'pull-up',
-              exerciseName: 'Dominadas',
-              muscleGroup: 'back',
-              targetSets: 1,
-              targetRepsMin: 6,
-              targetRepsMax: 6,
-              targetReps: [6],
-              restSeconds: 60,
-              sets: [SetSpec(reps: 6)],
-              weeklySets: [
-                [SetSpec(reps: 6)],
-                [SetSpec(reps: 6)],
-              ],
-            ),
+  id: id,
+  name: 'Drop de presencia',
+  split: 'Full Body',
+  level: ExperienceLevel.advanced,
+  source: RoutineSource.trainerAssigned,
+  assignedBy: _trainerId,
+  assignedTo: _athleteId,
+  visibility: RoutineVisibility.private,
+  numWeeks: 2,
+  days: const [
+    RoutineDay(
+      dayNumber: 1,
+      name: 'Día A',
+      slots: [
+        RoutineSlot(
+          exerciseId: 'bench-press',
+          exerciseName: 'Press de Banca',
+          muscleGroup: 'chest',
+          targetSets: 1,
+          targetRepsMin: 8,
+          targetRepsMax: 8,
+          targetReps: [8],
+          targetWeightKg: 60,
+          restSeconds: 90,
+          supersetGroup: 1,
+          sets: [SetSpec(reps: 8, weightKg: 60)],
+          weeklySets: [
+            [SetSpec(reps: 8, weightKg: 60)],
+            [SetSpec(reps: 8, weightKg: 60)],
+          ],
+        ),
+        // Superset partner — scheduled ONLY in week 2.
+        RoutineSlot(
+          exerciseId: 'squat',
+          exerciseName: 'Sentadilla',
+          muscleGroup: 'legs',
+          targetSets: 1,
+          targetRepsMin: 10,
+          targetRepsMax: 10,
+          targetReps: [10],
+          targetWeightKg: 80,
+          restSeconds: 120,
+          supersetGroup: 1,
+          sets: [SetSpec(reps: 10, weightKg: 80)],
+          weeklySets: [
+            [SetSpec(reps: 10, weightKg: 80)],
+            [SetSpec(reps: 10, weightKg: 80)],
+          ],
+          activeWeeks: [1],
+        ),
+        RoutineSlot(
+          exerciseId: 'pull-up',
+          exerciseName: 'Dominadas',
+          muscleGroup: 'back',
+          targetSets: 1,
+          targetRepsMin: 6,
+          targetRepsMax: 6,
+          targetReps: [6],
+          restSeconds: 60,
+          sets: [SetSpec(reps: 6)],
+          weeklySets: [
+            [SetSpec(reps: 6)],
+            [SetSpec(reps: 6)],
           ],
         ),
       ],
-    );
+    ),
+  ],
+);
 
 /// A mobile-authored plan exercising every axis at once: 2 weeks with distinct
 /// per-week loads, a superset pair, typed sets, a rep range, coaching notes and
@@ -584,149 +581,149 @@ Routine _presenceDropRoutine({String id = 'r11'}) => Routine(
 /// `buildRoutineSlot` derives them, so a faithful web round-trip is an
 /// identity — any diff is a field web silently drops or rewrites.
 Routine _kitchenSinkRoutine({String id = 'r9'}) => Routine(
-      id: id,
-      name: 'Periodizada completa',
-      split: 'PPL',
-      level: ExperienceLevel.advanced,
-      source: RoutineSource.trainerAssigned,
-      assignedBy: _trainerId,
-      assignedTo: _athleteId,
-      visibility: RoutineVisibility.private,
-      numWeeks: 2,
-      days: const [
-        RoutineDay(
-          dayNumber: 1,
-          name: 'Día A',
-          slots: [
-            // Superset member 1: reps/single, typed sets, present every week.
-            RoutineSlot(
-              exerciseId: 'bench-press',
-              exerciseName: 'Press de Banca',
-              muscleGroup: 'chest',
-              targetSets: 3,
-              targetRepsMin: 6,
-              targetRepsMax: 12,
-              targetReps: [12, 8, 6],
-              targetWeightKg: 20,
-              restSeconds: 90,
-              supersetGroup: 1,
-              notes: 'Controlá la bajada',
-              sets: [
-                SetSpec(type: SetType.warmup, reps: 12, weightKg: 20),
-                SetSpec(reps: 8, weightKg: 60),
-                SetSpec(type: SetType.failure, reps: 6, weightKg: 70),
-              ],
-              weeklySets: [
-                [
-                  SetSpec(type: SetType.warmup, reps: 12, weightKg: 20),
-                  SetSpec(reps: 8, weightKg: 60),
-                  SetSpec(type: SetType.failure, reps: 6, weightKg: 70),
-                ],
-                [
-                  SetSpec(type: SetType.warmup, reps: 12, weightKg: 25),
-                  SetSpec(reps: 8, weightKg: 65),
-                  SetSpec(type: SetType.failure, reps: 5, weightKg: 75),
-                ],
-              ],
-            ),
-            // Superset member 2: reps/RANGE, dropped from week 2.
-            RoutineSlot(
-              exerciseId: 'squat',
-              exerciseName: 'Sentadilla',
-              muscleGroup: 'legs',
-              targetSets: 2,
-              targetRepsMin: 8,
-              targetRepsMax: 12,
-              targetWeightKg: 80,
-              restSeconds: 120,
-              supersetGroup: 1,
-              repMode: RepMode.range,
-              sets: [
-                SetSpec(repsMin: 8, repsMax: 12, weightKg: 80),
-                SetSpec(repsMin: 8, repsMax: 10, weightKg: 85),
-              ],
-              weeklySets: [
-                [
-                  SetSpec(repsMin: 8, repsMax: 12, weightKg: 80),
-                  SetSpec(repsMin: 8, repsMax: 10, weightKg: 85),
-                ],
-                [
-                  SetSpec(repsMin: 8, repsMax: 12, weightKg: 80),
-                  SetSpec(repsMin: 8, repsMax: 10, weightKg: 85),
-                ],
-              ],
-              activeWeeks: [0],
-            ),
+  id: id,
+  name: 'Periodizada completa',
+  split: 'PPL',
+  level: ExperienceLevel.advanced,
+  source: RoutineSource.trainerAssigned,
+  assignedBy: _trainerId,
+  assignedTo: _athleteId,
+  visibility: RoutineVisibility.private,
+  numWeeks: 2,
+  days: const [
+    RoutineDay(
+      dayNumber: 1,
+      name: 'Día A',
+      slots: [
+        // Superset member 1: reps/single, typed sets, present every week.
+        RoutineSlot(
+          exerciseId: 'bench-press',
+          exerciseName: 'Press de Banca',
+          muscleGroup: 'chest',
+          targetSets: 3,
+          targetRepsMin: 6,
+          targetRepsMax: 12,
+          targetReps: [12, 8, 6],
+          targetWeightKg: 20,
+          restSeconds: 90,
+          supersetGroup: 1,
+          notes: 'Controlá la bajada',
+          sets: [
+            SetSpec(type: SetType.warmup, reps: 12, weightKg: 20),
+            SetSpec(reps: 8, weightKg: 60),
+            SetSpec(type: SetType.failure, reps: 6, weightKg: 70),
+          ],
+          weeklySets: [
+            [
+              SetSpec(type: SetType.warmup, reps: 12, weightKg: 20),
+              SetSpec(reps: 8, weightKg: 60),
+              SetSpec(type: SetType.failure, reps: 6, weightKg: 70),
+            ],
+            [
+              SetSpec(type: SetType.warmup, reps: 12, weightKg: 25),
+              SetSpec(reps: 8, weightKg: 65),
+              SetSpec(type: SetType.failure, reps: 5, weightKg: 75),
+            ],
           ],
         ),
+        // Superset member 2: reps/RANGE, dropped from week 2.
+        RoutineSlot(
+          exerciseId: 'squat',
+          exerciseName: 'Sentadilla',
+          muscleGroup: 'legs',
+          targetSets: 2,
+          targetRepsMin: 8,
+          targetRepsMax: 12,
+          targetWeightKg: 80,
+          restSeconds: 120,
+          supersetGroup: 1,
+          repMode: RepMode.range,
+          sets: [
+            SetSpec(repsMin: 8, repsMax: 12, weightKg: 80),
+            SetSpec(repsMin: 8, repsMax: 10, weightKg: 85),
+          ],
+          weeklySets: [
+            [
+              SetSpec(repsMin: 8, repsMax: 12, weightKg: 80),
+              SetSpec(repsMin: 8, repsMax: 10, weightKg: 85),
+            ],
+            [
+              SetSpec(repsMin: 8, repsMax: 12, weightKg: 80),
+              SetSpec(repsMin: 8, repsMax: 10, weightKg: 85),
+            ],
+          ],
+          activeWeeks: [0],
+        ),
       ],
-    );
+    ),
+  ],
+);
 
 /// A mobile-authored routine whose sets carry non-default [SetType]s — the
 /// shape web must not damage when it opens and re-saves someone else's plan.
 Routine _typedSetsRoutine({String id = 'r8'}) => Routine(
-      id: id,
-      name: 'Con series tipadas',
-      split: 'Full Body',
-      level: ExperienceLevel.advanced,
-      source: RoutineSource.trainerAssigned,
-      assignedBy: _trainerId,
-      assignedTo: _athleteId,
-      visibility: RoutineVisibility.private,
-      days: const [
-        RoutineDay(
-          dayNumber: 1,
-          name: 'Día A',
-          slots: [
-            RoutineSlot(
-              exerciseId: 'bench-press',
-              exerciseName: 'Press de Banca',
-              muscleGroup: 'chest',
-              targetSets: 3,
-              targetRepsMin: 8,
-              targetRepsMax: 8,
-              restSeconds: 90,
-              sets: [
-                SetSpec(type: SetType.warmup, reps: 12, weightKg: 20),
-                SetSpec(reps: 8, weightKg: 60),
-                SetSpec(type: SetType.failure, reps: 6, weightKg: 70),
-              ],
-            ),
+  id: id,
+  name: 'Con series tipadas',
+  split: 'Full Body',
+  level: ExperienceLevel.advanced,
+  source: RoutineSource.trainerAssigned,
+  assignedBy: _trainerId,
+  assignedTo: _athleteId,
+  visibility: RoutineVisibility.private,
+  days: const [
+    RoutineDay(
+      dayNumber: 1,
+      name: 'Día A',
+      slots: [
+        RoutineSlot(
+          exerciseId: 'bench-press',
+          exerciseName: 'Press de Banca',
+          muscleGroup: 'chest',
+          targetSets: 3,
+          targetRepsMin: 8,
+          targetRepsMax: 8,
+          restSeconds: 90,
+          sets: [
+            SetSpec(type: SetType.warmup, reps: 12, weightKg: 20),
+            SetSpec(reps: 8, weightKg: 60),
+            SetSpec(type: SetType.failure, reps: 6, weightKg: 70),
           ],
         ),
       ],
-    );
+    ),
+  ],
+);
 
 Routine _presenceRoutine({String id = 'r7'}) => Routine(
-      id: id,
-      name: 'Con máscara de presencia',
-      split: 'PPL',
-      level: ExperienceLevel.advanced,
-      source: RoutineSource.trainerAssigned,
-      assignedBy: _trainerId,
-      assignedTo: _athleteId,
-      visibility: RoutineVisibility.private,
-      numWeeks: 2,
-      days: const [
-        RoutineDay(
-          dayNumber: 1,
-          name: 'Día A',
-          slots: [
-            RoutineSlot(
-              exerciseId: 'bench-press',
-              exerciseName: 'Press de Banca',
-              muscleGroup: 'chest',
-              targetSets: 1,
-              targetRepsMin: 8,
-              targetRepsMax: 8,
-              restSeconds: 90,
-              sets: [SetSpec(reps: 8, weightKg: 60)],
-              activeWeeks: [0],
-            ),
-          ],
+  id: id,
+  name: 'Con máscara de presencia',
+  split: 'PPL',
+  level: ExperienceLevel.advanced,
+  source: RoutineSource.trainerAssigned,
+  assignedBy: _trainerId,
+  assignedTo: _athleteId,
+  visibility: RoutineVisibility.private,
+  numWeeks: 2,
+  days: const [
+    RoutineDay(
+      dayNumber: 1,
+      name: 'Día A',
+      slots: [
+        RoutineSlot(
+          exerciseId: 'bench-press',
+          exerciseName: 'Press de Banca',
+          muscleGroup: 'chest',
+          targetSets: 1,
+          targetRepsMin: 8,
+          targetRepsMax: 8,
+          restSeconds: 90,
+          sets: [SetSpec(reps: 8, weightKg: 60)],
+          activeWeeks: [0],
         ),
       ],
-    );
+    ),
+  ],
+);
 
 /// Fills name + split and adds one exercise (via the mocked exercise picker
 /// data) to the first day, then sets valid reps on its single default set.
@@ -945,6 +942,120 @@ void main() {
     });
   });
 
+  group('RoutineEditorWebScreen — borrar ejercicio con scope (Fase 6)', () {
+    Future<void> addPressDeBanca(WidgetTester tester) async {
+      await tester.tap(find.text('Agregar ejercicio'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Press de Banca'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Agregar (1)'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('en plan de 1 semana el tacho borra directo, sin diálogo', (
+      tester,
+    ) async {
+      await _pumpEditor(tester);
+      await addPressDeBanca(tester);
+      expect(find.text('Press de Banca'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Quitar ejercicio'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('¿Eliminar ejercicio?'), findsNothing);
+      expect(find.text('Press de Banca'), findsNothing);
+    });
+
+    testWidgets('en multi-semana el tacho abre el diálogo de scope', (
+      tester,
+    ) async {
+      await _pumpEditor(tester);
+      await addPressDeBanca(tester);
+      await tester.tap(find.text('+')); // 2 semanas
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Quitar ejercicio'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('¿Eliminar ejercicio?'), findsOneWidget);
+      expect(find.text('Solo esta semana'), findsOneWidget);
+      expect(find.text('Todas las semanas'), findsOneWidget);
+    });
+
+    testWidgets('"Todas las semanas" elimina el ejercicio por completo', (
+      tester,
+    ) async {
+      await _pumpEditor(tester);
+      await addPressDeBanca(tester);
+      await tester.tap(find.text('+'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Quitar ejercicio'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Todas las semanas'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Press de Banca'), findsNothing);
+    });
+
+    testWidgets(
+      '"Solo esta semana" lo conserva y guarda con activeWeeks sin la actual',
+      (tester) async {
+        final repo = _MockRoutineRepository();
+        when(
+          () => repo.createAssigned(any()),
+        ).thenAnswer((i) async => i.positionalArguments.first as Routine);
+        await _pumpEditor(tester, repo: repo);
+
+        // Llena reps en la semana 1 ANTES de sumar semanas, así la semana 2
+        // se siembra con esa prescripción válida (_normalizeSlotWeeks).
+        await _fillMinimalValidForm(tester);
+        await tester.tap(find.text('+')); // 2 semanas
+        await tester.pumpAndSettle();
+
+        // Estamos en la semana 1 (índice 0): "Solo esta semana" la saca.
+        await tester.tap(find.byTooltip('Quitar ejercicio'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Solo esta semana'));
+        await tester.pumpAndSettle();
+
+        // Sigue estando (ahora solo en la semana 2).
+        expect(find.text('Press de Banca'), findsOneWidget);
+
+        await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+        await tester.pumpAndSettle();
+
+        final routine =
+            verify(() => repo.createAssigned(captureAny())).captured.single
+                as Routine;
+        expect(routine.days.single.slots.single.activeWeeks, [1]);
+      },
+    );
+
+    testWidgets(
+      '"Solo esta semana" en la última semana presente borra el slot entero',
+      (tester) async {
+        await _pumpEditor(tester);
+        await _fillMinimalValidForm(tester);
+        await tester.tap(find.text('+')); // 2 semanas
+        await tester.pumpAndSettle();
+
+        // Saca la semana 2 → el ejercicio queda presente SOLO en la semana 1.
+        await tester.ensureVisible(find.byKey(const Key('presence_chip_1')));
+        await tester.tap(find.byKey(const Key('presence_chip_1')));
+        await tester.pumpAndSettle();
+
+        // "Solo esta semana" sobre la única semana presente → borrado real.
+        await tester.tap(find.byTooltip('Quitar ejercicio'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Solo esta semana'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Press de Banca'), findsNothing);
+      },
+    );
+  });
+
   group('RoutineEditorWebScreen — submit', () {
     testWidgets(
       'valid form calls createAssigned with a well-formed single-week Routine',
@@ -1084,12 +1195,14 @@ void main() {
         await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
         await tester.pumpAndSettle();
 
-        final draft = verify(
-          () => repo.updateAssigned(
-            uid: any(named: 'uid'),
-            draft: captureAny(named: 'draft'),
-          ),
-        ).captured.single as Routine;
+        final draft =
+            verify(
+                  () => repo.updateAssigned(
+                    uid: any(named: 'uid'),
+                    draft: captureAny(named: 'draft'),
+                  ),
+                ).captured.single
+                as Routine;
         expect(draft.id, 'r1'); // UPDATE on the same document, not a new one
         expect(draft.name, 'Fuerza v2');
         expect(draft.numWeeks, 1);
@@ -1157,9 +1270,9 @@ void main() {
       await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
       await tester.pumpAndSettle();
 
-      final routine = verify(() => repo.createAssigned(captureAny()))
-          .captured
-          .single as Routine;
+      final routine =
+          verify(() => repo.createAssigned(captureAny())).captured.single
+              as Routine;
       final slot = routine.days.single.slots.single;
       expect(slot.repMode, RepMode.range);
       expect(slot.sets.single.repsMin, 8);
@@ -1185,9 +1298,9 @@ void main() {
       await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
       await tester.pumpAndSettle();
 
-      final routine = verify(() => repo.createAssigned(captureAny()))
-          .captured
-          .single as Routine;
+      final routine =
+          verify(() => repo.createAssigned(captureAny())).captured.single
+              as Routine;
       expect(routine.days.single.slots.single.notes, 'Bajá despacio la barra');
     });
 
@@ -1253,12 +1366,14 @@ void main() {
       await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
       await tester.pumpAndSettle();
 
-      final draft = verify(
-        () => repo.updateAssigned(
-          uid: any(named: 'uid'),
-          draft: captureAny(named: 'draft'),
-        ),
-      ).captured.single as Routine;
+      final draft =
+          verify(
+                () => repo.updateAssigned(
+                  uid: any(named: 'uid'),
+                  draft: captureAny(named: 'draft'),
+                ),
+              ).captured.single
+              as Routine;
       final slot = draft.days.single.slots.single;
       expect(slot.repMode, RepMode.range);
       expect(slot.sets.single.repsMin, 8);
@@ -1308,9 +1423,9 @@ void main() {
       await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
       await tester.pumpAndSettle();
 
-      final routine = verify(() => repo.createAssigned(captureAny()))
-          .captured
-          .single as Routine;
+      final routine =
+          verify(() => repo.createAssigned(captureAny())).captured.single
+              as Routine;
       final slot = routine.days.single.slots.single;
       expect(slot.exerciseMode, ExerciseMode.duration);
       expect(slot.sets.single.durationSeconds, 60);
@@ -1367,12 +1482,14 @@ void main() {
         await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
         await tester.pumpAndSettle();
 
-        final draft = verify(
-          () => repo.updateAssigned(
-            uid: any(named: 'uid'),
-            draft: captureAny(named: 'draft'),
-          ),
-        ).captured.single as Routine;
+        final draft =
+            verify(
+                  () => repo.updateAssigned(
+                    uid: any(named: 'uid'),
+                    draft: captureAny(named: 'draft'),
+                  ),
+                ).captured.single
+                as Routine;
         final slot = draft.days.single.slots.single;
         expect(slot.exerciseMode, ExerciseMode.duration);
         expect(slot.sets.single.durationSeconds, 60);
@@ -1406,12 +1523,14 @@ void main() {
       await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
       await tester.pumpAndSettle();
 
-      final draft = verify(
-        () => repo.updateAssigned(
-          uid: any(named: 'uid'),
-          draft: captureAny(named: 'draft'),
-        ),
-      ).captured.single as Routine;
+      final draft =
+          verify(
+                () => repo.updateAssigned(
+                  uid: any(named: 'uid'),
+                  draft: captureAny(named: 'draft'),
+                ),
+              ).captured.single
+              as Routine;
       final slots = draft.days.single.slots;
       // A lone (unlinked) slot normalizes to a standalone (null group).
       expect(slots[0].supersetGroup, isNull);
@@ -1441,12 +1560,14 @@ void main() {
       await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
       await tester.pumpAndSettle();
 
-      final draft = verify(
-        () => repo.updateAssigned(
-          uid: any(named: 'uid'),
-          draft: captureAny(named: 'draft'),
-        ),
-      ).captured.single as Routine;
+      final draft =
+          verify(
+                () => repo.updateAssigned(
+                  uid: any(named: 'uid'),
+                  draft: captureAny(named: 'draft'),
+                ),
+              ).captured.single
+              as Routine;
       final slots = draft.days.single.slots;
       expect(slots[0].supersetGroup, isNotNull);
       expect(slots[0].supersetGroup, slots[1].supersetGroup);
@@ -1480,9 +1601,9 @@ void main() {
       await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
       await tester.pumpAndSettle();
 
-      final routine = verify(() => repo.createAssigned(captureAny()))
-          .captured
-          .single as Routine;
+      final routine =
+          verify(() => repo.createAssigned(captureAny())).captured.single
+              as Routine;
       expect(routine.numWeeks, 3);
       // Same prescription every week (copied by the padding above) — still
       // written to weeklySets since numWeeks > 1 (Fase 4b, ADR-PB-03 parity).
@@ -1520,12 +1641,14 @@ void main() {
       await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
       await tester.pumpAndSettle();
 
-      final draft = verify(
-        () => repo.updateAssigned(
-          uid: any(named: 'uid'),
-          draft: captureAny(named: 'draft'),
-        ),
-      ).captured.single as Routine;
+      final draft =
+          verify(
+                () => repo.updateAssigned(
+                  uid: any(named: 'uid'),
+                  draft: captureAny(named: 'draft'),
+                ),
+              ).captured.single
+              as Routine;
       expect(draft.numWeeks, 4);
     });
   });
@@ -1566,9 +1689,9 @@ void main() {
       await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
       await tester.pumpAndSettle();
 
-      final routine = verify(() => repo.createAssigned(captureAny()))
-          .captured
-          .single as Routine;
+      final routine =
+          verify(() => repo.createAssigned(captureAny())).captured.single
+              as Routine;
       expect(routine.numWeeks, 2);
       final slot = routine.days.single.slots.single;
       expect(slot.weeklySets, hasLength(2));
@@ -1600,12 +1723,14 @@ void main() {
         await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
         await tester.pumpAndSettle();
 
-        final draft = verify(
-          () => repo.updateAssigned(
-            uid: any(named: 'uid'),
-            draft: captureAny(named: 'draft'),
-          ),
-        ).captured.single as Routine;
+        final draft =
+            verify(
+                  () => repo.updateAssigned(
+                    uid: any(named: 'uid'),
+                    draft: captureAny(named: 'draft'),
+                  ),
+                ).captured.single
+                as Routine;
         final slot = draft.days.single.slots.single;
         expect(slot.weeklySets, hasLength(2));
         expect(slot.weeklySets[0].single.reps, 10);
@@ -1645,9 +1770,9 @@ void main() {
         await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
         await tester.pumpAndSettle();
 
-        final routine = verify(() => repo.createAssigned(captureAny()))
-            .captured
-            .single as Routine;
+        final routine =
+            verify(() => repo.createAssigned(captureAny())).captured.single
+                as Routine;
         expect(routine.days.single.slots.single.activeWeeks, [0]);
       },
     );
@@ -1681,9 +1806,9 @@ void main() {
         await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
         await tester.pumpAndSettle();
 
-        final routine = verify(() => repo.createAssigned(captureAny()))
-            .captured
-            .single as Routine;
+        final routine =
+            verify(() => repo.createAssigned(captureAny())).captured.single
+                as Routine;
         expect(routine.days.single.slots.single.activeWeeks, [0]);
       },
     );
@@ -1713,9 +1838,9 @@ void main() {
         await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
         await tester.pumpAndSettle();
 
-        final routine = verify(() => repo.createAssigned(captureAny()))
-            .captured
-            .single as Routine;
+        final routine =
+            verify(() => repo.createAssigned(captureAny())).captured.single
+                as Routine;
         // Covering every week again is canonically "no mask", not [0, 1].
         expect(routine.days.single.slots.single.activeWeeks, isEmpty);
       },
@@ -1745,12 +1870,14 @@ void main() {
         await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
         await tester.pumpAndSettle();
 
-        final draft = verify(
-          () => repo.updateAssigned(
-            uid: any(named: 'uid'),
-            draft: captureAny(named: 'draft'),
-          ),
-        ).captured.single as Routine;
+        final draft =
+            verify(
+                  () => repo.updateAssigned(
+                    uid: any(named: 'uid'),
+                    draft: captureAny(named: 'draft'),
+                  ),
+                ).captured.single
+                as Routine;
         expect(draft.days.single.slots.single.activeWeeks, [0]);
       },
     );
@@ -1777,23 +1904,25 @@ void main() {
       await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
       await tester.pumpAndSettle();
 
-      final draft = verify(
-        () => repo.updateAssigned(
-          uid: any(named: 'uid'),
-          draft: captureAny(named: 'draft'),
-        ),
-      ).captured.single as Routine;
+      final draft =
+          verify(
+                () => repo.updateAssigned(
+                  uid: any(named: 'uid'),
+                  draft: captureAny(named: 'draft'),
+                ),
+              ).captured.single
+              as Routine;
 
       expect(
         draft.days.single.slots.single.sets.map((s) => s.type).toList(),
         const [SetType.warmup, SetType.normal, SetType.failure],
-        reason: 'Opening and re-saving a plan must not silently downgrade '
+        reason:
+            'Opening and re-saving a plan must not silently downgrade '
             'warm-up/failure sets to normal working sets.',
       );
     });
 
-    testWidgets('re-saving a full mobile-authored plan changes nothing at all',
-        (
+    testWidgets('re-saving a full mobile-authored plan changes nothing at all', (
       tester,
     ) async {
       // This is what justifies dropping the isRoutineWebEditable gate: web may
@@ -1812,12 +1941,14 @@ void main() {
       await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
       await tester.pumpAndSettle();
 
-      final draft = verify(
-        () => repo.updateAssigned(
-          uid: any(named: 'uid'),
-          draft: captureAny(named: 'draft'),
-        ),
-      ).captured.single as Routine;
+      final draft =
+          verify(
+                () => repo.updateAssigned(
+                  uid: any(named: 'uid'),
+                  draft: captureAny(named: 'draft'),
+                ),
+              ).captured.single
+              as Routine;
 
       expect(draft.days, original.days);
     });
@@ -1846,11 +1977,12 @@ void main() {
       await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
       await tester.pumpAndSettle();
       return verify(
-        () => repo.updateAssigned(
-          uid: any(named: 'uid'),
-          draft: captureAny(named: 'draft'),
-        ),
-      ).captured.single as Routine;
+            () => repo.updateAssigned(
+              uid: any(named: 'uid'),
+              draft: captureAny(named: 'draft'),
+            ),
+          ).captured.single
+          as Routine;
     }
 
     testWidgets(
@@ -1883,8 +2015,7 @@ void main() {
       },
     );
 
-    testWidgets(
-        'moving a standalone exercise up does not absorb it into the '
+    testWidgets('moving a standalone exercise up does not absorb it into the '
         'superset above', (tester) async {
       final repo = await pumpOrderRoutine(tester);
 
@@ -1964,11 +2095,12 @@ void main() {
       await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
       await tester.pumpAndSettle();
       return verify(
-        () => repo.updateAssigned(
-          uid: any(named: 'uid'),
-          draft: captureAny(named: 'draft'),
-        ),
-      ).captured.single as Routine;
+            () => repo.updateAssigned(
+              uid: any(named: 'uid'),
+              draft: captureAny(named: 'draft'),
+            ),
+          ).captured.single
+          as Routine;
     }
 
     testWidgets('the button is hidden on week 1 and labelled with the source', (
@@ -2053,7 +2185,8 @@ void main() {
         expect(
           slots.map((s) => s.exerciseName).toList(),
           const ['Press de Banca', 'Dominadas'],
-          reason: 'Sentadilla lived only in week 2; copying week 1 over it '
+          reason:
+              'Sentadilla lived only in week 2; copying week 1 over it '
               'leaves it scheduled nowhere.',
         );
         expect(
@@ -2110,11 +2243,12 @@ void main() {
       await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
       await tester.pumpAndSettle();
       return verify(
-        () => repo.updateAssigned(
-          uid: any(named: 'uid'),
-          draft: captureAny(named: 'draft'),
-        ),
-      ).captured.single as Routine;
+            () => repo.updateAssigned(
+              uid: any(named: 'uid'),
+              draft: captureAny(named: 'draft'),
+            ),
+          ).captured.single
+          as Routine;
     }
 
     testWidgets(
@@ -2251,8 +2385,9 @@ void main() {
       await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
       await tester.pumpAndSettle();
 
-      final t = verify(() => repo.createTemplate(captureAny())).captured.single
-          as Routine;
+      final t =
+          verify(() => repo.createTemplate(captureAny())).captured.single
+              as Routine;
       expect(t.source, RoutineSource.trainerTemplate);
       expect(t.assignedTo, isNull);
       expect(t.visibility, RoutineVisibility.private);
@@ -2281,12 +2416,14 @@ void main() {
       await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
       await tester.pumpAndSettle();
 
-      final draft = verify(
-        () => repo.updateTemplate(
-          uid: any(named: 'uid'),
-          draft: captureAny(named: 'draft'),
-        ),
-      ).captured.single as Routine;
+      final draft =
+          verify(
+                () => repo.updateTemplate(
+                  uid: any(named: 'uid'),
+                  draft: captureAny(named: 'draft'),
+                ),
+              ).captured.single
+              as Routine;
       expect(draft.id, 't1');
       expect(draft.source, RoutineSource.trainerTemplate);
       verifyNever(
