@@ -10,6 +10,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/features/coach/presentation/widgets/athlete_picker_sheet.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
@@ -50,9 +51,8 @@ class TemplatesTab extends ConsumerWidget {
         ),
         Expanded(
           child: templatesAsync.when(
-            loading: () => Center(
-              child: CircularProgressIndicator(color: palette.accent),
-            ),
+            loading: () =>
+                Center(child: CircularProgressIndicator(color: palette.accent)),
             error: (e, _) => Center(
               child: Text(
                 'Error al cargar plantillas.', // i18n
@@ -95,6 +95,8 @@ class TemplatesTab extends ConsumerWidget {
                       routine,
                       onEdit: () =>
                           context.push('/template-editor/${routine.id}'),
+                      onUse: () =>
+                          _assignTemplateToAthlete(context, ref, routine),
                     ),
                   );
                 },
@@ -103,6 +105,35 @@ class TemplatesTab extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Opens the athlete picker and, on a pick, copies [template] into a
+/// trainer-assigned routine for that athlete via the repository's
+/// assignTemplateToAthlete. Mirrors mobile's template-card "Asignar"
+/// (trainer_workout_view.dart _onAssign): same picker, same repo call, same
+/// success/error copy. The template is left untouched, so it can be assigned to
+/// other athletes later.
+Future<void> _assignTemplateToAthlete(
+  BuildContext context,
+  WidgetRef ref,
+  Routine template,
+) async {
+  final athleteId = await showAthletePickerSheet(context);
+  if (athleteId == null || !context.mounted) return;
+  // Capture the messenger before the async gap — context may unmount.
+  final messenger = ScaffoldMessenger.of(context);
+  try {
+    await ref
+        .read(routineRepositoryProvider)
+        .assignTemplateToAthlete(template: template, athleteId: athleteId);
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Plantilla asignada al alumno.')), // i18n
+    );
+  } catch (_) {
+    messenger.showSnackBar(
+      const SnackBar(content: Text('No pudimos asignar la plantilla.')), // i18n
     );
   }
 }
@@ -122,7 +153,9 @@ class _NuevaPlantillaButton extends StatelessWidget {
       label: Text(
         'Nueva plantilla', // i18n
         style: GoogleFonts.barlow(
-            color: palette.accent, fontWeight: FontWeight.w600),
+          color: palette.accent,
+          fontWeight: FontWeight.w600,
+        ),
       ),
       style: TextButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
