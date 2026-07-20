@@ -956,6 +956,7 @@
   "insightsTileMuscleDistributionSubtitle": "Current vs. previous period comparison",
   "muscleDistributionScreenTitle": "MUSCLE DISTRIBUTION",
   "muscleDistributionLoadError": "We couldn't load your muscle distribution. Try again.",
+  "frequentExercisesLoadError": "",
   "exerciseProgressionScreenTitle": "EXERCISE PROGRESSION",
   "insightsTileExerciseProgressionTitle": "Exercise progression",
   "insightsTileExerciseProgressionSubtitle": "Your progress per exercise + records",

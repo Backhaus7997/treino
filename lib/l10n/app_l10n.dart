@@ -4749,6 +4749,12 @@ abstract class AppL10n {
   /// **'No pudimos cargar tu distribución muscular. Probá de nuevo.'**
   String get muscleDistributionLoadError;
 
+  /// Error state for the FrequentExercisesScreen's exerciseFrequencyProvider load failure. Paired with coachRetryLabel for the retry CTA — same convention as muscleDistributionLoadError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar tus ejercicios frecuentes. Probá de nuevo.'**
+  String get frequentExercisesLoadError;
+
   /// Header title for the athlete-side ExerciseProgressionScreen.
   ///
   /// In es_AR, this message translates to:

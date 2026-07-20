@@ -78,7 +78,16 @@ class _FrequentExercisesScreenState
                     height: 120,
                     child: Center(child: CircularProgressIndicator()),
                   ),
-                  error: (_, __) => const SizedBox.shrink(),
+                  // QA-INS-005: nunca `SizedBox.shrink()` en error — dejaba la
+                  // pantalla en blanco, sin mensaje ni forma de reintentar.
+                  // `_ErrorState` (mensaje + retry) invalida el provider que
+                  // alimenta la lista para volver a intentar la carga.
+                  error: (_, __) => _ErrorState(
+                    message: l10n.frequentExercisesLoadError,
+                    retryLabel: l10n.coachRetryLabel,
+                    onRetry: () => ref.invalidate(exerciseFrequencyProvider(
+                        (athleteUid: widget.uid, period: _selectedPeriod))),
+                  ),
                   data: (entries) => MostFrequentExercisesList(
                     entries: entries,
                     selectedPeriod: _selectedPeriod,
@@ -151,5 +160,44 @@ void _safePopOrInsights(BuildContext context) {
     context.pop();
   } else {
     context.go('/home/insights');
+  }
+}
+
+// ── Error state ───────────────────────────────────────────────────────────────
+
+/// Message + retry CTA — same shape as [MuscleDistributionScreen]'s
+/// `_ErrorState`. `retryLabel` is optional; falls back to [coachRetryLabel].
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({
+    required this.message,
+    this.retryLabel,
+    required this.onRetry,
+  });
+
+  final String message;
+  final String? retryLabel;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      child: Column(
+        children: [
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: onRetry,
+            child: Text(retryLabel ?? l10n.coachRetryLabel),
+          ),
+        ],
+      ),
+    );
   }
 }

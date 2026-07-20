@@ -2621,6 +2621,10 @@ class AppL10nEs extends AppL10n {
       'No pudimos cargar tu distribución muscular. Inténtalo de nuevo.';
 
   @override
+  String get frequentExercisesLoadError =>
+      'No pudimos cargar tus ejercicios frecuentes. Inténtalo de nuevo.';
+
+  @override
   String get exerciseProgressionScreenTitle => 'EVOLUCIÓN POR EJERCICIO';
 
   @override
@@ -5311,6 +5315,10 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get muscleDistributionLoadError =>
       'No pudimos cargar tu distribución muscular. Probá de nuevo.';
+
+  @override
+  String get frequentExercisesLoadError =>
+      'No pudimos cargar tus ejercicios frecuentes. Probá de nuevo.';
 
   @override
   String get exerciseProgressionScreenTitle => 'EVOLUCIÓN POR EJERCICIO';

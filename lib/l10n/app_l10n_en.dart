@@ -2566,6 +2566,9 @@ class AppL10nEn extends AppL10n {
       'We couldn\'t load your muscle distribution. Try again.';
 
   @override
+  String get frequentExercisesLoadError => '';
+
+  @override
   String get exerciseProgressionScreenTitle => 'EXERCISE PROGRESSION';
 
   @override

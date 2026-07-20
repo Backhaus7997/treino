@@ -618,7 +618,16 @@ class _DailyMusclesCard extends ConsumerWidget {
               height: 240,
               child: Center(child: CircularProgressIndicator()),
             ),
-            error: (_, __) => const SizedBox.shrink(),
+            // QA-INS-005: nunca `SizedBox.shrink()` en error — antes la card
+            // quedaba vacía (ni silueta ni mensaje) y no había forma de
+            // distinguir "sin datos" de "falló la carga", ni de reintentar.
+            // Reusa `_ErrorState` (compacto) con retry que invalida el
+            // provider de ESTE card (day-insights), no el semanal.
+            error: (_, __) => _ErrorState(
+              onRetry: () => ref.invalidate(
+                athleteDayInsightsProvider((uid: uid, day: selectedDay)),
+              ),
+            ),
             // [UX-back-view] `showBack: true` renders bodyfront + bodyback
             // side by side — that pair needs more horizontal room than the
             // old single-body 160px column had next to it. Stacked
