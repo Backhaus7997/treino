@@ -104,6 +104,24 @@ void main() {
     expect(find.text('Sin plan todavía'), findsNothing);
   });
 
+  testWidgets(
+      'NutricionPlanRow.loading muestra shimmer sin necesitar un entry '
+      '(WU-05, roster completo en loading)', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          home: const Scaffold(body: NutricionPlanRow.loading()),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byKey(const Key('list_row_skeleton')), findsOneWidget);
+  });
+
   testWidgets('onTap dispara el callback inyectado', (tester) async {
     var tapped = false;
     final entry = (

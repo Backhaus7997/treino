@@ -23,7 +23,6 @@ import '../../../../../app/theme/tokens/primitives.dart';
 import '../../../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../../../core/widgets/treino_icon.dart';
-import '../../../../../l10n/app_l10n.dart';
 import '../../../../coach/application/trainer_link_providers.dart';
 import '../../widgets/coach_hub_widgets.dart';
 import 'nutricion_providers.dart';
@@ -77,15 +76,25 @@ class NutricionScreen extends ConsumerWidget {
             ),
             child: entriesAsync.when(
               loading: () => const _LoadingList(),
-              error: (e, _) => _ErrorSection(
-                onRetry: () => ref.invalidate(trainerLinksStreamProvider),
+              error: (e, _) => TreinoEmptyState(
+                key: const Key('nutricion_error'),
+                icon: TreinoIcon.errorState,
+                title: 'No pudimos cargar tus alumnos.', // i18n: Fase W6
+                ctaLabel: 'Reintentar', // i18n: Fase W6
+                onCtaTap: () => ref.invalidate(trainerLinksStreamProvider),
               ),
               data: (entries) {
                 final filtered = [
                   for (final entry in entries)
                     if (matchesNutricionFiltro(entry, filtro)) entry,
                 ];
-                if (filtered.isEmpty) return const _EmptyNutricion();
+                if (filtered.isEmpty) {
+                  return _EmptyNutricion(
+                    filtro: filtro,
+                    hasAnyAlumno: entries.isNotEmpty,
+                    onIrAAlumnos: () => context.go('/alumnos'),
+                  );
+                }
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -153,75 +162,67 @@ class _FiltroChips extends ConsumerWidget {
   }
 }
 
-/// Skeleton de carga — columna de `NutricionPlanRow` en modo `loading`.
+/// Skeleton de carga — columna de `NutricionPlanRow.loading` (shimmer del
+/// kit vía `TreinoListRow`, nunca un `CircularProgressIndicator` seco).
 class _LoadingList extends StatelessWidget {
   const _LoadingList();
 
+  static const _rowCount = 5;
+
   @override
   Widget build(BuildContext context) {
-    return const Column(
+    return Column(
       children: [
-        TreinoListRow(title: '', loading: true),
-        SizedBox(height: AppSpacing.s8),
-        TreinoListRow(title: '', loading: true),
-        SizedBox(height: AppSpacing.s8),
-        TreinoListRow(title: '', loading: true),
-        SizedBox(height: AppSpacing.s8),
-        TreinoListRow(title: '', loading: true),
-        SizedBox(height: AppSpacing.s8),
-        TreinoListRow(title: '', loading: true),
+        for (var i = 0; i < _rowCount; i++) ...[
+          if (i != 0) const SizedBox(height: AppSpacing.s8),
+          NutricionPlanRow.loading(key: ValueKey('nutricion_loading_$i')),
+        ],
       ],
     );
   }
 }
 
-/// Error al cargar `trainerLinksStreamProvider` + retry — mismo patrón que
-/// `_ErrorSection` en `invitaciones_screen.dart`.
-class _ErrorSection extends StatelessWidget {
-  const _ErrorSection({this.onRetry});
-
-  final VoidCallback? onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    final l10n = AppL10n.of(context);
-    return Padding(
-      key: const Key('nutricion_error'),
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.s18),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            l10n.coachHubSectionLoadError,
-            style: TextStyle(color: palette.textMuted),
-            textAlign: TextAlign.center,
-          ),
-          if (onRetry != null) ...[
-            const SizedBox(height: AppSpacing.s8),
-            TextButton(
-              key: const Key('nutricion_retry'),
-              onPressed: onRetry,
-              style: TextButton.styleFrom(foregroundColor: palette.accent),
-              child: Text(l10n.coachRetryLabel),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-/// Estado vacío honesto — sin CTA: la screen depende de que existan alumnos
-/// activos vinculados, no hay acción de "crear" desde acá.
+/// Estado vacío honesto por caso (ADR-F6-06):
+/// - sin alumnos activos vinculados → CTA a Alumnos.
+/// - filtro "Con plan"/"Sin plan" sin resultados → mensaje específico, sin
+///   CTA (el roster existe, solo no hay match para ese filtro).
 class _EmptyNutricion extends StatelessWidget {
-  const _EmptyNutricion();
+  const _EmptyNutricion({
+    required this.filtro,
+    required this.hasAnyAlumno,
+    required this.onIrAAlumnos,
+  });
+
+  final NutricionFiltro filtro;
+  final bool hasAnyAlumno;
+  final VoidCallback onIrAAlumnos;
 
   @override
   Widget build(BuildContext context) {
-    return const TreinoEmptyState(
+    if (!hasAnyAlumno) {
+      return TreinoEmptyState(
+        key: const Key('nutricion_empty_sin_alumnos'),
+        icon: TreinoIcon.emptyState,
+        title: 'Todavía no tenés alumnos.', // i18n: Fase W6
+        ctaLabel: 'Ir a Alumnos', // i18n: Fase W6
+        onCtaTap: onIrAAlumnos,
+      );
+    }
+
+    final title = switch (filtro) {
+      NutricionFiltro.conPlan =>
+        'Ningún alumno con plan todavía.', // i18n: Fase W6
+      NutricionFiltro.sinPlan =>
+        'Todos tus alumnos ya tienen plan.', // i18n: Fase W6
+      // Inalcanzable en la práctica: "Todos" siempre incluye todo el
+      // roster, así que si `hasAnyAlumno` es `true` este filtro nunca
+      // produce una lista filtrada vacía. Mensaje defensivo por las dudas.
+      NutricionFiltro.todos => 'Todavía no tenés alumnos.', // i18n: Fase W6
+    };
+    return TreinoEmptyState(
+      key: ValueKey('nutricion_empty_${filtro.name}'),
       icon: TreinoIcon.emptyState,
-      title: 'Todavía no tenés alumnos con este filtro.', // i18n: Fase W6
+      title: title,
     );
   }
 }
