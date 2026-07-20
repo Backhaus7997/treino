@@ -11,6 +11,12 @@ import 'package:treino/features/coach_hub/presentation/shell/sidebar_item.dart';
 /// cross-alumno de planes de nutrición. Cada sección posee su propio archivo
 /// para que los PRs paralelos no choquen en `coach_hub_router.dart` ni en
 /// `sidebar_registry.dart` (ADR-CHW-002).
+///
+/// Fase 6 (WU-06, ADR-F6-07): el item vuelve a pertenecer a
+/// [SidebarGroup.recursos] — el único grupo que `sidebar_registry.dart`
+/// efectivamente renderea junto a `gestion` — para que la overview sea
+/// alcanzable por navegación, no solo por URL directa. `wellness` (grupo
+/// original pre-W2) queda legacy y sin renderear.
 final List<RouteBase> nutricionRoutes = [
   GoRoute(
     path: '/nutricion',
@@ -24,7 +30,7 @@ const List<SidebarItem> nutricionSidebarItems = [
     label: 'Nutrición', // i18n: Fase W1
     route: '/nutricion',
     iconBuilder: _nutricionIcon,
-    group: SidebarGroup.wellness,
+    group: SidebarGroup.recursos,
   ),
 ];
 
