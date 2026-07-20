@@ -17,32 +17,47 @@ import 'package:treino/features/profile/application/user_public_profile_provider
 import 'package:treino/l10n/app_l10n.dart';
 
 class NutricionPlanRow extends ConsumerWidget {
-  const NutricionPlanRow({super.key, required this.entry, this.onTap});
+  const NutricionPlanRow({super.key, required this.entry, this.onTap})
+      : loading = false;
+
+  /// Fila-skeleton sin `entry` — usada por la screen (WU-05) mientras
+  /// `nutricionEntriesProvider` todavía no resolvió el roster completo
+  /// (distinto del `planLoading` por-fila, que resuelve solo el plan de un
+  /// alumno ya conocido).
+  const NutricionPlanRow.loading({super.key})
+      : entry = null,
+        onTap = null,
+        loading = true;
 
   /// Vínculo + plan (o ausencia de) del alumno — `nutricionEntriesProvider`.
-  final NutricionEntry entry;
+  /// `null` solo cuando `loading == true`.
+  final NutricionEntry? entry;
 
   /// Acción al tocar la fila. El caller (screen, WU-04+) es responsable de
   /// navegar al detalle del plan — este widget solo delega el evento.
   final VoidCallback? onTap;
 
+  /// `true` = fila-skeleton sin datos todavía (roster completo en loading).
+  final bool loading;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Mientras el plan del alumno todavía está resolviendo el stream, el
-    // skeleton del kit (`TreinoListRow(loading: true)`) reemplaza toda la
-    // fila — nunca un `CircularProgressIndicator` seco.
-    if (entry.planLoading) {
+    // Mientras el roster completo o el plan de este alumno todavía están
+    // resolviendo el stream, el skeleton del kit (`TreinoListRow(loading:
+    // true)`) reemplaza toda la fila — nunca un `CircularProgressIndicator`
+    // seco.
+    if (loading || entry!.planLoading) {
       return const TreinoListRow(title: '', loading: true);
     }
 
+    final e = entry!;
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    final profileAsync =
-        ref.watch(userPublicProfileProvider(entry.link.athleteId));
+    final profileAsync = ref.watch(userPublicProfileProvider(e.link.athleteId));
     final profile = profileAsync.valueOrNull;
     final displayName = profile?.displayName ?? 'Alumno'; // i18n: Fase W2
     final avatarUrl = profile?.avatarUrl;
-    final plan = entry.plan;
+    final plan = e.plan;
 
     final subtitle = plan != null
         ? 'Con plan · ${plan.meals.length} comidas · actualizado ${_relativeTime(plan.updatedAt)}' // i18n: Fase W2
