@@ -356,12 +356,39 @@ GoRouter buildRouter({
         // MUST stay top-level (out of the shell) like its origin
         // `/coach/athlete/:id` — pushing the in-shell `/workout/routine/:id`
         // from an out-of-shell route rebuilds the whole shell branch and lands
-        // blank (issue #399). RoutineDetailScreen already renders read-only for
-        // a non-owner trainer, so no screen change is needed — only the route.
+        // blank (issue #399). `coachAthleteId` tells RoutineDetailScreen it is
+        // in this out-of-shell context so exercise taps and the back fallback
+        // stay out of the shell / athlete tab (issue #410).
         path: '/coach/athlete/:athleteId/plan/:routineId',
         builder: (context, state) {
+          final athleteId = state.pathParameters['athleteId']!;
           final routineId = state.pathParameters['routineId']!;
-          return _immersive(RoutineDetailScreen(routineId: routineId));
+          return _immersive(RoutineDetailScreen(
+            routineId: routineId,
+            coachAthleteId: athleteId,
+          ));
+        },
+      ),
+      GoRoute(
+        // Exercise detail reached from a coach's read-only plan detail. Like
+        // its origin (the plan route above) it MUST stay top-level (out of the
+        // shell): pushing the in-shell `/workout/exercise/:id` from an
+        // out-of-shell route rebuilds the shell branch and lands blank
+        // (issue #410 Bug 1 — the root cause #399's symptom fix left open).
+        // Mirror of the in-shell exercise route; `backFallbackRoute` sends a
+        // state-restoration back to the athlete detail instead of `/workout`.
+        path: '/coach/athlete/:athleteId/plan/:routineId/exercise/:exerciseId',
+        builder: (context, state) {
+          final athleteId = state.pathParameters['athleteId']!;
+          final exerciseId = state.pathParameters['exerciseId']!;
+          final ownerId = state.uri.queryParameters['ownerId'];
+          final exerciseName = state.uri.queryParameters['name'];
+          return _immersive(ExerciseDetailScreen(
+            exerciseId: exerciseId,
+            ownerId: ownerId,
+            exerciseName: exerciseName,
+            backFallbackRoute: '/coach/athlete/$athleteId',
+          ));
         },
       ),
       GoRoute(

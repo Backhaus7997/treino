@@ -663,6 +663,142 @@ void main() {
       },
     );
 
+    // ── Issue #410 — coach read-only plan detail (out-of-shell context) ──────
+    //
+    // In the coach (PF) context RoutineDetailScreen lives at the TOP-LEVEL
+    // route `/coach/athlete/:id/plan/:routineId` (OUTSIDE the ShellRoute),
+    // signalled by `coachAthleteId`. Two behaviours must stay out of the shell
+    // / athlete tab, else they land blank / on the wrong tab — the root cause
+    // that #399's symptom fix left open:
+    //   Bug 1 — tapping an exercise must push the TOP-LEVEL exercise mirror,
+    //           not the in-shell `/workout/exercise/:id`.
+    //   Bug 2 — the back fallback (deep-link / OS state restoration) must land
+    //           on the athlete detail, not the athlete `/workout` tab.
+    testWidgets(
+      'REGRESSION-410 Bug 1: coach-context slot tap pushes the TOP-LEVEL '
+      'exercise route (not the in-shell one) and renders the destination',
+      (tester) async {
+        String? pushedLocation;
+        String? capturedOwnerId;
+        final router = GoRouter(
+          initialLocation: '/coach/athlete/athlete-1/plan/test-id',
+          routes: [
+            GoRoute(
+              path: '/coach/athlete/:athleteId/plan/:routineId',
+              builder: (ctx, state) => RoutineDetailScreen(
+                routineId: state.pathParameters['routineId']!,
+                coachAthleteId: state.pathParameters['athleteId'],
+              ),
+            ),
+            GoRoute(
+              path:
+                  '/coach/athlete/:athleteId/plan/:routineId/exercise/:exerciseId',
+              builder: (ctx, state) {
+                pushedLocation = state.matchedLocation;
+                capturedOwnerId = state.uri.queryParameters['ownerId'];
+                return const Text('COACH EXERCISE');
+              },
+            ),
+            // In-shell mirror — MUST NOT be the one taken from a coach context.
+            GoRoute(
+              path: '/workout/exercise/:exerciseId',
+              builder: (_, __) => const Text('IN-SHELL EXERCISE'),
+            ),
+          ],
+        );
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              routineByIdStreamProvider('test-id').overrideWith(
+                (ref) => Stream.value(
+                  _makeRoutine(
+                    assignedBy: 'trainer-1',
+                    days: [
+                      _makeDay(slots: [_makeSlot(exerciseId: 'bench-press')]),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+            child: MaterialApp.router(
+              theme: AppTheme.dark(),
+              localizationsDelegates: AppL10n.localizationsDelegates,
+              supportedLocales: AppL10n.supportedLocales,
+              locale: const Locale('es', 'AR'),
+              routerConfig: router,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byType(ExerciseSlotRow).first);
+        await tester.pumpAndSettle();
+
+        expect(find.text('COACH EXERCISE'), findsOneWidget);
+        expect(find.text('IN-SHELL EXERCISE'), findsNothing);
+        expect(
+          pushedLocation,
+          equals('/coach/athlete/athlete-1/plan/test-id/exercise/bench-press'),
+        );
+        // ownerId (assignedBy) still flows through in the coach context.
+        expect(capturedOwnerId, equals('trainer-1'));
+      },
+    );
+
+    testWidgets(
+      'REGRESSION-410 Bug 2: coach-context back fallback lands on the athlete '
+      'detail, not the athlete /workout tab',
+      (tester) async {
+        String? backLocation;
+        final router = GoRouter(
+          initialLocation: '/coach/athlete/athlete-1/plan/test-id',
+          routes: [
+            GoRoute(
+              path: '/coach/athlete/:athleteId/plan/:routineId',
+              builder: (ctx, state) => RoutineDetailScreen(
+                routineId: state.pathParameters['routineId']!,
+                coachAthleteId: state.pathParameters['athleteId'],
+              ),
+            ),
+            GoRoute(
+              path: '/coach/athlete/:athleteId',
+              builder: (ctx, state) {
+                backLocation = state.matchedLocation;
+                return const Text('ATHLETE DETAIL');
+              },
+            ),
+            // Athlete tab — MUST NOT be where a coach-context back lands.
+            GoRoute(
+              path: '/workout',
+              builder: (_, __) => const Text('WORKOUT TAB'),
+            ),
+          ],
+        );
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              routineByIdStreamProvider('test-id')
+                  .overrideWith((ref) => Stream.value(_makeRoutine())),
+            ],
+            child: MaterialApp.router(
+              theme: AppTheme.dark(),
+              localizationsDelegates: AppL10n.localizationsDelegates,
+              supportedLocales: AppL10n.supportedLocales,
+              locale: const Locale('es', 'AR'),
+              routerConfig: router,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        // Initial location → nothing to pop → back uses the fallback route.
+        await tester.tap(find.byIcon(TreinoIcon.back));
+        await tester.pumpAndSettle();
+
+        expect(find.text('ATHLETE DETAIL'), findsOneWidget);
+        expect(find.text('WORKOUT TAB'), findsNothing);
+        expect(backLocation, equals('/coach/athlete/athlete-1'));
+      },
+    );
+
     testWidgets(
       'SCENARIO-094: no Scaffold/AppBackground/SafeArea inside screen subtree',
       (tester) async {
