@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../../../app/theme/app_palette.dart';
+import '../../../../../../app/theme/tokens/primitives.dart';
 import '../../../../../../core/widgets/firebase_storage_video_player.dart';
 
 /// Burbuja de un mensaje individual en el detail pane.
@@ -43,35 +43,53 @@ class ChatMessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final bg = isOwn ? palette.accent.withValues(alpha: 0.2) : palette.bgCard;
-    final fg = palette.textPrimary;
+    // Burbuja propia: fondo mint SÓLIDO (mockup), sin alpha. Burbuja
+    // recibida: bgCard, como antes.
+    final bg = isOwn ? palette.accent : palette.bgCard;
+    // Texto sobre mint sólido necesita un tono "tinta" (near-black) para
+    // contraste alto en AMBOS temas. `palette.bg` es near-black solo en
+    // dark (ink950) — en light es near-white (paper50), así que ahí usamos
+    // `palette.textPrimary` (inkText900, near-black en light). Ninguno de
+    // los dos por sí solo sirve en ambos temas; se elige según brightness.
+    final ownFg = Theme.of(context).brightness == Brightness.dark
+        ? palette.bg
+        : palette.textPrimary;
+    final fg = isOwn ? ownFg : palette.textPrimary;
     return Align(
       alignment: isOwn ? Alignment.centerRight : Alignment.centerLeft,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 520),
         child: Container(
-          margin: const EdgeInsets.symmetric(vertical: 3),
-          padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
+          key: const Key('chat_bubble_container'),
+          margin: const EdgeInsets.symmetric(vertical: AppSpacing.hairline),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.s14,
+            AppSpacing.s12,
+            AppSpacing.s14,
+            AppSpacing.s8,
+          ),
           decoration: BoxDecoration(
             color: bg,
             borderRadius: BorderRadius.only(
-              topLeft: const Radius.circular(14),
-              topRight: const Radius.circular(14),
-              bottomLeft: Radius.circular(isOwn ? 14 : 4),
-              bottomRight: Radius.circular(isOwn ? 4 : 14),
+              topLeft: const Radius.circular(AppRadius.sm),
+              topRight: const Radius.circular(AppRadius.sm),
+              bottomLeft: Radius.circular(
+                isOwn ? AppRadius.sm : AppSpacing.hairline,
+              ),
+              bottomRight: Radius.circular(
+                isOwn ? AppSpacing.hairline : AppRadius.sm,
+              ),
             ),
-            border: Border.all(
-              color: isOwn
-                  ? palette.accent.withValues(alpha: 0.3)
-                  : palette.border,
-            ),
+            // Burbuja propia es sólida (sin borde); recibida mantiene el
+            // borde sutil sobre bgCard.
+            border: isOwn ? null : Border.all(color: palette.border),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (imageUrl != null) ...[
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
                   child: Image.network(
                     imageUrl!,
                     // Cap max height so a portrait photo does not push the
@@ -96,20 +114,21 @@ class ChatMessageBubble extends StatelessWidget {
                     },
                     errorBuilder: (_, __, ___) => Container(
                       height: 80,
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(AppSpacing.s12),
                       color: palette.bg.withValues(alpha: 0.4),
                       child: Text(
                         'No pudimos cargar la imagen', // i18n: Fase W2
-                        style: GoogleFonts.barlow(
+                        style: const TextStyle(
+                          fontFamily: AppFonts.barlow,
                           fontWeight: FontWeight.w500,
                           fontSize: 13,
-                          color: palette.textMuted,
-                        ),
+                        ).copyWith(color: palette.textMuted),
                       ),
                     ),
                   ),
                 ),
-                if (text.isNotEmpty) const SizedBox(height: 6),
+                if (text.isNotEmpty)
+                  const SizedBox(height: AppSpacing.hairline),
               ],
               if (videoUrl != null) ...[
                 SizedBox(
@@ -119,46 +138,54 @@ class ChatMessageBubble extends StatelessWidget {
                     palette: palette,
                   ),
                 ),
-                if (text.isNotEmpty) const SizedBox(height: 6),
+                if (text.isNotEmpty)
+                  const SizedBox(height: AppSpacing.hairline),
               ],
               if (mediaPlaceholderLabel != null) ...[
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.s8,
+                    vertical: AppSpacing.hairline,
+                  ),
                   decoration: BoxDecoration(
                     color: palette.bg.withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
                   ),
                   child: Text(
                     mediaPlaceholderLabel!,
-                    style: GoogleFonts.barlow(
+                    style: const TextStyle(
+                      fontFamily: AppFonts.barlow,
                       fontWeight: FontWeight.w500,
                       fontSize: 13,
-                      color: palette.textMuted,
-                    ),
+                    ).copyWith(color: palette.textMuted),
                   ),
                 ),
-                if (text.isNotEmpty) const SizedBox(height: 6),
+                if (text.isNotEmpty)
+                  const SizedBox(height: AppSpacing.hairline),
               ],
               if (text.isNotEmpty)
                 Text(
                   text,
-                  style: GoogleFonts.barlow(
+                  style: const TextStyle(
+                    fontFamily: AppFonts.barlow,
                     fontWeight: FontWeight.w400,
                     fontSize: 14,
                     height: 1.35,
-                    color: fg,
-                  ),
+                  ).copyWith(color: fg),
                 ),
-              const SizedBox(height: 4),
+              const SizedBox(height: AppSpacing.hairline),
               Align(
                 alignment: Alignment.centerRight,
                 child: Text(
                   DateFormat('HH:mm').format(createdAt.toLocal()),
-                  style: GoogleFonts.barlow(
+                  style: const TextStyle(
+                    fontFamily: AppFonts.barlow,
                     fontWeight: FontWeight.w400,
                     fontSize: 10,
-                    color: palette.textMuted,
+                  ).copyWith(
+                    color: isOwn
+                        ? ownFg.withValues(alpha: 0.6)
+                        : palette.textMuted,
                   ),
                 ),
               ),
