@@ -218,9 +218,12 @@ void main() {
     expect(find.text('2'), findsWidgets);
   });
 
-  // SCENARIO-375: PR badge stub visible on every set row
+  // SCENARIO-375: no PR badge on set rows (QA-WKT-007). The Etapa-5 stub
+  // rendered a "PR" badge on EVERY set, so the athlete — and the trainer via
+  // the coach-hub reuse — saw false personal records. Removed until real PR
+  // detection exists.
   testWidgets(
-      'SCENARIO-375: PR badge stub (_PrBadgeStub) rendered on each set row',
+      'SCENARIO-375: no "PR" badge rendered on set rows',
       (tester) async {
     final setLogs = [
       _makeSetLog(exerciseName: 'Bench Press', setNumber: 1),
@@ -233,8 +236,8 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    // PR badge stub shows "PR" text on every row — 3 set rows = 3 PR chips
-    expect(find.text('PR'), findsNWidgets(3));
+    // The fake per-set PR badge is gone — no "PR" chip on any row.
+    expect(find.text('PR'), findsNothing);
   });
 
   // SCENARIO-376: not-found state when session is null

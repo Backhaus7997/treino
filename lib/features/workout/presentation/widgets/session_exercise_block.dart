@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
-import '../../../../l10n/app_l10n.dart';
 import '../../domain/set_log.dart';
 
 /// Displays one exercise group: name heading followed by a row per [SetLog].
@@ -79,38 +78,10 @@ class _SetRow extends StatelessWidget {
             '${log.weightKg} kg',
             style: TextStyle(color: palette.textPrimary),
           ),
-          const SizedBox(width: 8),
-          const _PrBadgeStub(),
+          // QA-WKT-007: no PR badge until real personal-record detection exists.
+          // The Etapa-5 stub rendered on every set, showing false PRs to the
+          // athlete and — via the coach-hub reuse — to the trainer too.
         ],
-      ),
-    );
-  }
-}
-
-// ── PR badge stub ─────────────────────────────────────────────────────────────
-// Placeholder widget — no params, no logic. Grep-friendly name for Etapa 5.
-
-class _PrBadgeStub extends StatelessWidget {
-  const _PrBadgeStub();
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: palette.accent.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: palette.accent.withValues(alpha: 0.4)),
-      ),
-      child: Text(
-        AppL10n.of(context).workoutDetailPrBadge,
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          color: palette.accent,
-          letterSpacing: 0.5,
-        ),
       ),
     );
   }
