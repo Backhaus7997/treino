@@ -257,6 +257,19 @@ bool isSetValid(_EditableSet s, ExerciseMode exerciseMode, RepMode repMode) {
   return s.reps != null && s.reps! > 0 && s.reps! <= kMaxReps;
 }
 
+/// QA-WKT-004: a day must never list the same exerciseId twice. The session
+/// player keys ALL progress (logs, gating, set-count overrides) by exerciseId,
+/// so two slots sharing an id collapse into one pool of logs — the second slot
+/// can't be logged and the day counts double. Pure so the editor validation
+/// and its tests share one definition.
+bool dayHasDuplicateExerciseId(Iterable<String> exerciseIds) {
+  final seen = <String>{};
+  for (final id in exerciseIds) {
+    if (!seen.add(id)) return true;
+  }
+  return false;
+}
+
 /// Builds the [RoutineSlot] from an [_EditableSlot], populating both new
 /// and legacy fields. Extracted top-level so the submit path and tests share
 /// the same derivation logic.
@@ -692,7 +705,15 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         );
       }
     }
-    // 3) Incomplete sets. Prefer the named-exercise feedback when we can point
+    // 3) No duplicate exercise within a day (QA-WKT-004).
+    for (final day in _days) {
+      if (dayHasDuplicateExerciseId(
+        day.slots.where((s) => s.exercise != null).map((s) => s.exercise!.id),
+      )) {
+        return (message: l10n.routineEditorDuplicateExercise, day: day);
+      }
+    }
+    // 4) Incomplete sets. Prefer the named-exercise feedback when we can point
     // at a specific exercise; otherwise fall back to the generic reps hint.
     final invalid = _firstInvalidSlot();
     if (invalid != null) {
@@ -758,6 +779,12 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     if (_days.isEmpty) return false;
     for (final day in _days) {
       if (day.slots.isEmpty) return false;
+      // QA-WKT-004: no duplicate exerciseId within a day.
+      if (dayHasDuplicateExerciseId(
+        day.slots.where((s) => s.exercise != null).map((s) => s.exercise!.id),
+      )) {
+        return false;
+      }
       for (final slot in day.slots) {
         if (slot.exercise == null) return false;
         // Zero-presence guard (ADR-WPRES-03, REQ-WPRES-014): a non-empty mask
@@ -1090,6 +1117,20 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   /// Replaces [slot]'s exercise with [newExercise], keeping all other fields
   /// (sets, rest, exerciseMode, repMode, supersetGroup) intact.
   void _replaceExercise(_EditableSlot slot, Exercise newExercise) {
+    // QA-WKT-004: don't replace into an exercise already present elsewhere in
+    // the same day — mirrors the dedup the three add-flows do. A duplicated
+    // exerciseId makes the player collapse both slots into one pool of logs.
+    final day = _days.firstWhere((d) => d.slots.contains(slot));
+    final isDuplicate = day.slots
+        .any((s) => !identical(s, slot) && s.exercise?.id == newExercise.id);
+    if (isDuplicate) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppL10n.of(context).routineEditorDuplicateExercise),
+        ),
+      );
+      return;
+    }
     _markDirty();
     setState(() {
       slot.exercise = newExercise;

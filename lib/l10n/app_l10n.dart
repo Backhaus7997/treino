@@ -3932,6 +3932,12 @@ abstract class AppL10n {
   /// **'Completá las reps de los sets antes de guardar.'**
   String get routineEditorMissingReps;
 
+  /// No description provided for @routineEditorDuplicateExercise.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ese ejercicio ya está en el día. Elegí otro.'**
+  String get routineEditorDuplicateExercise;
+
   /// Success snackbar after publishing a post (finding 25). Shown via the root ScaffoldMessenger since the compose screen pops on success.
   ///
   /// In es_AR, this message translates to:

@@ -2139,6 +2139,10 @@ class AppL10nEs extends AppL10n {
       'Completa las reps de los sets antes de guardar.';
 
   @override
+  String get routineEditorDuplicateExercise =>
+      'Ese ejercicio ya está en el día. Elegí otro.';
+
+  @override
   String get feedPostPublishedSuccess => 'Post publicado.';
 
   @override
@@ -4834,6 +4838,10 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get routineEditorMissingReps =>
       'Completá las reps de los sets antes de guardar.';
+
+  @override
+  String get routineEditorDuplicateExercise =>
+      'Ese ejercicio ya está en el día. Elegí otro.';
 
   @override
   String get feedPostPublishedSuccess => 'Post publicado.';

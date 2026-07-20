@@ -1494,6 +1494,7 @@
     }
   },
   "routineEditorMissingReps": "Completá las reps de los sets antes de guardar.",
+  "routineEditorDuplicateExercise": "Ese ejercicio ya está en el día. Elegí otro.",
   "@routineEditorMissingReps": {
     "description": "Inline validation hint when a visible set is missing a valid reps/duration value in a single-week self-routine (finding 19). routineEditorIncompleteSetsFeedback already covers the named-exercise multi-week case."
   },

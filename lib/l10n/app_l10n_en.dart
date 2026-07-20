@@ -2088,6 +2088,10 @@ class AppL10nEn extends AppL10n {
       'Fill in the reps for your sets before saving.';
 
   @override
+  String get routineEditorDuplicateExercise =>
+      'Ese ejercicio ya está en el día. Elegí otro.';
+
+  @override
   String get feedPostPublishedSuccess => 'Post published.';
 
   @override
