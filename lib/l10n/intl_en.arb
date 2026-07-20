@@ -257,6 +257,7 @@
   "workoutSelfEditorUpdateSuccess": "",
   "workoutSelfEditorNotFound": "",
   "workoutSelfEditorError": "",
+  "workoutDiscardError": "",
   "workoutSelfEditorPermissionDenied": "",
   "workoutEditStubToast": "",
   "workoutSelfEditorCapReached": "",

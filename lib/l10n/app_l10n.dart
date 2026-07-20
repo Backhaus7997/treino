@@ -1262,6 +1262,12 @@ abstract class AppL10n {
   /// **'No pudimos crear la rutina. Reintentá.'**
   String get workoutSelfEditorError;
 
+  /// No description provided for @workoutDiscardError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos descartar la sesión. Probá de nuevo.'**
+  String get workoutDiscardError;
+
   /// No description provided for @workoutSelfEditorPermissionDenied.
   ///
   /// In es_AR, this message translates to:

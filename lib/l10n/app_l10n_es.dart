@@ -639,6 +639,10 @@ class AppL10nEs extends AppL10n {
   String get workoutSelfEditorError => 'No pudimos crear la rutina. Reintentá.';
 
   @override
+  String get workoutDiscardError =>
+      'No pudimos descartar la sesión. Probá de nuevo.';
+
+  @override
   String get workoutSelfEditorPermissionDenied =>
       'No tenés permisos para hacer esto. Recargá la app.';
 
@@ -3331,6 +3335,10 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get workoutSelfEditorError => 'No pudimos crear la rutina. Reintentá.';
+
+  @override
+  String get workoutDiscardError =>
+      'No pudimos descartar la sesión. Probá de nuevo.';
 
   @override
   String get workoutSelfEditorPermissionDenied =>

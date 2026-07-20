@@ -624,6 +624,9 @@ class AppL10nEn extends AppL10n {
   String get workoutSelfEditorError => '';
 
   @override
+  String get workoutDiscardError => '';
+
+  @override
   String get workoutSelfEditorPermissionDenied => '';
 
   @override
