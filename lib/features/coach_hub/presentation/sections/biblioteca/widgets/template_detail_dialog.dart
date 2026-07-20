@@ -29,20 +29,35 @@ void showTemplateDetailDialog(
   Routine routine, {
   VoidCallback? onEdit,
   VoidCallback? onUse,
+  VoidCallback? onDelete,
 }) {
   showDialog<void>(
     context: context,
-    builder: (_) =>
-        _TemplateDetailDialog(routine: routine, onEdit: onEdit, onUse: onUse),
+    builder: (_) => _TemplateDetailDialog(
+      routine: routine,
+      onEdit: onEdit,
+      onUse: onUse,
+      onDelete: onDelete,
+    ),
   );
 }
 
 class _TemplateDetailDialog extends StatelessWidget {
-  const _TemplateDetailDialog({required this.routine, this.onEdit, this.onUse});
+  const _TemplateDetailDialog({
+    required this.routine,
+    this.onEdit,
+    this.onUse,
+    this.onDelete,
+  });
 
   final Routine routine;
   final VoidCallback? onEdit;
   final VoidCallback? onUse;
+
+  /// When provided, an "Eliminar" action pops the dialog and hands off to the
+  /// caller (which shows the confirmation + deletes) — same context-safe
+  /// pop-then-hand-off contract as [onEdit]/[onUse].
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -156,6 +171,21 @@ class _TemplateDetailDialog extends StatelessWidget {
             ),
           ),
         ),
+        if (onDelete != null)
+          TextButton(
+            key: const Key('template_detail_delete_button'),
+            onPressed: () {
+              Navigator.of(context).pop();
+              onDelete!();
+            },
+            child: Text(
+              'Eliminar', // i18n
+              style: GoogleFonts.barlow(
+                fontWeight: FontWeight.w600,
+                color: palette.danger,
+              ),
+            ),
+          ),
         if (onEdit != null)
           TextButton(
             key: const Key('template_detail_edit_button'),
