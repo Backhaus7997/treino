@@ -5,22 +5,36 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-import 'package:treino/app/theme/app_palette.dart';
-import 'package:treino/features/workout/application/routine_providers.dart';
-import 'package:treino/features/workout/application/session_providers.dart'
+import '../../../../../../app/theme/app_palette.dart';
+import '../../../../../../app/theme/tokens/primitives.dart';
+import '../../../../../../core/widgets/motion/treino_shimmer.dart';
+import '../../../../../../core/widgets/motion/treino_state_switcher.dart';
+import '../../../../../../core/widgets/treino_icon.dart';
+import '../../../../../workout/application/routine_providers.dart';
+import '../../../../../workout/application/session_providers.dart'
     show currentUidProvider;
-import 'package:treino/features/workout/domain/routine.dart';
-
+import '../../../../../workout/domain/routine.dart';
+import '../../../widgets/empty_state/empty_state.dart';
 import 'template_detail_dialog.dart';
 import 'template_grid_card.dart';
+
+/// Grid delegate compartido entre la grilla real y el skeleton de carga —
+/// mismas proporciones para que el cross-fade loading→data no "salte".
+const _gridDelegate = SliverGridDelegateWithMaxCrossAxisExtent(
+  maxCrossAxisExtent: 360,
+  childAspectRatio: 1.6,
+  crossAxisSpacing: AppSpacing.s12,
+  mainAxisSpacing: AppSpacing.s12,
+);
+
+const _gridPadding = EdgeInsets.fromLTRB(16, 16, 16, 24);
 
 /// Tab body for the "Templates Rutinas" tab of [BibliotecaWebScreen].
 ///
 /// Watches [trainerTemplatesStreamProvider] (filtered to trainer-templates).
-/// Layout: loading spinner / error text / GridView of [TemplateGridCard].
-/// Empty-list → centered empty-state text.
+/// Layout: [TreinoStateSwitcher] con skeleton shimmer / empty-state honesto /
+/// error tokenizado / GridView de [TemplateGridCard].
 ///
 /// REQ-BIBW-09, REQ-BIBW-11.
 /// SCENARIO-BIBW-09a, SCENARIO-BIBW-09b, SCENARIO-BIBW-09c, SCENARIO-BIBW-11b.
@@ -29,57 +43,79 @@ class TemplatesTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final palette = AppPalette.of(context);
     final uid = ref.watch(currentUidProvider) ?? '';
 
     final templatesAsync = uid.isEmpty
         ? const AsyncValue<List<Routine>>.data([])
         : ref.watch(trainerTemplatesStreamProvider(uid));
 
-    return templatesAsync.when(
-      loading: () => Center(
-        child: CircularProgressIndicator(color: palette.accent),
+    return TreinoStateSwitcher(
+      childKey: ValueKey(_stateKey(templatesAsync)),
+      child: templatesAsync.when(
+        loading: () => const _TemplatesGridSkeleton(),
+        error: (e, _) => const TreinoEmptyState(
+          icon: TreinoIcon.errorState,
+          title: 'Error al cargar plantillas', // i18n
+        ),
+        data: (templates) {
+          if (templates.isEmpty) {
+            return const TreinoEmptyState(
+              icon: TreinoIcon.emptyState,
+              title: 'Todavía no creaste plantillas', // i18n
+            );
+          }
+
+          return GridView.builder(
+            padding: _gridPadding,
+            gridDelegate: _gridDelegate,
+            itemCount: templates.length,
+            itemBuilder: (context, index) {
+              final routine = templates[index];
+              return TemplateGridCard(
+                routine: routine,
+                onTap: () => showTemplateDetailDialog(context, routine),
+              );
+            },
+          );
+        },
       ),
-      error: (e, _) => Center(
-        child: Text(
-          'Error al cargar plantillas.', // i18n
-          style: GoogleFonts.barlow(
-            color: palette.textMuted,
-            fontSize: 14,
+    );
+  }
+}
+
+/// Discrimina el estado actual para [TreinoStateSwitcher]. Sin filtros en
+/// esta tab, por lo que las keys son fijas: `loading`/`error`/`empty`/`data`.
+String _stateKey(AsyncValue<List<Routine>> templatesAsync) {
+  if (templatesAsync.hasError) return 'error';
+  if (templatesAsync.isLoading && !templatesAsync.hasValue) return 'loading';
+  final data = templatesAsync.value ?? const [];
+  if (data.isEmpty) return 'empty';
+  return 'data';
+}
+
+/// Skeleton de carga de la grilla de plantillas — mismo [_gridDelegate] que
+/// la grilla real (para que el cross-fade no "salte") con cajas placeholder
+/// envueltas en [TreinoShimmer].
+class _TemplatesGridSkeleton extends StatelessWidget {
+  const _TemplatesGridSkeleton();
+
+  static const _placeholderCount = 4;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return TreinoShimmer(
+      child: GridView.builder(
+        padding: _gridPadding,
+        gridDelegate: _gridDelegate,
+        itemCount: _placeholderCount,
+        itemBuilder: (context, index) => Container(
+          decoration: BoxDecoration(
+            color: palette.bgCard,
+            borderRadius: BorderRadius.circular(AppRadius.md),
           ),
         ),
       ),
-      data: (templates) {
-        if (templates.isEmpty) {
-          return Center(
-            child: Text(
-              'Todavía no creaste plantillas.', // i18n
-              style: GoogleFonts.barlow(
-                color: palette.textMuted,
-                fontSize: 14,
-              ),
-            ),
-          );
-        }
-
-        return GridView.builder(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: 360,
-            childAspectRatio: 1.6,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-          ),
-          itemCount: templates.length,
-          itemBuilder: (context, index) {
-            final routine = templates[index];
-            return TemplateGridCard(
-              routine: routine,
-              onTap: () => showTemplateDetailDialog(context, routine),
-            );
-          },
-        );
-      },
     );
   }
 }
