@@ -9,7 +9,11 @@ const int monthlyReportWindowSize = 12;
 /// [AD6] Aggregates [sessions] into [monthlyReportWindowSize] calendar-month
 /// buckets ending at the calendar month containing [now] (inclusive).
 ///
-/// - Only [SessionStatus.finished] sessions are counted.
+/// - Only sessions with [SessionCounting.countsAsWorkout] are counted —
+///   `status == finished` AND `wasFullyCompleted`. Abandoned sessions
+///   (`wasFullyCompleted == false`) are excluded (#372: the docstring
+///   previously said "finished" only, but the code has always also required
+///   `wasFullyCompleted`).
 /// - Bucketing uses `toArgentina(startedAt)`'s calendar year/month — NOT a
 ///   rolling 30-day window (design risk: the 60-session scan bound used
 ///   elsewhere is INSUFFICIENT here — callers MUST pass the full session

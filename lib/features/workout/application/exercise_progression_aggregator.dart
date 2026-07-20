@@ -101,7 +101,15 @@ ExerciseProgression aggregateExerciseProgression({
   // periodWindow filtering below). `frecuencia` deliberately uses this
   // UNFILTERED list separately — Frecuencia is an independent "last 8 weeks"
   // stat, not scoped to the display period selector.
-  final sessionsAscUnfiltered = sessionsDesc.reversed.toList();
+  // #372: exclude sessions that don't count as a completed workout (abandoned
+  // `wasFullyCompleted=false` / in-progress `active`) BEFORE deriving anything —
+  // both the 4 metric series AND the independent frecuencia-8-weeks stat must
+  // ignore them, matching the criterion the other Insights screens use. Without
+  // this an abandoned session's sets inflated progression/PRs while the same
+  // session was absent from the radar/monthly report.
+  final countsSessionsDesc =
+      sessionsDesc.where((s) => s.countsAsWorkout).toList();
+  final sessionsAscUnfiltered = countsSessionsDesc.reversed.toList();
   var sessionsAsc = sessionsAscUnfiltered;
 
   // [AD7] Filter to the selected period's CURRENT window, inclusive by

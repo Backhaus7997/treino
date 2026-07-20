@@ -9,6 +9,10 @@ import 'package:treino/features/workout/domain/set_log.dart';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+// #372: the aggregator now counts only `countsAsWorkout` sessions (finished
+// AND wasFullyCompleted). These fixtures represent COMPLETED workouts, so they
+// set `wasFullyCompleted: true` explicitly — otherwise the default (false)
+// would make them abandoned and they'd be excluded from every series.
 Session _session(String id, DateTime startedAt) => Session(
       id: id,
       uid: 'athlete1',
@@ -16,6 +20,19 @@ Session _session(String id, DateTime startedAt) => Session(
       routineName: 'Rutina A',
       startedAt: startedAt,
       status: SessionStatus.finished,
+      wasFullyCompleted: true,
+    );
+
+// #372: an ABANDONED session (finished but wasFullyCompleted=false) — its sets
+// must NOT feed any progression series, the PRs, or the frecuencia-8-weeks stat.
+Session _abandoned(String id, DateTime startedAt) => Session(
+      id: id,
+      uid: 'athlete1',
+      routineId: 'r1',
+      routineName: 'Rutina A',
+      startedAt: startedAt,
+      status: SessionStatus.finished,
+      wasFullyCompleted: false,
     );
 
 SetLog _log({
@@ -185,6 +202,48 @@ void main() {
       // bench sets in s1 should NOT influence squat heaviest weight
       expect(result.heaviestWeightSeries[0].value, 90.0);
       expect(result.heaviestWeightSeries.every((p) => p.value != 60.0), isTrue);
+    });
+
+    test('REGRESSION-372: abandoned sessions feed NO series, PR, or frecuencia',
+        () {
+      // A COMPLETED session at 70kg + an ABANDONED session at 200kg — the 200kg
+      // set would be a bogus all-time PR if the abandoned session counted.
+      final sOk = _session('s-ok', DateTime(2025, 1, 20));
+      final sAband = _abandoned('s-aband', DateTime(2025, 1, 25));
+      final logs = {
+        's-ok': [
+          _log(
+              sessionId: 's-ok',
+              exerciseId: 'squat',
+              exerciseName: 'S',
+              reps: 5,
+              weightKg: 70),
+        ],
+        's-aband': [
+          _log(
+              sessionId: 's-aband',
+              exerciseId: 'squat',
+              exerciseName: 'S',
+              reps: 5,
+              weightKg: 200),
+        ],
+      };
+
+      final result = aggregateExerciseProgression(
+        exerciseId: 'squat',
+        sessionsDesc: [sAband, sOk], // DESC
+        logsBySession: logs,
+        now: DateTime(2025, 2, 1),
+      );
+
+      // Only the completed session feeds the series → the 200kg abandoned set is
+      // absent from every series (and therefore from the derived PRs).
+      expect(result.heaviestWeightSeries.length, 1);
+      expect(result.heaviestWeightSeries.single.value, 70.0);
+      expect(
+          result.heaviestWeightSeries.every((p) => p.value != 200.0), isTrue);
+      // frecuencia-8-weeks counts only the completed session.
+      expect(result.frequencyLast8Weeks, 1);
     });
 
     // T2 — Best Session Volume series (renamed from volumeSeries)
