@@ -198,7 +198,11 @@ export async function runDeleteAccount(
 export const deleteAccountHandler = functions.onCall(
   // Region aligned with the existing parsePlan CF for latency
   // consistency for LATAM users.
-  { region: "southamerica-east1" },
+  //
+  // QA-SEC-006: enforce App Check so only the legitimate, attested app can
+  // invoke account deletion. Defense-in-depth on top of the request.auth
+  // guard below. See PR body for the release prerequisite before deploy.
+  { region: "southamerica-east1", enforceAppCheck: true },
   async (request): Promise<DeleteAccountResponse> => {
     // ── Guard: caller must be authenticated ─────────────────────────────────
     if (!request.auth) {
