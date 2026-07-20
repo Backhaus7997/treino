@@ -5,6 +5,7 @@ import 'package:treino/features/coach_hub/presentation/sections/biblioteca/route
 import 'package:treino/features/coach_hub/presentation/sections/chat/routes.dart';
 import 'package:treino/features/coach_hub/presentation/sections/dashboard/routes.dart';
 import 'package:treino/features/coach_hub/presentation/sections/invitaciones/routes.dart';
+import 'package:treino/features/coach_hub/presentation/sections/nutricion/routes.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/routes.dart';
 import 'package:treino/features/coach_hub/presentation/sections/rutinas/routes.dart';
 
@@ -42,6 +43,12 @@ import 'sidebar_item.dart';
 /// registro deja de ser `const` (pasa a `final`) porque
 /// `invitacionesSidebarItems` tampoco lo es — su `badgeProvider` referencia
 /// un provider real, no evaluable en tiempo de compilación.
+///
+/// **Nutrición re-agregada (Fase 6 WU-06, ADR-F6-07)**: la overview
+/// cross-alumno de planes (Fase 6 WU-04, antes solo alcanzable por URL
+/// directa) vuelve al grupo RECURSOS, inmediatamente después de Biblioteca
+/// — simetría con la re-exposición de Solicitudes en ADR-F4-04 — llevando
+/// el total a 10.
 final List<SidebarItem> sidebarRegistry = [
   // GESTIÓN — surfaces multi-alumno del día a día del PF
   ...dashboardSidebarItems,
@@ -52,6 +59,7 @@ final List<SidebarItem> sidebarRegistry = [
 
   // RECURSOS — bibliotecas del PF y finanzas
   ...bibliotecaSidebarItems,
+  ...nutricionSidebarItems,
   ...rutinasSidebarItems,
   ...pagosSidebarItems,
 

@@ -6,9 +6,9 @@ import 'package:treino/features/coach_hub/presentation/shell/sidebar_registry.da
 void main() {
   group('sidebarRegistry (REQ-CHW-SIDEBAR-001)', () {
     test(
-        'tiene exactamente 9 items (7 post-W2 reduce + Rutinas + Solicitudes): '
-        'Dashboard, Alumnos, Solicitudes, Agenda, Chat, Biblioteca, Rutinas, '
-        'Pagos, Ajustes', () {
+        'tiene exactamente 10 items (7 post-W2 reduce + Rutinas + Solicitudes '
+        '+ Nutrición): Dashboard, Alumnos, Solicitudes, Agenda, Chat, '
+        'Biblioteca, Nutrición, Rutinas, Pagos, Ajustes', () {
       // W2 reduce 2026-07-02: se removieron 12 items del sidebar que
       // duplicaban funcionalidad del alumno_detail o pertenecen a una
       // futura Biblioteca (sub-tabs). Reportes también sale (sin scope
@@ -21,7 +21,12 @@ void main() {
       // Fase 4 WU-06 (ADR-F4-04): Solicitudes (ex-Invitaciones) vuelve al
       // grupo GESTIÓN, inmediatamente después de Alumnos, con badge real de
       // pendientes — llevando el total de 8 a 9.
-      expect(sidebarRegistry.length, 9);
+      //
+      // Fase 6 WU-06 (ADR-F6-07): Nutrición vuelve al grupo RECURSOS,
+      // inmediatamente después de Biblioteca — la overview cross-alumno de
+      // planes (Fase 6 WU-04) ahora es alcanzable por navegación, no solo
+      // por URL directa — llevando el total de 9 a 10.
+      expect(sidebarRegistry.length, 10);
     });
 
     test('cubre los 2 grupos activos post-reduce, cada uno no vacío', () {
@@ -48,7 +53,7 @@ void main() {
         SidebarGroup.resumen,
         SidebarGroup.alumnos,
         SidebarGroup.plan,
-        SidebarGroup.wellness,
+        SidebarGroup.wellness, // Nutrición ahora vive en recursos (ADR-F6-07)
         SidebarGroup.negocio,
         SidebarGroup.comunicacion,
       ];
@@ -86,11 +91,22 @@ void main() {
           '/agenda',
           '/chat',
           '/biblioteca',
+          '/nutricion',
           '/rutinas',
           '/pagos',
           '/ajustes',
         },
       );
+    });
+
+    test(
+        'Nutrición queda en RECURSOS, inmediatamente después de Biblioteca '
+        '[ADR-F6-07]', () {
+      final recursos = sidebarRegistry
+          .where((i) => i.group == SidebarGroup.recursos)
+          .map((i) => i.id)
+          .toList();
+      expect(recursos, ['biblioteca', 'nutricion', 'rutinas', 'pagos']);
     });
 
     test(
@@ -121,6 +137,7 @@ void main() {
         'Biblioteca',
         'Chat',
         'Dashboard',
+        'Nutrición',
       ]) {
         expect(labels, contains(esLabel));
       }
