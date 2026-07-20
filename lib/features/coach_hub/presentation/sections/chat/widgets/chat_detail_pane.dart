@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../../../../app/theme/app_palette.dart';
+import '../../../../../../app/theme/tokens/primitives.dart';
 import '../../../../../../core/widgets/treino_icon.dart';
 import '../../../../../chat/application/chat_providers.dart';
 import '../../../../../chat/domain/media_type.dart';
@@ -301,8 +302,12 @@ class _Header extends ConsumerWidget {
         : const AsyncValue.data(null);
 
     return Container(
+      key: const Key('chat_detail_header'),
       color: palette.bgCard,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.s20,
+        vertical: AppSpacing.s14,
+      ),
       child: Row(
         children: [
           CircleAvatar(
@@ -321,8 +326,9 @@ class _Header extends ConsumerWidget {
                           (p?.displayName ?? '?').isNotEmpty
                               ? (p?.displayName ?? '?')[0].toUpperCase()
                               : '?',
-                          style: GoogleFonts.barlowCondensed(
-                            fontWeight: FontWeight.w700,
+                          style: TextStyle(
+                            fontFamily: AppFonts.barlowCondensed,
+                            fontWeight: AppFonts.w700,
                             fontSize: 14,
                             color: palette.textMuted,
                           ),
@@ -331,7 +337,7 @@ class _Header extends ConsumerWidget {
               orElse: () => const SizedBox.shrink(),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.s12),
           Expanded(
             child: Text(
               pubAsync.maybeWhen(
@@ -340,8 +346,9 @@ class _Header extends ConsumerWidget {
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.barlow(
-                fontWeight: FontWeight.w600,
+              style: TextStyle(
+                fontFamily: AppFonts.barlow,
+                fontWeight: AppFonts.w600,
                 fontSize: 15,
                 color: palette.textPrimary,
               ),
