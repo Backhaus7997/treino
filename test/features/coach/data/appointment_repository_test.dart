@@ -35,6 +35,9 @@ void main() {
           athleteDisplayName: athleteDisplayName,
           startsAt: startsAt,
           durationMin: durationMin,
+          // QA-COA-003: inject a reference just before the fixture so the new
+          // past-guard passes deterministically (fixture date is now in the past).
+          now: DateTime.utc(2026, 6, 30, 9, 0),
         );
 
         expect(appt.id, equals(expectedDocId));
@@ -76,6 +79,8 @@ void main() {
             athleteDisplayName: athleteDisplayName,
             startsAt: startsAt,
             durationMin: durationMin,
+            // QA-COA-003: reference before the fixture so the past-guard passes.
+            now: DateTime.utc(2026, 6, 30, 9, 0),
           ),
           throwsA(isA<SlotAlreadyTakenException>()),
         );
@@ -112,6 +117,8 @@ void main() {
           athleteDisplayName: athleteDisplayName,
           startsAt: startsAt,
           durationMin: durationMin,
+          // QA-COA-003: reference before the fixture so the past-guard passes.
+          now: DateTime.utc(2026, 6, 30, 9, 0),
         );
 
         expect(appt.status, equals(AppointmentStatus.confirmed));
@@ -195,6 +202,8 @@ void main() {
           athleteDisplayName: athleteDisplayName,
           startsAt: startsAt,
           durationMin: durationMin,
+          // QA-COA-003: reference before the fixture so the past-guard passes.
+          now: DateTime.utc(2026, 6, 30, 9, 0),
         );
 
         expect(

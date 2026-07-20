@@ -168,4 +168,27 @@ void main() {
     expect(find.text('Esta semana'), findsOneWidget);
     expect(find.text('Remo'), findsOneWidget);
   });
+
+  testWidgets(
+      'SCENARIO-FREQ-SCREEN-04 (QA-INS-005): on load failure shows the error '
+      'message + retry, NOT a blank screen', (tester) async {
+    // Antes esta rama era `SizedBox.shrink()`: una carga fallida dejaba la
+    // pantalla en blanco, sin mensaje ni forma de reintentar.
+    await tester.pumpWidget(wrap(
+      const SizedBox.shrink(),
+      overrides: [
+        exerciseFrequencyProvider((
+          athleteUid: 'me',
+          period: ChartPeriod.defaultPeriod,
+        )).overrideWith((ref) async => throw Exception('boom')),
+      ],
+    ));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('No pudimos cargar tus ejercicios frecuentes. Probá de nuevo.'),
+      findsOneWidget,
+    );
+    expect(find.text('Reintentar'), findsOneWidget);
+  });
 }

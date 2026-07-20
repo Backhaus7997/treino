@@ -35,6 +35,16 @@ class BookingTooFarAheadException implements Exception {
   String toString() => 'BookingTooFarAheadException()';
 }
 
+/// Thrown by `AppointmentRepository.book` when `startsAt` is at or before
+/// "now" (wall-clock, ADR-7) — a session can't be booked in the past. Mirrors
+/// the UI-side guard in new_session_sheet.dart. QA-COA-003.
+class BookingInThePastException implements Exception {
+  const BookingInThePastException();
+
+  @override
+  String toString() => 'BookingInThePastException()';
+}
+
 /// Thrown by `AppointmentRepository.billAppointment` when the appointment
 /// already has a non-null `paymentId` — guards against re-cobro from a
 /// double-submit or a stale/reopened detail dialog (Slice 2a, money-critical).

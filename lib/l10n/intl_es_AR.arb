@@ -2070,6 +2070,10 @@
     "description": "[stats-hub] Header title for the dedicated MuscleDistributionScreen."
   },
   "muscleDistributionLoadError": "No pudimos cargar tu distribución muscular. Probá de nuevo.",
+  "frequentExercisesLoadError": "No pudimos cargar tus ejercicios frecuentes. Probá de nuevo.",
+  "@frequentExercisesLoadError": {
+    "description": "Error state for the FrequentExercisesScreen's exerciseFrequencyProvider load failure. Paired with coachRetryLabel for the retry CTA — same convention as muscleDistributionLoadError."
+  },
   "exerciseProgressionScreenTitle": "EVOLUCIÓN POR EJERCICIO",
   "@exerciseProgressionScreenTitle": {
     "description": "Header title for the athlete-side ExerciseProgressionScreen."

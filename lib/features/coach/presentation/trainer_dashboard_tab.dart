@@ -22,6 +22,7 @@ import '../application/recent_activity_provider.dart';
 import '../application/trained_today_provider.dart';
 import '../application/trainer_link_providers.dart';
 import '../domain/appointment.dart';
+import '../domain/wall_clock.dart';
 
 // Re-export so the mobile test (trainer_dashboard_day_counts_test.dart) that
 // imports dashboardDayCounts/DashboardDayCounts from this file keeps compiling
@@ -1826,7 +1827,9 @@ String _formatTime(DateTime dt) {
 }
 
 String _formatDateLabel(AppL10n l10n, DateTime dt) {
-  final now = DateTime.now().toUtc();
+  // QA-COA-003: dt is wall-clock UTC (ADR-7); use wall-clock "now" so a session
+  // tomorrow isn't labelled "Hoy" between 21:00-23:59 ART.
+  final now = nowWall();
   final isToday = _isSameLocalDay(dt, now);
   final isTomorrow = _isSameLocalDay(dt, now.add(const Duration(days: 1)));
   if (isToday) return l10n.dashboardDateToday;

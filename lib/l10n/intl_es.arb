@@ -661,6 +661,7 @@
   "insightsTileMuscleDistributionSubtitle": "Comparativa actual vs. período anterior",
   "muscleDistributionScreenTitle": "DISTRIBUCIÓN MUSCULAR",
   "muscleDistributionLoadError": "No pudimos cargar tu distribución muscular. Inténtalo de nuevo.",
+  "frequentExercisesLoadError": "No pudimos cargar tus ejercicios frecuentes. Inténtalo de nuevo.",
   "exerciseProgressionScreenTitle": "EVOLUCIÓN POR EJERCICIO",
   "insightsTileExerciseProgressionTitle": "Evolución por ejercicio",
   "insightsTileExerciseProgressionSubtitle": "Tu progreso en cada ejercicio + records",

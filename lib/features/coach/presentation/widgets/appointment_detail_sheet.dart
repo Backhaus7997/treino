@@ -20,6 +20,7 @@ import '../../../profile/application/user_providers.dart'
 import '../../application/agenda_providers.dart';
 import '../../domain/agenda_exceptions.dart';
 import '../../domain/appointment.dart';
+import '../../domain/wall_clock.dart';
 import '../agenda_formatters.dart';
 
 /// Bottom-sheet content showing the full detail of a single [Appointment].
@@ -92,7 +93,9 @@ class _AppointmentDetailSheetState
     // counterpart (appointment_detail_dialog.dart).
     ref.watch(athleteBillingProvider(appointment.athleteId));
 
-    final canCancel = appointment.startsAt.difference(DateTime.now().toUtc()) >
+    // QA-COA-003: startsAt is wall-clock UTC (ADR-7); compare against wall-clock
+    // "now" so the 24h cancel window isn't 3h short in ART.
+    final canCancel = appointment.startsAt.difference(nowWall()) >
         const Duration(hours: 24);
 
     final endTime =
