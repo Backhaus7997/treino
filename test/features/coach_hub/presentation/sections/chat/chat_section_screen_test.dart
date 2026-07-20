@@ -232,5 +232,112 @@ void main() {
         expect(container.read(selectedChatIdProvider), _chatId);
       },
     );
+
+    testWidgets(
+      'selected row exposes a distinct background/border from unselected',
+      (tester) async {
+        final chat = _stubChat(
+          lastMessageText: 'Hola',
+          lastMessageAt: DateTime.now(),
+        );
+        final container = ProviderContainer(overrides: [
+          currentUidProvider.overrideWithValue(_pfUid),
+          chatsForCurrentUserProvider.overrideWith(
+            (ref) => Stream<List<Chat>>.value([chat]),
+          ),
+          userPublicProfileProvider(_athleteUid).overrideWith(
+            (ref) => Stream<UserPublicProfile?>.value(_stubPub()),
+          ),
+        ]);
+        addTearDown(container.dispose);
+
+        await tester.pumpWidget(
+          MediaQuery(
+            data: const MediaQueryData(size: Size(1200, 800)),
+            child: UncontrolledProviderScope(
+              container: container,
+              child: MaterialApp(
+                theme: AppTheme.dark(),
+                localizationsDelegates: AppL10n.localizationsDelegates,
+                supportedLocales: AppL10n.supportedLocales,
+                locale: const Locale('es', 'AR'),
+                home: const Scaffold(body: ChatSectionScreen()),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final containerFinder =
+            find.byKey(const Key('chat_row_container_$_chatId'));
+        final before = tester.widget<AnimatedContainer>(containerFinder);
+        final beforeDecoration = before.decoration! as BoxDecoration;
+
+        container.read(selectedChatIdProvider.notifier).state = _chatId;
+        await tester.pumpAndSettle();
+
+        final after = tester.widget<AnimatedContainer>(containerFinder);
+        final afterDecoration = after.decoration! as BoxDecoration;
+
+        expect(afterDecoration.color, isNot(equals(beforeDecoration.color)));
+        expect(
+          afterDecoration.border,
+          isNot(equals(beforeDecoration.border)),
+        );
+      },
+    );
+  });
+
+  group('ChatSectionScreen — unread badge', () {
+    testWidgets(
+      'renders the unread badge when the chat has an unread message',
+      (tester) async {
+        final chat = _stubChat(
+          lastMessageText: 'Hola PF',
+          lastMessageAt: DateTime.now(),
+        );
+        await tester.pumpWidget(_wrap(
+          overrides: [
+            currentUidProvider.overrideWithValue(_pfUid),
+            chatsForCurrentUserProvider.overrideWith(
+              (ref) => Stream<List<Chat>>.value([chat]),
+            ),
+            userPublicProfileProvider(_athleteUid).overrideWith(
+              (ref) => Stream<UserPublicProfile?>.value(_stubPub()),
+            ),
+          ],
+        ));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const Key('chat_row_unread_badge_$_chatId')),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'does not render the unread badge when the chat has no messages',
+      (tester) async {
+        final chat = _stubChat();
+        await tester.pumpWidget(_wrap(
+          overrides: [
+            currentUidProvider.overrideWithValue(_pfUid),
+            chatsForCurrentUserProvider.overrideWith(
+              (ref) => Stream<List<Chat>>.value([chat]),
+            ),
+            userPublicProfileProvider(_athleteUid).overrideWith(
+              (ref) => Stream<UserPublicProfile?>.value(_stubPub()),
+            ),
+          ],
+        ));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const Key('chat_row_unread_badge_$_chatId')),
+          findsNothing,
+        );
+      },
+    );
   });
 }
