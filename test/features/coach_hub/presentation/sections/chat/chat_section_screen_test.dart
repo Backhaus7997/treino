@@ -78,7 +78,9 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.text('Seleccioná una conversación'), findsOneWidget);
-        expect(find.byType(TreinoEmptyState), findsOneWidget);
+        // 2 TreinoEmptyState: el detail pane (sin selección) + la lista
+        // (0 chats) — ambos usan el mismo componente del kit por diseño.
+        expect(find.byType(TreinoEmptyState), findsWidgets);
       },
     );
 
@@ -110,7 +112,7 @@ void main() {
           );
           await tester.pumpAndSettle();
 
-          expect(find.byType(TreinoEmptyState), findsOneWidget);
+          expect(find.byType(TreinoEmptyState), findsWidgets);
           expect(find.text('Seleccioná una conversación'), findsOneWidget);
         }
       },
@@ -284,6 +286,108 @@ void main() {
           afterDecoration.border,
           isNot(equals(beforeDecoration.border)),
         );
+      },
+    );
+  });
+
+  group('ChatSectionScreen — list pane states', () {
+    testWidgets(
+      'loading state renders skeleton rows, not a raw spinner',
+      (tester) async {
+        await tester.pumpWidget(_wrap(
+          overrides: [
+            currentUidProvider.overrideWithValue(_pfUid),
+            chatsForCurrentUserProvider.overrideWith(
+              // Stream que nunca emite → el AsyncValue queda en loading.
+              (ref) => const Stream<List<Chat>>.empty(),
+            ),
+          ],
+        ));
+        await tester.pump();
+
+        expect(find.byKey(const Key('chat_list_skeleton')), findsOneWidget);
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'empty list state still shows the preserved copy',
+      (tester) async {
+        await tester.pumpWidget(_wrap(
+          overrides: [
+            currentUidProvider.overrideWithValue(_pfUid),
+            chatsForCurrentUserProvider.overrideWith(
+              (ref) => Stream<List<Chat>>.value(const []),
+            ),
+          ],
+        ));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.textContaining('Todavía no tenés conversaciones'),
+          findsOneWidget,
+        );
+        expect(find.byType(TreinoEmptyState), findsWidgets);
+      },
+    );
+
+    testWidgets(
+      'error state renders a TreinoEmptyState with the error copy',
+      (tester) async {
+        await tester.pumpWidget(_wrap(
+          overrides: [
+            currentUidProvider.overrideWithValue(_pfUid),
+            chatsForCurrentUserProvider.overrideWith(
+              (ref) => Stream<List<Chat>>.error('boom'),
+            ),
+          ],
+        ));
+        await tester.pumpAndSettle();
+
+        expect(find.text('No pudimos cargar tus chats.'), findsOneWidget);
+        expect(find.byType(TreinoEmptyState), findsWidgets);
+      },
+    );
+
+    testWidgets(
+      'typing in the search field filters rows by resolved displayName',
+      (tester) async {
+        final chatVicente = _stubChat(lastMessageText: 'Hola PF');
+        final chatOtro = Chat(
+          chatId: 'chat-2',
+          members: const [_pfUid, 'athlete-2'],
+          createdAt: DateTime(2026, 6, 1),
+          lastMessageText: 'Otro mensaje',
+        );
+        await tester.pumpWidget(_wrap(
+          overrides: [
+            currentUidProvider.overrideWithValue(_pfUid),
+            chatsForCurrentUserProvider.overrideWith(
+              (ref) => Stream<List<Chat>>.value([chatVicente, chatOtro]),
+            ),
+            userPublicProfileProvider(_athleteUid).overrideWith(
+              (ref) => Stream<UserPublicProfile?>.value(_stubPub()),
+            ),
+            userPublicProfileProvider('athlete-2').overrideWith(
+              (ref) => Stream<UserPublicProfile?>.value(
+                _stubPub(displayName: 'Mica'),
+              ),
+            ),
+          ],
+        ));
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const Key('chat_row_chat-1')), findsOneWidget);
+        expect(find.byKey(const Key('chat_row_chat-2')), findsOneWidget);
+
+        await tester.enterText(
+          find.byKey(const Key('chat_search_field')),
+          'vice',
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const Key('chat_row_chat-1')), findsOneWidget);
+        expect(find.byKey(const Key('chat_row_chat-2')), findsNothing);
       },
     );
   });
