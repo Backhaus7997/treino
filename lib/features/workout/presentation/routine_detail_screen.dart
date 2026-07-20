@@ -446,24 +446,16 @@ class _RoutineDetailContent extends ConsumerWidget {
                   emptyWeekMessage: l10n.routineDetailNoExercisesThisWeek,
                 ),
               const SizedBox(height: 20),
-              // CTA bar — periodized vs single-week.
-              // QA-WKT-005: only offer EMPEZAR when the viewed day/week has at
-              // least one present exercise. Starting an empty day yields a
-              // 0-set session that would instantly count as a completed workout
-              // (inflating workoutsCount/racha and marking the plan day done).
-              if (isPeriodized
-                  ? day.slots.any((s) => s.isPresentInWeek(viewedWeek))
-                  : day.slots.isNotEmpty) ...[
-                if (isPeriodized)
-                  _PeriodizedCTABar(
-                    routine: routine,
-                    day: day,
-                    viewedWeek: viewedWeek,
-                  )
-                else
-                  _StartSessionCTABar(routine: routine, day: day),
-                const SizedBox(height: 18),
-              ],
+              // CTA bar — periodized vs single-week
+              if (isPeriodized)
+                _PeriodizedCTABar(
+                  routine: routine,
+                  day: day,
+                  viewedWeek: viewedWeek,
+                )
+              else
+                _StartSessionCTABar(routine: routine, day: day),
+              const SizedBox(height: 18),
             ]),
           ),
         ),
