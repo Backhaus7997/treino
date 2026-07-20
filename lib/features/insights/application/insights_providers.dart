@@ -127,11 +127,11 @@ final athleteWeekInsightsProvider = FutureProvider.autoDispose
   // streak — días consecutivos entrenados (incluye hoy si entrenó, sino
   // cuenta desde ayer). ADR-WRS-08: lifted to lib/core/utils/streak_calculator.dart
   // in PR#2.
-  // NB: computeStreak is device-local (it calls `.toLocal()` internally on both
-  // its `now` arg and each session date), NOT ART — passing the ART-framed
-  // `now` above would double-shift and corrupt the day math. We deliberately
-  // let it default to `DateTime.now()`, keeping its behavior IDENTICAL to before
-  // this fix and consistent with every other computeStreak caller
+  // NB: computeStreak now buckets in the Argentina calendar frame internally
+  // (#411), consistent with the rest of Insights. Its `now` param is a REAL
+  // instant (normalized with `.toUtc()` inside) — passing the ART-framed `now`
+  // above would double-shift and corrupt the day math, so we deliberately let
+  // it default to `DateTime.now()`, same as every other computeStreak caller
   // (workout_days_providers / profile_stats / session_repository).
   final streak = computeStreak(allSessions);
 

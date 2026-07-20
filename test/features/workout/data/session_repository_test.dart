@@ -395,9 +395,11 @@ void main() {
     final data = profileSnap.data()!;
     // 1 fully completed session
     expect(data['workoutsCount'], equals(1));
-    // racha is computed by computeStreak using DateTime.now() — the value
-    // is correct (0 if not trained today in local TZ, 1 if trained today).
-    // We only verify it's a non-negative integer.
+    // racha is computed by computeStreak using DateTime.now(), bucketed by the
+    // Argentina calendar day (#411). Its value depends on the real "today" in
+    // ART relative to the fixed 2026-05-15 session, so we only assert it is a
+    // non-negative integer (TZ-independent). startedAt is UTC-flagged, as real
+    // data always is.
     expect(data['racha'], isA<int>());
   });
 
