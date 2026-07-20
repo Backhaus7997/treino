@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/custom_exercise_video_web_uploader.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/exercise_picker_dialog.dart';
 import 'package:treino/features/workout/application/custom_exercise_providers.dart';
 import 'package:treino/features/workout/application/exercise_providers.dart';
@@ -92,6 +93,9 @@ Future<void> _openPicker(
 
 class _MockCustomExerciseRepository extends Mock
     implements CustomExerciseRepository {}
+
+class _MockVideoUploader extends Mock
+    implements CustomExerciseVideoWebUploader {}
 
 void main() {
   setUpAll(() {
@@ -447,6 +451,162 @@ void main() {
           id: any(named: 'id'),
         ),
       );
+    });
+  });
+
+  group('ExercisePickerDialog (web) — video del ejercicio custom', () {
+    // Neither a YouTube nor a Storage URL → ExerciseVideoPlayer renders a static
+    // placeholder (no network image / no video controller), so the preview
+    // never leaves a widget test un-settleable.
+    const kVideoUrl = 'https://vids.test/clip1';
+
+    List<Override> repoOverride(CustomExerciseRepository repo) => [
+      customExerciseRepositoryProvider.overrideWithValue(repo),
+    ];
+
+    void stubCreate(_MockCustomExerciseRepository repo) {
+      when(
+        () => repo.create(
+          trainerId: any(named: 'trainerId'),
+          name: any(named: 'name'),
+          muscleGroup: any(named: 'muscleGroup'),
+          secondaryMuscleGroup: any(named: 'secondaryMuscleGroup'),
+          description: any(named: 'description'),
+          videoUrl: any(named: 'videoUrl'),
+          defaultRestSeconds: any(named: 'defaultRestSeconds'),
+          equipment: any(named: 'equipment'),
+        ),
+      ).thenAnswer(
+        (inv) async => CustomExercise(
+          id: 'new-ex',
+          ownerId: inv.namedArguments[#trainerId] as String,
+          name: inv.namedArguments[#name] as String,
+          videoUrl: inv.namedArguments[#videoUrl] as String?,
+          createdAt: DateTime(2024, 1, 1),
+          updatedAt: DateTime(2024, 1, 1),
+        ),
+      );
+    }
+
+    List<String?> capturedCreate(_MockCustomExerciseRepository repo) => verify(
+      () => repo.create(
+        trainerId: captureAny(named: 'trainerId'),
+        name: captureAny(named: 'name'),
+        muscleGroup: any(named: 'muscleGroup'),
+        secondaryMuscleGroup: any(named: 'secondaryMuscleGroup'),
+        description: any(named: 'description'),
+        videoUrl: captureAny(named: 'videoUrl'),
+        defaultRestSeconds: any(named: 'defaultRestSeconds'),
+        equipment: any(named: 'equipment'),
+      ),
+    ).captured.cast<String?>();
+
+    testWidgets('un link pegado se guarda en videoUrl al crear', (
+      tester,
+    ) async {
+      final repo = _MockCustomExerciseRepository();
+      stubCreate(repo);
+      await _openPicker(tester, extraOverrides: repoOverride(repo));
+
+      await tester.tap(find.byKey(const Key('create_new_exercise_button')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('create_exercise_name_field')),
+        'Sentadilla',
+      );
+      await tester.enterText(
+        find.byKey(const Key('create_exercise_video_field')),
+        kVideoUrl,
+      );
+      await tester.pumpAndSettle();
+      // The video preview makes the form taller than the viewport → scroll the
+      // submit button into view before tapping.
+      await tester.ensureVisible(
+        find.byKey(const Key('create_exercise_submit_button')),
+      );
+      await tester.tap(find.byKey(const Key('create_exercise_submit_button')));
+      await tester.pumpAndSettle();
+
+      expect(capturedCreate(repo), ['u1', 'Sentadilla', kVideoUrl]);
+    });
+
+    testWidgets('"Subir mi propio video" sube y guarda la URL devuelta', (
+      tester,
+    ) async {
+      final repo = _MockCustomExerciseRepository();
+      stubCreate(repo);
+      final uploader = _MockVideoUploader();
+      when(
+        () => uploader.pickAndUpload(onProgress: any(named: 'onProgress')),
+      ).thenAnswer((_) async => 'https://vids.test/uploaded');
+
+      await _openPicker(
+        tester,
+        extraOverrides: [
+          ...repoOverride(repo),
+          customExerciseVideoWebUploaderProvider.overrideWithValue(uploader),
+        ],
+      );
+
+      await tester.tap(find.byKey(const Key('create_new_exercise_button')));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const Key('create_exercise_upload_video_button')),
+      );
+      await tester.tap(
+        find.byKey(const Key('create_exercise_upload_video_button')),
+      );
+      await tester.pumpAndSettle();
+
+      // El campo quedó con la URL subida.
+      final field = tester.widget<TextField>(
+        find.byKey(const Key('create_exercise_video_field')),
+      );
+      expect(field.controller?.text, 'https://vids.test/uploaded');
+
+      await tester.enterText(
+        find.byKey(const Key('create_exercise_name_field')),
+        'Sentadilla',
+      );
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const Key('create_exercise_submit_button')),
+      );
+      await tester.tap(find.byKey(const Key('create_exercise_submit_button')));
+      await tester.pumpAndSettle();
+
+      verify(
+        () => uploader.pickAndUpload(onProgress: any(named: 'onProgress')),
+      ).called(1);
+      expect(capturedCreate(repo), [
+        'u1',
+        'Sentadilla',
+        'https://vids.test/uploaded',
+      ]);
+    });
+
+    testWidgets('editar pre-carga el video existente', (tester) async {
+      final withVideo = _customBench.copyWith(
+        videoUrl: 'https://vids.test/existing',
+      );
+      final repo = _MockCustomExerciseRepository();
+      await _openPicker(
+        tester,
+        extraOverrides: [
+          customExercisesForTrainerStreamProvider(
+            'u1',
+          ).overrideWith((ref) => Stream.value([withVideo])),
+          ...repoOverride(repo),
+        ],
+      );
+
+      await tester.tap(find.byTooltip('Editar'));
+      await tester.pumpAndSettle();
+
+      final field = tester.widget<TextField>(
+        find.byKey(const Key('create_exercise_video_field')),
+      );
+      expect(field.controller?.text, 'https://vids.test/existing');
     });
   });
 }
