@@ -13,7 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/motion/treino_shimmer.dart';
 import 'package:treino/features/coach_hub/presentation/sections/biblioteca/widgets/ejercicios_tab.dart';
-import 'package:treino/features/coach_hub/presentation/widgets/empty_state/empty_state.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/workout/application/custom_exercise_providers.dart';
 import 'package:treino/features/workout/application/exercise_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
@@ -200,7 +200,7 @@ void main() {
   });
 
   group('EjerciciosTab — exercise detail dialog', () {
-    testWidgets('tap exercise card opens AlertDialog — SCENARIO-BIBW-07a',
+    testWidgets('tap exercise card opens TreinoDialog — SCENARIO-BIBW-07a',
         (tester) async {
       tester.view.physicalSize = const Size(1280, 900);
       tester.view.devicePixelRatio = 1.0;
@@ -218,8 +218,10 @@ void main() {
       await tester.tap(find.text('Press de Banca'));
       await tester.pumpAndSettle();
 
-      // AlertDialog should be present
-      expect(find.byType(AlertDialog), findsOneWidget);
+      // TreinoDialog (kit) should be present, with the exercise name as
+      // title — no bare AlertDialog anymore.
+      expect(find.byType(TreinoDialog), findsOneWidget);
+      expect(find.byType(AlertDialog), findsNothing);
       // No BottomSheet
       expect(find.byType(BottomSheet), findsNothing);
     });
@@ -248,7 +250,7 @@ void main() {
       await tester.tap(find.text('Cerrar'));
       await tester.pumpAndSettle();
 
-      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.byType(TreinoDialog), findsNothing);
     });
   });
 }
