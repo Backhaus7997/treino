@@ -45,9 +45,9 @@ List<Override> _overrides({RoutineRepository? repo}) {
     currentUidProvider.overrideWithValue(_trainerId),
     routineRepositoryProvider.overrideWithValue(mockRepo),
     exercisesProvider.overrideWith((ref) async => kExerciseSeed),
-    customExercisesForTrainerStreamProvider(_trainerId).overrideWith(
-      (ref) => Stream<List<CustomExercise>>.value(const []),
-    ),
+    customExercisesForTrainerStreamProvider(
+      _trainerId,
+    ).overrideWith((ref) => Stream<List<CustomExercise>>.value(const [])),
     userPublicProfileProvider(_athleteId).overrideWith(
       (ref) => Stream.value(
         const UserPublicProfile(uid: _athleteId, displayName: 'Juan Pérez'),
@@ -494,7 +494,7 @@ Routine _twoWeekTypedRoutine({String id = 'r10'}) => Routine(
                 ],
                 [
                   SetSpec(reps: 10, weightKg: 50),
-                  SetSpec(reps: 10, weightKg: 50),
+                  SetSpec(reps: 10, weightKg: 50)
                 ],
               ],
             ),
@@ -732,9 +732,13 @@ Routine _presenceRoutine({String id = 'r7'}) => Routine(
 /// data) to the first day, then sets valid reps on its single default set.
 Future<void> _fillMinimalValidForm(WidgetTester tester) async {
   await tester.enterText(
-      find.byKey(const Key('routine_editor_name_field')), 'Fuerza 4x semana');
+    find.byKey(const Key('routine_editor_name_field')),
+    'Fuerza 4x semana',
+  );
   await tester.enterText(
-      find.byKey(const Key('routine_editor_split_field')), 'Push/Pull/Legs');
+    find.byKey(const Key('routine_editor_split_field')),
+    'Push/Pull/Legs',
+  );
 
   await tester.tap(find.text('Agregar ejercicio'));
   await tester.pumpAndSettle();
@@ -755,13 +759,15 @@ Future<void> _fillMinimalValidForm(WidgetTester tester) async {
 
 void main() {
   setUpAll(() {
-    registerFallbackValue(const Routine(
-      id: '',
-      name: 'fallback',
-      level: ExperienceLevel.beginner,
-      days: [],
-      source: RoutineSource.trainerAssigned,
-    ));
+    registerFallbackValue(
+      const Routine(
+        id: '',
+        name: 'fallback',
+        level: ExperienceLevel.beginner,
+        days: [],
+        source: RoutineSource.trainerAssigned,
+      ),
+    );
   });
 
   group('RoutineEditorWebScreen — header', () {
@@ -772,9 +778,7 @@ void main() {
   });
 
   group('RoutineEditorWebScreen — validation', () {
-    testWidgets('empty name blocks submit and shows an error', (
-      tester,
-    ) async {
+    testWidgets('empty name blocks submit and shows an error', (tester) async {
       final repo = _MockRoutineRepository();
       await _pumpEditor(tester, repo: repo);
 
@@ -790,7 +794,9 @@ void main() {
       await _pumpEditor(tester, repo: repo);
 
       await tester.enterText(
-          find.byKey(const Key('routine_editor_name_field')), 'Fuerza');
+        find.byKey(const Key('routine_editor_name_field')),
+        'Fuerza',
+      );
       await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
       await tester.pumpAndSettle();
 
@@ -806,14 +812,20 @@ void main() {
       await _pumpEditor(tester, repo: repo);
 
       await tester.enterText(
-          find.byKey(const Key('routine_editor_name_field')), 'Fuerza');
+        find.byKey(const Key('routine_editor_name_field')),
+        'Fuerza',
+      );
       await tester.enterText(
-          find.byKey(const Key('routine_editor_split_field')), 'PPL');
+        find.byKey(const Key('routine_editor_split_field')),
+        'PPL',
+      );
       await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('necesita al menos un ejercicio'),
-          findsOneWidget);
+      expect(
+        find.textContaining('necesita al menos un ejercicio'),
+        findsOneWidget,
+      );
       verifyNever(() => repo.createAssigned(any()));
     });
 
@@ -822,9 +834,13 @@ void main() {
       await _pumpEditor(tester, repo: repo);
 
       await tester.enterText(
-          find.byKey(const Key('routine_editor_name_field')), 'Fuerza');
+        find.byKey(const Key('routine_editor_name_field')),
+        'Fuerza',
+      );
       await tester.enterText(
-          find.byKey(const Key('routine_editor_split_field')), 'PPL');
+        find.byKey(const Key('routine_editor_split_field')),
+        'PPL',
+      );
       await tester.tap(find.text('Agregar ejercicio'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Press de Banca'));
@@ -853,45 +869,125 @@ void main() {
     });
   });
 
-  group('RoutineEditorWebScreen — submit', () {
-    testWidgets(
-        'valid form calls createAssigned with a well-formed single-week Routine',
-        (tester) async {
-      final repo = _MockRoutineRepository();
-      when(() => repo.createAssigned(any())).thenAnswer(
-        (i) async => i.positionalArguments.first as Routine,
+  group('RoutineEditorWebScreen — reemplazar ejercicio (in-place)', () {
+    // Picks [name] inside the open picker dialog. [query] is a SUBSTRING of the
+    // name typed into the search field so the row is on-screen regardless of
+    // seed size — it must differ from the full name, otherwise find.text([name])
+    // would also match the text the search field now holds. The tap is scoped
+    // to the Dialog so it never hits the slot card behind it.
+    Future<void> pickInDialog(
+      WidgetTester tester,
+      String name,
+      String query,
+    ) async {
+      await tester.enterText(
+        find.descendant(
+          of: find.byType(Dialog),
+          matching: find.byType(TextField),
+        ),
+        query,
       );
-      await _pumpEditor(tester, repo: repo);
-      await _fillMinimalValidForm(tester);
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(of: find.byType(Dialog), matching: find.text(name)),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Agregar (1)'));
+      await tester.pumpAndSettle();
+    }
 
-      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+    testWidgets('cambia el ejercicio conservando las series ya cargadas', (
+      tester,
+    ) async {
+      await _pumpEditor(tester);
+
+      // Agrega "Press de Banca" y le carga reps 10.
+      await tester.tap(find.text('Agregar ejercicio'));
+      await tester.pumpAndSettle();
+      await pickInDialog(tester, 'Press de Banca', 'Banca');
+      await tester.enterText(
+        find.ancestor(
+          of: find.text('reps'),
+          matching: find.byType(TextFormField),
+        ),
+        '10',
+      );
       await tester.pumpAndSettle();
 
-      final captured = verify(() => repo.createAssigned(captureAny())).captured;
-      final routine = captured.single as Routine;
+      expect(find.text('Press de Banca'), findsOneWidget);
+      expect(find.text('10'), findsOneWidget);
 
-      expect(routine.name, 'Fuerza 4x semana');
-      expect(routine.split, 'Push/Pull/Legs');
-      expect(routine.source, RoutineSource.trainerAssigned);
-      expect(routine.assignedBy, _trainerId);
-      expect(routine.assignedTo, _athleteId);
-      // firestore.rules rejects 'public' on a trainer-assigned create — the
-      // plan must be private (the model default 'public' would be denied).
-      expect(routine.visibility, RoutineVisibility.private);
-      expect(routine.numWeeks, 1);
-      expect(routine.days, hasLength(1));
+      // "Cambiar ejercicio" → elegir "Sentadilla con Barra".
+      await tester.tap(find.byTooltip('Cambiar ejercicio'));
+      await tester.pumpAndSettle();
+      await pickInDialog(tester, 'Sentadilla con Barra', 'Sentadilla');
 
-      final slot = routine.days.single.slots.single;
-      expect(slot.exerciseId, 'bench-press');
-      expect(slot.sets, hasLength(1));
-      expect(slot.sets.single.reps, 10);
-      expect(slot.weeklySets, isEmpty); // single-week → no periodization data
-      expect(slot.activeWeeks, isEmpty); // present in all (the only) week
-      expect(slot.supersetGroup, isNull);
+      // El ejercicio cambió en el mismo slot (no se agregó otro) y las reps
+      // siguen cargadas: la config sobrevive al swap.
+      expect(find.text('Sentadilla con Barra'), findsOneWidget);
+      expect(find.text('Press de Banca'), findsNothing);
+      expect(find.text('10'), findsOneWidget);
     });
 
-    testWidgets('repository failure surfaces a retry-friendly error message',
-        (tester) async {
+    testWidgets('elegir el mismo ejercicio es un no-op', (tester) async {
+      await _pumpEditor(tester);
+
+      await tester.tap(find.text('Agregar ejercicio'));
+      await tester.pumpAndSettle();
+      await pickInDialog(tester, 'Press de Banca', 'Banca');
+
+      await tester.tap(find.byTooltip('Cambiar ejercicio'));
+      await tester.pumpAndSettle();
+      await pickInDialog(tester, 'Press de Banca', 'Banca');
+
+      // Sigue habiendo un único slot con el mismo ejercicio.
+      expect(find.text('Press de Banca'), findsOneWidget);
+    });
+  });
+
+  group('RoutineEditorWebScreen — submit', () {
+    testWidgets(
+      'valid form calls createAssigned with a well-formed single-week Routine',
+      (tester) async {
+        final repo = _MockRoutineRepository();
+        when(
+          () => repo.createAssigned(any()),
+        ).thenAnswer((i) async => i.positionalArguments.first as Routine);
+        await _pumpEditor(tester, repo: repo);
+        await _fillMinimalValidForm(tester);
+
+        await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+        await tester.pumpAndSettle();
+
+        final captured = verify(
+          () => repo.createAssigned(captureAny()),
+        ).captured;
+        final routine = captured.single as Routine;
+
+        expect(routine.name, 'Fuerza 4x semana');
+        expect(routine.split, 'Push/Pull/Legs');
+        expect(routine.source, RoutineSource.trainerAssigned);
+        expect(routine.assignedBy, _trainerId);
+        expect(routine.assignedTo, _athleteId);
+        // firestore.rules rejects 'public' on a trainer-assigned create — the
+        // plan must be private (the model default 'public' would be denied).
+        expect(routine.visibility, RoutineVisibility.private);
+        expect(routine.numWeeks, 1);
+        expect(routine.days, hasLength(1));
+
+        final slot = routine.days.single.slots.single;
+        expect(slot.exerciseId, 'bench-press');
+        expect(slot.sets, hasLength(1));
+        expect(slot.sets.single.reps, 10);
+        expect(slot.weeklySets, isEmpty); // single-week → no periodization data
+        expect(slot.activeWeeks, isEmpty); // present in all (the only) week
+        expect(slot.supersetGroup, isNull);
+      },
+    );
+
+    testWidgets('repository failure surfaces a retry-friendly error message', (
+      tester,
+    ) async {
       final repo = _MockRoutineRepository();
       when(() => repo.createAssigned(any())).thenThrow(Exception('boom'));
       await _pumpEditor(tester, repo: repo);
@@ -914,7 +1010,9 @@ void main() {
       await _pumpEditor(tester);
 
       await tester.enterText(
-          find.byKey(const Key('routine_editor_name_field')), 'Fuerza');
+        find.byKey(const Key('routine_editor_name_field')),
+        'Fuerza',
+      );
       await tester.tap(find.text('Cancelar'));
       await tester.pumpAndSettle();
 
@@ -925,7 +1023,9 @@ void main() {
       await _pumpEditor(tester);
 
       await tester.enterText(
-          find.byKey(const Key('routine_editor_name_field')), 'Fuerza');
+        find.byKey(const Key('routine_editor_name_field')),
+        'Fuerza',
+      );
       await tester.tap(find.text('Cancelar'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Descartar'));
@@ -948,8 +1048,9 @@ void main() {
   });
 
   group('RoutineEditorWebScreen — edit mode', () {
-    testWidgets('loads and populates an existing web-editable routine',
-        (tester) async {
+    testWidgets('loads and populates an existing web-editable routine', (
+      tester,
+    ) async {
       final repo = _MockRoutineRepository();
       when(() => repo.getById(any())).thenAnswer((_) async => _simpleRoutine());
       await _pumpEditor(tester, repo: repo, routineId: 'r1');
@@ -962,33 +1063,43 @@ void main() {
     });
 
     testWidgets(
-        'saving calls updateAssigned on the same doc, not createAssigned',
-        (tester) async {
-      final repo = _MockRoutineRepository();
-      when(() => repo.getById(any())).thenAnswer((_) async => _simpleRoutine());
-      when(() => repo.updateAssigned(
+      'saving calls updateAssigned on the same doc, not createAssigned',
+      (tester) async {
+        final repo = _MockRoutineRepository();
+        when(
+          () => repo.getById(any()),
+        ).thenAnswer((_) async => _simpleRoutine());
+        when(
+          () => repo.updateAssigned(
             uid: any(named: 'uid'),
             draft: any(named: 'draft'),
-          )).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
-      await _pumpEditor(tester, repo: repo, routineId: 'r1');
+          ),
+        ).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+        await _pumpEditor(tester, repo: repo, routineId: 'r1');
 
-      await tester.enterText(
-          find.byKey(const Key('routine_editor_name_field')), 'Fuerza v2');
-      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
-      await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byKey(const Key('routine_editor_name_field')),
+          'Fuerza v2',
+        );
+        await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+        await tester.pumpAndSettle();
 
-      final draft = verify(() => repo.updateAssigned(
+        final draft = verify(
+          () => repo.updateAssigned(
             uid: any(named: 'uid'),
             draft: captureAny(named: 'draft'),
-          )).captured.single as Routine;
-      expect(draft.id, 'r1'); // UPDATE on the same document, not a new one
-      expect(draft.name, 'Fuerza v2');
-      expect(draft.numWeeks, 1);
-      verifyNever(() => repo.createAssigned(any()));
-    });
+          ),
+        ).captured.single as Routine;
+        expect(draft.id, 'r1'); // UPDATE on the same document, not a new one
+        expect(draft.name, 'Fuerza v2');
+        expect(draft.numWeeks, 1);
+        verifyNever(() => repo.createAssigned(any()));
+      },
+    );
 
-    testWidgets('shows a not-found message when the routine is missing',
-        (tester) async {
+    testWidgets('shows a not-found message when the routine is missing', (
+      tester,
+    ) async {
       final repo = _MockRoutineRepository();
       when(() => repo.getById(any())).thenAnswer((_) async => null);
       await _pumpEditor(tester, repo: repo, routineId: 'ghost');
@@ -999,18 +1110,23 @@ void main() {
   });
 
   group('RoutineEditorWebScreen — rep ranges + notes (Fase 1)', () {
-    testWidgets('switching to "Rango" saves a min-max range routine',
-        (tester) async {
+    testWidgets('switching to "Rango" saves a min-max range routine', (
+      tester,
+    ) async {
       final repo = _MockRoutineRepository();
-      when(() => repo.createAssigned(any())).thenAnswer(
-        (i) async => i.positionalArguments.first as Routine,
-      );
+      when(
+        () => repo.createAssigned(any()),
+      ).thenAnswer((i) async => i.positionalArguments.first as Routine);
       await _pumpEditor(tester, repo: repo);
 
       await tester.enterText(
-          find.byKey(const Key('routine_editor_name_field')), 'Hipertrofia');
+        find.byKey(const Key('routine_editor_name_field')),
+        'Hipertrofia',
+      );
       await tester.enterText(
-          find.byKey(const Key('routine_editor_split_field')), 'PPL');
+        find.byKey(const Key('routine_editor_split_field')),
+        'PPL',
+      );
       await tester.tap(find.text('Agregar ejercicio'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Press de Banca'));
@@ -1024,12 +1140,16 @@ void main() {
 
       await tester.enterText(
         find.ancestor(
-            of: find.text('mín'), matching: find.byType(TextFormField)),
+          of: find.text('mín'),
+          matching: find.byType(TextFormField),
+        ),
         '8',
       );
       await tester.enterText(
         find.ancestor(
-            of: find.text('máx'), matching: find.byType(TextFormField)),
+          of: find.text('máx'),
+          matching: find.byType(TextFormField),
+        ),
         '12',
       );
       await tester.pumpAndSettle();
@@ -1049,16 +1169,17 @@ void main() {
 
     testWidgets('a coaching note is persisted on the slot', (tester) async {
       final repo = _MockRoutineRepository();
-      when(() => repo.createAssigned(any())).thenAnswer(
-        (i) async => i.positionalArguments.first as Routine,
-      );
+      when(
+        () => repo.createAssigned(any()),
+      ).thenAnswer((i) async => i.positionalArguments.first as Routine);
       await _pumpEditor(tester, repo: repo);
       await _fillMinimalValidForm(tester);
 
       await tester.enterText(
         find.ancestor(
-            of: find.text('Notas para el alumno (opcional)'),
-            matching: find.byType(TextFormField)),
+          of: find.text('Notas para el alumno (opcional)'),
+          matching: find.byType(TextFormField),
+        ),
         'Bajá despacio la barra',
       );
       await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
@@ -1075,9 +1196,13 @@ void main() {
       await _pumpEditor(tester, repo: repo);
 
       await tester.enterText(
-          find.byKey(const Key('routine_editor_name_field')), 'Hipertrofia');
+        find.byKey(const Key('routine_editor_name_field')),
+        'Hipertrofia',
+      );
       await tester.enterText(
-          find.byKey(const Key('routine_editor_split_field')), 'PPL');
+        find.byKey(const Key('routine_editor_split_field')),
+        'PPL',
+      );
       await tester.tap(find.text('Agregar ejercicio'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Press de Banca'));
@@ -1089,12 +1214,16 @@ void main() {
 
       await tester.enterText(
         find.ancestor(
-            of: find.text('mín'), matching: find.byType(TextFormField)),
+          of: find.text('mín'),
+          matching: find.byType(TextFormField),
+        ),
         '12',
       );
       await tester.enterText(
         find.ancestor(
-            of: find.text('máx'), matching: find.byType(TextFormField)),
+          of: find.text('máx'),
+          matching: find.byType(TextFormField),
+        ),
         '8',
       );
       await tester.pumpAndSettle();
@@ -1105,14 +1234,17 @@ void main() {
       verifyNever(() => repo.createAssigned(any()));
     });
 
-    testWidgets('edit mode loads a range routine and re-saves it as a range',
-        (tester) async {
+    testWidgets('edit mode loads a range routine and re-saves it as a range', (
+      tester,
+    ) async {
       final repo = _MockRoutineRepository();
       when(() => repo.getById(any())).thenAnswer((_) async => _rangeRoutine());
-      when(() => repo.updateAssigned(
-            uid: any(named: 'uid'),
-            draft: any(named: 'draft'),
-          )).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+      when(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: any(named: 'draft'),
+        ),
+      ).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
       await _pumpEditor(tester, repo: repo, routineId: 'r2');
 
       expect(find.text('Controlá la bajada'), findsOneWidget); // notes loaded
@@ -1121,10 +1253,12 @@ void main() {
       await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
       await tester.pumpAndSettle();
 
-      final draft = verify(() => repo.updateAssigned(
-            uid: any(named: 'uid'),
-            draft: captureAny(named: 'draft'),
-          )).captured.single as Routine;
+      final draft = verify(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: captureAny(named: 'draft'),
+        ),
+      ).captured.single as Routine;
       final slot = draft.days.single.slots.single;
       expect(slot.repMode, RepMode.range);
       expect(slot.sets.single.repsMin, 8);
@@ -1134,18 +1268,23 @@ void main() {
   });
 
   group('RoutineEditorWebScreen — duración (Fase 2)', () {
-    testWidgets('"Tiempo" saves a duration exercise (seconds, no reps)',
-        (tester) async {
+    testWidgets('"Tiempo" saves a duration exercise (seconds, no reps)', (
+      tester,
+    ) async {
       final repo = _MockRoutineRepository();
-      when(() => repo.createAssigned(any())).thenAnswer(
-        (i) async => i.positionalArguments.first as Routine,
-      );
+      when(
+        () => repo.createAssigned(any()),
+      ).thenAnswer((i) async => i.positionalArguments.first as Routine);
       await _pumpEditor(tester, repo: repo);
 
       await tester.enterText(
-          find.byKey(const Key('routine_editor_name_field')), 'Core');
+        find.byKey(const Key('routine_editor_name_field')),
+        'Core',
+      );
       await tester.enterText(
-          find.byKey(const Key('routine_editor_split_field')), 'Full Body');
+        find.byKey(const Key('routine_editor_split_field')),
+        'Full Body',
+      );
       await tester.tap(find.text('Agregar ejercicio'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Press de Banca'));
@@ -1159,7 +1298,9 @@ void main() {
       // 'seg' (exact) matches only the duration field hint, not 'Descanso (seg)'.
       await tester.enterText(
         find.ancestor(
-            of: find.text('seg'), matching: find.byType(TextFormField)),
+          of: find.text('seg'),
+          matching: find.byType(TextFormField),
+        ),
         '60',
       );
       await tester.pumpAndSettle();
@@ -1181,9 +1322,13 @@ void main() {
       await _pumpEditor(tester, repo: repo);
 
       await tester.enterText(
-          find.byKey(const Key('routine_editor_name_field')), 'Core');
+        find.byKey(const Key('routine_editor_name_field')),
+        'Core',
+      );
       await tester.enterText(
-          find.byKey(const Key('routine_editor_split_field')), 'Full Body');
+        find.byKey(const Key('routine_editor_split_field')),
+        'Full Body',
+      );
       await tester.tap(find.text('Agregar ejercicio'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Press de Banca'));
@@ -1202,43 +1347,53 @@ void main() {
     });
 
     testWidgets(
-        'edit mode loads a duration routine and re-saves it as duration',
-        (tester) async {
-      final repo = _MockRoutineRepository();
-      when(() => repo.getById(any()))
-          .thenAnswer((_) async => _durationRoutine());
-      when(() => repo.updateAssigned(
+      'edit mode loads a duration routine and re-saves it as duration',
+      (tester) async {
+        final repo = _MockRoutineRepository();
+        when(
+          () => repo.getById(any()),
+        ).thenAnswer((_) async => _durationRoutine());
+        when(
+          () => repo.updateAssigned(
             uid: any(named: 'uid'),
             draft: any(named: 'draft'),
-          )).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
-      await _pumpEditor(tester, repo: repo, routineId: 'r3');
+          ),
+        ).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+        await _pumpEditor(tester, repo: repo, routineId: 'r3');
 
-      expect(find.text('60'), findsWidgets); // seconds loaded into the field
-      expect(find.text('reps'), findsNothing); // not in reps mode
+        expect(find.text('60'), findsWidgets); // seconds loaded into the field
+        expect(find.text('reps'), findsNothing); // not in reps mode
 
-      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
-      await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+        await tester.pumpAndSettle();
 
-      final draft = verify(() => repo.updateAssigned(
+        final draft = verify(
+          () => repo.updateAssigned(
             uid: any(named: 'uid'),
             draft: captureAny(named: 'draft'),
-          )).captured.single as Routine;
-      final slot = draft.days.single.slots.single;
-      expect(slot.exerciseMode, ExerciseMode.duration);
-      expect(slot.sets.single.durationSeconds, 60);
-    });
+          ),
+        ).captured.single as Routine;
+        final slot = draft.days.single.slots.single;
+        expect(slot.exerciseMode, ExerciseMode.duration);
+        expect(slot.sets.single.durationSeconds, 60);
+      },
+    );
   });
 
   group('RoutineEditorWebScreen — supersets (Fase 3)', () {
-    testWidgets('unlinking a superset saves both exercises as standalone',
-        (tester) async {
+    testWidgets('unlinking a superset saves both exercises as standalone', (
+      tester,
+    ) async {
       final repo = _MockRoutineRepository();
-      when(() => repo.getById(any()))
-          .thenAnswer((_) async => _supersetRoutine());
-      when(() => repo.updateAssigned(
-            uid: any(named: 'uid'),
-            draft: any(named: 'draft'),
-          )).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+      when(
+        () => repo.getById(any()),
+      ).thenAnswer((_) async => _supersetRoutine());
+      when(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: any(named: 'draft'),
+        ),
+      ).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
       await _pumpEditor(tester, repo: repo, routineId: 'r4');
 
       // Loaded as a linked superset → toggle it off. ensureVisible because the
@@ -1251,25 +1406,31 @@ void main() {
       await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
       await tester.pumpAndSettle();
 
-      final draft = verify(() => repo.updateAssigned(
-            uid: any(named: 'uid'),
-            draft: captureAny(named: 'draft'),
-          )).captured.single as Routine;
+      final draft = verify(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: captureAny(named: 'draft'),
+        ),
+      ).captured.single as Routine;
       final slots = draft.days.single.slots;
       // A lone (unlinked) slot normalizes to a standalone (null group).
       expect(slots[0].supersetGroup, isNull);
       expect(slots[1].supersetGroup, isNull);
     });
 
-    testWidgets('edit mode loads a superset and re-saves it linked',
-        (tester) async {
+    testWidgets('edit mode loads a superset and re-saves it linked', (
+      tester,
+    ) async {
       final repo = _MockRoutineRepository();
-      when(() => repo.getById(any()))
-          .thenAnswer((_) async => _supersetRoutine());
-      when(() => repo.updateAssigned(
-            uid: any(named: 'uid'),
-            draft: any(named: 'draft'),
-          )).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+      when(
+        () => repo.getById(any()),
+      ).thenAnswer((_) async => _supersetRoutine());
+      when(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: any(named: 'draft'),
+        ),
+      ).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
       await _pumpEditor(tester, repo: repo, routineId: 'r4');
 
       expect(find.text('Press de Banca'), findsOneWidget);
@@ -1280,10 +1441,12 @@ void main() {
       await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
       await tester.pumpAndSettle();
 
-      final draft = verify(() => repo.updateAssigned(
-            uid: any(named: 'uid'),
-            draft: captureAny(named: 'draft'),
-          )).captured.single as Routine;
+      final draft = verify(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: captureAny(named: 'draft'),
+        ),
+      ).captured.single as Routine;
       final slots = draft.days.single.slots;
       expect(slots[0].supersetGroup, isNotNull);
       expect(slots[0].supersetGroup, slots[1].supersetGroup);
@@ -1291,12 +1454,13 @@ void main() {
   });
 
   group('RoutineEditorWebScreen — semanas (Fase 4a)', () {
-    testWidgets('the weeks stepper sets numWeeks on create (shared sets)',
-        (tester) async {
+    testWidgets('the weeks stepper sets numWeeks on create (shared sets)', (
+      tester,
+    ) async {
       final repo = _MockRoutineRepository();
-      when(() => repo.createAssigned(any())).thenAnswer(
-        (i) async => i.positionalArguments.first as Routine,
-      );
+      when(
+        () => repo.createAssigned(any()),
+      ).thenAnswer((i) async => i.positionalArguments.first as Routine);
       await _pumpEditor(tester, repo: repo);
 
       // Fill week 1 FIRST, then bump 1 → 3 weeks: each new week is seeded
@@ -1340,12 +1504,15 @@ void main() {
 
     testWidgets('edit mode loads numWeeks and re-saves it', (tester) async {
       final repo = _MockRoutineRepository();
-      when(() => repo.getById(any()))
-          .thenAnswer((_) async => _multiWeekRoutine());
-      when(() => repo.updateAssigned(
-            uid: any(named: 'uid'),
-            draft: any(named: 'draft'),
-          )).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+      when(
+        () => repo.getById(any()),
+      ).thenAnswer((_) async => _multiWeekRoutine());
+      when(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: any(named: 'draft'),
+        ),
+      ).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
       await _pumpEditor(tester, repo: repo, routineId: 'r5');
 
       expect(find.text('4 semanas'), findsOneWidget); // loaded
@@ -1353,21 +1520,24 @@ void main() {
       await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
       await tester.pumpAndSettle();
 
-      final draft = verify(() => repo.updateAssigned(
-            uid: any(named: 'uid'),
-            draft: captureAny(named: 'draft'),
-          )).captured.single as Routine;
+      final draft = verify(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: captureAny(named: 'draft'),
+        ),
+      ).captured.single as Routine;
       expect(draft.numWeeks, 4);
     });
   });
 
   group('RoutineEditorWebScreen — prescripción por semana (Fase 4b)', () {
-    testWidgets('different reps per week saves weeklySets with 2 entries',
-        (tester) async {
+    testWidgets('different reps per week saves weeklySets with 2 entries', (
+      tester,
+    ) async {
       final repo = _MockRoutineRepository();
-      when(() => repo.createAssigned(any())).thenAnswer(
-        (i) async => i.positionalArguments.first as Routine,
-      );
+      when(
+        () => repo.createAssigned(any()),
+      ).thenAnswer((i) async => i.positionalArguments.first as Routine);
       await _pumpEditor(tester, repo: repo);
 
       // Bump 1 → 2 weeks (stepper is near the top, before adding exercises).
@@ -1386,7 +1556,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.enterText(
         find.ancestor(
-            of: find.text('reps'), matching: find.byType(TextFormField)),
+          of: find.text('reps'),
+          matching: find.byType(TextFormField),
+        ),
         '6',
       );
       await tester.pumpAndSettle();
@@ -1407,175 +1579,197 @@ void main() {
     });
 
     testWidgets(
-        'edit mode loads a per-week routine and re-saves weeklySets preserved',
-        (tester) async {
-      final repo = _MockRoutineRepository();
-      when(() => repo.getById(any()))
-          .thenAnswer((_) async => _perWeekRoutine());
-      when(() => repo.updateAssigned(
+      'edit mode loads a per-week routine and re-saves weeklySets preserved',
+      (tester) async {
+        final repo = _MockRoutineRepository();
+        when(
+          () => repo.getById(any()),
+        ).thenAnswer((_) async => _perWeekRoutine());
+        when(
+          () => repo.updateAssigned(
             uid: any(named: 'uid'),
             draft: any(named: 'draft'),
-          )).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
-      await _pumpEditor(tester, repo: repo, routineId: 'r6');
+          ),
+        ).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+        await _pumpEditor(tester, repo: repo, routineId: 'r6');
 
-      expect(find.text('2 semanas'), findsOneWidget); // loaded
-      expect(find.text('Sem 1'), findsOneWidget);
-      expect(find.text('Sem 2'), findsOneWidget);
+        expect(find.text('2 semanas'), findsOneWidget); // loaded
+        expect(find.text('Sem 1'), findsOneWidget);
+        expect(find.text('Sem 2'), findsOneWidget);
 
-      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
-      await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+        await tester.pumpAndSettle();
 
-      final draft = verify(() => repo.updateAssigned(
+        final draft = verify(
+          () => repo.updateAssigned(
             uid: any(named: 'uid'),
             draft: captureAny(named: 'draft'),
-          )).captured.single as Routine;
-      final slot = draft.days.single.slots.single;
-      expect(slot.weeklySets, hasLength(2));
-      expect(slot.weeklySets[0].single.reps, 10);
-      expect(slot.weeklySets[0].single.weightKg, 55);
-      expect(slot.weeklySets[1].single.reps, 8);
-      expect(slot.weeklySets[1].single.weightKg, 60);
-    });
+          ),
+        ).captured.single as Routine;
+        final slot = draft.days.single.slots.single;
+        expect(slot.weeklySets, hasLength(2));
+        expect(slot.weeklySets[0].single.reps, 10);
+        expect(slot.weeklySets[0].single.weightKg, 55);
+        expect(slot.weeklySets[1].single.reps, 8);
+        expect(slot.weeklySets[1].single.weightKg, 60);
+      },
+    );
   });
 
   group('RoutineEditorWebScreen — presencia por semana (Fase 4c)', () {
-    testWidgets('excluding week 2 via its presence chip saves activeWeeks: [0]',
-        (tester) async {
-      final repo = _MockRoutineRepository();
-      when(() => repo.createAssigned(any())).thenAnswer(
-        (i) async => i.positionalArguments.first as Routine,
-      );
-      await _pumpEditor(tester, repo: repo);
+    testWidgets(
+      'excluding week 2 via its presence chip saves activeWeeks: [0]',
+      (tester) async {
+        final repo = _MockRoutineRepository();
+        when(
+          () => repo.createAssigned(any()),
+        ).thenAnswer((i) async => i.positionalArguments.first as Routine);
+        await _pumpEditor(tester, repo: repo);
 
-      // Fill week 1 FIRST, then bump to 2 weeks — the new week is seeded with
-      // a deep copy of week 1's (now-filled) sets (_normalizeSlotWeeks, Fase
-      // 4b), so both weeks start with a valid prescription; only the
-      // presence mask changes below (bumping first would leave week 2 blank
-      // and block submit, mirroring the Fase 4a stepper test).
-      await _fillMinimalValidForm(tester);
+        // Fill week 1 FIRST, then bump to 2 weeks — the new week is seeded with
+        // a deep copy of week 1's (now-filled) sets (_normalizeSlotWeeks, Fase
+        // 4b), so both weeks start with a valid prescription; only the
+        // presence mask changes below (bumping first would leave week 2 blank
+        // and block submit, mirroring the Fase 4a stepper test).
+        await _fillMinimalValidForm(tester);
 
-      await tester.tap(find.text('+'));
-      await tester.pumpAndSettle();
-      expect(find.text('2 semanas'), findsOneWidget);
+        await tester.tap(find.text('+'));
+        await tester.pumpAndSettle();
+        expect(find.text('2 semanas'), findsOneWidget);
 
-      // Exclude week 2 (0-based index 1) via its presence chip.
-      await tester.ensureVisible(find.byKey(const Key('presence_chip_1')));
-      await tester.tap(find.byKey(const Key('presence_chip_1')));
-      await tester.pumpAndSettle();
+        // Exclude week 2 (0-based index 1) via its presence chip.
+        await tester.ensureVisible(find.byKey(const Key('presence_chip_1')));
+        await tester.tap(find.byKey(const Key('presence_chip_1')));
+        await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
-      await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+        await tester.pumpAndSettle();
 
-      final routine = verify(() => repo.createAssigned(captureAny()))
-          .captured
-          .single as Routine;
-      expect(routine.days.single.slots.single.activeWeeks, [0]);
-    });
+        final routine = verify(() => repo.createAssigned(captureAny()))
+            .captured
+            .single as Routine;
+        expect(routine.days.single.slots.single.activeWeeks, [0]);
+      },
+    );
 
     testWidgets(
-        'a blank week does NOT block submit when the exercise is absent from it',
-        (tester) async {
-      // Regression: the trainer bumps the week count FIRST and then adds the
-      // exercise, so weeks 2..N start blank. Excluding week 2 via its presence
-      // chip must let the plan save — those rows are never executed, so
-      // demanding reps for them blocked a perfectly valid routine.
-      final repo = _MockRoutineRepository();
-      when(() => repo.createAssigned(any())).thenAnswer(
-        (i) async => i.positionalArguments.first as Routine,
-      );
-      await _pumpEditor(tester, repo: repo);
+      'a blank week does NOT block submit when the exercise is absent from it',
+      (tester) async {
+        // Regression: the trainer bumps the week count FIRST and then adds the
+        // exercise, so weeks 2..N start blank. Excluding week 2 via its presence
+        // chip must let the plan save — those rows are never executed, so
+        // demanding reps for them blocked a perfectly valid routine.
+        final repo = _MockRoutineRepository();
+        when(
+          () => repo.createAssigned(any()),
+        ).thenAnswer((i) async => i.positionalArguments.first as Routine);
+        await _pumpEditor(tester, repo: repo);
 
-      // Bump FIRST → the exercise added below gets 2 BLANK weeks.
-      await tester.tap(find.text('+'));
-      await tester.pumpAndSettle();
-      expect(find.text('2 semanas'), findsOneWidget);
+        // Bump FIRST → the exercise added below gets 2 BLANK weeks.
+        await tester.tap(find.text('+'));
+        await tester.pumpAndSettle();
+        expect(find.text('2 semanas'), findsOneWidget);
 
-      // Adds the exercise and fills ONLY week 1's reps — week 2 stays blank.
-      await _fillMinimalValidForm(tester);
+        // Adds the exercise and fills ONLY week 1's reps — week 2 stays blank.
+        await _fillMinimalValidForm(tester);
 
-      // Exclude week 2 (0-based 1): its blank sets must not be validated.
-      await tester.ensureVisible(find.byKey(const Key('presence_chip_1')));
-      await tester.tap(find.byKey(const Key('presence_chip_1')));
-      await tester.pumpAndSettle();
+        // Exclude week 2 (0-based 1): its blank sets must not be validated.
+        await tester.ensureVisible(find.byKey(const Key('presence_chip_1')));
+        await tester.tap(find.byKey(const Key('presence_chip_1')));
+        await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
-      await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+        await tester.pumpAndSettle();
 
-      final routine = verify(() => repo.createAssigned(captureAny()))
-          .captured
-          .single as Routine;
-      expect(routine.days.single.slots.single.activeWeeks, [0]);
-    });
-
-    testWidgets(
-        'toggling a week off then back on canonicalizes the mask back to empty (all weeks)',
-        (tester) async {
-      final repo = _MockRoutineRepository();
-      when(() => repo.createAssigned(any())).thenAnswer(
-        (i) async => i.positionalArguments.first as Routine,
-      );
-      await _pumpEditor(tester, repo: repo);
-
-      await _fillMinimalValidForm(tester);
-      await tester.tap(find.text('+'));
-      await tester.pumpAndSettle();
-      expect(find.text('2 semanas'), findsOneWidget);
-
-      await tester.ensureVisible(find.byKey(const Key('presence_chip_1')));
-      await tester.tap(find.byKey(const Key('presence_chip_1'))); // exclude
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('presence_chip_1'))); // re-include
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
-      await tester.pumpAndSettle();
-
-      final routine = verify(() => repo.createAssigned(captureAny()))
-          .captured
-          .single as Routine;
-      // Covering every week again is canonically "no mask", not [0, 1].
-      expect(routine.days.single.slots.single.activeWeeks, isEmpty);
-    });
+        final routine = verify(() => repo.createAssigned(captureAny()))
+            .captured
+            .single as Routine;
+        expect(routine.days.single.slots.single.activeWeeks, [0]);
+      },
+    );
 
     testWidgets(
-        'edit mode loads a presence-masked routine (gate is gone) and re-saves it unchanged',
-        (tester) async {
-      final repo = _MockRoutineRepository();
-      when(() => repo.getById(any()))
-          .thenAnswer((_) async => _presenceRoutine());
-      when(() => repo.updateAssigned(
+      'toggling a week off then back on canonicalizes the mask back to empty (all weeks)',
+      (tester) async {
+        final repo = _MockRoutineRepository();
+        when(
+          () => repo.createAssigned(any()),
+        ).thenAnswer((i) async => i.positionalArguments.first as Routine);
+        await _pumpEditor(tester, repo: repo);
+
+        await _fillMinimalValidForm(tester);
+        await tester.tap(find.text('+'));
+        await tester.pumpAndSettle();
+        expect(find.text('2 semanas'), findsOneWidget);
+
+        await tester.ensureVisible(find.byKey(const Key('presence_chip_1')));
+        await tester.tap(find.byKey(const Key('presence_chip_1'))); // exclude
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const Key('presence_chip_1')),
+        ); // re-include
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+        await tester.pumpAndSettle();
+
+        final routine = verify(() => repo.createAssigned(captureAny()))
+            .captured
+            .single as Routine;
+        // Covering every week again is canonically "no mask", not [0, 1].
+        expect(routine.days.single.slots.single.activeWeeks, isEmpty);
+      },
+    );
+
+    testWidgets(
+      'edit mode loads a presence-masked routine (gate is gone) and re-saves it unchanged',
+      (tester) async {
+        final repo = _MockRoutineRepository();
+        when(
+          () => repo.getById(any()),
+        ).thenAnswer((_) async => _presenceRoutine());
+        when(
+          () => repo.updateAssigned(
             uid: any(named: 'uid'),
             draft: any(named: 'draft'),
-          )).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
-      await _pumpEditor(tester, repo: repo, routineId: 'r7');
+          ),
+        ).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+        await _pumpEditor(tester, repo: repo, routineId: 'r7');
 
-      // Loads successfully now — the isRoutineWebEditable gate is gone.
-      expect(find.textContaining('periodización'), findsNothing);
-      expect(find.text('Editar rutina'), findsOneWidget);
-      expect(find.text('Con máscara de presencia'), findsOneWidget);
-      expect(find.text('Guardar cambios'), findsOneWidget);
+        // Loads successfully now — the isRoutineWebEditable gate is gone.
+        expect(find.textContaining('periodización'), findsNothing);
+        expect(find.text('Editar rutina'), findsOneWidget);
+        expect(find.text('Con máscara de presencia'), findsOneWidget);
+        expect(find.text('Guardar cambios'), findsOneWidget);
 
-      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
-      await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+        await tester.pumpAndSettle();
 
-      final draft = verify(() => repo.updateAssigned(
+        final draft = verify(
+          () => repo.updateAssigned(
             uid: any(named: 'uid'),
             draft: captureAny(named: 'draft'),
-          )).captured.single as Routine;
-      expect(draft.days.single.slots.single.activeWeeks, [0]);
-    });
+          ),
+        ).captured.single as Routine;
+        expect(draft.days.single.slots.single.activeWeeks, [0]);
+      },
+    );
   });
 
   group('RoutineEditorWebScreen — SetType round-trip', () {
-    testWidgets('re-saving a mobile-authored routine preserves each set type',
-        (tester) async {
+    testWidgets('re-saving a mobile-authored routine preserves each set type', (
+      tester,
+    ) async {
       final repo = _MockRoutineRepository();
-      when(() => repo.getById(any()))
-          .thenAnswer((_) async => _typedSetsRoutine());
-      when(() => repo.updateAssigned(
-            uid: any(named: 'uid'),
-            draft: any(named: 'draft'),
-          )).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+      when(
+        () => repo.getById(any()),
+      ).thenAnswer((_) async => _typedSetsRoutine());
+      when(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: any(named: 'draft'),
+        ),
+      ).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
       await _pumpEditor(tester, repo: repo, routineId: 'r8');
 
       // Touch nothing — just open the plan and hit save, the way a trainer
@@ -1583,10 +1777,12 @@ void main() {
       await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
       await tester.pumpAndSettle();
 
-      final draft = verify(() => repo.updateAssigned(
-            uid: any(named: 'uid'),
-            draft: captureAny(named: 'draft'),
-          )).captured.single as Routine;
+      final draft = verify(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: captureAny(named: 'draft'),
+        ),
+      ).captured.single as Routine;
 
       expect(
         draft.days.single.slots.single.sets.map((s) => s.type).toList(),
@@ -1597,25 +1793,31 @@ void main() {
     });
 
     testWidgets('re-saving a full mobile-authored plan changes nothing at all',
-        (tester) async {
+        (
+      tester,
+    ) async {
       // This is what justifies dropping the isRoutineWebEditable gate: web may
       // open ANY routine only if a no-op edit is provably a no-op on the wire.
       final original = _kitchenSinkRoutine();
       final repo = _MockRoutineRepository();
       when(() => repo.getById(any())).thenAnswer((_) async => original);
-      when(() => repo.updateAssigned(
-            uid: any(named: 'uid'),
-            draft: any(named: 'draft'),
-          )).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+      when(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: any(named: 'draft'),
+        ),
+      ).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
       await _pumpEditor(tester, repo: repo, routineId: 'r9');
 
       await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
       await tester.pumpAndSettle();
 
-      final draft = verify(() => repo.updateAssigned(
-            uid: any(named: 'uid'),
-            draft: captureAny(named: 'draft'),
-          )).captured.single as Routine;
+      final draft = verify(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: captureAny(named: 'draft'),
+        ),
+      ).captured.single as Routine;
 
       expect(draft.days, original.days);
     });
@@ -1624,47 +1826,62 @@ void main() {
   group('RoutineEditorWebScreen — reordenar sin romper superseries', () {
     Future<_MockRoutineRepository> pumpOrderRoutine(WidgetTester tester) async {
       final repo = _MockRoutineRepository();
-      when(() => repo.getById(any()))
-          .thenAnswer((_) async => _supersetOrderRoutine());
-      when(() => repo.updateAssigned(
-            uid: any(named: 'uid'),
-            draft: any(named: 'draft'),
-          )).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+      when(
+        () => repo.getById(any()),
+      ).thenAnswer((_) async => _supersetOrderRoutine());
+      when(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: any(named: 'draft'),
+        ),
+      ).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
       await _pumpEditor(tester, repo: repo, routineId: 'r12');
       return repo;
     }
 
     Future<Routine> save(
-        WidgetTester tester, _MockRoutineRepository repo) async {
+      WidgetTester tester,
+      _MockRoutineRepository repo,
+    ) async {
       await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
       await tester.pumpAndSettle();
-      return verify(() => repo.updateAssigned(
-            uid: any(named: 'uid'),
-            draft: captureAny(named: 'draft'),
-          )).captured.single as Routine;
+      return verify(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: captureAny(named: 'draft'),
+        ),
+      ).captured.single as Routine;
     }
 
-    testWidgets('moving the last superset member down moves the WHOLE superset',
-        (tester) async {
-      // Press+Sentadilla are supersetted; Dominadas is alone. A naive
-      // position swap would leave Press linked to Dominadas — dragging an
-      // unrelated exercise into the superset and evicting Sentadilla.
-      final repo = await pumpOrderRoutine(tester);
+    testWidgets(
+      'moving the last superset member down moves the WHOLE superset',
+      (tester) async {
+        // Press+Sentadilla are supersetted; Dominadas is alone. A naive
+        // position swap would leave Press linked to Dominadas — dragging an
+        // unrelated exercise into the superset and evicting Sentadilla.
+        final repo = await pumpOrderRoutine(tester);
 
-      final btn = find.byTooltip('Bajar').at(1); // Sentadilla
-      await tester.ensureVisible(btn); // 900px-tall viewport: a
-      // missed tap only WARNS, it does not fail — the test would
-      // silently assert on an untouched routine.
-      await tester.tap(btn);
-      await tester.pumpAndSettle();
+        final btn = find.byTooltip('Bajar').at(1); // Sentadilla
+        await tester.ensureVisible(btn); // 900px-tall viewport: a
+        // missed tap only WARNS, it does not fail — the test would
+        // silently assert on an untouched routine.
+        await tester.tap(btn);
+        await tester.pumpAndSettle();
 
-      final slots = (await save(tester, repo)).days.single.slots;
+        final slots = (await save(tester, repo)).days.single.slots;
 
-      expect(slots.map((s) => s.exerciseName).toList(),
-          const ['Dominadas', 'Press de Banca', 'Sentadilla']);
-      expect(slots.map((s) => s.supersetGroup).toList(), const [null, 1, 1],
-          reason: 'Dominadas must stay standalone and the superset intact.');
-    });
+        expect(slots.map((s) => s.exerciseName).toList(), const [
+          'Dominadas',
+          'Press de Banca',
+          'Sentadilla',
+        ]);
+        expect(
+          slots.map((s) => s.supersetGroup).toList(),
+          const [null, 1, 1],
+          reason: 'Dominadas must stay standalone and the superset intact.',
+        );
+      },
+    );
 
     testWidgets(
         'moving a standalone exercise up does not absorb it into the '
@@ -1680,14 +1897,21 @@ void main() {
 
       final slots = (await save(tester, repo)).days.single.slots;
 
-      expect(slots.map((s) => s.exerciseName).toList(),
-          const ['Dominadas', 'Press de Banca', 'Sentadilla']);
-      expect(slots.map((s) => s.supersetGroup).toList(), const [null, 1, 1],
-          reason: 'Dominadas jumped the whole superset, not into it.');
+      expect(slots.map((s) => s.exerciseName).toList(), const [
+        'Dominadas',
+        'Press de Banca',
+        'Sentadilla',
+      ]);
+      expect(
+        slots.map((s) => s.supersetGroup).toList(),
+        const [null, 1, 1],
+        reason: 'Dominadas jumped the whole superset, not into it.',
+      );
     });
 
-    testWidgets('moving a member INSIDE a superset just reorders it',
-        (tester) async {
+    testWidgets('moving a member INSIDE a superset just reorders it', (
+      tester,
+    ) async {
       final repo = await pumpOrderRoutine(tester);
 
       final btn = find.byTooltip('Bajar').at(0); // Press, inside {1}
@@ -1699,10 +1923,16 @@ void main() {
 
       final slots = (await save(tester, repo)).days.single.slots;
 
-      expect(slots.map((s) => s.exerciseName).toList(),
-          const ['Sentadilla', 'Press de Banca', 'Dominadas']);
-      expect(slots.map((s) => s.supersetGroup).toList(), const [1, 1, null],
-          reason: 'Swapping two members keeps the group; nothing joins it.');
+      expect(slots.map((s) => s.exerciseName).toList(), const [
+        'Sentadilla',
+        'Press de Banca',
+        'Dominadas',
+      ]);
+      expect(
+        slots.map((s) => s.supersetGroup).toList(),
+        const [1, 1, null],
+        reason: 'Swapping two members keeps the group; nothing joins it.',
+      );
     });
   });
 
@@ -1715,10 +1945,12 @@ void main() {
     ) async {
       final repo = _MockRoutineRepository();
       when(() => repo.getById(any())).thenAnswer((_) async => routine);
-      when(() => repo.updateAssigned(
-            uid: any(named: 'uid'),
-            draft: any(named: 'draft'),
-          )).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+      when(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: any(named: 'draft'),
+        ),
+      ).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
       await _pumpEditor(tester, repo: repo, routineId: routine.id);
       await tester.tap(find.byKey(const Key('week_tab_1')));
       await tester.pumpAndSettle();
@@ -1726,23 +1958,33 @@ void main() {
     }
 
     Future<Routine> saveAndCapture(
-        WidgetTester tester, _MockRoutineRepository repo) async {
+      WidgetTester tester,
+      _MockRoutineRepository repo,
+    ) async {
       await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
       await tester.pumpAndSettle();
-      return verify(() => repo.updateAssigned(
-            uid: any(named: 'uid'),
-            draft: captureAny(named: 'draft'),
-          )).captured.single as Routine;
+      return verify(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: captureAny(named: 'draft'),
+        ),
+      ).captured.single as Routine;
     }
 
-    testWidgets('the button is hidden on week 1 and labelled with the source',
-        (tester) async {
-      await _pumpEditor(tester, repo: (() {
-        final r = _MockRoutineRepository();
-        when(() => r.getById(any()))
-            .thenAnswer((_) async => _twoWeekTypedRoutine());
-        return r;
-      })(), routineId: 'r10');
+    testWidgets('the button is hidden on week 1 and labelled with the source', (
+      tester,
+    ) async {
+      await _pumpEditor(
+        tester,
+        repo: (() {
+          final r = _MockRoutineRepository();
+          when(
+            () => r.getById(any()),
+          ).thenAnswer((_) async => _twoWeekTypedRoutine());
+          return r;
+        })(),
+        routineId: 'r10',
+      );
 
       // Week 1 is selected by default — nothing to copy from.
       expect(find.byKey(const Key('duplicate_week_button')), findsNothing);
@@ -1754,8 +1996,9 @@ void main() {
       expect(find.text('Copiar Sem 1 acá'), findsOneWidget);
     });
 
-    testWidgets('copying carries the set TYPES, not just the numbers',
-        (tester) async {
+    testWidgets('copying carries the set TYPES, not just the numbers', (
+      tester,
+    ) async {
       final repo = await pumpOnWeek2(tester, _twoWeekTypedRoutine());
 
       await tester.tap(find.byKey(const Key('duplicate_week_button')));
@@ -1766,8 +2009,10 @@ void main() {
       final draft = await saveAndCapture(tester, repo);
       final week2 = draft.days.single.slots.single.weeklySets[1];
 
-      expect(week2.map((s) => s.type).toList(),
-          const [SetType.warmup, SetType.normal]);
+      expect(week2.map((s) => s.type).toList(), const [
+        SetType.warmup,
+        SetType.normal,
+      ]);
       expect(week2.map((s) => s.reps).toList(), const [12, 8]);
       expect(week2.map((s) => s.weightKg).toList(), const [20.0, 60.0]);
     });
@@ -1786,32 +2031,42 @@ void main() {
     });
 
     testWidgets(
-        'an exercise scheduled ONLY in the target week is dropped, not spread '
-        'to every week', (tester) async {
-      // The deviation from mobile. Mobile empties the mask here, and an empty
-      // mask reads as "present in EVERY week" — so a once-scheduled exercise
-      // silently lands in the whole plan. Week 1 has no Sentadilla, so after
-      // copying week 1 over week 2 nothing does: drop it.
-      final repo = await pumpOnWeek2(tester, _presenceDropRoutine());
+      'an exercise scheduled ONLY in the target week is dropped, not spread '
+      'to every week',
+      (tester) async {
+        // The deviation from mobile. Mobile empties the mask here, and an empty
+        // mask reads as "present in EVERY week" — so a once-scheduled exercise
+        // silently lands in the whole plan. Week 1 has no Sentadilla, so after
+        // copying week 1 over week 2 nothing does: drop it.
+        final repo = await pumpOnWeek2(tester, _presenceDropRoutine());
 
-      await tester.tap(find.byKey(const Key('duplicate_week_button')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('duplicate_week_confirm_button')));
-      await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('duplicate_week_button')));
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const Key('duplicate_week_confirm_button')),
+        );
+        await tester.pumpAndSettle();
 
-      final draft = await saveAndCapture(tester, repo);
-      final slots = draft.days.single.slots;
+        final draft = await saveAndCapture(tester, repo);
+        final slots = draft.days.single.slots;
 
-      expect(slots.map((s) => s.exerciseName).toList(),
+        expect(
+          slots.map((s) => s.exerciseName).toList(),
           const ['Press de Banca', 'Dominadas'],
           reason: 'Sentadilla lived only in week 2; copying week 1 over it '
-              'leaves it scheduled nowhere.');
-      expect(slots.every((s) => s.activeWeeks.isEmpty), isTrue,
-          reason: 'No survivor should have inherited a stale mask.');
-    });
+              'leaves it scheduled nowhere.',
+        );
+        expect(
+          slots.every((s) => s.activeWeeks.isEmpty),
+          isTrue,
+          reason: 'No survivor should have inherited a stale mask.',
+        );
+      },
+    );
 
-    testWidgets('dropping a superset member does not re-link the survivors',
-        (tester) async {
+    testWidgets('dropping a superset member does not re-link the survivors', (
+      tester,
+    ) async {
       // Press+Sentadilla were the superset; Dominadas stood alone. Evicting
       // Sentadilla must leave Press alone too — NOT supersetted with
       // Dominadas, which `linkedToNext` would do since it links by position.
@@ -1824,49 +2079,62 @@ void main() {
 
       final draft = await saveAndCapture(tester, repo);
 
-      expect(draft.days.single.slots.map((s) => s.supersetGroup).toList(),
-          const [null, null]);
+      expect(
+        draft.days.single.slots.map((s) => s.supersetGroup).toList(),
+        const [null, null],
+      );
     });
   });
 
   group('RoutineEditorWebScreen — series tipadas (warm-up/drop/al-fallo)', () {
     Future<_MockRoutineRepository> pump(
-        WidgetTester tester, Routine routine) async {
+      WidgetTester tester,
+      Routine routine,
+    ) async {
       final repo = _MockRoutineRepository();
       when(() => repo.getById(any())).thenAnswer((_) async => routine);
-      when(() => repo.updateAssigned(
-            uid: any(named: 'uid'),
-            draft: any(named: 'draft'),
-          )).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+      when(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: any(named: 'draft'),
+        ),
+      ).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
       await _pumpEditor(tester, repo: repo, routineId: routine.id);
       return repo;
     }
 
     Future<Routine> save(
-        WidgetTester tester, _MockRoutineRepository repo) async {
+      WidgetTester tester,
+      _MockRoutineRepository repo,
+    ) async {
       await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
       await tester.pumpAndSettle();
-      return verify(() => repo.updateAssigned(
-            uid: any(named: 'uid'),
-            draft: captureAny(named: 'draft'),
-          )).captured.single as Routine;
+      return verify(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: captureAny(named: 'draft'),
+        ),
+      ).captured.single as Routine;
     }
 
-    testWidgets('tapping the chip and picking "Entrada en calor" saves warmup',
-        (tester) async {
-      final repo = await pump(tester, _simpleRoutine());
+    testWidgets(
+      'tapping the chip and picking "Entrada en calor" saves warmup',
+      (tester) async {
+        final repo = await pump(tester, _simpleRoutine());
 
-      await tester.tap(find.byType(PopupMenuButton<SetType>).first);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Entrada en calor (W)'));
-      await tester.pumpAndSettle();
+        await tester.tap(find.byType(PopupMenuButton<SetType>).first);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Entrada en calor (W)'));
+        await tester.pumpAndSettle();
 
-      final slot = (await save(tester, repo)).days.single.slots.single;
-      expect(slot.sets.single.type, SetType.warmup);
-    });
+        final slot = (await save(tester, repo)).days.single.slots.single;
+        expect(slot.sets.single.type, SetType.warmup);
+      },
+    );
 
-    testWidgets('a warm-up does not consume a set number (running relabel)',
-        (tester) async {
+    testWidgets('a warm-up does not consume a set number (running relabel)', (
+      tester,
+    ) async {
       // Two normal sets show "1" and "2". Marking the first as warm-up must
       // renumber the second to "1" — the glyph replaces the count, it doesn't
       // shift it.
@@ -1886,12 +2154,15 @@ void main() {
 
       // And it round-trips.
       final sets = (await save(tester, repo)).days.single.slots.single.sets;
-      expect(sets.map((s) => s.type).toList(),
-          const [SetType.failure, SetType.normal]);
+      expect(sets.map((s) => s.type).toList(), const [
+        SetType.failure,
+        SetType.normal,
+      ]);
     });
 
-    testWidgets('a failure set with no reps still saves (reps are optional)',
-        (tester) async {
+    testWidgets('a failure set with no reps still saves (reps are optional)', (
+      tester,
+    ) async {
       // The whole point of "al fallo": the athlete works to failure, so the
       // reps-completeness validation must skip it instead of blocking submit.
       final repo = await pump(tester, _failureSetRoutine());
@@ -1941,8 +2212,10 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: _overrides(repo: repo),
-          child:
-              MaterialApp.router(theme: AppTheme.dark(), routerConfig: router),
+          child: MaterialApp.router(
+            theme: AppTheme.dark(),
+            routerConfig: router,
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -1955,8 +2228,9 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    testWidgets('header reads "Nueva plantilla" and names no athlete',
-        (tester) async {
+    testWidgets('header reads "Nueva plantilla" and names no athlete', (
+      tester,
+    ) async {
       await pumpTemplate(tester);
 
       expect(find.text('Nueva plantilla'), findsOneWidget);
@@ -1964,12 +2238,13 @@ void main() {
       expect(find.textContaining('Para '), findsNothing);
     });
 
-    testWidgets('creating saves via createTemplate with the template shape',
-        (tester) async {
+    testWidgets('creating saves via createTemplate with the template shape', (
+      tester,
+    ) async {
       final repo = _MockRoutineRepository();
-      when(() => repo.createTemplate(any())).thenAnswer(
-        (i) async => i.positionalArguments.first as Routine,
-      );
+      when(
+        () => repo.createTemplate(any()),
+      ).thenAnswer((i) async => i.positionalArguments.first as Routine);
       await pumpTemplate(tester, repo: repo);
 
       await _fillMinimalValidForm(tester);
@@ -1986,15 +2261,19 @@ void main() {
       verifyNever(() => repo.createAssigned(any()));
     });
 
-    testWidgets('editing saves via updateTemplate, never updateAssigned',
-        (tester) async {
+    testWidgets('editing saves via updateTemplate, never updateAssigned', (
+      tester,
+    ) async {
       final repo = _MockRoutineRepository();
-      when(() => repo.getById(any()))
-          .thenAnswer((_) async => _templateRoutine());
-      when(() => repo.updateTemplate(
-            uid: any(named: 'uid'),
-            draft: any(named: 'draft'),
-          )).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+      when(
+        () => repo.getById(any()),
+      ).thenAnswer((_) async => _templateRoutine());
+      when(
+        () => repo.updateTemplate(
+          uid: any(named: 'uid'),
+          draft: any(named: 'draft'),
+        ),
+      ).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
       await pumpTemplate(tester, repo: repo, templateId: 't1');
 
       expect(find.text('Editar plantilla'), findsOneWidget);
@@ -2002,16 +2281,20 @@ void main() {
       await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
       await tester.pumpAndSettle();
 
-      final draft = verify(() => repo.updateTemplate(
-            uid: any(named: 'uid'),
-            draft: captureAny(named: 'draft'),
-          )).captured.single as Routine;
+      final draft = verify(
+        () => repo.updateTemplate(
+          uid: any(named: 'uid'),
+          draft: captureAny(named: 'draft'),
+        ),
+      ).captured.single as Routine;
       expect(draft.id, 't1');
       expect(draft.source, RoutineSource.trainerTemplate);
-      verifyNever(() => repo.updateAssigned(
-            uid: any(named: 'uid'),
-            draft: any(named: 'draft'),
-          ));
+      verifyNever(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: any(named: 'draft'),
+        ),
+      );
     });
   });
 }
