@@ -32,9 +32,24 @@ class RoutineDetailScreen extends ConsumerStatefulWidget {
     required this.routineId,
     this.initialDayNumber,
     this.initialWeekIndex,
+    this.coachAthleteId,
   });
 
   final String routineId;
+
+  /// Non-null ONLY when this screen is shown in the coach (PF) read-only
+  /// context, reached from the TOP-LEVEL route
+  /// `/coach/athlete/:athleteId/plan/:routineId` (OUTSIDE the ShellRoute).
+  /// It carries the athlete's uid and switches two behaviours that would
+  /// otherwise assume the athlete's in-shell placement (issue #410):
+  ///  1. Tapping an exercise pushes the top-level (out-of-shell) exercise
+  ///     mirror instead of the in-shell `/workout/exercise/:id` — pushing the
+  ///     in-shell route from here rebuilds the shell branch and lands blank
+  ///     (the root cause #399's symptom fix left open).
+  ///  2. The back fallback lands on `/coach/athlete/:id` instead of the
+  ///     athlete's `/workout` tab.
+  /// Null for the athlete's own in-shell usage → behaviour unchanged.
+  final String? coachAthleteId;
 
   /// 1-based RoutineDay.dayNumber to pre-select on first render. Out-of-range
   /// values are clamped to the valid day range by the build method's
@@ -131,9 +146,19 @@ class _RoutineDetailScreenState extends ConsumerState<RoutineDetailScreen> {
                     // `exerciseId` drifted from the catalogue.
                     final nameParam =
                         'name=${Uri.encodeQueryComponent(slot.exerciseName)}';
+                    // In the coach read-only context this screen is OUTSIDE the
+                    // shell, so the exercise detail must be pushed on the
+                    // top-level (out-of-shell) mirror — pushing the in-shell
+                    // `/workout/exercise/:id` from here rebuilds the shell branch
+                    // and lands blank (issue #410 Bug 1).
+                    final base = widget.coachAthleteId != null
+                        ? '/coach/athlete/${widget.coachAthleteId}'
+                            '/plan/${widget.routineId}'
+                            '/exercise/${slot.exerciseId}'
+                        : '/workout/exercise/${slot.exerciseId}';
                     final target = ownerId != null && ownerId.isNotEmpty
-                        ? '/workout/exercise/${slot.exerciseId}?ownerId=$ownerId&$nameParam'
-                        : '/workout/exercise/${slot.exerciseId}?$nameParam';
+                        ? '$base?ownerId=$ownerId&$nameParam'
+                        : '$base?$nameParam';
                     context.push(target);
                   },
                 );
@@ -147,7 +172,15 @@ class _RoutineDetailScreenState extends ConsumerState<RoutineDetailScreen> {
             ),
           ),
         ),
-        const Positioned(top: 0, left: 0, child: _BackBar()),
+        Positioned(
+          top: 0,
+          left: 0,
+          child: _BackBar(
+            fallbackRoute: widget.coachAthleteId != null
+                ? '/coach/athlete/${widget.coachAthleteId}'
+                : '/workout',
+          ),
+        ),
         // Edit affordance only for the owner of a user-created routine —
         // trainer-assigned plans and system templates render read-only.
         // Sits opposite the back button, same chip treatment for parity.
@@ -166,7 +199,13 @@ class _RoutineDetailScreenState extends ConsumerState<RoutineDetailScreen> {
 /// states (REQ-RDT-016 strengthened). Now floats over the hero image with a
 /// translucent chip so it stays legible on bright photos.
 class _BackBar extends StatelessWidget {
-  const _BackBar();
+  const _BackBar({required this.fallbackRoute});
+
+  /// Where to land when there is nothing to pop (deep-link / OS state
+  /// restoration). The athlete's own usage passes `/workout`; the coach
+  /// read-only context passes `/coach/athlete/:id` so the PF doesn't get
+  /// dumped on the athlete's Entrenar tab (issue #410 Bug 2).
+  final String fallbackRoute;
 
   @override
   Widget build(BuildContext context) {
@@ -185,7 +224,7 @@ class _BackBar extends StatelessWidget {
             tooltip: l10n.commonBack,
             icon: Icon(TreinoIcon.back, color: palette.textPrimary),
             onPressed: () =>
-                context.canPop() ? context.pop() : context.go('/workout'),
+                context.canPop() ? context.pop() : context.go(fallbackRoute),
           ),
         ),
       ),

@@ -41,6 +41,7 @@ class ExerciseDetailScreen extends ConsumerWidget {
     required this.exerciseId,
     this.ownerId,
     this.exerciseName,
+    this.backFallbackRoute = '/workout',
   });
 
   final String exerciseId;
@@ -55,6 +56,14 @@ class ExerciseDetailScreen extends ConsumerWidget {
   /// from the current catalogue. Optional — when omitted, only strict ID
   /// + custom-exercise fallbacks run.
   final String? exerciseName;
+
+  /// Where the back button lands when there is nothing to pop (deep-link or
+  /// OS state restoration). Defaults to the athlete's `/workout` tab. The
+  /// coach read-only context — reached OUT of the shell from a plan detail —
+  /// passes `/coach/athlete/:id` so a restored PF isn't dumped on the
+  /// athlete's Entrenar tab (issue #410, same class as the RoutineDetailScreen
+  /// back fallback).
+  final String backFallbackRoute;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -89,7 +98,11 @@ class ExerciseDetailScreen extends ConsumerWidget {
             ),
           ),
         ),
-        const Positioned(top: 0, left: 0, child: _BackBar()),
+        Positioned(
+          top: 0,
+          left: 0,
+          child: _BackBar(fallbackRoute: backFallbackRoute),
+        ),
       ],
     );
   }
@@ -100,7 +113,11 @@ class ExerciseDetailScreen extends ConsumerWidget {
 /// screen (REQ-RDT-020 strengthened). Floats over the hero photo with a
 /// translucent chip so it stays legible on bright images.
 class _BackBar extends StatelessWidget {
-  const _BackBar();
+  const _BackBar({required this.fallbackRoute});
+
+  /// Where to land when nothing can be popped — see
+  /// [ExerciseDetailScreen.backFallbackRoute].
+  final String fallbackRoute;
 
   @override
   Widget build(BuildContext context) {
@@ -116,7 +133,7 @@ class _BackBar extends StatelessWidget {
           tooltip: l10n.commonBack,
           icon: Icon(TreinoIcon.back, color: palette.textPrimary),
           onPressed: () =>
-              context.canPop() ? context.pop() : context.go('/workout'),
+              context.canPop() ? context.pop() : context.go(fallbackRoute),
         ),
       ),
     );
