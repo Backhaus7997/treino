@@ -1056,6 +1056,76 @@ void main() {
     );
   });
 
+  group('RoutineEditorWebScreen — validación en vivo (Fase 6)', () {
+    Future<void> addPressDeBanca(WidgetTester tester) async {
+      await tester.tap(find.text('Agregar ejercicio'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Press de Banca'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Agregar (1)'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets(
+      'un ejercicio sin reps muestra el motivo y el hint, y se limpian al cargar',
+      (tester) async {
+        await _pumpEditor(tester);
+        await addPressDeBanca(tester);
+
+        // En vivo, sin apretar Guardar: motivo bajo el ejercicio + hint arriba.
+        expect(
+          find.text('Falta cargar las reps de una serie.'),
+          findsOneWidget,
+        );
+        expect(find.byKey(const Key('invalid_week_hint')), findsOneWidget);
+
+        // Al cargar las reps, ambos desaparecen solos.
+        await tester.enterText(
+          find.ancestor(
+            of: find.text('reps'),
+            matching: find.byType(TextFormField),
+          ),
+          '10',
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Falta cargar las reps de una serie.'), findsNothing);
+        expect(find.byKey(const Key('invalid_week_hint')), findsNothing);
+      },
+    );
+
+    testWidgets('la pestaña de la semana incompleta muestra el dot de aviso', (
+      tester,
+    ) async {
+      await _pumpEditor(tester);
+      await addPressDeBanca(tester);
+
+      // 2 semanas, ambas en blanco (reps vacías) → dot en las dos pestañas.
+      await tester.tap(find.text('+'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('week_tab_warning_0')), findsOneWidget);
+      expect(find.byKey(const Key('week_tab_warning_1')), findsOneWidget);
+
+      // Cargar la semana 1 apaga su dot; la semana 2 sigue marcada y el motivo
+      // del ejercicio nombra la semana que falta.
+      await tester.enterText(
+        find.ancestor(
+          of: find.text('reps'),
+          matching: find.byType(TextFormField),
+        ),
+        '10',
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('week_tab_warning_0')), findsNothing);
+      expect(find.byKey(const Key('week_tab_warning_1')), findsOneWidget);
+      expect(
+        find.text('Falta cargar las reps de una serie (Semana 2).'),
+        findsOneWidget,
+      );
+    });
+  });
+
   group('RoutineEditorWebScreen — submit', () {
     testWidgets(
       'valid form calls createAssigned with a well-formed single-week Routine',

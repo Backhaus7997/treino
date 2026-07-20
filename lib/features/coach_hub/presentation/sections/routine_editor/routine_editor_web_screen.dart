@@ -973,23 +973,112 @@ class _RoutineEditorWebScreenState
           // meaningful once there's more than one week.
           final wk = _numWeeks > 1 ? ' en la Semana ${w + 1}' : ''; // i18n
           for (final set in slot.weeklySets[w]) {
-            // A failure set has no countable target by definition — the
-            // athlete works to failure. Reps/duration are an optional
-            // reference, never a requirement (mirrors mobile's isSetValid).
-            if (set.type == SetType.failure) continue;
+            // Failure sets have no countable target — `_isSetValid` treats them
+            // as valid (mirrors mobile's isSetValid). One source of truth for
+            // both this submit check and the live markers below.
+            if (_isSetValid(slot, set)) continue;
             if (slot.exerciseMode == ExerciseMode.duration) {
-              if (set.durationSeconds == null || set.durationSeconds! <= 0) {
-                return '$name tiene una serie sin duración$wk.'; // i18n
-              }
+              return '$name tiene una serie sin duración$wk.'; // i18n
             } else if (slot.repMode == RepMode.range) {
-              final min = set.repsMin, max = set.repsMax;
-              if (min == null || min <= 0 || max == null || max < min) {
-                return '$name tiene un rango de reps inválido (mín ≤ máx)$wk.'; // i18n
-              }
-            } else if (set.reps == null || set.reps! <= 0) {
+              return '$name tiene un rango de reps inválido (mín ≤ máx)$wk.'; // i18n
+            } else {
               return '$name tiene una serie sin reps$wk.'; // i18n
             }
           }
+        }
+      }
+    }
+    return null;
+  }
+
+  // ── Live validation (REQ-PERIOD-016 / SCENARIO-PERIOD-020) ───────────────
+  // Pure, recomputed every build (the set/mode/presence handlers all setState),
+  // so the day/slot/week/field markers below track edits keystroke-by-keystroke
+  // instead of only surfacing a single banner at submit time.
+
+  /// A single set's countable target is complete. Shared by the submit check
+  /// [_firstValidationError] and every live marker so they can't diverge.
+  bool _isSetValid(_EditorSlot slot, _EditorSet set) {
+    if (set.type == SetType.failure) return true;
+    if (slot.exerciseMode == ExerciseMode.duration) {
+      return set.durationSeconds != null && set.durationSeconds! > 0;
+    }
+    if (slot.repMode == RepMode.range) {
+      final min = set.repsMin, max = set.repsMax;
+      return min != null && min > 0 && max != null && max >= min;
+    }
+    return set.reps != null && set.reps! > 0;
+  }
+
+  /// The slot has an incomplete set in week [w] — but only for weeks it is
+  /// actually scheduled in (absent weeks never run, so they can't be "wrong").
+  bool _slotHasErrorInWeek(_EditorSlot slot, int w) {
+    if (slot.exercise == null) return false;
+    if (w < 0 || w >= slot.weeklySets.length) return false;
+    if (!slot.isPresentInWeek(w)) return false;
+    return slot.weeklySets[w].any((s) => !_isSetValid(slot, s));
+  }
+
+  /// A non-empty presence mask that names no in-range week → invisible ghost.
+  bool _slotIsGhost(_EditorSlot slot) =>
+      _numWeeks > 1 &&
+      slot.activeWeeks.isNotEmpty &&
+      !slot.activeWeeks.any((w) => w >= 0 && w < _numWeeks);
+
+  bool _slotHasError(_EditorSlot slot) {
+    if (slot.exercise == null) return false; // empty slots block at day level
+    if (_slotIsGhost(slot)) return true;
+    for (var w = 0; w < slot.weeklySets.length; w++) {
+      if (_slotHasErrorInWeek(slot, w)) return true;
+    }
+    return false;
+  }
+
+  /// Short reason rendered under an invalid exercise; names the offending week
+  /// on multi-week plans. Null when the slot is complete.
+  String? _slotErrorText(_EditorSlot slot) {
+    if (slot.exercise == null) return null;
+    if (_slotIsGhost(slot)) return 'No está en ninguna semana.'; // i18n
+    for (var w = 0; w < slot.weeklySets.length; w++) {
+      if (!_slotHasErrorInWeek(slot, w)) continue;
+      final wk = _numWeeks > 1 ? ' (Semana ${w + 1})' : ''; // i18n
+      if (slot.exerciseMode == ExerciseMode.duration) {
+        return 'Falta la duración de una serie$wk.'; // i18n
+      }
+      if (slot.repMode == RepMode.range) {
+        return 'Rango de reps inválido, mín ≤ máx$wk.'; // i18n
+      }
+      return 'Falta cargar las reps de una serie$wk.'; // i18n
+    }
+    return null;
+  }
+
+  /// A day is invalid when it has no exercise at all, or any slot is invalid.
+  bool _dayHasError(_EditorDay day) =>
+      !day.slots.any((s) => s.exercise != null) || day.slots.any(_slotHasError);
+
+  /// Some scheduled exercise has an incomplete set in week [w] — drives the
+  /// warning dot on that week's tab.
+  bool _weekHasError(int w) =>
+      _days.any((day) => day.slots.any((s) => _slotHasErrorInWeek(s, w)));
+
+  Set<int> _weeksWithError() => {
+        for (var w = 0; w < _numWeeks; w++)
+          if (_weekHasError(w)) w,
+      };
+
+  /// One-line pointer to the first thing that needs attention (day → exercise →
+  /// week). Name/split stay in the submit banner, so this only nags about the
+  /// structural, easy-to-miss parts of a long multi-week plan.
+  String? _firstInvalidHint() {
+    for (final day in _days) {
+      if (!day.slots.any((s) => s.exercise != null)) {
+        return 'El día "${day.name}" necesita un ejercicio.'; // i18n
+      }
+      for (final slot in day.slots) {
+        final err = _slotErrorText(slot);
+        if (err != null) {
+          return '${day.name} · ${slot.exercise!.name}: $err'; // i18n
         }
       }
     }
@@ -1411,6 +1500,7 @@ class _RoutineEditorWebScreenState
                                     child: _WeekTabs(
                                       numWeeks: _numWeeks,
                                       selectedWeek: _selectedWeek,
+                                      weeksWithError: _weeksWithError(),
                                       palette: palette,
                                       onSelected: (w) =>
                                           setState(() => _selectedWeek = w),
@@ -1429,12 +1519,40 @@ class _RoutineEditorWebScreenState
                               ),
                               const SizedBox(height: 12),
                             ],
+                            // Live pointer to the first structural problem so a
+                            // long multi-week plan doesn't have to be submitted
+                            // blind (REQ-PERIOD-016). Name/split stay on submit.
+                            if (_firstInvalidHint() != null) ...[
+                              Container(
+                                key: const Key('invalid_week_hint'),
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: palette.danger.withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: palette.danger.withValues(alpha: 0.4),
+                                  ),
+                                ),
+                                child: Text(
+                                  _firstInvalidHint()!,
+                                  style: GoogleFonts.barlow(
+                                    color: palette.danger,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
                             for (var i = 0; i < _days.length; i++) ...[
                               _DayCard(
                                 day: _days[i],
                                 palette: palette,
                                 selectedWeek: _selectedWeek,
                                 numWeeks: _numWeeks,
+                                hasError: _dayHasError(_days[i]),
+                                slotHasError: _slotHasError,
+                                slotErrorText: _slotErrorText,
                                 canRemove: _days.length > 1,
                                 onNameChanged: (v) => _onDayNameChanged(i, v),
                                 onRemove: () => _removeDay(i),
@@ -1824,6 +1942,9 @@ class _DayCard extends StatelessWidget {
     required this.palette,
     required this.selectedWeek,
     required this.numWeeks,
+    required this.hasError,
+    required this.slotHasError,
+    required this.slotErrorText,
     required this.canRemove,
     required this.onNameChanged,
     required this.onRemove,
@@ -1856,6 +1977,15 @@ class _DayCard extends StatelessWidget {
   /// Total plan weeks — threaded down to [_SlotCard] so it knows whether to
   /// render the presence chips row and whether to dim (Fase 4c).
   final int numWeeks;
+
+  /// Live validation: the day has no exercise, or one of its slots is
+  /// incomplete. Drives the red border + header dot (REQ-PERIOD-016).
+  final bool hasError;
+
+  /// Per-slot validity, evaluated live by the parent state and threaded so each
+  /// [_SlotCard] can paint its own red border + reason without re-deriving.
+  final bool Function(_EditorSlot slot) slotHasError;
+  final String? Function(_EditorSlot slot) slotErrorText;
   final bool canRemove;
   final ValueChanged<String> onNameChanged;
   final VoidCallback onRemove;
@@ -1891,7 +2021,12 @@ class _DayCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: palette.bgCard,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: palette.border),
+        border: Border.all(
+          color: hasError
+              ? palette.danger.withValues(alpha: 0.6)
+              : palette.border,
+          width: hasError ? 1.5 : 1,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1913,6 +2048,16 @@ class _DayCard extends StatelessWidget {
                   ),
                 ),
               ),
+              if (hasError)
+                Container(
+                  width: 8,
+                  height: 8,
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    color: palette.danger,
+                    shape: BoxShape.circle,
+                  ),
+                ),
               if (canRemove)
                 IconButton(
                   tooltip: 'Eliminar día', // i18n
@@ -1932,6 +2077,8 @@ class _DayCard extends StatelessWidget {
               palette: palette,
               selectedWeek: selectedWeek,
               numWeeks: numWeeks,
+              hasError: slotHasError(day.slots[i]),
+              errorText: slotErrorText(day.slots[i]),
               canMoveUp: i > 0,
               canMoveDown: i < day.slots.length - 1,
               canLink: i < day.slots.length - 1,
@@ -1989,6 +2136,8 @@ class _SlotCard extends StatelessWidget {
     required this.palette,
     required this.selectedWeek,
     required this.numWeeks,
+    required this.hasError,
+    required this.errorText,
     required this.canMoveUp,
     required this.canMoveDown,
     required this.canLink,
@@ -2023,6 +2172,11 @@ class _SlotCard extends StatelessWidget {
   /// exercises absent from [selectedWeek] only apply when this is > 1
   /// (Fase 4c).
   final int numWeeks;
+
+  /// Live validation for this exercise (a scheduled week has an incomplete set,
+  /// or it names no valid week). Paints the red border + the [errorText] line.
+  final bool hasError;
+  final String? errorText;
   final bool canMoveUp;
   final bool canMoveDown;
   final bool canLink; // false for the last slot of a day (nothing to link to)
@@ -2059,7 +2213,12 @@ class _SlotCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
         // Slots in a superset run share an accent-tinted border to read as a
         // group (the "link with next" toggle is what forms the run).
-        border: inSuperset
+        border: hasError
+            ? Border.all(
+                color: palette.danger.withValues(alpha: 0.75),
+                width: 1.5,
+              )
+            : inSuperset
             ? Border.all(color: palette.accent.withValues(alpha: 0.55))
             : null,
       ),
@@ -2123,6 +2282,13 @@ class _SlotCard extends StatelessWidget {
               ),
             ],
           ),
+          if (errorText != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              errorText!,
+              style: GoogleFonts.barlow(color: palette.danger, fontSize: 12),
+            ),
+          ],
           const SizedBox(height: 6),
           // Modo del ejercicio: reps fijas / rango (mín–máx) / tiempo (paridad
           // con mobile, Fases 1-2). exerciseMode + repMode combinados en 3 chips.
@@ -2225,6 +2391,7 @@ class _SlotCard extends StatelessWidget {
               palette: palette,
               exerciseMode: slot.exerciseMode,
               repMode: slot.repMode,
+              showErrors: hasError,
               canRemove: weekSets.length > 1,
               onRemove: () => onRemoveSet(i),
               onRepsChanged: (v) => onSetRepsChanged(i, v),
@@ -2385,6 +2552,7 @@ class _SetRow extends StatelessWidget {
     required this.palette,
     required this.exerciseMode,
     required this.repMode,
+    required this.showErrors,
     required this.canRemove,
     required this.onRemove,
     required this.onRepsChanged,
@@ -2401,6 +2569,10 @@ class _SetRow extends StatelessWidget {
   final AppPalette palette;
   final ExerciseMode exerciseMode;
   final RepMode repMode;
+
+  /// When true, invalid number fields in this row paint a red underline — set
+  /// by the parent [_SlotCard] whenever the slot has a validation error.
+  final bool showErrors;
   final bool canRemove;
   final VoidCallback onRemove;
   final ValueChanged<String> onRepsChanged;
@@ -2419,6 +2591,16 @@ class _SetRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDuration = exerciseMode == ExerciseMode.duration;
     final isRange = !isDuration && repMode == RepMode.range;
+    // Failure sets have no countable target, so their fields never flag red.
+    final flag = showErrors && set.type != SetType.failure;
+    final durationInvalid =
+        flag && (set.durationSeconds == null || set.durationSeconds! <= 0);
+    final repsInvalid = flag && (set.reps == null || set.reps! <= 0);
+    final rangeInvalid = flag &&
+        (set.repsMin == null ||
+            set.repsMin! <= 0 ||
+            set.repsMax == null ||
+            set.repsMax! < set.repsMin!);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
@@ -2436,6 +2618,7 @@ class _SetRow extends StatelessWidget {
                 initial: set.durationSeconds?.toString() ?? '',
                 hint: 'seg', // i18n
                 onChanged: onDurationChanged,
+                invalid: durationInvalid,
               ),
             )
           else ...[
@@ -2445,6 +2628,7 @@ class _SetRow extends StatelessWidget {
                   initial: set.repsMin?.toString() ?? '',
                   hint: 'mín', // i18n
                   onChanged: onRepsMinChanged,
+                  invalid: rangeInvalid,
                 ),
               ),
               const SizedBox(width: 8),
@@ -2453,6 +2637,7 @@ class _SetRow extends StatelessWidget {
                   initial: set.repsMax?.toString() ?? '',
                   hint: 'máx', // i18n
                   onChanged: onRepsMaxChanged,
+                  invalid: rangeInvalid,
                 ),
               ),
             ] else
@@ -2461,6 +2646,7 @@ class _SetRow extends StatelessWidget {
                   initial: set.reps?.toString() ?? '',
                   hint: 'reps', // i18n
                   onChanged: onRepsChanged,
+                  invalid: repsInvalid,
                 ),
               ),
             const SizedBox(width: 8),
@@ -2489,7 +2675,11 @@ class _SetRow extends StatelessWidget {
     required String hint,
     required ValueChanged<String> onChanged,
     bool decimal = false,
+    bool invalid = false,
   }) {
+    final redUnderline = UnderlineInputBorder(
+      borderSide: BorderSide(color: palette.danger),
+    );
     return TextFormField(
       initialValue: initial,
       keyboardType: decimal
@@ -2501,6 +2691,8 @@ class _SetRow extends StatelessWidget {
         isDense: true,
         hintText: hint,
         hintStyle: GoogleFonts.barlow(color: palette.textMuted, fontSize: 12),
+        enabledBorder: invalid ? redUnderline : null,
+        focusedBorder: invalid ? redUnderline : null,
       ),
     );
   }
@@ -2592,12 +2784,17 @@ class _WeekTabs extends StatelessWidget {
   const _WeekTabs({
     required this.numWeeks,
     required this.selectedWeek,
+    required this.weeksWithError,
     required this.palette,
     required this.onSelected,
   });
 
   final int numWeeks;
   final int selectedWeek;
+
+  /// 0-based weeks that currently have a validation error — a warning dot is
+  /// painted on those tabs so the trainer sees WHICH week to open.
+  final Set<int> weeksWithError;
   final AppPalette palette;
   final ValueChanged<int> onSelected;
 
@@ -2611,6 +2808,7 @@ class _WeekTabs extends StatelessWidget {
             _WeekChip(
               index: w,
               selected: w == selectedWeek,
+              warning: weeksWithError.contains(w),
               palette: palette,
               onTap: () => onSelected(w),
             ),
@@ -2630,11 +2828,15 @@ class _WeekChip extends StatelessWidget {
     required this.selected,
     required this.palette,
     required this.onTap,
+    this.warning = false,
   });
 
   /// 0-based week — rendered 1-based ("Sem 1").
   final int index;
   final bool selected;
+
+  /// A slot scheduled in this week has an incomplete set — show a warning dot.
+  final bool warning;
   final AppPalette palette;
   final VoidCallback onTap;
 
@@ -2643,21 +2845,43 @@ class _WeekChip extends StatelessWidget {
     return GestureDetector(
       key: Key('week_tab_$index'),
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-        decoration: BoxDecoration(
-          color: selected ? palette.accent : palette.bgCard,
-          borderRadius: BorderRadius.circular(9999),
-          border: Border.all(color: selected ? palette.accent : palette.border),
-        ),
-        child: Text(
-          'Sem ${index + 1}', // i18n
-          style: GoogleFonts.barlowCondensed(
-            color: selected ? palette.bg : palette.textMuted,
-            fontWeight: FontWeight.w700,
-            fontSize: 12,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+            decoration: BoxDecoration(
+              color: selected ? palette.accent : palette.bgCard,
+              borderRadius: BorderRadius.circular(9999),
+              border: Border.all(
+                color: selected ? palette.accent : palette.border,
+              ),
+            ),
+            child: Text(
+              'Sem ${index + 1}', // i18n
+              style: GoogleFonts.barlowCondensed(
+                color: selected ? palette.bg : palette.textMuted,
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+              ),
+            ),
           ),
-        ),
+          if (warning)
+            Positioned(
+              top: -2,
+              right: -2,
+              child: Container(
+                key: Key('week_tab_warning_$index'),
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: palette.danger,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: palette.bg, width: 1),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
