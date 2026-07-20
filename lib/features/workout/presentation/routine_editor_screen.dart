@@ -26,8 +26,10 @@ import '../domain/routine_slot.dart';
 import '../domain/routine_source.dart';
 import '../domain/routine_visibility.dart';
 import '../domain/set_enums.dart';
+import '../domain/set_limits.dart';
 import '../domain/set_spec.dart';
 import 'routine_editor_mode.dart';
+import 'widgets/bounded_number_formatter.dart';
 import 'widgets/duration_text_field.dart';
 
 // ── Presence-aware delete / add scope enums ───────────────────────────────────
@@ -237,6 +239,10 @@ bool isSetValid(_EditableSet s, ExerciseMode exerciseMode, RepMode repMode) {
   // A failure set ("al fallo") has no countable target by definition — the
   // athlete works until failure. Reps/duration are an optional reference,
   // never a requirement.
+  // QA-WKT-003: no set — failure or countable — may carry a load over the
+  // shared ceiling; it would still corrupt totalVolumeKg. Checked first so it
+  // also gates "al fallo" sets, and catches specs seeded before the caps.
+  if (s.weightKg != null && s.weightKg! > kMaxWeightKg) return false;
   if (s.type == SetType.failure) return true;
   if (exerciseMode == ExerciseMode.duration) {
     return s.durationSeconds != null && s.durationSeconds! > 0;
@@ -245,9 +251,10 @@ bool isSetValid(_EditableSet s, ExerciseMode exerciseMode, RepMode repMode) {
     return s.repsMin != null &&
         s.repsMin! > 0 &&
         s.repsMax != null &&
-        s.repsMax! >= s.repsMin!;
+        s.repsMax! >= s.repsMin! &&
+        s.repsMax! <= kMaxReps;
   }
-  return s.reps != null && s.reps! > 0;
+  return s.reps != null && s.reps! > 0 && s.reps! <= kMaxReps;
 }
 
 /// Builds the [RoutineSlot] from an [_EditableSlot], populating both new
@@ -3593,6 +3600,14 @@ class _NumberField extends StatelessWidget {
       keyboardType: decimal
           ? const TextInputType.numberWithOptions(decimal: true)
           : TextInputType.number,
+      inputFormatters: [
+        // QA-WKT-003: cap reps/weight at the shared domain ceiling so an
+        // impossible set can't be authored and flow untouched into a SetLog.
+        BoundedNumberFormatter(
+          max: decimal ? kMaxWeightKg : kMaxReps.toDouble(),
+          decimal: decimal,
+        ),
+      ],
       style: GoogleFonts.barlow(fontSize: 16, color: palette.textPrimary),
       textAlign: TextAlign.center,
       decoration: InputDecoration(
@@ -3709,6 +3724,7 @@ class RoutineEditorTestBridge {
     required ExerciseMode exerciseMode,
     required RepMode repMode,
     SetType type = SetType.normal,
+    double? weightKg,
     int? reps,
     int? repsMin,
     int? repsMax,
@@ -3716,6 +3732,7 @@ class RoutineEditorTestBridge {
   }) {
     final s = _EditableSet(
       type: type,
+      weightKg: weightKg,
       reps: reps,
       repsMin: repsMin,
       repsMax: repsMax,

@@ -23,8 +23,10 @@ import '../application/session_state.dart';
 import '../domain/routine.dart';
 import '../domain/routine_slot.dart';
 import '../domain/set_enums.dart';
+import '../domain/set_limits.dart';
 import '../domain/set_log.dart';
 import '../domain/set_spec.dart';
+import 'widgets/bounded_number_formatter.dart';
 import 'widgets/coach_note.dart';
 import 'widgets/set_entry_sheet.dart';
 
@@ -1852,8 +1854,11 @@ class _RepsSetRowState extends State<_RepsSetRow> {
   @override
   void initState() {
     super.initState();
-    _weightKg = widget.initialWeightKg;
-    _reps = widget.initialReps;
+    // QA-WKT-003: clamp the prefill so a corrupt spec (or a legacy Firestore
+    // doc written before the caps existed) can't seed an impossible value that
+    // the athlete would then commit untouched by tapping the check.
+    _weightKg = clampWeightKg(widget.initialWeightKg);
+    _reps = clampReps(widget.initialReps);
     _weightController = TextEditingController(
       text: _weightKg == 0 ? '' : _formatWeight(_weightKg),
     );
@@ -1874,7 +1879,7 @@ class _RepsSetRowState extends State<_RepsSetRow> {
     // Empty/unparseable -> 0; out-of-range -> clamped to [0, 500]. This keeps
     // _weightKg in sync with what the user sees and with what gets logged,
     // instead of silently retaining a stale value.
-    final next = (parsed ?? 0).clamp(0.0, 500.0).toDouble();
+    final next = clampWeightKg(parsed ?? 0);
     if (next == _weightKg) return;
     setState(() => _weightKg = next);
     if (widget.isDone) {
@@ -1888,7 +1893,7 @@ class _RepsSetRowState extends State<_RepsSetRow> {
     // check button is what commits the value; the parent's check handler
     // guards against 0-rep sets.
     final parsed = int.tryParse(value);
-    final next = (parsed ?? 0).clamp(0, 999);
+    final next = clampReps(parsed ?? 0);
     if (next == _reps) return;
     setState(() => _reps = next);
     if (widget.isDone) {
@@ -2052,8 +2057,10 @@ class _WeightField extends StatelessWidget {
       child: TextField(
         controller: controller,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        inputFormatters: [
-          FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+        inputFormatters: const [
+          // QA-WKT-002/003: single separator + hard cap so the field text can
+          // never diverge from the value that gets logged, nor exceed 500 kg.
+          BoundedNumberFormatter(max: kMaxWeightKg, decimal: true),
         ],
         textAlign: TextAlign.center,
         style: GoogleFonts.barlow(
