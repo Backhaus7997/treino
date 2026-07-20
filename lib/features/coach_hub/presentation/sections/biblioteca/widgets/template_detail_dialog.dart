@@ -17,7 +17,10 @@ import 'package:treino/features/workout/domain/routine.dart';
 ///
 /// Shows: name, level, días/sem · semanas, and a per-day slot-count summary.
 /// When [onEdit] is provided, an "Editar" action closes the dialog and runs it
-/// (the caller navigates to the template editor). Navigation lives in the
+/// (the caller navigates to the template editor). When [onUse] is provided, a
+/// "Usar en un alumno" action closes the dialog and runs it (the caller opens
+/// the athlete picker and copies the template into an assigned routine —
+/// parity with mobile's template-card "Asignar"). Both actions hand off to the
 /// caller so this widget stays context-safe after the dialog pops.
 ///
 /// REQ-BIBW-10, SCENARIO-BIBW-10a.
@@ -25,18 +28,21 @@ void showTemplateDetailDialog(
   BuildContext context,
   Routine routine, {
   VoidCallback? onEdit,
+  VoidCallback? onUse,
 }) {
   showDialog<void>(
     context: context,
-    builder: (_) => _TemplateDetailDialog(routine: routine, onEdit: onEdit),
+    builder: (_) =>
+        _TemplateDetailDialog(routine: routine, onEdit: onEdit, onUse: onUse),
   );
 }
 
 class _TemplateDetailDialog extends StatelessWidget {
-  const _TemplateDetailDialog({required this.routine, this.onEdit});
+  const _TemplateDetailDialog({required this.routine, this.onEdit, this.onUse});
 
   final Routine routine;
   final VoidCallback? onEdit;
+  final VoidCallback? onUse;
 
   @override
   Widget build(BuildContext context) {
@@ -65,13 +71,16 @@ class _TemplateDetailDialog extends StatelessWidget {
             children: [
               // ── Level chip ───────────────────────────────────────────────
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: palette.accent.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(6),
-                  border:
-                      Border.all(color: palette.accent.withValues(alpha: 0.3)),
+                  border: Border.all(
+                    color: palette.accent.withValues(alpha: 0.3),
+                  ),
                 ),
                 child: Text(
                   routine.level.displayNameEs.toUpperCase(), // i18n
@@ -160,6 +169,23 @@ class _TemplateDetailDialog extends StatelessWidget {
               'Editar', // i18n
               style: GoogleFonts.barlow(
                 fontWeight: FontWeight.w600,
+                color: palette.accent,
+              ),
+            ),
+          ),
+        if (onUse != null)
+          TextButton(
+            key: const Key('template_detail_use_button'),
+            // Same pop-then-hand-off contract as Editar: the caller owns the
+            // athlete picker + assign, so nothing runs on this dead context.
+            onPressed: () {
+              Navigator.of(context).pop();
+              onUse!();
+            },
+            child: Text(
+              'Usar en un alumno', // i18n
+              style: GoogleFonts.barlow(
+                fontWeight: FontWeight.w700,
                 color: palette.accent,
               ),
             ),
