@@ -127,6 +127,21 @@ List<Override> _mixedBucketsOverrides() {
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(
+      Payment(
+        id: '',
+        trainerId: 'trainer-1',
+        athleteId: 'athlete-1',
+        amountArs: 1000,
+        concept: 'test',
+        status: PaymentStatus.paid,
+        createdAt: DateTime.utc(2026, 1, 1),
+        paidAt: DateTime.utc(2026, 1, 1),
+      ),
+    );
+  });
+
   // Desktop viewport for all tests
   setUp(() {
     TestWidgetsFlutterBinding.ensureInitialized();
