@@ -83,9 +83,132 @@ void main() {
 
       expect(find.byType(RadarChart), findsOneWidget);
       expect(find.text('Sin datos para este período.'), findsNothing);
+      // Ambos períodos tienen ejes → ambos polígonos presentes.
+      final data = tester.widget<RadarChart>(find.byType(RadarChart)).data;
+      expect(data.dataSets.length, 2);
       // Legend renders both series labels.
       expect(find.text('Actual'), findsOneWidget);
       expect(find.text('Anterior'), findsOneWidget);
+    });
+
+    testWidgets(
+        'previous period without axis data → its dataSet is omitted '
+        '(no ghost hexagon), legend stays', (tester) async {
+      // Regression #382: fl_chart normaliza contra el mínimo de TODOS los
+      // datasets y ubica el centro en (min − tickSpace), así que el dataset
+      // "Anterior" todo-en-cero se dibujaba como un hexágono chico sobre el
+      // primer anillo — sugiriendo "un poco de todo" en un período que fue
+      // cero entrenos.
+      const insights = MuscleDistributionInsights(
+        currentSetsByAxis: {
+          RadarAxis.back: 8,
+          RadarAxis.chest: 10,
+          RadarAxis.core: 4,
+          RadarAxis.shoulders: 5,
+          RadarAxis.arms: 6,
+          RadarAxis.legs: 12,
+        },
+        previousSetsByAxis: {},
+        currentWorkouts: 4,
+        previousWorkouts: 0,
+        currentDurationMin: 180,
+        previousDurationMin: 0,
+        currentVolumeKg: 4000,
+        previousVolumeKg: 0,
+        currentSets: 45,
+        previousSets: 0,
+      );
+
+      await tester.pumpWidget(_wrap(
+        MuscleDistributionRadar(insights: insights, labels: _labels()),
+      ));
+
+      final data = tester.widget<RadarChart>(find.byType(RadarChart)).data;
+      expect(data.dataSets.length, 1);
+      // El dataset sobreviviente es el ACTUAL (borde 2.5, no el 2 del previo)
+      // con los valores actuales en displayOrder.
+      final survivor = data.dataSets.single;
+      expect(survivor.borderWidth, 2.5);
+      expect(
+        survivor.dataEntries.map((e) => e.value).toList(),
+        [8, 10, 4, 5, 6, 12],
+      );
+      // La leyenda "Anterior" queda (apagada) — el issue pide omitir el
+      // polígono, no la referencia; las stat cards siguen mostrando "→ 0".
+      expect(find.text('Anterior'), findsOneWidget);
+    });
+
+    testWidgets(
+        'current period without axis data → its dataSet is omitted '
+        '(mirrored ghost)', (tester) async {
+      // Espejo de #382: usuario que entrenó el período pasado y dejó — el
+      // dataset actual todo-en-cero dibujaba el mismo hexágono fantasma en
+      // color accent.
+      const insights = MuscleDistributionInsights(
+        currentSetsByAxis: {},
+        previousSetsByAxis: {RadarAxis.chest: 6, RadarAxis.legs: 3},
+        currentWorkouts: 0,
+        previousWorkouts: 2,
+        currentDurationMin: 0,
+        previousDurationMin: 90,
+        currentVolumeKg: 0,
+        previousVolumeKg: 1500,
+        currentSets: 0,
+        previousSets: 15,
+      );
+
+      await tester.pumpWidget(_wrap(
+        MuscleDistributionRadar(insights: insights, labels: _labels()),
+      ));
+
+      final data = tester.widget<RadarChart>(find.byType(RadarChart)).data;
+      expect(data.dataSets.length, 1);
+      // Sobrevive el PREVIO (borde 2) con sus valores sparse → 0 en los ejes
+      // ausentes, en displayOrder (back, chest, core, shoulders, arms, legs).
+      final survivor = data.dataSets.single;
+      expect(survivor.borderWidth, 2);
+      expect(
+        survivor.dataEntries.map((e) => e.value).toList(),
+        [0, 6, 0, 0, 0, 3],
+      );
+    });
+
+    testWidgets(
+        'workouts but zero axis data in BOTH periods → single all-zero '
+        'dataSet, chart survives a tap', (tester) async {
+      // Edge cardio-only: cardio/full_body nunca llegan a MuscleGroupDisplay,
+      // así que puede haber entrenos (isEmpty == false → el chart se muestra)
+      // con ambos mapas byAxis vacíos. `dataSets: []` está prohibido: fl_chart
+      // no pinta nada y su touch handler crashea (titleCount indexa
+      // dataSets[0]) — se conserva el dataset actual todo-en-cero, que con
+      // max == min == 0 sí colapsa al centro (sin hexágono fantasma).
+      const insights = MuscleDistributionInsights(
+        currentSetsByAxis: {},
+        previousSetsByAxis: {},
+        currentWorkouts: 2,
+        previousWorkouts: 1,
+        currentDurationMin: 60,
+        previousDurationMin: 30,
+        currentVolumeKg: 0,
+        previousVolumeKg: 0,
+        currentSets: 0,
+        previousSets: 0,
+      );
+
+      await tester.pumpWidget(_wrap(
+        MuscleDistributionRadar(insights: insights, labels: _labels()),
+      ));
+
+      final data = tester.widget<RadarChart>(find.byType(RadarChart)).data;
+      expect(data.dataSets.length, 1);
+      expect(
+        data.dataSets.single.dataEntries.map((e) => e.value).toList(),
+        [0, 0, 0, 0, 0, 0],
+      );
+
+      await tester.tap(find.byType(RadarChart), warnIfMissed: false);
+      await tester.pump();
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('stat cards render current value + previous arrow',

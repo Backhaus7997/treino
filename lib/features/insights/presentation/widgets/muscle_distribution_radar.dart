@@ -180,10 +180,28 @@ class _Radar extends StatelessWidget {
         .map((axis) => RadarEntry(
             value: (insights.previousSetsByAxis[axis] ?? 0).toDouble()))
         .toList();
+    // #382: fl_chart ubica el centro del radar en (min − tickSpace), no en 0,
+    // así que un dataset todo-en-cero NO colapsa al centro: se dibuja como un
+    // hexágono chico sobre el primer anillo, sugiriendo "un poco de todo" en
+    // un período que en realidad fue cero. Los mapas byAxis son sparse (solo
+    // ejes con ≥1 set están presentes), o sea `isNotEmpty` ⟺ el polígono
+    // tiene al menos un vértice real → un período sin ejes se omite del chart
+    // (su entrada de leyenda queda, apagada, igual que las flechas "→ 0" de
+    // las stat cards).
+    final hasPrevious = insights.previousSetsByAxis.isNotEmpty;
+    final hasCurrent = insights.currentSetsByAxis.isNotEmpty;
 
     return SizedBox(
       height: 240,
       child: RadarChart(
+        // #382: key estructural — si al cambiar de período/mes un dataset
+        // aparece o desaparece, cambia la CANTIDAD de dataSets y el lerp de
+        // la animación implícita empareja por ÍNDICE posicional (lerpList):
+        // el polígono gris "Anterior" morpheaba hacia el accent "Actual" a
+        // mitad de transición. Con el key, esos cambios estructurales
+        // recrean el chart (snap limpio); los cambios que conservan la
+        // estructura siguen animando el morph de siempre.
+        key: ValueKey((hasPrevious, hasCurrent)),
         // TREINO Motion PR2: anima el morph del polígono al cambiar de
         // período con los tokens del sistema. fl_chart 1.x expone
         // `duration`/`curve` (los viejos `swapAnimation*` están deprecados).
@@ -216,20 +234,29 @@ class _Radar extends StatelessWidget {
           getTitle: (index, _) =>
               RadarChartTitle(text: axes[index].displayLabel),
           dataSets: [
-            RadarDataSet(
-              dataEntries: previousEntries,
-              fillColor: palette.textMuted.withValues(alpha: 0.12),
-              borderColor: palette.textMuted,
-              borderWidth: 2,
-              entryRadius: 2.5,
-            ),
-            RadarDataSet(
-              dataEntries: currentEntries,
-              fillColor: palette.accent.withValues(alpha: 0.20),
-              borderColor: palette.accent,
-              borderWidth: 2.5,
-              entryRadius: 3.5,
-            ),
+            if (hasPrevious)
+              RadarDataSet(
+                dataEntries: previousEntries,
+                fillColor: palette.textMuted.withValues(alpha: 0.12),
+                borderColor: palette.textMuted,
+                borderWidth: 2,
+                entryRadius: 2.5,
+              ),
+            // `|| !hasPrevious`: la lista NUNCA puede quedar vacía — con
+            // `dataSets: []` fl_chart no pinta nada (ni grilla ni títulos) y
+            // su touch handler crashea (`titleCount` indexa `dataSets[0]`).
+            // Si ningún período tiene ejes (p. ej. solo cardio/full_body, que
+            // no llegan a MuscleGroupDisplay), el dataset actual todo-en-cero
+            // es inofensivo: con max == min == 0 fl_chart sí colapsa al
+            // centro, sin hexágono fantasma.
+            if (hasCurrent || !hasPrevious)
+              RadarDataSet(
+                dataEntries: currentEntries,
+                fillColor: palette.accent.withValues(alpha: 0.20),
+                borderColor: palette.accent,
+                borderWidth: 2.5,
+                entryRadius: 3.5,
+              ),
           ],
         ),
       ),
