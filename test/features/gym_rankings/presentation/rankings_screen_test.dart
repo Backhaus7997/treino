@@ -184,6 +184,29 @@ void main() {
       expect(find.text('8'), findsOneWidget);
     });
 
+    testWidgets(
+        'QA-GYM-101: athletes tied on the metric share a rank (1, 1, 3), the '
+        'next distinct value skips the tied count', (tester) async {
+      await tester.pumpWidget(_buildScreen(
+        overrides: baseOverrides(
+          streak: [
+            _rankedProfile(uid: 'u2', displayName: 'Lu', racha: 12),
+            _rankedProfile(uid: 'u3', displayName: 'Coti', racha: 12),
+            _rankedProfile(uid: 'u4', displayName: 'Ana', racha: 8),
+          ],
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      // The two athletes tied at 12 both render the rank badge "1"…
+      expect(find.text('1'), findsNWidgets(2));
+      // …and the third skips to 3 (standard competition ranking), so a rank
+      // badge "2" is never rendered — this proves the row actually consumes
+      // competitionRanks, not the old index+1.
+      expect(find.text('2'), findsNothing);
+      expect(find.text('3'), findsOneWidget);
+    });
+
     testWidgets('current user is highlighted when present in a leaderboard',
         (tester) async {
       await tester.pumpWidget(_buildScreen(
@@ -465,6 +488,36 @@ void main() {
         expect(
             find.byKey(const Key('rankings_section_streak')), findsOneWidget);
       });
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────
+  // QA-GYM-101 — pure competition-ranking unit tests (no widget pumping).
+  // ──────────────────────────────────────────────────────────────────────
+  group('competitionRanks (QA-GYM-101)', () {
+    test('no ties → sequential 1..n', () {
+      expect(competitionRanks([10, 8, 5]), [1, 2, 3]);
+    });
+    test('tie at the top shares rank 1, next skips to 3', () {
+      expect(competitionRanks([12, 12, 8]), [1, 1, 3]);
+    });
+    test('tie in the middle (standard "1224" ranking)', () {
+      expect(competitionRanks([12, 8, 8, 5]), [1, 2, 2, 4]);
+    });
+    test('triple tie at the top then a distinct value', () {
+      expect(competitionRanks([12, 12, 12, 5]), [1, 1, 1, 4]);
+    });
+    test('everyone tied → all rank 1', () {
+      expect(competitionRanks([5, 5, 5]), [1, 1, 1]);
+    });
+    test('mixed int/double but numerically equal values still tie', () {
+      expect(competitionRanks([12, 12.0, 8]), [1, 1, 3]);
+    });
+    test('single row → [1]', () {
+      expect(competitionRanks([7]), [1]);
+    });
+    test('empty → []', () {
+      expect(competitionRanks(<num>[]), <int>[]);
     });
   });
 }
