@@ -175,6 +175,9 @@ class TreinoIcon {
   static const IconData sidebarReportes = PhosphorIconsRegular.chartLine;
   static const IconData sidebarChat = chat;
   static const IconData sidebarAjustes = PhosphorIconsRegular.gear;
+  // Perfil público (Fase 11) — alias semántico de [globe] (misma familia
+  // usada por Coach Discovery en mobile).
+  static const IconData sidebarPerfilPublico = globe;
 
   // Alumno detail — Archivos tab (upload/download/trash/image ya existen arriba)
   static const IconData file = PhosphorIconsRegular.file;
