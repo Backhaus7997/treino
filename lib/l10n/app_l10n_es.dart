@@ -521,6 +521,12 @@ class AppL10nEs extends AppL10n {
   String get workoutStatVolume => 'VOLUMEN';
 
   @override
+  String get workoutStatDurationMin => 'DURACIÓN MIN';
+
+  @override
+  String get workoutStatVolumeKg => 'VOLUMEN KG';
+
+  @override
   String get workoutStatSets => 'SETS';
 
   @override
@@ -606,6 +612,12 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get workoutDetailStatVolume => 'VOLUMEN';
+
+  @override
+  String get workoutDetailStatDurationMin => 'DURACIÓN MIN';
+
+  @override
+  String get workoutDetailStatVolumeKg => 'VOLUMEN KG';
 
   @override
   String get workoutDetailStatPrsToday => 'PRS HOY';
@@ -3219,6 +3231,12 @@ class AppL10nEsAr extends AppL10nEs {
   String get workoutStatVolume => 'VOLUMEN';
 
   @override
+  String get workoutStatDurationMin => 'DURACIÓN MIN';
+
+  @override
+  String get workoutStatVolumeKg => 'VOLUMEN KG';
+
+  @override
   String get workoutStatSets => 'SETS';
 
   @override
@@ -3304,6 +3322,12 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get workoutDetailStatVolume => 'VOLUMEN';
+
+  @override
+  String get workoutDetailStatDurationMin => 'DURACIÓN MIN';
+
+  @override
+  String get workoutDetailStatVolumeKg => 'VOLUMEN KG';
 
   @override
   String get workoutDetailStatPrsToday => 'PRS HOY';

@@ -135,7 +135,7 @@ class _DetailLoaded extends StatelessWidget {
             childAspectRatio: 2,
             children: [
               StatTile(
-                label: l10n.workoutDetailStatDuration,
+                label: l10n.workoutDetailStatDurationMin,
                 value: session.durationMin.toString(),
               ),
               StatTile(
@@ -143,7 +143,7 @@ class _DetailLoaded extends StatelessWidget {
                 value: setLogs.length.toString(),
               ),
               StatTile(
-                label: l10n.workoutDetailStatVolume,
+                label: l10n.workoutDetailStatVolumeKg,
                 value: session.totalVolumeKg.toString(),
               ),
               StatTile(

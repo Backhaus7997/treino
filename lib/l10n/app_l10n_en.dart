@@ -508,6 +508,12 @@ class AppL10nEn extends AppL10n {
   String get workoutStatVolume => '';
 
   @override
+  String get workoutStatDurationMin => '';
+
+  @override
+  String get workoutStatVolumeKg => '';
+
+  @override
   String get workoutStatSets => '';
 
   @override
@@ -592,6 +598,12 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get workoutDetailStatVolume => '';
+
+  @override
+  String get workoutDetailStatDurationMin => '';
+
+  @override
+  String get workoutDetailStatVolumeKg => '';
 
   @override
   String get workoutDetailStatPrsToday => '';

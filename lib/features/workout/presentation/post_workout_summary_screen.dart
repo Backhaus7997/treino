@@ -146,11 +146,11 @@ class _LoadedBody extends StatelessWidget {
             childAspectRatio: 2,
             children: [
               StatTile(
-                label: l10n.workoutStatDuration,
+                label: l10n.workoutStatDurationMin,
                 value: session.durationMin.toString(),
               ),
               StatTile(
-                label: l10n.workoutStatVolume,
+                label: l10n.workoutStatVolumeKg,
                 value: session.totalVolumeKg.toString(),
               ),
               StatTile(

@@ -166,10 +166,10 @@ void main() {
     expect(find.textContaining(expectedTime), findsOneWidget);
     expect(find.text('Push'), findsOneWidget);
 
-    // 4 StatTiles — labels
-    expect(find.text('DURACIÓN'), findsOneWidget);
+    // 4 StatTiles — labels (duración/volumen carry their unit, #363)
+    expect(find.text('DURACIÓN MIN'), findsOneWidget);
     expect(find.text('SETS'), findsOneWidget);
-    expect(find.text('VOLUMEN'), findsOneWidget);
+    expect(find.text('VOLUMEN KG'), findsOneWidget);
     expect(find.text('PRS HOY'), findsOneWidget);
 
     // Stat values: duration=45, sets=3 (count of setLogs), volume=1800
