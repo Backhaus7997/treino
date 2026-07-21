@@ -858,16 +858,21 @@ class _RendimientoSection extends ConsumerWidget {
                       // Key metrics (non-null only)
                       _MetricRow(
                         metrics: [
+                          // QA-PERF-104: formatear con el helper existente para
+                          // no interpolar el double crudo (30.0 -> 30),
+                          // consistente con la card de MEDICIONES vecina.
                           if (latest.cmjCm != null)
-                            _Metric('CMJ', '${latest.cmjCm} cm'),
+                            _Metric('CMJ',
+                                '${_formatMetricValue(latest.cmjCm!)} cm'),
                           if (latest.squat1rmKg != null)
-                            _Metric(
-                                'Sentadilla 1RM', '${latest.squat1rmKg} kg'),
+                            _Metric('Sentadilla 1RM',
+                                '${_formatMetricValue(latest.squat1rmKg!)} kg'),
                           if (latest.sprint20mS != null)
-                            _Metric('Sprint 20m', '${latest.sprint20mS} s'),
+                            _Metric('Sprint 20m',
+                                '${_formatMetricValue(latest.sprint20mS!)} s'),
                           if (latest.vo2maxMlKgMin != null)
-                            _Metric(
-                                'VO2máx', '${latest.vo2maxMlKgMin} ml/kg/min'),
+                            _Metric('VO2máx',
+                                '${_formatMetricValue(latest.vo2maxMlKgMin!)} ml/kg/min'),
                         ],
                         palette: palette,
                       ),
