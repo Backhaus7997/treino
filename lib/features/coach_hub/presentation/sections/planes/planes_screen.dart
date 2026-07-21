@@ -203,14 +203,17 @@ class _TarifasKpiRow extends StatelessWidget {
       KpiCard(
         label: 'Precio promedio', // i18n
         value: fmtArs(resumen?.precioPromedio ?? 0),
-        sublabel:
-            '${resumen?.alumnosConTarifa ?? 0} alumnos con tarifa', // i18n
+        // ADR-F10-02 (tarifas_model.dart): mezcla mensual/semanal/porSesion/
+        // suelto en un único promedio, no comparable entre cadencias — el
+        // sublabel debe aclarar el caveat, no duplicar un conteo.
+        sublabel: 'Mezcla cadencias, no comparable', // i18n
         loading: loading,
       ),
       KpiCard(
         label: 'Alumnos con tarifa', // i18n
         value: '${resumen?.alumnosConTarifa ?? 0}',
-        sublabel: '${resumen?.tarifasDistintas ?? 0} tarifas', // i18n
+        sublabel: '${resumen?.tarifasDistintas ?? 0} '
+            '${pluralizarEs(resumen?.tarifasDistintas ?? 0, 'tarifa', 'tarifas')}', // i18n
         loading: loading,
       ),
       KpiCard(
