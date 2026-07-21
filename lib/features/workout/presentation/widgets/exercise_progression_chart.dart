@@ -453,8 +453,17 @@ class _ProgressLineChart extends StatelessWidget {
               sideTitles: SideTitles(
                 showTitles: true,
                 reservedSize: 28,
+                // The X axis is point-index-based, so titles must be sampled
+                // at whole indices. Without a fixed interval fl_chart samples
+                // fractional Xs sized to the chart width, and value.round()
+                // maps neighbouring samples onto the same index → duplicated
+                // and skipped date labels (#383).
+                interval: 1,
                 getTitlesWidget: (value, meta) {
                   final idx = value.round();
+                  if ((value - idx).abs() > 0.01) {
+                    return const SizedBox.shrink();
+                  }
                   if (!labelIndices.contains(idx)) {
                     return const SizedBox.shrink();
                   }
