@@ -8,6 +8,7 @@ import '../../../app/theme/app_palette.dart';
 import '../../../core/utils/geohash.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../auth/application/auth_providers.dart';
 import '../../coach/domain/trainer_location.dart';
 import '../../coach/domain/trainer_specialty.dart';
 import '../../gyms/application/gym_providers.dart';
@@ -237,7 +238,8 @@ class _ProfileEditTrainerScreenState
 
     // ADR-TPO-006: in onboarding mode, block back navigation at both levels.
     final body = SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(20, 18, 20, 20 + MediaQuery.paddingOf(context).bottom),
+      padding: EdgeInsets.fromLTRB(
+          20, 18, 20, 20 + MediaQuery.paddingOf(context).bottom),
       child: Form(
         key: _formKey,
         child: Column(
@@ -390,6 +392,23 @@ class _ProfileEditTrainerScreenState
         // ADR-TPO-006: in onboarding mode, hide the back arrow entirely.
         automaticallyImplyLeading:
             widget.mode != ProfileEditTrainerMode.onboarding,
+        // QA-PRO-008 (#429): the onboarding gate intentionally blocks every
+        // navigation path (router redirect + PopScope + no back arrow), which
+        // turned the screen into a dead end — a trainer unwilling/unable to
+        // complete the form couldn't even leave the account. Sign-out is the
+        // minimum escape hatch: authStateChanges emits null and the router
+        // redirect lands the user back on /welcome. Edit mode keeps the
+        // normal back arrow and needs no extra exit.
+        actions: [
+          if (widget.mode == ProfileEditTrainerMode.onboarding)
+            IconButton(
+              key: const Key('trainer_onboarding_sign_out'),
+              tooltip: AppL10n.of(context).authProfileSignOut,
+              icon: const Icon(TreinoIcon.signOut),
+              onPressed: () =>
+                  ref.read(authNotifierProvider.notifier).signOut(),
+            ),
+        ],
       ),
       body: wrappedBody,
     );
@@ -577,16 +596,17 @@ class _GymsSection extends ConsumerWidget {
                         title: gymsById[loc.gymId]?.name ??
                             (gymsLoading ? l10n.coachLoadingLabel : 'Gimnasio'),
                         subtitle: gymsById[loc.gymId]?.address,
-                        trailing: gymsLoading && !gymsById.containsKey(loc.gymId)
-                            ? SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: palette.accent,
-                                ),
-                              )
-                            : null,
+                        trailing:
+                            gymsLoading && !gymsById.containsKey(loc.gymId)
+                                ? SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: palette.accent,
+                                    ),
+                                  )
+                                : null,
                         onRemove: () => onRemove(loc),
                       ),
                     ))
