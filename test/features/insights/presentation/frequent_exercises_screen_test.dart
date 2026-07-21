@@ -2,13 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mocktail/mocktail.dart';
 
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/insights/presentation/frequent_exercises_screen.dart';
 import 'package:treino/features/insights/domain/chart_period.dart';
 import 'package:treino/features/workout/application/exercise_frequency_providers.dart';
+import 'package:treino/features/workout/application/session_providers.dart';
+import 'package:treino/features/workout/data/session_repository.dart';
 import 'package:treino/features/workout/domain/exercise_frequency.dart';
+import 'package:treino/features/workout/domain/session_status.dart';
 import 'package:treino/l10n/app_l10n.dart';
+
+import '../../workout/application/stub_factories.dart';
+
+class MockSessionRepository extends Mock implements SessionRepository {}
 
 /// [stats-hub] Athlete-side "Ejercicios frecuentes" screen — reuses the
 /// coach-only MostFrequentExercisesList widget with the athlete's OWN uid
@@ -190,5 +198,67 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Reintentar'), findsOneWidget);
+  });
+
+  testWidgets(
+      'SCENARIO-FREQ-SCREEN-05 (#376): tapping Reintentar actually recovers — '
+      'it re-fetches the sessions dependency, not just the frequency provider',
+      (tester) async {
+    // `ref.invalidate` does NOT cascade to dependencies, and the screen keeps
+    // sessionsByUidProvider alive (watched via exerciseFrequencyProvider), so
+    // its AsyncError stays cached across the rebuild. Invalidating only
+    // exerciseFrequencyProvider replayed the SAME cached sessions error
+    // forever, so the button could never recover the very case that brings
+    // the user here (offline / failed sessions fetch). Same graph-shaped bug
+    // muscle_distribution_screen already pinned with its recovery test.
+    final repo = MockSessionRepository();
+    final now = DateTime.now();
+    final todayOnly = DateTime(now.year, now.month, now.day);
+
+    // Cold sessions fetch fails once (offline), then succeeds.
+    var sessionAttempts = 0;
+    when(() => repo.listByUid('me', limit: any(named: 'limit')))
+        .thenAnswer((_) async {
+      sessionAttempts++;
+      if (sessionAttempts == 1) throw Exception('sessions fetch failed');
+      return [
+        makeSession(
+          id: 's1',
+          startedAt: todayOnly.add(const Duration(hours: 9)),
+          status: SessionStatus.finished,
+          wasFullyCompleted: true,
+        ),
+      ];
+    });
+    when(() => repo.listSetLogs(uid: 'me', sessionId: 's1'))
+        .thenAnswer((_) async => [
+              makeSetLog(
+                id: 'l1',
+                exerciseId: 'e-press',
+                exerciseName: 'Press Banca',
+              ),
+            ]);
+
+    await tester.pumpWidget(wrap(
+      const SizedBox.shrink(),
+      overrides: [sessionRepositoryProvider.overrideWithValue(repo)],
+    ));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('No pudimos cargar tus ejercicios frecuentes. Probá de nuevo.'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Reintentar'));
+    await tester.pumpAndSettle();
+
+    expect(sessionAttempts, 2,
+        reason: 'retry must re-fetch sessions, not replay the cached error');
+    expect(find.text('Press Banca'), findsOneWidget);
+    expect(
+      find.text('No pudimos cargar tus ejercicios frecuentes. Probá de nuevo.'),
+      findsNothing,
+    );
   });
 }
