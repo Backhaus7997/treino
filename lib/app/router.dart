@@ -826,11 +826,29 @@ class _VolumeByGroupRouteHost extends ConsumerWidget {
 
 /// Resuelve athleteId (currentUid) y trainerId (active link) y monta
 /// AthleteAgendaScreen. Loading state mientras se resuelve el link.
+///
+/// QA-NOT-002: role-aware. Los pushes de "Nueva solicitud de sesión" anteriores
+/// al fix del deepLink en notifyOnAppointment apuntan a /coach/agenda; para un
+/// TRAINER este host resolvía el vínculo de atleta (vacío) y mostraba
+/// "Necesitás un vínculo activo con un PF". Ahora un trainer aterriza en su
+/// propia agenda (misma vista que /coach?tab=agenda).
 class _AthleteAgendaRouteHost extends ConsumerWidget {
   const _AthleteAgendaRouteHost();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Gate por rol ANTES de resolver el vínculo: spinner mientras el profile
+    // carga (evita el flash del estado de error de atleta en cold start).
+    final profileAsync = ref.watch(userProfileProvider);
+    if (profileAsync.isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (profileAsync.valueOrNull?.role == UserRole.trainer) {
+      return const CoachScreen(initialTab: 'agenda');
+    }
+
     final athleteId = ref.watch(currentUidProvider) ?? '';
     final linkAsync = ref.watch(currentAthleteLinkProvider);
 

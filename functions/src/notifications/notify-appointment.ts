@@ -9,7 +9,7 @@
  *   - Guards: after missing → skip; after.reason === 'athlete-account-deleted' → skip;
  *     before?.status === after.status → skip (no-op write).
  *   - Branches:
- *       create + requested → notify trainer, deepLink "/coach/agenda"
+ *       create + requested → notify trainer, deepLink "/coach?tab=agenda"
  *       requested → confirmed → notify athlete, deepLink "/coach?tab=agenda"
  *       * → cancelled → use after.cancelledBy if present, else notify both
  *   - All user-facing strings in es-AR.
@@ -91,7 +91,11 @@ export async function notifyOnAppointmentHandler(
     recipientUids = [trainerId];
     title = "Nueva solicitud de sesión"; // i18n: Fase 6 Etapa 2
     body = "Un atleta solicitó una sesión contigo."; // i18n: Fase 6 Etapa 2
-    deepLink = "/coach/agenda";
+    // QA-NOT-002: "/coach/agenda" monta el host de ATLETA (resuelve el vínculo
+    // atleta→PF); para el trainer eso mostraba "Necesitás un vínculo activo
+    // con un PF". "/coach?tab=agenda" es role-aware (CoachScreen despacha a
+    // TrainerCoachView con la tab AGENDA) — igual que confirmed/cancelled.
+    deepLink = "/coach?tab=agenda";
   } else if (afterStatus === "confirmed") {
     // Appointment confirmed → notify athlete.
     recipientUids = [athleteId];
