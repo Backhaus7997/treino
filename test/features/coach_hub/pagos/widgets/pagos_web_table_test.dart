@@ -242,4 +242,100 @@ void main() {
       expect(retried, isTrue);
     });
   });
+
+  group('PagosWebTable → acciones de fila (Fase 9 WU-07)', () {
+    testWidgets(
+        'SCENARIO 8 — showActions:true + pago pending muestra Recordar y '
+        'Marcar pagado; tocar Marcar pagado invoca el callback',
+        (tester) async {
+      tester.view.physicalSize = _kDesktopSize;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      final profiles = {
+        'uid-bob': const UserPublicProfile(uid: 'uid-bob', displayName: 'Bob'),
+      };
+      final pending = _vencidoHaceDias(4);
+      Payment? marcado;
+
+      await tester.pumpWidget(
+        _wrap(
+          PagosWebTable(
+            payments: [pending],
+            profiles: profiles,
+            emptyMessage: 'Sin pagos',
+            onMarcarPagado: (p) => marcado = p,
+            onRecordar: (_) {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Recordar'), findsOneWidget); // i18n
+      expect(find.text('Marcar pagado'), findsOneWidget); // i18n
+
+      await tester.tap(find.text('Marcar pagado'));
+      await tester.pumpAndSettle();
+
+      expect(marcado, pending);
+    });
+
+    testWidgets(
+        'SCENARIO 9 — showActions:false (tab Pagados) no muestra Recordar '
+        'ni Marcar pagado', (tester) async {
+      tester.view.physicalSize = _kDesktopSize;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      final profiles = {
+        'uid-ana': const UserPublicProfile(uid: 'uid-ana', displayName: 'Ana'),
+      };
+
+      await tester.pumpWidget(
+        _wrap(
+          PagosWebTable(
+            payments: [_paid()],
+            profiles: profiles,
+            emptyMessage: 'Sin pagos',
+            showActions: false,
+            onMarcarPagado: (_) {},
+            onRecordar: (_) {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Recordar'), findsNothing);
+      expect(find.text('Marcar pagado'), findsNothing);
+      expect(find.text('ACCIONES'), findsNothing); // i18n — no column either
+    });
+
+    testWidgets(
+        'SCENARIO 10 — pago ya pagado con showActions:true muestra Recordar '
+        'pero NO Marcar pagado', (tester) async {
+      tester.view.physicalSize = _kDesktopSize;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      final profiles = {
+        'uid-ana': const UserPublicProfile(uid: 'uid-ana', displayName: 'Ana'),
+      };
+
+      await tester.pumpWidget(
+        _wrap(
+          PagosWebTable(
+            payments: [_paid()],
+            profiles: profiles,
+            emptyMessage: 'Sin pagos',
+            onMarcarPagado: (_) {},
+            onRecordar: (_) {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Recordar'), findsOneWidget); // i18n
+      expect(find.text('Marcar pagado'), findsNothing);
+    });
+  });
 }

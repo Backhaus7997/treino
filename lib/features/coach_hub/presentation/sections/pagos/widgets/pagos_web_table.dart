@@ -9,8 +9,13 @@
 /// indicador de columna ordenada.
 ///
 /// ADR-F9-02: sin columna PLAN (no hay plan real) — la columna real es
-/// CONCEPTO. Las acciones de fila (Recordar / Marcar pagado) se difieren a
-/// WU-07 — sin columna ACCIONES en este archivo.
+/// CONCEPTO.
+///
+/// Fase 9 WU-07: columna ACCIONES (Recordar / Marcar pagado) — visible solo
+/// cuando [showActions] es `true` (se oculta en el tab Pagados). Reusa la
+/// lógica existente de `marcar_pagado_actions.dart` vía los callbacks
+/// [onMarcarPagado]/[onRecordar] — este widget NO conoce Firestore/chat, solo
+/// pinta los botones y delega.
 ///
 /// Sección: coach_hub/pagos — contrato: sin Scaffold, sin HEX, es-AR + // i18n.
 library;
@@ -18,6 +23,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/payments/domain/payment.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 
@@ -47,6 +53,9 @@ class PagosWebTable extends StatelessWidget {
     this.sortColumnKey,
     this.sortAscending = true,
     this.onSort,
+    this.showActions = true,
+    this.onMarcarPagado,
+    this.onRecordar,
   });
 
   /// Pagos a renderizar, ya ordenados por el caller según [sortColumnKey].
@@ -76,6 +85,16 @@ class PagosWebTable extends StatelessWidget {
   /// Llamado al tocar un encabezado ordenable: (columnKey, ascending).
   final void Function(String key, bool ascending)? onSort;
 
+  /// `false` oculta la columna ACCIONES por completo (tab Pagados).
+  final bool showActions;
+
+  /// Callback de "Marcar pagado" para una fila; solo se ofrece si el pago
+  /// está `pending` (ver [_AccionesCell]).
+  final void Function(Payment)? onMarcarPagado;
+
+  /// Callback de "Recordar" para una fila.
+  final void Function(Payment)? onRecordar;
+
   // ── Helpers ─────────────────────────────────────────────────────────────────
 
   String _displayName(String athleteId) {
@@ -103,6 +122,13 @@ class PagosWebTable extends StatelessWidget {
         'alumno': _AlumnoCell(name: name, palette: palette),
         'monto': _MontoCell(amountArs: p.amountArs, palette: palette),
         'estado': _EstadoBadge(estado: estado, label: label, palette: palette),
+        if (showActions)
+          'acciones': _AccionesCell(
+            payment: p,
+            palette: palette,
+            onRecordar: onRecordar,
+            onMarcarPagado: onMarcarPagado,
+          ),
       },
     );
   }
@@ -112,18 +138,22 @@ class PagosWebTable extends StatelessWidget {
     final palette = AppPalette.of(context);
 
     return CoachHubDataTable(
-      columns: const [
-        CoachHubColumn(
+      columns: [
+        const CoachHubColumn(
             key: 'alumno', label: 'ALUMNO', sortable: true, flex: 3), // i18n
-        CoachHubColumn(key: 'concepto', label: 'CONCEPTO', flex: 4), // i18n
-        CoachHubColumn(
+        const CoachHubColumn(
+            key: 'concepto', label: 'CONCEPTO', flex: 4), // i18n
+        const CoachHubColumn(
             key: 'monto', label: 'MONTO', sortable: true, flex: 2), // i18n
-        CoachHubColumn(
+        const CoachHubColumn(
             key: 'vencimiento',
             label: 'VENCIMIENTO',
             sortable: true,
             flex: 2), // i18n
-        CoachHubColumn(key: 'estado', label: 'ESTADO', flex: 2), // i18n
+        const CoachHubColumn(key: 'estado', label: 'ESTADO', flex: 2), // i18n
+        if (showActions)
+          const CoachHubColumn(
+              key: 'acciones', label: 'ACCIONES', flex: 3), // i18n
       ],
       rows: [for (final p in payments) _rowFor(palette, p)],
       loading: loading,
@@ -254,17 +284,124 @@ class _EstadoBadge extends StatelessWidget {
               decoration: BoxDecoration(color: color, shape: BoxShape.circle),
             ),
             const SizedBox(width: AppSpacing.hairline),
-            Text(
-              label,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: color,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+            Flexible(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── _AccionesCell ────────────────────────────────────────────────────────────
+
+/// Botones de acción de la fila: Recordar (siempre, si hay callback) y
+/// Marcar pagado (solo si el pago está `pending`, si hay callback).
+///
+/// Sin `onRowTap` en `CoachHubDataTable` (ADR-F9-03) — no hay pelea de gestos
+/// entre el tap de fila y el tap de estos botones.
+class _AccionesCell extends StatelessWidget {
+  const _AccionesCell({
+    required this.payment,
+    required this.palette,
+    required this.onRecordar,
+    required this.onMarcarPagado,
+  });
+
+  final Payment payment;
+  final AppPalette palette;
+  final void Function(Payment)? onRecordar;
+  final void Function(Payment)? onMarcarPagado;
+
+  @override
+  Widget build(BuildContext context) {
+    final pending = payment.status == PaymentStatus.pending;
+
+    // `Flexible` en cada botón (en vez de tamaño natural fijo) evita que el
+    // Row overflowee si el ancho de la columna es angosto — el label se
+    // elide con TextOverflow.ellipsis en ese caso extremo, sin romper el
+    // layout de la fila (finders por texto siguen matcheando el `data`).
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Flexible(
+          child: _AccionButton(
+            key: Key('pagos_accion_recordar_${payment.id}'),
+            icon: TreinoIcon.bell,
+            label: 'Recordar', // i18n
+            color: palette.textMuted,
+            onTap: onRecordar == null ? null : () => onRecordar!(payment),
+          ),
+        ),
+        if (pending) ...[
+          const SizedBox(width: AppSpacing.hairline),
+          Flexible(
+            child: _AccionButton(
+              key: Key('pagos_accion_marcar_pagado_${payment.id}'),
+              icon: TreinoIcon.check,
+              label: 'Marcar pagado', // i18n
+              color: palette.accent,
+              onTap: onMarcarPagado == null
+                  ? null
+                  : () => onMarcarPagado!(payment),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Botón compacto de acción de fila — `TextButton` con `tapTargetSize`
+/// achicado para no romper el `rowHeight` fijo de `CoachHubDataTable`.
+class _AccionButton extends StatelessWidget {
+  const _AccionButton({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton(
+      onPressed: onTap,
+      style: TextButton.styleFrom(
+        foregroundColor: color,
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.hairline),
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        visualDensity: VisualDensity.compact,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12),
+          const SizedBox(width: AppSpacing.hairline),
+          Flexible(
+            child: Text(
+              label,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -3,8 +3,8 @@
 //
 // PagosScreen shell: header + KPI row + filtro (TreinoFilterChips,
 // Vencidos/Por vencer/Pagados/Todos, WU-05 Fase 9). Tabla vía
-// CoachHubDataTable con celdas ricas y estados completos (WU-06 Fase 9) —
-// las acciones de fila (Marcar pagado / Recordar) quedan para WU-07.
+// CoachHubDataTable con celdas ricas, estados completos y acciones de fila
+// (Marcar pagado / Recordar, WU-07 Fase 9).
 //
 // Todas las strings están en español hardcodeado + comentario // i18n.
 // NO se usa AppL10n en este archivo (constraint C-6).
@@ -22,6 +22,8 @@ import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/payments/application/payment_providers.dart'
     show paymentRepositoryProvider, trainerPaymentsProvider;
 import 'package:treino/features/payments/domain/payment.dart';
+import 'package:treino/features/profile/application/user_providers.dart'
+    show userProfileProvider;
 import 'package:treino/features/profile/application/user_public_profile_providers.dart'
     show userPublicProfilesBatchProvider;
 import 'package:treino/features/profile/domain/user_public_profile.dart';
@@ -30,6 +32,7 @@ import 'package:treino/features/workout/application/session_providers.dart'
 
 import '../../widgets/coach_hub_widgets.dart'
     show TreinoFilterChips, TreinoInteractiveState, TreinoSectionHeader;
+import 'widgets/marcar_pagado_actions.dart';
 import 'widgets/pagos_buckets_provider.dart';
 import 'widgets/pagos_filtro_provider.dart';
 import 'widgets/pagos_kpi_row.dart';
@@ -137,6 +140,10 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
     final palette = AppPalette.of(context);
     final bucketsAsync = ref.watch(pagosBucketsProvider);
     final filtro = ref.watch(pagosFiltroProvider);
+
+    // Alias de pago del trainer, para el mensaje de recordatorio (WU-07).
+    final paymentAlias = ref
+        .watch(userProfileProvider.select((s) => s.valueOrNull?.paymentAlias));
 
     // Counts for chip badges (reactive).
     int vencidosN = 0;
@@ -251,6 +258,10 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
                   PagosFiltro.todos => 'No hay pagos', // i18n
                 },
                 profiles: profiles,
+                // Tab Pagados no ofrece acciones — un pago ya cobrado no
+                // necesita recordatorio ni "marcar pagado" de nuevo.
+                showActions: filtro != PagosFiltro.pagados,
+                paymentAlias: paymentAlias,
               ),
             ),
           ),
@@ -267,6 +278,8 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
     required List<Payment> Function(PagosBuckets) getPayments,
     required String emptyMessage,
     required Map<String, UserPublicProfile> profiles,
+    required bool showActions,
+    required String? paymentAlias,
   }) {
     final payments = bucketsAsync.valueOrNull != null
         ? getPayments(bucketsAsync.valueOrNull!)
@@ -278,7 +291,7 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
     // seco, sin el cross-fade que si tienen las pantallas hermanas.
     //
     // Se conserva envolviendo la tabla nueva del kit (fase 9), que ademas trae
-    // loading/error/retry y ordenamiento propios.
+    // loading/error/retry, ordenamiento y acciones de fila propias.
     return TreinoStateSwitcher(
       childKey: ValueKey(bucketsAsync.when(
         loading: () => 'loading',
@@ -299,6 +312,9 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
           _sortColumnKey = key;
           _sortAscending = ascending;
         }),
+        showActions: showActions,
+        onMarcarPagado: (p) => marcarPagadoDoc(context, ref, p),
+        onRecordar: (p) => recordar(context, ref, p, paymentAlias),
       ),
     );
   }
