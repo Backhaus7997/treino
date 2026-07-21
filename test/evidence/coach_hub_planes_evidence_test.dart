@@ -2,9 +2,10 @@
 // Hub web (EVIDENCE-HARNESS).
 //
 // Captura 4 screenshots (goldens) de la pantalla de planes (`/planes`)
-// montada DENTRO del shell real (CoachHubScaffold). Hoy la ruta renderiza
-// el placeholder [ProximamenteScreen] (Fase W1) — estos PNGs documentan el
-// estado BEFORE de la Fase 10 (rediseño de la sección real).
+// montada DENTRO del shell real (CoachHubScaffold). Desde WU-03 la ruta
+// renderiza [PlanesScreen] real (shell + KPI strip + banner de descope),
+// cableada a `trainerBillingsProvider` con datos fake — no se regeneran
+// PNGs en este WU (eso es WU-05).
 //
 // Mismo patrón que test/evidence/coach_hub_pagos_evidence_test.dart — ver
 // ese archivo para el detalle de por qué se cargan las fuentes así.
@@ -42,10 +43,13 @@ import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/coach_hub/presentation/sections/planes/routes.dart'
     show planesRoutes;
+import 'package:treino/features/coach_hub/presentation/sections/planes/tarifas_provider.dart'
+    show trainerBillingsProvider;
 import 'package:treino/features/coach_hub/presentation/shell/coach_hub_scaffold.dart';
 import 'package:treino/features/coach_hub/presentation/shell/responsive.dart'
     show kMobileBreakpoint;
 import 'package:treino/features/coach_hub/presentation/shell/sidebar_registry.dart';
+import 'package:treino/features/payments/domain/athlete_billing.dart';
 import 'package:treino/features/profile/application/user_providers.dart'
     show userProfileProvider;
 import 'package:treino/features/profile/domain/user_profile.dart';
@@ -90,6 +94,32 @@ UserProfile _trainerProfile() => UserProfile(
       updatedAt: DateTime.utc(2026, 1, 1),
       paymentAlias: 'trainer.mp',
     );
+
+// Tarifas fake para la screen real de Planes (WU-03) — variadas en
+// amount/cadence, con grupos repetidos para que el KPI "Tarifas distintas"
+// y el futuro grid (WU-04) tengan más de una fila.
+AthleteBilling _billing({
+  required String athleteId,
+  required int amountArs,
+  required BillingCadence cadence,
+}) =>
+    AthleteBilling(
+      trainerId: _trainerUid,
+      athleteId: athleteId,
+      amountArs: amountArs,
+      cadence: cadence,
+      updatedAt: DateTime.utc(2026, 6, 1),
+    );
+
+final _fakeBillings = [
+  _billing(athleteId: 'a1', amountArs: 15000, cadence: BillingCadence.mensual),
+  _billing(athleteId: 'a2', amountArs: 15000, cadence: BillingCadence.mensual),
+  _billing(athleteId: 'a3', amountArs: 15000, cadence: BillingCadence.mensual),
+  _billing(athleteId: 'a4', amountArs: 8000, cadence: BillingCadence.semanal),
+  _billing(athleteId: 'a5', amountArs: 8000, cadence: BillingCadence.semanal),
+  _billing(
+      athleteId: 'a6', amountArs: 30000, cadence: BillingCadence.porSesion),
+];
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Carga de fuentes TTF reales desde test/fonts/ (idéntico a
@@ -231,8 +261,7 @@ void _ignoreKnownGoogleFontsAsyncErrors() {
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Helper: monta el shell real (CoachHubScaffold) con la pantalla de planes
-// (hoy placeholder [ProximamenteScreen]) en `/planes`, GoRouter + proveedores
-// falsos.
+// real ([PlanesScreen], WU-03) en `/planes`, GoRouter + proveedores falsos.
 // ──────────────────────────────────────────────────────────────────────────────
 Future<void> _pumpPlanes(
   WidgetTester tester, {
@@ -259,6 +288,7 @@ Future<void> _pumpPlanes(
     ),
     sharedPreferencesProvider.overrideWith((ref) => Future.value(sp)),
     currentUidProvider.overrideWithValue(_trainerUid),
+    trainerBillingsProvider.overrideWith((ref) => Stream.value(_fakeBillings)),
   ]);
   addTearDown(container.dispose);
 
@@ -325,8 +355,9 @@ Future<void> _pumpPlanes(
     return;
   }
 
-  // Guard endurecido: confirma que la pantalla de Planes (hoy el placeholder
-  // ProximamenteScreen, Fase W1) está montada.
+  // Guard endurecido (WU-03): confirma que la screen REAL [PlanesScreen] está
+  // montada — título de sección + un KPI real (no el placeholder
+  // ProximamenteScreen/"Próximamente" de Fase W1).
   expect(
     find.text('PLANES COMERCIALES').evaluate().isNotEmpty ||
         find.textContaining('Planes comerciales').evaluate().isNotEmpty,
@@ -335,12 +366,11 @@ Future<void> _pumpPlanes(
         'montó (regresión o l10n español ausente).',
   );
   expect(
-    find.textContaining('Próximamente').evaluate().isNotEmpty,
+    find.text('Precio promedio').evaluate().isNotEmpty,
     isTrue,
-    reason: 'Placeholder "Próximamente" ausente — esta evidencia BEFORE '
-        'documenta el estado placeholder de la sección (Fase W1); si este '
-        'guard falla, la sección real ya está cableada y hay que actualizar '
-        'el harness para reflejarlo.',
+    reason: 'KPI "Precio promedio" ausente — la screen real [PlanesScreen] '
+        '(WU-03) no se montó (regresión al placeholder o provider sin '
+        'override).',
   );
 }
 
