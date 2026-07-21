@@ -1,16 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/features/coach/application/trainer_link_providers.dart'
+    show trainerLinksStreamProvider;
+import 'package:treino/features/coach/domain/trainer_link.dart';
+import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/pagos_web_screen.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart'
     show TreinoFilterChips;
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart'
     show pagosPorCobrarProvider;
 import 'package:treino/features/payments/application/payment_providers.dart'
-    show trainerPaymentsProvider;
+    show paymentRepositoryProvider, trainerPaymentsProvider;
+import 'package:treino/features/payments/data/payment_repository.dart';
 import 'package:treino/features/payments/domain/payment.dart';
+import 'package:treino/features/profile/application/user_public_profile_providers.dart'
+    show userPublicProfilesBatchProvider;
+import 'package:treino/features/profile/domain/user_public_profile.dart';
+import 'package:treino/features/workout/application/session_providers.dart'
+    show currentUidProvider;
 import 'package:treino/l10n/app_l10n.dart';
+
+// ── Mocks ─────────────────────────────────────────────────────────────────────
+
+class _MockPaymentRepo extends Mock implements PaymentRepository {}
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
 
@@ -31,6 +46,11 @@ Widget _wrap(Widget child, {List<Override> overrides = const []}) =>
 List<Override> _emptyOverrides() => [
       trainerPaymentsProvider.overrideWith((ref) => Stream.value(const [])),
       pagosPorCobrarProvider.overrideWith((ref) => const AsyncValue.data([])),
+      // Sin roster override, trainerLinksStreamProvider real cuelga en
+      // `loading` (currentUidProvider null en test env → Stream.empty(),
+      // que nunca emite) — el picker de alumno (ADR-F9-06) quedaría en su
+      // skeleton shimmer para siempre y pumpAndSettle() nunca asienta.
+      trainerLinksStreamProvider.overrideWith((ref) => Stream.value(const [])),
     ];
 
 // Buckets: `_periodStart` = primer día del mes actual (UTC). Un `createdAt`
@@ -85,6 +105,21 @@ List<Override> _mixedBucketsOverrides() {
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(
+      Payment(
+        id: '',
+        trainerId: 'trainer-1',
+        athleteId: 'athlete-1',
+        amountArs: 1000,
+        concept: 'test',
+        status: PaymentStatus.paid,
+        createdAt: DateTime.utc(2026, 1, 1),
+        paidAt: DateTime.utc(2026, 1, 1),
+      ),
+    );
+  });
+
   // Desktop viewport for all tests
   setUp(() {
     TestWidgetsFlutterBinding.ensureInitialized();
@@ -240,6 +275,76 @@ void main() {
       expect(find.text('Ingreso del mes'), findsOneWidget); // i18n
       expect(find.text('Pendiente cobrar'), findsOneWidget); // i18n
       expect(find.text('Vencido'), findsOneWidget); // i18n
+    });
+  });
+
+  group('CTA "Registrar pago" persiste de verdad (REQ-PAGW-ACTION-003, '
+      'ADR-F9-06 — remediación CRITICAL-1 verify ronda 1)', () {
+    // Antes de esta pieza, `_onRegistrarPago` abría RegistrarPagoDialog y
+    // descartaba el resultado: el trainer completaba el form, tocaba
+    // "Registrar" y NO se persistía nada. Este test falla contra la
+    // implementación vieja (repo.add nunca se llamaba) y pasa contra la
+    // nueva (picker de alumno → registrarPago → repo.add real).
+    testWidgets(
+        'SCENARIO — CTA → elegir alumno → completar monto/concepto → '
+        'repo.add llamado con el Payment correcto', (tester) async {
+      tester.view.physicalSize = _kDesktopSize;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      final mockRepo = _MockPaymentRepo();
+      when(() => mockRepo.add(any())).thenAnswer((_) async {});
+
+      final link = TrainerLink(
+        id: 'l1',
+        trainerId: 'trainer-1',
+        athleteId: 'athlete-1',
+        status: TrainerLinkStatus.active,
+        requestedAt: DateTime.utc(2026, 1, 1),
+      );
+
+      await tester.pumpWidget(_wrap(
+        const PagosScreen(),
+        overrides: [
+          ..._emptyOverrides(),
+          paymentRepositoryProvider.overrideWithValue(mockRepo),
+          currentUidProvider.overrideWithValue('trainer-1'),
+          trainerLinksStreamProvider.overrideWith((ref) => Stream.value([link])),
+          userPublicProfilesBatchProvider.overrideWith(
+            (ref, key) async => {
+              'athlete-1': const UserPublicProfile(
+                uid: 'athlete-1',
+                displayName: 'Juana Pérez',
+              ),
+            },
+          ),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      // Tap CTA → picker de alumno (no RegistrarPagoDialog directo).
+      await tester.tap(find.byKey(const Key('pagos_registrar_pago_cta')));
+      await tester.pumpAndSettle();
+      expect(find.text('Elegí un alumno'), findsOneWidget); // i18n
+
+      // Elegir el único alumno del roster.
+      await tester.tap(find.text('Juana Pérez'));
+      await tester.pumpAndSettle();
+
+      // Ahora sí RegistrarPagoDialog.
+      expect(find.text('Registrar pago'), findsWidgets);
+
+      await tester.enterText(find.byType(TextField).first, '5000');
+      await tester.enterText(find.byType(TextField).last, 'Clase suelta');
+      await tester.tap(find.text('Registrar')); // i18n
+      await tester.pumpAndSettle();
+
+      final captured =
+          verify(() => mockRepo.add(captureAny())).captured.single as Payment;
+      expect(captured.athleteId, 'athlete-1');
+      expect(captured.amountArs, 5000);
+      expect(captured.concept, 'Clase suelta');
+      expect(captured.status, PaymentStatus.paid);
     });
   });
 }

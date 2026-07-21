@@ -30,12 +30,12 @@ import 'package:treino/features/profile/domain/user_public_profile.dart';
 
 import '../../widgets/coach_hub_widgets.dart'
     show TreinoFilterChips, TreinoInteractiveState, TreinoSectionHeader;
+import 'widgets/athlete_picker_dialog.dart';
 import 'widgets/marcar_pagado_actions.dart';
 import 'widgets/pagos_buckets_provider.dart';
 import 'widgets/pagos_filtro_provider.dart';
 import 'widgets/pagos_kpi_row.dart';
 import 'widgets/pagos_web_table.dart';
-import 'widgets/registrar_pago_dialog.dart';
 
 /// Etiquetas (es-AR) de cada [PagosFiltro], en el orden en que se muestran
 /// los chips.
@@ -55,7 +55,8 @@ const _kFiltroLabels = {
 ///
 /// REQ-PAGW-SHELL-001, REQ-PAGW-SHELL-002, REQ-PAGW-KPI-001,
 /// REQ-PAGW-TAB-001, REQ-PAGW-TAB-002, REQ-PAGW-EMPTY-001,
-/// REQ-PAGW-TABLE-001, REQ-PAGW-ACTION-001, REQ-PAGW-ACTION-002.
+/// REQ-PAGW-TABLE-001, REQ-PAGW-ACTION-001, REQ-PAGW-ACTION-002,
+/// REQ-PAGW-ACTION-003.
 class PagosScreen extends ConsumerStatefulWidget {
   const PagosScreen({super.key});
 
@@ -98,16 +99,20 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
     return sorted;
   }
 
+  /// CTA "+ Registrar pago" (trainer-wide, sin alumno de contexto).
+  ///
+  /// ADR-F9-06 (remediación CRITICAL-1, verify ronda 1): primero elige el
+  /// alumno vía [pickAthleteForPago] (roster real del trainer) y recién
+  /// entonces delega en `registrarPago`, que abre `RegistrarPagoDialog` y
+  /// persiste el resultado con `paymentRepositoryProvider.add` — el mismo
+  /// helper que ya usa `alumno_detail_screen.dart`. Antes de esta pieza el
+  /// diálogo se abría y el resultado se descartaba (botón fantasma, no
+  /// persistía nada).
   Future<void> _onRegistrarPago() async {
-    await showDialog<({int amount, String concept})>(
-      context: context,
-      builder: (_) => const RegistrarPagoDialog(),
-    );
-    // NOTE: RegistrarPagoDialog is a trainer-wide dialog without athlete picker.
-    // The dialog itself handles cancellation/submission. Persistence happens
-    // inside the dialog if an athleteId can be provided.
-    // Full athlete-picker wiring for the trainer-wide context is tracked V2
-    // (requires showing an athlete selection before the dialog).
+    final athleteId = await pickAthleteForPago(context, ref);
+    if (athleteId != null && mounted) {
+      await registrarPago(context, ref, athleteId);
+    }
   }
 
   @override
