@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/utils/appointment_window.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../application/agenda_providers.dart';
@@ -51,10 +52,10 @@ class _TrainerAgendaTabState extends ConsumerState<TrainerAgendaTab> {
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now().toUtc();
-    _rangeFrom =
-        DateTime.utc(now.year, now.month - 1 < 1 ? 1 : now.month - 1, 1);
-    _rangeTo = DateTime.utc(now.year + 1, now.month, 1);
+    // QA-COA-007: ventana rodante sin el clamp de enero roto (helper compartido).
+    final window = rollingAppointmentWindow(DateTime.now().toUtc());
+    _rangeFrom = window.from;
+    _rangeTo = window.to;
   }
 
   @override
