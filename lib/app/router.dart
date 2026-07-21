@@ -560,6 +560,18 @@ GoRouter buildRouter({
                 path: 'search',
                 builder: (_, __) => _withBg(const SearchUsersScreen()),
               ),
+              GoRoute(
+                // Friend-requests inbox reached from the feed header bell.
+                // Mirror of /profile/friend-requests: _ShellScaffold derives
+                // the highlighted tab from the location's path prefix, so the
+                // same screen registered under the ORIGIN branch keeps FEED
+                // highlighted — and pop lands back on /feed — instead of
+                // jumping to PERFIL (issue #387). Same route-mirroring
+                // pattern as the coach plan/exercise routes (issue #410).
+                // ProfileScreen keeps pushing the /profile twin.
+                path: 'friend-requests',
+                builder: (_, __) => _withBg(const FriendRequestsInboxScreen()),
+              ),
               // Messages inbox moved to the top-level immersive route
               // /feed/messages (no bottom nav bar).
             ],
@@ -645,6 +657,19 @@ GoRouter buildRouter({
               GoRoute(
                 path: 'settings/appearance',
                 builder: (_, __) => _withBg(const AppearanceScreen()),
+              ),
+              GoRoute(
+                // Trainer availability editor reached from TrainerProfileView's
+                // "Disponibilidad" row. Mirror of /coach/availability-editor:
+                // registered under the ORIGIN branch so _ShellScaffold's
+                // prefix-derived tab highlight keeps PERFIL — and pop lands
+                // back on /profile — instead of jumping to COACH (issue #387).
+                // TrainerAgendaTab keeps pushing the /coach twin.
+                path: 'availability-editor',
+                builder: (context, state) {
+                  final uid = state.uri.queryParameters['trainerId'] ?? '';
+                  return _withBg(AvailabilityEditorScreen(trainerId: uid));
+                },
               ),
               // /profile/settings GoRoute REMOVED 2026-05-28 — PR#4 pivot.
               // Sign-out and eliminar-cuenta tiles now live directly in
