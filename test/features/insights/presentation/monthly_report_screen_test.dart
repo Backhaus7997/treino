@@ -47,15 +47,16 @@ void main() {
   testWidgets('renders chart + summary cards when data loads', (tester) async {
     final repo = MockSessionRepository();
     final now = DateTime.now();
-    when(() => repo.listByUid('u1')).thenAnswer((_) async => [
-          makeSession(
-            id: 's1',
-            startedAt: now,
-            status: SessionStatus.finished,
-            wasFullyCompleted: true,
-            durationMin: 45,
-          ),
-        ]);
+    when(() => repo.listByUid('u1', limit: any(named: 'limit')))
+        .thenAnswer((_) async => [
+              makeSession(
+                id: 's1',
+                startedAt: now,
+                status: SessionStatus.finished,
+                wasFullyCompleted: true,
+                durationMin: 45,
+              ),
+            ]);
     when(() => repo.listSetLogs(uid: 'u1', sessionId: 's1'))
         .thenAnswer((_) async => [makeSetLog()]);
 
@@ -83,29 +84,30 @@ void main() {
     // the Argentina calendar month unambiguous and TZ-independent.
     final now = argentinaNow();
 
-    when(() => repo.listByUid('u1')).thenAnswer((_) async => [
-          makeSession(
-            id: 's1',
-            startedAt: DateTime.utc(now.year, now.month, 10, 12),
-            status: SessionStatus.finished,
-            wasFullyCompleted: true,
-            durationMin: 40,
-          ),
-          makeSession(
-            id: 's2',
-            startedAt: DateTime.utc(now.year, now.month, 11, 12),
-            status: SessionStatus.finished,
-            wasFullyCompleted: true,
-            durationMin: 25,
-          ),
-          // A non-finished session's duration must NOT be counted.
-          makeSession(
-            id: 's3',
-            startedAt: DateTime.utc(now.year, now.month, 12, 12),
-            status: SessionStatus.active,
-            durationMin: 999,
-          ),
-        ]);
+    when(() => repo.listByUid('u1', limit: any(named: 'limit')))
+        .thenAnswer((_) async => [
+              makeSession(
+                id: 's1',
+                startedAt: DateTime.utc(now.year, now.month, 10, 12),
+                status: SessionStatus.finished,
+                wasFullyCompleted: true,
+                durationMin: 40,
+              ),
+              makeSession(
+                id: 's2',
+                startedAt: DateTime.utc(now.year, now.month, 11, 12),
+                status: SessionStatus.finished,
+                wasFullyCompleted: true,
+                durationMin: 25,
+              ),
+              // A non-finished session's duration must NOT be counted.
+              makeSession(
+                id: 's3',
+                startedAt: DateTime.utc(now.year, now.month, 12, 12),
+                status: SessionStatus.active,
+                durationMin: 999,
+              ),
+            ]);
     when(() => repo.listSetLogs(uid: 'u1', sessionId: any(named: 'sessionId')))
         .thenAnswer((_) async => [makeSetLog()]);
 
@@ -122,7 +124,8 @@ void main() {
 
   testWidgets('shows error state + retry on load failure', (tester) async {
     final repo = MockSessionRepository();
-    when(() => repo.listByUid('u1')).thenThrow(Exception('boom'));
+    when(() => repo.listByUid('u1', limit: any(named: 'limit')))
+        .thenThrow(Exception('boom'));
 
     await tester.pumpWidget(wrap(
       const SizedBox.shrink(),
@@ -143,15 +146,16 @@ void main() {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
-    when(() => repo.listByUid('u1')).thenAnswer((_) async => [
-          makeSession(
-            id: 's1',
-            startedAt: today,
-            status: SessionStatus.finished,
-            wasFullyCompleted: true,
-            durationMin: 45,
-          ),
-        ]);
+    when(() => repo.listByUid('u1', limit: any(named: 'limit')))
+        .thenAnswer((_) async => [
+              makeSession(
+                id: 's1',
+                startedAt: today,
+                status: SessionStatus.finished,
+                wasFullyCompleted: true,
+                durationMin: 45,
+              ),
+            ]);
     when(() => repo.listSetLogs(uid: 'u1', sessionId: any(named: 'sessionId')))
         .thenAnswer((_) async => [makeSetLog()]);
 
@@ -173,21 +177,22 @@ void main() {
     final repo = MockSessionRepository();
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    when(() => repo.listByUid('u1')).thenAnswer((_) async => [
-          makeSession(
-            id: 's1',
-            startedAt: today,
-            status: SessionStatus.finished,
-            wasFullyCompleted: true,
-            durationMin: 45,
-          ),
-          makeSession(
-            id: 's2',
-            startedAt: today.subtract(const Duration(days: 1)),
-            status: SessionStatus.finished,
-            wasFullyCompleted: true,
-          ),
-        ]);
+    when(() => repo.listByUid('u1', limit: any(named: 'limit')))
+        .thenAnswer((_) async => [
+              makeSession(
+                id: 's1',
+                startedAt: today,
+                status: SessionStatus.finished,
+                wasFullyCompleted: true,
+                durationMin: 45,
+              ),
+              makeSession(
+                id: 's2',
+                startedAt: today.subtract(const Duration(days: 1)),
+                status: SessionStatus.finished,
+                wasFullyCompleted: true,
+              ),
+            ]);
     when(() => repo.listSetLogs(uid: 'u1', sessionId: any(named: 'sessionId')))
         .thenAnswer((_) async => [makeSetLog()]);
 
@@ -219,16 +224,17 @@ void main() {
     final now = DateTime.now();
     final olderMonth = DateTime(now.year, now.month - 2);
 
-    when(() => repo.listByUid('u1')).thenAnswer((_) async => [
-          // Only trains in the OLDER month — the current month (default
-          // selection) has zero trained days.
-          makeSession(
-            id: 's1',
-            startedAt: DateTime(olderMonth.year, olderMonth.month, 10),
-            status: SessionStatus.finished,
-            wasFullyCompleted: true,
-          ),
-        ]);
+    when(() => repo.listByUid('u1', limit: any(named: 'limit')))
+        .thenAnswer((_) async => [
+              // Only trains in the OLDER month — the current month (default
+              // selection) has zero trained days.
+              makeSession(
+                id: 's1',
+                startedAt: DateTime(olderMonth.year, olderMonth.month, 10),
+                status: SessionStatus.finished,
+                wasFullyCompleted: true,
+              ),
+            ]);
     when(() => repo.listSetLogs(uid: 'u1', sessionId: any(named: 'sessionId')))
         .thenAnswer((_) async => [makeSetLog()]);
 
@@ -285,15 +291,16 @@ void main() {
     final now = DateTime.now();
     final currentMonthStart = DateTime(now.year, now.month, 1);
 
-    when(() => repo.listByUid('u1')).thenAnswer((_) async => [
-          makeSession(
-            id: 's1',
-            startedAt: currentMonthStart,
-            status: SessionStatus.finished,
-            wasFullyCompleted: true,
-            durationMin: 45,
-          ),
-        ]);
+    when(() => repo.listByUid('u1', limit: any(named: 'limit')))
+        .thenAnswer((_) async => [
+              makeSession(
+                id: 's1',
+                startedAt: currentMonthStart,
+                status: SessionStatus.finished,
+                wasFullyCompleted: true,
+                durationMin: 45,
+              ),
+            ]);
     when(() => repo.listSetLogs(uid: 'u1', sessionId: any(named: 'sessionId')))
         .thenAnswer((_) async => [makeSetLog()]);
 
@@ -328,14 +335,15 @@ void main() {
     final now = DateTime.now();
     final olderMonth = DateTime(now.year, now.month - 2);
 
-    when(() => repo.listByUid('u1')).thenAnswer((_) async => [
-          makeSession(
-            id: 's1',
-            startedAt: DateTime(olderMonth.year, olderMonth.month, 10),
-            status: SessionStatus.finished,
-            wasFullyCompleted: true,
-          ),
-        ]);
+    when(() => repo.listByUid('u1', limit: any(named: 'limit')))
+        .thenAnswer((_) async => [
+              makeSession(
+                id: 's1',
+                startedAt: DateTime(olderMonth.year, olderMonth.month, 10),
+                status: SessionStatus.finished,
+                wasFullyCompleted: true,
+              ),
+            ]);
     when(() => repo.listSetLogs(uid: 'u1', sessionId: any(named: 'sessionId')))
         .thenAnswer((_) async => [makeSetLog()]);
 

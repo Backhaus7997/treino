@@ -47,15 +47,16 @@ void main() {
     final now = DateTime.now();
     final todayOnly = DateTime(now.year, now.month, now.day);
 
-    when(() => repo.listByUid('u1')).thenAnswer((_) async => [
-          makeSession(
-            id: 's1',
-            startedAt: todayOnly.add(const Duration(hours: 9)),
-            status: SessionStatus.finished,
-            wasFullyCompleted: true,
-            routineId: 'r1',
-          ),
-        ]);
+    when(() => repo.listByUid('u1', limit: any(named: 'limit')))
+        .thenAnswer((_) async => [
+              makeSession(
+                id: 's1',
+                startedAt: todayOnly.add(const Duration(hours: 9)),
+                status: SessionStatus.finished,
+                wasFullyCompleted: true,
+                routineId: 'r1',
+              ),
+            ]);
     when(() => repo.listSetLogs(uid: 'u1', sessionId: 's1'))
         .thenAnswer((_) async => [makeSetLog(id: 'l1', exerciseId: 'e-chest')]);
 
@@ -101,22 +102,23 @@ void main() {
     final olderDay = DateTime(todayOnly.year, todayOnly.month - 1,
         todayOnly.day - 10 < 1 ? 1 : todayOnly.day - 10);
 
-    when(() => repo.listByUid('u1')).thenAnswer((_) async => [
-          makeSession(
-            id: 's-recent',
-            startedAt: recentDay.add(const Duration(hours: 9)),
-            status: SessionStatus.finished,
-            wasFullyCompleted: true,
-            routineId: 'r1',
-          ),
-          makeSession(
-            id: 's-older',
-            startedAt: olderDay.add(const Duration(hours: 9)),
-            status: SessionStatus.finished,
-            wasFullyCompleted: true,
-            routineId: 'r1',
-          ),
-        ]);
+    when(() => repo.listByUid('u1', limit: any(named: 'limit')))
+        .thenAnswer((_) async => [
+              makeSession(
+                id: 's-recent',
+                startedAt: recentDay.add(const Duration(hours: 9)),
+                status: SessionStatus.finished,
+                wasFullyCompleted: true,
+                routineId: 'r1',
+              ),
+              makeSession(
+                id: 's-older',
+                startedAt: olderDay.add(const Duration(hours: 9)),
+                status: SessionStatus.finished,
+                wasFullyCompleted: true,
+                routineId: 'r1',
+              ),
+            ]);
     when(() => repo.listSetLogs(uid: 'u1', sessionId: 's-recent'))
         .thenAnswer((_) async => [makeSetLog(id: 'l1', exerciseId: 'e-chest')]);
     when(() => repo.listSetLogs(uid: 'u1', sessionId: 's-older'))
@@ -172,15 +174,16 @@ void main() {
     final now = DateTime.now();
     final todayOnly = DateTime(now.year, now.month, now.day);
 
-    when(() => repo.listByUid('u1')).thenAnswer((_) async => [
-          makeSession(
-            id: 's1',
-            startedAt: todayOnly.add(const Duration(hours: 9)),
-            status: SessionStatus.finished,
-            wasFullyCompleted: true,
-            routineId: 'deleted-routine',
-          ),
-        ]);
+    when(() => repo.listByUid('u1', limit: any(named: 'limit')))
+        .thenAnswer((_) async => [
+              makeSession(
+                id: 's1',
+                startedAt: todayOnly.add(const Duration(hours: 9)),
+                status: SessionStatus.finished,
+                wasFullyCompleted: true,
+                routineId: 'deleted-routine',
+              ),
+            ]);
     when(() => repo.listSetLogs(uid: 'u1', sessionId: 's1'))
         .thenAnswer((_) async => [makeSetLog(id: 'l1', exerciseId: 'e-chest')]);
 
@@ -218,7 +221,7 @@ void main() {
     // bug undiagnosable: an empty card is indistinguishable from "no data".
     // Any future failure must be VISIBLE.
     final repo = MockSessionRepository();
-    when(() => repo.listByUid('u1'))
+    when(() => repo.listByUid('u1', limit: any(named: 'limit')))
         .thenAnswer((_) async => throw Exception('boom'));
 
     await tester.pumpWidget(wrap(
@@ -249,15 +252,16 @@ void main() {
     final now = DateTime.now();
     final todayOnly = DateTime(now.year, now.month, now.day);
 
-    when(() => repo.listByUid('u1')).thenAnswer((_) async => [
-          makeSession(
-            id: 's1',
-            startedAt: todayOnly.add(const Duration(hours: 9)),
-            status: SessionStatus.finished,
-            wasFullyCompleted: true,
-            routineId: 'r1',
-          ),
-        ]);
+    when(() => repo.listByUid('u1', limit: any(named: 'limit')))
+        .thenAnswer((_) async => [
+              makeSession(
+                id: 's1',
+                startedAt: todayOnly.add(const Duration(hours: 9)),
+                status: SessionStatus.finished,
+                wasFullyCompleted: true,
+                routineId: 'r1',
+              ),
+            ]);
     when(() => repo.listSetLogs(uid: 'u1', sessionId: 's1'))
         .thenAnswer((_) async => [makeSetLog(id: 'l1', exerciseId: 'e-chest')]);
 
