@@ -133,6 +133,11 @@ void main() {
       expect(calculateOneRepMax(weightKg: 100, reps: 0), isNull);
       expect(calculateOneRepMax(weightKg: 100, reps: -1), isNull);
     });
+
+    test('weightKg <= 0 returns null (#368 — bodyweight set, skip)', () {
+      expect(calculateOneRepMax(weightKg: 0, reps: 8), isNull);
+      expect(calculateOneRepMax(weightKg: -5, reps: 8), isNull);
+    });
   });
 
   group('roundToNearestHalfKg [AD2 display rounding]', () {
@@ -244,6 +249,139 @@ void main() {
           result.heaviestWeightSeries.every((p) => p.value != 200.0), isTrue);
       // frecuencia-8-weeks counts only the completed session.
       expect(result.frequencyLast8Weeks, 1);
+    });
+
+    // #368 — bodyweight sets (player logs them with weightKg = 0) must not
+    // become "0 kg" points/records in the 4 weight-based metrics.
+    test(
+        'REGRESSION-368: bodyweight sets (weightKg=0) feed NO weight series '
+        'and derive NO "0 kg" PRs — frecuencia and name still resolve', () {
+      // The issue repro: real 3×8 Dominadas with the player weight field left
+      // empty (weightKg = 0), across two completed sessions.
+      final sA = _session('s-bw-a', DateTime(2025, 1, 10));
+      final sB = _session('s-bw-b', DateTime(2025, 1, 15));
+      List<SetLog> pullUps(String sessionId) => [
+            for (var i = 1; i <= 3; i++)
+              _log(
+                  sessionId: sessionId,
+                  exerciseId: 'pullup',
+                  exerciseName: 'Dominadas',
+                  reps: 8,
+                  weightKg: 0,
+                  setNumber: i),
+          ];
+      final result = aggregateExerciseProgression(
+        exerciseId: 'pullup',
+        sessionsDesc: [sB, sA],
+        logsBySession: {
+          's-bw-a': pullUps('s-bw-a'),
+          's-bw-b': pullUps('s-bw-b'),
+        },
+        now: DateTime(2025, 2, 1),
+      );
+
+      expect(result.heaviestWeightSeries, isEmpty);
+      expect(result.oneRepMaxSeries, isEmpty);
+      expect(result.bestSetVolumeSeries, isEmpty);
+      expect(result.bestSessionVolumeSeries, isEmpty);
+      // No points → no derived PersonalRecord rows → the UI shows its empty
+      // text instead of four green "0" records.
+      expect(result.personalRecords, isEmpty);
+      // The workouts still happened: frecuencia and the resolved name are
+      // weight-agnostic.
+      expect(result.frequencyLast8Weeks, 2);
+      expect(result.exerciseName, 'Dominadas');
+    });
+
+    test(
+        'REGRESSION-368: within a session, 0kg sets are excluded while '
+        'weighted sets still feed every series', () {
+      final sessions = [_session('s-mixed', DateTime(2025, 1, 20))];
+      final logs = {
+        's-mixed': [
+          _log(
+              sessionId: 's-mixed',
+              exerciseId: 'pullup',
+              exerciseName: 'Dominadas',
+              reps: 8,
+              weightKg: 0,
+              setNumber: 1),
+          _log(
+              sessionId: 's-mixed',
+              exerciseId: 'pullup',
+              exerciseName: 'Dominadas',
+              reps: 5,
+              weightKg: 20,
+              setNumber: 2),
+          _log(
+              sessionId: 's-mixed',
+              exerciseId: 'pullup',
+              exerciseName: 'Dominadas',
+              reps: 3,
+              weightKg: 25,
+              setNumber: 3),
+        ],
+      };
+      final result = aggregateExerciseProgression(
+        exerciseId: 'pullup',
+        sessionsDesc: sessions,
+        logsBySession: logs,
+        now: DateTime(2025, 2, 1),
+      );
+
+      expect(result.heaviestWeightSeries.single.value, 25.0);
+      // Best set volume: max(5×20=100, 3×25=75) — the 8×0 set is not a
+      // candidate.
+      expect(result.bestSetVolumeSeries.single.value, closeTo(100.0, 0.01));
+      // Session volume: 100 + 75 — numerically unchanged vs before (the 0kg
+      // set only ever added 0).
+      expect(result.bestSessionVolumeSeries.single.value, closeTo(175.0, 0.01));
+      // 1RM: max(20×(1+5/30)=23.333, 25×(1+3/30)=27.5).
+      expect(result.oneRepMaxSeries.single.value, closeTo(27.5, 0.001));
+      // Every derived PR is > 0 — a 0-valued record can no longer exist.
+      expect(result.personalRecords, hasLength(4));
+      expect(result.personalRecords.every((r) => r.value > 0), isTrue);
+    });
+
+    test(
+        'REGRESSION-368: an all-0kg session is omitted from weight series — '
+        'the weighted session is the only point', () {
+      final sBw = _session('s-bw', DateTime(2025, 1, 10));
+      final sWeighted = _session('s-w', DateTime(2025, 1, 15));
+      final logs = {
+        's-bw': [
+          _log(
+              sessionId: 's-bw',
+              exerciseId: 'pullup',
+              exerciseName: 'Dominadas',
+              reps: 10,
+              weightKg: 0),
+        ],
+        's-w': [
+          _log(
+              sessionId: 's-w',
+              exerciseId: 'pullup',
+              exerciseName: 'Dominadas',
+              reps: 5,
+              weightKg: 10),
+        ],
+      };
+      final result = aggregateExerciseProgression(
+        exerciseId: 'pullup',
+        sessionsDesc: [sWeighted, sBw],
+        logsBySession: logs,
+        now: DateTime(2025, 2, 1),
+      );
+
+      // Only the weighted session produces points — the chart renders its
+      // single-point view instead of a line dropping to 0.
+      expect(result.heaviestWeightSeries.single.value, 10.0);
+      expect(
+        result.heaviestWeightSeries.single.date,
+        sWeighted.startedAt.toLocal(),
+      );
+      // The 0kg session still counts for frecuencia.
+      expect(result.frequencyLast8Weeks, 2);
     });
 
     // T2 — Best Session Volume series (renamed from volumeSeries)
