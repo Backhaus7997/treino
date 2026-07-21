@@ -164,6 +164,10 @@ test('SCENARIO-CC-06: real trainer CAN create a payment for an athlete', async (
   const coach = testEnv.authenticatedContext('coach');
   await assertSucceeds(
     coach.firestore().collection('payments').doc('legit1').set({
+      // QA-PAY-007 (#447): create now enforces id == doc id — mirrors what
+      // every real writer already stamps (PaymentRepository.add /
+      // AppointmentRepository.billAppointment via copyWith(id: ref.id)).
+      id: 'legit1',
       trainerId: 'coach',
       athleteId: 'athlete',
       amountArs: 15000,
@@ -218,9 +222,14 @@ test('SCENARIO-CC-06d: real trainer CAN create athlete_billing for an athlete', 
   const coach = testEnv.authenticatedContext('coach4');
   await assertSucceeds(
     coach.firestore().collection('athlete_billing').doc('coach4_athlete').set({
+      // QA-PAY-007 (#447): create now enforces the real AthleteBilling model
+      // shape (strict hasOnly) — the old synthetic payload with `createdAt`
+      // no longer represents what BillingRepository.setConfig writes.
       trainerId: 'coach4',
       athleteId: 'athlete',
-      createdAt: new Date(),
+      amountArs: 20000,
+      cadence: 'mensual',
+      updatedAt: new Date(),
     }),
   );
 });
@@ -232,19 +241,26 @@ test('SCENARIO-CC-06d: real trainer CAN create athlete_billing for an athlete', 
 // ---------------------------------------------------------------------------
 test('SCENARIO-CC-06e: real trainer CAN update their existing athlete_billing config', async () => {
   await seedUserRole('coach5', 'trainer');
+  // QA-PAY-007 (#447): the seed deliberately keeps a legacy zombie field
+  // (`monthlyRate`) — the update rule is diff()-based precisely so a doc
+  // predating the current model can still be updated without the zombie
+  // blocking a strict keys().hasOnly() forever.
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
     await ctx.firestore().collection('athlete_billing').doc('coach5_athlete').set({
       trainerId: 'coach5',
       athleteId: 'athlete',
-      monthlyRate: 10000,
-      createdAt: new Date(),
+      amountArs: 10000,
+      cadence: 'mensual',
+      updatedAt: new Date(),
+      monthlyRate: 10000, // zombie pre-model field, untouched by the update
     });
   });
 
   const coach = testEnv.authenticatedContext('coach5');
   await assertSucceeds(
     coach.firestore().collection('athlete_billing').doc('coach5_athlete').update({
-      monthlyRate: 12000,
+      amountArs: 12000,
+      updatedAt: new Date(),
     }),
   );
 });
