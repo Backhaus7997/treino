@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../../../../../app/theme/app_motion.dart';
 import '../../../../../../app/theme/app_palette.dart';
+import '../../../../../../app/theme/tokens/components/treino_focus_tokens.dart';
 import '../../../../../../app/theme/tokens/primitives.dart';
 import '../../../../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../../../../core/widgets/motion/treino_state_switcher.dart';
@@ -263,6 +264,7 @@ class _ChatRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final focusTokens = TreinoFocusTokens.of(context);
     final otherUid = _resolveOtherUid(chat, currentUid);
     final pubAsync = ref.watch(userPublicProfileProvider(otherUid));
     final hasUnread = chatHasUnread(chat, currentUid);
@@ -297,6 +299,18 @@ class _ChatRow extends ConsumerWidget {
                 width: 3,
               ),
             ),
+            // Anillo de foco de teclado — mismo patrón que
+            // filter_chips.dart (ADR-SH-002, remediación CRITICAL-2 verify
+            // ronda 2): sin esto la row no da feedback visual al navegar
+            // con Tab, rompiendo accesibilidad de teclado.
+            boxShadow: states.focused
+                ? [
+                    BoxShadow(
+                      color: focusTokens.ring.withValues(alpha: 0.5),
+                      spreadRadius: TreinoFocusTokens.ringWidth,
+                    ),
+                  ]
+                : null,
           ),
           padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.s18,

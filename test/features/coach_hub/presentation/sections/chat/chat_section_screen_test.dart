@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/app/theme/tokens/components/treino_focus_tokens.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/chat/domain/chat.dart';
 import 'package:treino/features/coach_hub/presentation/sections/chat/chat_section_screen.dart';
@@ -440,6 +441,63 @@ void main() {
         expect(
           find.byKey(const Key('chat_row_unread_badge_$_chatId')),
           findsNothing,
+        );
+      },
+    );
+  });
+
+  group('ChatSectionScreen — chat row keyboard focus ring (remediación '
+      'WARNING-2)', () {
+    testWidgets(
+      'foco de teclado en una row pinta el anillo de TreinoFocusTokens',
+      (tester) async {
+        final chat = _stubChat(lastMessageText: 'Hola');
+        await tester.pumpWidget(_wrap(
+          overrides: [
+            currentUidProvider.overrideWithValue(_pfUid),
+            chatsForCurrentUserProvider.overrideWith(
+              (ref) => Stream<List<Chat>>.value([chat]),
+            ),
+            userPublicProfileProvider(_athleteUid).overrideWith(
+              (ref) => Stream<UserPublicProfile?>.value(_stubPub()),
+            ),
+          ],
+        ));
+        await tester.pumpAndSettle();
+
+        final rowContainerFinder =
+            find.byKey(const Key('chat_row_container_$_chatId'));
+
+        final beforeFocus =
+            tester.widget<AnimatedContainer>(rowContainerFinder);
+        final beforeDecoration = beforeFocus.decoration! as BoxDecoration;
+        expect(
+          beforeDecoration.boxShadow,
+          anyOf(isNull, isEmpty),
+          reason: 'sin foco no debe haber anillo pintado',
+        );
+
+        final focusTokens = TreinoFocusTokens.of(
+          tester.element(rowContainerFinder),
+        );
+
+        Focus.of(tester.element(rowContainerFinder)).requestFocus();
+        await tester.pump();
+        await tester.pump();
+
+        final afterFocus =
+            tester.widget<AnimatedContainer>(rowContainerFinder);
+        final afterDecoration = afterFocus.decoration! as BoxDecoration;
+        expect(
+          afterDecoration.boxShadow,
+          isNotNull,
+          reason: 'row enfocada por teclado debe pintar un anillo visible '
+              '(ADR-SH-002, mismo patrón que filter_chips.dart)',
+        );
+        expect(afterDecoration.boxShadow, isNotEmpty);
+        expect(
+          afterDecoration.boxShadow!.first.color,
+          focusTokens.ring.withValues(alpha: 0.5),
         );
       },
     );

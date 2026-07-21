@@ -2,7 +2,6 @@ import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
@@ -128,7 +127,12 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
               leading: Icon(TreinoIcon.image, color: palette.textPrimary),
               title: Text(
                 'Foto', // i18n: Fase W2
-                style: GoogleFonts.barlow(color: palette.textPrimary),
+                style: TextStyle(
+                  fontFamily: AppFonts.barlow,
+                  fontWeight: AppFonts.w400,
+                  fontSize: 14,
+                  color: palette.textPrimary,
+                ),
               ),
               onTap: () => Navigator.of(ctx).pop(MediaType.image),
             ),
@@ -137,7 +141,12 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
               leading: Icon(TreinoIcon.play, color: palette.textPrimary),
               title: Text(
                 'Video', // i18n: Fase W2
-                style: GoogleFonts.barlow(color: palette.textPrimary),
+                style: TextStyle(
+                  fontFamily: AppFonts.barlow,
+                  fontWeight: AppFonts.w400,
+                  fontSize: 14,
+                  color: palette.textPrimary,
+                ),
               ),
               onTap: () => Navigator.of(ctx).pop(MediaType.video),
             ),
@@ -581,7 +590,12 @@ class _Composer extends StatelessWidget {
     final fieldEnabled = !sending;
     return Container(
       color: palette.bgCard,
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.s20,
+        AppSpacing.s12,
+        AppSpacing.s20,
+        AppSpacing.s14,
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
@@ -663,26 +677,38 @@ class _Composer extends StatelessWidget {
           // `onTap: null` (sending) devuelve el child pelado sin gesture —
           // mismo comportamiento disabled que `onPressed: null` antes, más
           // el feedback de escala 0.97 al presionar cuando está habilitado.
-          TreinoTappable(
-            key: const Key('chat_send_button'),
-            onTap: sending ? null : onSend,
-            child: Container(
-              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-              alignment: Alignment.center,
-              child: sending
-                  ? SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
+          //
+          // Semantics(button:true, label:'Enviar') explícito porque
+          // TreinoTappable es un GestureDetector puro (sin rol ni label
+          // propios) — sin este wrapper el CTA principal del composer no se
+          // anuncia como botón para lectores de pantalla (remediación
+          // adversarial WARNING-1).
+          Semantics(
+            button: true,
+            enabled: !sending,
+            label: 'Enviar', // i18n: Fase W2
+            child: TreinoTappable(
+              key: const Key('chat_send_button'),
+              onTap: sending ? null : onSend,
+              child: Container(
+                constraints:
+                    const BoxConstraints(minWidth: 40, minHeight: 40),
+                alignment: Alignment.center,
+                child: sending
+                    ? SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: palette.accent,
+                        ),
+                      )
+                    : Icon(
+                        TreinoIcon.send,
+                        size: 20,
                         color: palette.accent,
                       ),
-                    )
-                  : Icon(
-                      TreinoIcon.send,
-                      size: 20,
-                      color: palette.accent,
-                    ),
+              ),
             ),
           ),
         ],
