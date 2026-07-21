@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -43,6 +44,7 @@ class ProfileSetupState {
     this.isSubmitting = false,
     this.submitError,
     this.usernameAvailability = UsernameAvailability.unknown,
+    this.termsAccepted = false,
   });
 
   final ProfileSetupDraft draft;
@@ -53,6 +55,11 @@ class ProfileSetupState {
   /// Resultado de la verificación de disponibilidad del username (step 1).
   final UsernameAvailability usernameAvailability;
 
+  /// Checkbox de Términos y Privacidad del último step. Solo se muestra (y
+  /// solo importa) para cuentas OAuth nuevas — ver `needsTermsConsent` en
+  /// [submit] (QA-AUTH-001, issue #434).
+  final bool termsAccepted;
+
   ProfileSetupState copyWith({
     ProfileSetupDraft? draft,
     int? currentStep,
@@ -60,6 +67,7 @@ class ProfileSetupState {
     Object? submitError,
     bool clearSubmitError = false,
     UsernameAvailability? usernameAvailability,
+    bool? termsAccepted,
   }) =>
       ProfileSetupState(
         draft: draft ?? this.draft,
@@ -68,6 +76,7 @@ class ProfileSetupState {
         submitError:
             clearSubmitError ? null : (submitError ?? this.submitError),
         usernameAvailability: usernameAvailability ?? this.usernameAvailability,
+        termsAccepted: termsAccepted ?? this.termsAccepted,
       );
 
   static const total = 4;
@@ -196,6 +205,11 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
   void updateHeightCm(int? value) =>
       state = state.copyWith(draft: state.draft.copyWith(heightCm: value));
 
+  /// Checkbox de Términos y Privacidad del último step (solo relevante para
+  /// cuentas OAuth nuevas — QA-AUTH-001, issue #434).
+  void updateTermsAccepted(bool value) =>
+      state = state.copyWith(termsAccepted: value);
+
   // ---------- Submit ----------
 
   /// Persiste el draft a Firestore via `UserRepository.update`.
@@ -243,6 +257,25 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
       final draft = state.draft;
       final handle = draft.username?.trim() ?? '';
 
+      // QA-AUTH-001 (issue #434): OAuth sign-ins (Google/Apple) never pass
+      // through Register's Terms checkbox — they land here with NO
+      // `users/{uid}` doc yet (that is exactly what marks them as new: the
+      // router only sends a user to ProfileSetup once, and an existing email
+      // account's doc was already created by signUpWithEmail with
+      // termsAcceptedAt set). So `needsTermsConsent` is true only for those
+      // brand-new accounts; email accounts skip this gate entirely because
+      // their profile already exists. Checked ANTES del createIfAbsent de
+      // abajo — un self-heal (sesión restaurada sin doc) también cuenta como
+      // "sin evidencia de consentimiento" y debe re-pedirlo.
+      final needsTermsConsent =
+          ref.read(userProfileProvider).valueOrNull == null;
+      if (needsTermsConsent && !state.termsAccepted) {
+        // Mismo patrón que 'username-taken': cortamos el spinner acá y
+        // dejamos que el catch de abajo setee submitError con esta excepción.
+        state = state.copyWith(isSubmitting: false);
+        throw StateError('terms-not-accepted');
+      }
+
       // Revalidación de unicidad en el último submit (red de seguridad sobre el
       // check con debounce de step 1): nunca persistimos un handle duplicado en
       // silencio. Si otro usuario lo tomó entre el check y el submit, marcamos
@@ -275,6 +308,10 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
         'bodyWeightKg': draft.bodyWeightKg,
         'heightCm': draft.heightCm,
         if (avatarUrl != null) 'avatarUrl': avatarUrl,
+        // Email accounts already carry the original signup consent — NEVER
+        // overwrite that evidence with a later ProfileSetup timestamp.
+        if (needsTermsConsent)
+          'termsAcceptedAt': Timestamp.fromDate(DateTime.now().toUtc()),
       };
       await repo.update(uid, partial);
       state = state.copyWith(isSubmitting: false);

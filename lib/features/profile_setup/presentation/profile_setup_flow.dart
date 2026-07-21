@@ -8,6 +8,8 @@ import '../../../app/theme/app_palette.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../auth/application/auth_providers.dart';
+import '../../auth/presentation/widgets/terms_checkbox.dart';
+import '../../profile/application/user_providers.dart';
 import '../application/profile_setup_notifier.dart';
 import '../application/profile_setup_providers.dart';
 import 'steps/step_1_username_avatar.dart';
@@ -50,6 +52,23 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
     final notifier = ref.read(profileSetupNotifierProvider.notifier);
     if (!state.isLastStep) {
       notifier.goNext();
+      return;
+    }
+
+    // QA-AUTH-001 (issue #434): cuentas OAuth nuevas (Google/Apple) nunca
+    // pasaron por el checkbox de Register. Mismo gate que register_screen —
+    // mostramos el snackbar y NO disparamos submit. Email ya tiene perfil
+    // (creado por signUpWithEmail) así que este gate no le aplica.
+    final needsTermsConsent = ref.read(userProfileProvider).valueOrNull == null;
+    if (needsTermsConsent && !state.termsAccepted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Aceptá los Términos y la Política de Privacidad para continuar',
+          ),
+          duration: Duration(seconds: 3),
+        ),
+      );
       return;
     }
 
@@ -145,6 +164,9 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
     );
 
     final state = ref.watch(profileSetupNotifierProvider);
+    // OAuth nuevo (sin perfil aún) — ver comentario de _onPrimary.
+    final needsTermsConsent =
+        ref.watch(userProfileProvider).valueOrNull == null;
 
     return Scaffold(
       backgroundColor: palette.bg,
@@ -200,6 +222,17 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
                       ],
                     ),
                   ),
+                  // Terms checkbox — solo en el último step y solo para OAuth
+                  // nuevo (email ya aceptó en Register). QA-AUTH-001 (#434).
+                  if (state.isLastStep && needsTermsConsent) ...[
+                    const SizedBox(height: 12),
+                    TermsCheckbox(
+                      value: state.termsAccepted,
+                      onChanged: ref
+                          .read(profileSetupNotifierProvider.notifier)
+                          .updateTermsAccepted,
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   ProfileSetupFooter(
                     onBack: state.currentStep == 0 ? null : _onBack,
