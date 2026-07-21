@@ -9,6 +9,10 @@
 //   un spinner genérico ni "…" ad-hoc).
 // SCENARIO-PS-03: estado vacío — resumen sin billings no rompe el render;
 //   los KPI degradan a valores en cero, sin excepciones.
+// SCENARIO-PS-04: contrato ADR-F10-02 — el sublabel del KPI "Precio
+//   promedio" es el caveat de mezcla de cadencias (no un conteo de
+//   alumnos), y el sublabel "N tarifas" del KPI "Alumnos con tarifa"
+//   singulariza correctamente.
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -136,6 +140,49 @@ void main() {
         ),
         findsNWidgets(2),
       );
+    });
+  });
+
+  group(
+      'SCENARIO-PS-04 — PlanesScreen: caveat de promedio (ADR-F10-02) + '
+      'pluralización', () {
+    testWidgets(
+        'KPI "Precio promedio": sublabel es el caveat de cadencias, no un '
+        'conteo de alumnos', (tester) async {
+      await _pump(tester, overrides: [
+        trainerBillingsProvider.overrideWith((ref) => Stream.value(_billings)),
+      ]);
+      await tester.pumpAndSettle();
+
+      final kpiPromedio = tester.widget<KpiCard>(
+        find.byWidgetPredicate(
+          (w) => w is KpiCard && w.label == 'Precio promedio',
+        ),
+      );
+
+      expect(kpiPromedio.sublabel, isNotNull);
+      expect(kpiPromedio.sublabel, contains('cadencia'));
+      expect(kpiPromedio.sublabel, isNot(contains('alumnos con tarifa')));
+    });
+
+    testWidgets(
+        'KPI "Alumnos con tarifa": sublabel "N tarifas" singulariza con 1 '
+        'grupo', (tester) async {
+      await _pump(tester, overrides: [
+        trainerBillingsProvider.overrideWith(
+          (ref) => Stream.value([
+            _billing(
+              athleteId: 'a1',
+              amountArs: 15000,
+              cadence: BillingCadence.mensual,
+            ),
+          ]),
+        ),
+      ]);
+      await tester.pumpAndSettle();
+
+      expect(find.text('1 tarifa'), findsOneWidget);
+      expect(find.text('1 tarifas'), findsNothing);
     });
   });
 }
