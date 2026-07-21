@@ -11,7 +11,12 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/app/theme/tokens/components/treino_focus_tokens.dart';
+import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
+import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/payments/domain/payment.dart';
 import 'package:treino/features/profile/application/user_providers.dart'
     show userProfileProvider;
@@ -19,6 +24,8 @@ import 'package:treino/features/profile/application/user_public_profile_provider
     show userPublicProfilesBatchProvider;
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 
+import '../../widgets/coach_hub_widgets.dart'
+    show TreinoInteractiveState, TreinoSectionHeader;
 import 'widgets/marcar_pagado_actions.dart';
 import 'widgets/pagos_buckets_provider.dart';
 import 'widgets/pagos_kpi_row.dart';
@@ -113,45 +120,44 @@ class _PagosScreenState extends ConsumerState<PagosScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── Section header + action ─────────────────────────────────────────
+        // ── Section header + action (staggered, ADR-F9-04: sin "Exportar" —
+        // no hay exportador real) ────────────────────────────────────────────
         Padding(
           padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-          child: Row(
-            children: [
-              Text(
-                'PAGOS', // i18n
-                style: TextStyle(
-                  color: palette.textPrimary,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.2,
-                ),
-              ),
-              const Spacer(),
-              TextButton(
-                onPressed: _onRegistrarPago,
-                style: TextButton.styleFrom(
-                  backgroundColor: palette.accent,
-                  foregroundColor: palette.bg,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+          child: TreinoFadeSlideIn(
+            delay: AppMotion.stagger(0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const TreinoSectionHeader(title: 'Pagos'), // i18n
+                      const SizedBox(height: AppSpacing.hairline),
+                      Text(
+                        'Cobros, vencimientos e ingresos', // i18n
+                        style: TextStyle(
+                          color: palette.textMuted,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                child: const Text(
-                  '+ Registrar pago', // i18n
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
+                _RegistrarPagoButton(onTap: _onRegistrarPago),
+              ],
+            ),
           ),
         ),
 
         // ── KPI row ─────────────────────────────────────────────────────────
-        const Padding(
-          padding: EdgeInsets.fromLTRB(24, 20, 24, 0),
-          child: PagosKpiRow(),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+          child: TreinoFadeSlideIn(
+            delay: AppMotion.stagger(1),
+            child: const PagosKpiRow(),
+          ),
         ),
 
         // ── TabBar ──────────────────────────────────────────────────────────
@@ -249,6 +255,69 @@ class _PagosScreenState extends ConsumerState<PagosScreen>
           style: TextStyle(color: palette.danger),
         ),
       ),
+    );
+  }
+}
+
+// ── _RegistrarPagoButton ────────────────────────────────────────────────────
+
+/// CTA accent del header de Pagos — abre [RegistrarPagoDialog].
+///
+/// Construido con [TreinoInteractiveState] (hover/pressed/focus + Semantics +
+/// activación por teclado) en lugar de un `TextButton`/`ElevatedButton` ad-hoc
+/// — mismo patrón que el resto del kit Coach Hub Web (ADR-SH-002).
+class _RegistrarPagoButton extends StatelessWidget {
+  const _RegistrarPagoButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final focusTokens = TreinoFocusTokens.of(context);
+
+    return TreinoInteractiveState(
+      onTap: onTap,
+      builder: (ctx, states) {
+        final highlighted = states.hovered || states.pressed;
+
+        return AnimatedContainer(
+          key: const Key('pagos_registrar_pago_cta'),
+          duration: AppMotion.resolve(ctx, AppMotion.micro),
+          curve: AppMotion.standard,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.s18,
+            vertical: AppSpacing.s12,
+          ),
+          decoration: BoxDecoration(
+            color: palette.accent.withValues(alpha: highlighted ? 0.88 : 1),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            boxShadow: states.focused
+                ? [
+                    BoxShadow(
+                      color: focusTokens.ring.withValues(alpha: 0.5),
+                      spreadRadius: TreinoFocusTokens.ringWidth,
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(TreinoIcon.plus, size: 16, color: palette.bg),
+              const SizedBox(width: AppSpacing.hairline),
+              Text(
+                'Registrar pago', // i18n
+                style: TextStyle(
+                  color: palette.bg,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

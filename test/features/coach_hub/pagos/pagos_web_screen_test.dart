@@ -39,10 +39,10 @@ void main() {
   });
 
   group('PagosScreen smoke (REQ-PAGW-SHELL-001/002, TAB-002, EMPTY-001)', () {
-    // (a) Header and action button present
+    // (a) Header, subtitle and CTA action present
     testWidgets(
-        'SCENARIO 1 — section header "PAGOS" and "+ Registrar pago" present',
-        (tester) async {
+        'SCENARIO 1 — section header "PAGOS", subtítulo y CTA "Registrar '
+        'pago" presentes', (tester) async {
       tester.view.physicalSize = _kDesktopSize;
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -53,12 +53,17 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('PAGOS'), findsOneWidget); // i18n header
-      expect(find.text('+ Registrar pago'), findsOneWidget); // i18n
+      expect(
+        find.textContaining('Cobros, vencimientos'), // i18n
+        findsOneWidget,
+      );
+      expect(find.text('Registrar pago'), findsOneWidget); // i18n CTA
+      expect(find.byKey(const Key('pagos_registrar_pago_cta')), findsOneWidget);
     });
 
-    // (b) Tap "+ Registrar pago" → AlertDialog opens
+    // (b) Tap CTA "Registrar pago" → AlertDialog opens
     testWidgets(
-        'SCENARIO 2 — tap "+ Registrar pago" opens AlertDialog '
+        'SCENARIO 2 — tap CTA "Registrar pago" opens AlertDialog '
         '(REQ-PAGW-SHELL-002)', (tester) async {
       tester.view.physicalSize = _kDesktopSize;
       tester.view.devicePixelRatio = 1.0;
@@ -69,7 +74,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('+ Registrar pago'));
+      await tester.tap(find.byKey(const Key('pagos_registrar_pago_cta')));
       await tester.pumpAndSettle();
 
       expect(find.byType(AlertDialog), findsOneWidget);
