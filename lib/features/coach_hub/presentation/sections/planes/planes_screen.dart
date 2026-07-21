@@ -8,8 +8,14 @@
 // ADR-F10-01 (descope, WU-01): sin catálogo de "planes comerciales"
 // vendibles — solo la tarifa real por alumno (`AthleteBilling`), agrupada.
 // El banner de descope materializa esa decisión para el trainer: la sección
-// es de solo lectura hoy. La grilla de tarifas (WU-04) reemplaza el
-// placeholder al final de este archivo.
+// es de solo lectura hoy.
+//
+// Grid de tarifas + filtro por cadencia (WU-04, Fase 10): reemplaza el
+// placeholder de WU-03. Filtro vía `TreinoFilterChips` (mismo patrón
+// single-select que Pagos, `pagos_web_screen.dart`) sobre
+// `planesFiltroProvider` (`planes_filtro_provider.dart`). El grid es
+// read-only — sin CTA de edición (no hay mutación de tarifas cableada en
+// esta fase).
 //
 // Todas las strings están en español hardcodeado + comentario // i18n.
 // NO se usa AppL10n en este archivo (constraint C-6).
@@ -21,13 +27,28 @@ import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
+import 'package:treino/core/widgets/motion/treino_shimmer.dart';
+import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/payment_format.dart'
     show fmtArs;
 
-import '../../widgets/coach_hub_widgets.dart' show KpiCard, TreinoSectionHeader;
+import '../../widgets/coach_hub_widgets.dart'
+    show KpiCard, TreinoEmptyState, TreinoFilterChips, TreinoSectionHeader;
+import 'planes_filtro_provider.dart';
 import 'tarifas_model.dart';
 import 'tarifas_provider.dart';
+import 'widgets/tarifa_card.dart';
+
+/// Etiquetas (es-AR) de cada [PlanesFiltroCadencia], en el orden en que se
+/// muestran los chips.
+const _kFiltroLabels = {
+  PlanesFiltroCadencia.todas: 'Todas', // i18n
+  PlanesFiltroCadencia.mensual: 'Mensual', // i18n
+  PlanesFiltroCadencia.semanal: 'Semanal', // i18n
+  PlanesFiltroCadencia.porSesion: 'Por sesión', // i18n
+  PlanesFiltroCadencia.suelto: 'Suelto', // i18n
+};
 
 // ── PlanesScreen ─────────────────────────────────────────────────────────────
 
@@ -42,6 +63,7 @@ class PlanesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final resumenAsync = ref.watch(tarifasResumenProvider);
+    final filtro = ref.watch(planesFiltroProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -86,7 +108,31 @@ class PlanesScreen extends ConsumerWidget {
           ),
         ),
 
-        // WU-04: grid de tarifas (CoachHubDataTable/cards) debajo del strip.
+        // ── Filtro por cadencia (chips) ────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+          child: TreinoFadeSlideIn(
+            delay: AppMotion.stagger(3),
+            child: _TarifasFiltroChips(
+              grupos: resumenAsync.valueOrNull?.grupos ?? const [],
+              filtro: filtro,
+            ),
+          ),
+        ),
+
+        // ── Grid de tarifas (según filtro activo) ──────────────────────────
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+            child: TreinoStateSwitcher(
+              childKey: ValueKey('planes_filtro_${filtro.name}'),
+              child: _TarifasGridBody(
+                resumenAsync: resumenAsync,
+                filtro: filtro,
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -196,6 +242,218 @@ class _TarifasKpiRow extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+// ── _TarifasFiltroChips ─────────────────────────────────────────────────────
+
+/// Filtro de cadencia de la grilla — mismo patrón single-select que
+/// `PagosScreen` (`pagos_web_screen.dart`): un tap que vacía la selección es
+/// un no-op, siempre hay un filtro activo.
+///
+/// [badgeCounts] cuenta GRUPOS por cadencia (no alumnos) — coherente con lo
+/// que el chip filtra (grupos de tarifa, no billings individuales).
+class _TarifasFiltroChips extends ConsumerWidget {
+  const _TarifasFiltroChips({required this.grupos, required this.filtro});
+
+  final List<TarifaGroup> grupos;
+  final PlanesFiltroCadencia filtro;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final badgeCounts = <String, int>{};
+    for (final entry in _kFiltroLabels.entries) {
+      if (entry.key == PlanesFiltroCadencia.todas) continue;
+      final cadence = cadenceOfFiltro(entry.key);
+      badgeCounts[entry.value] =
+          grupos.where((g) => g.cadence == cadence).length;
+    }
+
+    return TreinoFilterChips(
+      options: _kFiltroLabels.values.toList(),
+      selected: {_kFiltroLabels[filtro]!},
+      badgeCounts: badgeCounts,
+      onChanged: (newSelected) {
+        if (newSelected.isEmpty) return;
+        final label = newSelected.first;
+        for (final entry in _kFiltroLabels.entries) {
+          if (entry.value == label) {
+            ref.read(planesFiltroProvider.notifier).state = entry.key;
+            break;
+          }
+        }
+      },
+    );
+  }
+}
+
+// ── _TarifasGridBody ─────────────────────────────────────────────────────────
+
+/// Resuelve los 4 estados del grid (loading/error/vacío/data) para el
+/// [filtro] activo.
+class _TarifasGridBody extends StatelessWidget {
+  const _TarifasGridBody({required this.resumenAsync, required this.filtro});
+
+  final AsyncValue<TarifasResumen> resumenAsync;
+  final PlanesFiltroCadencia filtro;
+
+  @override
+  Widget build(BuildContext context) {
+    if (resumenAsync.isLoading) return const _TarifasGridSkeleton();
+
+    if (resumenAsync.hasError) {
+      return _TarifasGridError(
+        onRetry: () {
+          final container = ProviderScope.containerOf(context);
+          container.invalidate(trainerBillingsProvider);
+        },
+      );
+    }
+
+    final resumen = resumenAsync.valueOrNull;
+    final grupos = resumen?.grupos ?? const <TarifaGroup>[];
+
+    if (grupos.isEmpty) {
+      return const TreinoEmptyState(
+        key: Key('planes_tarifas_empty'),
+        icon: TreinoIcon.emptyState,
+        title: 'Todavía no configuraste tarifas', // i18n
+        description: 'Definí el precio de cada alumno desde Alumnos o '
+            'Pagos.', // i18n
+      );
+    }
+
+    final cadence = cadenceOfFiltro(filtro);
+    final filtrados =
+        cadence == null ? grupos : grupos.where((g) => g.cadence == cadence);
+    final visibles = filtrados.toList();
+
+    if (visibles.isEmpty) {
+      return TreinoEmptyState(
+        key: const Key('planes_tarifas_empty_filtro'),
+        icon: TreinoIcon.emptyState,
+        title:
+            'No hay tarifas ${_kFiltroLabels[filtro]!.toLowerCase()}', // i18n
+      );
+    }
+
+    final masUsada = resumen?.masUsada;
+
+    return _TarifasGrid(
+      grupos: visibles,
+      isMasUsada: (g) => masUsada != null && g == masUsada,
+    );
+  }
+}
+
+/// Grid responsive de [TarifaCard]: ~3 columnas desde 1200px, 2 columnas
+/// entre 768-1200px (Coach Hub es desktop-only, `PagosKpiRow` doc).
+class _TarifasGrid extends StatelessWidget {
+  const _TarifasGrid({required this.grupos, required this.isMasUsada});
+
+  final List<TarifaGroup> grupos;
+  final bool Function(TarifaGroup) isMasUsada;
+
+  static const double _wideBreakpoint = 1200;
+  static const double _spacing = 12;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= _wideBreakpoint ? 3 : 2;
+        final cardWidth =
+            (constraints.maxWidth - _spacing * (columns - 1)) / columns;
+
+        return Wrap(
+          spacing: _spacing,
+          runSpacing: _spacing,
+          children: [
+            for (final grupo in grupos)
+              SizedBox(
+                width: cardWidth,
+                child: TarifaCard(
+                  key: Key(
+                    'tarifa_card_${grupo.cadence.name}_${grupo.amountArs}',
+                  ),
+                  group: grupo,
+                  masUsada: isMasUsada(grupo),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Skeleton shimmer del grid — 4 cards fantasma mientras
+/// `trainerBillingsProvider` no resolvió.
+class _TarifasGridSkeleton extends StatelessWidget {
+  const _TarifasGridSkeleton();
+
+  static const _skeletonCount = 4;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    return TreinoShimmer(
+      child: Wrap(
+        key: const Key('planes_tarifas_skeleton'),
+        spacing: 12,
+        runSpacing: 12,
+        children: [
+          for (var i = 0; i < _skeletonCount; i++)
+            Container(
+              width: 280,
+              height: 150,
+              decoration: BoxDecoration(
+                color: palette.bgCard,
+                border: Border.all(color: palette.border),
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Estado de error del grid — mensaje honesto + "Reintentar" (invalida
+/// `trainerBillingsProvider`, mismo patrón que `PagosWebTable`/
+/// `CoachHubDataTable._ErrorState`).
+class _TarifasGridError extends StatelessWidget {
+  const _TarifasGridError({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.s20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Error al cargar tarifas.', // i18n
+              style: TextStyle(color: palette.textMuted, fontSize: 14),
+            ),
+            const SizedBox(height: AppSpacing.s12),
+            TextButton(
+              onPressed: onRetry,
+              child: Text(
+                'Reintentar', // i18n
+                style: TextStyle(color: palette.accent, fontSize: 14),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
