@@ -128,6 +128,59 @@ void main() {
       expect(find.text('detail-my-routine-id'), findsOneWidget);
     });
 
+    testWidgets(
+        'reserveTitleLines → card height independent of 1-line vs 2-line name',
+        (tester) async {
+      // La card vive siempre en contextos de altura unbounded (celda de
+      // Table en Plantillas, children de ListView en feed/profile) donde su
+      // Column interna se ajusta al contenido — la Column del harness replica
+      // eso; bajo altura bounded (p.ej. Center) se estiraría al viewport.
+      Widget host(String name, {required bool reserve}) => ProviderScope(
+            child: MaterialApp(
+              theme: AppTheme.dark(),
+              home: Scaffold(
+                body: Center(
+                  child: SizedBox(
+                    width: 280,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        RoutineCard(
+                          routine: makeRoutine(name: name),
+                          reserveTitleLines: reserve,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+
+      const shortName = 'Push';
+      const longName =
+          'Rutina de hipertrofia avanzada del tren superior completo';
+
+      await tester.pumpWidget(host(shortName, reserve: true));
+      await tester.pump();
+      final reservedShort = tester.getSize(find.byType(RoutineCard)).height;
+
+      await tester.pumpWidget(host(longName, reserve: true));
+      await tester.pump();
+      final reservedLong = tester.getSize(find.byType(RoutineCard)).height;
+
+      // With the reservation the height is deterministic — the grid rows in
+      // PlantillasSection align without an IntrinsicHeight pass (#402).
+      expect(reservedShort, moreOrLessEquals(reservedLong, epsilon: 0.01));
+
+      // Without it (default), a short name yields a shorter card — the flag
+      // is what guarantees the deterministic height.
+      await tester.pumpWidget(host(shortName, reserve: false));
+      await tester.pump();
+      final naturalShort = tester.getSize(find.byType(RoutineCard)).height;
+      expect(naturalShort, lessThan(reservedShort));
+    });
+
     testWidgets('renders without crash (smoke)', (tester) async {
       final routine = makeRoutine(
         name: 'PPL Advanced',
