@@ -7,6 +7,7 @@ import 'package:treino/features/coach_hub/presentation/sections/dashboard/routes
 import 'package:treino/features/coach_hub/presentation/sections/invitaciones/routes.dart';
 import 'package:treino/features/coach_hub/presentation/sections/nutricion/routes.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/routes.dart';
+import 'package:treino/features/coach_hub/presentation/sections/perfil_publico/routes.dart';
 import 'package:treino/features/coach_hub/presentation/sections/rutinas/routes.dart';
 
 import 'sidebar_item.dart';
@@ -49,6 +50,11 @@ import 'sidebar_item.dart';
 /// directa) vuelve al grupo RECURSOS, inmediatamente después de Biblioteca
 /// — simetría con la re-exposición de Solicitudes en ADR-F4-04 — llevando
 /// el total a 10.
+///
+/// **Perfil público agregado (Fase 11 WU-01, ADR-F11-01)**: nueva sección
+/// que muestra al PF cómo lo ven los alumnos potenciales en TREINO Coach
+/// Discovery; se agrega al grupo GESTIÓN inmediatamente después de Chat
+/// (adyacente, sin header nuevo) — llevando el total a 11.
 final List<SidebarItem> sidebarRegistry = [
   // GESTIÓN — surfaces multi-alumno del día a día del PF
   ...dashboardSidebarItems,
@@ -56,6 +62,7 @@ final List<SidebarItem> sidebarRegistry = [
   ...invitacionesSidebarItems,
   ...agendaSidebarItems,
   ...chatSidebarItems,
+  ...perfilPublicoSidebarItems,
 
   // RECURSOS — bibliotecas del PF y finanzas
   ...bibliotecaSidebarItems,

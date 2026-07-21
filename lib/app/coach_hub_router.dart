@@ -19,6 +19,7 @@ import '../features/coach_hub/presentation/sections/invitaciones/routes.dart';
 import '../features/coach_hub/presentation/sections/legacy/routes.dart';
 import '../features/coach_hub/presentation/sections/nutricion/routes.dart';
 import '../features/coach_hub/presentation/sections/pagos/routes.dart';
+import '../features/coach_hub/presentation/sections/perfil_publico/routes.dart';
 import '../features/coach_hub/presentation/sections/planes/routes.dart';
 import '../features/coach_hub/presentation/sections/planner/routes.dart';
 import '../features/coach_hub/presentation/sections/recetas/routes.dart';
@@ -115,6 +116,7 @@ final List<RouteBase> _signedInRoutes = [
   ...suplementosRoutes,
   ...habitosRoutes,
   ...pagosRoutes,
+  ...perfilPublicoRoutes,
   ...planesRoutes,
   ...facturacionPlanesRoutes,
   ...reportesRoutes,
