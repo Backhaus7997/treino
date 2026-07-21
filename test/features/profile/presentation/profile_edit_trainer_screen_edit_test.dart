@@ -163,6 +163,23 @@ void main() {
           reason:
               'Edit mode must not have a blocking PopScope — back should be allowed');
     });
+
+    // QA-PRO-008 (#429): the sign-out escape hatch is onboarding-only — edit
+    // mode already has the back arrow, so no extra exit belongs there.
+    testWidgets('edit mode does NOT show the onboarding sign-out action',
+        (tester) async {
+      await tester.pumpWidget(_buildScreen(
+        mode: ProfileEditTrainerMode.edit,
+        initialLocation: '/profile/edit-trainer',
+      ));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('trainer_onboarding_sign_out')),
+        findsNothing,
+        reason: 'Sign-out action is an onboarding-only escape hatch',
+      );
+    });
   });
 
   group('SCENARIO-717: post-save in edit mode calls context.pop()', () {
