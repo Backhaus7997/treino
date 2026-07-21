@@ -8,6 +8,8 @@ import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../workout/application/exercise_frequency_providers.dart';
+import '../../workout/application/session_providers.dart'
+    show sessionsByUidProvider;
 import '../../workout/presentation/widgets/exercise_progression_section.dart'
     show ChartPeriodLabels;
 import '../../workout/presentation/widgets/most_frequent_exercises_list.dart';
@@ -80,13 +82,13 @@ class _FrequentExercisesScreenState
                   ),
                   // QA-INS-005: nunca `SizedBox.shrink()` en error — dejaba la
                   // pantalla en blanco, sin mensaje ni forma de reintentar.
-                  // `_ErrorState` (mensaje + retry) invalida el provider que
-                  // alimenta la lista para volver a intentar la carga.
+                  // `_ErrorState` (mensaje + retry) reintenta la carga vía
+                  // [_retry] (#376: invalida también la dependencia fallida,
+                  // no sólo este provider).
                   error: (_, __) => _ErrorState(
                     message: l10n.frequentExercisesLoadError,
                     retryLabel: l10n.coachRetryLabel,
-                    onRetry: () => ref.invalidate(exerciseFrequencyProvider(
-                        (athleteUid: widget.uid, period: _selectedPeriod))),
+                    onRetry: () => _retry(ref, widget.uid, _selectedPeriod),
                   ),
                   data: (entries) => MostFrequentExercisesList(
                     entries: entries,
@@ -161,6 +163,25 @@ void _safePopOrInsights(BuildContext context) {
   } else {
     context.go('/home/insights');
   }
+}
+
+/// #376: invalidates the frequency provider AND the sessions provider that
+/// actually performs the fetch it depends on.
+///
+/// `ref.invalidate` does NOT cascade to dependencies, and the screen keeps
+/// [sessionsByUidProvider] alive (watched via [exerciseFrequencyProvider]), so
+/// its `AsyncError` stays cached across the rebuild. Invalidating only
+/// [exerciseFrequencyProvider] would re-read the SAME cached sessions error
+/// and re-render the identical error state: a retry button that can never
+/// recover, precisely in the case that brings the user here (offline / failed
+/// sessions fetch). Same fix as MuscleDistributionScreen's `_retry`; setlog
+/// fetches run inside [exerciseFrequencyProvider]'s own body, so invalidating
+/// it re-runs those.
+void _retry(WidgetRef ref, String uid, ChartPeriod period) {
+  ref.invalidate(sessionsByUidProvider(uid));
+  ref.invalidate(
+    exerciseFrequencyProvider((athleteUid: uid, period: period)),
+  );
 }
 
 // ── Error state ───────────────────────────────────────────────────────────────
