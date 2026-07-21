@@ -1,9 +1,10 @@
 // NOTE: el Scaffold y el SafeArea los provee CoachHubScaffold (el shell).
 // NO los agregues acá (ADR-CHW-005).
 //
-// PR2a — PagosScreen shell: header + KPI row + filtro (TreinoFilterChips,
-// Vencidos/Por vencer/Pagados/Todos, WU-05 Fase 9). Tabla rica con acciones
-// de fila (Marcar pagado / Recordar) implementada en PR2b vía PagosWebTable.
+// PagosScreen shell: header + KPI row + filtro (TreinoFilterChips,
+// Vencidos/Por vencer/Pagados/Todos, WU-05 Fase 9). Tabla vía
+// CoachHubDataTable con celdas ricas y estados completos (WU-06 Fase 9) —
+// las acciones de fila (Marcar pagado / Recordar) quedan para WU-07.
 //
 // Todas las strings están en español hardcodeado + comentario // i18n.
 // NO se usa AppL10n en este archivo (constraint C-6).
@@ -18,16 +19,15 @@ import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/features/payments/application/payment_providers.dart'
+    show trainerPaymentsProvider;
 import 'package:treino/features/payments/domain/payment.dart';
-import 'package:treino/features/profile/application/user_providers.dart'
-    show userProfileProvider;
 import 'package:treino/features/profile/application/user_public_profile_providers.dart'
     show userPublicProfilesBatchProvider;
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 
 import '../../widgets/coach_hub_widgets.dart'
     show TreinoFilterChips, TreinoInteractiveState, TreinoSectionHeader;
-import 'widgets/marcar_pagado_actions.dart';
 import 'widgets/pagos_buckets_provider.dart';
 import 'widgets/pagos_filtro_provider.dart';
 import 'widgets/pagos_kpi_row.dart';
@@ -61,6 +61,40 @@ class PagosScreen extends ConsumerStatefulWidget {
 }
 
 class _PagosScreenState extends ConsumerState<PagosScreen> {
+  // Estado de orden de la tabla (WU-06) — owned por el screen, no por
+  // PagosWebTable: el ordenamiento depende de `profiles` (nombre de alumno)
+  // que ya se resuelve acá.
+  String? _sortColumnKey;
+  bool _sortAscending = true;
+
+  /// Ordena [payments] según [_sortColumnKey]/[_sortAscending]. Sin columna
+  /// activa, devuelve la lista tal cual (orden del bucket, DESC createdAt).
+  List<Payment> _sorted(
+    List<Payment> payments,
+    Map<String, UserPublicProfile> profiles,
+  ) {
+    final key = _sortColumnKey;
+    if (key == null) return payments;
+
+    String nameOf(Payment p) =>
+        (profiles[p.athleteId]?.displayName?.isNotEmpty == true
+                ? profiles[p.athleteId]!.displayName!
+                : 'Alumno') // i18n fallback, igual que PagosWebTable
+            .toLowerCase();
+
+    int cmp(Payment a, Payment b) => switch (key) {
+          'alumno' => nameOf(a).compareTo(nameOf(b)),
+          'monto' => a.amountArs.compareTo(b.amountArs),
+          'vencimiento' =>
+            (a.dueAt ?? a.createdAt).compareTo(b.dueAt ?? b.createdAt),
+          _ => 0,
+        };
+
+    final sorted = List<Payment>.of(payments);
+    sorted.sort(_sortAscending ? cmp : (a, b) => cmp(b, a));
+    return sorted;
+  }
+
   Future<void> _onRegistrarPago() async {
     await showDialog<({int amount, String concept})>(
       context: context,
@@ -78,10 +112,6 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
     final palette = AppPalette.of(context);
     final bucketsAsync = ref.watch(pagosBucketsProvider);
     final filtro = ref.watch(pagosFiltroProvider);
-
-    // Trainer's paymentAlias for WhatsApp reminder messages.
-    final paymentAlias = ref
-        .watch(userProfileProvider.select((s) => s.valueOrNull?.paymentAlias));
 
     // Counts for chip badges (reactive).
     int vencidosN = 0;
@@ -189,16 +219,13 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
                   PagosFiltro.pagados => (b) => b.pagados,
                   PagosFiltro.todos => (b) => b.todos,
                 },
-                emptyLabel: switch (filtro) {
+                emptyMessage: switch (filtro) {
                   PagosFiltro.vencidos => 'No hay pagos vencidos', // i18n
                   PagosFiltro.porVencer => 'No hay pagos pendientes', // i18n
                   PagosFiltro.pagados => 'No hay pagos registrados', // i18n
                   PagosFiltro.todos => 'No hay pagos', // i18n
                 },
-                palette: palette,
                 profiles: profiles,
-                paymentAlias: paymentAlias,
-                showActions: filtro != PagosFiltro.pagados,
               ),
             ),
           ),
@@ -207,35 +234,33 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
     );
   }
 
-  /// Construye el body de la tabla según el filtro activo: loading / error /
-  /// tabla.
+  /// Construye la tabla del filtro activo. Loading / error / vacío ya no se
+  /// resuelven acá (WU-06): [PagosWebTable] delega esos tres estados a
+  /// `CoachHubDataTable` (shimmer / mensaje+retry / TreinoEmptyState).
   Widget _tabBody({
     required AsyncValue<PagosBuckets> bucketsAsync,
     required List<Payment> Function(PagosBuckets) getPayments,
-    required String emptyLabel,
-    required AppPalette palette,
+    required String emptyMessage,
     required Map<String, UserPublicProfile> profiles,
-    required String? paymentAlias,
-    required bool showActions,
   }) {
-    return bucketsAsync.when(
-      data: (b) => PagosWebTable(
-        payments: getPayments(b),
-        profiles: profiles,
-        emptyLabel: emptyLabel,
-        onMarcarPagado:
-            showActions ? (p) => marcarPagadoDoc(context, ref, p) : null,
-        onRecordar:
-            showActions ? (p) => recordar(context, ref, p, paymentAlias) : null,
-        showActions: showActions,
-      ),
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(
-        child: Text(
-          'Error al cargar pagos.', // i18n
-          style: TextStyle(color: palette.danger),
-        ),
-      ),
+    final payments = bucketsAsync.valueOrNull != null
+        ? getPayments(bucketsAsync.valueOrNull!)
+        : const <Payment>[];
+
+    return PagosWebTable(
+      payments: _sorted(payments, profiles),
+      profiles: profiles,
+      emptyMessage: emptyMessage,
+      loading: bucketsAsync.isLoading,
+      errorMessage:
+          bucketsAsync.hasError ? 'Error al cargar pagos.' : null, // i18n
+      onRetry: () => ref.invalidate(trainerPaymentsProvider),
+      sortColumnKey: _sortColumnKey,
+      sortAscending: _sortAscending,
+      onSort: (key, ascending) => setState(() {
+        _sortColumnKey = key;
+        _sortAscending = ascending;
+      }),
     );
   }
 }
