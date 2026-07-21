@@ -32,6 +32,8 @@ import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/presentation/routine_detail_screen.dart';
+import 'package:treino/features/performance/application/performance_test_providers.dart';
+import 'package:treino/features/performance/domain/performance_test.dart';
 
 class _MockSessionRepository extends Mock implements SessionRepository {}
 
@@ -77,6 +79,19 @@ UserPublicProfile _makeProfile(String uid, String name) => UserPublicProfile(
       uid: uid,
       displayName: name,
       displayNameLowercase: name.toLowerCase(),
+    );
+
+/// QA-PERF-104 fixture: whole-number doubles (cmjCm/squat1rmKg/vo2maxMlKgMin)
+/// must render without the ".0" tail; sprint keeps its one decimal.
+PerformanceTest _makePerfTest() => PerformanceTest(
+      id: 'pt-1',
+      athleteId: 'athlete-1',
+      recordedBy: 'trainer-1',
+      recordedAt: DateTime(2026, 1, 15),
+      cmjCm: 30,
+      squat1rmKg: 100,
+      sprint20mS: 2.9,
+      vo2maxMlKgMin: 55,
     );
 
 Routine _makePlan({
@@ -650,6 +665,56 @@ void main() {
       // The wrapper injects l10n.coachDailyHeatmapSectionTitle — proves the
       // AD5 label bag reaches the shared DailyHeatmapSection correctly.
       expect(find.text('MÚSCULOS DEL DÍA'), findsOneWidget);
+    });
+  });
+
+  // ── QA-PERF-104 — última-evaluación card formats doubles via the helper ───
+
+  group('AthleteDetailScreen — QA-PERF-104 (performance card formatting)', () {
+    setUpAll(() {
+      registerFallbackValue(
+          _makeSession(id: 'fallback', wasFullyCompleted: true));
+    });
+
+    testWidgets(
+        'QA-PERF-104: the latest-evaluation card formats doubles with '
+        '_formatMetricValue (30.0 -> 30) instead of interpolating the raw value',
+        (tester) async {
+      final repo = _MockSessionRepository();
+      when(() => repo.listByUid('athlete-1')).thenAnswer((_) async => []);
+
+      await _pumpScreen(
+        tester,
+        athleteId: 'athlete-1',
+        overrides: [
+          currentUidProvider.overrideWithValue('trainer-1'),
+          userPublicProfileProvider('athlete-1').overrideWith(
+            (ref) => Stream.value(_makeProfile('athlete-1', 'Martín García')),
+          ),
+          assignedRoutinesProvider('athlete-1').overrideWith(
+            (ref) async => const [],
+          ),
+          sessionsByUidProvider('athlete-1').overrideWith(
+            (ref) async => const [],
+          ),
+          sessionRepositoryProvider.overrideWithValue(repo),
+          exercisesProvider.overrideWith((ref) async => const []),
+          performanceTestsForAthleteProvider('athlete-1').overrideWith(
+            (ref) => Stream.value([_makePerfTest()]),
+          ),
+        ],
+      );
+
+      await tester.pumpAndSettle();
+
+      // Whole-number doubles render without the ".0" tail…
+      expect(find.text('30 cm'), findsOneWidget);
+      expect(find.text('100 kg'), findsOneWidget);
+      expect(find.text('55 ml/kg/min'), findsOneWidget);
+      // …a one-decimal value keeps its decimal (the helper trims to 1 dp).
+      expect(find.text('2.9 s'), findsOneWidget);
+      // Regression guard: the raw double interpolation ("30.0 cm") is gone.
+      expect(find.text('30.0 cm'), findsNothing);
     });
   });
 }
