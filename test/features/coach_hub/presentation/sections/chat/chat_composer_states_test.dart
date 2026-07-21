@@ -110,5 +110,43 @@ void main() {
         expect(tapped, isTrue);
       },
     );
+
+    testWidgets(
+      'botón enviar expone Semantics(button: true, label: "Enviar") — '
+      'remediación a11y (adversarial WARNING-1)',
+      (tester) async {
+        final handle = tester.ensureSemantics();
+        final ctrl = TextEditingController(text: 'hola');
+        addTearDown(ctrl.dispose);
+
+        await tester.pumpWidget(_wrapComposer(
+          Builder(builder: (context) {
+            final palette = AppPalette.of(context);
+            return chatDetailPaneComposerForTest(
+              controller: ctrl,
+              sending: false,
+              onSend: () {},
+              onAttach: () {},
+              palette: palette,
+            );
+          }),
+          dark: false,
+        ));
+        await tester.pump();
+
+        final semantics =
+            tester.getSemantics(find.byKey(const Key('chat_send_button')));
+        expect(
+          semantics.flagsCollection.isButton,
+          isTrue,
+          reason: 'el CTA principal del composer debe anunciarse como '
+              'botón para screen readers (TreinoTappable pelado no lo '
+              'hacía)',
+        );
+        expect(semantics.label, 'Enviar');
+
+        handle.dispose();
+      },
+    );
   });
 }

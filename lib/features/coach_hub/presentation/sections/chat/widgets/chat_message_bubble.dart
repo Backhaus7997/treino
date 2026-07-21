@@ -59,12 +59,25 @@ class ChatMessageBubble extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
           decoration: BoxDecoration(
             color: bg,
+<<<<<<< HEAD
             borderRadius: BorderRadius.only(
               topLeft: const Radius.circular(14),
               topRight: const Radius.circular(14),
               bottomLeft: Radius.circular(isOwn ? 14 : 4),
               bottomRight: Radius.circular(isOwn ? 4 : 14),
             ),
+=======
+            // Los 4 corners comparten AppRadius.sm — la escala cerrada del
+            // design system solo admite 12/16/20/full, así que la "cola"
+            // asimétrica de la burbuja (antes con AppSpacing.hairline, un
+            // token de SPACING reusado indebidamente como radio) queda
+            // pareja con el resto en vez de introducir una excepción fuera
+            // de escala (remediación CRITICAL-2, verify report Fase 8).
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            // Burbuja propia es sólida (sin borde); recibida mantiene el
+            // borde sutil sobre bgCard.
+            border: isOwn ? null : Border.all(color: palette.border),
+>>>>>>> 2d5b34a5 (fix(coach-hub): remediación ronda 2 de verify Fase 8 chat)
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
