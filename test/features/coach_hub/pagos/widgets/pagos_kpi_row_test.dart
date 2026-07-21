@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pagos_kpi_row.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart'
+    show KpiCard;
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart'
     show CobroPendiente, pagosPorCobrarProvider;
 import 'package:treino/features/payments/application/payment_providers.dart'
@@ -130,8 +132,10 @@ void main() {
           reason: 'All three KPI tiles must show \$0 when provider is empty');
     });
 
-    // SCENARIO: exactly 3 tile widgets rendered
-    testWidgets('SCENARIO — exactly 3 KPI tiles rendered', (tester) async {
+    // SCENARIO: exactly 3 KpiCard widgets rendered (kit v2), no ad-hoc tile
+    testWidgets('SCENARIO — exactly 3 KpiCard widgets rendered', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         _wrap(
           const PagosKpiRow(),
@@ -140,7 +144,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.byType(KpiTile), findsNWidgets(3));
+      expect(find.byType(KpiCard), findsNWidgets(3));
     });
 
     // Tile labels present
@@ -156,6 +160,60 @@ void main() {
       expect(find.text('Ingreso del mes'), findsOneWidget); // i18n
       expect(find.text('Pendiente cobrar'), findsOneWidget); // i18n
       expect(find.text('Vencido'), findsOneWidget); // i18n
+    });
+
+    // ADR-F9-01: honestidad — sin KPI proyectado ni deltas inventados
+    testWidgets('no Proyectado KPI is ever rendered', (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          const PagosKpiRow(),
+          overrides: _overrides(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Proyectado'), findsNothing);
+    });
+
+    // Sublabels honestos derivados de conteos reales
+    testWidgets('sublabels show honest counts derived from real data', (
+      tester,
+    ) async {
+      final paidThisMonth = _payment(
+        id: 'pm1',
+        status: PaymentStatus.paid,
+        createdAt: _firstOfMonth.add(const Duration(days: 1)),
+        amountArs: 10000,
+      );
+      final vencido = _payment(
+        id: 'v1',
+        status: PaymentStatus.pending,
+        createdAt: _firstOfMonth.subtract(const Duration(days: 1)),
+        amountArs: 3000,
+      );
+      final cobros = [
+        const CobroPendiente(
+          athleteId: 'athlete-1',
+          amountArs: 8000,
+          cadence: BillingCadence.suelto,
+          concept: 'Plan',
+        ),
+      ];
+
+      await tester.pumpWidget(
+        _wrap(
+          const PagosKpiRow(),
+          overrides: _overrides(
+            payments: [paidThisMonth, vencido],
+            cobros: cobros,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('1 cobrados'), findsOneWidget); // i18n
+      expect(find.text('1 alumnos'), findsOneWidget); // i18n
+      expect(find.text('1 vencidos'), findsOneWidget); // i18n
     });
   });
 }
