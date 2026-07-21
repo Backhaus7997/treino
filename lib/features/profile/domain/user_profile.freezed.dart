@@ -44,6 +44,13 @@ mixin _$UserProfile {
   String? get phone => throw _privateConstructorUsedError;
   @TimestampConverter()
   DateTime? get bornAt =>
+      throw _privateConstructorUsedError; // ── Consentimiento legal (QA-AUTH-001, issue #434) ────────────────────
+// Instante de aceptación de Términos y Política de Privacidad. Email:
+// escrito por signUpWithEmail (el gate del checkbox vive en Register).
+// OAuth: escrito por el submit de ProfileSetup (checkbox obligatorio para
+// cuentas nuevas). Null ⇒ cuenta legacy pre-feature (sin evidencia).
+  @TimestampConverter()
+  DateTime? get termsAcceptedAt =>
       throw _privateConstructorUsedError; // ── Trainer-specific (Fase 5 Etapa 1 foundations) ───────────────────
   String? get trainerBio => throw _privateConstructorUsedError;
   String? get trainerSpecialty => throw _privateConstructorUsedError;
@@ -130,6 +137,7 @@ abstract class $UserProfileCopyWith<$Res> {
       String? lastName,
       String? phone,
       @TimestampConverter() DateTime? bornAt,
+      @TimestampConverter() DateTime? termsAcceptedAt,
       String? trainerBio,
       String? trainerSpecialty,
       int? trainerMonthlyRate,
@@ -178,6 +186,7 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
     Object? lastName = freezed,
     Object? phone = freezed,
     Object? bornAt = freezed,
+    Object? termsAcceptedAt = freezed,
     Object? trainerBio = freezed,
     Object? trainerSpecialty = freezed,
     Object? trainerMonthlyRate = freezed,
@@ -256,6 +265,10 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
       bornAt: freezed == bornAt
           ? _value.bornAt
           : bornAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      termsAcceptedAt: freezed == termsAcceptedAt
+          ? _value.termsAcceptedAt
+          : termsAcceptedAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
       trainerBio: freezed == trainerBio
           ? _value.trainerBio
@@ -352,6 +365,7 @@ abstract class _$$UserProfileImplCopyWith<$Res>
       String? lastName,
       String? phone,
       @TimestampConverter() DateTime? bornAt,
+      @TimestampConverter() DateTime? termsAcceptedAt,
       String? trainerBio,
       String? trainerSpecialty,
       int? trainerMonthlyRate,
@@ -399,6 +413,7 @@ class __$$UserProfileImplCopyWithImpl<$Res>
     Object? lastName = freezed,
     Object? phone = freezed,
     Object? bornAt = freezed,
+    Object? termsAcceptedAt = freezed,
     Object? trainerBio = freezed,
     Object? trainerSpecialty = freezed,
     Object? trainerMonthlyRate = freezed,
@@ -478,6 +493,10 @@ class __$$UserProfileImplCopyWithImpl<$Res>
           ? _value.bornAt
           : bornAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
+      termsAcceptedAt: freezed == termsAcceptedAt
+          ? _value.termsAcceptedAt
+          : termsAcceptedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
       trainerBio: freezed == trainerBio
           ? _value.trainerBio
           : trainerBio // ignore: cast_nullable_to_non_nullable
@@ -554,6 +573,7 @@ class _$UserProfileImpl implements _UserProfile {
       this.lastName,
       this.phone,
       @TimestampConverter() this.bornAt,
+      @TimestampConverter() this.termsAcceptedAt,
       this.trainerBio,
       this.trainerSpecialty,
       this.trainerMonthlyRate,
@@ -613,6 +633,14 @@ class _$UserProfileImpl implements _UserProfile {
   @override
   @TimestampConverter()
   final DateTime? bornAt;
+// ── Consentimiento legal (QA-AUTH-001, issue #434) ────────────────────
+// Instante de aceptación de Términos y Política de Privacidad. Email:
+// escrito por signUpWithEmail (el gate del checkbox vive en Register).
+// OAuth: escrito por el submit de ProfileSetup (checkbox obligatorio para
+// cuentas nuevas). Null ⇒ cuenta legacy pre-feature (sin evidencia).
+  @override
+  @TimestampConverter()
+  final DateTime? termsAcceptedAt;
 // ── Trainer-specific (Fase 5 Etapa 1 foundations) ───────────────────
   @override
   final String? trainerBio;
@@ -698,7 +726,7 @@ class _$UserProfileImpl implements _UserProfile {
 
   @override
   String toString() {
-    return 'UserProfile(uid: $uid, email: $email, displayName: $displayName, role: $role, createdAt: $createdAt, updatedAt: $updatedAt, gymId: $gymId, bodyWeightKg: $bodyWeightKg, heightCm: $heightCm, gender: $gender, experienceLevel: $experienceLevel, avatarUrl: $avatarUrl, firstName: $firstName, lastName: $lastName, phone: $phone, bornAt: $bornAt, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerMonthlyRate: $trainerMonthlyRate, paymentAlias: $paymentAlias, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerGeohash: $trainerGeohash, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline, activeRoutineId: $activeRoutineId, subscription: $subscription, weightedLoad: $weightedLoad)';
+    return 'UserProfile(uid: $uid, email: $email, displayName: $displayName, role: $role, createdAt: $createdAt, updatedAt: $updatedAt, gymId: $gymId, bodyWeightKg: $bodyWeightKg, heightCm: $heightCm, gender: $gender, experienceLevel: $experienceLevel, avatarUrl: $avatarUrl, firstName: $firstName, lastName: $lastName, phone: $phone, bornAt: $bornAt, termsAcceptedAt: $termsAcceptedAt, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerMonthlyRate: $trainerMonthlyRate, paymentAlias: $paymentAlias, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerGeohash: $trainerGeohash, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline, activeRoutineId: $activeRoutineId, subscription: $subscription, weightedLoad: $weightedLoad)';
   }
 
   @override
@@ -731,6 +759,8 @@ class _$UserProfileImpl implements _UserProfile {
                 other.lastName == lastName) &&
             (identical(other.phone, phone) || other.phone == phone) &&
             (identical(other.bornAt, bornAt) || other.bornAt == bornAt) &&
+            (identical(other.termsAcceptedAt, termsAcceptedAt) ||
+                other.termsAcceptedAt == termsAcceptedAt) &&
             (identical(other.trainerBio, trainerBio) ||
                 other.trainerBio == trainerBio) &&
             (identical(other.trainerSpecialty, trainerSpecialty) ||
@@ -779,6 +809,7 @@ class _$UserProfileImpl implements _UserProfile {
         lastName,
         phone,
         bornAt,
+        termsAcceptedAt,
         trainerBio,
         trainerSpecialty,
         trainerMonthlyRate,
@@ -828,6 +859,7 @@ abstract class _UserProfile implements UserProfile {
       final String? lastName,
       final String? phone,
       @TimestampConverter() final DateTime? bornAt,
+      @TimestampConverter() final DateTime? termsAcceptedAt,
       final String? trainerBio,
       final String? trainerSpecialty,
       final int? trainerMonthlyRate,
@@ -885,7 +917,15 @@ abstract class _UserProfile implements UserProfile {
   @override
   @TimestampConverter()
   DateTime?
-      get bornAt; // ── Trainer-specific (Fase 5 Etapa 1 foundations) ───────────────────
+      get bornAt; // ── Consentimiento legal (QA-AUTH-001, issue #434) ────────────────────
+// Instante de aceptación de Términos y Política de Privacidad. Email:
+// escrito por signUpWithEmail (el gate del checkbox vive en Register).
+// OAuth: escrito por el submit de ProfileSetup (checkbox obligatorio para
+// cuentas nuevas). Null ⇒ cuenta legacy pre-feature (sin evidencia).
+  @override
+  @TimestampConverter()
+  DateTime?
+      get termsAcceptedAt; // ── Trainer-specific (Fase 5 Etapa 1 foundations) ───────────────────
   @override
   String? get trainerBio;
   @override

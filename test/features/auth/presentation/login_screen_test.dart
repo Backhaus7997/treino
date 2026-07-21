@@ -9,6 +9,7 @@ import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/auth/domain/auth_failure.dart';
 import 'package:treino/features/auth/presentation/login_screen.dart';
 import 'package:treino/features/auth/presentation/widgets/auth_pill_button.dart';
+import 'package:treino/features/auth/presentation/widgets/terms_notice_text.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 class MockUser extends Mock implements User {}
@@ -232,5 +233,16 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('FORGOT'), findsOneWidget);
+  });
+
+  // ---------------------------------------------------------------------------
+  // QA-AUTH-001 (issue #434): Terms notice below the social buttons
+  // ---------------------------------------------------------------------------
+  testWidgets('renders the TermsNoticeText legend below the social buttons',
+      (tester) async {
+    await tester.pumpWidget(_buildApp(notifier: _TestAuthNotifier()));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TermsNoticeText), findsOneWidget);
   });
 }

@@ -255,9 +255,16 @@ class UserRepository {
   /// Creates the `users/{uid}` doc if missing, with `displayName: null`.
   /// Atomically also creates `userPublicProfiles/{uid}` in the same batch.
   /// REQ-UPP-009.
+  ///
+  /// [termsAcceptedAt] (QA-AUTH-001, issue #434): only the email signup flow
+  /// passes this — the checkbox gate lives in `register_screen.dart`, and by
+  /// the time `AuthService.signUpWithEmail` reaches this call the user has
+  /// already accepted. `null` leaves the field unset, matching a legacy
+  /// pre-feature account.
   Future<UserProfile> getOrCreate({
     required String uid,
     required String email,
+    DateTime? termsAcceptedAt,
   }) async {
     final existing = await get(uid);
     if (existing != null) return existing;
@@ -269,6 +276,7 @@ class UserRepository {
       role: UserRole.athlete,
       createdAt: now,
       updatedAt: now,
+      termsAcceptedAt: termsAcceptedAt,
     );
 
     final batch = _firestore.batch();

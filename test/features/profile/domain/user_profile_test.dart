@@ -167,5 +167,68 @@ void main() {
       expect(profile.trainerGeohash, isNull);
       expect(profile.trainerMonthlyRate, isNull);
     });
+
+    // ── termsAcceptedAt (QA-AUTH-001, issue #434) ────────────────────────
+    group('termsAcceptedAt', () {
+      test('defaults to null when omitted', () {
+        final profile = UserProfile(
+          uid: 'uid-1',
+          email: 'a@b.com',
+          displayName: null,
+          role: UserRole.athlete,
+          createdAt: fixedDt,
+          updatedAt: fixedDt,
+        );
+        expect(profile.termsAcceptedAt, isNull);
+
+        final decoded = UserProfile.fromJson(profile.toJson());
+        expect(decoded.termsAcceptedAt, isNull);
+      });
+
+      test('round-trips through toJson/fromJson when populated', () {
+        final acceptedAt = DateTime.utc(2026, 6, 1, 10, 0);
+        final profile = UserProfile(
+          uid: 'uid-2',
+          email: 'b@c.com',
+          displayName: null,
+          role: UserRole.athlete,
+          createdAt: fixedDt,
+          updatedAt: fixedDt,
+          termsAcceptedAt: acceptedAt,
+        );
+
+        final decoded = UserProfile.fromJson(profile.toJson());
+        expect(decoded.termsAcceptedAt, equals(acceptedAt));
+      });
+
+      test('raw map with a Firestore Timestamp decodes to DateTime', () {
+        final acceptedAt = DateTime.utc(2026, 6, 1, 10, 0);
+        final raw = <String, Object?>{
+          'uid': 'uid-3',
+          'email': 'c@d.com',
+          'displayName': null,
+          'role': 'athlete',
+          'createdAt': Timestamp.fromDate(fixedDt),
+          'updatedAt': Timestamp.fromDate(fixedDt),
+          'termsAcceptedAt': Timestamp.fromDate(acceptedAt),
+        };
+
+        final profile = UserProfile.fromJson(raw);
+        expect(profile.termsAcceptedAt, equals(acceptedAt));
+      });
+
+      test('legacy doc with no termsAcceptedAt key deserializes to null', () {
+        final raw = <String, dynamic>{
+          'uid': 'uid-legacy',
+          'email': 'a@b.com',
+          'displayName': null,
+          'role': 'athlete',
+          'createdAt': Timestamp.fromDate(fixedDt),
+          'updatedAt': Timestamp.fromDate(fixedDt),
+        };
+        final profile = UserProfile.fromJson(raw);
+        expect(profile.termsAcceptedAt, isNull);
+      });
+    });
   });
 }

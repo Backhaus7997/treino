@@ -28,6 +28,8 @@ _$UserProfileImpl _$$UserProfileImplFromJson(Map<String, dynamic> json) =>
       phone: json['phone'] as String?,
       bornAt: _$JsonConverterFromJson<Timestamp, DateTime>(
           json['bornAt'], const TimestampConverter().fromJson),
+      termsAcceptedAt: _$JsonConverterFromJson<Timestamp, DateTime>(
+          json['termsAcceptedAt'], const TimestampConverter().fromJson),
       trainerBio: json['trainerBio'] as String?,
       trainerSpecialty: json['trainerSpecialty'] as String?,
       trainerMonthlyRate: (json['trainerMonthlyRate'] as num?)?.toInt(),
@@ -71,6 +73,8 @@ Map<String, dynamic> _$$UserProfileImplToJson(_$UserProfileImpl instance) =>
       'phone': instance.phone,
       'bornAt': _$JsonConverterToJson<Timestamp, DateTime>(
           instance.bornAt, const TimestampConverter().toJson),
+      'termsAcceptedAt': _$JsonConverterToJson<Timestamp, DateTime>(
+          instance.termsAcceptedAt, const TimestampConverter().toJson),
       'trainerBio': instance.trainerBio,
       'trainerSpecialty': instance.trainerSpecialty,
       'trainerMonthlyRate': instance.trainerMonthlyRate,

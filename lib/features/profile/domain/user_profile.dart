@@ -46,6 +46,12 @@ class UserProfile with _$UserProfile {
     String? lastName,
     String? phone,
     @TimestampConverter() DateTime? bornAt,
+    // ── Consentimiento legal (QA-AUTH-001, issue #434) ────────────────────
+    // Instante de aceptación de Términos y Política de Privacidad. Email:
+    // escrito por signUpWithEmail (el gate del checkbox vive en Register).
+    // OAuth: escrito por el submit de ProfileSetup (checkbox obligatorio para
+    // cuentas nuevas). Null ⇒ cuenta legacy pre-feature (sin evidencia).
+    @TimestampConverter() DateTime? termsAcceptedAt,
     // ── Trainer-specific (Fase 5 Etapa 1 foundations) ───────────────────
     String? trainerBio,
     String? trainerSpecialty,
