@@ -45,6 +45,7 @@ class ProfileSetupState {
     this.submitError,
     this.usernameAvailability = UsernameAvailability.unknown,
     this.termsAccepted = false,
+    this.avatarUploadFailed = false,
   });
 
   final ProfileSetupDraft draft;
@@ -60,6 +61,12 @@ class ProfileSetupState {
   /// [submit] (QA-AUTH-001, issue #434).
   final bool termsAccepted;
 
+  /// QA-PRO-106 (issue #430): el upload del avatar durante [submit] es
+  /// best-effort — si falla, el perfil se persiste igual (sin foto) y este
+  /// flag queda prendido para que la UI avise en vez de tragarse la pérdida
+  /// del avatar elegido. Se resetea al inicio de cada submit (reintentos).
+  final bool avatarUploadFailed;
+
   ProfileSetupState copyWith({
     ProfileSetupDraft? draft,
     int? currentStep,
@@ -68,6 +75,7 @@ class ProfileSetupState {
     bool clearSubmitError = false,
     UsernameAvailability? usernameAvailability,
     bool? termsAccepted,
+    bool? avatarUploadFailed,
   }) =>
       ProfileSetupState(
         draft: draft ?? this.draft,
@@ -77,6 +85,7 @@ class ProfileSetupState {
             clearSubmitError ? null : (submitError ?? this.submitError),
         usernameAvailability: usernameAvailability ?? this.usernameAvailability,
         termsAccepted: termsAccepted ?? this.termsAccepted,
+        avatarUploadFailed: avatarUploadFailed ?? this.avatarUploadFailed,
       );
 
   static const total = 4;
@@ -238,7 +247,13 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
       return;
     }
     final uid = user.uid;
-    state = state.copyWith(isSubmitting: true, clearSubmitError: true);
+    state = state.copyWith(
+      isSubmitting: true,
+      clearSubmitError: true,
+      // QA-PRO-106: cada submit re-evalúa el upload — un reintento que ahora
+      // sube bien no debe arrastrar el flag del intento anterior.
+      avatarUploadFailed: false,
+    );
 
     String? avatarUrl;
     final localPath = state.draft.avatarLocalPath;
@@ -247,9 +262,14 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
         avatarUrl =
             await ref.read(avatarUploadServiceProvider).upload(localPath);
       } on FirebaseException {
+        // QA-PRO-106 (issue #430): best-effort sigue siendo la política (el
+        // perfil se guarda sin foto), pero el fallo ya no es mudo — el flag
+        // le permite a la UI avisar que el avatar elegido no quedó subido.
         avatarUrl = null;
+        state = state.copyWith(avatarUploadFailed: true);
       } catch (_) {
         avatarUrl = null;
+        state = state.copyWith(avatarUploadFailed: true);
       }
     }
 

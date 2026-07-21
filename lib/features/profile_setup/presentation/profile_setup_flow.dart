@@ -82,6 +82,19 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
     // /profile-setup y recién después volvía a /home: flicker visible (audit F3).
     try {
       await notifier.submit();
+      // QA-PRO-106 (issue #430): el upload del avatar es best-effort — si
+      // falló, el perfil YA quedó guardado y el router navega a /home solo.
+      // El aviso va por el ScaffoldMessenger root, así que sobrevive esa
+      // navegación; sin esto la foto elegida se pierde en silencio.
+      if (!mounted) return;
+      if (ref.read(profileSetupNotifierProvider).avatarUploadFailed) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No pudimos subir tu foto — reintentá desde Perfil.'),
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
