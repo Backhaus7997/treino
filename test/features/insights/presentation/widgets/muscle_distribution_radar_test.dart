@@ -294,8 +294,9 @@ void main() {
         MuscleDistributionRadar(insights: insights, labels: _labels()),
       ));
 
-      // Formato compacto: 20770 → '20.8k', no '20770'.
-      expect(find.text('20.8k kg'), findsOneWidget);
+      // Formato compacto compartido (formatVolumeKg): 20770 → '20.7k' —
+      // floored, nunca redondea para arriba (#378).
+      expect(find.text('20.7k kg'), findsOneWidget);
       expect(find.text('20770 kg'), findsNothing);
 
       // Las 4 cards comparten altura (IntrinsicHeight + CrossAxisAlignment
@@ -312,6 +313,46 @@ void main() {
       expect(cardHeights.length, 1,
           reason: 'las 4 stat cards deben tener exactamente la misma altura, '
               'pero se midieron: $cardHeights');
+    });
+
+    testWidgets(
+        'QA #370: la unidad del volumen queda visible en ancho de iPhone — '
+        'el valor se achica, no se recorta', (tester) async {
+      // 49 480 kg en "Últimos 30 días" (mesociclo normal de un intermedio):
+      // con el ellipsis anterior la card mostraba "49.5k …" sin unidad.
+      const insights = MuscleDistributionInsights(
+        currentSetsByAxis: {RadarAxis.chest: 10},
+        previousSetsByAxis: {RadarAxis.chest: 6},
+        currentWorkouts: 22,
+        previousWorkouts: 20,
+        currentDurationMin: 1440,
+        previousDurationMin: 1380,
+        currentVolumeKg: 49480,
+        previousVolumeKg: 13900,
+        currentSets: 480,
+        previousSets: 450,
+      );
+
+      // Ancho lógico de iPhone 14 Pro (393pt) — el device del reporte de QA.
+      tester.view.physicalSize = const Size(393 * 3, 852 * 3);
+      tester.view.devicePixelRatio = 3.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(_wrap(
+        MuscleDistributionRadar(insights: insights, labels: _labels()),
+      ));
+
+      // Floored: 49 480 → '49.4k kg', y el string llega ENTERO al widget.
+      final value = find.text('49.4k kg');
+      expect(value, findsOneWidget);
+      // El valor vive dentro de un FittedBox(scaleDown): si no entra en la
+      // card se achica el font — un ellipsis acá volvía a comerse la unidad.
+      expect(
+        find.ancestor(of: value, matching: find.byType(FittedBox)),
+        findsOneWidget,
+      );
+      expect(find.textContaining('→ 13.9k kg'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
   });
 }

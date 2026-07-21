@@ -172,10 +172,12 @@ void main() {
     expect(find.text('VOLUMEN KG'), findsOneWidget);
     expect(find.text('PRS HOY'), findsOneWidget);
 
-    // Stat values: duration=45, sets=3 (count of setLogs), volume=1800
+    // Stat values: duration=45, sets=3 (count of setLogs), volume=1800.
+    // Volume renders via formatVolumeKg — whole values drop the .0 (#436).
     expect(find.text('45'), findsOneWidget);
     expect(find.text('3'), findsOneWidget);
-    expect(find.text('1800.0'), findsOneWidget);
+    expect(find.text('1800'), findsOneWidget);
+    expect(find.text('1800.0'), findsNothing);
 
     // Exercise group headings
     expect(find.text('Bench Press'), findsOneWidget);
@@ -222,8 +224,7 @@ void main() {
   // rendered a "PR" badge on EVERY set, so the athlete — and the trainer via
   // the coach-hub reuse — saw false personal records. Removed until real PR
   // detection exists.
-  testWidgets(
-      'SCENARIO-375: no "PR" badge rendered on set rows',
+  testWidgets('SCENARIO-375: no "PR" badge rendered on set rows',
       (tester) async {
     final setLogs = [
       _makeSetLog(exerciseName: 'Bench Press', setNumber: 1),

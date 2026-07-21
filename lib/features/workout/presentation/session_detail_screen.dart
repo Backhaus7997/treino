@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_palette.dart';
+import '../../../core/utils/kg_format.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../application/session_providers.dart';
 import '../domain/session.dart';
@@ -144,7 +145,7 @@ class _DetailLoaded extends StatelessWidget {
               ),
               StatTile(
                 label: l10n.workoutDetailStatVolumeKg,
-                value: session.totalVolumeKg.toString(),
+                value: formatVolumeKg(session.totalVolumeKg),
               ),
               StatTile(
                 label: l10n.workoutDetailStatPrsToday,

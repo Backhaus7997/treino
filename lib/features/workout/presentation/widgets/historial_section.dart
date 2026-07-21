@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/utils/kg_format.dart';
 import '../../application/session_providers.dart';
 import '../../domain/session.dart';
 import '../../domain/session_status.dart';
@@ -35,8 +36,8 @@ class _HistorialSectionState extends ConsumerState<HistorialSection> {
 
     final completedCount = sessionsAsync.maybeWhen(
       data: (all) => all
-          .where((s) =>
-              s.status == SessionStatus.finished && s.wasFullyCompleted)
+          .where(
+              (s) => s.status == SessionStatus.finished && s.wasFullyCompleted)
           .length,
       orElse: () => 0,
     );
@@ -240,7 +241,7 @@ class _HistorialCard extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Text(
-              '${session.totalVolumeKg}${AppL10n.of(context).workoutHistorialCardKgSuffix}',
+              '${formatVolumeKg(session.totalVolumeKg)}${AppL10n.of(context).workoutHistorialCardKgSuffix}',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: palette.textMuted,
               ),
