@@ -182,16 +182,19 @@ class _LoadedBody extends StatelessWidget {
           ),
           const SizedBox(height: 32),
 
-          // Mood row — 5 emojis, visual only (decorative, non-interactive)
+          // Mood row — 5 emojis, visual only (decorative, non-interactive).
+          // Flexible + FittedBox per emoji: when a glyph measures wider than
+          // expected (tofu .notdef, large font scale) the row scales down
+          // instead of overflowing (#456).
           const ExcludeSemantics(
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                Text('😞', style: TextStyle(fontSize: 28)),
-                Text('😕', style: TextStyle(fontSize: 28)),
-                Text('😐', style: TextStyle(fontSize: 28)),
-                Text('🙂', style: TextStyle(fontSize: 28)),
-                Text('😄', style: TextStyle(fontSize: 28)),
+                Flexible(child: _MoodEmoji('😞')),
+                Flexible(child: _MoodEmoji('😕')),
+                Flexible(child: _MoodEmoji('😐')),
+                Flexible(child: _MoodEmoji('🙂')),
+                Flexible(child: _MoodEmoji('😄')),
               ],
             ),
           ),
@@ -226,6 +229,33 @@ class _LoadedBody extends StatelessWidget {
                 : Text(l10n.workoutButtonShare),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Mood emoji ────────────────────────────────────────────────────────────────
+
+class _MoodEmoji extends StatelessWidget {
+  const _MoodEmoji(this.emoji);
+
+  final String emoji;
+
+  @override
+  Widget build(BuildContext context) {
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Text(
+        emoji,
+        // #456: on the iOS simulator (iPhone 16e / iOS 26.3) these glyphs can
+        // render as tofu "?" — the theme's Barlow families carry no emoji and
+        // the automatic platform fallback doesn't kick in there (likely an
+        // engine/Impeller simulator issue). The explicit fallback pins the
+        // system emoji font; physical-device verification is still pending.
+        style: const TextStyle(
+          fontSize: 28,
+          fontFamilyFallback: ['Apple Color Emoji'],
+        ),
       ),
     );
   }

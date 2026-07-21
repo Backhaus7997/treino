@@ -217,6 +217,58 @@ void main() {
     expect(emojiTexts.length, equals(5));
   });
 
+  // ── #456 regression: mood row must never overflow ────────────────────────
+
+  testWidgets(
+      '#456: mood row scales down instead of overflowing on a narrow screen',
+      (tester) async {
+    tester.view.physicalSize = const Size(180, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    // At this extreme width the StatTile grid cells legitimately overflow
+    // vertically before the mood row is even laid out, which would fail the
+    // test for an unrelated reason. Capture layout errors and assert that
+    // nothing overflows HORIZONTALLY — the mood row is the only horizontal
+    // Flex at risk on this screen (#456).
+    final horizontalOverflows = <FlutterErrorDetails>[];
+    final originalOnError = FlutterError.onError;
+    FlutterError.onError = (details) {
+      final message = details.exceptionAsString();
+      if (message.contains('overflowed')) {
+        if (message.contains('on the right')) {
+          horizontalOverflows.add(details);
+        }
+        return; // vertical overflows of unrelated widgets tolerated here
+      }
+      originalOnError?.call(details);
+    };
+    try {
+      await tester.pumpWidget(_buildWithRouter(
+        summaryOverride: () => (session: _makeSession(), setLogs: []),
+      ));
+      await tester.pumpAndSettle();
+    } finally {
+      // Must be restored BEFORE any expect(): the test binding reports expect
+      // failures through FlutterError.onError and asserts it wasn't replaced.
+      FlutterError.onError = originalOnError;
+    }
+
+    expect(
+      horizontalOverflows.map((d) => d.exceptionAsString()).toList(),
+      isEmpty,
+    );
+
+    // The row itself still renders its 5 emojis (scaled, not dropped).
+    final emojiTexts = tester
+        .widgetList<Text>(find.byType(Text))
+        .where((t) =>
+            t.data != null &&
+            RegExp(r'[\u{1F600}-\u{1F64F}]', unicode: true).hasMatch(t.data!))
+        .toList();
+    expect(emojiTexts.length, equals(5));
+  });
+
   // ── SCENARIO-349/350: LISTO + COMPARTIR buttons ──────────────────────────
 
   testWidgets('SCENARIO-349: LISTO button navigates to /workout without Post',
