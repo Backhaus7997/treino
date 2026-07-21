@@ -10,6 +10,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pagos_web_table.dart';
@@ -61,6 +62,23 @@ Payment _vencidoHaceDias(int diasAtraso, {String id = 'pay-2'}) {
     createdAt: now.subtract(Duration(days: diasAtraso + 30)),
     dueAt: now.subtract(Duration(days: diasAtraso)),
   );
+}
+
+// ── Helpers de layout ────────────────────────────────────────────────────────
+
+/// `true` si el `Text` encontrado por [finder] se está elidiendo con "…"
+/// (WARNING-1, Fase 9): compara el ancho intrínseco del contenido (el que
+/// ocuparía sin restricción de ancho, con el mismo estilo/escala ya
+/// resueltos por el `RenderParagraph` real) contra el ancho efectivamente
+/// asignado tras el layout de `Flex`. Si el intrínseco excede al disponible,
+/// `TextOverflow.ellipsis` recortó el texto — más robusto que comparar
+/// contra un ancho de columna hardcodeado, porque no depende de asumir el
+/// árbol de padding/flex exacto.
+bool _isTextTruncated(WidgetTester tester, Finder finder) {
+  final renderParagraph = tester.renderObject<RenderParagraph>(finder);
+  final intrinsicWidth = renderParagraph.getMaxIntrinsicWidth(double.infinity);
+  final actualWidth = renderParagraph.size.width;
+  return intrinsicWidth > actualWidth + 0.5;
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -246,8 +264,7 @@ void main() {
   group('PagosWebTable → acciones de fila (Fase 9 WU-07)', () {
     testWidgets(
         'SCENARIO 8 — showActions:true + pago pending muestra Recordar y '
-        'Marcar pagado; tocar Marcar pagado invoca el callback',
-        (tester) async {
+        'Pagado; tocar Pagado invoca el callback', (tester) async {
       tester.view.physicalSize = _kDesktopSize;
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -272,9 +289,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Recordar'), findsOneWidget); // i18n
-      expect(find.text('Marcar pagado'), findsOneWidget); // i18n
+      expect(find.text('Pagado'), findsOneWidget); // i18n
 
-      await tester.tap(find.text('Marcar pagado'));
+      await tester.tap(find.text('Pagado'));
       await tester.pumpAndSettle();
 
       expect(marcado, pending);
@@ -282,7 +299,7 @@ void main() {
 
     testWidgets(
         'SCENARIO 9 — showActions:false (tab Pagados) no muestra Recordar '
-        'ni Marcar pagado', (tester) async {
+        'ni Pagado', (tester) async {
       tester.view.physicalSize = _kDesktopSize;
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -306,13 +323,19 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Recordar'), findsNothing);
-      expect(find.text('Marcar pagado'), findsNothing);
+      // Por Key, no por texto: el payment está `paid`, así que el badge
+      // ESTADO ya rinde el texto 'Pagado' — buscar por texto sería un falso
+      // positivo/negativo ambiguo con esa celda.
+      expect(
+        find.byKey(const Key('pagos_accion_marcar_pagado_pay-1')),
+        findsNothing,
+      );
       expect(find.text('ACCIONES'), findsNothing); // i18n — no column either
     });
 
     testWidgets(
         'SCENARIO 10 — pago ya pagado con showActions:true muestra Recordar '
-        'pero NO Marcar pagado', (tester) async {
+        'pero NO Pagado', (tester) async {
       tester.view.physicalSize = _kDesktopSize;
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -335,7 +358,47 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Recordar'), findsOneWidget); // i18n
-      expect(find.text('Marcar pagado'), findsNothing);
+      // Por Key, no por texto: el payment está `paid`, así que el badge
+      // ESTADO ya rinde el texto 'Pagado' — buscar por texto sería un falso
+      // positivo/negativo ambiguo con esa celda.
+      expect(
+        find.byKey(const Key('pagos_accion_marcar_pagado_pay-1')),
+        findsNothing,
+      );
+    });
+
+    testWidgets(
+        'SCENARIO 11 — label "Pagado" no se elide con "…" en la '
+        'columna ACCIONES a 1440x900 (WARNING-1, Fase 9)', (tester) async {
+      tester.view.physicalSize = _kDesktopSize;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      final profiles = {
+        'uid-bob': const UserPublicProfile(uid: 'uid-bob', displayName: 'Bob'),
+      };
+      final pending = _vencidoHaceDias(4);
+
+      await tester.pumpWidget(
+        _wrap(
+          PagosWebTable(
+            payments: [pending],
+            profiles: profiles,
+            emptyMessage: 'Sin pagos',
+            onMarcarPagado: (_) {},
+            onRecordar: (_) {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        _isTextTruncated(tester, find.text('Pagado')),
+        isFalse,
+        reason: 'El ancho intrínseco del label "Pagado" no debe exceder el '
+            'ancho realmente disponible en la columna ACCIONES (si excede, '
+            'TextOverflow.ellipsis lo está recortando).',
+      );
     });
   });
 }
