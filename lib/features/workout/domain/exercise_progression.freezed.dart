@@ -670,6 +670,13 @@ mixin _$ExerciseListEntry {
   String get exerciseId => throw _privateConstructorUsedError;
   String get exerciseName => throw _privateConstructorUsedError;
 
+  /// [#377] Periods whose CURRENT window holds at least one chartable set
+  /// for this exercise — same predicate the aggregator uses to build the
+  /// series (countsAsWorkout session, weightKg > 0). The section widget
+  /// bounds the default preselection to the active period with this, so
+  /// the screen never opens on the chart's empty state by itself.
+  Set<ChartPeriod> get periodsWithData => throw _privateConstructorUsedError;
+
   /// Create a copy of ExerciseListEntry
   /// with the given fields replaced by the non-null parameter values.
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -683,7 +690,10 @@ abstract class $ExerciseListEntryCopyWith<$Res> {
           ExerciseListEntry value, $Res Function(ExerciseListEntry) then) =
       _$ExerciseListEntryCopyWithImpl<$Res, ExerciseListEntry>;
   @useResult
-  $Res call({String exerciseId, String exerciseName});
+  $Res call(
+      {String exerciseId,
+      String exerciseName,
+      Set<ChartPeriod> periodsWithData});
 }
 
 /// @nodoc
@@ -703,6 +713,7 @@ class _$ExerciseListEntryCopyWithImpl<$Res, $Val extends ExerciseListEntry>
   $Res call({
     Object? exerciseId = null,
     Object? exerciseName = null,
+    Object? periodsWithData = null,
   }) {
     return _then(_value.copyWith(
       exerciseId: null == exerciseId
@@ -713,6 +724,10 @@ class _$ExerciseListEntryCopyWithImpl<$Res, $Val extends ExerciseListEntry>
           ? _value.exerciseName
           : exerciseName // ignore: cast_nullable_to_non_nullable
               as String,
+      periodsWithData: null == periodsWithData
+          ? _value.periodsWithData
+          : periodsWithData // ignore: cast_nullable_to_non_nullable
+              as Set<ChartPeriod>,
     ) as $Val);
   }
 }
@@ -725,7 +740,10 @@ abstract class _$$ExerciseListEntryImplCopyWith<$Res>
       __$$ExerciseListEntryImplCopyWithImpl<$Res>;
   @override
   @useResult
-  $Res call({String exerciseId, String exerciseName});
+  $Res call(
+      {String exerciseId,
+      String exerciseName,
+      Set<ChartPeriod> periodsWithData});
 }
 
 /// @nodoc
@@ -743,6 +761,7 @@ class __$$ExerciseListEntryImplCopyWithImpl<$Res>
   $Res call({
     Object? exerciseId = null,
     Object? exerciseName = null,
+    Object? periodsWithData = null,
   }) {
     return _then(_$ExerciseListEntryImpl(
       exerciseId: null == exerciseId
@@ -753,6 +772,10 @@ class __$$ExerciseListEntryImplCopyWithImpl<$Res>
           ? _value.exerciseName
           : exerciseName // ignore: cast_nullable_to_non_nullable
               as String,
+      periodsWithData: null == periodsWithData
+          ? _value._periodsWithData
+          : periodsWithData // ignore: cast_nullable_to_non_nullable
+              as Set<ChartPeriod>,
     ));
   }
 }
@@ -761,16 +784,39 @@ class __$$ExerciseListEntryImplCopyWithImpl<$Res>
 
 class _$ExerciseListEntryImpl implements _ExerciseListEntry {
   const _$ExerciseListEntryImpl(
-      {required this.exerciseId, required this.exerciseName});
+      {required this.exerciseId,
+      required this.exerciseName,
+      final Set<ChartPeriod> periodsWithData = const <ChartPeriod>{}})
+      : _periodsWithData = periodsWithData;
 
   @override
   final String exerciseId;
   @override
   final String exerciseName;
 
+  /// [#377] Periods whose CURRENT window holds at least one chartable set
+  /// for this exercise — same predicate the aggregator uses to build the
+  /// series (countsAsWorkout session, weightKg > 0). The section widget
+  /// bounds the default preselection to the active period with this, so
+  /// the screen never opens on the chart's empty state by itself.
+  final Set<ChartPeriod> _periodsWithData;
+
+  /// [#377] Periods whose CURRENT window holds at least one chartable set
+  /// for this exercise — same predicate the aggregator uses to build the
+  /// series (countsAsWorkout session, weightKg > 0). The section widget
+  /// bounds the default preselection to the active period with this, so
+  /// the screen never opens on the chart's empty state by itself.
+  @override
+  @JsonKey()
+  Set<ChartPeriod> get periodsWithData {
+    if (_periodsWithData is EqualUnmodifiableSetView) return _periodsWithData;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableSetView(_periodsWithData);
+  }
+
   @override
   String toString() {
-    return 'ExerciseListEntry(exerciseId: $exerciseId, exerciseName: $exerciseName)';
+    return 'ExerciseListEntry(exerciseId: $exerciseId, exerciseName: $exerciseName, periodsWithData: $periodsWithData)';
   }
 
   @override
@@ -781,11 +827,14 @@ class _$ExerciseListEntryImpl implements _ExerciseListEntry {
             (identical(other.exerciseId, exerciseId) ||
                 other.exerciseId == exerciseId) &&
             (identical(other.exerciseName, exerciseName) ||
-                other.exerciseName == exerciseName));
+                other.exerciseName == exerciseName) &&
+            const DeepCollectionEquality()
+                .equals(other._periodsWithData, _periodsWithData));
   }
 
   @override
-  int get hashCode => Object.hash(runtimeType, exerciseId, exerciseName);
+  int get hashCode => Object.hash(runtimeType, exerciseId, exerciseName,
+      const DeepCollectionEquality().hash(_periodsWithData));
 
   /// Create a copy of ExerciseListEntry
   /// with the given fields replaced by the non-null parameter values.
@@ -800,12 +849,21 @@ class _$ExerciseListEntryImpl implements _ExerciseListEntry {
 abstract class _ExerciseListEntry implements ExerciseListEntry {
   const factory _ExerciseListEntry(
       {required final String exerciseId,
-      required final String exerciseName}) = _$ExerciseListEntryImpl;
+      required final String exerciseName,
+      final Set<ChartPeriod> periodsWithData}) = _$ExerciseListEntryImpl;
 
   @override
   String get exerciseId;
   @override
   String get exerciseName;
+
+  /// [#377] Periods whose CURRENT window holds at least one chartable set
+  /// for this exercise — same predicate the aggregator uses to build the
+  /// series (countsAsWorkout session, weightKg > 0). The section widget
+  /// bounds the default preselection to the active period with this, so
+  /// the screen never opens on the chart's empty state by itself.
+  @override
+  Set<ChartPeriod> get periodsWithData;
 
   /// Create a copy of ExerciseListEntry
   /// with the given fields replaced by the non-null parameter values.

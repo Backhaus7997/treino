@@ -21,6 +21,25 @@ double? calculateOneRepMax({required double weightKg, required int reps}) {
 /// Internal aggregation always keeps full double precision.
 double roundToNearestHalfKg(double value) => (value * 2).round() / 2;
 
+/// [#377] Whether [session] falls inside [window]'s CURRENT period — the
+/// exact calendar-day (ART) comparison [aggregateExerciseProgression] applies
+/// before building the 4 series. Shared with `athleteExerciseListProvider`'s
+/// per-period data flags so the picker's notion of "has data in this period"
+/// can never drift from what the chart actually renders.
+///
+/// Inclusive by calendar day: `currentEnd` is compared against the END of
+/// that day, so a session logged later that same day (any time-of-day) is
+/// still included.
+bool sessionInCurrentWindow(Session session, ChartPeriodWindow window) {
+  final endExclusive = DateTime.utc(
+    window.currentEnd.year,
+    window.currentEnd.month,
+    window.currentEnd.day + 1,
+  );
+  final local = toArgentina(session.startedAt);
+  return !local.isBefore(window.currentStart) && local.isBefore(endExclusive);
+}
+
 /// [AD3] Derives the first-achieved-date [PersonalRecord] for a single
 /// series — i.e. the point with the max [ProgressionPoint.value], picking
 /// the EARLIEST date if the max is reached more than once.
@@ -120,19 +139,10 @@ ExerciseProgression aggregateExerciseProgression({
   var sessionsAsc = sessionsAscUnfiltered;
 
   // [AD7] Filter to the selected period's CURRENT window, inclusive by
-  // calendar day. Comparing against end-of-day of currentEnd so a session
-  // logged later that same day (any time-of-day) is still included.
+  // calendar day (see [sessionInCurrentWindow]).
   if (periodWindow != null) {
-    final start = periodWindow.currentStart;
-    final endExclusive = DateTime.utc(
-      periodWindow.currentEnd.year,
-      periodWindow.currentEnd.month,
-      periodWindow.currentEnd.day + 1,
-    );
     sessionsAsc = sessionsAsc
-        .where((s) =>
-            !toArgentina(s.startedAt).isBefore(start) &&
-            toArgentina(s.startedAt).isBefore(endExclusive))
+        .where((s) => sessionInCurrentWindow(s, periodWindow))
         .toList();
   }
 
