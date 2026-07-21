@@ -83,6 +83,13 @@ class TarifasResumen {
       );
 }
 
+/// Pluraliza una palabra es-AR según [count]: singular solo cuando
+/// `count == 1`, plural en cualquier otro caso (incluido 0). Helper puro
+/// reusado por `TarifaCard` y `PlanesScreen` para evitar "1 alumnos"/
+/// "1 tarifas" (WARNING de verify Fase 10).
+String pluralizarEs(int count, String singular, String plural) =>
+    count == 1 ? singular : plural;
+
 bool _gruposEquals(List<TarifaGroup> a, List<TarifaGroup> b) {
   if (a.length != b.length) return false;
   for (var i = 0; i < a.length; i++) {

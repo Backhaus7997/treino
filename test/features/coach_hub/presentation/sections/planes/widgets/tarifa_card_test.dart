@@ -9,6 +9,8 @@
 // SCENARIO-TC-05: hover (con onTap wired) cambia el color real del root —
 //   sin onTap (default), la card queda estática (read-only honesto).
 // SCENARIO-TC-06: smoke dark+light sin crash.
+// SCENARIO-TC-07: pluralización es-AR de "alumno/alumnos" — singular con
+//   alumnosCount == 1 (texto visible y Semantics), plural en el resto.
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -73,7 +75,7 @@ void main() {
       expect(find.text('POR SESIÓN'), findsOneWidget);
       expect(find.text(r'$30.000'), findsOneWidget);
       expect(find.text('/sesión'), findsOneWidget);
-      expect(find.text('1 alumnos'), findsOneWidget);
+      expect(find.text('1 alumno'), findsOneWidget);
     });
 
     testWidgets('suelto → badge SUELTO, precio + único', (tester) async {
@@ -188,6 +190,42 @@ void main() {
 
       final hoverColor = decorationColor();
       expect(hoverColor, isNot(equals(normalColor)));
+    });
+  });
+
+  group('SCENARIO-TC-07 — TarifaCard: pluralización de alumnos', () {
+    testWidgets('alumnosCount == 1 → "1 alumno" (texto y Semantics)',
+        (tester) async {
+      await tester.pumpWidget(_wrap(const TarifaCard(
+        group: TarifaGroup(
+          amountArs: 30000,
+          cadence: BillingCadence.porSesion,
+          alumnosCount: 1,
+        ),
+        masUsada: true,
+      )));
+      await tester.pump();
+
+      expect(find.text('1 alumno'), findsOneWidget);
+      expect(find.text('1 alumnos'), findsNothing);
+
+      final semantics = tester.getSemantics(
+        find.byKey(const Key('tarifa_card_root')),
+      );
+      expect(semantics.label, matches(RegExp(r'1 alumno(?!s)')));
+    });
+
+    testWidgets('alumnosCount > 1 → plural ("N alumnos")', (tester) async {
+      await tester.pumpWidget(_wrap(const TarifaCard(
+        group: TarifaGroup(
+          amountArs: 15000,
+          cadence: BillingCadence.mensual,
+          alumnosCount: 3,
+        ),
+      )));
+      await tester.pump();
+
+      expect(find.text('3 alumnos'), findsOneWidget);
     });
   });
 

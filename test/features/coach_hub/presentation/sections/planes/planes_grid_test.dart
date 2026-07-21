@@ -102,7 +102,7 @@ void main() {
       expect(find.text(r'$30.000'), findsOneWidget);
       expect(find.text('3 alumnos'), findsOneWidget);
       expect(find.text('2 alumnos'), findsOneWidget);
-      expect(find.text('1 alumnos'), findsOneWidget);
+      expect(find.text('1 alumno'), findsOneWidget);
 
       // Solo el grupo mensual (3 alumnos, la moda) tiene el chip.
       expect(find.text('Más usada'), findsOneWidget);

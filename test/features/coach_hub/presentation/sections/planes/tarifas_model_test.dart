@@ -254,4 +254,21 @@ void main() {
       expect(base, isNot(otroMonto));
     });
   });
+
+  group('SCENARIO-TM-08 — pluralizarEs: singular/plural es-AR', () {
+    test('count == 1 → singular', () {
+      expect(pluralizarEs(1, 'alumno', 'alumnos'), 'alumno');
+      expect(pluralizarEs(1, 'tarifa', 'tarifas'), 'tarifa');
+    });
+
+    test('count == 0 → plural', () {
+      expect(pluralizarEs(0, 'alumno', 'alumnos'), 'alumnos');
+      expect(pluralizarEs(0, 'tarifa', 'tarifas'), 'tarifas');
+    });
+
+    test('count > 1 → plural', () {
+      expect(pluralizarEs(3, 'alumno', 'alumnos'), 'alumnos');
+      expect(pluralizarEs(2, 'tarifa', 'tarifas'), 'tarifas');
+    });
+  });
 }

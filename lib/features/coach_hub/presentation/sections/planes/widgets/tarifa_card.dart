@@ -82,7 +82,8 @@ class TarifaCard extends StatelessWidget {
           key: const Key('tarifa_card_semantics'),
           label: '${cadenceLabel(group.cadence)}, '
               '${fmtArs(group.amountArs)}${cadenceSuffix(group.cadence)}, '
-              '${group.alumnosCount} alumnos'
+              '${group.alumnosCount} '
+              '${pluralizarEs(group.alumnosCount, 'alumno', 'alumnos')}' // i18n
               '${masUsada ? ', más usada' : ''}', // i18n
           child: AnimatedContainer(
             key: const Key('tarifa_card_root'),
@@ -140,7 +141,8 @@ class TarifaCard extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.s12),
                 Text(
-                  '${group.alumnosCount} alumnos', // i18n
+                  '${group.alumnosCount} '
+                  '${pluralizarEs(group.alumnosCount, 'alumno', 'alumnos')}', // i18n
                   style: TextStyle(
                     fontFamily: AppFonts.barlow,
                     fontSize: 13,
