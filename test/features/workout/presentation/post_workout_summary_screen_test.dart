@@ -163,6 +163,12 @@ void main() {
     expect(find.text('3.2'), findsOneWidget);
     expect(find.text('22'), findsOneWidget);
     expect(find.text('—'), findsWidgets);
+
+    // Labels carry their unit (#363) — bare DURACIÓN/VOLUMEN must be gone.
+    expect(find.text('DURACIÓN MIN'), findsOneWidget);
+    expect(find.text('VOLUMEN KG'), findsOneWidget);
+    expect(find.text('DURACIÓN'), findsNothing);
+    expect(find.text('VOLUMEN'), findsNothing);
   });
 
   testWidgets('SCENARIO-346: SETS stat uses count from setLogs',
@@ -289,7 +295,8 @@ void main() {
     await tester.tap(find.text('COMPARTIR'));
     await tester.pumpAndSettle();
 
-    expect(find.text('No pudimos compartir tu post. Intentá de nuevo.'), findsOneWidget);
+    expect(find.text('No pudimos compartir tu post. Intentá de nuevo.'),
+        findsOneWidget);
     expect(find.text('workout-home'), findsNothing);
   });
 

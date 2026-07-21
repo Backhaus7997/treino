@@ -1034,6 +1034,18 @@ abstract class AppL10n {
   /// **'VOLUMEN'**
   String get workoutStatVolume;
 
+  /// No description provided for @workoutStatDurationMin.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DURACIÓN MIN'**
+  String get workoutStatDurationMin;
+
+  /// No description provided for @workoutStatVolumeKg.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VOLUMEN KG'**
+  String get workoutStatVolumeKg;
+
   /// No description provided for @workoutStatSets.
   ///
   /// In es_AR, this message translates to:
@@ -1201,6 +1213,18 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'VOLUMEN'**
   String get workoutDetailStatVolume;
+
+  /// No description provided for @workoutDetailStatDurationMin.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DURACIÓN MIN'**
+  String get workoutDetailStatDurationMin;
+
+  /// No description provided for @workoutDetailStatVolumeKg.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VOLUMEN KG'**
+  String get workoutDetailStatVolumeKg;
 
   /// No description provided for @workoutDetailStatPrsToday.
   ///
