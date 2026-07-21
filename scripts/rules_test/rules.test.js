@@ -427,6 +427,68 @@ test('GYM-PLACES-06: update cannot flip an existing self-service doc to google-p
   );
 });
 
+test('GYM-PLACES-07: update that CHANGES the name of an existing google-places doc is denied (QA-SEC-003 vandalism)', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_7')
+      .set(validGooglePlacesGym('ChIJ_place_7'));
+  });
+
+  // Any OTHER authenticated user must not be able to rewrite the name — this
+  // is the core catalog-vandalism vector the pin closes.
+  const attacker = testEnv.authenticatedContext('attacker');
+  await assertFails(
+    attacker
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_7')
+      .set({ name: 'VANDALIZED' }, { merge: true }),
+  );
+});
+
+test('GYM-PLACES-08: update that CHANGES lat/lng of an existing google-places doc is denied (QA-SEC-003 vandalism)', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_8')
+      .set(validGooglePlacesGym('ChIJ_place_8'));
+  });
+
+  const attacker = testEnv.authenticatedContext('attacker');
+  await assertFails(
+    attacker
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_8')
+      .set({ lat: 0, lng: 0 }, { merge: true }),
+  );
+});
+
+test('GYM-PLACES-09: create is denied when lat is outside geographic range', async () => {
+  const athleteA = testEnv.authenticatedContext('athlete-a');
+  await assertFails(
+    athleteA
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_9')
+      .set({ ...validGooglePlacesGym('ChIJ_place_9'), lat: 999 }),
+  );
+});
+
+test('GYM-PLACES-10: create is denied when lng is outside geographic range', async () => {
+  const athleteA = testEnv.authenticatedContext('athlete-a');
+  await assertFails(
+    athleteA
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_10')
+      .set({ ...validGooglePlacesGym('ChIJ_place_10'), lng: -200 }),
+  );
+});
+
 // ---------------------------------------------------------------------------
 // routines (user-created) — SCENARIO-600..608
 // REQ-USR-004, REQ-USR-008, REQ-USR-009, REQ-USR-012, REQ-USR-013,
