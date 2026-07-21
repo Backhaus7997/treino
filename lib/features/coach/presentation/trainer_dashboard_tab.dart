@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../l10n/app_l10n.dart';
+import '../../../core/utils/appointment_window.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../coach_hub/presentation/sections/pagos/widgets/thousands_input_formatter.dart';
 import '../../payments/application/pagos_por_cobrar_provider.dart';
@@ -1975,12 +1976,11 @@ bool _looksLikeUid(String s) {
 }
 
 TrainerAppointmentsKey _appointmentsKey(String trainerId) {
-  final now = DateTime.now().toUtc();
-  final from = DateTime.utc(now.year, now.month - 1 < 1 ? 1 : now.month - 1, 1);
-  final to = DateTime.utc(now.year + 1, now.month, 1);
+  // QA-HOME-009: misma ventana rodante que la agenda (helper compartido).
+  final window = rollingAppointmentWindow(DateTime.now().toUtc());
   return TrainerAppointmentsKey(
     trainerId: trainerId,
-    fromDate: from,
-    toDate: to,
+    fromDate: window.from,
+    toDate: window.to,
   );
 }
