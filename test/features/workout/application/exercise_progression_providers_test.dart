@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
+import 'package:treino/core/utils/argentina_time.dart';
 import 'package:treino/features/insights/domain/chart_period.dart';
 import 'package:treino/features/workout/application/exercise_progression_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
@@ -21,15 +22,26 @@ class _MockSessionRepository extends Mock implements SessionRepository {}
 // #372: the progression aggregator now counts only `countsAsWorkout` sessions
 // (finished AND wasFullyCompleted). These fixtures are COMPLETED workouts, so
 // set `wasFullyCompleted: true` — the default (false) would exclude them.
-Session _s(String id, DateTime dt) => Session(
+Session _s(String id, DateTime dt, {bool wasFullyCompleted = true}) => Session(
       id: id,
       uid: 'a1',
       routineId: 'r',
       routineName: 'R',
       startedAt: dt,
       status: SessionStatus.finished,
-      wasFullyCompleted: true,
+      wasFullyCompleted: wasFullyCompleted,
     );
+
+/// [#377] Instante UTC-flagged al MEDIODÍA del día calendario ART de hace
+/// [daysBack] días. Anclado a [argentinaNow] y no a `DateTime.now()`: entre
+/// 21:00 y 23:59 ART el día UTC ya es "mañana", y un fixture derivado del día
+/// UTC caería fuera de la ventana actual (que termina en el día ART de hoy).
+/// Mediodía para que el shift −3h de [toArgentina] nunca cruce el borde de
+/// día.
+DateTime _artDay(int daysBack) {
+  final today = argentinaNow();
+  return DateTime.utc(today.year, today.month, today.day - daysBack, 12);
+}
 
 SetLog _log(String sessionId, String exId, String exName, int reps, double kg,
         {int setNum = 1}) =>
@@ -229,5 +241,116 @@ void main() {
     verify(() => repo.listSetLogs(
         uid: any(named: 'uid'),
         sessionId: any(named: 'sessionId'))).called(greaterThan(60));
+  });
+
+  // ── #377 — periodsWithData: la preselección acotada por período ────────────
+
+  group('#377 periodsWithData', () {
+    test(
+        'marca los períodos cuya ventana actual tiene sets con peso; '
+        'un ejercicio fuera de toda ventana queda EN la lista sin flags',
+        () async {
+      // "Hoy" (ART) cae siempre dentro de las ventanas actuales de los 3
+      // períodos; hace 40 días cae siempre fuera de las 3 (last30d = 29 días
+      // atrás, thisWeek ≤ 6, month ≤ 30).
+      final sToday = _s('sToday', _artDay(0));
+      final sOld = _s('sOld', _artDay(40));
+      final sessions = [sToday, sOld]; // DESC
+
+      when(() => repo.listSetLogs(uid: 'a1', sessionId: 'sToday')).thenAnswer(
+          (_) async => [_log('sToday', 'squat', 'Sentadilla', 5, 80)]);
+      when(() => repo.listSetLogs(uid: 'a1', sessionId: 'sOld')).thenAnswer(
+          (_) async => [_log('sOld', 'bench', 'Press banca', 5, 60)]);
+
+      final container = _container(repo: repo, sessions: sessions);
+      addTearDown(container.dispose);
+
+      final list =
+          await container.read(athleteExerciseListProvider('a1').future);
+
+      final squat = list.firstWhere((e) => e.exerciseId == 'squat');
+      expect(squat.periodsWithData, ChartPeriod.values.toSet());
+
+      // Membership intacta: bench sigue en el picker, pero sin datos en
+      // ningún período seleccionable.
+      final bench = list.firstWhere((e) => e.exerciseId == 'bench');
+      expect(bench.periodsWithData, isEmpty);
+    });
+
+    test('sets con weightKg = 0 no marcan período (espejo de #368)', () async {
+      // Dominadas al peso corporal: el player las loguea con 0kg y el chart
+      // las excluye de las 4 series → un período con SOLO sets 0kg rendiría
+      // "Sin datos para este ejercicio." y no debe marcar flag.
+      final sToday = _s('sToday', _artDay(0));
+
+      when(() => repo.listSetLogs(uid: 'a1', sessionId: 'sToday'))
+          .thenAnswer((_) async => [
+                _log('sToday', 'pullup', 'Dominadas', 10, 0),
+                _log('sToday', 'squat', 'Sentadilla', 5, 80, setNum: 2),
+              ]);
+
+      final container = _container(repo: repo, sessions: [sToday]);
+      addTearDown(container.dispose);
+
+      final list =
+          await container.read(athleteExerciseListProvider('a1').future);
+
+      final pullup = list.firstWhere((e) => e.exerciseId == 'pullup');
+      expect(pullup.periodsWithData, isEmpty);
+      final squat = list.firstWhere((e) => e.exerciseId == 'squat');
+      expect(squat.periodsWithData, isNotEmpty);
+    });
+
+    test('sesiones abandonadas no marcan período (espejo de #372)', () async {
+      // countsAsWorkout == false: el aggregator la excluye de las series, así
+      // que tampoco puede sostener la preselección.
+      final sAbandoned = _s('sAbandoned', _artDay(0), wasFullyCompleted: false);
+
+      when(() => repo.listSetLogs(uid: 'a1', sessionId: 'sAbandoned'))
+          .thenAnswer(
+              (_) async => [_log('sAbandoned', 'squat', 'Sentadilla', 5, 80)]);
+
+      final container = _container(repo: repo, sessions: [sAbandoned]);
+      addTearDown(container.dispose);
+
+      final list =
+          await container.read(athleteExerciseListProvider('a1').future);
+
+      final squat = list.firstWhere((e) => e.exerciseId == 'squat');
+      expect(squat.periodsWithData, isEmpty);
+    });
+
+    test(
+        'el scan de la lista se ensancha más allá de 60 para cubrir la '
+        'ventana del período (mismo contrato AD7 del provider de progresión)',
+        () async {
+      // 3 sesiones/día durante los 30 días de la ventana last30d = 90
+      // sesiones dentro de la ventana — supera el cap de 60. La ÚNICA sesión
+      // con 'old-ex' es la más vieja (día 29, índice 89): con el cap plano de
+      // antes ni siquiera se escaneaba, y el ejercicio perdía flag y entrada.
+      final sessions = List.generate(
+        90,
+        (i) => _s('s$i', _artDay(i ~/ 3)), // DESC, 3 por día
+      );
+
+      when(() => repo.listSetLogs(
+          uid: any(named: 'uid'),
+          sessionId: any(named: 'sessionId'))).thenAnswer((_) async => []);
+      when(() => repo.listSetLogs(uid: 'a1', sessionId: 's89')).thenAnswer(
+          (_) async => [_log('s89', 'old-ex', 'Remo con barra', 5, 70)]);
+
+      final container = _container(repo: repo, sessions: sessions);
+      addTearDown(container.dispose);
+
+      final list =
+          await container.read(athleteExerciseListProvider('a1').future);
+
+      verify(() => repo.listSetLogs(
+          uid: any(named: 'uid'),
+          sessionId: any(named: 'sessionId'))).called(90);
+
+      final oldEx = list.firstWhere((e) => e.exerciseId == 'old-ex');
+      expect(oldEx.periodsWithData, contains(ChartPeriod.last30d));
+    });
   });
 }
