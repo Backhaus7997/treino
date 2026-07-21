@@ -1,4 +1,7 @@
 {
+  "notFoundTitle": "Página no encontrada",
+  "notFoundBody": "La ruta que buscás no existe o el enlace es inválido.",
+  "notFoundCta": "Volver al inicio",
   "homeAthleteFirstRunTitle": "Arrancá tu entrenamiento",
   "@homeAthleteFirstRunTitle": {"description": "Home first-run empty-state title for an athlete with no routine (usability finding 6)."},
   "homeAthleteFirstRunBody": "Creá tu primera rutina o buscá un entrenador para empezar.",

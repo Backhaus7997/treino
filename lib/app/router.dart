@@ -41,6 +41,7 @@ import '../features/profile/application/account_deletion_notifier.dart';
 import '../features/feed/presentation/public_profile_screen.dart';
 import '../features/feed/presentation/search_users_screen.dart';
 import '../features/home/home_screen.dart';
+import 'not_found_screen.dart';
 import '../features/insights/presentation/exercise_progression_screen.dart';
 import '../features/insights/presentation/frequent_exercises_screen.dart';
 import '../features/insights/presentation/insights_screen.dart';
@@ -189,6 +190,9 @@ GoRouter buildRouter({
     initialLocation: '/splash',
     refreshListenable: refreshListenable,
     redirect: (ctx, state) => authRedirect(read, state.matchedLocation),
+    // QA-NAV-002: una ruta desconocida o un deep-link malformado cae acá en vez
+    // de en la pantalla de error roja default de go_router.
+    errorBuilder: (context, state) => const NotFoundScreen(),
     routes: [
       // Entry routes — full screen, NO bottom bar
       GoRoute(

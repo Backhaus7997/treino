@@ -98,6 +98,24 @@ abstract class AppL10n {
     Locale('es', 'AR')
   ];
 
+  /// No description provided for @notFoundTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Página no encontrada'**
+  String get notFoundTitle;
+
+  /// No description provided for @notFoundBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'La ruta que buscás no existe o el enlace es inválido.'**
+  String get notFoundBody;
+
+  /// No description provided for @notFoundCta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Volver al inicio'**
+  String get notFoundCta;
+
   /// Home first-run empty-state title for an athlete with no routine (usability finding 6).
   ///
   /// In es_AR, this message translates to:

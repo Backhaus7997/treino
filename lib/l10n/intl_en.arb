@@ -1,4 +1,7 @@
 {
+  "notFoundTitle": "",
+  "notFoundBody": "",
+  "notFoundCta": "",
   "homeAthleteFirstRunTitle": "Start training",
   "homeAthleteFirstRunBody": "Create your first routine or find a trainer to get started.",
   "homeAthleteFirstRunCreateCta": "CREATE ROUTINE",

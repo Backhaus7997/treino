@@ -9,6 +9,16 @@ class AppL10nEs extends AppL10n {
   AppL10nEs([String locale = 'es']) : super(locale);
 
   @override
+  String get notFoundTitle => 'Página no encontrada';
+
+  @override
+  String get notFoundBody =>
+      'La ruta que buscás no existe o el enlace es inválido.';
+
+  @override
+  String get notFoundCta => 'Volver al inicio';
+
+  @override
   String get homeAthleteFirstRunTitle => 'Arrancá tu entrenamiento';
 
   @override
@@ -2717,6 +2727,16 @@ class AppL10nEs extends AppL10n {
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
 class AppL10nEsAr extends AppL10nEs {
   AppL10nEsAr() : super('es_AR');
+
+  @override
+  String get notFoundTitle => 'Página no encontrada';
+
+  @override
+  String get notFoundBody =>
+      'La ruta que buscás no existe o el enlace es inválido.';
+
+  @override
+  String get notFoundCta => 'Volver al inicio';
 
   @override
   String get homeAthleteFirstRunTitle => 'Arrancá tu entrenamiento';

@@ -9,6 +9,15 @@ class AppL10nEn extends AppL10n {
   AppL10nEn([String locale = 'en']) : super(locale);
 
   @override
+  String get notFoundTitle => '';
+
+  @override
+  String get notFoundBody => '';
+
+  @override
+  String get notFoundCta => '';
+
+  @override
   String get homeAthleteFirstRunTitle => 'Start training';
 
   @override
