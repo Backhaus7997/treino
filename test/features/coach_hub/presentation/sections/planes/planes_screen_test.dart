@@ -17,6 +17,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach_hub/presentation/sections/planes/planes_screen.dart';
 import 'package:treino/features/coach_hub/presentation/sections/planes/tarifas_provider.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart'
+    show KpiCard;
 import 'package:treino/features/payments/domain/athlete_billing.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
@@ -123,8 +125,17 @@ void main() {
       expect(find.byKey(const Key('kpi_card_skeleton')), findsNothing);
       expect(find.text(r'$0'), findsOneWidget); // Precio promedio
       // Alumnos con tarifa (0) y Tarifas distintas (0) comparten el mismo
-      // texto de value — deben aparecer dos KpiCard con "0".
-      expect(find.text('0'), findsNWidgets(2));
+      // texto de value — deben aparecer dos KpiCard con "0". Scoped a KpiCard
+      // (WU-04 agregó badges "0" por cadencia en los TreinoFilterChips del
+      // grid, que también matchean texto "0" — no son parte de este
+      // contrato).
+      expect(
+        find.descendant(
+          of: find.byType(KpiCard),
+          matching: find.text('0'),
+        ),
+        findsNWidgets(2),
+      );
     });
   });
 }
