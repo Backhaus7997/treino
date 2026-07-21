@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/pagos_web_screen.dart';
+import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pagos_filtro_provider.dart';
 import 'package:treino/features/coach_hub/presentation/shell/coach_hub_page.dart';
 import 'package:treino/features/coach_hub/presentation/shell/sidebar_item.dart';
 
@@ -17,13 +18,19 @@ final List<RouteBase> pagosRoutes = [
   ),
 ];
 
-const List<SidebarItem> pagosSidebarItems = [
+// No-const (a diferencia de otras secciones sin badge): `badgeProvider`
+// apunta a `pagosBadgeCountProvider`, un top-level `final` no evaluable en
+// tiempo de compilación — mismo patrón que `invitacionesSidebarItems`
+// (ADR-F4-04). `sidebar_registry.dart` ya dejó de ser `const` por Solicitudes,
+// así que sumar este provider no rompe la compilación (Fase 9 WU-08).
+final List<SidebarItem> pagosSidebarItems = [
   SidebarItem(
     id: 'pagos',
     label: 'Pagos', // i18n: Fase W1
     route: '/pagos',
     iconBuilder: _pagosIcon,
     group: SidebarGroup.recursos,
+    badgeProvider: pagosBadgeCountProvider,
   ),
 ];
 
