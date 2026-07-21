@@ -16,9 +16,14 @@ final myFriendsFeedProvider = FutureProvider<List<Post>>((ref) async {
   if (auth == null) return const <Post>[];
 
   final friendUids = await ref.watch(acceptedFriendsProvider(auth.uid).future);
-  if (friendUids.isEmpty) return const <Post>[];
-
-  return await ref.watch(feedForFriendsProvider(friendUidsKey(friendUids)).future);
+  // QA-FEED-003: incluir el propio uid para que los posts AMIGOS del autor
+  // aparezcan en su feed AMIGOS (consistente con MI GYM / PÚBLICO, donde los
+  // propios sí se ven). Sin esto, el autor publica y no ve nada. No hay
+  // early-return por amigos vacíos: un usuario sin amigos igual debe ver sus
+  // propios posts privacy=friends. La regla de posts ya permite leer los
+  // propios (request.auth.uid == authorUid), así que la query no falla.
+  final authorUids = <String>{...friendUids, auth.uid}.toList();
+  return await ref.watch(feedForFriendsProvider(friendUidsKey(authorUids)).future);
 });
 
 /// Returns the gym-privacy feed for the current user's gym.
