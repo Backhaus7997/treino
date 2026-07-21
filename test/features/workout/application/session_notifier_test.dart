@@ -638,7 +638,8 @@ void main() {
             durationMin: any(named: 'durationMin'),
             wasFullyCompleted: any(named: 'wasFullyCompleted'),
           )).thenAnswer((_) async {});
-      when(() => repo.listByUid('u1')).thenAnswer((_) async => <Session>[]);
+      when(() => repo.listByUid('u1', limit: any(named: 'limit')))
+          .thenAnswer((_) async => <Session>[]);
 
       final routine = makeRoutine();
       final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
@@ -656,7 +657,7 @@ void main() {
 
       await container.read(sessionsByUidProvider('u1').future); // forces #2
 
-      verify(() => repo.listByUid('u1')).called(2);
+      verify(() => repo.listByUid('u1', limit: any(named: 'limit'))).called(2);
     });
   });
 
@@ -782,7 +783,8 @@ void main() {
           )).thenAnswer((_) async {});
       // sessionsByUidProvider's fetch — counted to prove the invalidation
       // forces a re-fetch.
-      when(() => repo.listByUid('u1')).thenAnswer((_) async => <Session>[]);
+      when(() => repo.listByUid('u1', limit: any(named: 'limit')))
+          .thenAnswer((_) async => <Session>[]);
 
       final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
       addTearDown(container.dispose);
@@ -803,7 +805,7 @@ void main() {
       // The invalidate scheduled a rebuild; awaiting the future forces fetch #2.
       await container.read(sessionsByUidProvider('u1').future);
 
-      verify(() => repo.listByUid('u1')).called(2);
+      verify(() => repo.listByUid('u1', limit: any(named: 'limit'))).called(2);
     });
   });
 
