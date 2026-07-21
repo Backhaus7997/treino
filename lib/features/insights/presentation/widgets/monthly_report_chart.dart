@@ -9,6 +9,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../app/theme/app_motion.dart';
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/utils/date_labels.dart';
+import '../../../../core/utils/kg_format.dart';
 import '../../domain/monthly_report.dart';
 
 // ── Label bag ─────────────────────────────────────────────────────────────────
@@ -276,9 +277,7 @@ class _Bars extends StatelessWidget {
           : hours.toStringAsFixed(1);
     }
     if (metric == MonthlyReportMetric.volume && value is double) {
-      return value % 1 == 0
-          ? value.toStringAsFixed(0)
-          : value.toStringAsFixed(1);
+      return formatVolumeKg(value);
     }
     return value.toString();
   }

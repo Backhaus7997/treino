@@ -10,6 +10,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_motion.dart';
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/utils/kg_format.dart';
 import '../../domain/muscle_distribution_insights.dart';
 import '../../domain/radar_axis.dart';
 
@@ -305,9 +306,9 @@ class _StatCardGrid extends StatelessWidget {
             child: _StatCard(
               label: labels.volumeLabel,
               currentValue:
-                  '${_formatVolume(insights.currentVolumeKg)} ${labels.volumeUnit}',
+                  '${formatVolumeKg(insights.currentVolumeKg)} ${labels.volumeUnit}',
               previousValue:
-                  '${_formatVolume(insights.previousVolumeKg)} ${labels.volumeUnit}',
+                  '${formatVolumeKg(insights.previousVolumeKg)} ${labels.volumeUnit}',
             ),
           ),
           const SizedBox(width: 8),
@@ -322,21 +323,6 @@ class _StatCardGrid extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Volumen compacto para que entre en UNA línea en un cuarto del ancho de
-/// pantalla: `20770` → `20.8k`. Un volumen real de gimnasio pasa los 5 dígitos
-/// enseguida, y con la unidad al lado (`20770 kg`) wrappeaba a dos líneas y
-/// estiraba esa card por encima de las otras tres.
-///
-/// El corte en 10k es deliberado: por debajo, el número entra entero y se
-/// prefiere la precisión exacta.
-String _formatVolume(double value) {
-  if (value >= 10000) {
-    final k = (value / 1000).toStringAsFixed(1);
-    return '${k.endsWith('.0') ? k.substring(0, k.length - 2) : k}k';
-  }
-  return value % 1 == 0 ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
 }
 
 /// One stat card: current value big, previous value small with a `→` arrow
@@ -374,18 +360,20 @@ class _StatCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          // maxLines 1 + ellipsis: red de seguridad. El formato compacto ya
-          // evita el wrap para volúmenes reales, pero un valor inesperadamente
-          // largo debe recortarse, NUNCA saltar de línea — eso es lo que
-          // desparejaba las alturas.
-          Text(
-            currentValue,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 16,
-              color: palette.textPrimary,
+          // FittedBox scaleDown: el valor entra SIEMPRE en una línea — se
+          // achica en vez de recortarse. El ellipsis que había acá se comía
+          // la unidad con volúmenes reales de 30 días ("49.5k …", QA #370),
+          // y saltar de línea desparejaba las alturas de las 4 cards.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              currentValue,
+              maxLines: 1,
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
+                color: palette.textPrimary,
+              ),
             ),
           ),
           Text(

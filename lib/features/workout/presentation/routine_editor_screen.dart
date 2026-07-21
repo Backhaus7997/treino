@@ -11,6 +11,7 @@ import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/analytics/analytics_service.dart';
+import '../../../core/utils/kg_format.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../coach/presentation/widgets/exercise_picker_sheet.dart';
@@ -3740,10 +3741,9 @@ class _LevelDropdown extends StatelessWidget {
 
 /// Formats a weight for display in the KG field: integers drop the decimal
 /// (60), fractional values keep theirs (17.5). Null/absent → empty string.
-String formatEditorWeight(double? w) {
-  if (w == null) return '';
-  return w == w.truncateToDouble() ? w.toInt().toString() : w.toString();
-}
+/// Delegates to the app-wide rule so the editor can never drift from how the
+/// rest of the app renders loads.
+String formatEditorWeight(double? w) => formatWeightKg(w);
 
 /// Parses KG field text into a nullable double, accepting comma as the decimal
 /// separator (common on iOS numeric keypads). Empty/invalid → null.

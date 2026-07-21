@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
+import '../../../core/utils/kg_format.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
@@ -38,9 +39,6 @@ String _formatMMSS(int totalSeconds) {
   final s = (totalSeconds % 60).toString().padLeft(2, '0');
   return '$m:$s';
 }
-
-String _formatWeight(double w) =>
-    w == w.truncateToDouble() ? w.toInt().toString() : w.toString();
 
 // ── Block gating helpers (top-level, testable) ────────────────────────────────
 
@@ -359,7 +357,9 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
   /// NO aplica — si no, el set nunca se marca hecho y un día con cualquier
   /// ejercicio por tiempo jamás puede terminarse.
   void _logSet(RoutineSlot slot, int setNumber, int reps, double weightKg) {
-    if (slot.effectiveExerciseMode != ExerciseMode.duration && reps <= 0) return;
+    if (slot.effectiveExerciseMode != ExerciseMode.duration && reps <= 0) {
+      return;
+    }
     ref.read(sessionNotifierProvider(widget.init).notifier).logSet(
           SetLog(
             id: '',
@@ -764,7 +764,7 @@ class _SessionStatsCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   '$completed / $total ejercicios · '
-                  '${state.totalVolumeKg.toStringAsFixed(1)} kg vol.',
+                  '${formatVolumeKg(state.totalVolumeKg)} kg vol.',
                   style: GoogleFonts.barlow(
                     fontWeight: FontWeight.w400,
                     fontSize: 12,
@@ -1860,7 +1860,7 @@ class _RepsSetRowState extends State<_RepsSetRow> {
     _weightKg = clampWeightKg(widget.initialWeightKg);
     _reps = clampReps(widget.initialReps);
     _weightController = TextEditingController(
-      text: _weightKg == 0 ? '' : _formatWeight(_weightKg),
+      text: _weightKg == 0 ? '' : formatWeightKg(_weightKg),
     );
     _repsController = TextEditingController(
       text: _reps == 0 ? '' : _reps.toString(),
@@ -1948,7 +1948,7 @@ class _RepsSetRowState extends State<_RepsSetRow> {
             // planned display when the row is not done and _reps still equals
             // plannedReps, so the range hint stays visible pre-check.
             child: Text(
-              '${_summaryReps()} · ${_formatWeight(_weightKg)} kg',
+              '${_summaryReps()} · ${formatWeightKg(_weightKg)} kg',
               style: GoogleFonts.barlow(
                 fontWeight: FontWeight.w500,
                 fontSize: 14,

@@ -180,7 +180,10 @@ void main() {
 
       expect(find.text('Push A'), findsOneWidget);
       expect(find.textContaining('Mié'), findsOneWidget);
-      expect(find.textContaining('100.0'), findsOneWidget);
+      // formatVolumeKg drops the .0 of whole volumes (#436): "100 kg", not
+      // "100.0 kg".
+      expect(find.textContaining('100 kg'), findsOneWidget);
+      expect(find.textContaining('100.0'), findsNothing);
       expect(find.textContaining('45'), findsOneWidget);
     });
 

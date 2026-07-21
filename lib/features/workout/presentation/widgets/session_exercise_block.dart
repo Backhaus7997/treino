@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/utils/kg_format.dart';
 import '../../domain/set_log.dart';
 
 /// Displays one exercise group: name heading followed by a row per [SetLog].
@@ -75,7 +76,7 @@ class _SetRow extends StatelessWidget {
             ),
           ),
           Text(
-            '${log.weightKg} kg',
+            '${formatWeightKg(log.weightKg)} kg',
             style: TextStyle(color: palette.textPrimary),
           ),
           // QA-WKT-007: no PR badge until real personal-record detection exists.

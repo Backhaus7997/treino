@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/utils/kg_format.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../core/analytics/analytics_service.dart';
@@ -606,10 +607,7 @@ class _SlotRowWithLastWeight extends ConsumerWidget {
 }
 
 /// "15 kg" para enteros, "17.5 kg" para fraccionarios.
-String _formatWeight(double kg) {
-  final text = kg == kg.roundToDouble() ? kg.toStringAsFixed(0) : kg.toString();
-  return '$text kg';
-}
+String _formatWeight(double kg) => '${formatWeightKg(kg)} kg';
 
 class _HeroStrip extends ConsumerWidget {
   const _HeroStrip({

@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_palette.dart';
+import '../../../core/utils/kg_format.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../application/session_providers.dart';
@@ -69,8 +70,7 @@ class SessionHistoryScreen extends ConsumerWidget {
                     child: CircularProgressIndicator(color: palette.accent),
                   ),
                   error: (_, __) => _ErrorState(
-                    onRetry: () =>
-                        ref.invalidate(sessionsByUidProvider(uid)),
+                    onRetry: () => ref.invalidate(sessionsByUidProvider(uid)),
                   ),
                   data: (all) {
                     final completed = all
@@ -152,7 +152,7 @@ class _HistoryCard extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Text(
-              '${session.totalVolumeKg}${l10n.workoutHistorialCardKgSuffix}',
+              '${formatVolumeKg(session.totalVolumeKg)}${l10n.workoutHistorialCardKgSuffix}',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: palette.textMuted,
               ),
@@ -195,9 +195,8 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             TextButton(
-              onPressed: () => context.canPop()
-                  ? context.pop()
-                  : context.go('/workout'),
+              onPressed: () =>
+                  context.canPop() ? context.pop() : context.go('/workout'),
               child: Text(AppL10n.of(context).workoutHistorialEmptyCta),
             ),
           ],
