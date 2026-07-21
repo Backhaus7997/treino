@@ -439,7 +439,7 @@ class DailyDurationChart extends StatelessWidget {
   }
 }
 
-class _DailyBars extends StatelessWidget {
+class _DailyBars extends StatefulWidget {
   const _DailyBars({
     required this.points,
     required this.palette,
@@ -452,107 +452,151 @@ class _DailyBars extends StatelessWidget {
   final String dayLabel;
   final String minutesUnit;
 
+  /// Ancho de la ranura horizontal de cada día. Con
+  /// [BarChartAlignment.spaceAround] y ancho total `points.length * ranura`,
+  /// cada día ocupa exactamente una ranura — el mapeo tap→día de
+  /// [_DailyBarsState._onTapUp] divide por este mismo valor.
+  static const double daySlotWidth = 26;
+
+  @override
+  State<_DailyBars> createState() => _DailyBarsState();
+}
+
+class _DailyBarsState extends State<_DailyBars> {
+  /// Índice del día con tooltip visible, o null si no hay ninguno.
+  int? _selectedIndex;
+
+  @override
+  void didUpdateWidget(_DailyBars oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Mes nuevo → serie nueva: el día seleccionado del mes anterior no
+    // tiene sentido sobre la serie entrante.
+    if (!identical(oldWidget.points, widget.points)) _selectedIndex = null;
+  }
+
+  void _onTapUp(TapUpDetails details) {
+    final index = details.localPosition.dx ~/ _DailyBars.daySlotWidth;
+    if (index < 0 || index >= widget.points.length) return;
+    setState(() => _selectedIndex = _selectedIndex == index ? null : index);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final points = widget.points;
+    final palette = widget.palette;
     final values = points.map((p) => p.durationMin.toDouble()).toList();
     final maxVal = values.reduce((a, b) => a > b ? a : b);
     // Keep generous headroom so a dominant day still defines the visual scale
     // without pushing its tooltip outside the chart/card bounds.
     final maxY = maxVal <= 0 ? 1.0 : maxVal * 1.45;
-    final chartWidth = points.length * 26.0;
+    final chartWidth = points.length * _DailyBars.daySlotWidth;
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      child: SizedBox(
-        width: chartWidth,
-        height: 200,
-        child: BarChart(
-          // TREINO Motion PR2 — mismos tokens que el chart mensual de arriba.
-          duration: AppMotion.resolve(context, AppMotion.base),
-          curve: AppMotion.standard,
-          BarChartData(
-            maxY: maxY,
-            minY: 0,
-            alignment: BarChartAlignment.spaceAround,
-            barTouchData: BarTouchData(
-              handleBuiltInTouches: true,
-              touchExtraThreshold: const EdgeInsets.symmetric(
-                horizontal: 8,
-                vertical: 28,
-              ),
-              touchTooltipData: BarTouchTooltipData(
-                getTooltipColor: (_) => palette.bgCard,
-                tooltipBorder: BorderSide(color: palette.border),
-                tooltipBorderRadius: BorderRadius.circular(8),
-                tooltipMargin: 38,
-                fitInsideHorizontally: true,
-                fitInsideVertically: true,
-                getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                  final point = points[group.x.toInt()];
-                  return BarTooltipItem(
-                    '$dayLabel ${point.day.day}\n'
-                    '${point.durationMin} $minutesUnit',
-                    GoogleFonts.barlow(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: palette.textPrimary,
-                    ),
-                  );
-                },
-              ),
-            ),
-            titlesData: FlTitlesData(
-              topTitles:
-                  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              rightTitles:
-                  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              leftTitles:
-                  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              bottomTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  reservedSize: 24,
-                  getTitlesWidget: (value, meta) {
-                    final idx = value.round();
-                    if (idx < 0 || idx >= points.length) {
-                      return const SizedBox.shrink();
-                    }
-                    return SideTitleWidget(
-                      meta: meta,
-                      child: Text(
-                        '${points[idx].day.day}',
-                        style: GoogleFonts.barlowCondensed(
-                          fontSize: 10,
-                          color: palette.textMuted,
-                        ),
+      // #369: el tap-para-tooltip vive en un GestureDetector PROPIO (solo
+      // TapGestureRecognizer, que cede ante cualquier drag) en vez del touch
+      // de fl_chart — así el swipe sobre las barras scrollea y el tap sigue
+      // mostrando el día.
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapUp: _onTapUp,
+        child: SizedBox(
+          width: chartWidth,
+          height: 200,
+          child: BarChart(
+            // TREINO Motion PR2 — mismos tokens que el chart mensual de arriba.
+            duration: AppMotion.resolve(context, AppMotion.base),
+            curve: AppMotion.standard,
+            BarChartData(
+              maxY: maxY,
+              minY: 0,
+              alignment: BarChartAlignment.spaceAround,
+              barTouchData: BarTouchData(
+                // #369: touch de fl_chart APAGADO. Con cualquier touchCallback
+                // activo, RenderBaseChart alimenta un PanGestureRecognizer
+                // (slop 36px) que en un swipe rápido acepta antes de que el
+                // HorizontalDrag del SingleChildScrollView (slop 18px,
+                // registrado después) vea el movimiento — por eso arrastrar
+                // sobre las barras no scrolleaba. El tooltip se maneja arriba
+                // vía showingTooltipIndicators: el painter los dibuja aunque
+                // enabled sea false.
+                enabled: false,
+                touchTooltipData: BarTouchTooltipData(
+                  getTooltipColor: (_) => palette.bgCard,
+                  tooltipBorder: BorderSide(color: palette.border),
+                  tooltipBorderRadius: BorderRadius.circular(8),
+                  tooltipMargin: 38,
+                  fitInsideHorizontally: true,
+                  fitInsideVertically: true,
+                  getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                    final point = points[group.x.toInt()];
+                    return BarTooltipItem(
+                      '${widget.dayLabel} ${point.day.day}\n'
+                      '${point.durationMin} ${widget.minutesUnit}',
+                      GoogleFonts.barlow(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: palette.textPrimary,
                       ),
                     );
                   },
                 ),
               ),
-            ),
-            gridData: FlGridData(
-              show: true,
-              drawHorizontalLine: true,
-              drawVerticalLine: false,
-              getDrawingHorizontalLine: (_) =>
-                  FlLine(color: palette.border, strokeWidth: 1),
-            ),
-            borderData: FlBorderData(show: false),
-            barGroups: [
-              for (var i = 0; i < points.length; i++)
-                BarChartGroupData(
-                  x: i,
-                  barRods: [
-                    BarChartRodData(
-                      toY: points[i].durationMin.toDouble(),
-                      color: palette.highlight,
-                      width: 10,
-                      borderRadius: BorderRadius.circular(5),
-                    ),
-                  ],
+              titlesData: FlTitlesData(
+                topTitles:
+                    const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles:
+                    const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                leftTitles:
+                    const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 24,
+                    getTitlesWidget: (value, meta) {
+                      final idx = value.round();
+                      if (idx < 0 || idx >= points.length) {
+                        return const SizedBox.shrink();
+                      }
+                      return SideTitleWidget(
+                        meta: meta,
+                        child: Text(
+                          '${points[idx].day.day}',
+                          style: GoogleFonts.barlowCondensed(
+                            fontSize: 10,
+                            color: palette.textMuted,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 ),
-            ],
+              ),
+              gridData: FlGridData(
+                show: true,
+                drawHorizontalLine: true,
+                drawVerticalLine: false,
+                getDrawingHorizontalLine: (_) =>
+                    FlLine(color: palette.border, strokeWidth: 1),
+              ),
+              borderData: FlBorderData(show: false),
+              barGroups: [
+                for (var i = 0; i < points.length; i++)
+                  BarChartGroupData(
+                    x: i,
+                    showingTooltipIndicators:
+                        i == _selectedIndex ? const [0] : const [],
+                    barRods: [
+                      BarChartRodData(
+                        toY: points[i].durationMin.toDouble(),
+                        color: palette.highlight,
+                        width: 10,
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
           ),
         ),
       ),
