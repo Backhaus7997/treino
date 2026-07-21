@@ -683,8 +683,14 @@ service cloud.firestore {
                     && request.resource.data.name is string
                     && request.resource.data.name.size() > 0
                     && request.resource.data.name.size() <= 100
+                    // QA-SEC-003: geographic range guard (mirrors the
+                    // google-places create branch) — coordinates must be valid.
                     && request.resource.data.lat is number
+                    && request.resource.data.lat >= -90
+                    && request.resource.data.lat <= 90
                     && request.resource.data.lng is number
+                    && request.resource.data.lng >= -180
+                    && request.resource.data.lng <= 180
                     && request.resource.data.geohash is string;
 
       allow create: if request.auth != null
@@ -694,22 +700,38 @@ service cloud.firestore {
                     && request.resource.data.name is string
                     && request.resource.data.name.size() > 0
                     && request.resource.data.name.size() <= 100
+                    // QA-SEC-003: geographic range guard — a resolved place must
+                    // land on Earth. Blocks garbage coordinates polluting the
+                    // world-readable catalog / distance math.
                     && request.resource.data.lat is number
-                    && request.resource.data.lng is number;
+                    && request.resource.data.lat >= -90
+                    && request.resource.data.lat <= 90
+                    && request.resource.data.lng is number
+                    && request.resource.data.lng >= -180
+                    && request.resource.data.lng <= 180;
 
       // Client-side resolve can race two concurrent selectors of the same
       // never-before-seen placeId; the read-through cache in
-      // ResolveGymPlaceService only calls upsert() on a cache miss, so this
-      // update branch is a narrow, same-shape re-assertion (not an arbitrary
-      // edit surface) — it never changes an existing doc's `source`.
+      // ResolveGymPlaceService only calls upsert() on a cache miss, so the
+      // ONLY legitimate update is that race re-upserting the SAME Place
+      // Details for an already-resolved placeId.
+      //
+      // QA-SEC-003: `gyms` is world-readable and drives gym association and
+      // leaderboards, so the resolved identity fields MUST be pinned to their
+      // existing values. The previous type-only check let ANY authenticated
+      // user overwrite name/lat/lng of any existing gym — catalog vandalism.
+      // Pinning name/lat/lng/source/id equal-to-existing still lets the
+      // same-shape race write through (identical values are a no-op match)
+      // while denying every value change. Mirrors the field-pin idiom used by
+      // userPublicProfiles ranking metrics and trainerPublicProfiles
+      // averageRating/reviewCount above.
       allow update: if request.auth != null
                     && resource.data.source == 'google-places'
-                    && request.resource.data.source == 'google-places'
+                    && request.resource.data.source == resource.data.source
                     && request.resource.data.id == gymId
-                    && request.resource.data.name is string
-                    && request.resource.data.name.size() > 0
-                    && request.resource.data.lat is number
-                    && request.resource.data.lng is number;
+                    && request.resource.data.name == resource.data.name
+                    && request.resource.data.lat == resource.data.lat
+                    && request.resource.data.lng == resource.data.lng;
 
       allow delete: if false;
     }
