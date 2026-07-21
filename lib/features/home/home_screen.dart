@@ -12,6 +12,7 @@ import '../notifications/presentation/permission_gate.dart';
 import '../profile/application/user_providers.dart';
 import '../profile/domain/user_role.dart';
 import '../workout/application/assigned_routine_providers.dart';
+import '../workout/application/session_duration.dart';
 import '../workout/application/session_providers.dart';
 import '../workout/application/user_routines_providers.dart';
 import '../workout/domain/session.dart';
@@ -226,13 +227,42 @@ void _maybeShowResumePrompt(
         },
         onDiscard: () async {
           final repo = ref.read(sessionRepositoryProvider);
-          await repo.finish(
-            uid: session.uid,
-            sessionId: session.id,
-            finishedAt: DateTime.now(),
-            totalVolumeKg: _sumVolume(record.setLogs),
-            durationMin: _elapsedMin(session.startedAt),
+          // QA-WKT-011: clamp the discarded session's duration with the same
+          // policy SessionNotifier uses (recover from the set-log timeline, cap
+          // at maxWorkoutDuration) instead of raw wall-clock minutes — a session
+          // left open overnight was persisting durationMin well over 480.
+          final elapsedSecs = sanitizedActiveSessionElapsedSeconds(
+            session: session,
+            setLogs: record.setLogs,
+            now: DateTime.now(),
           );
+          final durationMin = elapsedSecs <= 0 ? 1 : (elapsedSecs + 59) ~/ 60;
+          try {
+            await repo
+                .finish(
+                  uid: session.uid,
+                  sessionId: session.id,
+                  finishedAt: DateTime.now(),
+                  totalVolumeKg: _sumVolume(record.setLogs),
+                  durationMin: durationMin,
+                )
+                .timeout(const Duration(seconds: 15));
+          } catch (_) {
+            // QA-WKT-011: the write can throw or (offline) stall indefinitely.
+            // Don't leave the barrierDismissible:false dialog stuck with an
+            // unhandled exception — close it and surface a retryable error.
+            if (dialogCtx.mounted) {
+              Navigator.of(dialogCtx, rootNavigator: true).pop();
+            }
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(AppL10n.of(context).workoutDiscardError),
+                ),
+              );
+            }
+            return;
+          }
           // _AthleteHome may have been disposed during the finish() write
           // (user navigated away). Invalidating through a torn-down ref throws,
           // so guard on the host context before touching ref again.
@@ -250,11 +280,6 @@ void _maybeShowResumePrompt(
 double _sumVolume(List<SetLog> logs) =>
     logs.fold<double>(0, (acc, l) => acc + l.reps * l.weightKg);
 
-int _elapsedMin(DateTime startedAt) {
-  final secs = DateTime.now().difference(startedAt).inSeconds;
-  if (secs <= 0) return 1;
-  return (secs + 59) ~/ 60;
-}
 
 /// Private placeholder that occupies the same 56 px height as [HomeHeader]
 /// during [AsyncLoading], preventing a layout jump (REQ-HOME-PROVIDER-003).

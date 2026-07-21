@@ -645,6 +645,9 @@ class AppL10nEn extends AppL10n {
   String get workoutSelfEditorError => '';
 
   @override
+  String get workoutDiscardError => '';
+
+  @override
   String get workoutSelfEditorPermissionDenied => '';
 
   @override
@@ -2104,6 +2107,10 @@ class AppL10nEn extends AppL10n {
   @override
   String get routineEditorMissingReps =>
       'Fill in the reps for your sets before saving.';
+
+  @override
+  String get routineEditorDuplicateExercise =>
+      'Ese ejercicio ya está en el día. Elegí otro.';
 
   @override
   String get feedPostPublishedSuccess => 'Post published.';

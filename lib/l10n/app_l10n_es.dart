@@ -661,6 +661,10 @@ class AppL10nEs extends AppL10n {
   String get workoutSelfEditorError => 'No pudimos crear la rutina. Reintentá.';
 
   @override
+  String get workoutDiscardError =>
+      'No pudimos descartar la sesión. Probá de nuevo.';
+
+  @override
   String get workoutSelfEditorPermissionDenied =>
       'No tenés permisos para hacer esto. Recargá la app.';
 
@@ -2157,6 +2161,10 @@ class AppL10nEs extends AppL10n {
       'Completa las reps de los sets antes de guardar.';
 
   @override
+  String get routineEditorDuplicateExercise =>
+      'Ese ejercicio ya está en el día. Elegí otro.';
+
+  @override
   String get feedPostPublishedSuccess => 'Post publicado.';
 
   @override
@@ -3379,6 +3387,10 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get workoutSelfEditorError => 'No pudimos crear la rutina. Reintentá.';
+
+  @override
+  String get workoutDiscardError =>
+      'No pudimos descartar la sesión. Probá de nuevo.';
 
   @override
   String get workoutSelfEditorPermissionDenied =>
@@ -4874,6 +4886,10 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get routineEditorMissingReps =>
       'Completá las reps de los sets antes de guardar.';
+
+  @override
+  String get routineEditorDuplicateExercise =>
+      'Ese ejercicio ya está en el día. Elegí otro.';
 
   @override
   String get feedPostPublishedSuccess => 'Post publicado.';

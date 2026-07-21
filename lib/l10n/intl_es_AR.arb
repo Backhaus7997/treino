@@ -278,6 +278,7 @@
   "workoutSelfEditorUpdateSuccess": "Rutina actualizada",
   "workoutSelfEditorNotFound": "Esta rutina ya no existe. Volvé y actualizá la lista.",
   "workoutSelfEditorError": "No pudimos crear la rutina. Reintentá.",
+  "workoutDiscardError": "No pudimos descartar la sesión. Probá de nuevo.",
   "workoutSelfEditorPermissionDenied": "No tenés permisos para hacer esto. Recargá la app.",
   "workoutEditStubToast": "Pronto vas a poder editar el contenido. Por ahora podés archivar y crear de nuevo.",
   "workoutSelfEditorCapReached": "Llegaste al máximo de 10 rutinas activas.",
@@ -1500,6 +1501,7 @@
     }
   },
   "routineEditorMissingReps": "Completá las reps de los sets antes de guardar.",
+  "routineEditorDuplicateExercise": "Ese ejercicio ya está en el día. Elegí otro.",
   "@routineEditorMissingReps": {
     "description": "Inline validation hint when a visible set is missing a valid reps/duration value in a single-week self-routine (finding 19). routineEditorIncompleteSetsFeedback already covers the named-exercise multi-week case."
   },

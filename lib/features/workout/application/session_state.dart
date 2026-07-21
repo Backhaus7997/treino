@@ -55,10 +55,21 @@ class SessionState {
   }
 
   /// Verdadero cuando cada slot del día tiene al menos `plannedSetsFor(slot)` logs.
-  bool get isFullyCompleted => day.slots.every((slot) {
-        final count = setsLoggedFor(slot.exerciseId);
-        return count >= plannedSetsFor(slot);
-      });
+  ///
+  /// QA-WKT-005: un día sin trabajo a hacer NO cuenta como completado. Sin este
+  /// guard, un día con `slots: []` (o una semana donde todos los slots quedan
+  /// enmascarados por presencia, con `plannedSetsFor == 0`) daba `every` sobre
+  /// nada = `true`, así que una sesión de 0 sets quedaba instantáneamente
+  /// "completa" → habilitaba TERMINAR, incrementaba workoutsCount/racha y
+  /// marcaba el día del plan como hecho (farmeo de racha en dos taps).
+  bool get isFullyCompleted {
+    final totalPlanned =
+        day.slots.fold<int>(0, (sum, slot) => sum + plannedSetsFor(slot));
+    if (totalPlanned == 0) return false;
+    return day.slots.every(
+      (slot) => setsLoggedFor(slot.exerciseId) >= plannedSetsFor(slot),
+    );
+  }
 
   /// Suma de reps × weightKg sobre todos los setLogs.
   double get totalVolumeKg =>

@@ -1304,6 +1304,12 @@ abstract class AppL10n {
   /// **'No pudimos crear la rutina. Reintentá.'**
   String get workoutSelfEditorError;
 
+  /// No description provided for @workoutDiscardError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos descartar la sesión. Probá de nuevo.'**
+  String get workoutDiscardError;
+
   /// No description provided for @workoutSelfEditorPermissionDenied.
   ///
   /// In es_AR, this message translates to:
@@ -3967,6 +3973,12 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Completá las reps de los sets antes de guardar.'**
   String get routineEditorMissingReps;
+
+  /// No description provided for @routineEditorDuplicateExercise.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ese ejercicio ya está en el día. Elegí otro.'**
+  String get routineEditorDuplicateExercise;
 
   /// Success snackbar after publishing a post (finding 25). Shown via the root ScaffoldMessenger since the compose screen pops on success.
   ///

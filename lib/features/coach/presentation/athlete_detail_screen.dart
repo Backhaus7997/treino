@@ -1897,8 +1897,15 @@ class _ExpandableSessionRowState extends ConsumerState<_ExpandableSessionRow> {
   }
 }
 
-String _fmtDate(DateTime d) =>
-    '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+/// QA-WKT-006: [finishedAt] is a real UTC instant, so it must be converted to
+/// the device (ART) zone before splitting into day/month/year — matching the
+/// sibling session-history screens fixed in #405. Formatting the raw UTC value
+/// showed tomorrow's date for any session finished after ~21:00 ART (already
+/// past midnight UTC).
+String _fmtDate(DateTime d) {
+  final local = d.toLocal();
+  return '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}/${local.year}';
+}
 
 /// Loads and renders the set logs for one session (read-only trainer view).
 /// Maps permission-denied to the no-share placeholder (REQ-SETLOGS-008).
