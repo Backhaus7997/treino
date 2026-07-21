@@ -86,7 +86,9 @@ class _FeedHeader extends ConsumerWidget {
                 ? l10n.feedFriendRequestsWithCountA11y(pendingRequests)
                 : l10n.feedFriendRequestsA11y,
             child: GestureDetector(
-              onTap: () => context.push('/profile/friend-requests'),
+              // /feed twin of /profile/friend-requests so the bottom bar
+              // keeps FEED highlighted while the inbox is open (issue #387).
+              onTap: () => context.push('/feed/friend-requests'),
               behavior: HitTestBehavior.opaque,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
