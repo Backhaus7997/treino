@@ -1,9 +1,9 @@
 // NOTE: el Scaffold y el SafeArea los provee CoachHubScaffold (el shell).
 // NO los agregues acá (ADR-CHW-005).
 //
-// PR2a — PagosScreen shell: header + KPI row + 4 tabs (Vencidos/Por vencer/
-// Pagados/Todos). Tabla rica con acciones de fila (Marcar pagado / Recordar)
-// implementada en PR2b reemplazando _TabBody con PagosWebTable.
+// PR2a — PagosScreen shell: header + KPI row + filtro (TreinoFilterChips,
+// Vencidos/Por vencer/Pagados/Todos, WU-05 Fase 9). Tabla rica con acciones
+// de fila (Marcar pagado / Recordar) implementada en PR2b vía PagosWebTable.
 //
 // Todas las strings están en español hardcodeado + comentario // i18n.
 // NO se usa AppL10n en este archivo (constraint C-6).
@@ -30,12 +30,22 @@ import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
 
 import '../../widgets/coach_hub_widgets.dart'
-    show TreinoInteractiveState, TreinoSectionHeader;
+    show TreinoFilterChips, TreinoInteractiveState, TreinoSectionHeader;
 import 'widgets/marcar_pagado_actions.dart';
 import 'widgets/pagos_buckets_provider.dart';
+import 'widgets/pagos_filtro_provider.dart';
 import 'widgets/pagos_kpi_row.dart';
 import 'widgets/pagos_web_table.dart';
 import 'widgets/registrar_pago_dialog.dart';
+
+/// Etiquetas (es-AR) de cada [PagosFiltro], en el orden en que se muestran
+/// los chips.
+const _kFiltroLabels = {
+  PagosFiltro.vencidos: 'Vencidos', // i18n
+  PagosFiltro.porVencer: 'Por vencer', // i18n
+  PagosFiltro.pagados: 'Pagados', // i18n
+  PagosFiltro.todos: 'Todos', // i18n
+};
 
 // ── PagosScreen ───────────────────────────────────────────────────────────────
 
@@ -54,25 +64,7 @@ class PagosScreen extends ConsumerStatefulWidget {
   ConsumerState<PagosScreen> createState() => _PagosScreenState();
 }
 
-class _PagosScreenState extends ConsumerState<PagosScreen>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabController;
-
-  static const _kTabs = ['Por vencer', 'Vencidos', 'Pagados', 'Todos']; // i18n
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: _kTabs.length, vsync: this);
-    _tabController.addListener(() => setState(() {}));
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
+class _PagosScreenState extends ConsumerState<PagosScreen> {
   Future<void> _onRegistrarPago() async {
     final result = await showDialog<RegistrarPagoResult>(
       context: context,
@@ -112,29 +104,21 @@ class _PagosScreenState extends ConsumerState<PagosScreen>
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final bucketsAsync = ref.watch(pagosBucketsProvider);
+    final filtro = ref.watch(pagosFiltroProvider);
 
     // Trainer's paymentAlias for WhatsApp reminder messages.
     final paymentAlias = ref
         .watch(userProfileProvider.select((s) => s.valueOrNull?.paymentAlias));
 
-    // Counts for tab labels (reactive).
+    // Counts for chip badges (reactive).
     int vencidosN = 0;
     int porVencerN = 0;
     int pagadosN = 0;
-    int todosN = 0;
     bucketsAsync.whenData((b) {
       vencidosN = b.vencidos.length;
       porVencerN = b.porVencer.length;
       pagadosN = b.pagados.length;
-      todosN = b.todos.length;
     });
-
-    final tabLabels = [
-      'Por vencer · $porVencerN', // i18n
-      'Vencidos · $vencidosN', // i18n
-      'Pagados · $pagadosN', // i18n
-      'Todos · $todosN', // i18n
-    ];
 
     // Collect all unique athlete ids across all payments to resolve profiles
     // in a single batch fetch (no N+1). ADR-PGW design section 3.
@@ -188,74 +172,70 @@ class _PagosScreenState extends ConsumerState<PagosScreen>
           ),
         ),
 
-        // ── TabBar ──────────────────────────────────────────────────────────
+        // ── Filtro (chips) ──────────────────────────────────────────────────
         Padding(
           padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-          child: TabBar(
-            controller: _tabController,
-            isScrollable: true,
-            labelColor: palette.accent,
-            unselectedLabelColor: palette.textMuted,
-            indicatorColor: palette.accent,
-            indicatorWeight: 2,
-            labelStyle: const TextStyle(fontWeight: FontWeight.w600),
-            tabs: tabLabels.map((l) => Tab(text: l)).toList(),
+          child: TreinoFadeSlideIn(
+            delay: AppMotion.stagger(2),
+            child: TreinoFilterChips(
+              options: _kFiltroLabels.values.toList(),
+              selected: {_kFiltroLabels[filtro]!},
+              badgeCounts: {
+                _kFiltroLabels[PagosFiltro.vencidos]!: vencidosN,
+                _kFiltroLabels[PagosFiltro.porVencer]!: porVencerN,
+                _kFiltroLabels[PagosFiltro.pagados]!: pagadosN,
+              },
+              onChanged: (newSelected) {
+                // Single-select: un tap que vacía la selección (chip activo
+                // desmarcado) es un no-op — siempre necesitamos un filtro
+                // activo (mismo patrón que solicitudTabProvider).
+                if (newSelected.isEmpty) return;
+                final label = newSelected.first;
+                for (final entry in _kFiltroLabels.entries) {
+                  if (entry.value == label) {
+                    ref.read(pagosFiltroProvider.notifier).state = entry.key;
+                    break;
+                  }
+                }
+              },
+            ),
           ),
         ),
 
-        // ── Tab body ────────────────────────────────────────────────────────
+        // ── Tabla (según filtro activo) ────────────────────────────────────
         Expanded(
-          child: TabBarView(
-            controller: _tabController,
-            children: [
-              // Por vencer tab
-              _tabBody(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(0, 20, 0, 0),
+            child: TreinoStateSwitcher(
+              childKey: ValueKey('pagos_filtro_${filtro.name}'),
+              child: _tabBody(
                 bucketsAsync: bucketsAsync,
-                getPayments: (b) => b.porVencer,
-                emptyLabel: 'No hay pagos pendientes', // i18n
+                getPayments: switch (filtro) {
+                  PagosFiltro.vencidos => (b) => b.vencidos,
+                  PagosFiltro.porVencer => (b) => b.porVencer,
+                  PagosFiltro.pagados => (b) => b.pagados,
+                  PagosFiltro.todos => (b) => b.todos,
+                },
+                emptyLabel: switch (filtro) {
+                  PagosFiltro.vencidos => 'No hay pagos vencidos', // i18n
+                  PagosFiltro.porVencer => 'No hay pagos pendientes', // i18n
+                  PagosFiltro.pagados => 'No hay pagos registrados', // i18n
+                  PagosFiltro.todos => 'No hay pagos', // i18n
+                },
                 palette: palette,
                 profiles: profiles,
                 paymentAlias: paymentAlias,
-                showActions: true,
+                showActions: filtro != PagosFiltro.pagados,
               ),
-              // Vencidos tab
-              _tabBody(
-                bucketsAsync: bucketsAsync,
-                getPayments: (b) => b.vencidos,
-                emptyLabel: 'No hay pagos vencidos', // i18n
-                palette: palette,
-                profiles: profiles,
-                paymentAlias: paymentAlias,
-                showActions: true,
-              ),
-              // Pagados tab
-              _tabBody(
-                bucketsAsync: bucketsAsync,
-                getPayments: (b) => b.pagados,
-                emptyLabel: 'No hay pagos registrados', // i18n
-                palette: palette,
-                profiles: profiles,
-                paymentAlias: paymentAlias,
-                showActions: false,
-              ),
-              // Todos tab
-              _tabBody(
-                bucketsAsync: bucketsAsync,
-                getPayments: (b) => b.todos,
-                emptyLabel: 'No hay pagos', // i18n
-                palette: palette,
-                profiles: profiles,
-                paymentAlias: paymentAlias,
-                showActions: true,
-              ),
-            ],
+            ),
           ),
         ),
       ],
     );
   }
 
-  /// Construye el body de un tab: loading / error / tabla.
+  /// Construye el body de la tabla según el filtro activo: loading / error /
+  /// tabla.
   Widget _tabBody({
     required AsyncValue<PagosBuckets> bucketsAsync,
     required List<Payment> Function(PagosBuckets) getPayments,
