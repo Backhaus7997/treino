@@ -349,7 +349,11 @@ class _AccionesCell extends StatelessWidget {
             child: _AccionButton(
               key: Key('pagos_accion_marcar_pagado_${payment.id}'),
               icon: TreinoIcon.check,
-              label: 'Marcar pagado', // i18n
+              // Label corto (WARNING-1, Fase 9): "Marcar pagado" completo se
+              // elidía con "…" en la columna ACCIONES a 1440x900 — el ícono
+              // check ya distingue la acción de "Recordar", así que
+              // "Pagado" alcanza sin ambigüedad y entra sin truncar.
+              label: 'Pagado', // i18n
               color: palette.accent,
               onTap: onMarcarPagado == null
                   ? null
