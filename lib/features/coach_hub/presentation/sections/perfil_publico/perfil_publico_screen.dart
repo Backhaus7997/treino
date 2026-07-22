@@ -25,6 +25,8 @@ import '../../../../../core/widgets/treino_icon.dart';
 import '../../../../profile/application/user_providers.dart';
 import '../../../../profile/domain/user_profile.dart';
 import '../../widgets/coach_hub_widgets.dart';
+import 'widgets/coach_discovery_preview_card.dart';
+import 'widgets/identidad_card.dart';
 
 /// Pantalla «Perfil público» (`/perfil-publico`) — Fase 11 WU-01.
 class PerfilPublicoScreen extends ConsumerWidget {
@@ -79,7 +81,7 @@ class PerfilPublicoScreen extends ConsumerWidget {
                       icon: TreinoIcon.emptyState,
                       title: 'No encontramos tu perfil.', // i18n: Fase 11
                     )
-                  : _PerfilPublicoPlano(profile: profile),
+                  : _PerfilPublicoDosColumnas(profile: profile),
             ),
           ),
         ],
@@ -127,6 +129,39 @@ class _PerfilPublicoLoading extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Layout de dos columnas — WU-02: izquierda edición (bloque plano
+/// pre-rediseño, WU-03/04 lo reemplaza por el editor tokenizado), derecha
+/// `CoachDiscoveryPreviewCard` (el norte visual real del mockup).
+class _PerfilPublicoDosColumnas extends StatelessWidget {
+  const _PerfilPublicoDosColumnas({required this.profile});
+
+  final UserProfile profile;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              IdentidadCard(profile: profile),
+              const SizedBox(height: AppSpacing.s18),
+              _PerfilPublicoPlano(profile: profile),
+            ],
+          ),
+        ),
+        const SizedBox(width: AppSpacing.s18),
+        SizedBox(
+          width: 320,
+          child: CoachDiscoveryPreviewCard(profile: profile),
+        ),
+      ],
     );
   }
 }
@@ -193,21 +228,6 @@ class _PerfilPublicoPlano extends StatelessWidget {
             value: profile.trainerOffersOnline
                 ? 'Ofrece online' // i18n: Fase 11
                 : 'Solo presencial', // i18n: Fase 11
-          ),
-          const SizedBox(height: AppSpacing.s18),
-          Container(
-            key: const Key('perfil_publico_preview_placeholder'),
-            padding: const EdgeInsets.all(AppSpacing.s14),
-            decoration: BoxDecoration(
-              color: palette.bg,
-              border: Border.all(color: palette.border),
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-            ),
-            child: Text(
-              'Preview de Coach Discovery — próximamente en esta '
-              'sección.', // i18n: Fase 11
-              style: TextStyle(color: palette.textMuted, fontSize: 13),
-            ),
           ),
         ],
       ),
