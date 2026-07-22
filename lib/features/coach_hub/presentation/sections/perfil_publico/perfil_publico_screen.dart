@@ -26,6 +26,7 @@ import '../../../../profile/application/user_providers.dart';
 import '../../../../profile/domain/user_profile.dart';
 import '../../widgets/coach_hub_widgets.dart';
 import 'widgets/coach_discovery_preview_card.dart';
+import 'widgets/especialidad_precio_card.dart';
 import 'widgets/identidad_card.dart';
 
 /// Pantalla «Perfil público» (`/perfil-publico`) — Fase 11 WU-01.
@@ -151,6 +152,8 @@ class _PerfilPublicoDosColumnas extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               IdentidadCard(profile: profile),
+              const SizedBox(height: AppSpacing.s18),
+              EspecialidadPrecioCard(profile: profile),
               const SizedBox(height: AppSpacing.s18),
               _PerfilPublicoPlano(profile: profile),
             ],
