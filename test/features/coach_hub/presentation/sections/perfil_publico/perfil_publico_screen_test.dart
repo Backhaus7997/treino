@@ -128,8 +128,9 @@ void main() {
     });
   });
 
-  group('PerfilPublicoScreen — loading (WU-01)', () {
-    testWidgets('perfil en loading → shimmer', (tester) async {
+  group('PerfilPublicoScreen — loading (WU-01/WU-05)', () {
+    testWidgets('perfil en loading → shimmer (no spinner seco)',
+        (tester) async {
       final controller = StreamController<UserProfile?>();
       addTearDown(controller.close);
 
@@ -141,6 +142,9 @@ void main() {
 
       expect(find.byKey(const Key('perfil_publico_loading')), findsOneWidget);
       expect(find.textContaining('PERFIL PÚBLICO'), findsOneWidget);
+      // WU-05: nada de spinner->data seco — el shimmer imita la grilla real
+      // de dos columnas (dos cards izquierda + card preview derecha).
+      expect(find.byType(CircularProgressIndicator), findsNothing);
     });
   });
 
@@ -174,6 +178,83 @@ void main() {
 
       expect(find.byKey(const Key('perfil_publico_empty')), findsOneWidget);
       expect(find.text('No encontramos tu perfil.'), findsOneWidget);
+    });
+  });
+
+  group('PerfilPublicoScreen — banner de perfil incompleto (WU-05)', () {
+    testWidgets('trainerProfileComplete == false → muestra banner honesto',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _trainerProfile(trainerBio: null),
+      );
+
+      expect(
+        find.byKey(const Key('perfil_publico_incomplete_banner')),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Coach Discovery'),
+        findsWidgets,
+      );
+    });
+
+    testWidgets('trainerProfileComplete == true → NO muestra banner',
+        (tester) async {
+      await _pump(tester, profile: _trainerProfile());
+
+      expect(
+        find.byKey(const Key('perfil_publico_incomplete_banner')),
+        findsNothing,
+      );
+    });
+  });
+
+  group('PerfilPublicoScreen — responsive (WU-05)', () {
+    testWidgets('ancho angosto (compact) → layout apilado en una columna',
+        (tester) async {
+      tester.view.physicalSize = const Size(820, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            userProfileProvider.overrideWith(
+              (ref) => Stream<UserProfile?>.value(_trainerProfile()),
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.dark(),
+            home: const Scaffold(body: PerfilPublicoScreen()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('perfil_publico_columns_stacked')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('perfil_publico_columns_desktop')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('ancho amplio (desktop) → layout de dos columnas',
+        (tester) async {
+      await _pump(tester, profile: _trainerProfile());
+
+      expect(
+        find.byKey(const Key('perfil_publico_columns_desktop')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('perfil_publico_columns_stacked')),
+        findsNothing,
+      );
     });
   });
 
