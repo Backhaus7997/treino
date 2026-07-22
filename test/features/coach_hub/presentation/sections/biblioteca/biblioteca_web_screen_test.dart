@@ -8,7 +8,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/features/coach_hub/presentation/sections/biblioteca/biblioteca_web_screen.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
@@ -199,6 +201,27 @@ void main() {
       await tester.pump();
 
       expect(find.byType(TreinoSectionHeader), findsOneWidget);
+    });
+
+    testWidgets(
+        'header está envuelto en TreinoFadeSlideIn con stagger explícito '
+        '(índice 0) — ADR-B7-03', (tester) async {
+      tester.view.physicalSize = const Size(1280, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(_wrap());
+      await tester.pump();
+
+      final fadeSlideInAncestor = tester.widget<TreinoFadeSlideIn>(
+        find.ancestor(
+          of: find.byType(TreinoSectionHeader),
+          matching: find.byType(TreinoFadeSlideIn),
+        ),
+      );
+
+      expect(fadeSlideInAncestor.delay, AppMotion.stagger(0));
     });
 
     testWidgets('shows honest subtitle with real exercise + template counts',

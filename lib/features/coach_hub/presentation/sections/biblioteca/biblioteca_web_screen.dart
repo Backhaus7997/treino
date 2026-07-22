@@ -12,6 +12,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
@@ -85,7 +86,9 @@ class _BibliotecaWebScreenState extends ConsumerState<BibliotecaWebScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // ── Section header + subtítulo honesto ──────────────────────────────
+        // Bloque eager con stagger real (ADR-B7-03): header = índice 0.
         TreinoFadeSlideIn(
+          delay: AppMotion.stagger(0),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.s20,
