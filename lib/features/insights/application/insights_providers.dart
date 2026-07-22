@@ -3,9 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/utils/argentina_time.dart';
 import '../../../core/utils/streak_calculator.dart';
 import '../../workout/application/exercise_providers.dart';
+import '../../workout/application/plan_progress.dart';
 import '../../workout/application/routine_providers.dart';
 import '../../workout/application/session_providers.dart';
+import '../../workout/domain/routine.dart';
 import '../../workout/domain/session.dart';
+import '../../workout/domain/session_status.dart';
 import '../domain/muscle_group.dart';
 import '../domain/weekly_insights.dart';
 
@@ -67,25 +70,52 @@ final athleteWeekInsightsProvider = FutureProvider.autoDispose
   final exercises = await ref.watch(exercisesProvider.future);
   final byId = {for (final e in exercises) e.id: e};
 
-  // Rutina de la sesión más reciente (mejor heurística disponible hasta que
-  // UserProfile.currentRoutineId exista). Se trae antes de los setLogs porque
-  // sus slots llevan el `muscleGroup` denormalizado — la única fuente del
-  // grupo para ejercicios custom del trainer, que NO están en el catálogo
-  // público.
-  final routine = mostRecentSession != null
-      ? await ref.watch(routineByIdProvider(mostRecentSession.routineId).future)
-      : null;
+  // QA #373: la rutina de referencia y el fallback de grupos se resolvían
+  // desde UNA sola rutina (la de la última sesión de TODO el historial).
+  // Una semana calendario puede mezclar rutinas (cambio de plan a mitad de
+  // semana) y el atleta puede haber cambiado de plan sin entrenar aún — así
+  // que: (a) el fallback de muscleGroup se resuelve POR RUTINA DE LA SEMANA
+  // (patrón de muscleDistributionInsightsProvider, ver su doc-comment);
+  // (b) la rutina de referencia del target es la de la sesión más reciente
+  // DE LA SEMANA pedida, con fallback a la última del historial solo cuando
+  // la semana está vacía.
+  final routineIds = <String>{
+    for (final s in weekSessions) s.routineId,
+    if (mostRecentSession != null) mostRecentSession.routineId,
+  }..removeWhere((id) => id.isEmpty);
+  final fetchedRoutines = await Future.wait(
+    routineIds.map((id) => ref.watch(routineByIdProvider(id).future)),
+  );
+  final routinesById = {
+    for (final r in fetchedRoutines)
+      if (r != null) r.id: r,
+  };
 
-  // Fallback exerciseId → muscleGroup String desde los slots de la rutina.
-  // Cubre ejercicios custom ausentes del catálogo, cuyos setLogs sólo guardan
-  // exerciseId (SetLog no denormaliza el grupo).
+  // weekSessions preserva el orden DESC de listByUid → first = más reciente.
+  final referenceRoutineId = weekSessions.isNotEmpty
+      ? weekSessions.first.routineId
+      : mostRecentSession?.routineId;
+  final routine =
+      referenceRoutineId != null ? routinesById[referenceRoutineId] : null;
+
+  // Fallback exerciseId → muscleGroup String desde los slots de TODAS las
+  // rutinas de la semana. Cubre ejercicios custom ausentes del catálogo,
+  // cuyos setLogs sólo guardan exerciseId (SetLog no denormaliza el grupo).
+  // La rutina de referencia se vuelca primero: ante un exerciseId repetido
+  // entre rutinas, gana el mapeo del plan más fresco (putIfAbsent).
   final slotGroupById = <String, String>{};
-  if (routine != null) {
-    for (final day in routine.days) {
+  void addSlotGroups(Routine? r) {
+    if (r == null) return;
+    for (final day in r.days) {
       for (final slot in day.slots) {
         slotGroupById.putIfAbsent(slot.exerciseId, () => slot.muscleGroup);
       }
     }
+  }
+
+  addSlotGroups(routine);
+  for (final id in routineIds) {
+    if (id != referenceRoutineId) addSlotGroups(routinesById[id]);
   }
 
   // setsByGroup — los setLogs de cada session de la semana. Las lecturas por
@@ -112,10 +142,20 @@ final athleteWeekInsightsProvider = FutureProvider.autoDispose
   // para ejercicios custom y sin depender de que el catálogo esté completo).
   // Si el usuario nunca entrenó o la rutina no se encuentra, queda vacío y las
   // progress bars se renderizan sin target.
+  //
+  // QA #373: en un plan periodizado (Model B) los slots difieren por semana —
+  // sumar TODOS los day.slots sobreestimaba el denominador con sets de
+  // semanas que no corresponden. El target ahora cuenta SOLO los slots
+  // presentes en la semana del plan que esta semana calendario representa
+  // (mismo criterio isPresentInWeek que planProgressProvider). Para planes
+  // sin periodización la mask vacía hace isPresentInWeek == true siempre →
+  // comportamiento idéntico al anterior.
   final targetByGroup = <MuscleGroupDisplay, int>{};
   if (routine != null) {
+    final planWeek = _planWeekFor(routine, weekSessions, allSessions);
     for (final day in routine.days) {
       for (final slot in day.slots) {
+        if (!slot.isPresentInWeek(planWeek)) continue;
         final group = slot.muscleGroup.toDisplayGroup();
         if (group != null) {
           targetByGroup[group] = (targetByGroup[group] ?? 0) + slot.targetSets;
@@ -194,4 +234,52 @@ DateTime mondayOfWeek(DateTime now) {
   // comparaciones de sesión vía toArgentina); pasarle argentinaNow() da el
   // lunes calendario de Argentina.
   return DateTime.utc(now.year, now.month, now.day - daysFromMonday);
+}
+
+/// QA #373: qué semana del PLAN representa la semana calendario pedida.
+///
+/// 1. Si la semana tiene sesiones de [routine], la más reciente manda: su
+///    `weekNumber` (0-based, el mismo que persiste el player y consume
+///    planProgressProvider) ES la semana del plan que el atleta cursaba en
+///    esa semana calendario — correcto también al paginar semanas pasadas.
+/// 2. Semana sin sesiones de la rutina (típico: semana calendario recién
+///    empezada, o el atleta cambió de plan sin estrenarlo): la semana activa
+///    derivada del plan completo, con el MISMO derive que
+///    planProgressProvider (completed + requiredPairs por isPresentInWeek).
+///    El armado de requiredPairs espeja session_providers.dart
+///    (REQ-WPRES-022) — extraer un helper compartido cuando #442 aterrice,
+///    para no ensanchar ese archivo mientras está en vuelo.
+int _planWeekFor(
+  Routine routine,
+  List<Session> weekSessions,
+  List<Session> allSessions,
+) {
+  for (final s in weekSessions) {
+    if (s.routineId == routine.id) return s.weekNumber;
+  }
+
+  final completed = allSessions
+      .where(
+        (s) =>
+            s.routineId == routine.id &&
+            s.status == SessionStatus.finished &&
+            s.wasFullyCompleted,
+      )
+      .map((s) => (week: s.weekNumber, day: s.dayNumber))
+      .toSet();
+  final dayNumbers = routine.days.map((d) => d.dayNumber).toList();
+  final requiredPairs = <CompletedKey>{};
+  for (var w = 0; w < routine.numWeeks; w++) {
+    for (final d in routine.days) {
+      if (d.slots.any((s) => s.isPresentInWeek(w))) {
+        requiredPairs.add((week: w, day: d.dayNumber));
+      }
+    }
+  }
+  return derivePlanProgress(
+    completed,
+    dayNumbers,
+    routine.numWeeks,
+    requiredPairs: requiredPairs,
+  ).activeWeek;
 }
