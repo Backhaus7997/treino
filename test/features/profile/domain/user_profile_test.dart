@@ -37,6 +37,34 @@ void main() {
       expect(decoded.bornAt, isNull);
     });
 
+    test('#388: trainerExperienceYears round-trips (and defaults to null)', () {
+      final withYears = UserProfile(
+        uid: 'uid-exp',
+        email: 'pf@b.com',
+        displayName: 'Coach',
+        role: UserRole.trainer,
+        createdAt: fixedDt,
+        updatedAt: fixedDt,
+        trainerExperienceYears: 7,
+      );
+
+      final decoded = UserProfile.fromJson(withYears.toJson());
+      expect(decoded.trainerExperienceYears, equals(7));
+
+      final without = UserProfile(
+        uid: 'uid-exp-2',
+        email: 'pf2@b.com',
+        displayName: null,
+        role: UserRole.trainer,
+        createdAt: fixedDt,
+        updatedAt: fixedDt,
+      );
+      expect(
+        UserProfile.fromJson(without.toJson()).trainerExperienceYears,
+        isNull,
+      );
+    });
+
     test('SCENARIO-001b: displayName can be non-null and round-trips', () {
       final profile = UserProfile(
         uid: 'uid-1b',

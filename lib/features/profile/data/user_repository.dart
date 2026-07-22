@@ -55,6 +55,8 @@ class UserRepository {
     'trainerLongitude', // DEPRECATED
     'trainerMonthlyRate',
     'paymentAlias',
+    // Años de experiencia (#388) — self-attested, editable desde el form PF.
+    'trainerExperienceYears',
     // Multi-location (Fase 6 Etapa 0)
     'trainerLocations',
     'trainerGeohashes',
@@ -62,6 +64,8 @@ class UserRepository {
     // ADR-RV-005: CF-write-only — do not add averageRating or reviewCount here.
     // Those fields are written exclusively by the reviewAggregate Cloud Function
     // and must never be propagated by client dual-write.
+    // Same contract for athleteCount (#388): written exclusively by the
+    // linkAggregate Cloud Function (count of active trainer_links).
   };
 
   CollectionReference<Map<String, Object?>> get _users =>
@@ -207,6 +211,9 @@ class UserRepository {
     }
     if (partial.containsKey('paymentAlias')) {
       result['paymentAlias'] = partial['paymentAlias'];
+    }
+    if (partial.containsKey('trainerExperienceYears')) {
+      result['trainerExperienceYears'] = partial['trainerExperienceYears'];
     }
     // ── Multi-location (Fase 6 Etapa 0) ──────────────────────────────────
     if (partial.containsKey('trainerLocations')) {

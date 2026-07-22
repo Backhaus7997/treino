@@ -58,6 +58,7 @@ class _ProfileEditTrainerScreenState
   final _bioController = TextEditingController();
   final _priceController = TextEditingController();
   final _aliasController = TextEditingController();
+  final _experienceController = TextEditingController();
   TrainerSpecialty? _specialty;
   final List<TrainerLocation> _locations = [];
   bool _offersOnline = false;
@@ -70,6 +71,7 @@ class _ProfileEditTrainerScreenState
     _bioController.dispose();
     _priceController.dispose();
     _aliasController.dispose();
+    _experienceController.dispose();
     super.dispose();
   }
 
@@ -78,6 +80,8 @@ class _ProfileEditTrainerScreenState
     _bioController.text = profile.trainerBio ?? '';
     _priceController.text = profile.trainerMonthlyRate?.toString() ?? '';
     _aliasController.text = profile.paymentAlias ?? '';
+    _experienceController.text =
+        profile.trainerExperienceYears?.toString() ?? '';
     _specialty = trainerSpecialtyFromString(profile.trainerSpecialty);
     _locations
       ..clear()
@@ -183,6 +187,10 @@ class _ProfileEditTrainerScreenState
       'paymentAlias': _aliasController.text.trim().isEmpty
           ? null
           : _aliasController.text.trim(),
+      // Opcional (#388): vacío ⇒ null ⇒ el perfil público muestra "—".
+      'trainerExperienceYears': _experienceController.text.trim().isEmpty
+          ? null
+          : int.parse(_experienceController.text.trim()),
       'trainerLocations': _locations.map((l) => l.toJson()).toList(),
       'trainerGeohashes': _locations.map((l) => l.geohash).toSet().toList(),
       'trainerOffersOnline': _offersOnline,
@@ -276,6 +284,27 @@ class _ProfileEditTrainerScreenState
                 _specialty = s;
                 _error = null;
               }),
+            ),
+            const SizedBox(height: 14),
+            _SectionLabel(palette: palette, text: 'AÑOS DE EXPERIENCIA'),
+            const SizedBox(height: 8),
+            TextFormField(
+              key: const Key('profile_edit_trainer_experience_field'),
+              controller: _experienceController,
+              keyboardType: TextInputType.number,
+              style: TextStyle(color: palette.textPrimary),
+              decoration: _inputDecoration(
+                palette,
+                hint: 'Ej: 5 (opcional — se muestra en tu perfil público)',
+              ),
+              validator: (v) {
+                final raw = v?.trim() ?? '';
+                if (raw.isEmpty) return null; // Opcional.
+                final n = int.tryParse(raw);
+                if (n == null) return 'Ingresá un número entero.';
+                if (n < 0 || n > 80) return 'Entre 0 y 80 años.';
+                return null;
+              },
             ),
             const SizedBox(height: 14),
             _SectionLabel(palette: palette, text: 'PRECIO MENSUAL (ARS)'),
