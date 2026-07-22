@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/feed/domain/post.dart';
 import 'package:treino/features/feed/domain/post_privacy.dart';
 import 'package:treino/features/feed/domain/routine_tag.dart';
+import 'package:treino/features/feed/domain/workout_stats.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
@@ -96,7 +97,8 @@ void main() {
       addTearDown(container.dispose);
 
       final notifier = container.read(postWorkoutNotifierProvider.notifier);
-      await notifier.shareWorkout(_makeSession(), text: _sharedText);
+      await notifier.shareWorkout(_makeSession(),
+          text: _sharedText, exerciseCount: 3);
 
       expect(fakeRepo.capturedPost, isNotNull);
       expect(fakeRepo.capturedPost!.authorDisplayName, equals('Ana'));
@@ -111,7 +113,8 @@ void main() {
       addTearDown(container.dispose);
 
       final notifier = container.read(postWorkoutNotifierProvider.notifier);
-      await notifier.shareWorkout(_makeSession(), text: _sharedText);
+      await notifier.shareWorkout(_makeSession(),
+          text: _sharedText, exerciseCount: 3);
 
       expect(fakeRepo.capturedPost, isNotNull);
       expect(fakeRepo.capturedPost!.authorDisplayName, equals(''));
@@ -129,6 +132,7 @@ void main() {
       await notifier.shareWorkout(
         _makeSession(routineId: 'r1', routineName: 'Push'),
         text: _sharedText,
+        exerciseCount: 3,
       );
 
       expect(fakeRepo.capturedPost, isNotNull);
@@ -149,7 +153,8 @@ void main() {
       addTearDown(container.dispose);
 
       final notifier = container.read(postWorkoutNotifierProvider.notifier);
-      await notifier.shareWorkout(_makeSession(), text: _sharedText);
+      await notifier.shareWorkout(_makeSession(),
+          text: _sharedText, exerciseCount: 3);
 
       expect(fakeRepo.capturedPost, isNotNull);
       expect(fakeRepo.capturedPost!.text, equals(_sharedText));
@@ -157,15 +162,15 @@ void main() {
 
     // ── REGRESSION: text is not hardcoded — caller controls localization ───
 
-    test(
-        'shareWorkout uses the caller-provided text (no hardcoded Spanish)',
+    test('shareWorkout uses the caller-provided text (no hardcoded Spanish)',
         () async {
       final container = makeContainer();
       addTearDown(container.dispose);
 
       const englishText = 'Finished my workout! 💪';
       final notifier = container.read(postWorkoutNotifierProvider.notifier);
-      await notifier.shareWorkout(_makeSession(), text: englishText);
+      await notifier.shareWorkout(_makeSession(),
+          text: englishText, exerciseCount: 3);
 
       expect(fakeRepo.capturedPost, isNotNull);
       expect(fakeRepo.capturedPost!.text, equals(englishText));
@@ -183,7 +188,8 @@ void main() {
       final notifier = container.read(postWorkoutNotifierProvider.notifier);
 
       await expectLater(
-        () => notifier.shareWorkout(_makeSession(), text: _sharedText),
+        () => notifier.shareWorkout(_makeSession(),
+            text: _sharedText, exerciseCount: 3),
         throwsException,
       );
 
@@ -201,7 +207,11 @@ class _FakeNotifier extends PostWorkoutNotifier {
   final _FakePostRepository _fakeRepo;
 
   @override
-  Future<void> shareWorkout(Session session, {required String text}) async {
+  Future<void> shareWorkout(
+    Session session, {
+    required String text,
+    required int exerciseCount,
+  }) async {
     state = const AsyncLoading();
     try {
       final profile = await ref.read(userProfileProvider.future);
@@ -218,6 +228,11 @@ class _FakeNotifier extends PostWorkoutNotifier {
         ),
         privacy: PostPrivacy.friends,
         createdAt: DateTime.now().toUtc(),
+        workoutStats: WorkoutStats(
+          volumeKg: session.totalVolumeKg,
+          durationMin: session.durationMin,
+          exerciseCount: exerciseCount,
+        ),
       );
       await _fakeRepo.create(post);
       state = const AsyncData(null);

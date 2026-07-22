@@ -12,6 +12,7 @@ import 'package:treino/features/feed/data/post_repository.dart';
 import 'package:treino/features/feed/domain/post.dart';
 import 'package:treino/features/feed/domain/post_privacy.dart';
 import 'package:treino/features/feed/domain/routine_tag.dart';
+import 'package:treino/features/feed/domain/workout_stats.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/feed/presentation/widgets/post_card.dart';
 import 'package:treino/l10n/app_l10n.dart';
@@ -35,6 +36,7 @@ Post makePost({
   RoutineTag? routineTag,
   PostPrivacy privacy = PostPrivacy.friends,
   DateTime? createdAt,
+  WorkoutStats? workoutStats,
 }) =>
     Post(
       id: id,
@@ -46,6 +48,7 @@ Post makePost({
       routineTag: routineTag,
       privacy: privacy,
       createdAt: createdAt ?? DateTime.now().subtract(const Duration(hours: 2)),
+      workoutStats: workoutStats,
     );
 
 /// Wraps [PostCard] with a viewer identity ([viewerUid], `null` = signed out)
@@ -215,33 +218,43 @@ void main() {
       );
     });
 
-    // SCENARIO-173: stats row present with em-dashes
-    testWidgets('SCENARIO-173: stats row contains em-dash text',
+    // QA-FEED-364/389: the old always-empty "— kg / — min / — ej." stub is
+    // gone. A post with no workout behind it (manual/legacy → workoutStats
+    // null) shows NO stats row at all — not a permanent em-dash placeholder.
+    testWidgets(
+        'QA-FEED-364/389: no stats row (no em-dash stub) when workoutStats is null',
         (tester) async {
       final post = makePost();
       await tester.pumpWidget(_wrap(PostCard(post: post)));
       await tester.pump();
 
-      final dashFinder = find.byWidgetPredicate(
-        (w) => w is Text && w.data != null && w.data!.contains('—'),
-      );
-      expect(dashFinder, findsAtLeastNWidgets(1));
+      expect(find.text('— kg'), findsNothing);
+      expect(find.text('— min'), findsNothing);
+      expect(find.text('— ej.'), findsNothing);
+      // "ej." is unique to the stats row → its absence proves the row is gone.
+      expect(find.textContaining('ej.'), findsNothing);
     });
 
-    // SCENARIO-174: stats row contains no real numeric data
-    testWidgets('SCENARIO-174: stats row has no real numeric values',
-        (tester) async {
-      final post = makePost();
+    // QA-FEED-364/389: a share-a-workout post (workoutStats present) shows the
+    // REAL volume / duration / exercise numbers instead of the em-dash stub.
+    testWidgets(
+        'QA-FEED-364/389: renders real volume/duration/exercise stats when '
+        'workoutStats is present', (tester) async {
+      final post = makePost(
+        workoutStats: const WorkoutStats(
+          volumeKg: 3.2,
+          durationMin: 52,
+          exerciseCount: 6,
+        ),
+      );
       await tester.pumpWidget(_wrap(PostCard(post: post)));
       await tester.pump();
 
-      final numericStatsFinder = find.byWidgetPredicate(
-        (w) =>
-            w is Text &&
-            w.data != null &&
-            RegExp(r'\d+ kg|\d+ min|\d+ ej').hasMatch(w.data!),
-      );
-      expect(numericStatsFinder, findsNothing);
+      expect(find.text('3.2 kg'), findsOneWidget);
+      expect(find.text('52 min'), findsOneWidget);
+      expect(find.text('6 ej.'), findsOneWidget);
+      // And never the old em-dash stub.
+      expect(find.text('— kg'), findsNothing);
     });
 
     // SCENARIO-175: card container decoration — borderRadius, bgCard color, border
