@@ -202,7 +202,7 @@ class _CustomBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.s8,
-        vertical: AppSpacing.hairline - 2,
+        vertical: AppSpacing.hairline,
       ),
       decoration: BoxDecoration(
         color: palette.accent,
@@ -232,7 +232,7 @@ class _InfoChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.s8,
-        vertical: AppSpacing.hairline - 2,
+        vertical: AppSpacing.hairline,
       ),
       decoration: BoxDecoration(
         color: palette.border.withValues(alpha: 0.5),
