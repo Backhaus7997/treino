@@ -566,7 +566,7 @@ class _DangerZone extends ConsumerWidget {
             runSpacing: 12,
             children: [
               OutlinedButton(
-                onPressed: () => _soon(context),
+                onPressed: () => _confirmPausarCuenta(context),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: palette.warning,
                   side: BorderSide(color: palette.warning),
@@ -574,7 +574,7 @@ class _DangerZone extends ConsumerWidget {
                 child: const Text('PAUSAR CUENTA'), // i18n: Fase W3
               ),
               OutlinedButton(
-                onPressed: () => _soon(context),
+                onPressed: () => _confirmEliminarCuenta(context),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: palette.danger,
                   side: BorderSide(color: palette.danger),
@@ -742,10 +742,47 @@ class _Muted extends StatelessWidget {
   }
 }
 
-/// Placeholder honesto para acciones todavía no cableadas (pausar/eliminar →
-/// W3.3; pausar no tiene backend).
-void _soon(BuildContext context) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(content: Text('Próximamente')), // i18n: Fase W3
+/// Confirmación honesta de ELIMINAR CUENTA (ADR-F12-01/F12-08): eliminar la
+/// cuenta se gestiona desde la app móvil (políticas de las stores) — no hay
+/// backend web para ejecutarlo, así que el dialog nunca promete una acción
+/// que no corre. `Entendido` sólo cierra el dialog, no muta nada.
+Future<void> _confirmEliminarCuenta(BuildContext context) {
+  return showTreinoDialog<void>(
+    context,
+    builder: (ctx) => TreinoDialog(
+      title: 'Eliminar cuenta', // i18n: Fase W3
+      body: const Text(
+        // i18n: Fase W3
+        'La eliminación de tu cuenta se gestiona desde la app TREINO, '
+        'según las políticas de las tiendas de aplicaciones. Próximamente '
+        'vas a poder hacerlo también desde acá.',
+      ),
+      destructive: true,
+      primaryLabel: 'Entendido', // i18n: Fase W3
+      onPrimaryTap: () => Navigator.of(ctx).maybePop(),
+      secondaryLabel: 'Cancelar', // i18n: Fase W3
+      onSecondaryTap: () => Navigator.of(ctx).maybePop(),
+    ),
+  );
+}
+
+/// Confirmación honesta de PAUSAR CUENTA: todavía no hay backend web para
+/// pausar la cuenta — el dialog lo explica en vez de simular la acción con
+/// un snackbar «Próximamente» seco.
+Future<void> _confirmPausarCuenta(BuildContext context) {
+  return showTreinoDialog<void>(
+    context,
+    builder: (ctx) => TreinoDialog(
+      title: 'Pausar cuenta', // i18n: Fase W3
+      body: const Text(
+        // i18n: Fase W3
+        'Pausar la cuenta todavía no está disponible desde la web. '
+        'Próximamente vas a poder hacerlo desde acá.',
+      ),
+      primaryLabel: 'Entendido', // i18n: Fase W3
+      onPrimaryTap: () => Navigator.of(ctx).maybePop(),
+      secondaryLabel: 'Cancelar', // i18n: Fase W3
+      onSecondaryTap: () => Navigator.of(ctx).maybePop(),
+    ),
   );
 }
