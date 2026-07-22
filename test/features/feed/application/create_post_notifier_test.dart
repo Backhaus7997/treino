@@ -12,6 +12,7 @@ import 'package:treino/features/feed/application/post_providers.dart';
 import 'package:treino/features/feed/data/post_repository.dart';
 import 'package:treino/features/feed/domain/post.dart';
 import 'package:treino/features/feed/domain/post_privacy.dart';
+import 'package:treino/features/feed/domain/routine_tag.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
@@ -547,6 +548,104 @@ void main() {
       expect(state.isEditing, isFalse);
       expect(state.editingPost, isNull);
       expect(state.text, '');
+    });
+  });
+
+  // ── routine tag ──────────────────────────────────────────────────────────
+
+  group('CreatePostNotifier — routine tag', () {
+    const tag = RoutineTag(routineId: 'r1', routineName: 'Push A');
+
+    test('setRoutineTag attaches the chosen tag', () async {
+      final container = _makeContainer();
+      addTearDown(container.dispose);
+      final notifier =
+          container.read(createPostNotifierProvider(null).notifier);
+      await container.read(createPostNotifierProvider(null).future);
+
+      notifier.setRoutineTag(tag);
+
+      expect(
+        container
+            .read(createPostNotifierProvider(null))
+            .valueOrNull
+            ?.routineTag,
+        tag,
+      );
+    });
+
+    test('setRoutineTag(null) detaches the tag', () async {
+      final container = _makeContainer();
+      addTearDown(container.dispose);
+      final notifier =
+          container.read(createPostNotifierProvider(null).notifier);
+      await container.read(createPostNotifierProvider(null).future);
+
+      notifier.setRoutineTag(tag);
+      notifier.setRoutineTag(null);
+
+      expect(
+        container
+            .read(createPostNotifierProvider(null))
+            .valueOrNull
+            ?.routineTag,
+        isNull,
+      );
+    });
+
+    test('submit() persists the chosen routineTag on create', () async {
+      final mockRepo = MockPostRepository();
+      when(() => mockRepo.create(any())).thenAnswer((inv) async {
+        final post = inv.positionalArguments[0] as Post;
+        return post.copyWith(id: 'generated-id');
+      });
+      final container = _makeContainer(mockRepo: mockRepo);
+      addTearDown(container.dispose);
+      final notifier =
+          container.read(createPostNotifierProvider(null).notifier);
+      await container.read(createPostNotifierProvider(null).future);
+
+      notifier.setText('Buena sesión!');
+      notifier.setRoutineTag(tag);
+      final ok = await notifier.submit();
+
+      expect(ok, isTrue);
+      final captured =
+          verify(() => mockRepo.create(captureAny())).captured.single as Post;
+      expect(captured.routineTag, tag);
+    });
+
+    test('build pre-fills routineTag when editing a post that has one',
+        () async {
+      final existingPost = _makePost(authorUid: 'u1').copyWith(routineTag: tag);
+      final container = _makeContainer(uid: 'u1');
+      addTearDown(container.dispose);
+
+      final state =
+          await container.read(createPostNotifierProvider(existingPost).future);
+
+      expect(state.routineTag, tag);
+    });
+
+    test('submit() persists the routineTag change in edit mode', () async {
+      final existingPost = _makePost(authorUid: 'u1');
+      final mockActions = MockPostActionsNotifier();
+      when(() => mockActions.updatePost(any()))
+          .thenAnswer((inv) async => inv.positionalArguments[0] as Post);
+      final container = _makeContainer(uid: 'u1', mockActions: mockActions);
+      addTearDown(container.dispose);
+      final notifier =
+          container.read(createPostNotifierProvider(existingPost).notifier);
+      await container.read(createPostNotifierProvider(existingPost).future);
+
+      notifier.setRoutineTag(tag);
+      final ok = await notifier.submit();
+
+      expect(ok, isTrue);
+      final captured = verify(() => mockActions.updatePost(captureAny()))
+          .captured
+          .single as Post;
+      expect(captured.routineTag, tag);
     });
   });
 }
