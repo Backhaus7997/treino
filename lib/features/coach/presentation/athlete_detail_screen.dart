@@ -9,7 +9,9 @@ import '../../../l10n/app_l10n.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../chat/application/chat_providers.dart';
 import '../../measurements/application/measurement_providers.dart';
+import '../../measurements/domain/measurement.dart';
 import '../../measurements/presentation/log_measurement_screen.dart';
+import '../../measurements/presentation/widgets/measurement_history_list.dart';
 import '../../measurements/presentation/widgets/measurement_progress_chart.dart';
 import '../application/athlete_note_providers.dart';
 import '../domain/athlete_note.dart';
@@ -223,7 +225,8 @@ class _AthleteDetailBody extends ConsumerWidget {
 
               // ── Antropometría section ────────────────────────────────
               const SizedBox(height: 8),
-              _AntropometriaSection(athleteId: athleteId),
+              _AntropometriaSection(
+                  athleteId: athleteId, trainerUid: trainerUid),
 
               // ── Rendimiento section ──────────────────────────────────
               const SizedBox(height: 20),
@@ -478,16 +481,26 @@ String _formatMetricValue(double value) =>
 ///
 /// When ≥2 measurements exist a PROGRESO chart card is rendered below the
 /// summary card (TANDA-3). With <2 measurements a muted hint card is shown.
+///
+/// Below that, a HISTORIAL list offers per-measurement EDIT/DELETE (#439) via
+/// [MeasurementHistoryList]. Actions only appear on rows this trainer authored
+/// (`recordedBy == trainerUid`) — self-logged rows are read-only, matching the
+/// update/delete rules.
 class _AntropometriaSection extends ConsumerWidget {
-  const _AntropometriaSection({required this.athleteId});
+  const _AntropometriaSection({
+    required this.athleteId,
+    required this.trainerUid,
+  });
 
   final String athleteId;
+  final String trainerUid;
 
-  void _openLogForm(BuildContext context) {
+  void _openLogForm(BuildContext context, {Measurement? initial}) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         fullscreenDialog: true,
-        builder: (_) => LogMeasurementScreen(athleteId: athleteId),
+        builder: (_) =>
+            LogMeasurementScreen(athleteId: athleteId, initial: initial),
       ),
     );
   }
@@ -645,6 +658,26 @@ class _AntropometriaSection extends ConsumerWidget {
                       ),
                     ),
                   ),
+
+                // ── Historial con editar/borrar por fila (#439) ────────
+                const SizedBox(height: 12),
+                Text(
+                  AppL10n.of(context).measurementsHistoryTitle,
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    letterSpacing: 1.2,
+                    color: palette.textMuted,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                MeasurementHistoryList(
+                  measurements: measurements,
+                  currentUid: trainerUid,
+                  readOnlyLabel:
+                      AppL10n.of(context).measurementHistorySelfLoggedTag,
+                  onEdit: (m) => _openLogForm(context, initial: m),
+                ),
               ],
             );
           },

@@ -9,6 +9,7 @@ import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../measurements/application/measurement_providers.dart';
 import '../../measurements/presentation/log_measurement_screen.dart';
+import '../../measurements/presentation/widgets/measurement_history_list.dart';
 import '../../measurements/presentation/widgets/measurement_progress_chart.dart';
 import '../../profile/application/user_providers.dart' show userProfileProvider;
 
@@ -107,6 +108,36 @@ class MeasurementsScreen extends ConsumerWidget {
                     _Hint(text: l10n.measurementsNeedsMoreData)
                   else
                     MeasurementProgressChart(measurements: measurements),
+
+                  // ── HISTORIAL: editar/borrar mediciones (#439) ────────
+                  // El atleta sólo puede tocar lo que él mismo se cargó
+                  // (recordedBy == uid, el pin de las rules de update/
+                  // delete); lo que registró un PF se muestra read-only.
+                  if (measurements.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    Text(
+                      l10n.measurementsHistoryTitle,
+                      style: GoogleFonts.barlowCondensed(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                        letterSpacing: 1.2,
+                        color: palette.textMuted,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    MeasurementHistoryList(
+                      measurements: measurements,
+                      currentUid: uid,
+                      readOnlyLabel: l10n.measurementHistoryTrainerLoggedTag,
+                      onEdit: (m) => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          fullscreenDialog: true,
+                          builder: (_) =>
+                              LogMeasurementScreen.selfLog(initial: m),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

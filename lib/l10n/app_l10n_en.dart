@@ -2651,6 +2651,47 @@ class AppL10nEn extends AppL10n {
       'A single measurement is not enough to show progress. At least one more is needed.';
 
   @override
+  String get measurementsHistoryTitle => 'HISTORY';
+
+  @override
+  String get measurementHistoryEditTooltip => 'Edit measurement';
+
+  @override
+  String get measurementHistoryDeleteTooltip => 'Delete measurement';
+
+  @override
+  String measurementHistoryShowAll(int count) {
+    return 'Show all ($count)';
+  }
+
+  @override
+  String get measurementHistoryShowLess => 'Show less';
+
+  @override
+  String get measurementDeleteConfirmTitle => 'Delete measurement?';
+
+  @override
+  String measurementDeleteConfirmBody(String date) {
+    return 'The measurement from $date will be deleted. This action cannot be undone.';
+  }
+
+  @override
+  String get measurementDeleteConfirmAction => 'Delete';
+
+  @override
+  String get measurementDeleteSuccess => 'Measurement deleted';
+
+  @override
+  String get measurementDeleteError =>
+      'We couldn\'t delete the measurement. Try again.';
+
+  @override
+  String get measurementHistorySelfLoggedTag => 'Self-logged';
+
+  @override
+  String get measurementHistoryTrainerLoggedTag => 'Logged by your trainer';
+
+  @override
   String get insightsTileFrequentExercisesTitle => 'Frequent exercises';
 
   @override

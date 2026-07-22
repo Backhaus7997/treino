@@ -2709,6 +2709,48 @@ class AppL10nEs extends AppL10n {
       'Con una sola medición no hay progreso que mostrar. Falta al menos una más.';
 
   @override
+  String get measurementsHistoryTitle => 'HISTORIAL';
+
+  @override
+  String get measurementHistoryEditTooltip => 'Editar medición';
+
+  @override
+  String get measurementHistoryDeleteTooltip => 'Eliminar medición';
+
+  @override
+  String measurementHistoryShowAll(int count) {
+    return 'Ver todas ($count)';
+  }
+
+  @override
+  String get measurementHistoryShowLess => 'Ver menos';
+
+  @override
+  String get measurementDeleteConfirmTitle => '¿Eliminar medición?';
+
+  @override
+  String measurementDeleteConfirmBody(String date) {
+    return 'Se eliminará la medición del $date. Esta acción no se puede deshacer.';
+  }
+
+  @override
+  String get measurementDeleteConfirmAction => 'Eliminar';
+
+  @override
+  String get measurementDeleteSuccess => 'Medición eliminada';
+
+  @override
+  String get measurementDeleteError =>
+      'No pudimos eliminar la medición. Inténtalo de nuevo.';
+
+  @override
+  String get measurementHistorySelfLoggedTag => 'Auto-registro';
+
+  @override
+  String get measurementHistoryTrainerLoggedTag =>
+      'Registrada por tu entrenador';
+
+  @override
   String get insightsTileFrequentExercisesTitle => 'Ejercicios frecuentes';
 
   @override
@@ -5437,6 +5479,47 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get measurementsNeedsMoreData =>
       'Con una sola medición no hay progreso que mostrar. Falta al menos una más.';
+
+  @override
+  String get measurementsHistoryTitle => 'HISTORIAL';
+
+  @override
+  String get measurementHistoryEditTooltip => 'Editar medición';
+
+  @override
+  String get measurementHistoryDeleteTooltip => 'Eliminar medición';
+
+  @override
+  String measurementHistoryShowAll(int count) {
+    return 'Ver todas ($count)';
+  }
+
+  @override
+  String get measurementHistoryShowLess => 'Ver menos';
+
+  @override
+  String get measurementDeleteConfirmTitle => '¿Eliminar medición?';
+
+  @override
+  String measurementDeleteConfirmBody(String date) {
+    return 'Se eliminará la medición del $date. Esta acción no se puede deshacer.';
+  }
+
+  @override
+  String get measurementDeleteConfirmAction => 'Eliminar';
+
+  @override
+  String get measurementDeleteSuccess => 'Medición eliminada';
+
+  @override
+  String get measurementDeleteError =>
+      'No pudimos eliminar la medición. Probá de nuevo.';
+
+  @override
+  String get measurementHistorySelfLoggedTag => 'Auto-registro';
+
+  @override
+  String get measurementHistoryTrainerLoggedTag => 'Cargada por tu entrenador';
 
   @override
   String get insightsTileFrequentExercisesTitle => 'Ejercicios frecuentes';

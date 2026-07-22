@@ -2150,6 +2150,64 @@
   "@measurementsNeedsMoreData": {
     "description": "Shown when the athlete has exactly ONE measurement. MeasurementProgressChart requires >= 2 points — distinct from the zero case, which is why it is a separate string."
   },
+  "measurementsHistoryTitle": "HISTORIAL",
+  "@measurementsHistoryTitle": {
+    "description": "[#439] Section label above MeasurementHistoryList on both mobile surfaces (athlete MEDIDAS screen and trainer ANTROPOMETRÍA section)."
+  },
+  "measurementHistoryEditTooltip": "Editar medición",
+  "@measurementHistoryEditTooltip": {
+    "description": "[#439] Tooltip/a11y label of the per-row edit action in MeasurementHistoryList. Only rendered on rows authored by the current uid (the update rule pins recordedBy)."
+  },
+  "measurementHistoryDeleteTooltip": "Eliminar medición",
+  "@measurementHistoryDeleteTooltip": {
+    "description": "[#439] Tooltip/a11y label of the per-row delete action in MeasurementHistoryList. Only rendered on rows authored by the current uid (the delete rule pins recordedBy)."
+  },
+  "measurementHistoryShowAll": "Ver todas ({count})",
+  "@measurementHistoryShowAll": {
+    "description": "[#439] Footer toggle of MeasurementHistoryList when more rows exist than the collapsed cap. {count} is the TOTAL number of measurements.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "measurementHistoryShowLess": "Ver menos",
+  "@measurementHistoryShowLess": {
+    "description": "[#439] Footer toggle of MeasurementHistoryList when expanded — collapses back to the capped list."
+  },
+  "measurementDeleteConfirmTitle": "¿Eliminar medición?",
+  "@measurementDeleteConfirmTitle": {
+    "description": "[#439] Title of the delete-confirmation AlertDialog for a measurement (same pattern as athleteDetailPlanDeleteTitle)."
+  },
+  "measurementDeleteConfirmBody": "Se eliminará la medición del {date}. Esta acción no se puede deshacer.",
+  "@measurementDeleteConfirmBody": {
+    "description": "[#439] Body of the delete-confirmation dialog. {date} is the pre-formatted recordedAt day label (e.g. '3 jul 2026').",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "measurementDeleteConfirmAction": "Eliminar",
+  "@measurementDeleteConfirmAction": {
+    "description": "[#439] Destructive confirm button of the measurement delete dialog. Cancel reuses commonCancel."
+  },
+  "measurementDeleteSuccess": "Medición eliminada",
+  "@measurementDeleteSuccess": {
+    "description": "[#439] Snackbar after a measurement was deleted successfully."
+  },
+  "measurementDeleteError": "No pudimos eliminar la medición. Probá de nuevo.",
+  "@measurementDeleteError": {
+    "description": "[#439] Snackbar when the measurement delete fails (network/rules)."
+  },
+  "measurementHistorySelfLoggedTag": "Auto-registro",
+  "@measurementHistorySelfLoggedTag": {
+    "description": "[#439] Read-only tag on the TRAINER's history rows the athlete self-logged: the trainer cannot edit/delete them (rules pin recordedBy), the tag explains why there are no actions."
+  },
+  "measurementHistoryTrainerLoggedTag": "Cargada por tu entrenador",
+  "@measurementHistoryTrainerLoggedTag": {
+    "description": "[#439] Read-only tag on the ATHLETE's history rows a trainer recorded: the athlete cannot edit/delete them (rules pin recordedBy), the tag explains why there are no actions."
+  },
   "insightsTileFrequentExercisesTitle": "Ejercicios frecuentes",
   "@insightsTileFrequentExercisesTitle": {
     "description": "[stats-hub] Tile title on InsightsScreen navigating to FrequentExercisesScreen (athlete's own uid)."
