@@ -6,6 +6,7 @@ import '../../feed/application/post_providers.dart';
 import '../../feed/domain/post.dart';
 import '../../feed/domain/post_privacy.dart';
 import '../../feed/domain/routine_tag.dart';
+import '../../feed/domain/workout_stats.dart';
 import '../../profile/application/user_providers.dart';
 import '../domain/session.dart';
 
@@ -13,7 +14,11 @@ class PostWorkoutNotifier extends AutoDisposeAsyncNotifier<void> {
   @override
   Future<void> build() async {}
 
-  Future<void> shareWorkout(Session session, {required String text}) async {
+  Future<void> shareWorkout(
+    Session session, {
+    required String text,
+    required int exerciseCount,
+  }) async {
     state = const AsyncLoading();
     try {
       final authUser = await ref.read(authStateChangesProvider.future);
@@ -32,6 +37,11 @@ class PostWorkoutNotifier extends AutoDisposeAsyncNotifier<void> {
         ),
         privacy: PostPrivacy.friends,
         createdAt: DateTime.now().toUtc(),
+        workoutStats: WorkoutStats(
+          volumeKg: session.totalVolumeKg,
+          durationMin: session.durationMin,
+          exerciseCount: exerciseCount,
+        ),
       );
 
       await ref.read(postRepositoryProvider).create(post);

@@ -39,9 +39,9 @@ Session _makeSession({
       wasFullyCompleted: wasFullyCompleted,
     );
 
-SetLog _makeSetLog() => SetLog(
+SetLog _makeSetLog({String exerciseId = 'e1'}) => SetLog(
       id: 'sl1',
-      exerciseId: 'e1',
+      exerciseId: exerciseId,
       exerciseName: 'Press',
       setNumber: 1,
       reps: 10,
@@ -313,6 +313,34 @@ void main() {
     expect(shareCalled, isTrue);
   });
 
+  testWidgets(
+      'QA-FEED-364/389: COMPARTIR passes the DISTINCT-exercise count to shareWorkout',
+      (tester) async {
+    final notifier = _TrackingNotifier(onShare: () {});
+
+    // 3 set logs across 2 DISTINCT exercises → the feed card stat is "2 ej.",
+    // not 3 (that would be the sets count).
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (
+        session: _makeSession(),
+        setLogs: [
+          _makeSetLog(exerciseId: 'e1'),
+          _makeSetLog(exerciseId: 'e1'),
+          _makeSetLog(exerciseId: 'e2'),
+        ],
+      ),
+      notifierOverride: () => notifier,
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('COMPARTIR'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('COMPARTIR'));
+    await tester.pumpAndSettle();
+
+    expect(notifier.capturedExerciseCount, equals(2));
+  });
+
   // ── SCENARIO-351/352: SnackBars ──────────────────────────────────────────
 
   testWidgets(
@@ -375,9 +403,15 @@ void main() {
 class _TrackingNotifier extends PostWorkoutNotifier {
   _TrackingNotifier({required this.onShare});
   final void Function() onShare;
+  int? capturedExerciseCount;
 
   @override
-  Future<void> shareWorkout(Session session, {required String text}) async {
+  Future<void> shareWorkout(
+    Session session, {
+    required String text,
+    required int exerciseCount,
+  }) async {
+    capturedExerciseCount = exerciseCount;
     onShare();
     state = const AsyncData(null);
   }
@@ -385,7 +419,11 @@ class _TrackingNotifier extends PostWorkoutNotifier {
 
 class _SuccessNotifier extends PostWorkoutNotifier {
   @override
-  Future<void> shareWorkout(Session session, {required String text}) async {
+  Future<void> shareWorkout(
+    Session session, {
+    required String text,
+    required int exerciseCount,
+  }) async {
     state = const AsyncLoading();
     await Future<void>.delayed(Duration.zero);
     state = const AsyncData(null);
@@ -394,7 +432,11 @@ class _SuccessNotifier extends PostWorkoutNotifier {
 
 class _ErrorNotifier extends PostWorkoutNotifier {
   @override
-  Future<void> shareWorkout(Session session, {required String text}) async {
+  Future<void> shareWorkout(
+    Session session, {
+    required String text,
+    required int exerciseCount,
+  }) async {
     state = const AsyncLoading();
     await Future<void>.delayed(Duration.zero);
     final err = Exception('fail');

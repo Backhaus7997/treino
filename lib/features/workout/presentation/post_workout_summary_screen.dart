@@ -55,6 +55,12 @@ class PostWorkoutSummaryScreen extends ConsumerWidget {
                         .shareWorkout(
                           session,
                           text: l10n.workoutPostAutoCompleteText,
+                          // QA-FEED-364/389: distinct exercises in this session
+                          // → the feed card's "N ej." stat.
+                          exerciseCount: data.setLogs
+                              .map((s) => s.exerciseId)
+                              .toSet()
+                              .length,
                         );
                     if (!context.mounted) return;
                     messenger.showSnackBar(SnackBar(
