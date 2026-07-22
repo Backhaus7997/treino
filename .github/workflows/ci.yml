@@ -45,3 +45,31 @@ jobs:
       # y (con branch protection activada) el PR NO se puede mergear.
       - name: Run tests
         run: flutter test
+
+  # Gate de compilación para las Cloud Functions (functions/, Node 20 + TS).
+  # Antes NADIE compilaba functions en CI: flutter analyze/test no ven functions/,
+  # así que un error de tipos o de compilación en functions/src podía entrar a
+  # main sin que nada lo frenara. Este job corre `tsc` y falla ante cualquiera.
+  # NOTA: los tests de functions (jest) corren contra el Firebase Emulator Suite,
+  # que exige Java 21+ y firebase-tools. Ejecutarlos en CI es el siguiente paso
+  # natural (ver el PR de #365 para el detalle de por qué no van en este job).
+  functions-build:
+    name: Functions Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+
+      # Instala exactamente lo del lockfile (reproducible, igual que en local).
+      - name: Install functions dependencies
+        run: npm --prefix functions ci
+
+      - name: Build functions (tsc)
+        run: npm --prefix functions run build
