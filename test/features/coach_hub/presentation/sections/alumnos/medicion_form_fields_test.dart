@@ -63,8 +63,7 @@ void main() {
       ));
       await tester.pump();
 
-      final semantics =
-          tester.getSemantics(find.text('COMPOSICIÓN CORPORAL'));
+      final semantics = tester.getSemantics(find.text('COMPOSICIÓN CORPORAL'));
       expect(semantics.flagsCollection.isButton, isTrue,
           reason: 'el header colapsable debe exponer Semantics(button: true)');
 
