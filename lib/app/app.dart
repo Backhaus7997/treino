@@ -10,6 +10,7 @@ import '../features/notifications/application/notification_providers.dart';
 import '../features/notifications/application/notification_router.dart';
 import '../l10n/app_l10n.dart';
 import 'locale_resolver.dart';
+import 'root_scaffold_messenger.dart';
 import 'router.dart';
 import 'theme/app_theme.dart';
 import 'theme/theme_mode_provider.dart';
@@ -51,11 +52,6 @@ class TreinoApp extends ConsumerStatefulWidget {
 
 class _TreinoAppState extends ConsumerState<TreinoApp> {
   late final GoRouter _router;
-
-  /// Root ScaffoldMessenger key used by the foreground SnackBar handler.
-  /// Passed to [MaterialApp.router] so the SnackBar can be shown from
-  /// [_onForeground] without needing a BuildContext. (ADR-PN-010)
-  final _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
 
   /// Foreground message subscription — cancelled on dispose.
   StreamSubscription<RemoteMessage>? _fgSub;
@@ -123,7 +119,7 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
         message, ref.read(firebaseAuthProvider).currentUser?.uid)) {
       return;
     }
-    final messenger = _scaffoldMessengerKey.currentState;
+    final messenger = ref.read(rootScaffoldMessengerKeyProvider).currentState;
     if (messenger == null) return;
 
     final title = message.notification?.title ?? '';
@@ -176,8 +172,10 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
       supportedLocales: AppL10n.supportedLocales,
       localeResolutionCallback: (locale, supported) =>
           resolveLocale(locale ?? const Locale('es', 'AR'), supported),
-      // Root ScaffoldMessenger key for foreground push SnackBars. (ADR-PN-010)
-      scaffoldMessengerKey: _scaffoldMessengerKey,
+      // Root ScaffoldMessenger key — foreground push SnackBars (ADR-PN-010)
+      // y avisos de la capa de providers (p.ej. adjuntos de chat, #435).
+      // Vive en un provider para que ese código lo alcance sin BuildContext.
+      scaffoldMessengerKey: ref.watch(rootScaffoldMessengerKeyProvider),
       // Global: tap anywhere outside an input dismisses the keyboard.
       // translucent so buttons/scroll still win the tap; only empty-area
       // taps reach this and unfocus the current field.

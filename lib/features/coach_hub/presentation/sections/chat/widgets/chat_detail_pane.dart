@@ -1,4 +1,4 @@
-import 'dart:developer' as developer;
+import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../../../../app/theme/app_palette.dart';
 import '../../../../../../core/widgets/treino_icon.dart';
+import '../../../../../chat/application/chat_media_send_controller.dart';
 import '../../../../../chat/application/chat_providers.dart';
 import '../../../../../chat/domain/media_type.dart';
 import '../../../../../chat/domain/message.dart';
@@ -38,8 +39,13 @@ class ChatDetailPane extends ConsumerStatefulWidget {
 class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
   final _composerCtrl = TextEditingController();
   bool _sending = false;
-  bool _uploading = false;
-  double _uploadProgress = 0;
+
+  // Upload state (progress + composer disabled) vive en
+  // chatMediaSendControllerProvider(chatId): sobrevive al dispose del pane y
+  // a los cambios de chat vía didUpdateWidget (issue #435).
+
+  bool get _mediaSendInFlight =>
+      ref.read(chatMediaSendControllerProvider(widget.chatId)).uploading;
 
   @override
   void initState() {
@@ -80,7 +86,7 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
 
   Future<void> _send() async {
     final text = _composerCtrl.text.trim();
-    if (text.isEmpty || _sending) return;
+    if (text.isEmpty || _sending || _mediaSendInFlight) return;
     final uid = ref.read(currentUidProvider);
     if (uid == null) return;
     setState(() => _sending = true);
@@ -109,7 +115,7 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
   /// [_pickAndSendMedia] con el [MediaType] elegido. Mismo patrón que el
   /// chat mobile — un solo entrypoint desde el composer.
   Future<void> _openAttachMenu() async {
-    if (_uploading || _sending) return;
+    if (_sending || _mediaSendInFlight) return;
     final palette = AppPalette.of(context);
     final choice = await showModalBottomSheet<MediaType>(
       context: context,
@@ -147,9 +153,13 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
   /// Corre el pick + upload + send de una media (foto o video). Handler
   /// agnóstico usado por el menú del composer.
   Future<void> _pickAndSendMedia(MediaType mediaType) async {
-    if (_uploading || _sending) return;
+    if (_sending || _mediaSendInFlight) return;
     final uid = ref.read(currentUidProvider);
     if (uid == null) return;
+    // Capturado ANTES del picker: didUpdateWidget puede cambiar widget.chatId
+    // sin desmontar el pane — el adjunto debe aterrizar en el chat donde el
+    // PF lo eligió, no en el que quedó visible (issue #435).
+    final chatId = widget.chatId;
 
     final picker = ImagePicker();
     // On web, imageQuality is ignored by the platform but harmless — mobile
@@ -166,55 +176,17 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
     }
     if (file == null || !mounted) return;
 
-    setState(() {
-      _uploading = true;
-      _uploadProgress = 0;
-    });
-
-    try {
-      final uploadService = ref.read(chatMediaUploadServiceProvider);
-      final mediaUrl = await uploadService.upload(
-        file.path,
-        chatId: widget.chatId,
-        mediaType: mediaType,
-        onProgress: (fraction) {
-          if (mounted) setState(() => _uploadProgress = fraction);
-        },
-      );
-
-      if (!mounted) return;
-
-      await ref.read(chatRepositoryProvider).sendMessage(
-            chatId: widget.chatId,
+    // Fire-and-forget A PROPÓSITO (issue #435): el controller vive en el
+    // ProviderContainer y completa upload+send aunque el pane muera o cambie
+    // de chat. Errores, cleanup de huérfanos y aviso al usuario (snackbar
+    // por el ScaffoldMessenger root) son responsabilidad del controller.
+    unawaited(
+      ref.read(chatMediaSendControllerProvider(chatId).notifier).sendMedia(
+            localPath: file.path,
             senderId: uid,
-            mediaUrl: mediaUrl,
             mediaType: mediaType,
-          );
-    } catch (e, st) {
-      developer.log(
-        'chat web media upload/send failed',
-        name: 'chat',
-        error: e,
-        stackTrace: st,
-      );
-      if (mounted) {
-        final label = mediaType == MediaType.image ? 'la foto' : 'el video';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'No pudimos enviar $label. Reintentá.', // i18n: Fase W2
-            ),
           ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _uploading = false;
-          _uploadProgress = 0;
-        });
-      }
-    }
+    );
   }
 
   @override
@@ -222,6 +194,7 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
     final palette = AppPalette.of(context);
     final currentUid = ref.watch(currentUidProvider);
     final messagesAsync = ref.watch(messagesProvider(widget.chatId));
+    final mediaSend = ref.watch(chatMediaSendControllerProvider(widget.chatId));
 
     return Container(
       color: palette.bg,
@@ -252,16 +225,16 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
             ),
           ),
           Divider(height: 1, color: palette.border),
-          if (_uploading)
+          if (mediaSend.uploading)
             LinearProgressIndicator(
-              value: _uploadProgress > 0 ? _uploadProgress : null,
+              value: mediaSend.progress > 0 ? mediaSend.progress : null,
               minHeight: 2,
               color: palette.accent,
               backgroundColor: palette.bgCard,
             ),
           _Composer(
             controller: _composerCtrl,
-            sending: _sending || _uploading,
+            sending: _sending || mediaSend.uploading,
             onSend: _send,
             onAttach: _openAttachMenu,
             palette: palette,

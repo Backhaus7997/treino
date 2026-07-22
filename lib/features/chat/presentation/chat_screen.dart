@@ -1,3 +1,4 @@
+import 'dart:async' show unawaited;
 import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
@@ -14,6 +15,7 @@ import '../../feed/presentation/widgets/post_avatar.dart';
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
+import '../application/chat_media_send_controller.dart';
 import '../application/chat_providers.dart';
 import '../domain/media_type.dart';
 import '../domain/message.dart';
@@ -40,9 +42,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _textController = TextEditingController();
   bool _sending = false;
 
-  // Upload state — drives LinearProgressIndicator and disables controls.
-  bool _uploading = false;
-  double _uploadProgress = 0;
+  // Upload state (progress bar + disabled composer) ya no vive acá: lo
+  // expone chatMediaSendControllerProvider(chatId), que sobrevive al dispose
+  // de esta pantalla (issue #435).
 
   @override
   void initState() {
@@ -72,8 +74,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     super.dispose();
   }
 
+  bool get _mediaSendInFlight =>
+      ref.read(chatMediaSendControllerProvider(widget.chatId)).uploading;
+
   Future<void> _onSend() async {
-    if (_sending || _uploading) return;
+    if (_sending || _mediaSendInFlight) return;
     final text = _textController.text.trim();
     if (text.isEmpty) return;
     final currentUid = ref.read(currentUidProvider);
@@ -111,8 +116,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Future<void> _onAttach() async {
-    if (_uploading || _sending) return;
+    if (_sending || _mediaSendInFlight) return;
     final l10n = AppL10n.of(context);
+    // Capturado antes de los awaits: el envío pertenece a ESTE chat pase lo
+    // que pase con la pantalla mientras el sheet/picker están abiertos.
+    final chatId = widget.chatId;
     final picked = await showModalBottomSheet<_PickChoice>(
       context: context,
       builder: (_) => _AttachSheet(l10n: l10n),
@@ -139,52 +147,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     if (file == null || !mounted) return;
 
-    setState(() {
-      _uploading = true;
-      _uploadProgress = 0;
-    });
-
-    try {
-      final uploadService = ref.read(chatMediaUploadServiceProvider);
-      final mediaUrl = await uploadService.upload(
-        file.path,
-        chatId: widget.chatId,
-        mediaType: mediaType,
-        onProgress: (fraction) {
-          if (mounted) setState(() => _uploadProgress = fraction);
-        },
-      );
-
-      if (!mounted) return;
-
-      await ref.read(chatRepositoryProvider).sendMessage(
-            chatId: widget.chatId,
+    // Fire-and-forget A PROPÓSITO (issue #435): el controller vive en el
+    // ProviderContainer y completa upload+send aunque esta pantalla muera.
+    // Errores, cleanup de huérfanos y aviso al usuario son responsabilidad
+    // del controller (snackbar por el ScaffoldMessenger root).
+    unawaited(
+      ref.read(chatMediaSendControllerProvider(chatId).notifier).sendMedia(
+            localPath: file.path,
             senderId: currentUid,
-            mediaUrl: mediaUrl,
             mediaType: mediaType,
-          );
-    } catch (e, st) {
-      developer.log(
-        'media upload/send failed',
-        name: 'chat',
-        error: e,
-        stackTrace: st,
-      );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(AppL10n.of(context).chatMediaUploadFailed),
           ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _uploading = false;
-          _uploadProgress = 0;
-        });
-      }
-    }
+    );
   }
 
   @override
@@ -194,6 +167,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final messagesAsync = ref.watch(messagesProvider(widget.chatId));
     final currentUid = ref.watch(currentUidProvider);
     final pubAsync = ref.watch(userPublicProfileProvider(widget.otherUid));
+    final mediaSend = ref.watch(chatMediaSendControllerProvider(widget.chatId));
 
     // REQ-CHATUNREAD-007: re-mark as read when a new message arrives while
     // the screen is open, so the badge doesn't re-appear.
@@ -292,15 +266,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 },
               ),
             ),
-            if (_uploading)
+            if (mediaSend.uploading)
               LinearProgressIndicator(
-                value: _uploadProgress > 0 ? _uploadProgress : null,
+                value: mediaSend.progress > 0 ? mediaSend.progress : null,
                 color: palette.accent,
                 backgroundColor: palette.bgCard,
               ),
             _Composer(
               controller: _textController,
-              sending: _sending || _uploading,
+              sending: _sending || mediaSend.uploading,
               onSend: _onSend,
               onAttach: _onAttach,
               palette: palette,
