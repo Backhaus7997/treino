@@ -143,7 +143,7 @@ class _EspecialidadPrecioCardState
     final profile = widget.profile;
 
     OutlineInputBorder border(Color c) => OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           borderSide: BorderSide(color: c),
         );
 
@@ -160,7 +160,7 @@ class _EspecialidadPrecioCardState
         decoration: BoxDecoration(
           color: palette.bgCard,
           border: Border.all(color: palette.border),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppRadius.md),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

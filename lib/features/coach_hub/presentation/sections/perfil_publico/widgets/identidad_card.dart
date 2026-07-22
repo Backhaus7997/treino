@@ -97,7 +97,7 @@ class _IdentidadCardState extends ConsumerState<IdentidadCard> {
     final name = (profile.displayName ?? '').trim();
 
     OutlineInputBorder border(Color c) => OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           borderSide: BorderSide(color: c),
         );
 
@@ -109,7 +109,7 @@ class _IdentidadCardState extends ConsumerState<IdentidadCard> {
         decoration: BoxDecoration(
           color: palette.bgCard,
           border: Border.all(color: palette.border),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppRadius.md),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
