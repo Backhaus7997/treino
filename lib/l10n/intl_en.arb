@@ -987,5 +987,6 @@
   "insightsTileMonthlyReportSubtitle": "Monthly workout summary",
   "insightsTileVolumeByGroupTitle": "Volume by muscle group",
   "insightsTileVolumeByGroupSubtitle": "Sets vs. target per muscle group",
-  "volumeByGroupScreenTitle": "VOLUME BY GROUP"
+  "volumeByGroupScreenTitle": "VOLUME BY GROUP",
+  "volumeByGroupEmptyTarget": "You need an assigned routine to see your target volume."
 }
