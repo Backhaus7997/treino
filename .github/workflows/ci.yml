@@ -50,9 +50,8 @@ jobs:
   # Antes NADIE compilaba functions en CI: flutter analyze/test no ven functions/,
   # así que un error de tipos o de compilación en functions/src podía entrar a
   # main sin que nada lo frenara. Este job corre `tsc` y falla ante cualquiera.
-  # NOTA: los tests de functions (jest) corren contra el Firebase Emulator Suite,
-  # que exige Java 21+ y firebase-tools. Ejecutarlos en CI es el siguiente paso
-  # natural (ver el PR de #365 para el detalle de por qué no van en este job).
+  # Rápido y sin Java → feedback inmediato. Los tests (jest contra el Emulator
+  # Suite) viven en el job `functions-test` de abajo.
   functions-build:
     name: Functions Build
     runs-on: ubuntu-latest
@@ -73,3 +72,46 @@ jobs:
 
       - name: Build functions (tsc)
         run: npm --prefix functions run build
+
+  # Corre los tests de las Cloud Functions (jest) contra el Firebase Emulator
+  # Suite. Era el agujero que faltaba: hasta ahora los tests de functions/ —
+  # incluidos los de reglas de seguridad, que nunca se ejecutaron en CI (ver
+  # #360) — no corrían nunca. Requisitos: Java 21+ (lo exige el Emulator Suite
+  # de firebase-tools 15+) y el CLI de firebase.
+  #
+  # Una sola pasada `emulators:exec --only firestore,auth "npm test"` replica el
+  # flujo documentado en functions/README.md: emulador con el project default
+  # `treino-dev` (.firebaserc) + `npm test`. Los tests de reglas usan sus propios
+  # projectIds vía @firebase/rules-unit-testing y conviven en el mismo emulador
+  # (mismo esquema que corren los devs en local). El emulador NO necesita login.
+  functions-test:
+    name: Functions Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+
+      # El Emulator Suite de firebase-tools 15+ no arranca sin Java 21+.
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install functions dependencies
+        run: npm --prefix functions ci
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
+      # Levanta firestore + auth, corre TODO el suite (unit + emulator-backed +
+      # rules) y baja el emulador. El script `test` ya trae --forceExit.
+      - name: Run functions tests against the emulator
+        run: firebase emulators:exec --only firestore,auth "npm --prefix functions test"
