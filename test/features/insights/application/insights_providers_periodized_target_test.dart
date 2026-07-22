@@ -59,6 +59,10 @@ void main() {
       exercisesProvider.overrideWith((ref) async => const <Exercise>[]),
       for (final e in routines.entries)
         routineByIdProvider(e.key).overrideWith((ref) async => e.value),
+      // [#442] el fallback de muscleGroup pasa por el resolver compartido,
+      // que lee visibleRoutineByIdProvider (targets siguen en routineById).
+      for (final e in routines.entries)
+        visibleRoutineByIdProvider(e.key).overrideWith((ref) async => e.value),
     ]);
     addTearDown(container.dispose);
     return container;

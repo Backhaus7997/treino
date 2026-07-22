@@ -32,6 +32,7 @@ void main() {
       sessionRepositoryProvider.overrideWithValue(repo),
       exercisesProvider.overrideWith((ref) async => const <Exercise>[]),
       routineByIdProvider('r1').overrideWith((ref) async => null),
+      visibleRoutineByIdProvider('r1').overrideWith((ref) async => null),
     ]);
   }
 

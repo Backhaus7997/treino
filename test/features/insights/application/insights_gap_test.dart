@@ -111,6 +111,7 @@ void main() {
         sessionRepositoryProvider.overrideWithValue(repo),
         exercisesProvider.overrideWith((ref) async => const <Exercise>[]),
         routineByIdProvider('r1').overrideWith((ref) async => null),
+        visibleRoutineByIdProvider('r1').overrideWith((ref) async => null),
       ]);
       addTearDown(container.dispose);
 
@@ -157,6 +158,7 @@ void main() {
         exercisesProvider.overrideWith(
             (ref) async => [_ex(id: 'e-chest', muscleGroup: 'chest')]),
         routineByIdProvider('r1').overrideWith((ref) async => null),
+        visibleRoutineByIdProvider('r1').overrideWith((ref) async => null),
       ]);
       addTearDown(container.dispose);
 
@@ -221,6 +223,10 @@ void main() {
         exercisesProvider.overrideWith((ref) async => const <Exercise>[]),
         routineByIdProvider('rNew').overrideWith((ref) async => newRoutine),
         routineByIdProvider('rOld').overrideWith((ref) async => oldRoutine),
+        visibleRoutineByIdProvider('rNew')
+            .overrideWith((ref) async => newRoutine),
+        visibleRoutineByIdProvider('rOld')
+            .overrideWith((ref) async => oldRoutine),
       ]);
       addTearDown(container.dispose);
 
@@ -277,6 +283,7 @@ void main() {
               _ex(id: 'e-back', muscleGroup: 'back'),
             ]),
         routineByIdProvider('r1').overrideWith((ref) async => null),
+        visibleRoutineByIdProvider('r1').overrideWith((ref) async => null),
       ]);
       addTearDown(container.dispose);
 
@@ -345,6 +352,7 @@ void main() {
         exercisesProvider.overrideWith(
             (ref) async => [_ex(id: 'e-chest', muscleGroup: 'chest')]),
         routineByIdProvider('r1').overrideWith((ref) async => null),
+        visibleRoutineByIdProvider('r1').overrideWith((ref) async => null),
       ]);
       addTearDown(container.dispose);
 
