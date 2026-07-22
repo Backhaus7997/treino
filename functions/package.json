@@ -8,6 +8,8 @@
     "test": "jest --forceExit",
     "test:rules": "jest --forceExit \"(user-public-profiles-rules|trainer-public-profiles-rules|trainer-links-paywall-rules|users-subscription-rules|users-role-create-rules|trainer-links-forge-rules|chat-relationship-rules|post-privacy-rules)\"",
     "test:rules:emulator": "firebase emulators:exec --only firestore,auth --project treino-rules-test \"npm run test:rules\"",
+    "test:integration": "jest --forceExit --testPathIgnorePatterns=/node_modules/ --testPathIgnorePatterns=-rules.test.ts$",
+    "test:integration:emulator": "firebase emulators:exec --only firestore,auth,storage --project treino-dev \"npm run test:integration\"",
     "lint": "eslint --ext .ts src/",
     "lint:fix": "eslint --ext .ts src/ --fix"
   },
