@@ -171,7 +171,7 @@ class _SkeletonCard extends StatelessWidget {
                 height: 14,
                 decoration: BoxDecoration(
                   color: palette.border,
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(AppRadius.full),
                 ),
               ),
             ],
