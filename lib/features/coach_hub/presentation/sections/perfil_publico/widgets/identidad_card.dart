@@ -15,6 +15,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/app/theme/tokens/components/treino_focus_tokens.dart';
 import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
@@ -91,6 +92,7 @@ class _IdentidadCardState extends ConsumerState<IdentidadCard> {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final focusTokens = TreinoFocusTokens.of(context);
     final profile = widget.profile;
     final name = (profile.displayName ?? '').trim();
 
@@ -151,6 +153,7 @@ class _IdentidadCardState extends ConsumerState<IdentidadCard> {
             TreinoInteractiveState(
               onTap: () => context.go('/ajustes'),
               builder: (ctx, states) => Container(
+                key: const Key('identidad_card_edit_link'),
                 padding: const EdgeInsets.symmetric(
                   horizontal: AppSpacing.s12,
                   vertical: AppSpacing.hairline,
@@ -160,6 +163,13 @@ class _IdentidadCardState extends ConsumerState<IdentidadCard> {
                       ? palette.accent.withValues(alpha: 0.08)
                       : AppColorPrimitives.transparent,
                   borderRadius: BorderRadius.circular(AppRadius.sm),
+                  // Anillo de foco de teclado — mismo patrón que
+                  // section_header.dart/filter_chips.dart (ADR-SH-002,
+                  // remediación WARNING-2 verify fase-11): sin esto el link
+                  // no da feedback visual al navegar con Tab.
+                  border: states.focused
+                      ? Border.all(color: focusTokens.ring)
+                      : null,
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
