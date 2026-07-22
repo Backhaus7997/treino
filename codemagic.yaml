@@ -1,0 +1,76 @@
+# Codemagic — release automatizado de iOS a TestFlight.
+#
+# Se dispara al pushear un tag `v*` (ej: `git tag v0.1.1 && git push origin v0.1.1`).
+# Codemagic maneja la firma solo (Automatic code signing) usando la App Store Connect API Key,
+# calcula el build number leyendo el último de TestFlight + 1, y sube a TestFlight.
+#
+# ─── ANTES del primer run, en la UI de Codemagic hay que dejar listo: ───────────────
+#   1. Integración "App Store Connect" cargada con el .p8 + Issuer ID + Key ID
+#      (Teams → Integrations → Apple Developer Portal).
+#   2. iOS code signing en modo Automatic para el bundle com.backhaus.treino.
+#   3. Reemplazar los 3 <PLACEHOLDER> de abajo:
+#        · APP_STORE_CONNECT_INTEGRATION  → el nombre que le pusiste a la integración del paso 1
+#        · APP_STORE_APP_ID               → el Apple ID numérico de la app
+#                                           (App Store Connect → tu app → App Information → General → Apple ID)
+#        · BETA_GROUP                     → el nombre exacto del grupo de testers en TestFlight
+# ────────────────────────────────────────────────────────────────────────────────────
+
+workflows:
+  ios-testflight:
+    name: iOS · TestFlight release
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+
+    integrations:
+      # Nombre EXACTO de la integración de App Store Connect creada en Codemagic.
+      app_store_connect: APP_STORE_CONNECT_INTEGRATION # <PLACEHOLDER>
+
+    environment:
+      flutter: 3.41.9 # pin del equipo (ver .github/workflows/ci.yml)
+      xcode: latest
+      cocoapods: default
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.backhaus.treino
+      vars:
+        # Apple ID numérico de la app (NO el bundle id). App Store Connect → App Information → Apple ID.
+        APP_STORE_APP_ID: "APP_STORE_APP_ID" # <PLACEHOLDER>
+
+    triggering:
+      events:
+        - tag
+      tag_patterns:
+        - pattern: "v*"
+          include: true
+
+    scripts:
+      - name: Flutter pub get
+        script: flutter pub get
+
+      - name: Build number automático (último de TestFlight + 1)
+        script: |
+          set -euo pipefail
+          LATEST=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APP_ID")
+          echo "BUILD_NUMBER=$(( LATEST + 1 ))" >> "$CM_ENV"
+
+      - name: Build IPA firmado
+        script: |
+          set -euo pipefail
+          # build-name sale de pubspec.yaml (0.1.0); build-number se auto-incrementa.
+          flutter build ipa --release \
+            --build-number="$BUILD_NUMBER" \
+            --export-options-plist=/Users/builder/export_options.plist
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        # Grupo de testers al que se distribuye. Testers internos = reciben al instante;
+        # externos = la 1ª build de cada versión pasa por Beta App Review de Apple.
+        # Si querés solo SUBIR sin distribuir todavía, borrá `beta_groups` entero.
+        beta_groups:
+          - BETA_GROUP # <PLACEHOLDER>
