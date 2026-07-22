@@ -1,10 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/app/theme/tokens/components/treino_focus_tokens.dart';
+import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/core/image/avatar_cropper.dart';
+import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
+import 'package:treino/core/widgets/motion/treino_shimmer.dart';
+import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/avatar_web_uploader.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 
@@ -21,16 +29,111 @@ class CuentaTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profileAsync = ref.watch(userProfileProvider);
-    return profileAsync.when(
-      loading: () => const Padding(
-        padding: EdgeInsets.symmetric(vertical: 48),
-        child: Center(child: CircularProgressIndicator()),
+    // Cross-fade entre loading→data→error (ADR-F12-03) — cada estado con su
+    // propia key para que TreinoStateSwitcher detecte el cambio y anime.
+    final stateKey = switch (profileAsync) {
+      AsyncData() => const ValueKey('data'),
+      AsyncError() => const ValueKey('error'),
+      _ => const ValueKey('loading'),
+    };
+    return TreinoStateSwitcher(
+      childKey: stateKey,
+      child: profileAsync.when(
+        loading: () => const _CuentaSkeleton(),
+        error: (_, __) =>
+            const _Muted('No se pudo cargar tu cuenta.'), // i18n: Fase W3
+        data: (profile) => profile == null
+            ? const _Muted('No se pudo cargar tu cuenta.') // i18n: Fase W3
+            : _CuentaForm(profile: profile),
       ),
-      error: (_, __) =>
-          const _Muted('No se pudo cargar tu cuenta.'), // i18n: Fase W3
-      data: (profile) => profile == null
-          ? const _Muted('No se pudo cargar tu cuenta.') // i18n: Fase W3
-          : _CuentaForm(profile: profile),
+    );
+  }
+}
+
+/// Skeleton de formulario para el loading de Cuenta (ADR-F12-03) — espeja el
+/// layout real: botón GUARDAR, label + subtítulo, y la card «INFORMACIÓN
+/// PERSONAL» (avatar circular + filas NOMBRE/APELLIDO, EMAIL, TELÉFONO).
+class _CuentaSkeleton extends StatelessWidget {
+  const _CuentaSkeleton();
+
+  Widget _bar(AppPalette palette, {double? width, double height = 12}) =>
+      Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          color: palette.border,
+          borderRadius: BorderRadius.circular(4),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Column(
+      key: const Key('cuenta_skeleton'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Align(
+          alignment: Alignment.centerRight,
+          child: _bar(palette, width: 170, height: 44),
+        ),
+        const SizedBox(height: 16),
+        _bar(palette, width: 160, height: 11),
+        const SizedBox(height: 6),
+        _bar(palette, width: 220, height: 13),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: palette.bgCard,
+            border: Border.all(color: palette.border),
+            borderRadius: BorderRadius.circular(AppRadius.md),
+          ),
+          child: TreinoShimmer(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: palette.border,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 18),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _bar(palette, width: 140),
+                          const SizedBox(height: 8),
+                          _bar(palette, width: 210, height: 10),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 22),
+                Row(
+                  children: [
+                    Expanded(child: _bar(palette, height: 44)),
+                    const SizedBox(width: 16),
+                    Expanded(child: _bar(palette, height: 44)),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                _bar(palette, height: 44),
+                const SizedBox(height: 14),
+                _bar(palette, height: 44),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -154,67 +257,123 @@ class _CuentaFormState extends ConsumerState<_CuentaForm> {
           ),
         ),
         const SizedBox(height: 16),
-        const _SectionLabel('INFORMACIÓN PERSONAL'), // i18n: Fase W3
-        const SizedBox(height: 4),
-        Text(
-          'Esta info se muestra en tu perfil público.', // i18n: Fase W3
-          style: TextStyle(color: palette.textMuted, fontSize: 13),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: palette.bgCard,
-            border: Border.all(color: palette.border),
-            borderRadius: BorderRadius.circular(14),
-          ),
+        // Tarjeta «INFORMACIÓN PERSONAL» — primera en el stagger eager
+        // (ADR-F12-04, PROHIBIDO dentro de ListView.builder; acá es un
+        // Column fijo, no aplica el riesgo).
+        TreinoFadeSlideIn(
+          delay: AppMotion.stagger(0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _FotoEditor(profile: widget.profile),
-              const SizedBox(height: 22),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: _LabeledInput(
-                      label: 'NOMBRE', // i18n: Fase W3
-                      controller: _first,
+              const _SectionLabel('INFORMACIÓN PERSONAL'), // i18n: Fase W3
+              const SizedBox(height: 4),
+              const _PerfilPublicoCaption(),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: palette.bgCard,
+                  border: Border.all(color: palette.border),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _FotoEditor(profile: widget.profile),
+                    const SizedBox(height: 22),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: _LabeledInput(
+                            label: 'NOMBRE', // i18n: Fase W3
+                            controller: _first,
+                            enabled: !_saving,
+                            onChanged: () => setState(() {}),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _LabeledInput(
+                            label: 'APELLIDO', // i18n: Fase W3
+                            controller: _last,
+                            enabled: !_saving,
+                            onChanged: () => setState(() {}),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    // Email = identidad de Auth, read-only (cambiarlo exige
+                    // re-verificación; la rule de Firestore lo bloquea).
+                    _Field(label: 'EMAIL', value: widget.profile.email),
+                    const SizedBox(height: 14),
+                    _LabeledInput(
+                      label: 'TELÉFONO', // i18n: Fase W3
+                      controller: _phone,
                       enabled: !_saving,
                       onChanged: () => setState(() {}),
+                      keyboardType: TextInputType.phone,
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _LabeledInput(
-                      label: 'APELLIDO', // i18n: Fase W3
-                      controller: _last,
-                      enabled: !_saving,
-                      onChanged: () => setState(() {}),
-                    ),
-                  ),
-                ],
+                    const SizedBox(height: 14),
+                    // Idioma lockeado a es-AR (locale_resolver, ADR-I18N-005).
+                    const _Field(label: 'IDIOMA', value: 'Español (Argentina)'),
+                  ],
+                ),
               ),
-              const SizedBox(height: 14),
-              // Email = identidad de Auth, read-only (cambiarlo exige
-              // re-verificación; la rule de Firestore lo bloquea).
-              _Field(label: 'EMAIL', value: widget.profile.email),
-              const SizedBox(height: 14),
-              _LabeledInput(
-                label: 'TELÉFONO', // i18n: Fase W3
-                controller: _phone,
-                enabled: !_saving,
-                onChanged: () => setState(() {}),
-                keyboardType: TextInputType.phone,
-              ),
-              const SizedBox(height: 14),
-              // Idioma lockeado a es-AR (locale_resolver, ADR-I18N-005).
-              const _Field(label: 'IDIOMA', value: 'Español (Argentina)'),
             ],
           ),
         ),
         const SizedBox(height: 28),
-        const _DangerZone(),
+        TreinoFadeSlideIn(
+          delay: AppMotion.stagger(1),
+          child: const _DangerZone(),
+        ),
+      ],
+    );
+  }
+}
+
+/// Subtítulo de la card «INFORMACIÓN PERSONAL» con deep-link honesto
+/// (ADR-F12-07) a `/perfil-publico` (Fase 11, ya rediseñada) — «perfil
+/// público» es tappable vía [TreinoInteractiveState] (hover/focus/teclado +
+/// `Semantics(button: true)` de fábrica).
+class _PerfilPublicoCaption extends StatelessWidget {
+  const _PerfilPublicoCaption();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final focusTokens = TreinoFocusTokens.of(context);
+    final muted = TextStyle(color: palette.textMuted, fontSize: 13);
+
+    return Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Text('Esta info se muestra en tu ', style: muted), // i18n: Fase W3
+        TreinoInteractiveState(
+          onTap: () => context.go('/perfil-publico'),
+          builder: (ctx, states) => Container(
+            key: const Key('cuenta_perfil_publico_link'),
+            padding:
+                const EdgeInsets.symmetric(horizontal: AppSpacing.hairline),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              border:
+                  states.focused ? Border.all(color: focusTokens.ring) : null,
+            ),
+            child: Text(
+              'perfil público', // i18n: Fase W3
+              style: TextStyle(
+                color: palette.accent,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                decoration: states.hovered ? TextDecoration.underline : null,
+              ),
+            ),
+          ),
+        ),
+        Text('.', style: muted),
       ],
     );
   }
@@ -380,7 +539,7 @@ class _DangerZone extends ConsumerWidget {
       decoration: BoxDecoration(
         color: palette.bgCard,
         border: Border.all(color: palette.danger),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
