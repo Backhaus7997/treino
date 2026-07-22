@@ -94,7 +94,7 @@ void main() {
               category: 'compound',
             ),
           ]),
-      routineByIdProvider('r1').overrideWith((ref) async => null),
+      visibleRoutineByIdProvider('r1').overrideWith((ref) async => null),
     ];
 
     await tester.pumpWidget(
@@ -185,7 +185,7 @@ void main() {
               category: 'compound',
             ),
           ]),
-      routineByIdProvider('r1').overrideWith((ref) async => null),
+      visibleRoutineByIdProvider('r1').overrideWith((ref) async => null),
     ];
 
     // Narrow width — the regression this test guards against is a
@@ -207,5 +207,76 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(_countMasksContaining(tester, 'assets/body/bodyfront.png'), 1);
     expect(_countMasksContaining(tester, 'assets/body/bodyback.png'), 1);
+  });
+
+  testWidgets(
+      'SCENARIO-DAILY-HEATMAP-SECTION-04: the day\'s routine is no longer '
+      'visible (deleted / access revoked) — the heat-map still renders the '
+      'catalog-resolved exercises instead of the error state (#479)',
+      (tester) async {
+    final repo = _MockSessionRepository();
+    final today = DateTime.now();
+    final todayOnly = DateTime(today.year, today.month, today.day);
+    const alumnoUid = 'alumno-gone-routine';
+
+    when(() => repo.listByUid(alumnoUid)).thenAnswer((_) async => [
+          makeSession(
+            id: 's-gone',
+            uid: alumnoUid,
+            startedAt: todayOnly.add(const Duration(hours: 9)),
+            status: SessionStatus.finished,
+            wasFullyCompleted: true,
+            routineId: 'r-gone',
+          ),
+        ]);
+    when(() => repo.listSetLogs(uid: alumnoUid, sessionId: 's-gone'))
+        .thenAnswer((_) async => [
+              makeSetLog(id: 'l1', exerciseId: 'e-chest'),
+              // Custom exercise whose ONLY mapping lived in the gone routine
+              // — must degrade to nothing, not error the tile.
+              makeSetLog(id: 'l2', exerciseId: 'e-custom'),
+            ]);
+
+    final overrides = <Override>[
+      currentUidProvider.overrideWithValue('coach-111'),
+      sessionRepositoryProvider.overrideWithValue(repo),
+      exercisesProvider.overrideWith((ref) async => [
+            const Exercise(
+              id: 'e-chest',
+              name: 'Press',
+              muscleGroup: 'chest',
+              category: 'compound',
+            ),
+          ]),
+      // Tripwire: the old unguarded path watched routineByIdProvider, so a
+      // gone routine surfaced as an error that killed the whole day tile.
+      // If the section's providers ever watch it again, this test fails
+      // loudly instead of silently re-introducing #479.
+      routineByIdProvider('r-gone').overrideWith(
+        (ref) async =>
+            throw StateError('routineByIdProvider must not be watched'),
+      ),
+      visibleRoutineByIdProvider('r-gone').overrideWith((ref) async => null),
+    ];
+
+    await tester.pumpWidget(
+      _wrap(
+        DailyHeatmapSection(athleteId: alumnoUid, labels: _labels()),
+        overrides,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('MÚSCULOS DEL DÍA'), findsOneWidget);
+    final pechoRowFinder =
+        find.ancestor(of: find.text('PECHO'), matching: find.byType(Row)).first;
+    expect(
+      find.descendant(of: pechoRowFinder, matching: find.text('1')),
+      findsOneWidget,
+      reason: 'the catalog-resolved set must render exactly once — the '
+          'e-custom set (whose only mapping lived in the gone routine) '
+          'degrades to nothing instead of erroring the whole day tile',
+    );
   });
 }
