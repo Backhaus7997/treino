@@ -29,7 +29,6 @@ import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/chat/widgets/avatar_color.dart';
 import 'package:treino/features/coach_hub/presentation/sections/chat/widgets/chat_detail_pane.dart';
-import 'package:treino/features/coach_hub/presentation/sections/routine_editor/routine_web_editability.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
 import 'package:treino/features/insights/domain/chart_period.dart';
 import 'package:treino/features/insights/presentation/widgets/daily_heatmap_section.dart';
@@ -1052,12 +1051,15 @@ class _ProxSesionCard extends ConsumerWidget {
   final String athleteId;
 
   String _fmtDate(DateTime dt) {
-    final local = dt.toLocal();
-    final d = local.day.toString().padLeft(2, '0');
-    final m = local.month.toString().padLeft(2, '0');
-    final y = local.year.toString();
-    final hh = local.hour.toString().padLeft(2, '0');
-    final mm = local.minute.toString().padLeft(2, '0');
+    // [dt] is an appointment.startsAt: wall-clock UTC per ADR-7 (the UTC fields
+    // already REPRESENT Argentina local time). Read them raw — a `.toLocal()`
+    // here would wrongly subtract 3h and show the turno earlier than it is
+    // (#403). Same convention as the agenda / appointment_detail_sheet.
+    final d = dt.day.toString().padLeft(2, '0');
+    final m = dt.month.toString().padLeft(2, '0');
+    final y = dt.year.toString();
+    final hh = dt.hour.toString().padLeft(2, '0');
+    final mm = dt.minute.toString().padLeft(2, '0');
     return '$d/$m/$y · $hh:$mm';
   }
 
@@ -1892,10 +1894,6 @@ class _RutinaCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Only web-authored (simple) routines can be edited here; periodized /
-    // superset plans from mobile would be truncated on save, so we route the
-    // trainer to the mobile app instead (see isRoutineWebEditable).
-    final editable = isRoutineWebEditable(routine);
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -1918,26 +1916,22 @@ class _RutinaCard extends StatelessWidget {
                   ),
                 ),
               ),
-              if (editable)
-                TextButton.icon(
-                  onPressed: () =>
-                      context.push('/routine-editor/$athleteId/${routine.id}'),
-                  icon: Icon(TreinoIcon.edit, size: 15, color: palette.accent),
-                  label: Text('Editar', // i18n: Fase W2
-                      style: TextStyle(
-                          color: palette.accent,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13)),
-                  style: TextButton.styleFrom(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                )
-              else
-                Text('Editá en la app', // i18n: Fase W2
-                    style: TextStyle(color: palette.textMuted, fontSize: 12)),
+              TextButton.icon(
+                onPressed: () =>
+                    context.push('/routine-editor/$athleteId/${routine.id}'),
+                icon: Icon(TreinoIcon.edit, size: 15, color: palette.accent),
+                label: Text('Editar', // i18n: Fase W2
+                    style: TextStyle(
+                        color: palette.accent,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13)),
+                style: TextButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 4),
@@ -2077,6 +2071,7 @@ class _ExpandableSessionRowState extends ConsumerState<_ExpandableSessionRow> {
                     // Historial tab shows active sessions too; fall back to
                     // startedAt when finishedAt is null so the user still
                     // sees WHEN the athlete started it.
+                    // Real UTC instants; fmtDate localizes them (#380).
                     s.finishedAt != null
                         ? fmtDate(s.finishedAt!)
                         : widget.showStatusBadge

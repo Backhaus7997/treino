@@ -9,10 +9,15 @@ import '../../../l10n/app_l10n.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../chat/application/chat_providers.dart';
 import '../../measurements/application/measurement_providers.dart';
+import '../../measurements/domain/measurement.dart';
 import '../../measurements/presentation/log_measurement_screen.dart';
+import '../../measurements/presentation/widgets/measurement_history_list.dart';
 import '../../measurements/presentation/widgets/measurement_progress_chart.dart';
 import '../application/athlete_note_providers.dart';
 import '../domain/athlete_note.dart';
+import '../../coach_hub/presentation/sections/pagos/widgets/payment_format.dart'
+    show groupThousands;
+import '../../coach_hub/presentation/sections/pagos/widgets/thousands_input_formatter.dart';
 import '../../payments/application/billing_providers.dart';
 import '../../payments/domain/athlete_billing.dart';
 import '../../insights/presentation/widgets/daily_heatmap_section.dart';
@@ -206,7 +211,9 @@ class _AthleteDetailBody extends ConsumerWidget {
                 for (final plan in myPlans) ...[
                   _PlanCard(
                     plan: plan,
-                    onTap: () => context.push('/workout/routine/${plan.id}'),
+                    onTap: () => context.push(
+                      '/coach/athlete/$athleteId/plan/${plan.id}',
+                    ),
                     onEdit: () => context.push(
                       '/workout/routine-editor/$athleteId',
                       extra: plan.id,
@@ -218,7 +225,8 @@ class _AthleteDetailBody extends ConsumerWidget {
 
               // ── Antropometría section ────────────────────────────────
               const SizedBox(height: 8),
-              _AntropometriaSection(athleteId: athleteId),
+              _AntropometriaSection(
+                  athleteId: athleteId, trainerUid: trainerUid),
 
               // ── Rendimiento section ──────────────────────────────────
               const SizedBox(height: 20),
@@ -450,9 +458,12 @@ class _AthleteHeader extends StatelessWidget {
 // ── Antropometría section ─────────────────────────────────────────────────────
 
 String _formatMeasurementDate(DateTime dt, String localeName) {
-  // Dates are stored UTC; display as-is (no .toLocal()) — same UTC convention
-  // used across the dashboard (see appointment_detail_sheet.dart).
-  return '${dt.day} ${monthAbbrev(dt, localeName)} ${dt.year}';
+  // Measurement/PerformanceTest recordedAt are real instants (UTC), NOT
+  // appointment wall-clock — localize before formatting or they read +3h in
+  // Argentina and shift the day near midnight (#392). Both call sites here pass
+  // a real instant, so converting inside the helper is safe.
+  final local = dt.toLocal();
+  return '${local.day} ${monthAbbrev(local, localeName)} ${local.year}';
 }
 
 /// Formats a metric double for the summary cards. Mirrors the chart header
@@ -470,16 +481,26 @@ String _formatMetricValue(double value) =>
 ///
 /// When ≥2 measurements exist a PROGRESO chart card is rendered below the
 /// summary card (TANDA-3). With <2 measurements a muted hint card is shown.
+///
+/// Below that, a HISTORIAL list offers per-measurement EDIT/DELETE (#439) via
+/// [MeasurementHistoryList]. Actions only appear on rows this trainer authored
+/// (`recordedBy == trainerUid`) — self-logged rows are read-only, matching the
+/// update/delete rules.
 class _AntropometriaSection extends ConsumerWidget {
-  const _AntropometriaSection({required this.athleteId});
+  const _AntropometriaSection({
+    required this.athleteId,
+    required this.trainerUid,
+  });
 
   final String athleteId;
+  final String trainerUid;
 
-  void _openLogForm(BuildContext context) {
+  void _openLogForm(BuildContext context, {Measurement? initial}) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         fullscreenDialog: true,
-        builder: (_) => LogMeasurementScreen(athleteId: athleteId),
+        builder: (_) =>
+            LogMeasurementScreen(athleteId: athleteId, initial: initial),
       ),
     );
   }
@@ -637,6 +658,26 @@ class _AntropometriaSection extends ConsumerWidget {
                       ),
                     ),
                   ),
+
+                // ── Historial con editar/borrar por fila (#439) ────────
+                const SizedBox(height: 12),
+                Text(
+                  AppL10n.of(context).measurementsHistoryTitle,
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    letterSpacing: 1.2,
+                    color: palette.textMuted,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                MeasurementHistoryList(
+                  measurements: measurements,
+                  currentUid: trainerUid,
+                  readOnlyLabel:
+                      AppL10n.of(context).measurementHistorySelfLoggedTag,
+                  onEdit: (m) => _openLogForm(context, initial: m),
+                ),
               ],
             );
           },
@@ -850,16 +891,21 @@ class _RendimientoSection extends ConsumerWidget {
                       // Key metrics (non-null only)
                       _MetricRow(
                         metrics: [
+                          // QA-PERF-104: formatear con el helper existente para
+                          // no interpolar el double crudo (30.0 -> 30),
+                          // consistente con la card de MEDICIONES vecina.
                           if (latest.cmjCm != null)
-                            _Metric('CMJ', '${latest.cmjCm} cm'),
+                            _Metric('CMJ',
+                                '${_formatMetricValue(latest.cmjCm!)} cm'),
                           if (latest.squat1rmKg != null)
-                            _Metric(
-                                'Sentadilla 1RM', '${latest.squat1rmKg} kg'),
+                            _Metric('Sentadilla 1RM',
+                                '${_formatMetricValue(latest.squat1rmKg!)} kg'),
                           if (latest.sprint20mS != null)
-                            _Metric('Sprint 20m', '${latest.sprint20mS} s'),
+                            _Metric('Sprint 20m',
+                                '${_formatMetricValue(latest.sprint20mS!)} s'),
                           if (latest.vo2maxMlKgMin != null)
-                            _Metric(
-                                'VO2máx', '${latest.vo2maxMlKgMin} ml/kg/min'),
+                            _Metric('VO2máx',
+                                '${_formatMetricValue(latest.vo2maxMlKgMin!)} ml/kg/min'),
                         ],
                         palette: palette,
                       ),
@@ -1077,8 +1123,9 @@ class _CobroConfigSheetState extends ConsumerState<_CobroConfigSheet> {
     final trainerRate =
         widget.ref.read(userProfileProvider).valueOrNull?.trainerMonthlyRate;
     final initialAmount = widget.existing?.amountArs ?? trainerRate ?? 0;
-    _priceController =
-        TextEditingController(text: initialAmount > 0 ? '$initialAmount' : '');
+    _priceController = TextEditingController(
+      text: initialAmount > 0 ? groupThousands('$initialAmount') : '',
+    );
     _cadence = widget.existing?.cadence ?? BillingCadence.mensual;
   }
 
@@ -1090,7 +1137,7 @@ class _CobroConfigSheetState extends ConsumerState<_CobroConfigSheet> {
 
   Future<void> _save() async {
     if (_saving) return;
-    final amount = int.tryParse(_priceController.text.trim());
+    final amount = parseGroupedInt(_priceController.text);
     if (amount == null || amount <= 0) return;
 
     final trainerId = ref.read(currentUidProvider);
@@ -1178,6 +1225,7 @@ class _CobroConfigSheetState extends ConsumerState<_CobroConfigSheet> {
           TextField(
             controller: _priceController,
             keyboardType: TextInputType.number,
+            inputFormatters: [ThousandsSeparatorInputFormatter()],
             style: TextStyle(color: palette.textPrimary),
             decoration: InputDecoration(
               hintText: 'Ej: 7000',
@@ -1887,8 +1935,15 @@ class _ExpandableSessionRowState extends ConsumerState<_ExpandableSessionRow> {
   }
 }
 
-String _fmtDate(DateTime d) =>
-    '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+/// QA-WKT-006: [finishedAt] is a real UTC instant, so it must be converted to
+/// the device (ART) zone before splitting into day/month/year — matching the
+/// sibling session-history screens fixed in #405. Formatting the raw UTC value
+/// showed tomorrow's date for any session finished after ~21:00 ART (already
+/// past midnight UTC).
+String _fmtDate(DateTime d) {
+  final local = d.toLocal();
+  return '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}/${local.year}';
+}
 
 /// Loads and renders the set logs for one session (read-only trainer view).
 /// Maps permission-denied to the no-share placeholder (REQ-SETLOGS-008).

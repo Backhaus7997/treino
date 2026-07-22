@@ -56,6 +56,36 @@ form is submitted. On save the user lands on `/home` as a discoverable trainer.
 
 ---
 
+## seed_emulator_full.js (Emulator seed)
+
+EMULATOR-ONLY full-stack seed for manual testing. Refuses to run without
+`FIREBASE_AUTH_EMULATOR_HOST` + `FIRESTORE_EMULATOR_HOST` set.
+
+```sh
+FIREBASE_AUTH_EMULATOR_HOST=localhost:9099 \
+FIRESTORE_EMULATOR_HOST=localhost:8080 \
+node scripts/seed_emulator_full.js          # seed (idempotent, re-run safe)
+node scripts/seed_emulator_full.js --clear  # remove everything it created
+```
+
+Populates: Auth users (3 coaches + 5 athletes, throwaway passwords printed at
+the end), `gyms`, `users` + `userPublicProfiles` + `trainerPublicProfiles`,
+`trainer_links`, `friendships`, the **`exercises` stock catalogue** (reused
+from `seed_workout_catalog.js` — same data prod uses), `routines`
+(trainer-assigned plans + a public template), historical sessions under
+`users/{uid}/sessions` **with realistic `setLogs` subcollections**
+(deterministic progressive weights ramping onto each slot's `targetWeightKg`;
+`totalVolumeKg` = Σ reps×kg of the generated sets; partial sessions stop
+mid-workout), `posts` (all privacy levels), `appointments`, and
+`coach_availability_rules`.
+
+Dates are relative to the run instant; pin `SEED_NOW=<ISO date>` for
+reproducible data. Session `muscleGroup` values use the canonical English keys
+(`chest`, `back`, …) exactly like app-written data — Insights' muscle pipeline
+(radar, Músculos del día, Volumen por grupo) depends on them.
+
+---
+
 ## Other scripts
 
 | Script | Purpose |

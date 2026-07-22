@@ -366,9 +366,36 @@ service cloud.firestore {
     }
 
     match /posts/{postId} {
-      // Any authenticated user can read posts (friends-privacy is soft / client-side).
-      // REQ-PFM-009
-      allow read: if request.auth != null;
+      // QA-FEED-001: post privacy is enforced SERVER-SIDE (was client-side only,
+      // REQ-PFM-009 — any authenticated user could read every post via the SDK).
+      // A post is readable when it is public, is the caller's own, is a
+      // 'friends' post authored by an ACCEPTED friend, or is a 'gym' post whose
+      // authorGymId matches the caller's gym. The client feed queries are
+      // already scoped to match (feedForFriends by friend uids, feedForGym by
+      // gym, profile by privacy tier), so these per-doc get()s only fire for
+      // rows the query already narrowed to.
+      function postFriendAccepted(authorUid) {
+        let fid = request.auth.uid < authorUid
+          ? request.auth.uid + '_' + authorUid
+          : authorUid + '_' + request.auth.uid;
+        return exists(/databases/$(database)/documents/friendships/$(fid))
+            && get(/databases/$(database)/documents/friendships/$(fid)).data.status == 'accepted';
+      }
+      function postSameGym(authorGymId) {
+        return authorGymId != null
+            && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.gymId == authorGymId;
+      }
+
+      allow read: if request.auth != null
+                  && (
+                    resource == null
+                    || resource.data.privacy == 'public'
+                    || request.auth.uid == resource.data.authorUid
+                    || (resource.data.privacy == 'friends'
+                        && postFriendAccepted(resource.data.authorUid))
+                    || (resource.data.privacy == 'gym'
+                        && postSameGym(resource.data.get('authorGymId', null)))
+                  );
 
       // Create: only the owner of the post — authorUid must equal caller uid.
       // SCENARIO-130: non-owner create is blocked.
@@ -586,6 +613,11 @@ service cloud.firestore {
     // verbatim, without the opt-in-disable exception clause (no analogous
     // disable flow exists for reviews).
     //
+    // #388 extends the same pin to `athleteCount`: derived aggregate (count
+    // of active trainer_links) written exclusively by the `linkAggregate`
+    // Cloud Function. Without the pin a trainer could forge their own
+    // student count on the discovery sales surface.
+    //
     // Deliberately NO keys().hasOnly() allowlist here (AD-3 divergence from
     // the trainer-reviews spec's "Out-of-allowlist field" scenario — see
     // tasks.md 2.7): TrainerPublicProfileRepository's write path is a
@@ -603,7 +635,8 @@ service cloud.firestore {
                     && request.auth.uid == uid
                     && request.resource.data.uid == uid
                     && request.resource.data.get('averageRating', null) == null
-                    && request.resource.data.get('reviewCount', null) == null;
+                    && request.resource.data.get('reviewCount', null) == null
+                    && request.resource.data.get('athleteCount', null) == null;
 
       // Only the owner can update; uid in body must not change (SCENARIO-418).
       // averageRating/reviewCount must be absent or unchanged from the
@@ -612,7 +645,8 @@ service cloud.firestore {
                     && request.auth.uid == uid
                     && request.resource.data.uid == resource.data.uid
                     && request.resource.data.get('averageRating', null) == resource.data.get('averageRating', null)
-                    && request.resource.data.get('reviewCount', null) == resource.data.get('reviewCount', null);
+                    && request.resource.data.get('reviewCount', null) == resource.data.get('reviewCount', null)
+                    && request.resource.data.get('athleteCount', null) == resource.data.get('athleteCount', null);
 
       // Delete denied — managed exclusively via privileged server-side operations.
       allow delete: if false;
@@ -656,8 +690,14 @@ service cloud.firestore {
                     && request.resource.data.name is string
                     && request.resource.data.name.size() > 0
                     && request.resource.data.name.size() <= 100
+                    // QA-SEC-003: geographic range guard (mirrors the
+                    // google-places create branch) — coordinates must be valid.
                     && request.resource.data.lat is number
+                    && request.resource.data.lat >= -90
+                    && request.resource.data.lat <= 90
                     && request.resource.data.lng is number
+                    && request.resource.data.lng >= -180
+                    && request.resource.data.lng <= 180
                     && request.resource.data.geohash is string;
 
       allow create: if request.auth != null
@@ -667,22 +707,38 @@ service cloud.firestore {
                     && request.resource.data.name is string
                     && request.resource.data.name.size() > 0
                     && request.resource.data.name.size() <= 100
+                    // QA-SEC-003: geographic range guard — a resolved place must
+                    // land on Earth. Blocks garbage coordinates polluting the
+                    // world-readable catalog / distance math.
                     && request.resource.data.lat is number
-                    && request.resource.data.lng is number;
+                    && request.resource.data.lat >= -90
+                    && request.resource.data.lat <= 90
+                    && request.resource.data.lng is number
+                    && request.resource.data.lng >= -180
+                    && request.resource.data.lng <= 180;
 
       // Client-side resolve can race two concurrent selectors of the same
       // never-before-seen placeId; the read-through cache in
-      // ResolveGymPlaceService only calls upsert() on a cache miss, so this
-      // update branch is a narrow, same-shape re-assertion (not an arbitrary
-      // edit surface) — it never changes an existing doc's `source`.
+      // ResolveGymPlaceService only calls upsert() on a cache miss, so the
+      // ONLY legitimate update is that race re-upserting the SAME Place
+      // Details for an already-resolved placeId.
+      //
+      // QA-SEC-003: `gyms` is world-readable and drives gym association and
+      // leaderboards, so the resolved identity fields MUST be pinned to their
+      // existing values. The previous type-only check let ANY authenticated
+      // user overwrite name/lat/lng of any existing gym — catalog vandalism.
+      // Pinning name/lat/lng/source/id equal-to-existing still lets the
+      // same-shape race write through (identical values are a no-op match)
+      // while denying every value change. Mirrors the field-pin idiom used by
+      // userPublicProfiles ranking metrics and trainerPublicProfiles
+      // averageRating/reviewCount above.
       allow update: if request.auth != null
                     && resource.data.source == 'google-places'
-                    && request.resource.data.source == 'google-places'
+                    && request.resource.data.source == resource.data.source
                     && request.resource.data.id == gymId
-                    && request.resource.data.name is string
-                    && request.resource.data.name.size() > 0
-                    && request.resource.data.lat is number
-                    && request.resource.data.lng is number;
+                    && request.resource.data.name == resource.data.name
+                    && request.resource.data.lat == resource.data.lat
+                    && request.resource.data.lng == resource.data.lng;
 
       allow delete: if false;
     }
@@ -759,6 +815,26 @@ service cloud.firestore {
     //   - update: caller en members. members/createdAt inmutables.
     //   - delete: denied.
     match /chats/{chatId} {
+      // QA-CHAT-004: a chat may only be opened between two users who have a real
+      // relationship — an ACCEPTED friendship (its doc id equals the chatId), or
+      // an active trainer_link named by a client-provided `linkId` whose
+      // trainerId+athleteId are exactly the two chat members. The link is
+      // verified here (not trusted): SEC-002 guarantees an active link is
+      // trainer-accepted, so neither party can forge one. Without this gate any
+      // authenticated user could open a chat with — and message — anyone.
+      function chatRelationshipOk(chatId, members, data) {
+        return (
+          exists(/databases/$(database)/documents/friendships/$(chatId))
+          && get(/databases/$(database)/documents/friendships/$(chatId)).data.status == 'accepted'
+        ) || (
+          'linkId' in data
+          && exists(/databases/$(database)/documents/trainer_links/$(data.linkId))
+          && get(/databases/$(database)/documents/trainer_links/$(data.linkId)).data.status == 'active'
+          && get(/databases/$(database)/documents/trainer_links/$(data.linkId)).data.trainerId in members
+          && get(/databases/$(database)/documents/trainer_links/$(data.linkId)).data.athleteId in members
+        );
+      }
+
       allow read: if request.auth != null
                   && (resource == null
                       || request.auth.uid in resource.data.members);
@@ -767,7 +843,9 @@ service cloud.firestore {
                     && request.resource.data.members.size() == 2
                     && request.auth.uid in request.resource.data.members
                     && request.resource.data.members[0] < request.resource.data.members[1]
-                    && chatId == request.resource.data.members[0] + '_' + request.resource.data.members[1];
+                    && chatId == request.resource.data.members[0] + '_' + request.resource.data.members[1]
+                    && chatRelationshipOk(
+                        chatId, request.resource.data.members, request.resource.data);
 
       // REQ-CHATUNREAD-008: members may update the chat (preview fields on
       // send) but a member may only touch THEIR OWN key inside lastRead — a
@@ -1091,12 +1169,44 @@ service cloud.firestore {
       // unaffected (SCENARIO-CC-06e regression test). Role-check only, NOT
       // a trainer_links relationship check — see design.md AD-1 / engram
       // obs #413.
-      allow create, update: if request.auth != null
+      // QA-PAY-007 (#447): the combined create+update block is split so each
+      // side can validate the money fields at the right strictness.
+      //
+      // CREATE — strict shape: the model is exactly {trainerId, athleteId,
+      // amountArs, cadence, updatedAt} (AthleteBilling.toJson) and the doc id
+      // is deterministic `${trainerId}_${athleteId}`, so both are enforced.
+      allow create: if request.auth != null
                   && request.resource.data.trainerId == request.auth.uid
-                  && (resource != null
-                      || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer')
+                  && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
                   && request.resource.data.athleteId is string
-                  && request.resource.data.athleteId.size() > 0;
+                  && request.resource.data.athleteId.size() > 0
+                  && docId == request.resource.data.trainerId + '_' + request.resource.data.athleteId
+                  && request.resource.data.keys().hasOnly([
+                       'trainerId', 'athleteId', 'amountArs', 'cadence', 'updatedAt'
+                     ])
+                  && request.resource.data.amountArs is int
+                  && request.resource.data.amountArs > 0
+                  && request.resource.data.amountArs <= 100000000
+                  && request.resource.data.cadence in ['mensual', 'semanal', 'por_sesion', 'suelto']
+                  && request.resource.data.updatedAt is timestamp;
+      // UPDATE — diff-based instead of keys().hasOnly(): setConfig writes via
+      // set(merge:true), so request.resource.data is the POST-merge doc. A
+      // legacy doc carrying a zombie field (e.g. pre-model monthlyRate) would
+      // never pass a strict hasOnly again even though the client didn't touch
+      // that field. affectedKeys() gates what the write CHANGES (identity
+      // fields trainerId/athleteId immutable by omission) while the final
+      // money values are still validated.
+      allow update: if request.auth != null
+                  && resource.data.trainerId == request.auth.uid
+                  && request.resource.data.trainerId == request.auth.uid
+                  && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                       'amountArs', 'cadence', 'updatedAt'
+                     ])
+                  && request.resource.data.amountArs is int
+                  && request.resource.data.amountArs > 0
+                  && request.resource.data.amountArs <= 100000000
+                  && request.resource.data.cadence in ['mensual', 'semanal', 'por_sesion', 'suelto']
+                  && request.resource.data.updatedAt is timestamp;
       allow delete: if request.auth != null && resource.data.trainerId == request.auth.uid;
     }
 
@@ -1208,11 +1318,46 @@ service cloud.firestore {
       // payment debt naming themselves trainer" vector. Role-check only,
       // NOT a trainer_links relationship check — see design.md AD-1 /
       // engram obs #413.
+      // QA-PAY-007 (#447): create now validates the money fields — before
+      // this, a legit-role trainer with a modified client could write
+      // amountArs negative/zero/decimal/string (poisoning the totals both
+      // sides see), unbounded concept, or arbitrary status/periodKey.
+      // Calibrated against every real writer: PaymentRepository.add and
+      // AppointmentRepository.billAppointment(s) both stamp id == doc id;
+      // paidPaymentFor legitimately creates already-paid records (status
+      // 'paid' + paidAt); the cita/vencimiento flows legitimately set dueAt
+      // at create (REQ-VENC-13 pins it immutable AFTER create, and only the
+      // CF may touch lastOverdueNotifiedAt — pinned null here).
+      // periodKey: null (porSesión/suelto) | 'YYYY-MM' (mensual) |
+      // 'YYYY-Www' (ISO week, semanal) — the two formats
+      // pagosPorCobrarProvider computes.
       allow create: if request.auth != null
                   && request.resource.data.trainerId == request.auth.uid
                   && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
                   && request.resource.data.athleteId is string
-                  && request.resource.data.athleteId.size() > 0;
+                  && request.resource.data.athleteId.size() > 0
+                  && request.resource.data.keys().hasOnly([
+                       'id', 'trainerId', 'athleteId', 'amountArs', 'concept',
+                       'status', 'periodKey', 'createdAt', 'paidAt', 'dueAt',
+                       'lastOverdueNotifiedAt'
+                     ])
+                  && request.resource.data.id == paymentId
+                  && request.resource.data.amountArs is int
+                  && request.resource.data.amountArs > 0
+                  && request.resource.data.amountArs <= 100000000
+                  && request.resource.data.concept is string
+                  && request.resource.data.concept.size() > 0
+                  && request.resource.data.concept.size() <= 200
+                  && request.resource.data.status in ['pending', 'paid']
+                  && (request.resource.data.get('periodKey', null) == null
+                      || (request.resource.data.periodKey is string
+                          && request.resource.data.periodKey.matches('^[0-9]{4}-(W[0-9]{2}|[0-9]{2})$')))
+                  && request.resource.data.createdAt is timestamp
+                  && (request.resource.data.get('paidAt', null) == null
+                      || request.resource.data.paidAt is timestamp)
+                  && (request.resource.data.get('dueAt', null) == null
+                      || request.resource.data.dueAt is timestamp)
+                  && request.resource.data.get('lastOverdueNotifiedAt', null) == null;
       // REQ-VENC-13: tightened update rule — field-level protection.
       // Follows the `reviews` rule pattern (keys().hasOnly + per-field equality).
       // Audited: markPaid/markManyPaid send only {status, paidAt} — still pass.

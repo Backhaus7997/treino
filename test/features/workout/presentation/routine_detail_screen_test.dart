@@ -107,7 +107,9 @@ void main() {
       final routine = _makeRoutine();
       await tester.pumpWidget(
         _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-          routineByIdProvider('test-id').overrideWith((ref) async => routine),
+          routineByIdStreamProvider(
+            'test-id',
+          ).overrideWith((ref) => Stream.value(routine)),
         ]),
       );
       await tester.pump();
@@ -130,7 +132,9 @@ void main() {
         );
         await tester.pumpWidget(
           _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-            routineByIdProvider('test-id').overrideWith((ref) async => routine),
+            routineByIdStreamProvider(
+              'test-id',
+            ).overrideWith((ref) => Stream.value(routine)),
           ]),
         );
         await tester.pump(const Duration(milliseconds: 50));
@@ -143,9 +147,11 @@ void main() {
       (tester) async {
         await tester.pumpWidget(
           _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-            routineByIdProvider(
+            // Never-closed, never-emitting controller keeps the provider in
+            // AsyncLoading forever — mirrors the old Completer().future.
+            routineByIdStreamProvider(
               'test-id',
-            ).overrideWith((ref) => Completer<Routine?>().future),
+            ).overrideWith((ref) => StreamController<Routine?>().stream),
           ]),
         );
         await tester.pump();
@@ -158,9 +164,9 @@ void main() {
       (tester) async {
         await tester.pumpWidget(
           _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-            routineByIdProvider(
+            routineByIdStreamProvider(
               'test-id',
-            ).overrideWith((ref) async => throw Exception('boom')),
+            ).overrideWith((ref) => Stream.error(Exception('boom'))),
           ]),
         );
         await tester.pump(const Duration(milliseconds: 50));
@@ -175,7 +181,9 @@ void main() {
       (tester) async {
         await tester.pumpWidget(
           _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-            routineByIdProvider('test-id').overrideWith((ref) async => null),
+            routineByIdStreamProvider(
+              'test-id',
+            ).overrideWith((ref) => Stream.value(null)),
           ]),
         );
         await tester.pump(const Duration(milliseconds: 50));
@@ -191,9 +199,9 @@ void main() {
     ) async {
       await tester.pumpWidget(
         _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-          routineByIdProvider(
+          routineByIdStreamProvider(
             'test-id',
-          ).overrideWith((ref) async => _makeRoutine(id: 'test-id')),
+          ).overrideWith((ref) => Stream.value(_makeRoutine(id: 'test-id'))),
         ]),
       );
       await tester.pump(const Duration(milliseconds: 50));
@@ -212,9 +220,10 @@ void main() {
     testWidgets('SCENARIO-080: badge shows "PPL · DÍA 1"', (tester) async {
       await tester.pumpWidget(
         _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-          routineByIdProvider('test-id').overrideWith(
-            (ref) async =>
-                _makeRoutine(split: 'PPL', days: [_makeDay(dayNumber: 1)]),
+          routineByIdStreamProvider('test-id').overrideWith(
+            (ref) => Stream.value(
+              _makeRoutine(split: 'PPL', days: [_makeDay(dayNumber: 1)]),
+            ),
           ),
         ]),
       );
@@ -225,8 +234,8 @@ void main() {
     testWidgets('SCENARIO-081: day name rendered in uppercase', (tester) async {
       await tester.pumpWidget(
         _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-          routineByIdProvider('test-id').overrideWith(
-            (ref) async => _makeRoutine(days: [_makeDay(name: 'Push')]),
+          routineByIdStreamProvider('test-id').overrideWith(
+            (ref) => Stream.value(_makeRoutine(days: [_makeDay(name: 'Push')])),
           ),
         ]),
       );
@@ -247,9 +256,9 @@ void main() {
         );
         await tester.pumpWidget(
           _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-            routineByIdProvider(
+            routineByIdStreamProvider(
               'test-id',
-            ).overrideWith((ref) async => _makeRoutine(days: [day])),
+            ).overrideWith((ref) => Stream.value(_makeRoutine(days: [day]))),
           ]),
         );
         await tester.pump(const Duration(milliseconds: 50));
@@ -265,9 +274,9 @@ void main() {
       final day = _makeDay(estimatedMinutes: null);
       await tester.pumpWidget(
         _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-          routineByIdProvider(
+          routineByIdStreamProvider(
             'test-id',
-          ).overrideWith((ref) async => _makeRoutine(days: [day])),
+          ).overrideWith((ref) => Stream.value(_makeRoutine(days: [day]))),
         ]),
       );
       await tester.pump(const Duration(milliseconds: 50));
@@ -284,9 +293,10 @@ void main() {
     ) async {
       await tester.pumpWidget(
         _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-          routineByIdProvider(
+          routineByIdStreamProvider(
             'test-id',
-          ).overrideWith((ref) async => _makeRoutine(days: [_makeDay()])),
+          ).overrideWith(
+              (ref) => Stream.value(_makeRoutine(days: [_makeDay()]))),
         ]),
       );
       await tester.pump(const Duration(milliseconds: 50));
@@ -306,7 +316,9 @@ void main() {
         );
         await tester.pumpWidget(
           _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-            routineByIdProvider('test-id').overrideWith((ref) async => routine),
+            routineByIdStreamProvider(
+              'test-id',
+            ).overrideWith((ref) => Stream.value(routine)),
           ]),
         );
         await tester.pump(const Duration(milliseconds: 50));
@@ -323,9 +335,9 @@ void main() {
         final day = _makeDay(slots: List.generate(4, (_) => _makeSlot()));
         await tester.pumpWidget(
           _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-            routineByIdProvider(
+            routineByIdStreamProvider(
               'test-id',
-            ).overrideWith((ref) async => _makeRoutine(days: [day])),
+            ).overrideWith((ref) => Stream.value(_makeRoutine(days: [day]))),
           ]),
         );
         await tester.pump(const Duration(milliseconds: 50));
@@ -343,9 +355,9 @@ void main() {
       final day = _makeDay(slots: []);
       await tester.pumpWidget(
         _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-          routineByIdProvider(
+          routineByIdStreamProvider(
             'test-id',
-          ).overrideWith((ref) async => _makeRoutine(days: [day])),
+          ).overrideWith((ref) => Stream.value(_makeRoutine(days: [day]))),
         ]),
       );
       await tester.pump(const Duration(milliseconds: 50));
@@ -365,9 +377,9 @@ void main() {
         );
         await tester.pumpWidget(
           _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-            routineByIdProvider(
+            routineByIdStreamProvider(
               'test-id',
-            ).overrideWith((ref) async => _makeRoutine(days: [day])),
+            ).overrideWith((ref) => Stream.value(_makeRoutine(days: [day]))),
           ]),
         );
         await tester.pump(const Duration(milliseconds: 50));
@@ -393,9 +405,9 @@ void main() {
         );
         await tester.pumpWidget(
           _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-            routineByIdProvider(
+            routineByIdStreamProvider(
               'test-id',
-            ).overrideWith((ref) async => _makeRoutine(days: [day])),
+            ).overrideWith((ref) => Stream.value(_makeRoutine(days: [day]))),
           ]),
         );
         await tester.pump(const Duration(milliseconds: 50));
@@ -421,9 +433,9 @@ void main() {
         );
         await tester.pumpWidget(
           _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-            routineByIdProvider(
+            routineByIdStreamProvider(
               'test-id',
-            ).overrideWith((ref) async => _makeRoutine(days: [day])),
+            ).overrideWith((ref) => Stream.value(_makeRoutine(days: [day]))),
           ]),
         );
         await tester.pump(const Duration(milliseconds: 50));
@@ -440,9 +452,9 @@ void main() {
       (tester) async {
         await tester.pumpWidget(
           _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-            routineByIdProvider(
+            routineByIdStreamProvider(
               'test-id',
-            ).overrideWith((ref) async => _makeRoutine()),
+            ).overrideWith((ref) => Stream.value(_makeRoutine())),
           ]),
         );
         await tester.pump(const Duration(milliseconds: 50));
@@ -463,9 +475,9 @@ void main() {
       (tester) async {
         await tester.pumpWidget(
           _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-            routineByIdProvider(
+            routineByIdStreamProvider(
               'test-id',
-            ).overrideWith((ref) async => _makeRoutine()),
+            ).overrideWith((ref) => Stream.value(_makeRoutine())),
             userProfileProvider.overrideWith(
               (ref) => Stream.value(_profile(UserRole.trainer)),
             ),
@@ -481,9 +493,9 @@ void main() {
     testWidgets('SCENARIO-565: athlete role shows EMPEZAR', (tester) async {
       await tester.pumpWidget(
         _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-          routineByIdProvider(
+          routineByIdStreamProvider(
             'test-id',
-          ).overrideWith((ref) async => _makeRoutine()),
+          ).overrideWith((ref) => Stream.value(_makeRoutine())),
           userProfileProvider.overrideWith(
             (ref) => Stream.value(_profile(UserRole.athlete)),
           ),
@@ -519,8 +531,10 @@ void main() {
         await tester.pumpWidget(
           ProviderScope(
             overrides: [
-              routineByIdProvider('test-id').overrideWith(
-                (ref) async => _makeRoutine(days: [_makeDay(dayNumber: 4)]),
+              routineByIdStreamProvider('test-id').overrideWith(
+                (ref) => Stream.value(
+                  _makeRoutine(days: [_makeDay(dayNumber: 4)]),
+                ),
               ),
               analyticsServiceProvider.overrideWithValue(analytics),
             ],
@@ -565,11 +579,13 @@ void main() {
         await tester.pumpWidget(
           ProviderScope(
             overrides: [
-              routineByIdProvider('test-id').overrideWith(
-                (ref) async => _makeRoutine(
-                  days: [
-                    _makeDay(slots: [_makeSlot(exerciseId: 'bench-press')]),
-                  ],
+              routineByIdStreamProvider('test-id').overrideWith(
+                (ref) => Stream.value(
+                  _makeRoutine(
+                    days: [
+                      _makeDay(slots: [_makeSlot(exerciseId: 'bench-press')]),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -617,13 +633,15 @@ void main() {
         await tester.pumpWidget(
           ProviderScope(
             overrides: [
-              routineByIdProvider('test-id').overrideWith(
-                (ref) async => _makeRoutine(
-                  assignedBy: null,
-                  createdBy: 'athlete-123',
-                  days: [
-                    _makeDay(slots: [_makeSlot(exerciseId: 'my-custom-ex')]),
-                  ],
+              routineByIdStreamProvider('test-id').overrideWith(
+                (ref) => Stream.value(
+                  _makeRoutine(
+                    assignedBy: null,
+                    createdBy: 'athlete-123',
+                    days: [
+                      _makeDay(slots: [_makeSlot(exerciseId: 'my-custom-ex')]),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -645,14 +663,150 @@ void main() {
       },
     );
 
+    // ── Issue #410 — coach read-only plan detail (out-of-shell context) ──────
+    //
+    // In the coach (PF) context RoutineDetailScreen lives at the TOP-LEVEL
+    // route `/coach/athlete/:id/plan/:routineId` (OUTSIDE the ShellRoute),
+    // signalled by `coachAthleteId`. Two behaviours must stay out of the shell
+    // / athlete tab, else they land blank / on the wrong tab — the root cause
+    // that #399's symptom fix left open:
+    //   Bug 1 — tapping an exercise must push the TOP-LEVEL exercise mirror,
+    //           not the in-shell `/workout/exercise/:id`.
+    //   Bug 2 — the back fallback (deep-link / OS state restoration) must land
+    //           on the athlete detail, not the athlete `/workout` tab.
+    testWidgets(
+      'REGRESSION-410 Bug 1: coach-context slot tap pushes the TOP-LEVEL '
+      'exercise route (not the in-shell one) and renders the destination',
+      (tester) async {
+        String? pushedLocation;
+        String? capturedOwnerId;
+        final router = GoRouter(
+          initialLocation: '/coach/athlete/athlete-1/plan/test-id',
+          routes: [
+            GoRoute(
+              path: '/coach/athlete/:athleteId/plan/:routineId',
+              builder: (ctx, state) => RoutineDetailScreen(
+                routineId: state.pathParameters['routineId']!,
+                coachAthleteId: state.pathParameters['athleteId'],
+              ),
+            ),
+            GoRoute(
+              path:
+                  '/coach/athlete/:athleteId/plan/:routineId/exercise/:exerciseId',
+              builder: (ctx, state) {
+                pushedLocation = state.matchedLocation;
+                capturedOwnerId = state.uri.queryParameters['ownerId'];
+                return const Text('COACH EXERCISE');
+              },
+            ),
+            // In-shell mirror — MUST NOT be the one taken from a coach context.
+            GoRoute(
+              path: '/workout/exercise/:exerciseId',
+              builder: (_, __) => const Text('IN-SHELL EXERCISE'),
+            ),
+          ],
+        );
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              routineByIdStreamProvider('test-id').overrideWith(
+                (ref) => Stream.value(
+                  _makeRoutine(
+                    assignedBy: 'trainer-1',
+                    days: [
+                      _makeDay(slots: [_makeSlot(exerciseId: 'bench-press')]),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+            child: MaterialApp.router(
+              theme: AppTheme.dark(),
+              localizationsDelegates: AppL10n.localizationsDelegates,
+              supportedLocales: AppL10n.supportedLocales,
+              locale: const Locale('es', 'AR'),
+              routerConfig: router,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byType(ExerciseSlotRow).first);
+        await tester.pumpAndSettle();
+
+        expect(find.text('COACH EXERCISE'), findsOneWidget);
+        expect(find.text('IN-SHELL EXERCISE'), findsNothing);
+        expect(
+          pushedLocation,
+          equals('/coach/athlete/athlete-1/plan/test-id/exercise/bench-press'),
+        );
+        // ownerId (assignedBy) still flows through in the coach context.
+        expect(capturedOwnerId, equals('trainer-1'));
+      },
+    );
+
+    testWidgets(
+      'REGRESSION-410 Bug 2: coach-context back fallback lands on the athlete '
+      'detail, not the athlete /workout tab',
+      (tester) async {
+        String? backLocation;
+        final router = GoRouter(
+          initialLocation: '/coach/athlete/athlete-1/plan/test-id',
+          routes: [
+            GoRoute(
+              path: '/coach/athlete/:athleteId/plan/:routineId',
+              builder: (ctx, state) => RoutineDetailScreen(
+                routineId: state.pathParameters['routineId']!,
+                coachAthleteId: state.pathParameters['athleteId'],
+              ),
+            ),
+            GoRoute(
+              path: '/coach/athlete/:athleteId',
+              builder: (ctx, state) {
+                backLocation = state.matchedLocation;
+                return const Text('ATHLETE DETAIL');
+              },
+            ),
+            // Athlete tab — MUST NOT be where a coach-context back lands.
+            GoRoute(
+              path: '/workout',
+              builder: (_, __) => const Text('WORKOUT TAB'),
+            ),
+          ],
+        );
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              routineByIdStreamProvider('test-id')
+                  .overrideWith((ref) => Stream.value(_makeRoutine())),
+            ],
+            child: MaterialApp.router(
+              theme: AppTheme.dark(),
+              localizationsDelegates: AppL10n.localizationsDelegates,
+              supportedLocales: AppL10n.supportedLocales,
+              locale: const Locale('es', 'AR'),
+              routerConfig: router,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        // Initial location → nothing to pop → back uses the fallback route.
+        await tester.tap(find.byIcon(TreinoIcon.back));
+        await tester.pumpAndSettle();
+
+        expect(find.text('ATHLETE DETAIL'), findsOneWidget);
+        expect(find.text('WORKOUT TAB'), findsNothing);
+        expect(backLocation, equals('/coach/athlete/athlete-1'));
+      },
+    );
+
     testWidgets(
       'SCENARIO-094: no Scaffold/AppBackground/SafeArea inside screen subtree',
       (tester) async {
         await tester.pumpWidget(
           _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-            routineByIdProvider(
+            routineByIdStreamProvider(
               'test-id',
-            ).overrideWith((ref) async => _makeRoutine()),
+            ).overrideWith((ref) => Stream.value(_makeRoutine())),
           ]),
         );
         await tester.pump(const Duration(milliseconds: 50));
@@ -680,9 +834,9 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            routineByIdProvider(
+            routineByIdStreamProvider(
               'test-id',
-            ).overrideWith((ref) async => _makeRoutine(id: 'test-id')),
+            ).overrideWith((ref) => Stream.value(_makeRoutine(id: 'test-id'))),
           ],
           child: MaterialApp.router(
             theme: AppTheme.dark(),
@@ -718,9 +872,9 @@ void main() {
               initialDayNumber: 3,
             ),
             [
-              routineByIdProvider(
+              routineByIdStreamProvider(
                 'test-id',
-              ).overrideWith((ref) async => routine),
+              ).overrideWith((ref) => Stream.value(routine)),
             ],
           ),
         );
@@ -752,9 +906,9 @@ void main() {
               initialDayNumber: 99,
             ),
             [
-              routineByIdProvider(
+              routineByIdStreamProvider(
                 'test-id',
-              ).overrideWith((ref) async => routine),
+              ).overrideWith((ref) => Stream.value(routine)),
             ],
           ),
         );
@@ -775,7 +929,9 @@ void main() {
         );
         await tester.pumpWidget(
           _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-            routineByIdProvider('test-id').overrideWith((ref) async => routine),
+            routineByIdStreamProvider(
+              'test-id',
+            ).overrideWith((ref) => Stream.value(routine)),
           ]),
         );
         await tester.pumpAndSettle();
@@ -828,9 +984,9 @@ void main() {
         );
         await tester.pumpWidget(
           _wrapWithOverrides(RoutineDetailScreen(routineId: routine.id), [
-            routineByIdProvider(
+            routineByIdStreamProvider(
               routine.id,
-            ).overrideWith((ref) async => routine),
+            ).overrideWith((ref) => Stream.value(routine)),
           ]),
         );
         await tester.pump(const Duration(milliseconds: 50));

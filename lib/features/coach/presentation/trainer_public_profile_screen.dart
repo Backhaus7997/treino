@@ -8,6 +8,8 @@ import '../../../l10n/app_l10n.dart';
 import '../../reviews/presentation/widgets/review_cta.dart';
 import '../../reviews/presentation/widgets/trainer_reviews_section.dart';
 import '../application/trainer_discovery_providers.dart';
+import '../../coach_hub/presentation/sections/pagos/widgets/payment_format.dart'
+    show fmtArs;
 import 'widgets/trainer_contact_cta_stub.dart';
 import 'widgets/trainer_profile_hero.dart';
 import 'widgets/trainer_stats_row.dart';
@@ -80,7 +82,7 @@ class TrainerPublicProfileScreen extends ConsumerWidget {
                     ),
                     const Spacer(),
                     Text(
-                      '\$${profile.trainerMonthlyRate}${l10n.coachMonthlyRateUnit}',
+                      '${fmtArs(profile.trainerMonthlyRate!)}${l10n.coachMonthlyRateUnit}',
                       style: TextStyle(
                         color: palette.textPrimary,
                         fontWeight: FontWeight.w700,

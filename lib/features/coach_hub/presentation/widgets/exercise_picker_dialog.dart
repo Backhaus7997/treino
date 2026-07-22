@@ -20,6 +20,7 @@ import '../../../workout/domain/exercise.dart';
 import '../../../workout/domain/muscle_group.dart';
 import '../sections/biblioteca/widgets/exercise_detail_dialog.dart'
     show showExerciseDetailDialog;
+import 'create_custom_exercise_dialog.dart';
 
 /// Web equivalent of [showExercisePicker] (mobile's `exercise_picker_sheet.dart`
 /// bottom sheet) — a multi-select exercise picker for the Coach Hub routine
@@ -38,10 +39,11 @@ import '../sections/biblioteca/widgets/exercise_detail_dialog.dart'
 /// `customExercisesForTrainerStreamProvider`) so search/filter BEHAVIOR is
 /// identical — only the presentation container (dialog vs. sheet) differs.
 ///
-/// NOT ported in this pass: inline "crear ejercicio nuevo" (mobile opens
-/// `CustomExerciseEditorScreen`, an 892-line mobile-styled screen) — deferred;
-/// trainers can still browse existing custom exercises here, just not create
-/// one from inside the picker yet.
+/// Trainers can create a new custom exercise inline via "+ Crear ejercicio
+/// nuevo" ([showCreateCustomExerciseDialog]): the created exercise is
+/// auto-selected and shows up under "Tus ejercicios" on its own (the custom
+/// stream is live). Web captures the MVP fields (name/muscle/equipment);
+/// mobile's richer description + validated-video editor stays app-only.
 Future<List<Exercise>?> showExercisePickerDialog(
   BuildContext context, {
   Set<String> alreadySelectedIds = const {},
@@ -83,11 +85,11 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
   }
 
   bool _matches(Exercise e) => exerciseMatchesFilters(
-        e,
-        query: _query,
-        muscles: _muscleFilters,
-        equipment: _equipmentFilters,
-      );
+    e,
+    query: _query,
+    muscles: _muscleFilters,
+    equipment: _equipmentFilters,
+  );
 
   void _toggle(String id) {
     setState(() {
@@ -113,6 +115,84 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
       }
     }
     Navigator.of(context).pop(result);
+  }
+
+  Future<void> _openCreateNew() async {
+    final created = await showCreateCustomExerciseDialog(context);
+    if (created == null || !mounted) return;
+    // The custom stream (customExercisesForTrainerStreamProvider) is live, so
+    // the new exercise shows up under "Tus ejercicios" on its own — pre-select
+    // it so the trainer just hits "Agregar".
+    setState(() => _selected.add(created.id));
+  }
+
+  Future<void> _editCustom(CustomExercise exercise) async {
+    // The custom stream is live and selection is keyed by id, so the edited row
+    // refreshes in place — nothing to reconcile here.
+    await showEditCustomExerciseDialog(context, exercise);
+  }
+
+  Future<void> _deleteCustom(CustomExercise exercise) async {
+    final uid = ref.read(currentUidProvider) ?? '';
+    if (uid.isEmpty) return;
+    final palette = AppPalette.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: palette.bgCard,
+        title: Text(
+          '¿Eliminar ejercicio?', // i18n
+          style: GoogleFonts.barlowCondensed(
+            color: palette.textPrimary,
+            fontWeight: FontWeight.w700,
+            fontSize: 18,
+          ),
+        ),
+        content: Text(
+          // Slots denormalize the name/group at assign time, so existing
+          // routines keep working after the library entry is gone.
+          'Se borra "${exercise.name}" de tu biblioteca. Las rutinas que ya lo '
+          'usan no se tocan.', // i18n
+          style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(
+              'Cancelar', // i18n
+              style: GoogleFonts.barlow(color: palette.textMuted),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(
+              'Eliminar', // i18n
+              style: GoogleFonts.barlow(
+                color: palette.danger,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref
+          .read(customExerciseRepositoryProvider)
+          .delete(trainerId: uid, id: exercise.id);
+      if (mounted) setState(() => _selected.remove(exercise.id));
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Ejercicio eliminado.')), // i18n
+      );
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('No pudimos eliminar el ejercicio.'), // i18n
+        ),
+      );
+    }
   }
 
   @override
@@ -172,14 +252,19 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
               child: TextField(
                 controller: _searchController,
                 style: GoogleFonts.barlow(
-                    color: palette.textPrimary, fontSize: 14),
+                  color: palette.textPrimary,
+                  fontSize: 14,
+                ),
                 decoration: InputDecoration(
                   prefixIcon: Icon(TreinoIcon.search, color: palette.textMuted),
                   suffixIcon: _query.isEmpty
                       ? null
                       : IconButton(
-                          icon: Icon(TreinoIcon.close,
-                              color: palette.textMuted, size: 18),
+                          icon: Icon(
+                            TreinoIcon.close,
+                            color: palette.textMuted,
+                            size: 18,
+                          ),
                           tooltip: 'Borrar', // i18n
                           onPressed: () {
                             _searchController.clear();
@@ -188,11 +273,15 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
                         ),
                   hintText: 'Buscar ejercicio…', // i18n
                   hintStyle: GoogleFonts.barlow(
-                      color: palette.textMuted, fontSize: 14),
+                    color: palette.textMuted,
+                    fontSize: 14,
+                  ),
                   filled: true,
                   fillColor: palette.bg,
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: BorderSide(color: palette.border),
@@ -221,6 +310,9 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
                     setState(() => _equipmentFilters = v),
               ),
             ),
+            const Divider(height: 1),
+            // ── Crear ejercicio nuevo (inline) ────────────────────────────
+            _CreateNewExerciseButton(palette: palette, onTap: _openCreateNew),
             const Divider(height: 1),
             // ── List ─────────────────────────────────────────────────────
             Expanded(
@@ -251,14 +343,15 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
                     onPressed: _selected.isEmpty
                         ? null
                         : () => _confirm(
-                              defaultsAsync.valueOrNull ?? const [],
-                              customsAsync.valueOrNull ?? const [],
-                            ),
+                            defaultsAsync.valueOrNull ?? const [],
+                            customsAsync.valueOrNull ?? const [],
+                          ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: palette.accent,
                       foregroundColor: palette.bg,
-                      disabledBackgroundColor:
-                          palette.accent.withValues(alpha: 0.3),
+                      disabledBackgroundColor: palette.accent.withValues(
+                        alpha: 0.3,
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(9999),
                       ),
@@ -302,8 +395,9 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
     final defaultList = defaults.value ?? const <Exercise>[];
     final customList = customs.value ?? const <CustomExercise>[];
 
-    final filteredCustoms =
-        customList.where((c) => _matches(customToExercise(c))).toList();
+    final filteredCustoms = customList
+        .where((c) => _matches(customToExercise(c)))
+        .toList();
     final filteredDefaults = defaultList.where(_matches).toList();
 
     if (filteredCustoms.isEmpty && filteredDefaults.isEmpty) {
@@ -337,6 +431,8 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
               selected: _selected.contains(c.id),
               palette: palette,
               onTap: () => _toggle(c.id),
+              onEdit: () => _editCustom(c),
+              onDelete: () => _deleteCustom(c),
             ),
         ],
         if (filteredDefaults.isNotEmpty) ...[
@@ -487,6 +583,8 @@ class _ExerciseRow extends StatelessWidget {
     required this.selected,
     required this.palette,
     required this.onTap,
+    this.onEdit,
+    this.onDelete,
   });
 
   final String id;
@@ -498,6 +596,10 @@ class _ExerciseRow extends StatelessWidget {
   final bool selected;
   final AppPalette palette;
   final VoidCallback onTap;
+
+  /// Present only for the trainer's own custom exercises → renders edit/delete.
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -518,8 +620,10 @@ class _ExerciseRow extends StatelessWidget {
           ),
         ),
         child: ListTile(
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 2,
+          ),
           leading: Icon(
             selected ? TreinoIcon.check : TreinoIcon.dumbbell,
             color: selected ? palette.accent : palette.textMuted,
@@ -534,17 +638,23 @@ class _ExerciseRow extends StatelessWidget {
             ),
           ),
           subtitle: subtitle != null && subtitle!.isNotEmpty
-              ? Text(subtitle!,
+              ? Text(
+                  subtitle!,
                   style: GoogleFonts.barlow(
-                      color: palette.textMuted, fontSize: 12))
+                    color: palette.textMuted,
+                    fontSize: 12,
+                  ),
+                )
               : null,
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               if (badge != null) ...[
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: palette.accent.withValues(alpha: 0.18),
                     borderRadius: BorderRadius.circular(6),
@@ -561,10 +671,35 @@ class _ExerciseRow extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
               ],
+              if (onEdit != null)
+                IconButton(
+                  tooltip: 'Editar', // i18n
+                  icon: Icon(
+                    TreinoIcon.edit,
+                    size: 15,
+                    color: palette.textMuted,
+                  ),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: onEdit,
+                ),
+              if (onDelete != null)
+                IconButton(
+                  tooltip: 'Eliminar', // i18n
+                  icon: Icon(
+                    TreinoIcon.trash,
+                    size: 15,
+                    color: palette.textMuted,
+                  ),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: onDelete,
+                ),
               IconButton(
                 tooltip: 'Ver detalle', // i18n
-                icon: Icon(TreinoIcon.chartBar,
-                    size: 16, color: palette.textMuted),
+                icon: Icon(
+                  TreinoIcon.chartBar,
+                  size: 16,
+                  color: palette.textMuted,
+                ),
                 visualDensity: VisualDensity.compact,
                 onPressed: () => showExerciseDetailDialog(
                   context,
@@ -598,6 +733,40 @@ class _SectionHeader extends StatelessWidget {
           fontSize: 11,
           fontWeight: FontWeight.w700,
           letterSpacing: 1.2,
+        ),
+      ),
+    );
+  }
+}
+
+/// Inline "+ Crear ejercicio nuevo" row, pinned above the exercise list so it
+/// stays reachable in every list state (results, empty, loading).
+class _CreateNewExerciseButton extends StatelessWidget {
+  const _CreateNewExerciseButton({required this.palette, required this.onTap});
+
+  final AppPalette palette;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      key: const Key('create_new_exercise_button'),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        child: Row(
+          children: [
+            Icon(TreinoIcon.plus, size: 18, color: palette.accent),
+            const SizedBox(width: 10),
+            Text(
+              'Crear ejercicio nuevo', // i18n
+              style: GoogleFonts.barlow(
+                color: palette.accent,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
         ),
       ),
     );

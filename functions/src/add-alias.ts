@@ -142,7 +142,10 @@ export async function runAddAlias(
  * Deployed to southamerica-east1 per ADR-CXP-004 / REQ-CXP-CF-008.
  */
 export const addAlias = functions.onCall(
-  { region: "southamerica-east1" },
+  // QA-SEC-006: enforce App Check so only the legitimate, attested app can
+  // mutate the exercise catalog. Defense-in-depth on top of request.auth.
+  // See PR body for the release prerequisite before deploy.
+  { region: "southamerica-east1", enforceAppCheck: true },
   async (request): Promise<{ status: "ok" | "noop" }> => {
     // ── Guard: caller must be authenticated ─────────────────────────────────
     if (!request.auth) {

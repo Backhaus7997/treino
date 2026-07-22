@@ -8,6 +8,7 @@ import '../../../app/theme/app_palette.dart';
 import '../../../core/utils/geohash.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../auth/application/auth_providers.dart';
 import '../../coach/domain/trainer_location.dart';
 import '../../coach/domain/trainer_specialty.dart';
 import '../../gyms/application/gym_providers.dart';
@@ -57,6 +58,7 @@ class _ProfileEditTrainerScreenState
   final _bioController = TextEditingController();
   final _priceController = TextEditingController();
   final _aliasController = TextEditingController();
+  final _experienceController = TextEditingController();
   TrainerSpecialty? _specialty;
   final List<TrainerLocation> _locations = [];
   bool _offersOnline = false;
@@ -69,6 +71,7 @@ class _ProfileEditTrainerScreenState
     _bioController.dispose();
     _priceController.dispose();
     _aliasController.dispose();
+    _experienceController.dispose();
     super.dispose();
   }
 
@@ -77,6 +80,8 @@ class _ProfileEditTrainerScreenState
     _bioController.text = profile.trainerBio ?? '';
     _priceController.text = profile.trainerMonthlyRate?.toString() ?? '';
     _aliasController.text = profile.paymentAlias ?? '';
+    _experienceController.text =
+        profile.trainerExperienceYears?.toString() ?? '';
     _specialty = trainerSpecialtyFromString(profile.trainerSpecialty);
     _locations
       ..clear()
@@ -182,6 +187,10 @@ class _ProfileEditTrainerScreenState
       'paymentAlias': _aliasController.text.trim().isEmpty
           ? null
           : _aliasController.text.trim(),
+      // Opcional (#388): vacío ⇒ null ⇒ el perfil público muestra "—".
+      'trainerExperienceYears': _experienceController.text.trim().isEmpty
+          ? null
+          : int.parse(_experienceController.text.trim()),
       'trainerLocations': _locations.map((l) => l.toJson()).toList(),
       'trainerGeohashes': _locations.map((l) => l.geohash).toSet().toList(),
       'trainerOffersOnline': _offersOnline,
@@ -237,7 +246,8 @@ class _ProfileEditTrainerScreenState
 
     // ADR-TPO-006: in onboarding mode, block back navigation at both levels.
     final body = SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(20, 18, 20, 20 + MediaQuery.paddingOf(context).bottom),
+      padding: EdgeInsets.fromLTRB(
+          20, 18, 20, 20 + MediaQuery.paddingOf(context).bottom),
       child: Form(
         key: _formKey,
         child: Column(
@@ -274,6 +284,27 @@ class _ProfileEditTrainerScreenState
                 _specialty = s;
                 _error = null;
               }),
+            ),
+            const SizedBox(height: 14),
+            _SectionLabel(palette: palette, text: 'AÑOS DE EXPERIENCIA'),
+            const SizedBox(height: 8),
+            TextFormField(
+              key: const Key('profile_edit_trainer_experience_field'),
+              controller: _experienceController,
+              keyboardType: TextInputType.number,
+              style: TextStyle(color: palette.textPrimary),
+              decoration: _inputDecoration(
+                palette,
+                hint: 'Ej: 5 (opcional — se muestra en tu perfil público)',
+              ),
+              validator: (v) {
+                final raw = v?.trim() ?? '';
+                if (raw.isEmpty) return null; // Opcional.
+                final n = int.tryParse(raw);
+                if (n == null) return 'Ingresá un número entero.';
+                if (n < 0 || n > 80) return 'Entre 0 y 80 años.';
+                return null;
+              },
             ),
             const SizedBox(height: 14),
             _SectionLabel(palette: palette, text: 'PRECIO MENSUAL (ARS)'),
@@ -390,6 +421,23 @@ class _ProfileEditTrainerScreenState
         // ADR-TPO-006: in onboarding mode, hide the back arrow entirely.
         automaticallyImplyLeading:
             widget.mode != ProfileEditTrainerMode.onboarding,
+        // QA-PRO-008 (#429): the onboarding gate intentionally blocks every
+        // navigation path (router redirect + PopScope + no back arrow), which
+        // turned the screen into a dead end — a trainer unwilling/unable to
+        // complete the form couldn't even leave the account. Sign-out is the
+        // minimum escape hatch: authStateChanges emits null and the router
+        // redirect lands the user back on /welcome. Edit mode keeps the
+        // normal back arrow and needs no extra exit.
+        actions: [
+          if (widget.mode == ProfileEditTrainerMode.onboarding)
+            IconButton(
+              key: const Key('trainer_onboarding_sign_out'),
+              tooltip: AppL10n.of(context).authProfileSignOut,
+              icon: const Icon(TreinoIcon.signOut),
+              onPressed: () =>
+                  ref.read(authNotifierProvider.notifier).signOut(),
+            ),
+        ],
       ),
       body: wrappedBody,
     );
@@ -577,16 +625,17 @@ class _GymsSection extends ConsumerWidget {
                         title: gymsById[loc.gymId]?.name ??
                             (gymsLoading ? l10n.coachLoadingLabel : 'Gimnasio'),
                         subtitle: gymsById[loc.gymId]?.address,
-                        trailing: gymsLoading && !gymsById.containsKey(loc.gymId)
-                            ? SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: palette.accent,
-                                ),
-                              )
-                            : null,
+                        trailing:
+                            gymsLoading && !gymsById.containsKey(loc.gymId)
+                                ? SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: palette.accent,
+                                    ),
+                                  )
+                                : null,
                         onRemove: () => onRemove(loc),
                       ),
                     ))

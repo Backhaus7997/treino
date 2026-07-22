@@ -14,6 +14,7 @@ import '../../profile/application/account_deletion_notifier.dart';
 import 'widgets/auth_failure_banner.dart';
 import 'widgets/auth_pill_button.dart';
 import 'widgets/auth_secondary_button.dart';
+import 'widgets/terms_notice_text.dart';
 import 'widgets/treino_logo.dart';
 
 /// Identifies which social provider button is currently awaiting its OAuth
@@ -171,8 +172,9 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                           ],
                           AuthPillButton(
                             label: l10n.authWelcomeCta,
-                            onPressed:
-                                isLoading ? null : () => context.push('/register'),
+                            onPressed: isLoading
+                                ? null
+                                : () => context.push('/register'),
                             showArrow: false,
                           ),
                           const SizedBox(height: 12),
@@ -215,6 +217,11 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                               ),
                             ],
                           ),
+                          const SizedBox(height: 12),
+                          // QA-AUTH-001 (issue #434): Google/Apple create a
+                          // TREINO account just like Register — the user must
+                          // be told before tapping the social button.
+                          const TermsNoticeText(),
                           const SizedBox(height: 18),
                           // Wrap (not a min-size Row) so the line flows to a
                           // second line instead of overflowing when the text is

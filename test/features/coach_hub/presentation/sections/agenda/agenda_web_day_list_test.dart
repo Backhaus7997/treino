@@ -283,14 +283,14 @@ void main() {
         await tester.tap(find.text('COBRAR (2)'));
         await tester.pumpAndSettle();
 
-        // Monto default = 2 × 5000 = 10000, mostrado en el TextField.
-        expect(find.text('10000'), findsOneWidget);
+        // Monto default = 2 × 5000 = 10000, mostrado agrupado en el TextField.
+        expect(find.text('10.000'), findsOneWidget);
         expect(find.textContaining('Tarifa de referencia'), findsOneWidget);
         expect(
             find.text('2 sesiones'), findsOneWidget); // i18n, concepto default
 
         // Editar el monto — el trainer cambia el default.
-        await tester.enterText(find.text('10000'), '9999');
+        await tester.enterText(find.text('10.000'), '9999');
         await tester.pumpAndSettle();
 
         await tester.tap(find.text('CONFIRMAR COBRO')); // i18n

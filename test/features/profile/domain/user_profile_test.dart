@@ -37,6 +37,34 @@ void main() {
       expect(decoded.bornAt, isNull);
     });
 
+    test('#388: trainerExperienceYears round-trips (and defaults to null)', () {
+      final withYears = UserProfile(
+        uid: 'uid-exp',
+        email: 'pf@b.com',
+        displayName: 'Coach',
+        role: UserRole.trainer,
+        createdAt: fixedDt,
+        updatedAt: fixedDt,
+        trainerExperienceYears: 7,
+      );
+
+      final decoded = UserProfile.fromJson(withYears.toJson());
+      expect(decoded.trainerExperienceYears, equals(7));
+
+      final without = UserProfile(
+        uid: 'uid-exp-2',
+        email: 'pf2@b.com',
+        displayName: null,
+        role: UserRole.trainer,
+        createdAt: fixedDt,
+        updatedAt: fixedDt,
+      );
+      expect(
+        UserProfile.fromJson(without.toJson()).trainerExperienceYears,
+        isNull,
+      );
+    });
+
     test('SCENARIO-001b: displayName can be non-null and round-trips', () {
       final profile = UserProfile(
         uid: 'uid-1b',
@@ -166,6 +194,69 @@ void main() {
       expect(profile.trainerBio, isNull);
       expect(profile.trainerGeohash, isNull);
       expect(profile.trainerMonthlyRate, isNull);
+    });
+
+    // ── termsAcceptedAt (QA-AUTH-001, issue #434) ────────────────────────
+    group('termsAcceptedAt', () {
+      test('defaults to null when omitted', () {
+        final profile = UserProfile(
+          uid: 'uid-1',
+          email: 'a@b.com',
+          displayName: null,
+          role: UserRole.athlete,
+          createdAt: fixedDt,
+          updatedAt: fixedDt,
+        );
+        expect(profile.termsAcceptedAt, isNull);
+
+        final decoded = UserProfile.fromJson(profile.toJson());
+        expect(decoded.termsAcceptedAt, isNull);
+      });
+
+      test('round-trips through toJson/fromJson when populated', () {
+        final acceptedAt = DateTime.utc(2026, 6, 1, 10, 0);
+        final profile = UserProfile(
+          uid: 'uid-2',
+          email: 'b@c.com',
+          displayName: null,
+          role: UserRole.athlete,
+          createdAt: fixedDt,
+          updatedAt: fixedDt,
+          termsAcceptedAt: acceptedAt,
+        );
+
+        final decoded = UserProfile.fromJson(profile.toJson());
+        expect(decoded.termsAcceptedAt, equals(acceptedAt));
+      });
+
+      test('raw map with a Firestore Timestamp decodes to DateTime', () {
+        final acceptedAt = DateTime.utc(2026, 6, 1, 10, 0);
+        final raw = <String, Object?>{
+          'uid': 'uid-3',
+          'email': 'c@d.com',
+          'displayName': null,
+          'role': 'athlete',
+          'createdAt': Timestamp.fromDate(fixedDt),
+          'updatedAt': Timestamp.fromDate(fixedDt),
+          'termsAcceptedAt': Timestamp.fromDate(acceptedAt),
+        };
+
+        final profile = UserProfile.fromJson(raw);
+        expect(profile.termsAcceptedAt, equals(acceptedAt));
+      });
+
+      test('legacy doc with no termsAcceptedAt key deserializes to null', () {
+        final raw = <String, dynamic>{
+          'uid': 'uid-legacy',
+          'email': 'a@b.com',
+          'displayName': null,
+          'role': 'athlete',
+          'createdAt': Timestamp.fromDate(fixedDt),
+          'updatedAt': Timestamp.fromDate(fixedDt),
+        };
+        final profile = UserProfile.fromJson(raw);
+        expect(profile.termsAcceptedAt, isNull);
+      });
     });
   });
 }

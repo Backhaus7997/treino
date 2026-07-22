@@ -1,4 +1,7 @@
 {
+  "notFoundTitle": "Página no encontrada",
+  "notFoundBody": "La ruta que buscás no existe o el enlace es inválido.",
+  "notFoundCta": "Volver al inicio",
   "homeAthleteFirstRunTitle": "Arrancá tu entrenamiento",
   "@homeAthleteFirstRunTitle": {"description": "Home first-run empty-state title for an athlete with no routine (usability finding 6)."},
   "homeAthleteFirstRunBody": "Creá tu primera rutina o buscá un entrenador para empezar.",
@@ -226,6 +229,8 @@
   "workoutSummaryHeaderAbandoned": "SESIÓN INTERRUMPIDA",
   "workoutStatDuration": "DURACIÓN",
   "workoutStatVolume": "VOLUMEN",
+  "workoutStatDurationMin": "DURACIÓN MIN",
+  "workoutStatVolumeKg": "VOLUMEN KG",
   "workoutStatSets": "SETS",
   "workoutStatPrsToday": "PRs HOY",
   "workoutStatPrsTodayStub": "—",
@@ -261,6 +266,8 @@
   "workoutDetailStatDuration": "DURACIÓN",
   "workoutDetailStatSets": "SETS",
   "workoutDetailStatVolume": "VOLUMEN",
+  "workoutDetailStatDurationMin": "DURACIÓN MIN",
+  "workoutDetailStatVolumeKg": "VOLUMEN KG",
   "workoutDetailStatPrsToday": "PRS HOY",
   "workoutDetailPrBadge": "PR",
   "workoutSelfEditorTitle": "Nueva rutina",
@@ -271,6 +278,7 @@
   "workoutSelfEditorUpdateSuccess": "Rutina actualizada",
   "workoutSelfEditorNotFound": "Esta rutina ya no existe. Volvé y actualizá la lista.",
   "workoutSelfEditorError": "No pudimos crear la rutina. Reintentá.",
+  "workoutDiscardError": "No pudimos descartar la sesión. Probá de nuevo.",
   "workoutSelfEditorPermissionDenied": "No tenés permisos para hacer esto. Recargá la app.",
   "workoutEditStubToast": "Pronto vas a poder editar el contenido. Por ahora podés archivar y crear de nuevo.",
   "workoutSelfEditorCapReached": "Llegaste al máximo de 10 rutinas activas.",
@@ -373,7 +381,6 @@
   "dashboardAceptarLabel": "ACEPTAR",
   "dashboardPagosPorCobrarTitle": "PAGOS POR COBRAR",
   "dashboardCobroTrailingLabel": "+ Cobro",
-  "dashboardInvitarAlumnoLabel": "+ INVITAR ALUMNO",
   "dashboardAsignarRutinaLabel": "+ ASIGNAR RUTINA",
   "dashboardCobroSueltoTitle": "COBRO SUELTO",
   "dashboardAlumnoLabel": "ALUMNO",
@@ -412,7 +419,6 @@
   "dashboardSinCobros": "Sin cobros pendientes.",
   "dashboardErrorCobros": "No pudimos cargar los cobros.",
   "dashboardHolaSinNombre": "HOLA",
-  "dashboardInvitarProximamente": "Invitar alumno — próximamente.",
   "dashboardSolicitudesPendientesTitle": "SOLICITUDES PENDIENTES ({count})",
   "@dashboardSolicitudesPendientesTitle": {
     "placeholders": {
@@ -1495,6 +1501,7 @@
     }
   },
   "routineEditorMissingReps": "Completá las reps de los sets antes de guardar.",
+  "routineEditorDuplicateExercise": "Ese ejercicio ya está en el día. Elegí otro.",
   "@routineEditorMissingReps": {
     "description": "Inline validation hint when a visible set is missing a valid reps/duration value in a single-week self-routine (finding 19). routineEditorIncompleteSetsFeedback already covers the named-exercise multi-week case."
   },
@@ -2072,6 +2079,10 @@
     "description": "[stats-hub] Header title for the dedicated MuscleDistributionScreen."
   },
   "muscleDistributionLoadError": "No pudimos cargar tu distribución muscular. Probá de nuevo.",
+  "frequentExercisesLoadError": "No pudimos cargar tus ejercicios frecuentes. Probá de nuevo.",
+  "@frequentExercisesLoadError": {
+    "description": "Error state for the FrequentExercisesScreen's exerciseFrequencyProvider load failure. Paired with coachRetryLabel for the retry CTA — same convention as muscleDistributionLoadError."
+  },
   "exerciseProgressionScreenTitle": "EVOLUCIÓN POR EJERCICIO",
   "@exerciseProgressionScreenTitle": {
     "description": "Header title for the athlete-side ExerciseProgressionScreen."
@@ -2139,6 +2150,64 @@
   "@measurementsNeedsMoreData": {
     "description": "Shown when the athlete has exactly ONE measurement. MeasurementProgressChart requires >= 2 points — distinct from the zero case, which is why it is a separate string."
   },
+  "measurementsHistoryTitle": "HISTORIAL",
+  "@measurementsHistoryTitle": {
+    "description": "[#439] Section label above MeasurementHistoryList on both mobile surfaces (athlete MEDIDAS screen and trainer ANTROPOMETRÍA section)."
+  },
+  "measurementHistoryEditTooltip": "Editar medición",
+  "@measurementHistoryEditTooltip": {
+    "description": "[#439] Tooltip/a11y label of the per-row edit action in MeasurementHistoryList. Only rendered on rows authored by the current uid (the update rule pins recordedBy)."
+  },
+  "measurementHistoryDeleteTooltip": "Eliminar medición",
+  "@measurementHistoryDeleteTooltip": {
+    "description": "[#439] Tooltip/a11y label of the per-row delete action in MeasurementHistoryList. Only rendered on rows authored by the current uid (the delete rule pins recordedBy)."
+  },
+  "measurementHistoryShowAll": "Ver todas ({count})",
+  "@measurementHistoryShowAll": {
+    "description": "[#439] Footer toggle of MeasurementHistoryList when more rows exist than the collapsed cap. {count} is the TOTAL number of measurements.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "measurementHistoryShowLess": "Ver menos",
+  "@measurementHistoryShowLess": {
+    "description": "[#439] Footer toggle of MeasurementHistoryList when expanded — collapses back to the capped list."
+  },
+  "measurementDeleteConfirmTitle": "¿Eliminar medición?",
+  "@measurementDeleteConfirmTitle": {
+    "description": "[#439] Title of the delete-confirmation AlertDialog for a measurement (same pattern as athleteDetailPlanDeleteTitle)."
+  },
+  "measurementDeleteConfirmBody": "Se eliminará la medición del {date}. Esta acción no se puede deshacer.",
+  "@measurementDeleteConfirmBody": {
+    "description": "[#439] Body of the delete-confirmation dialog. {date} is the pre-formatted recordedAt day label (e.g. '3 jul 2026').",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "measurementDeleteConfirmAction": "Eliminar",
+  "@measurementDeleteConfirmAction": {
+    "description": "[#439] Destructive confirm button of the measurement delete dialog. Cancel reuses commonCancel."
+  },
+  "measurementDeleteSuccess": "Medición eliminada",
+  "@measurementDeleteSuccess": {
+    "description": "[#439] Snackbar after a measurement was deleted successfully."
+  },
+  "measurementDeleteError": "No pudimos eliminar la medición. Probá de nuevo.",
+  "@measurementDeleteError": {
+    "description": "[#439] Snackbar when the measurement delete fails (network/rules)."
+  },
+  "measurementHistorySelfLoggedTag": "Auto-registro",
+  "@measurementHistorySelfLoggedTag": {
+    "description": "[#439] Read-only tag on the TRAINER's history rows the athlete self-logged: the trainer cannot edit/delete them (rules pin recordedBy), the tag explains why there are no actions."
+  },
+  "measurementHistoryTrainerLoggedTag": "Cargada por tu entrenador",
+  "@measurementHistoryTrainerLoggedTag": {
+    "description": "[#439] Read-only tag on the ATHLETE's history rows a trainer recorded: the athlete cannot edit/delete them (rules pin recordedBy), the tag explains why there are no actions."
+  },
   "insightsTileFrequentExercisesTitle": "Ejercicios frecuentes",
   "@insightsTileFrequentExercisesTitle": {
     "description": "[stats-hub] Tile title on InsightsScreen navigating to FrequentExercisesScreen (athlete's own uid)."
@@ -2166,5 +2235,9 @@
   "volumeByGroupScreenTitle": "VOLUMEN POR GRUPO",
   "@volumeByGroupScreenTitle": {
     "description": "[stats-hub] Header title for the dedicated VolumeByGroupScreen."
+  },
+  "volumeByGroupEmptyTarget": "Necesitás una rutina asignada para ver tu volumen objetivo.",
+  "@volumeByGroupEmptyTarget": {
+    "description": "[stats-hub] Empty state of the VolumeByGroupScreen card when the athlete has no target (no assigned routine). QA #371."
   }
 }

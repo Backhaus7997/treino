@@ -11,6 +11,10 @@ import 'ver_mas_cell.dart';
 /// Number of routine cards shown before the "Ver más" cell. When the user
 /// taps Ver más, the section expands to show all routines and the Ver más
 /// cell disappears.
+///
+/// Keep this odd: the Ver más cell sizes itself by filling the height of the
+/// card it shares a 2-up row with (see the grid [Table] below) — an odd limit
+/// guarantees it always lands next to a card, never alone in a row.
 const int _kCollapsedLimit = 3;
 
 class PlantillasSection extends ConsumerStatefulWidget {
@@ -22,6 +26,24 @@ class PlantillasSection extends ConsumerStatefulWidget {
 
 class _PlantillasSectionState extends ConsumerState<PlantillasSection> {
   bool _expanded = false;
+
+  /// Wraps a grid cell with the inter-row gap. The Ver más cell fills the row
+  /// height so its dashed border matches the card next to it — same look the
+  /// old Row(stretch) gave it, but resolved inside the table's single layout
+  /// pass. Cards keep their natural (deterministic) height.
+  Widget _gridCell(Widget cell, {required bool lastRow}) {
+    final padded = Padding(
+      padding: EdgeInsets.only(bottom: lastRow ? 0 : 12),
+      child: cell,
+    );
+    if (cell is VerMasCell) {
+      return TableCell(
+        verticalAlignment: TableCellVerticalAlignment.fill,
+        child: padded,
+      );
+    }
+    return padded;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -69,8 +91,21 @@ class _PlantillasSectionState extends ConsumerState<PlantillasSection> {
             // SliverGridDelegateWithFixedCrossAxisCount forces every cell to a
             // single hard-coded height (width / childAspectRatio): too short
             // for the card content — the subtitle overflowed — and it reserved
-            // phantom vertical space that pushed HISTORIAL down. Manual rows
-            // size to their content, like MisRutinas / TrainerTemplates.
+            // phantom vertical space that pushed HISTORIAL down.
+            //
+            // The rows live in a single-pass Table, NOT in per-row
+            // IntrinsicHeight wrappers: IntrinsicHeight re-ran a dry-layout of
+            // the whole row subtree every time a row re-entered the viewport,
+            // and expanded the row count scales with the catalog — that extra
+            // per-frame work janked the outer ListView scroll (#402). Equal
+            // heights now come for free: reserveTitleLines makes every card
+            // lay out at the same deterministic height, and the Ver más cell
+            // fills its row via TableCellVerticalAlignment.fill.
+            assert(
+              _kCollapsedLimit.isOdd,
+              'Ver más must share a 2-up row with a card (see _kCollapsedLimit '
+              'doc) — alone in a row, its fill cell collapses to height 0.',
+            );
             final cells = <Widget>[
               for (var i = 0; i < visibleCount; i++)
                 RoutineCard(
@@ -78,34 +113,33 @@ class _PlantillasSectionState extends ConsumerState<PlantillasSection> {
                   variant: routines[i].id.hashCode % 3 == 0
                       ? RoutineCardVariant.highlight
                       : RoutineCardVariant.accent,
+                  reserveTitleLines: true,
                 ),
               if (showVerMas)
                 VerMasCell(onTap: () => setState(() => _expanded = true)),
             ];
 
-            return Column(
+            return Table(
+              columnWidths: const {
+                0: FlexColumnWidth(),
+                1: FixedColumnWidth(12),
+                2: FlexColumnWidth(),
+              },
+              defaultVerticalAlignment: TableCellVerticalAlignment.top,
               children: [
                 for (var row = 0; row < cells.length; row += 2)
-                  Padding(
-                    padding: EdgeInsets.only(
-                      bottom: row + 2 < cells.length ? 12 : 0,
-                    ),
-                    // IntrinsicHeight so both cards in a row match the taller
-                    // one's height — keeps the 2-column grid look tidy.
-                    child: IntrinsicHeight(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Expanded(child: cells[row]),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: row + 1 < cells.length
-                                ? cells[row + 1]
-                                : const SizedBox.shrink(),
-                          ),
-                        ],
-                      ),
-                    ),
+                  TableRow(
+                    children: [
+                      _gridCell(cells[row], lastRow: row + 2 >= cells.length),
+                      const SizedBox.shrink(),
+                      if (row + 1 < cells.length)
+                        _gridCell(
+                          cells[row + 1],
+                          lastRow: row + 2 >= cells.length,
+                        )
+                      else
+                        const SizedBox.shrink(),
+                    ],
                   ),
               ],
             );

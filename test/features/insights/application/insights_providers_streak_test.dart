@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:treino/core/utils/argentina_time.dart';
 import 'package:treino/features/insights/application/insights_providers.dart';
 import 'package:treino/features/workout/application/exercise_providers.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
@@ -31,6 +32,7 @@ void main() {
       sessionRepositoryProvider.overrideWithValue(repo),
       exercisesProvider.overrideWith((ref) async => const <Exercise>[]),
       routineByIdProvider('r1').overrideWith((ref) async => null),
+      visibleRoutineByIdProvider('r1').overrideWith((ref) async => null),
     ]);
   }
 
@@ -38,8 +40,13 @@ void main() {
     // SCENARIO-300: trained today → streak includes today + preceding consecutive days
     test('SCENARIO-300: trained today → streak ≥ 1', () async {
       final repo = MockSessionRepository();
-      final now = DateTime.now().toLocal();
-      final today = DateTime(now.year, now.month, now.day, 10);
+      // computeStreak buckets by the Argentina calendar day (#411). Anchor
+      // fixtures to `argentinaNow()` and make them UTC-flagged at noon UTC
+      // (= 09:00 ART, same ART day under any runner, never crosses midnight),
+      // mirroring real data (always UTC-flagged via TimestampConverter). A
+      // device-local fixture would flake near the ART midnight boundary.
+      final nowArt = argentinaNow();
+      final today = DateTime.utc(nowArt.year, nowArt.month, nowArt.day, 12);
       final yesterday = today.subtract(const Duration(days: 1));
 
       when(() => repo.listByUid('u1')).thenAnswer((_) async => [
@@ -73,21 +80,22 @@ void main() {
     test('SCENARIO-301: not trained today → streak counts from yesterday',
         () async {
       final repo = MockSessionRepository();
-      final now = DateTime.now().toLocal();
-      final yesterday = DateTime(now.year, now.month, now.day)
-          .subtract(const Duration(days: 1));
-      final dayBefore = yesterday.subtract(const Duration(days: 1));
+      // UTC-flagged noon anchors on consecutive ART days (see SCENARIO-300).
+      final nowArt = argentinaNow();
+      final today = DateTime.utc(nowArt.year, nowArt.month, nowArt.day, 12);
+      final yesterday = today.subtract(const Duration(days: 1));
+      final dayBefore = today.subtract(const Duration(days: 2));
 
       when(() => repo.listByUid('u1')).thenAnswer((_) async => [
             makeSession(
               id: 's1',
-              startedAt: yesterday.add(const Duration(hours: 10)),
+              startedAt: yesterday,
               status: SessionStatus.finished,
               wasFullyCompleted: true,
             ),
             makeSession(
               id: 's2',
-              startedAt: dayBefore.add(const Duration(hours: 10)),
+              startedAt: dayBefore,
               status: SessionStatus.finished,
               wasFullyCompleted: true,
             ),
@@ -107,8 +115,9 @@ void main() {
     // SCENARIO-302: gap breaks the streak
     test('SCENARIO-302: gap in consecutive days → shorter streak', () async {
       final repo = MockSessionRepository();
-      final now = DateTime.now().toLocal();
-      final today = DateTime(now.year, now.month, now.day, 10);
+      // UTC-flagged noon anchors on ART days (see SCENARIO-300).
+      final nowArt = argentinaNow();
+      final today = DateTime.utc(nowArt.year, nowArt.month, nowArt.day, 12);
       // Skip one day — yesterday is missing
       final twoDaysAgo = today.subtract(const Duration(days: 2));
 
@@ -153,8 +162,9 @@ void main() {
     // Extra: active sessions are excluded from streak
     test('active sessions not counted in streak', () async {
       final repo = MockSessionRepository();
-      final now = DateTime.now().toLocal();
-      final today = DateTime(now.year, now.month, now.day, 10);
+      // UTC-flagged noon anchor on today's ART day (see SCENARIO-300).
+      final nowArt = argentinaNow();
+      final today = DateTime.utc(nowArt.year, nowArt.month, nowArt.day, 12);
 
       when(() => repo.listByUid('u1')).thenAnswer((_) async => [
             makeSession(
@@ -177,11 +187,14 @@ void main() {
     test('SCENARIO-304: only current-month finished sessions counted',
         () async {
       final repo = MockSessionRepository();
-      final now = DateTime.now().toLocal();
-      final thisMonthDate = DateTime(now.year, now.month, 1, 10);
-      // Previous month: last day of previous month
-      final prevMonthDate =
-          DateTime(now.year, now.month - 1 == 0 ? 12 : now.month - 1, 15, 10);
+      // monthSessionsCount uses the ART calendar month (#379). Anchor to
+      // `argentinaNow()` and build UTC-flagged noon instants (= 09:00 ART, same
+      // ART day/month under any runner), mirroring real UTC-flagged data.
+      final nowArt = argentinaNow();
+      final thisMonthDate = DateTime.utc(nowArt.year, nowArt.month, 1, 12);
+      // Previous month, mid-month → unambiguously outside the current ART month.
+      final prevMonthDate = DateTime.utc(
+          nowArt.year, nowArt.month - 1 == 0 ? 12 : nowArt.month - 1, 15, 12);
 
       when(() => repo.listByUid('u1')).thenAnswer((_) async => [
             makeSession(
@@ -210,15 +223,16 @@ void main() {
       expect(result!.monthSessionsCount, greaterThanOrEqualTo(1));
       // The prev-month session must NOT be included
       // We check total: if both months same year, prevMonth sessions are excluded
-      if (now.month > 1) {
+      if (nowArt.month > 1) {
         expect(result.monthSessionsCount, 1);
       }
     });
 
     test('active sessions excluded from monthSessionsCount', () async {
       final repo = MockSessionRepository();
-      final now = DateTime.now().toLocal();
-      final today = DateTime(now.year, now.month, now.day, 10);
+      // UTC-flagged noon anchor on today's ART day (see the streak group).
+      final nowArt = argentinaNow();
+      final today = DateTime.utc(nowArt.year, nowArt.month, nowArt.day, 12);
 
       when(() => repo.listByUid('u1')).thenAnswer((_) async => [
             makeSession(
@@ -237,14 +251,15 @@ void main() {
 
     test('multiple finished sessions this month counted correctly', () async {
       final repo = MockSessionRepository();
-      final now = DateTime.now().toLocal();
+      // UTC-flagged noon anchors (days 1..5) within the current ART month.
+      final nowArt = argentinaNow();
 
       when(() => repo.listByUid('u1')).thenAnswer((_) async => [
             for (var i = 0; i < 5; i++)
               makeSession(
                 id: 's$i',
-                startedAt:
-                    DateTime(now.year, now.month, (i + 1).clamp(1, 28), 10),
+                startedAt: DateTime.utc(
+                    nowArt.year, nowArt.month, (i + 1).clamp(1, 28), 12),
                 status: SessionStatus.finished,
                 wasFullyCompleted: true,
               ),

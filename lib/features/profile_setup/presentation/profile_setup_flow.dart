@@ -8,6 +8,8 @@ import '../../../app/theme/app_palette.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../auth/application/auth_providers.dart';
+import '../../auth/presentation/widgets/terms_checkbox.dart';
+import '../../profile/application/user_providers.dart';
 import '../application/profile_setup_notifier.dart';
 import '../application/profile_setup_providers.dart';
 import 'steps/step_1_username_avatar.dart';
@@ -53,6 +55,23 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
       return;
     }
 
+    // QA-AUTH-001 (issue #434): cuentas OAuth nuevas (Google/Apple) nunca
+    // pasaron por el checkbox de Register. Mismo gate que register_screen —
+    // mostramos el snackbar y NO disparamos submit. Email ya tiene perfil
+    // (creado por signUpWithEmail) así que este gate no le aplica.
+    final needsTermsConsent = ref.read(userProfileProvider).valueOrNull == null;
+    if (needsTermsConsent && !state.termsAccepted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Aceptá los Términos y la Política de Privacidad para continuar',
+          ),
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
     // Submit final: persiste el draft a Firestore. NO navegamos a mano desde
     // acá. El redirect del router saca al atleta de /profile-setup en cuanto
     // userProfileProvider emite el displayName recién guardado: RouterRefreshNotifier
@@ -63,6 +82,19 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
     // /profile-setup y recién después volvía a /home: flicker visible (audit F3).
     try {
       await notifier.submit();
+      // QA-PRO-106 (issue #430): el upload del avatar es best-effort — si
+      // falló, el perfil YA quedó guardado y el router navega a /home solo.
+      // El aviso va por el ScaffoldMessenger root, así que sobrevive esa
+      // navegación; sin esto la foto elegida se pierde en silencio.
+      if (!mounted) return;
+      if (ref.read(profileSetupNotifierProvider).avatarUploadFailed) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No pudimos subir tu foto — reintentá desde Perfil.'),
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -145,6 +177,9 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
     );
 
     final state = ref.watch(profileSetupNotifierProvider);
+    // OAuth nuevo (sin perfil aún) — ver comentario de _onPrimary.
+    final needsTermsConsent =
+        ref.watch(userProfileProvider).valueOrNull == null;
 
     return Scaffold(
       backgroundColor: palette.bg,
@@ -200,6 +235,17 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
                       ],
                     ),
                   ),
+                  // Terms checkbox — solo en el último step y solo para OAuth
+                  // nuevo (email ya aceptó en Register). QA-AUTH-001 (#434).
+                  if (state.isLastStep && needsTermsConsent) ...[
+                    const SizedBox(height: 12),
+                    TermsCheckbox(
+                      value: state.termsAccepted,
+                      onChanged: ref
+                          .read(profileSetupNotifierProvider.notifier)
+                          .updateTermsAccepted,
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   ProfileSetupFooter(
                     onBack: state.currentStep == 0 ? null : _onBack,

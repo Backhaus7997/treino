@@ -16,8 +16,11 @@ import 'package:treino/features/feed/domain/post_privacy.dart';
 import 'package:treino/features/feed/presentation/create_post_screen.dart';
 import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
+import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
+import 'package:treino/features/workout/application/user_routines_providers.dart';
+import 'package:treino/features/workout/domain/routine.dart';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -53,6 +56,13 @@ UserProfile _makeProfile({
       avatarUrl: avatarUrl,
     );
 
+Routine _makeRoutine({String id = 'r1', String name = 'Push A'}) => Routine(
+      id: id,
+      name: name,
+      level: ExperienceLevel.beginner,
+      days: const [],
+    );
+
 /// Wraps [CreatePostScreen] in a GoRouter + ProviderScope.
 ///
 /// The initial route is '/' which shows a button that pushes '/create'.
@@ -61,6 +71,7 @@ UserProfile _makeProfile({
 Widget _wrapWithRouter({
   String? gymId,
   MockPostRepository? mockRepo,
+  List<Routine> routines = const [],
 }) {
   final MockPostRepository repo;
   if (mockRepo != null) {
@@ -109,6 +120,8 @@ Widget _wrapWithRouter({
       myFriendsFeedProvider.overrideWith((ref) async => const []),
       feedPublicProvider.overrideWith((ref) async => const []),
       myGymFeedProvider.overrideWith((ref) async => null),
+      userCreatedRoutinesProvider
+          .overrideWith((ref, uid) => Stream.value(routines)),
     ],
     child: MaterialApp.router(
       theme: AppTheme.dark(),
@@ -296,9 +309,9 @@ void main() {
     });
   });
 
-  // ── SCENARIO-226 — Routine tag stub ──────────────────────────────────────
+  // ── SCENARIO-226 — Routine tag picker ────────────────────────────────────
 
-  group('SCENARIO-226: routine tag stub chip', () {
+  group('SCENARIO-226: routine tag picker', () {
     testWidgets('SCENARIO-226: routine chip shows ETIQUETAR RUTINA',
         (tester) async {
       await tester.pumpWidget(_wrapWithRouter());
@@ -307,15 +320,67 @@ void main() {
       expect(find.text('ETIQUETAR RUTINA'), findsOneWidget);
     });
 
-    testWidgets('SCENARIO-226: tapping routine chip has no side effect',
+    testWidgets('SCENARIO-226: tapping the chip opens the routine picker',
         (tester) async {
-      await tester.pumpWidget(_wrapWithRouter());
+      await tester.pumpWidget(
+        _wrapWithRouter(routines: [_makeRoutine(name: 'Push A')]),
+      );
       await _openCreatePost(tester);
 
-      await tester.tap(find.text('ETIQUETAR RUTINA'), warnIfMissed: false);
+      await tester.tap(find.text('ETIQUETAR RUTINA'));
       await tester.pumpAndSettle();
 
+      expect(find.text('ELEGÍ UNA RUTINA'), findsOneWidget);
+      expect(find.text('Push A'), findsOneWidget);
+    });
+
+    testWidgets('SCENARIO-226: choosing a routine tags the post',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapWithRouter(routines: [_makeRoutine(name: 'Push A')]),
+      );
+      await _openCreatePost(tester);
+
+      await tester.tap(find.text('ETIQUETAR RUTINA'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Push A'));
+      await tester.pumpAndSettle();
+
+      // Idle chip is replaced by the accent pill showing the routine name.
+      expect(find.text('ETIQUETAR RUTINA'), findsNothing);
+      expect(find.text('Push A'), findsOneWidget);
+    });
+
+    testWidgets('SCENARIO-226: chosen routine can be detached', (tester) async {
+      await tester.pumpWidget(
+        _wrapWithRouter(routines: [_makeRoutine(name: 'Push A')]),
+      );
+      await _openCreatePost(tester);
+
+      await tester.tap(find.text('ETIQUETAR RUTINA'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Push A'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.bySemanticsLabel('Quitar rutina etiquetada'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Push A'), findsNothing);
       expect(find.text('ETIQUETAR RUTINA'), findsOneWidget);
+    });
+
+    testWidgets('SCENARIO-226: empty state shown when user has no routines',
+        (tester) async {
+      await tester.pumpWidget(_wrapWithRouter(routines: const []));
+      await _openCreatePost(tester);
+
+      await tester.tap(find.text('ETIQUETAR RUTINA'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Todavía no tenés rutinas propias para etiquetar.'),
+        findsOneWidget,
+      );
     });
   });
 

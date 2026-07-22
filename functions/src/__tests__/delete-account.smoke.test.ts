@@ -349,6 +349,8 @@ describe("SCENARIO-551 (full): deletedCollections includes all cascade collectio
       "trainer_links",
       "appointments",
       "storage",
+      "storage-athlete",
+      "athlete-data",
       "users",
       "userPublicProfiles",
       "users-auth",

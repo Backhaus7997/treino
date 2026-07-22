@@ -374,7 +374,15 @@ class _WorkoutDaysSection extends ConsumerWidget {
           child: CircularProgressIndicator(color: palette.accent),
         ),
       ),
-      error: (_, __) => const SizedBox.shrink(),
+      // QA-INS-005: nunca `SizedBox.shrink()` en error — el calendario quedaba
+      // en blanco, sin aviso ni reintento. `_ErrorState` (compacto) + retry que
+      // invalida el provider de días entrenados de este mes.
+      error: (_, __) => _ErrorState(
+        message: l10n.monthlyReportLoadError,
+        retryLabel: l10n.coachRetryLabel,
+        onRetry: () => ref
+            .invalidate(athleteWorkoutDaysProvider((uid: uid, month: month))),
+      ),
       data: (data) => WorkoutDaysCalendar(
         data: data,
         labels: WorkoutDaysCalendarLabels(
@@ -416,11 +424,16 @@ class _DailyDurationSection extends ConsumerWidget {
         ),
         child: CircularProgressIndicator(color: palette.accent),
       ),
-      error: (_, __) => DailyDurationChart(
-        points: const [],
-        emptyHint: emptyHint,
-        dayLabel: l10n.monthlyReportDailyTooltipDayLabel,
-        minutesUnit: l10n.monthlyReportDurationUnit,
+      // QA-INS-005: en error se mostraba DailyDurationChart con `emptyHint` —
+      // es decir, el MISMO estado "sin datos" que un mes real sin entrenos,
+      // ocultando que la carga FALLÓ y sin ofrecer reintento. Ahora se
+      // DISTINGUE: error → `_ErrorState` (mensaje + retry que invalida el
+      // provider); el vacío real sigue viviendo en la rama `data`.
+      error: (_, __) => _ErrorState(
+        message: l10n.monthlyReportLoadError,
+        retryLabel: l10n.coachRetryLabel,
+        onRetry: () => ref.invalidate(
+            athleteDailyDurationReportProvider((uid: uid, month: month))),
       ),
       data: (points) => DailyDurationChart(
         points: points,
@@ -468,7 +481,15 @@ class _MonthRadarSection extends ConsumerWidget {
           child: CircularProgressIndicator(color: palette.accent),
         ),
       ),
-      error: (_, __) => const SizedBox.shrink(),
+      // QA-INS-005: nunca `SizedBox.shrink()` en error — el radar quedaba en
+      // blanco. `_ErrorState` (compacto) con el copy de distribución muscular
+      // + retry que invalida el provider del radar mensual.
+      error: (_, __) => _ErrorState(
+        message: l10n.muscleDistributionLoadError,
+        retryLabel: l10n.coachRetryLabel,
+        onRetry: () => ref.invalidate(
+            athleteMonthRadarInsightsProvider((uid: uid, month: month))),
+      ),
       data: (insights) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

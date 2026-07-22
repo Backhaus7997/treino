@@ -63,71 +63,61 @@ final postsByAuthorProvider =
 });
 
 /// Posts authored by [targetUid], visible to the current viewer per each
-/// post's [PostPrivacy] rule (Option X):
+/// post's [PostPrivacy] tier:
 /// - `public` → always visible
-/// - `friends` → visible if the viewer is an accepted follower OR is self
-/// - `gym` → visible if viewer.gymId == target.authorGymId OR is self
+/// - `friends` → visible if the viewer is an accepted friend OR is self
+/// - `gym` → visible if viewer.gymId == target.gymId OR is self
 ///
-/// Returned newest-first (post_repository.byAuthor returns unordered, we
-/// sort here). Empty list when viewer is unauthenticated. Powers the
-/// "ACTIVIDAD" tab of another user's public profile screen.
+/// Returned newest-first. Empty list when the viewer is unauthenticated.
+/// Powers the "ACTIVIDAD" tab of another user's public profile screen.
 ///
-/// Client-side filter is safe here because the volume is bounded by uid —
-/// no user is expected to have thousands of own posts, and the alternative
-/// (three separate parallel queries per privacy tier) would issue more reads
-/// than needed while adding complexity to reconcile the timelines.
+/// QA-FEED-001: privacy is now enforced by firestore.rules. A non-author
+/// viewer may only READ the tiers the rule allows, so this queries per tier —
+/// the old fetch-all-then-filter (`byAuthor`) would be rejected server-side
+/// because it pulls rows the viewer isn't allowed to read. Each tier is fetched
+/// only when the relationship that authorizes it holds, so every query returns
+/// only readable rows.
 final visiblePostsByAuthorProvider =
     FutureProvider.autoDispose.family<List<Post>, String>(
   (ref, targetUid) async {
     final viewerAuth = await ref.watch(authStateChangesProvider.future);
     if (viewerAuth == null) return const [];
     final viewerUid = viewerAuth.uid;
-    final isSelf = viewerUid == targetUid;
+    final repo = ref.watch(postRepositoryProvider);
 
-    final all =
-        await ref.watch(postsByAuthorProvider(targetUid).future);
-    if (all.isEmpty) return const [];
-
-    // Fast paths: viewer is the target user OR every post is public.
-    if (isSelf) {
-      final sorted = List<Post>.of(all)
+    // Self: the read rule lets the author read every tier of their own posts.
+    if (viewerUid == targetUid) {
+      final all = await ref.watch(postsByAuthorProvider(targetUid).future);
+      return List<Post>.of(all)
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      return sorted;
     }
 
-    // Relationship signals — only fetched when there is at least one
-    // non-public post; keeps the common case cheap.
-    final needsRelationships =
-        all.any((p) => p.privacy != PostPrivacy.public);
-    var isAcceptedFriend = false;
-    String? viewerGymId;
-    if (needsRelationships) {
-      final friendship = await ref.watch(
-        friendshipByPairProvider(
-          (viewerUid: viewerUid, targetUid: targetUid),
-        ).future,
-      );
-      isAcceptedFriend = friendship?.status == FriendshipStatus.accepted;
-      final viewerProfile =
-          await ref.watch(userPublicProfileProvider(viewerUid).future);
-      viewerGymId = viewerProfile?.gymId;
+    final visible = <Post>[
+      ...await repo.byAuthorAndPrivacy(targetUid, PostPrivacy.public),
+    ];
+
+    // Friends tier — only queried when the viewer is an accepted friend, so
+    // the rule authorizes every returned row.
+    final friendship = await ref.watch(
+      friendshipByPairProvider(
+        (viewerUid: viewerUid, targetUid: targetUid),
+      ).future,
+    );
+    if (friendship?.status == FriendshipStatus.accepted) {
+      visible
+          .addAll(await repo.byAuthorAndPrivacy(targetUid, PostPrivacy.friends));
     }
 
-    final visible = <Post>[];
-    for (final post in all) {
-      switch (post.privacy) {
-        case PostPrivacy.public:
-          visible.add(post);
-        case PostPrivacy.friends:
-          if (isAcceptedFriend) visible.add(post);
-        case PostPrivacy.gym:
-          if (viewerGymId != null &&
-              post.authorGymId != null &&
-              viewerGymId == post.authorGymId) {
-            visible.add(post);
-          }
-      }
+    // Gym tier — queried constrained to the viewer's own gym, so every returned
+    // row satisfies the read rule (viewer.gymId == post.authorGymId). Matches
+    // the rule per-post, which keys on each post's authorGymId, not the target's
+    // current gym.
+    final viewerGymId =
+        (await ref.watch(userPublicProfileProvider(viewerUid).future))?.gymId;
+    if (viewerGymId != null) {
+      visible.addAll(await repo.byAuthorGymTier(targetUid, viewerGymId));
     }
+
     visible.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return visible;
   },

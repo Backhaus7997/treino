@@ -76,7 +76,7 @@ void main() {
     // A single session pointing at a routine that is gone errored the whole
     // provider and blanked the month radar. It must degrade, not detonate.
     final juneSession =
-        _s('s1', DateTime(2026, 6, 15), routineId: 'deleted-routine');
+        _s('s1', DateTime.utc(2026, 6, 15, 12), routineId: 'deleted-routine');
 
     when(() => repo.listSetLogs(uid: 'a1', sessionId: 's1'))
         .thenAnswer((_) async => [_log('s1', 'chest')]);
@@ -112,7 +112,7 @@ void main() {
 
   test('a TRANSIENT routine failure propagates — never a silently wrong radar',
       () async {
-    final juneSession = _s('s1', DateTime(2026, 6, 15));
+    final juneSession = _s('s1', DateTime.utc(2026, 6, 15, 12));
 
     when(() => repo.listSetLogs(uid: 'a1', sessionId: 's1'))
         .thenAnswer((_) async => [_log('s1', 'chest')]);
@@ -145,8 +145,8 @@ void main() {
     // Selected month is June 2026; "now" (at test run time) could be any
     // month — the provider must resolve the window from `key.month`, never
     // from DateTime.now(), or this test would be flaky.
-    final juneSession = _s('s1', DateTime(2026, 6, 15));
-    final maySession = _s('s2', DateTime(2026, 5, 10));
+    final juneSession = _s('s1', DateTime.utc(2026, 6, 15, 12));
+    final maySession = _s('s2', DateTime.utc(2026, 5, 10, 12));
     final farPastSession = _s('s3', DateTime(2020, 1, 1));
 
     when(() => repo.listSetLogs(uid: 'a1', sessionId: 's1'))
@@ -201,7 +201,7 @@ void main() {
     // monthly report aggregator.
     final sessions = List.generate(
       65,
-      (i) => _s('s$i', DateTime(2026, 6, 1 + (i % 28))),
+      (i) => _s('s$i', DateTime.utc(2026, 6, 1 + (i % 28), 12)),
     );
 
     when(() => repo.listSetLogs(

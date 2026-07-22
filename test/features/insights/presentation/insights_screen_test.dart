@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/utils/argentina_time.dart';
 import 'package:treino/features/insights/application/insights_providers.dart';
 import 'package:treino/features/insights/domain/muscle_group.dart';
 import 'package:treino/features/insights/domain/weekly_insights.dart';
@@ -51,7 +52,8 @@ void main() {
       'exact PR2 regression fix), and defaults to today on first render',
       (tester) async {
     final repo = MockSessionRepository();
-    final now = DateTime.now();
+    final now =
+        argentinaNow(); // ART frame — matches the widget (argentinaNow); no-op on UTC-3, TZ-safe on UTC CI
     final todayOnly = DateTime(now.year, now.month, now.day);
     final weekStart = _mondayOfWeek(todayOnly);
     final todayIndex = todayOnly.weekday - DateTime.monday;
@@ -108,6 +110,7 @@ void main() {
             ),
           ]),
       routineByIdProvider('r1').overrideWith((ref) async => null),
+      visibleRoutineByIdProvider('r1').overrideWith((ref) async => null),
       weeklyInsightsProvider.overrideWith((ref) async => WeeklyInsights(
             weekStart: weekStart,
             weekEnd: weekStart.add(const Duration(days: 6)),
@@ -167,7 +170,10 @@ void main() {
     // display must FLIP: quads=1, chest=0. This proves the week card's
     // tap actually rewires the provider selection (setState → new
     // AthleteDayInsightsKey), not a static render.
-    await tester.tap(find.byKey(ValueKey(pastDay)));
+    // The day-strip keys days with UTC-flagged ART dates (DateTime.utc), so the
+    // tap target must use the same flag — a local-flagged ValueKey won't match.
+    await tester.tap(find.byKey(
+        ValueKey(DateTime.utc(pastDay.year, pastDay.month, pastDay.day))));
     await tester.pumpAndSettle();
 
     final pechoRowAfterTap =
@@ -191,7 +197,8 @@ void main() {
       'SCENARIO-DAY-SCREEN-02: tapping a future weekday circle in the '
       'SEMANA card does NOT change the selected day', (tester) async {
     final repo = MockSessionRepository();
-    final now = DateTime.now();
+    final now =
+        argentinaNow(); // ART frame — matches the widget (argentinaNow); no-op on UTC-3, TZ-safe on UTC CI
     final todayOnly = DateTime(now.year, now.month, now.day);
     final weekStart = _mondayOfWeek(todayOnly);
     final todayIndex = todayOnly.weekday - DateTime.monday;
@@ -228,6 +235,7 @@ void main() {
             ),
           ]),
       routineByIdProvider('r1').overrideWith((ref) async => null),
+      visibleRoutineByIdProvider('r1').overrideWith((ref) async => null),
       weeklyInsightsProvider.overrideWith((ref) async => WeeklyInsights(
             weekStart: weekStart,
             weekEnd: weekStart.add(const Duration(days: 6)),
@@ -250,7 +258,8 @@ void main() {
     );
 
     // Tapping the future day's circle must be a no-op — PECHO stays 1.
-    await tester.tap(find.byKey(ValueKey(futureDay)));
+    await tester.tap(find.byKey(ValueKey(
+        DateTime.utc(futureDay.year, futureDay.month, futureDay.day))));
     await tester.pumpAndSettle();
 
     final pechoRowAfterTap =
@@ -267,7 +276,8 @@ void main() {
       'previous week — title and adherence counter update to show that '
       'week\'s data', (tester) async {
     final repo = MockSessionRepository();
-    final now = DateTime.now();
+    final now =
+        argentinaNow(); // ART frame — matches the widget (argentinaNow); no-op on UTC-3, TZ-safe on UTC CI
     final todayOnly = DateTime(now.year, now.month, now.day);
     final currentWeekStart = _mondayOfWeek(todayOnly);
     final prevWeekStart = DateTime(
@@ -316,6 +326,7 @@ void main() {
             ),
           ]),
       routineByIdProvider('r1').overrideWith((ref) async => null),
+      visibleRoutineByIdProvider('r1').overrideWith((ref) async => null),
     ];
 
     await tester.pumpWidget(_wrap(const InsightsScreen(), overrides));
@@ -345,7 +356,8 @@ void main() {
       'SCENARIO-WEEK-PAGE-02: › (next week) chevron is disabled while '
       'showing the current week', (tester) async {
     final repo = MockSessionRepository();
-    final now = DateTime.now();
+    final now =
+        argentinaNow(); // ART frame — matches the widget (argentinaNow); no-op on UTC-3, TZ-safe on UTC CI
     final todayOnly = DateTime(now.year, now.month, now.day);
 
     when(() => repo.listByUid('u1')).thenAnswer((_) async => [
@@ -372,6 +384,7 @@ void main() {
             ),
           ]),
       routineByIdProvider('r1').overrideWith((ref) async => null),
+      visibleRoutineByIdProvider('r1').overrideWith((ref) async => null),
     ];
 
     await tester.pumpWidget(_wrap(const InsightsScreen(), overrides));
@@ -388,7 +401,8 @@ void main() {
       'SCENARIO-WEEK-PAGE-03: tapping a day in a past (paged-to) week '
       'updates the muscles card', (tester) async {
     final repo = MockSessionRepository();
-    final now = DateTime.now();
+    final now =
+        argentinaNow(); // ART frame — matches the widget (argentinaNow); no-op on UTC-3, TZ-safe on UTC CI
     final todayOnly = DateTime(now.year, now.month, now.day);
     final currentWeekStart = _mondayOfWeek(todayOnly);
     final prevWeekMonday = DateTime(
@@ -439,6 +453,7 @@ void main() {
             ),
           ]),
       routineByIdProvider('r1').overrideWith((ref) async => null),
+      visibleRoutineByIdProvider('r1').overrideWith((ref) async => null),
     ];
 
     await tester.pumpWidget(_wrap(const InsightsScreen(), overrides));
@@ -449,7 +464,8 @@ void main() {
     await tester.tap(find.byKey(const Key('week-strip-previous-week')));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(ValueKey(prevWeekMonday)));
+    await tester.tap(find.byKey(ValueKey(DateTime.utc(
+        prevWeekMonday.year, prevWeekMonday.month, prevWeekMonday.day))));
     await tester.pumpAndSettle();
 
     final pechoRowFinder =
@@ -465,7 +481,8 @@ void main() {
       'and bodyback assets (showBack: true) — lets the athlete see back '
       'muscles, and does not overflow next to the sets list', (tester) async {
     final repo = MockSessionRepository();
-    final now = DateTime.now();
+    final now =
+        argentinaNow(); // ART frame — matches the widget (argentinaNow); no-op on UTC-3, TZ-safe on UTC CI
     final todayOnly = DateTime(now.year, now.month, now.day);
 
     when(() => repo.listByUid('u1')).thenAnswer((_) async => [
@@ -501,6 +518,7 @@ void main() {
             ),
           ]),
       routineByIdProvider('r1').overrideWith((ref) async => null),
+      visibleRoutineByIdProvider('r1').overrideWith((ref) async => null),
     ];
 
     // Narrow width — the regression this test guards against is a
@@ -531,7 +549,8 @@ void main() {
       'muscular, Ejercicios frecuentes, Reporte mensual, Volumen por '
       'grupo)', (tester) async {
     final repo = MockSessionRepository();
-    final now = DateTime.now();
+    final now =
+        argentinaNow(); // ART frame — matches the widget (argentinaNow); no-op on UTC-3, TZ-safe on UTC CI
     final todayOnly = DateTime(now.year, now.month, now.day);
 
     when(() => repo.listByUid('u1')).thenAnswer((_) async => [
@@ -558,6 +577,7 @@ void main() {
             ),
           ]),
       routineByIdProvider('r1').overrideWith((ref) async => null),
+      visibleRoutineByIdProvider('r1').overrideWith((ref) async => null),
     ];
 
     await tester.pumpWidget(_wrap(const InsightsScreen(), overrides));
@@ -589,7 +609,8 @@ void main() {
       'week → sees the reports hub, not the onboarding empty state',
       (tester) async {
     final repo = MockSessionRepository();
-    final now = DateTime.now();
+    final now =
+        argentinaNow(); // ART frame — matches the widget (argentinaNow); no-op on UTC-3, TZ-safe on UTC CI
     // A completed session from far in the past — outside the current week,
     // so `sessionsCount` for the shown week is 0, but the athlete DID train
     // before (`hasEverCompletedAnyWorkout` must be true).
@@ -612,6 +633,7 @@ void main() {
       sessionRepositoryProvider.overrideWithValue(repo),
       exercisesProvider.overrideWith((ref) async => const []),
       routineByIdProvider('r1').overrideWith((ref) async => null),
+      visibleRoutineByIdProvider('r1').overrideWith((ref) async => null),
     ];
 
     await tester.pumpWidget(_wrap(const InsightsScreen(), overrides));
@@ -656,7 +678,8 @@ void main() {
       'SCENARIO-HUB-TILES-02: tapping each tile pushes its dedicated route',
       (tester) async {
     final repo = MockSessionRepository();
-    final now = DateTime.now();
+    final now =
+        argentinaNow(); // ART frame — matches the widget (argentinaNow); no-op on UTC-3, TZ-safe on UTC CI
     final todayOnly = DateTime(now.year, now.month, now.day);
 
     when(() => repo.listByUid('u1')).thenAnswer((_) async => [
@@ -683,6 +706,7 @@ void main() {
             ),
           ]),
       routineByIdProvider('r1').overrideWith((ref) async => null),
+      visibleRoutineByIdProvider('r1').overrideWith((ref) async => null),
     ];
 
     final router = GoRouter(

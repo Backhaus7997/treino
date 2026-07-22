@@ -79,6 +79,7 @@ RoutineSlot makeSlot({
   int? supersetGroup,
   List<List<SetSpec>>? weeklySets,
   int? durationSeconds,
+  List<int> activeWeeks = const [],
 }) =>
     RoutineSlot(
       exerciseId: exerciseId,
@@ -93,6 +94,7 @@ RoutineSlot makeSlot({
       supersetGroup: supersetGroup,
       weeklySets: weeklySets ?? const [],
       durationSeconds: durationSeconds,
+      activeWeeks: activeWeeks,
     );
 
 // ── RoutineDay ────────────────────────────────────────────────────────────────

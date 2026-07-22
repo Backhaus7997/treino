@@ -1108,6 +1108,27 @@ void main() {
       await tester.pump();
       expect(find.textContaining('1 / 3 ejercicios'), findsOneWidget);
     });
+
+    // Volumen del header vía formatVolumeKg (#436): enteros sin ".0".
+    testWidgets('volumen entero del header muestra "600 kg vol.", no "600.0"',
+        (tester) async {
+      final state = SessionState(
+        session: makeSession(),
+        day: _defaultState().day,
+        setLogs: [makeSetLog(reps: 10, weightKg: 60.0)], // 10×60 = 600.0
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      );
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(state),
+        ),
+      );
+      await tester.pump();
+      expect(find.textContaining('600 kg vol.'), findsOneWidget);
+      expect(find.textContaining('600.0'), findsNothing);
+    });
   });
 
   // ── SCENARIO-WPRES-025: numWeeks==1 player is unchanged (REQ-WPRES-015/030) ─

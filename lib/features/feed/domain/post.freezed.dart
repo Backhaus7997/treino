@@ -33,7 +33,12 @@ mixin _$Post {
   RoutineTag? get routineTag => throw _privateConstructorUsedError;
   PostPrivacy get privacy => throw _privateConstructorUsedError;
   @TimestampConverter()
-  DateTime get createdAt => throw _privateConstructorUsedError;
+  DateTime get createdAt =>
+      throw _privateConstructorUsedError; // QA-FEED-364/389: workout metrics for the feed card's stats row. Optional
+// (NOT `required`) on purpose — a manual post or a legacy doc simply omits
+// it and the card hides the row. Keeping it non-required also means the
+// other Post(...) call sites (e.g. manual create-post) need no change.
+  WorkoutStats? get workoutStats => throw _privateConstructorUsedError;
 
   /// Serializes this Post to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -58,9 +63,11 @@ abstract class $PostCopyWith<$Res> {
       String text,
       RoutineTag? routineTag,
       PostPrivacy privacy,
-      @TimestampConverter() DateTime createdAt});
+      @TimestampConverter() DateTime createdAt,
+      WorkoutStats? workoutStats});
 
   $RoutineTagCopyWith<$Res>? get routineTag;
+  $WorkoutStatsCopyWith<$Res>? get workoutStats;
 }
 
 /// @nodoc
@@ -87,6 +94,7 @@ class _$PostCopyWithImpl<$Res, $Val extends Post>
     Object? routineTag = freezed,
     Object? privacy = null,
     Object? createdAt = null,
+    Object? workoutStats = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -125,6 +133,10 @@ class _$PostCopyWithImpl<$Res, $Val extends Post>
           ? _value.createdAt
           : createdAt // ignore: cast_nullable_to_non_nullable
               as DateTime,
+      workoutStats: freezed == workoutStats
+          ? _value.workoutStats
+          : workoutStats // ignore: cast_nullable_to_non_nullable
+              as WorkoutStats?,
     ) as $Val);
   }
 
@@ -139,6 +151,20 @@ class _$PostCopyWithImpl<$Res, $Val extends Post>
 
     return $RoutineTagCopyWith<$Res>(_value.routineTag!, (value) {
       return _then(_value.copyWith(routineTag: value) as $Val);
+    });
+  }
+
+  /// Create a copy of Post
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $WorkoutStatsCopyWith<$Res>? get workoutStats {
+    if (_value.workoutStats == null) {
+      return null;
+    }
+
+    return $WorkoutStatsCopyWith<$Res>(_value.workoutStats!, (value) {
+      return _then(_value.copyWith(workoutStats: value) as $Val);
     });
   }
 }
@@ -159,10 +185,13 @@ abstract class _$$PostImplCopyWith<$Res> implements $PostCopyWith<$Res> {
       String text,
       RoutineTag? routineTag,
       PostPrivacy privacy,
-      @TimestampConverter() DateTime createdAt});
+      @TimestampConverter() DateTime createdAt,
+      WorkoutStats? workoutStats});
 
   @override
   $RoutineTagCopyWith<$Res>? get routineTag;
+  @override
+  $WorkoutStatsCopyWith<$Res>? get workoutStats;
 }
 
 /// @nodoc
@@ -186,6 +215,7 @@ class __$$PostImplCopyWithImpl<$Res>
     Object? routineTag = freezed,
     Object? privacy = null,
     Object? createdAt = null,
+    Object? workoutStats = freezed,
   }) {
     return _then(_$PostImpl(
       id: null == id
@@ -224,6 +254,10 @@ class __$$PostImplCopyWithImpl<$Res>
           ? _value.createdAt
           : createdAt // ignore: cast_nullable_to_non_nullable
               as DateTime,
+      workoutStats: freezed == workoutStats
+          ? _value.workoutStats
+          : workoutStats // ignore: cast_nullable_to_non_nullable
+              as WorkoutStats?,
     ));
   }
 }
@@ -240,7 +274,8 @@ class _$PostImpl implements _Post {
       required this.text,
       required this.routineTag,
       required this.privacy,
-      @TimestampConverter() required this.createdAt});
+      @TimestampConverter() required this.createdAt,
+      this.workoutStats});
 
   factory _$PostImpl.fromJson(Map<String, dynamic> json) =>
       _$$PostImplFromJson(json);
@@ -269,10 +304,16 @@ class _$PostImpl implements _Post {
   @override
   @TimestampConverter()
   final DateTime createdAt;
+// QA-FEED-364/389: workout metrics for the feed card's stats row. Optional
+// (NOT `required`) on purpose — a manual post or a legacy doc simply omits
+// it and the card hides the row. Keeping it non-required also means the
+// other Post(...) call sites (e.g. manual create-post) need no change.
+  @override
+  final WorkoutStats? workoutStats;
 
   @override
   String toString() {
-    return 'Post(id: $id, authorUid: $authorUid, authorDisplayName: $authorDisplayName, authorAvatarUrl: $authorAvatarUrl, authorGymId: $authorGymId, text: $text, routineTag: $routineTag, privacy: $privacy, createdAt: $createdAt)';
+    return 'Post(id: $id, authorUid: $authorUid, authorDisplayName: $authorDisplayName, authorAvatarUrl: $authorAvatarUrl, authorGymId: $authorGymId, text: $text, routineTag: $routineTag, privacy: $privacy, createdAt: $createdAt, workoutStats: $workoutStats)';
   }
 
   @override
@@ -294,13 +335,25 @@ class _$PostImpl implements _Post {
                 other.routineTag == routineTag) &&
             (identical(other.privacy, privacy) || other.privacy == privacy) &&
             (identical(other.createdAt, createdAt) ||
-                other.createdAt == createdAt));
+                other.createdAt == createdAt) &&
+            (identical(other.workoutStats, workoutStats) ||
+                other.workoutStats == workoutStats));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(runtimeType, id, authorUid, authorDisplayName,
-      authorAvatarUrl, authorGymId, text, routineTag, privacy, createdAt);
+  int get hashCode => Object.hash(
+      runtimeType,
+      id,
+      authorUid,
+      authorDisplayName,
+      authorAvatarUrl,
+      authorGymId,
+      text,
+      routineTag,
+      privacy,
+      createdAt,
+      workoutStats);
 
   /// Create a copy of Post
   /// with the given fields replaced by the non-null parameter values.
@@ -328,7 +381,8 @@ abstract class _Post implements Post {
       required final String text,
       required final RoutineTag? routineTag,
       required final PostPrivacy privacy,
-      @TimestampConverter() required final DateTime createdAt}) = _$PostImpl;
+      @TimestampConverter() required final DateTime createdAt,
+      final WorkoutStats? workoutStats}) = _$PostImpl;
 
   factory _Post.fromJson(Map<String, dynamic> json) = _$PostImpl.fromJson;
 
@@ -354,7 +408,13 @@ abstract class _Post implements Post {
   PostPrivacy get privacy;
   @override
   @TimestampConverter()
-  DateTime get createdAt;
+  DateTime
+      get createdAt; // QA-FEED-364/389: workout metrics for the feed card's stats row. Optional
+// (NOT `required`) on purpose — a manual post or a legacy doc simply omits
+// it and the card hides the row. Keeping it non-required also means the
+// other Post(...) call sites (e.g. manual create-post) need no change.
+  @override
+  WorkoutStats? get workoutStats;
 
   /// Create a copy of Post
   /// with the given fields replaced by the non-null parameter values.

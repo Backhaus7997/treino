@@ -96,7 +96,9 @@ void main() {
         _wrap(const TrainerStatsRow(profile: stubProfile)),
       );
 
-      // 3 "—" placeholders (RESEÑAS + AÑOS EXP + ALUMNOS all deferred)
+      // 3 "—" placeholders — profile without reviews, experience years, nor
+      // computed athleteCount falls back to the placeholder on every tile
+      // (#388: "—" is now a per-tile fallback, not a hardcoded value).
       expect(find.text('—'), findsNWidgets(3));
     });
   });

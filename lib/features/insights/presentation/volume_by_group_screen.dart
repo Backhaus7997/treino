@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/utils/argentina_time.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
@@ -29,7 +30,7 @@ class VolumeByGroupScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    final weekStart = mondayOfWeek(DateTime.now().toLocal());
+    final weekStart = mondayOfWeek(argentinaNow());
     final async = ref.watch(
       athleteWeekInsightsProvider((uid: uid, weekStart: weekStart)),
     );
@@ -169,6 +170,7 @@ class _VolumeBarCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final hasTarget = insights.targetByGroup.isNotEmpty;
 
     return Container(
@@ -181,7 +183,9 @@ class _VolumeBarCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'VOLUMEN POR GRUPO',
+            // QA #371: misma clave que el header de la pantalla — el copy es
+            // idéntico y así la card queda dentro del sistema l10n.
+            l10n.volumeByGroupScreenTitle,
             style: GoogleFonts.barlowCondensed(
               fontWeight: FontWeight.w700,
               fontSize: 12,
@@ -192,7 +196,7 @@ class _VolumeBarCard extends StatelessWidget {
           const SizedBox(height: 14),
           if (!hasTarget)
             Text(
-              'Necesitás una rutina asignada para ver tu volumen objetivo.',
+              l10n.volumeByGroupEmptyTarget,
               style: GoogleFonts.barlow(
                 fontWeight: FontWeight.w400,
                 fontSize: 13,

@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_palette.dart';
+import '../../../core/utils/kg_format.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../application/session_providers.dart';
 import '../domain/session.dart';
@@ -89,9 +90,11 @@ class _DetailLoaded extends StatelessWidget {
           ),
           const SizedBox(height: 8),
 
-          // Header: date + time + routineName
+          // Header: date + time + routineName. startedAt is a real instant
+          // (UTC via TimestampConverter) — convert to the viewer's local time
+          // before formatting, or it reads +3h in Argentina (#380).
           Text(
-            formatSessionDate(session.startedAt),
+            formatSessionDate(session.startedAt.toLocal()),
             textAlign: TextAlign.center,
             style: GoogleFonts.barlowCondensed(
               fontWeight: FontWeight.w600,
@@ -102,7 +105,7 @@ class _DetailLoaded extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(
-            _formatTime(session.startedAt),
+            _formatTime(session.startedAt.toLocal()),
             textAlign: TextAlign.center,
             style: GoogleFonts.barlowCondensed(
               fontWeight: FontWeight.w600,
@@ -133,7 +136,7 @@ class _DetailLoaded extends StatelessWidget {
             childAspectRatio: 2,
             children: [
               StatTile(
-                label: l10n.workoutDetailStatDuration,
+                label: l10n.workoutDetailStatDurationMin,
                 value: session.durationMin.toString(),
               ),
               StatTile(
@@ -141,8 +144,8 @@ class _DetailLoaded extends StatelessWidget {
                 value: setLogs.length.toString(),
               ),
               StatTile(
-                label: l10n.workoutDetailStatVolume,
-                value: session.totalVolumeKg.toString(),
+                label: l10n.workoutDetailStatVolumeKg,
+                value: formatVolumeKg(session.totalVolumeKg),
               ),
               StatTile(
                 label: l10n.workoutDetailStatPrsToday,

@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
+import '../../../core/utils/kg_format.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
@@ -23,8 +24,10 @@ import '../application/session_state.dart';
 import '../domain/routine.dart';
 import '../domain/routine_slot.dart';
 import '../domain/set_enums.dart';
+import '../domain/set_limits.dart';
 import '../domain/set_log.dart';
 import '../domain/set_spec.dart';
+import 'widgets/bounded_number_formatter.dart';
 import 'widgets/coach_note.dart';
 import 'widgets/set_entry_sheet.dart';
 
@@ -36,9 +39,6 @@ String _formatMMSS(int totalSeconds) {
   final s = (totalSeconds % 60).toString().padLeft(2, '0');
   return '$m:$s';
 }
-
-String _formatWeight(double w) =>
-    w == w.truncateToDouble() ? w.toInt().toString() : w.toString();
 
 // ── Block gating helpers (top-level, testable) ────────────────────────────────
 
@@ -357,7 +357,9 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
   /// NO aplica — si no, el set nunca se marca hecho y un día con cualquier
   /// ejercicio por tiempo jamás puede terminarse.
   void _logSet(RoutineSlot slot, int setNumber, int reps, double weightKg) {
-    if (slot.effectiveExerciseMode != ExerciseMode.duration && reps <= 0) return;
+    if (slot.effectiveExerciseMode != ExerciseMode.duration && reps <= 0) {
+      return;
+    }
     ref.read(sessionNotifierProvider(widget.init).notifier).logSet(
           SetLog(
             id: '',
@@ -762,7 +764,7 @@ class _SessionStatsCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   '$completed / $total ejercicios · '
-                  '${state.totalVolumeKg.toStringAsFixed(1)} kg vol.',
+                  '${formatVolumeKg(state.totalVolumeKg)} kg vol.',
                   style: GoogleFonts.barlow(
                     fontWeight: FontWeight.w400,
                     fontSize: 12,
@@ -1852,10 +1854,13 @@ class _RepsSetRowState extends State<_RepsSetRow> {
   @override
   void initState() {
     super.initState();
-    _weightKg = widget.initialWeightKg;
-    _reps = widget.initialReps;
+    // QA-WKT-003: clamp the prefill so a corrupt spec (or a legacy Firestore
+    // doc written before the caps existed) can't seed an impossible value that
+    // the athlete would then commit untouched by tapping the check.
+    _weightKg = clampWeightKg(widget.initialWeightKg);
+    _reps = clampReps(widget.initialReps);
     _weightController = TextEditingController(
-      text: _weightKg == 0 ? '' : _formatWeight(_weightKg),
+      text: _weightKg == 0 ? '' : formatWeightKg(_weightKg),
     );
     _repsController = TextEditingController(
       text: _reps == 0 ? '' : _reps.toString(),
@@ -1874,7 +1879,7 @@ class _RepsSetRowState extends State<_RepsSetRow> {
     // Empty/unparseable -> 0; out-of-range -> clamped to [0, 500]. This keeps
     // _weightKg in sync with what the user sees and with what gets logged,
     // instead of silently retaining a stale value.
-    final next = (parsed ?? 0).clamp(0.0, 500.0).toDouble();
+    final next = clampWeightKg(parsed ?? 0);
     if (next == _weightKg) return;
     setState(() => _weightKg = next);
     if (widget.isDone) {
@@ -1888,7 +1893,7 @@ class _RepsSetRowState extends State<_RepsSetRow> {
     // check button is what commits the value; the parent's check handler
     // guards against 0-rep sets.
     final parsed = int.tryParse(value);
-    final next = (parsed ?? 0).clamp(0, 999);
+    final next = clampReps(parsed ?? 0);
     if (next == _reps) return;
     setState(() => _reps = next);
     if (widget.isDone) {
@@ -1943,7 +1948,7 @@ class _RepsSetRowState extends State<_RepsSetRow> {
             // planned display when the row is not done and _reps still equals
             // plannedReps, so the range hint stays visible pre-check.
             child: Text(
-              '${_summaryReps()} · ${_formatWeight(_weightKg)} kg',
+              '${_summaryReps()} · ${formatWeightKg(_weightKg)} kg',
               style: GoogleFonts.barlow(
                 fontWeight: FontWeight.w500,
                 fontSize: 14,
@@ -2052,8 +2057,10 @@ class _WeightField extends StatelessWidget {
       child: TextField(
         controller: controller,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        inputFormatters: [
-          FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+        inputFormatters: const [
+          // QA-WKT-002/003: single separator + hard cap so the field text can
+          // never diverge from the value that gets logged, nor exceed 500 kg.
+          BoundedNumberFormatter(max: kMaxWeightKg, decimal: true),
         ],
         textAlign: TextAlign.center,
         style: GoogleFonts.barlow(

@@ -159,8 +159,9 @@ class ExerciseProgressionSection extends ConsumerStatefulWidget {
   });
 
   /// Preselecciona un ejercicio al montar — p. ej. cuando se llega desde
-  /// "Ejercicios frecuentes" tocando una fila. Null → se mantiene el default
-  /// de siempre (el más recientemente logueado, SCENARIO-PROG-05B).
+  /// "Ejercicios frecuentes" tocando una fila. Null → default: el más
+  /// recientemente logueado CON datos en el período activo
+  /// (SCENARIO-PROG-05B acotado por #377).
   final String? initialExerciseId;
 
   final String athleteId;
@@ -183,6 +184,14 @@ class _ExerciseProgressionSectionState
     extends ConsumerState<ExerciseProgressionSection> {
   String? _selectedExerciseId;
 
+  /// [#377] Período activo cuando [_selectedExerciseId] se fijó por una
+  /// acción EXPLÍCITA (tap en chip, [ExerciseProgressionSection.initialExerciseId],
+  /// hook externo). Una selección explícita se respeta dentro de su período
+  /// aunque no tenga datos ahí; al cambiar a un período donde queda vacía,
+  /// vuelve la preselección acotada (ver [_effectiveExerciseId]) sin olvidar
+  /// la elección — volver al período original la restaura.
+  ChartPeriod? _selectionPeriod;
+
   /// [AD7] Defaults to [ChartPeriod.defaultPeriod] (last30d).
   ChartPeriod _selectedPeriod = ChartPeriod.defaultPeriod;
 
@@ -194,6 +203,11 @@ class _ExerciseProgressionSectionState
   void initState() {
     super.initState();
     _selectedExerciseId = widget.initialExerciseId;
+    if (widget.initialExerciseId != null) {
+      // Llegar con un ejercicio elegido (fila de "Ejercicios frecuentes") es
+      // tan explícito como tocar un chip: se respeta en el período de apertura.
+      _selectionPeriod = _selectedPeriod;
+    }
     widget.externalExerciseSelection?.addListener(_onExternalSelection);
   }
 
@@ -206,7 +220,11 @@ class _ExerciseProgressionSectionState
   /// Los ejercicios que la chip row muestra AHORA.
   ///
   /// Sin buscador → todos (comportamiento histórico, intacto).
-  /// Con buscador y campo vacío → los primeros [kPickerChipCap].
+  /// Con buscador y campo vacío → los primeros [kPickerChipCap]; si el
+  /// ejercicio EFECTIVO cayó más allá del cap (#377: la preselección acotada
+  /// puede elegir el #11+ cuando los 10 más recientes no tienen datos en el
+  /// período), reemplaza al último para que el chip seleccionado siempre esté
+  /// visible — el chart no nombra al ejercicio en ningún otro lado.
   /// Con buscador y texto → todos los que matchean, sin tope: si tipeaste algo
   /// concreto, querés verlo aunque sea el ejercicio número 37.
   ///
@@ -215,11 +233,22 @@ class _ExerciseProgressionSectionState
   /// exacta por la que el ADR de `exercise-progression` prohíbe reusar
   /// exercise_picker_sheet.dart acá: aquél busca sobre los 429 ejercicios del
   /// catálogo, y un ejercicio que nunca entrenaste no tiene progresión).
-  List<ExerciseListEntry> _visibleExercises(List<ExerciseListEntry> all) {
+  List<ExerciseListEntry> _visibleExercises(
+      List<ExerciseListEntry> all, String effectiveId) {
     if (widget.labels.searchLabels == null) return all;
 
     final q = foldSearch(_query.trim());
-    if (q.isEmpty) return all.take(kPickerChipCap).toList();
+    if (q.isEmpty) {
+      final capped = all.take(kPickerChipCap).toList();
+      if (!capped.any((e) => e.exerciseId == effectiveId)) {
+        final effective =
+            all.where((e) => e.exerciseId == effectiveId).toList();
+        if (effective.isNotEmpty && capped.isNotEmpty) {
+          capped[capped.length - 1] = effective.first;
+        }
+      }
+      return capped;
+    }
 
     return all
         .where((e) => foldSearch(e.exerciseName).contains(q))
@@ -229,8 +258,42 @@ class _ExerciseProgressionSectionState
   void _onExternalSelection() {
     final id = widget.externalExerciseSelection?.value;
     if (id != null) {
-      setState(() => _selectedExerciseId = id);
+      setState(() {
+        _selectedExerciseId = id;
+        _selectionPeriod = _selectedPeriod;
+      });
     }
+  }
+
+  /// SCENARIO-PROG-05B acotado por #377: el ejercicio efectivo debe tener
+  /// datos EN EL PERÍODO ACTIVO — nunca abrir por sí solo en el empty state
+  /// del chart ("Sin datos para este ejercicio.").
+  ///
+  /// - Selección explícita ([_selectionPeriod] == período activo) → se
+  ///   respeta siempre, tenga o no datos: el usuario la pidió en este período.
+  /// - Selección recordada de otro período → se respeta sólo si tiene datos
+  ///   en el período activo; si quedó vacía, cae la preselección de abajo.
+  /// - Preselección: el más recientemente logueado CON datos en el período.
+  ///   Si NINGUNO tiene datos en la ventana (todo el historial quedó afuera),
+  ///   se mantiene el default histórico (el más reciente global) — el empty
+  ///   state ahí es verdad y no hay candidato mejor.
+  String _effectiveExerciseId(List<ExerciseListEntry> exercises) {
+    final selected = _selectedExerciseId;
+    if (selected != null) {
+      final selectedHasData = exercises.any((e) =>
+          e.exerciseId == selected &&
+          e.periodsWithData.contains(_selectedPeriod));
+      if (selectedHasData || _selectionPeriod == _selectedPeriod) {
+        return selected;
+      }
+    }
+
+    return exercises
+        .firstWhere(
+          (e) => e.periodsWithData.contains(_selectedPeriod),
+          orElse: () => exercises.first,
+        )
+        .exerciseId;
   }
 
   @override
@@ -279,12 +342,12 @@ class _ExerciseProgressionSectionState
               );
             }
 
-            // SCENARIO-PROG-05B: default to most-recently-logged exercise
-            final effectiveId =
-                _selectedExerciseId ?? exercises.first.exerciseId;
+            // SCENARIO-PROG-05B + #377: bounded by the active period — see
+            // [_effectiveExerciseId].
+            final effectiveId = _effectiveExerciseId(exercises);
 
             final searchLabels = widget.labels.searchLabels;
-            final visible = _visibleExercises(exercises);
+            final visible = _visibleExercises(exercises, effectiveId);
 
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -314,7 +377,10 @@ class _ExerciseProgressionSectionState
                   ExercisePickerRow(
                     exercises: visible,
                     selectedId: effectiveId,
-                    onSelect: (id) => setState(() => _selectedExerciseId = id),
+                    onSelect: (id) => setState(() {
+                      _selectedExerciseId = id;
+                      _selectionPeriod = _selectedPeriod;
+                    }),
                   ),
                 const SizedBox(height: 12),
 

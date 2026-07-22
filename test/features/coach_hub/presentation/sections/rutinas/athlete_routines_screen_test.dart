@@ -27,8 +27,7 @@ Routine _routine({
   int days = 1,
   int numWeeks = 1,
   RoutineStatus status = RoutineStatus.active,
-  bool presenceMasked =
-      false, // true → activeWeeks populated → NOT web-editable
+  bool presenceMasked = false, // true → activeWeeks populated (Fase 4c)
 }) =>
     Routine(
       id: id,
@@ -160,20 +159,20 @@ void main() {
     });
 
     testWidgets(
-        'a routine with a presence mask is view-only (tap does not open editor)',
+        'tapping a routine with a presence mask also opens the editor (Fase 4c parity)',
         (tester) async {
       await _pump(tester, [
         _routine(
             id: 'r9', name: 'Periodizada', numWeeks: 2, presenceMasked: true)
       ]);
 
-      expect(find.text('Editá en la app'), findsOneWidget);
+      // No more "view-only" hint — the editor has full parity now.
+      expect(find.text('Editá en la app'), findsNothing);
 
       await tester.tap(find.text('Periodizada'));
       await tester.pumpAndSettle();
 
-      expect(find.text('EDIT r9'), findsNothing); // stayed on the list
-      expect(find.text('Periodizada'), findsOneWidget);
+      expect(find.text('EDIT r9'), findsOneWidget);
     });
   });
 }

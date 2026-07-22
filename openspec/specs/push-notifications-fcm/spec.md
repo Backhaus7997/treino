@@ -187,16 +187,16 @@ The project MUST include a CF `notifyOnAppointment` triggered by `onDocumentWrit
 
 | Status | Title | Body | Recipient | deepLink |
 |---|---|---|---|---|
-| `requested` (create) | `"Nueva solicitud"` | `"${athleteName} solicitó una sesión para ${date}"` | trainer | `"/coach/agenda"` |
+| `requested` (create) | `"Nueva solicitud"` | `"${athleteName} solicitó una sesión para ${date}"` | trainer | `"/coach?tab=agenda"` |
 | `confirmed` | `"Sesión confirmada"` | `"${trainerName} confirmó tu sesión para ${date}"` | athlete | `"/coach?tab=agenda"` |
-| `cancelled` | `"Sesión cancelada"` | `"La sesión del ${date} fue cancelada"` | other party | role-dependent (see below) |
+| `cancelled` | `"Sesión cancelada"` | `"La sesión del ${date} fue cancelada"` | other party | `"/coach?tab=agenda"` |
 
-Cancelled deep links: trainer receives `"/coach/agenda"`, athlete receives `"/coach?tab=agenda"`.
+Cancelled deep links: both parties receive `"/coach?tab=agenda"`. QA-NOT-002: `"/coach/agenda"` MUST NOT be used as a deepLink — it mounted the athlete-only agenda host, so a trainer landed on the athlete "link required" error instead of their agenda. `"/coach?tab=agenda"` is role-aware (CoachScreen dispatches by `UserProfile.role`).
 
 #### SCENARIO-632: appointment create fires trainer notification
 - **Given** a new `appointments/{apptId}` document with `status: 'requested'` and no `before` data
 - **When** `notifyOnAppointment` fires
-- **Then** `sendFcm` is called with `uids: [trainerId]` and `data.deepLink == "/coach/agenda"`
+- **Then** `sendFcm` is called with `uids: [trainerId]` and `data.deepLink == "/coach?tab=agenda"`
 - **Test target**: `functions/src/__tests__/notify-appointment.test.ts`
 - **REQ**: REQ-PN-CF-003
 - **Status**: PASS ✅

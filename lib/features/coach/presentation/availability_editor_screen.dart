@@ -15,6 +15,8 @@ import 'agenda_formatters.dart';
 /// and date overrides.
 ///
 /// REQ-020: navigate here from TrainerAgendaTab via `/coach/availability-editor`
+/// (TrainerProfileView uses the `/profile/availability-editor` mirror so the
+/// PERFIL tab stays highlighted — issue #387)
 /// REQ-021: add / edit / delete recurring weekly rules
 /// REQ-022: add block / extra overrides, deletable
 ///

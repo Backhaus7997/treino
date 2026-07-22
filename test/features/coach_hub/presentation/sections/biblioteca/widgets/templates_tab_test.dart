@@ -9,11 +9,19 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/features/coach/application/trainer_link_providers.dart';
+import 'package:treino/features/coach/domain/trainer_link.dart';
+import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/biblioteca/widgets/templates_tab.dart';
+import 'package:treino/features/profile/application/user_public_profile_providers.dart';
+import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
+import 'package:treino/features/workout/data/routine_repository.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_day.dart';
 import 'package:treino/features/workout/domain/routine_source.dart';
@@ -30,11 +38,8 @@ Routine _makeRoutine(String id, String name, {int days = 3, int weeks = 8}) {
     level: ExperienceLevel.intermediate,
     days: List.generate(
       days,
-      (i) => RoutineDay(
-        dayNumber: i + 1,
-        name: 'Día ${i + 1}',
-        slots: const [],
-      ),
+      (i) =>
+          RoutineDay(dayNumber: i + 1, name: 'Día ${i + 1}', slots: const []),
     ),
     numWeeks: weeks,
     source: RoutineSource.trainerTemplate,
@@ -42,8 +47,12 @@ Routine _makeRoutine(String id, String name, {int days = 3, int weeks = 8}) {
 }
 
 final _templateA = _makeRoutine('tpl-a', 'Fuerza Total', days: 3, weeks: 8);
-final _templateB =
-    _makeRoutine('tpl-b', 'Hipertrofia Máxima', days: 4, weeks: 12);
+final _templateB = _makeRoutine(
+  'tpl-b',
+  'Hipertrofia Máxima',
+  days: 4,
+  weeks: 12,
+);
 final _templateC = _makeRoutine('tpl-c', 'Full Body Básico', days: 5, weeks: 4);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -70,6 +79,59 @@ Widget _wrap(
       home: Scaffold(body: child),
     ),
   );
+}
+
+// ── Assign-flow fixtures (PR2) ──────────────────────────────────────────────
+
+class _MockRoutineRepository extends Mock implements RoutineRepository {}
+
+TrainerLink _activeLink(String athleteId) => TrainerLink(
+  id: 'link-$athleteId',
+  trainerId: _kTrainerId,
+  athleteId: athleteId,
+  status: TrainerLinkStatus.active,
+  requestedAt: DateTime(2024, 1, 1),
+);
+
+/// Pumps [TemplatesTab] with everything the "Usar en un alumno" flow touches:
+/// the templates stream, the trainer-links stream (feeds the athlete picker),
+/// a mocked repository, and a public-profile override per athlete (the picker
+/// tiles watch it — without an override it would hit real Firestore).
+Future<void> _pumpAssignable(
+  WidgetTester tester, {
+  required RoutineRepository repo,
+  List<Routine> templates = const [],
+  List<TrainerLink> links = const [],
+  Map<String, String> names = const {},
+}) async {
+  tester.view.physicalSize = const Size(1280, 900);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        currentUidProvider.overrideWithValue(_kTrainerId),
+        trainerTemplatesStreamProvider(
+          _kTrainerId,
+        ).overrideWith((ref) => Stream.value(templates)),
+        trainerLinksStreamProvider.overrideWith((ref) => Stream.value(links)),
+        routineRepositoryProvider.overrideWithValue(repo),
+        for (final entry in names.entries)
+          userPublicProfileProvider(entry.key).overrideWith(
+            (ref) => Stream.value(
+              UserPublicProfile(uid: entry.key, displayName: entry.value),
+            ),
+          ),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.dark(),
+        home: const Scaffold(body: TemplatesTab()),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -101,22 +163,23 @@ void main() {
     });
 
     testWidgets(
-        'each card shows días/sem · semanas subtitle — SCENARIO-BIBW-09a',
-        (tester) async {
-      tester.view.physicalSize = const Size(1280, 900);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
+      'each card shows días/sem · semanas subtitle — SCENARIO-BIBW-09a',
+      (tester) async {
+        tester.view.physicalSize = const Size(1280, 900);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
 
-      await tester.pumpWidget(
-        _wrap(const TemplatesTab(), templates: [_templateA]),
-      );
-      await tester.pumpAndSettle();
+        await tester.pumpWidget(
+          _wrap(const TemplatesTab(), templates: [_templateA]),
+        );
+        await tester.pumpAndSettle();
 
-      // templateA: 3 días, 8 semanas
-      expect(find.textContaining('3 días/sem'), findsOneWidget);
-      expect(find.textContaining('8 semanas'), findsOneWidget);
-    });
+        // templateA: 3 días, 8 semanas
+        expect(find.textContaining('3 días/sem'), findsOneWidget);
+        expect(find.textContaining('8 semanas'), findsOneWidget);
+      },
+    );
 
     testWidgets('singulariza día/semana cuando el conteo es 1', (tester) async {
       tester.view.physicalSize = const Size(1280, 900);
@@ -124,11 +187,13 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
-      final single =
-          _makeRoutine('tpl-single', 'Plan Corto', days: 1, weeks: 1);
-      await tester.pumpWidget(
-        _wrap(const TemplatesTab(), templates: [single]),
+      final single = _makeRoutine(
+        'tpl-single',
+        'Plan Corto',
+        days: 1,
+        weeks: 1,
       );
+      await tester.pumpWidget(_wrap(const TemplatesTab(), templates: [single]));
       await tester.pumpAndSettle();
 
       // 1 día → "día" (no "días") · 1 semana → "semana" (no "semanas").
@@ -150,8 +215,9 @@ void main() {
       expect(find.textContaining('INTERMEDIO'), findsOneWidget);
     });
 
-    testWidgets('no text matching "alumnos" anywhere — SCENARIO-BIBW-09b',
-        (tester) async {
+    testWidgets('no text matching "alumnos" anywhere — SCENARIO-BIBW-09b', (
+      tester,
+    ) async {
       tester.view.physicalSize = const Size(1280, 900);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -169,16 +235,15 @@ void main() {
       expect(find.textContaining('alumno'), findsNothing);
     });
 
-    testWidgets('shows empty-state when list is empty — SCENARIO-BIBW-09c',
-        (tester) async {
+    testWidgets('shows empty-state when list is empty — SCENARIO-BIBW-09c', (
+      tester,
+    ) async {
       tester.view.physicalSize = const Size(1280, 900);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
-      await tester.pumpWidget(
-        _wrap(const TemplatesTab(), templates: const []),
-      );
+      await tester.pumpWidget(_wrap(const TemplatesTab(), templates: const []));
       await tester.pumpAndSettle();
 
       expect(find.byType(GridView), findsNothing);
@@ -186,44 +251,44 @@ void main() {
     });
 
     testWidgets(
-        'shows CircularProgressIndicator when loading — SCENARIO-BIBW-11b',
-        (tester) async {
-      tester.view.physicalSize = const Size(1280, 900);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
+      'shows CircularProgressIndicator when loading — SCENARIO-BIBW-11b',
+      (tester) async {
+        tester.view.physicalSize = const Size(1280, 900);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
 
-      // Use a Completer-based stream that never emits (stays in loading)
-      final completer = Completer<List<Routine>>();
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            currentUidProvider.overrideWithValue(_kTrainerId),
-            trainerTemplatesStreamProvider(_kTrainerId).overrideWith(
-              (ref) => Stream.fromFuture(completer.future),
+        // Use a Completer-based stream that never emits (stays in loading)
+        final completer = Completer<List<Routine>>();
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              currentUidProvider.overrideWithValue(_kTrainerId),
+              trainerTemplatesStreamProvider(
+                _kTrainerId,
+              ).overrideWith((ref) => Stream.fromFuture(completer.future)),
+            ],
+            child: MaterialApp(
+              theme: AppTheme.dark(),
+              home: const Scaffold(body: TemplatesTab()),
             ),
-          ],
-          child: MaterialApp(
-            theme: AppTheme.dark(),
-            home: const Scaffold(body: TemplatesTab()),
           ),
-        ),
-      );
-      await tester.pump(); // single frame — stream still pending
+        );
+        await tester.pump(); // single frame — stream still pending
 
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
-    });
+        expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      },
+    );
 
-    testWidgets('shows error text when stream errors — SCENARIO-BIBW-11b',
-        (tester) async {
+    testWidgets('shows error text when stream errors — SCENARIO-BIBW-11b', (
+      tester,
+    ) async {
       tester.view.physicalSize = const Size(1280, 900);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
-      await tester.pumpWidget(
-        _wrap(const TemplatesTab(), error: true),
-      );
+      await tester.pumpWidget(_wrap(const TemplatesTab(), error: true));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
 
@@ -232,8 +297,9 @@ void main() {
   });
 
   group('TemplatesTab — template detail dialog', () {
-    testWidgets('tap template card opens AlertDialog — SCENARIO-BIBW-10a',
-        (tester) async {
+    testWidgets('tap template card opens AlertDialog — SCENARIO-BIBW-10a', (
+      tester,
+    ) async {
       tester.view.physicalSize = const Size(1280, 900);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -252,28 +318,35 @@ void main() {
     });
 
     testWidgets(
-        'detail dialog is read-only — no edit controls — SCENARIO-BIBW-10a',
-        (tester) async {
-      tester.view.physicalSize = const Size(1280, 900);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
+      'detail dialog offers Editar but no INLINE editing (edits on a screen)',
+      (tester) async {
+        tester.view.physicalSize = const Size(1280, 900);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
 
-      await tester.pumpWidget(
-        _wrap(const TemplatesTab(), templates: [_templateA]),
-      );
-      await tester.pumpAndSettle();
+        await tester.pumpWidget(
+          _wrap(const TemplatesTab(), templates: [_templateA]),
+        );
+        await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Fuerza Total'));
-      await tester.pumpAndSettle();
+        await tester.tap(find.text('Fuerza Total'));
+        await tester.pumpAndSettle();
 
-      // No TextField or editing widgets in dialog
-      expect(find.byType(TextField), findsNothing);
-      expect(find.byType(EditableText), findsNothing);
-    });
+        // Editing happens on the full editor screen, not inline in the dialog:
+        // an Editar action is present, but no text fields.
+        expect(
+          find.byKey(const Key('template_detail_edit_button')),
+          findsOneWidget,
+        );
+        expect(find.byType(TextField), findsNothing);
+        expect(find.byType(EditableText), findsNothing);
+      },
+    );
 
-    testWidgets('detail dialog has Cerrar button that dismisses it',
-        (tester) async {
+    testWidgets('detail dialog has Cerrar button that dismisses it', (
+      tester,
+    ) async {
       tester.view.physicalSize = const Size(1280, 900);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -293,6 +366,230 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(AlertDialog), findsNothing);
+    });
+  });
+
+  group('TemplatesTab — navegación al editor de plantillas', () {
+    Future<void> pumpRouter(
+      WidgetTester tester, {
+      List<Routine> templates = const [],
+    }) async {
+      tester.view.physicalSize = const Size(1280, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final router = GoRouter(
+        initialLocation: '/biblioteca',
+        routes: [
+          GoRoute(
+            path: '/biblioteca',
+            builder: (_, __) => const Scaffold(body: TemplatesTab()),
+          ),
+          // Editor stand-ins — assert navigation by the marker text.
+          GoRoute(
+            path: '/template-editor',
+            builder: (_, __) => const Scaffold(body: Text('CREATE TEMPLATE')),
+          ),
+          GoRoute(
+            path: '/template-editor/:id',
+            builder: (_, s) =>
+                Scaffold(body: Text('EDIT ${s.pathParameters['id']}')),
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            currentUidProvider.overrideWithValue(_kTrainerId),
+            trainerTemplatesStreamProvider(
+              _kTrainerId,
+            ).overrideWith((ref) => Stream.value(templates)),
+          ],
+          child: MaterialApp.router(
+            theme: AppTheme.dark(),
+            routerConfig: router,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('"Nueva plantilla" abre el editor en modo plantilla', (
+      tester,
+    ) async {
+      await pumpRouter(tester);
+
+      await tester.tap(find.byKey(const Key('nueva_plantilla_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('CREATE TEMPLATE'), findsOneWidget);
+    });
+
+    testWidgets('"Editar" en el detalle abre el editor de esa plantilla', (
+      tester,
+    ) async {
+      await pumpRouter(tester, templates: [_templateA]);
+
+      await tester.tap(find.text('Fuerza Total'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('template_detail_edit_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('EDIT tpl-a'), findsOneWidget);
+    });
+  });
+
+  group('TemplatesTab — asignar plantilla a un alumno (PR2)', () {
+    testWidgets('el detalle ofrece "Usar en un alumno"', (tester) async {
+      final repo = _MockRoutineRepository();
+      await _pumpAssignable(tester, repo: repo, templates: [_templateA]);
+
+      await tester.tap(find.text('Fuerza Total'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('template_detail_use_button')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('usar → elegir alumno → copia la plantilla y avisa', (
+      tester,
+    ) async {
+      final repo = _MockRoutineRepository();
+      when(
+        () => repo.assignTemplateToAthlete(
+          template: _templateA,
+          athleteId: 'ath-1',
+        ),
+      ).thenAnswer(
+        (_) async => _templateA.copyWith(
+          id: 'assigned-1',
+          source: RoutineSource.trainerAssigned,
+          assignedTo: 'ath-1',
+        ),
+      );
+
+      await _pumpAssignable(
+        tester,
+        repo: repo,
+        templates: [_templateA],
+        links: [_activeLink('ath-1')],
+        names: {'ath-1': 'Vicente'},
+      );
+
+      // Abre el detalle → "Usar en un alumno".
+      await tester.tap(find.text('Fuerza Total'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('template_detail_use_button')));
+      await tester.pumpAndSettle();
+
+      // Se abre el picker de alumnos; elegimos uno.
+      expect(find.text('ASIGNAR A UN ALUMNO'), findsOneWidget);
+      await tester.tap(find.text('Vicente'));
+      await tester.pumpAndSettle();
+
+      // El repo copió la plantilla en una rutina asignada a ese alumno,
+      // dejando la plantilla intacta (parity con mobile _onAssign).
+      verify(
+        () => repo.assignTemplateToAthlete(
+          template: _templateA,
+          athleteId: 'ath-1',
+        ),
+      ).called(1);
+      expect(find.text('Plantilla asignada al alumno.'), findsOneWidget);
+    });
+
+    testWidgets('si el repo falla, muestra el snackbar de error', (
+      tester,
+    ) async {
+      final repo = _MockRoutineRepository();
+      when(
+        () => repo.assignTemplateToAthlete(
+          template: _templateA,
+          athleteId: 'ath-1',
+        ),
+      ).thenThrow(Exception('backend down'));
+
+      await _pumpAssignable(
+        tester,
+        repo: repo,
+        templates: [_templateA],
+        links: [_activeLink('ath-1')],
+        names: {'ath-1': 'Vicente'},
+      );
+
+      await tester.tap(find.text('Fuerza Total'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('template_detail_use_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Vicente'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No pudimos asignar la plantilla.'), findsOneWidget);
+    });
+  });
+
+  group('TemplatesTab — borrar plantilla', () {
+    testWidgets('el detalle ofrece "Eliminar"', (tester) async {
+      final repo = _MockRoutineRepository();
+      await _pumpAssignable(tester, repo: repo, templates: [_templateA]);
+
+      await tester.tap(find.text('Fuerza Total'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('template_detail_delete_button')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('confirmar borra la plantilla vía deleteRoutine', (
+      tester,
+    ) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.deleteRoutine(any())).thenAnswer((_) async {});
+      await _pumpAssignable(tester, repo: repo, templates: [_templateA]);
+
+      await tester.tap(find.text('Fuerza Total'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('template_detail_delete_button')));
+      await tester.pumpAndSettle();
+
+      // Diálogo de confirmación → el botón "Eliminar" (scopeado; el título dice
+      // "Eliminar plantilla" y no matchea exacto).
+      expect(find.text('Eliminar plantilla'), findsOneWidget);
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Eliminar'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      verify(() => repo.deleteRoutine('tpl-a')).called(1);
+      expect(find.text('Plantilla eliminada.'), findsOneWidget);
+    });
+
+    testWidgets('cancelar la confirmación no borra', (tester) async {
+      final repo = _MockRoutineRepository();
+      await _pumpAssignable(tester, repo: repo, templates: [_templateA]);
+
+      await tester.tap(find.text('Fuerza Total'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('template_detail_delete_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Cancelar'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      verifyNever(() => repo.deleteRoutine(any()));
     });
   });
 }

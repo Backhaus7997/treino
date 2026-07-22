@@ -18,6 +18,8 @@ void main() {
         trainerLatitude: -34.6037,
         trainerLongitude: -58.3816,
         trainerMonthlyRate: 2500,
+        trainerExperienceYears: 10,
+        athleteCount: 2,
       );
 
       final json = profile.toJson();
@@ -35,6 +37,8 @@ void main() {
       expect(restored.trainerLatitude, equals(-34.6037));
       expect(restored.trainerLongitude, equals(-58.3816));
       expect(restored.trainerMonthlyRate, equals(2500));
+      expect(restored.trainerExperienceYears, equals(10));
+      expect(restored.athleteCount, equals(2));
     });
 
     test('SCENARIO-408: roundtrip with all nullable fields null', () {
@@ -49,6 +53,8 @@ void main() {
         trainerLatitude: null,
         trainerLongitude: null,
         trainerMonthlyRate: null,
+        trainerExperienceYears: null,
+        athleteCount: null,
       );
 
       final json = profile.toJson();
@@ -65,6 +71,9 @@ void main() {
       expect(restored.trainerLatitude, isNull);
       expect(restored.trainerLongitude, isNull);
       expect(restored.trainerMonthlyRate, isNull);
+      // #388: sin dato cargado/computado → null → la UI muestra "—".
+      expect(restored.trainerExperienceYears, isNull);
+      expect(restored.athleteCount, isNull);
     });
 
     test('trainerSpecialty serializes as wire string in JSON', () {

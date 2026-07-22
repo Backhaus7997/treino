@@ -16,6 +16,7 @@ import 'widgets/auth_failure_banner.dart';
 import 'widgets/auth_input.dart';
 import 'widgets/auth_pill_button.dart';
 import 'widgets/auth_secondary_button.dart';
+import 'widgets/terms_notice_text.dart';
 import 'widgets/trainer_inquiry_card.dart';
 import 'widgets/treino_logo.dart';
 
@@ -241,6 +242,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 14),
+                  // QA-AUTH-001 (issue #434): Google/Apple create a TREINO
+                  // account just like Register — the user must be told
+                  // before tapping the social button.
+                  const TermsNoticeText(),
                   const SizedBox(height: 20),
                   // No account row
                   Center(

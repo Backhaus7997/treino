@@ -33,9 +33,27 @@ final trainerTemplatesStreamProvider =
 /// BOTH public catalog plantillas AND private trainer-assigned plans
 /// (which are not in [routinesProvider] because [listSystemTemplates] filters
 /// by `source == 'system'` and `visibility == 'public'`).
+///
+/// One-shot Future: callers that read the routine once (session finish/update,
+/// insights radars via `.future`) rely on this NOT holding an open stream.
+/// Screens that must AUTO-REFRESH after an edit use [routineByIdStreamProvider]
+/// instead.
 final routineByIdProvider = FutureProvider.family<Routine?, String>(
   (ref, id) async {
     return ref.watch(routineRepositoryProvider).getById(id);
+  },
+);
+
+/// Live single-doc stream via `watchById`, for screens that must re-render when
+/// the routine changes (routine detail: an edit must show immediately instead
+/// of a stale cached value — issue #401). `autoDispose` so the Firestore
+/// listener is torn down when the detail screen leaves. Separate from
+/// [routineByIdProvider] on purpose: the one-shot Future callers must not be
+/// switched to a stream (they read via `.future` and would leak open listeners).
+final routineByIdStreamProvider =
+    StreamProvider.autoDispose.family<Routine?, String>(
+  (ref, id) {
+    return ref.watch(routineRepositoryProvider).watchById(id);
   },
 );
 

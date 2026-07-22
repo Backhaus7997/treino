@@ -26,40 +26,51 @@ import '../../../../workout/domain/routine_visibility.dart';
 import '../../../../workout/domain/set_enums.dart';
 import '../../../../workout/domain/set_spec.dart';
 import '../../widgets/exercise_picker_dialog.dart';
-import 'routine_web_editability.dart';
 
 /// Editor de rutinas web — crea o edita la rutina de UN alumno (mirrors
 /// mobile's `RoutineEditorScreen(TrainerAssigning)`). Soporta, por ejercicio:
-/// reps fijas o rango (mín–máx), duración (por tiempo), notas para el alumno,
-/// supersets y N semanas, cada una con SU PROPIA prescripción de sets
-/// (`weeklySets`, Fase 4b) mediante el selector "Sem 1..N". Todavía NO:
-/// máscara de presencia por semana (Fase 4c) — esas rutinas se siguen editando
-/// en mobile.
+/// reps fijas o rango (mín–máx), duración (por tiempo), peso, descanso, notas
+/// para el alumno, supersets, N semanas con prescripción propia por semana
+/// (`weeklySets`, Fase 4b, selector "Sem 1..N") y máscara de presencia por
+/// semana (`activeWeeks`, Fase 4c, chips "Semanas:").
+///
+/// **Fidelidad total del modelo, NO paridad total de features**: el form
+/// modela el 100% del esquema de [RoutineSlot], así que hidrata y reescribe
+/// cualquier rutina sin perder un solo campo. Pero todavía NO sabe CREAR
+/// algunas cosas que mobile sí: series tipadas (warm-up/drop/al-fallo — las
+/// respeta y las round-trippea, pero no hay UI para asignarlas), plantillas
+/// reusables y ejercicios custom nuevos. Fidelidad ≠ paridad.
 ///
 /// **Modo edición** (`routineId != null`): carga la rutina y la abre en el
-/// form. Como `updateAssigned` pisa el array `days` entero, editar una rutina
-/// con máscara de presencia desde acá la truncaría silenciosamente — por eso
-/// [isRoutineWebEditable] actúa de compuerta: si la rutina usa un campo aún no
-/// soportado, el editor NO la carga y muestra un aviso para editarla en mobile.
-/// Las rutinas creadas en web están siempre dentro de scope, así que
-/// round-tripean sin drama.
-///
-/// La `Routine` que este editor escribe es 100% válida para el modelo de
-/// dominio completo (weeklySets/activeWeeks vacíos = "misma prescripción todas
-/// las semanas") — mobile puede leerla y editarla sin problema.
+/// form. `updateAssigned` pisa el array `days` entero en cada guardado, pero
+/// como el form modela el 100% del esquema, ninguna rutina asignada —sea cual
+/// sea su origen (mobile o web)— pierde información al re-guardarse.
 class RoutineEditorWebScreen extends ConsumerStatefulWidget {
+  /// Trainer-assigned mode: builds or edits ONE athlete's routine
+  /// (`RoutineSource.trainerAssigned`), saved via createAssigned/updateAssigned.
   const RoutineEditorWebScreen({
     super.key,
-    required this.athleteId,
+    required String this.athleteId,
     this.routineId,
-  });
+  }) : isTemplate = false;
 
-  final String athleteId;
+  /// Template mode: builds or edits a REUSABLE routine with no athlete
+  /// (`RoutineSource.trainerTemplate`), saved via createTemplate/updateTemplate.
+  /// Reached from the Biblioteca "Templates Rutinas" tab. Same rich form — a
+  /// template is just a routine without an `assignedTo`.
+  const RoutineEditorWebScreen.template({super.key, this.routineId})
+    : athleteId = null,
+      isTemplate = true;
 
-  /// When non-null, the editor loads this existing routine and saves via
-  /// `updateAssigned` instead of `createAssigned`. Only routines that pass
-  /// [isRoutineWebEditable] are loaded; advanced ones are refused.
+  /// Non-null only in trainer-assigned mode. Null ⟺ [isTemplate].
+  final String? athleteId;
+
+  /// When non-null, loads this existing doc (assigned routine OR template) and
+  /// saves via the update path instead of the create path.
   final String? routineId;
+
+  /// True → template mode: no athlete, `trainer-template` source.
+  final bool isTemplate;
 
   @override
   ConsumerState<RoutineEditorWebScreen> createState() =>
@@ -69,6 +80,11 @@ class RoutineEditorWebScreen extends ConsumerStatefulWidget {
 // ── Mutable editor state (web MVP) ────────────────────────────────────────────
 
 class _EditorSet {
+  /// Warm-up / normal / drop / failure. The web editor has no UI to CHANGE
+  /// this yet, but it must round-trip: plans authored in the mobile app carry
+  /// typed sets, and silently rewriting them to [SetType.normal] on save would
+  /// destroy the trainer's prescription without asking.
+  SetType type = SetType.normal;
   double? weightKg;
   int? reps; // used when repMode == single
   int? repsMin; // used when repMode == range
@@ -76,8 +92,11 @@ class _EditorSet {
   int? durationSeconds; // used when exerciseMode == duration
 
   /// Deep copy — used when padding a slot's `weeklySets` to a new week count
-  /// ([_RoutineEditorWebScreenState._normalizeSlotWeeks]).
+  /// ([_RoutineEditorWebScreenState._normalizeSlotWeeks]). Preserves [type],
+  /// like mobile's `_EditableSet.copy()`: replicating a week must replicate
+  /// its warm-ups and failure sets too.
   _EditorSet copy() => _EditorSet()
+    ..type = type
     ..weightKg = weightKg
     ..reps = reps
     ..repsMin = repsMin
@@ -87,11 +106,26 @@ class _EditorSet {
 
 /// Maps a persisted [SetSpec] into its mutable editor row.
 _EditorSet _editorSetFromSpec(SetSpec spec) => _EditorSet()
+  ..type = spec.type
   ..reps = spec.reps
   ..repsMin = spec.repsMin
   ..repsMax = spec.repsMax
   ..durationSeconds = spec.durationSeconds
   ..weightKg = spec.weightKg;
+
+/// Leading chip label for a set row: the running count of NORMAL sets up to
+/// and including [index] — so a warm-up/drop/failure doesn't consume a number
+/// — or the type glyph (W/D/F) for a typed set. Mirrors mobile's
+/// `setChipLabel`, and reuses [kSetTypeLabel] as the single source of glyphs.
+String _setChipLabel(List<_EditorSet> sets, int index) {
+  final type = sets[index].type;
+  if (type != SetType.normal) return kSetTypeLabel[type]!;
+  var n = 0;
+  for (var i = 0; i <= index; i++) {
+    if (sets[i].type == SetType.normal) n++;
+  }
+  return '$n';
+}
 
 class _EditorSlot {
   Exercise? exercise;
@@ -110,6 +144,15 @@ class _EditorSlot {
   List<List<_EditorSet>> weeklySets = [
     [_EditorSet()],
   ];
+
+  /// 0-based weeks in which this slot is present. Empty = present in ALL
+  /// weeks (back-compat default — legacy/single-week docs have no mask).
+  /// Mirrors mobile's `_EditableSlot.activeWeeks` (Fase 4c).
+  Set<int> activeWeeks = <int>{};
+
+  /// Whether this slot is present in 0-based [w].
+  /// Rule: `activeWeeks.isEmpty || activeWeeks.contains(w)`.
+  bool isPresentInWeek(int w) => activeWeeks.isEmpty || activeWeeks.contains(w);
 }
 
 class _EditorDay {
@@ -121,6 +164,10 @@ class _EditorDay {
 
 const _kMaxDays = 7; // mirrors mobile's _kMaxDays
 const _kMaxWeeks = 16; // mirrors mobile's _kMaxWeeks
+
+/// Scope choice when deleting an exercise from a multi-week plan (REQ-WPRES-010,
+/// mirrors mobile's `_DeleteScope`).
+enum _DeleteScope { thisWeek, allWeeks }
 
 class _RoutineEditorWebScreenState
     extends ConsumerState<RoutineEditorWebScreen> {
@@ -134,7 +181,7 @@ class _RoutineEditorWebScreenState
   /// Display is 1-based ("Sem 1"). Always kept in `[0, _numWeeks - 1]`.
   int _selectedWeek = 0;
   final List<_EditorDay> _days = [
-    _EditorDay(dayNumber: 1, name: 'Día 1')
+    _EditorDay(dayNumber: 1, name: 'Día 1'),
   ]; // i18n
   bool _submitting = false;
   bool _isDirty = false;
@@ -143,14 +190,25 @@ class _RoutineEditorWebScreenState
   // ── Edit mode ─────────────────────────────────────────────────────────────
   bool get _isEditing => widget.routineId != null;
 
+  /// "Nueva/Editar" × "rutina/plantilla".
+  String get _headerTitle {
+    if (widget.isTemplate) {
+      return _isEditing ? 'Editar plantilla' : 'Nueva plantilla'; // i18n
+    }
+    return _isEditing ? 'Editar rutina' : 'Nueva rutina'; // i18n
+  }
+
+  /// Noun for user-facing messages ("No pudimos guardar la …").
+  String get _noun => widget.isTemplate ? 'plantilla' : 'rutina'; // i18n
+
   /// The routine being edited (its identity fields are preserved on save).
   Routine? _loadedRoutine;
 
   /// True while the existing routine is being fetched (edit mode only).
   bool _loading = false;
 
-  /// Non-null when the form can't be shown: routine not found, or it uses
-  /// advanced fields the web editor would truncate ([isRoutineWebEditable]).
+  /// Non-null when the form can't be shown: routine not found, or it failed
+  /// to load.
   String? _fatalMessage;
 
   @override
@@ -164,22 +222,14 @@ class _RoutineEditorWebScreenState
 
   Future<void> _load() async {
     try {
-      final routine =
-          await ref.read(routineRepositoryProvider).getById(widget.routineId!);
+      final routine = await ref
+          .read(routineRepositoryProvider)
+          .getById(widget.routineId!);
       if (!mounted) return;
       if (routine == null) {
         setState(() {
           _loading = false;
-          _fatalMessage = 'No encontramos la rutina.'; // i18n
-        });
-        return;
-      }
-      // GATE: refuse to load a routine we'd silently truncate on save.
-      if (!isRoutineWebEditable(routine)) {
-        setState(() {
-          _loading = false;
-          _fatalMessage =
-              'Esta rutina tiene periodización o supersets. Editala desde la app mobile para no perder esa configuración.'; // i18n
+          _fatalMessage = 'No encontramos la $_noun.'; // i18n
         });
         return;
       }
@@ -192,7 +242,7 @@ class _RoutineEditorWebScreenState
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _fatalMessage = 'No pudimos cargar la rutina. Probá de nuevo.'; // i18n
+        _fatalMessage = 'No pudimos cargar la $_noun. Probá de nuevo.'; // i18n
       });
     }
   }
@@ -230,8 +280,8 @@ class _RoutineEditorWebScreenState
     // _loadExistingRoutine, REQ-PERIOD-018/019).
     final weeklySets = slot.weeklySets.isNotEmpty
         ? slot.weeklySets
-            .map((wk) => wk.map(_editorSetFromSpec).toList())
-            .toList()
+              .map((wk) => wk.map(_editorSetFromSpec).toList())
+              .toList()
         : [slot.effectiveSets.map(_editorSetFromSpec).toList()];
 
     // Derive the mode from WEEK 0's set data — robust against stale
@@ -255,7 +305,10 @@ class _RoutineEditorWebScreenState
       ..exerciseMode = isDuration ? ExerciseMode.duration : ExerciseMode.reps
       ..repMode = isRange ? RepMode.range : RepMode.single
       ..notes = slot.notes ?? ''
-      ..weeklySets = weeklySets;
+      ..weeklySets = weeklySets
+      // Hydrate presence mask from the domain slot (Fase 4c). Legacy docs
+      // have empty activeWeeks → empty set → all weeks.
+      ..activeWeeks = slot.activeWeeks.toSet();
     // Pad/truncate to _numWeeks (already set by _populate before this runs)
     // and guard against an authored-empty week 0 (deload) leaving a blank
     // editor slot with 0 sets.
@@ -280,7 +333,8 @@ class _RoutineEditorWebScreenState
   /// Padding appends a DEEP COPY of the last week's sets (via
   /// [_EditorSet.copy]) so a newly-added week starts from the trainer's most
   /// recent prescription instead of a blank set. Never leaves a slot with 0
-  /// weeks or a week with 0 sets.
+  /// weeks or a week with 0 sets. Also clamps the presence mask (Fase 4c) to
+  /// the valid week range, mirroring mobile's own normalize.
   void _normalizeSlotWeeks(_EditorSlot slot) {
     if (slot.weeklySets.isEmpty) {
       slot.weeklySets.add([_EditorSet()]);
@@ -296,6 +350,125 @@ class _RoutineEditorWebScreenState
         slot.weeklySets[w] = [_EditorSet()];
       }
     }
+    slot.activeWeeks.removeWhere((w) => w < 0 || w >= _numWeeks);
+  }
+
+  /// Replaces the selected week's prescription with a deep copy of the
+  /// PREVIOUS week's, slot by slot — mirrors mobile's `_duplicateWeek`
+  /// (REQ-PERIOD-014). `_EditorSet.copy()` keeps set types, so warm-ups and
+  /// failure sets survive the duplication.
+  ///
+  /// Presence travels with it (ADR-WPRES-06): a slot present in the source
+  /// week becomes present in the target too, and one absent from the source
+  /// is dropped from the target.
+  ///
+  /// DELIBERATE DEVIATION from mobile, in exactly one case: when the target is
+  /// a slot's ONLY week, mobile removes it from the mask and leaves the mask
+  /// EMPTY — which in this model reads as "present in EVERY week", so an
+  /// exercise scheduled once silently spreads across the whole plan (verified
+  /// against mobile's own `duplicateWeekPresence` test bridge). Since the
+  /// source week doesn't have that exercise, after the copy NO week does, and
+  /// a slot scheduled nowhere is a ghost — so it's dropped instead.
+  Future<void> _duplicateWeek() async {
+    if (_selectedWeek == 0) return;
+    final sourceWeek = _selectedWeek - 1;
+    final targetWeek = _selectedWeek;
+
+    final confirmed = await _confirmDuplicateWeek(sourceWeek, targetWeek);
+    if (confirmed != true || !mounted) return;
+
+    _markDirty();
+    setState(() {
+      for (final day in _days) {
+        for (final slot in day.slots) {
+          slot.weeklySets[targetWeek] = slot.weeklySets[sourceWeek]
+              .map((e) => e.copy())
+              .toList();
+        }
+        // Back-to-front: dropping a slot keeps the lower indices valid.
+        for (var i = day.slots.length - 1; i >= 0; i--) {
+          if (!_copyPresenceToTarget(day.slots[i], sourceWeek, targetWeek)) {
+            _dropSlotKeepingGroups(day.slots, i);
+          }
+        }
+      }
+    });
+  }
+
+  /// Confirms the overwrite. This replaces everything already loaded in the
+  /// target week, so it asks first — and names both weeks, since "duplicar"
+  /// alone doesn't say which direction it goes.
+  Future<bool?> _confirmDuplicateWeek(int sourceWeek, int targetWeek) {
+    final palette = AppPalette.of(context);
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: palette.bgCard,
+        title: Text(
+          '¿Copiar la Semana ${sourceWeek + 1} acá?', // i18n
+          style: GoogleFonts.barlow(
+            color: palette.textPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        content: Text(
+          'Se reemplaza todo lo que tengas cargado en la Semana '
+          '${targetWeek + 1}.', // i18n
+          style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            // Keyed: the form footer has its own "Cancelar" too.
+            key: const Key('duplicate_week_cancel_button'),
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(
+              'Cancelar', // i18n
+              style: GoogleFonts.barlow(color: palette.textMuted),
+            ),
+          ),
+          TextButton(
+            key: const Key('duplicate_week_confirm_button'),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(
+              'Copiar', // i18n
+              style: GoogleFonts.barlow(
+                color: palette.accent,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Copies [slot]'s presence from [sourceWeek] onto [targetWeek]. Returns
+  /// false when the slot ends up scheduled in NO week and must be dropped.
+  bool _copyPresenceToTarget(_EditorSlot slot, int sourceWeek, int targetWeek) {
+    // An empty mask already means "every week" — the target inherits it.
+    if (slot.activeWeeks.isEmpty) return true;
+    if (slot.isPresentInWeek(sourceWeek)) {
+      final mask = Set<int>.from(slot.activeWeeks)..add(targetWeek);
+      // Canonicalize a now-full mask back to empty, like
+      // [_toggleSlotWeekPresence] does — one wire shape for "all weeks".
+      slot.activeWeeks = mask.length == _numWeeks ? <int>{} : mask;
+      return true;
+    }
+    final mask = Set<int>.from(slot.activeWeeks)..remove(targetWeek);
+    if (mask.isEmpty) return false; // scheduled nowhere → see _duplicateWeek
+    slot.activeWeeks = mask;
+    return true;
+  }
+
+  /// Removes `slots[index]`, keeping superset grouping intact: the previous
+  /// slot inherits the dropped one's [_EditorSlot.linkedToNext]. Without this,
+  /// a group that ENDED at the dropped slot would silently swallow whatever
+  /// came after it, since `linkedToNext` links by POSITION, not by partner id.
+  void _dropSlotKeepingGroups(List<_EditorSlot> slots, int index) {
+    if (index > 0) {
+      slots[index - 1].linkedToNext = slots[index].linkedToNext;
+    }
+    slots.removeAt(index);
   }
 
   void _setNumWeeks(int value) {
@@ -350,16 +523,20 @@ class _RoutineEditorWebScreenState
         .where((s) => s.exercise != null)
         .map((s) => s.exercise!.id)
         .toSet();
-    final picked =
-        await showExercisePickerDialog(context, alreadySelectedIds: alreadyIds);
+    final picked = await showExercisePickerDialog(
+      context,
+      alreadySelectedIds: alreadyIds,
+    );
     if (picked == null || picked.isEmpty || !mounted) return;
     _markDirty();
     setState(() {
       for (final exercise in picked) {
         if (day.slots.any((s) => s.exercise?.id == exercise.id)) continue;
-        day.slots.add(_EditorSlot()
-          ..exercise = exercise
-          ..weeklySets = List.generate(_numWeeks, (_) => [_EditorSet()]));
+        day.slots.add(
+          _EditorSlot()
+            ..exercise = exercise
+            ..weeklySets = List.generate(_numWeeks, (_) => [_EditorSet()]),
+        );
       }
     });
   }
@@ -369,16 +546,177 @@ class _RoutineEditorWebScreenState
     setState(() => _days[dayIndex].slots.removeAt(slotIndex));
   }
 
+  /// Routes a slot delete through presence-aware scope, mirroring mobile's
+  /// `_onDeleteSlot` (REQ-WPRES-010, ADR-WPRES-03):
+  /// - single-week plan → structural delete, no dialog;
+  /// - multi-week → ask "solo esta semana" vs "todas las semanas". "Solo esta
+  ///   semana" materializes the presence mask and drops `_selectedWeek`; if that
+  ///   empties the mask (last present week), it falls back to a structural
+  ///   delete — a zero-presence slot is forbidden.
+  Future<void> _onDeleteSlot(int dayIndex, int slotIndex) async {
+    if (_numWeeks <= 1) {
+      _removeSlot(dayIndex, slotIndex);
+      return;
+    }
+
+    final palette = AppPalette.of(context);
+    final choice = await showDialog<_DeleteScope>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        backgroundColor: palette.bgCard,
+        title: Text(
+          '¿Eliminar ejercicio?', // i18n
+          style: GoogleFonts.barlowCondensed(
+            color: palette.textPrimary,
+            fontWeight: FontWeight.w700,
+            fontSize: 18,
+          ),
+        ),
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 10),
+            child: Text(
+              // i18n
+              'Está en varias semanas. ¿Lo sacás solo de esta semana o de todas?',
+              style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 13),
+            ),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.of(ctx).pop(_DeleteScope.thisWeek),
+            child: Text(
+              'Solo esta semana', // i18n
+              style: GoogleFonts.barlow(
+                color: palette.accent,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.of(ctx).pop(_DeleteScope.allWeeks),
+            child: Text(
+              'Todas las semanas', // i18n
+              style: GoogleFonts.barlow(
+                color: palette.danger,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (choice == null || !mounted) return;
+
+    if (choice == _DeleteScope.allWeeks) {
+      _removeSlot(dayIndex, slotIndex);
+      return;
+    }
+
+    // "Solo esta semana": materialize the mask and drop the current week.
+    final slot = _days[dayIndex].slots[slotIndex];
+    final newMask = slot.activeWeeks.isEmpty
+        ? {
+            for (var w = 0; w < _numWeeks; w++)
+              if (w != _selectedWeek) w,
+          }
+        : (Set<int>.from(slot.activeWeeks)..remove(_selectedWeek));
+
+    // Last present week → dropping it would leave a zero-presence ghost, so
+    // delete structurally instead (ADR-WPRES-03).
+    if (newMask.isEmpty) {
+      _removeSlot(dayIndex, slotIndex);
+      return;
+    }
+
+    _markDirty();
+    setState(() => slot.activeWeeks = newMask);
+  }
+
+  /// Swaps ONLY the exercise on a slot, keeping its sets, rest, notes,
+  /// superset link and week presence intact — mirrors mobile's in-place
+  /// "Cambiar ejercicio" (`_SlotEditorState._replaceExercise`). Reuses the
+  /// multi-select picker and takes the first pick as the replacement, so
+  /// correcting a wrong choice no longer means deleting the slot and losing
+  /// everything already configured.
+  Future<void> _replaceSlotExercise(int dayIndex, int slotIndex) async {
+    final picked = await showExercisePickerDialog(context);
+    if (picked == null || picked.isEmpty || !mounted) return;
+    final replacement = picked.first;
+    final slot = _days[dayIndex].slots[slotIndex];
+    if (slot.exercise?.id == replacement.id) return; // same exercise → no-op
+    _markDirty();
+    setState(() => slot.exercise = replacement);
+  }
+
+  /// Groups [slots] into blocks: a superset run, or a lone standalone slot.
+  /// `linkedToNext` links by POSITION, so a block is a maximal run of slots
+  /// joined by it.
+  List<List<_EditorSlot>> _blocksOf(List<_EditorSlot> slots) {
+    final blocks = <List<_EditorSlot>>[];
+    var current = <_EditorSlot>[];
+    for (var i = 0; i < slots.length; i++) {
+      current.add(slots[i]);
+      if (!slots[i].linkedToNext || i == slots.length - 1) {
+        blocks.add(current);
+        current = <_EditorSlot>[];
+      }
+    }
+    return blocks;
+  }
+
+  /// Flattens [blocks] back into [slots] and re-derives `linkedToNext` from
+  /// the block structure: every member links to the next except the last.
+  ///
+  /// The flags are POSITIONAL, so they must be rewritten after a reorder
+  /// rather than travel with the slots — carrying them is what let a plain
+  /// swap re-wire which exercises were grouped.
+  void _writeBlocks(List<_EditorSlot> slots, List<List<_EditorSlot>> blocks) {
+    for (final block in blocks) {
+      for (var i = 0; i < block.length; i++) {
+        block[i].linkedToNext = i < block.length - 1;
+      }
+    }
+    slots
+      ..clear()
+      ..addAll([for (final block in blocks) ...block]);
+  }
+
+  /// Moves the slot at [slotIndex] one step in [dir] (-1 up / +1 down),
+  /// keeping superset grouping intact — mirrors mobile, which splits this
+  /// across `_moveSlotWithinGroup` and `_moveBlock`:
+  ///
+  /// - Neighbour in the SAME superset → swap the two members; the group is
+  ///   untouched.
+  /// - At the block's edge → move the WHOLE block past the neighbouring one,
+  ///   so a reorder can never split a superset or drag an outsider into it.
+  ///
+  /// The old code swapped raw positions, which silently re-grouped: moving a
+  /// member out of a superset left the previous slot linked to whatever
+  /// landed next to it.
   void _moveSlot(int dayIndex, int slotIndex, int dir) {
     final slots = _days[dayIndex].slots;
-    final target = slotIndex + dir;
-    if (target < 0 || target >= slots.length) return;
+    if (slotIndex < 0 || slotIndex >= slots.length) return;
+    final slot = slots[slotIndex];
+    final blocks = _blocksOf(slots);
+
+    final blockIndex = blocks.indexWhere((b) => b.contains(slot));
+    final block = blocks[blockIndex];
+    final from = block.indexOf(slot);
+    final within = from + dir;
+
+    if (within >= 0 && within < block.length) {
+      // Reorder inside the superset.
+      block[from] = block[within];
+      block[within] = slot;
+    } else {
+      // Edge of the block → the whole block hops its neighbour.
+      final target = blockIndex + dir;
+      if (target < 0 || target >= blocks.length) return;
+      blocks.insert(target, blocks.removeAt(blockIndex));
+    }
+
     _markDirty();
-    setState(() {
-      final tmp = slots[slotIndex];
-      slots[slotIndex] = slots[target];
-      slots[target] = tmp;
-    });
+    setState(() => _writeBlocks(slots, blocks));
   }
 
   // Links / unlinks this exercise with the next one into a superset.
@@ -388,6 +726,35 @@ class _RoutineEditorWebScreenState
       final slot = _days[dayIndex].slots[slotIndex];
       slot.linkedToNext = !slot.linkedToNext;
     });
+  }
+
+  /// Toggles [week]'s presence for one slot (Fase 4c, "Semanas:" chips).
+  ///
+  /// An EMPTY mask means "present in all weeks" — so removing a week from an
+  /// all-present slot first MATERIALIZES the mask to every week index, then
+  /// removes the toggled one. Conversely, once a mask ends up covering EVERY
+  /// week again it collapses back to EMPTY (the canonical "all weeks" form) —
+  /// this keeps `[0, 1]` on a 2-week plan indistinguishable from "no mask" on
+  /// save, matching mobile's own round-trip. A removal that would empty the
+  /// mask is refused outright: a slot must stay present in at least one week
+  /// (`_firstValidationError`'s mask check is only a backstop for this).
+  void _toggleSlotWeekPresence(int dayIndex, int slotIndex, int week) {
+    final slot = _days[dayIndex].slots[slotIndex];
+    final mask = slot.activeWeeks.isEmpty
+        ? {for (var w = 0; w < _numWeeks; w++) w}
+        : Set<int>.from(slot.activeWeeks);
+    if (mask.contains(week)) {
+      if (mask.length <= 1) return; // never let a removal empty the mask
+      mask.remove(week);
+    } else {
+      mask.add(week);
+    }
+    // Covers every week again → canonicalize back to empty ("all weeks").
+    if (mask.length == _numWeeks) {
+      mask.clear();
+    }
+    _markDirty();
+    setState(() => slot.activeWeeks = mask);
   }
 
   void _onRestChanged(int dayIndex, int slotIndex, String value) {
@@ -403,13 +770,18 @@ class _RoutineEditorWebScreenState
     setState(() {
       final sets = _days[dayIndex].slots[slotIndex].weeklySets[_selectedWeek];
       // Duplicate the last row's values — same "+ Agregar set" UX as mobile.
+      // `type` is deliberately NOT carried over (it stays SetType.normal),
+      // matching mobile's `clone()`: adding a set after a warm-up should give
+      // you a working set, not a second warm-up.
       final last = sets.isEmpty ? null : sets.last;
-      sets.add(_EditorSet()
-        ..reps = last?.reps
-        ..repsMin = last?.repsMin
-        ..repsMax = last?.repsMax
-        ..durationSeconds = last?.durationSeconds
-        ..weightKg = last?.weightKg);
+      sets.add(
+        _EditorSet()
+          ..reps = last?.reps
+          ..repsMin = last?.repsMin
+          ..repsMax = last?.repsMax
+          ..durationSeconds = last?.durationSeconds
+          ..weightKg = last?.weightKg,
+      );
     });
   }
 
@@ -422,37 +794,69 @@ class _RoutineEditorWebScreenState
 
   void _onSetRepsChanged(int dayIndex, int slotIndex, int setIndex, String v) {
     _markDirty();
-    setState(() => _days[dayIndex]
-        .slots[slotIndex]
-        .weeklySets[_selectedWeek][setIndex]
-        .reps = int.tryParse(v.trim()));
+    setState(
+      () =>
+          _days[dayIndex]
+              .slots[slotIndex]
+              .weeklySets[_selectedWeek][setIndex]
+              .reps = int.tryParse(
+            v.trim(),
+          ),
+    );
   }
 
   void _onSetRepsMinChanged(
-      int dayIndex, int slotIndex, int setIndex, String v) {
+    int dayIndex,
+    int slotIndex,
+    int setIndex,
+    String v,
+  ) {
     _markDirty();
-    setState(() => _days[dayIndex]
-        .slots[slotIndex]
-        .weeklySets[_selectedWeek][setIndex]
-        .repsMin = int.tryParse(v.trim()));
+    setState(
+      () =>
+          _days[dayIndex]
+              .slots[slotIndex]
+              .weeklySets[_selectedWeek][setIndex]
+              .repsMin = int.tryParse(
+            v.trim(),
+          ),
+    );
   }
 
   void _onSetRepsMaxChanged(
-      int dayIndex, int slotIndex, int setIndex, String v) {
+    int dayIndex,
+    int slotIndex,
+    int setIndex,
+    String v,
+  ) {
     _markDirty();
-    setState(() => _days[dayIndex]
-        .slots[slotIndex]
-        .weeklySets[_selectedWeek][setIndex]
-        .repsMax = int.tryParse(v.trim()));
+    setState(
+      () =>
+          _days[dayIndex]
+              .slots[slotIndex]
+              .weeklySets[_selectedWeek][setIndex]
+              .repsMax = int.tryParse(
+            v.trim(),
+          ),
+    );
   }
 
   void _onSetDurationChanged(
-      int dayIndex, int slotIndex, int setIndex, String v) {
+    int dayIndex,
+    int slotIndex,
+    int setIndex,
+    String v,
+  ) {
     _markDirty();
-    setState(() => _days[dayIndex]
-        .slots[slotIndex]
-        .weeklySets[_selectedWeek][setIndex]
-        .durationSeconds = int.tryParse(v.trim()));
+    setState(
+      () =>
+          _days[dayIndex]
+              .slots[slotIndex]
+              .weeklySets[_selectedWeek][setIndex]
+              .durationSeconds = int.tryParse(
+            v.trim(),
+          ),
+    );
   }
 
   /// Switches an exercise between fixed reps, a min–max range, and duration.
@@ -497,14 +901,37 @@ class _RoutineEditorWebScreenState
   }
 
   void _onSetWeightChanged(
-      int dayIndex, int slotIndex, int setIndex, String v) {
+    int dayIndex,
+    int slotIndex,
+    int setIndex,
+    String v,
+  ) {
     _markDirty();
     setState(() {
       _days[dayIndex]
           .slots[slotIndex]
           .weeklySets[_selectedWeek][setIndex]
-          .weightKg = double.tryParse(v.trim().replaceAll(',', '.'));
+          .weightKg = double.tryParse(
+        v.trim().replaceAll(',', '.'),
+      );
     });
+  }
+
+  void _onSetTypeChanged(
+    int dayIndex,
+    int slotIndex,
+    int setIndex,
+    SetType type,
+  ) {
+    _markDirty();
+    setState(
+      () =>
+          _days[dayIndex]
+                  .slots[slotIndex]
+                  .weeklySets[_selectedWeek][setIndex]
+                  .type =
+              type,
+    );
   }
 
   // ── Validation ───────────────────────────────────────────────────────────
@@ -524,25 +951,134 @@ class _RoutineEditorWebScreenState
         return 'El día "${day.name}" necesita al menos un ejercicio.'; // i18n
       }
       for (final slot in day.slots) {
+        // Presence-mask backstop (Fase 4c): with the toggle's canonicalization
+        // rules this should be unreachable, but a non-empty mask that names no
+        // valid week would create an invisible ghost slot — refuse it.
+        if (_numWeeks > 1 &&
+            slot.activeWeeks.isNotEmpty &&
+            !slot.activeWeeks.any((w) => w >= 0 && w < _numWeeks)) {
+          final name = slot.exercise?.name ?? 'Un ejercicio'; // i18n
+          return '$name no está en ninguna semana.'; // i18n
+        }
         // Every week's sets must be complete (not just the currently viewed
         // one) — otherwise a trainer could save with an incomplete week
-        // hidden behind an unvisited "Sem N" tab (Fase 4b).
-        for (final week in slot.weeklySets) {
-          for (final set in week) {
-            final name = slot.exercise?.name ?? 'Un ejercicio'; // i18n
+        // hidden behind an unvisited "Sem N" tab (Fase 4b). Weeks where the
+        // exercise isn't scheduled are SKIPPED: those rows never get executed,
+        // so demanding reps for them would block a perfectly valid plan
+        // (Fase 4c presence mask; mirrors mobile's isPresentInWeek guard).
+        for (var w = 0; w < slot.weeklySets.length; w++) {
+          if (!slot.isPresentInWeek(w)) continue;
+          final name = slot.exercise?.name ?? 'Un ejercicio'; // i18n
+          // Name the offending week so the trainer knows where to look — only
+          // meaningful once there's more than one week.
+          final wk = _numWeeks > 1 ? ' en la Semana ${w + 1}' : ''; // i18n
+          for (final set in slot.weeklySets[w]) {
+            // Failure sets have no countable target — `_isSetValid` treats them
+            // as valid (mirrors mobile's isSetValid). One source of truth for
+            // both this submit check and the live markers below.
+            if (_isSetValid(slot, set)) continue;
             if (slot.exerciseMode == ExerciseMode.duration) {
-              if (set.durationSeconds == null || set.durationSeconds! <= 0) {
-                return '$name tiene una serie sin duración.'; // i18n
-              }
+              return '$name tiene una serie sin duración$wk.'; // i18n
             } else if (slot.repMode == RepMode.range) {
-              final min = set.repsMin, max = set.repsMax;
-              if (min == null || min <= 0 || max == null || max < min) {
-                return '$name tiene un rango de reps inválido (mín ≤ máx).'; // i18n
-              }
-            } else if (set.reps == null || set.reps! <= 0) {
-              return '$name tiene una serie sin reps.'; // i18n
+              return '$name tiene un rango de reps inválido (mín ≤ máx)$wk.'; // i18n
+            } else {
+              return '$name tiene una serie sin reps$wk.'; // i18n
             }
           }
+        }
+      }
+    }
+    return null;
+  }
+
+  // ── Live validation (REQ-PERIOD-016 / SCENARIO-PERIOD-020) ───────────────
+  // Pure, recomputed every build (the set/mode/presence handlers all setState),
+  // so the day/slot/week/field markers below track edits keystroke-by-keystroke
+  // instead of only surfacing a single banner at submit time.
+
+  /// A single set's countable target is complete. Shared by the submit check
+  /// [_firstValidationError] and every live marker so they can't diverge.
+  bool _isSetValid(_EditorSlot slot, _EditorSet set) {
+    if (set.type == SetType.failure) return true;
+    if (slot.exerciseMode == ExerciseMode.duration) {
+      return set.durationSeconds != null && set.durationSeconds! > 0;
+    }
+    if (slot.repMode == RepMode.range) {
+      final min = set.repsMin, max = set.repsMax;
+      return min != null && min > 0 && max != null && max >= min;
+    }
+    return set.reps != null && set.reps! > 0;
+  }
+
+  /// The slot has an incomplete set in week [w] — but only for weeks it is
+  /// actually scheduled in (absent weeks never run, so they can't be "wrong").
+  bool _slotHasErrorInWeek(_EditorSlot slot, int w) {
+    if (slot.exercise == null) return false;
+    if (w < 0 || w >= slot.weeklySets.length) return false;
+    if (!slot.isPresentInWeek(w)) return false;
+    return slot.weeklySets[w].any((s) => !_isSetValid(slot, s));
+  }
+
+  /// A non-empty presence mask that names no in-range week → invisible ghost.
+  bool _slotIsGhost(_EditorSlot slot) =>
+      _numWeeks > 1 &&
+      slot.activeWeeks.isNotEmpty &&
+      !slot.activeWeeks.any((w) => w >= 0 && w < _numWeeks);
+
+  bool _slotHasError(_EditorSlot slot) {
+    if (slot.exercise == null) return false; // empty slots block at day level
+    if (_slotIsGhost(slot)) return true;
+    for (var w = 0; w < slot.weeklySets.length; w++) {
+      if (_slotHasErrorInWeek(slot, w)) return true;
+    }
+    return false;
+  }
+
+  /// Short reason rendered under an invalid exercise; names the offending week
+  /// on multi-week plans. Null when the slot is complete.
+  String? _slotErrorText(_EditorSlot slot) {
+    if (slot.exercise == null) return null;
+    if (_slotIsGhost(slot)) return 'No está en ninguna semana.'; // i18n
+    for (var w = 0; w < slot.weeklySets.length; w++) {
+      if (!_slotHasErrorInWeek(slot, w)) continue;
+      final wk = _numWeeks > 1 ? ' (Semana ${w + 1})' : ''; // i18n
+      if (slot.exerciseMode == ExerciseMode.duration) {
+        return 'Falta la duración de una serie$wk.'; // i18n
+      }
+      if (slot.repMode == RepMode.range) {
+        return 'Rango de reps inválido, mín ≤ máx$wk.'; // i18n
+      }
+      return 'Falta cargar las reps de una serie$wk.'; // i18n
+    }
+    return null;
+  }
+
+  /// A day is invalid when it has no exercise at all, or any slot is invalid.
+  bool _dayHasError(_EditorDay day) =>
+      !day.slots.any((s) => s.exercise != null) || day.slots.any(_slotHasError);
+
+  /// Some scheduled exercise has an incomplete set in week [w] — drives the
+  /// warning dot on that week's tab.
+  bool _weekHasError(int w) =>
+      _days.any((day) => day.slots.any((s) => _slotHasErrorInWeek(s, w)));
+
+  Set<int> _weeksWithError() => {
+        for (var w = 0; w < _numWeeks; w++)
+          if (_weekHasError(w)) w,
+      };
+
+  /// One-line pointer to the first thing that needs attention (day → exercise →
+  /// week). Name/split stay in the submit banner, so this only nags about the
+  /// structural, easy-to-miss parts of a long multi-week plan.
+  String? _firstInvalidHint() {
+    for (final day in _days) {
+      if (!day.slots.any((s) => s.exercise != null)) {
+        return 'El día "${day.name}" necesita un ejercicio.'; // i18n
+      }
+      for (final slot in day.slots) {
+        final err = _slotErrorText(slot);
+        if (err != null) {
+          return '${day.name} · ${slot.exercise!.name}: $err'; // i18n
         }
       }
     }
@@ -614,12 +1150,18 @@ class _RoutineEditorWebScreenState
     // Mode is per-slot (not per-week), so the SAME conversion applies to
     // every week's rows.
     SetSpec toSpec(_EditorSet s) {
-      if (isDuration) return SetSpec(durationSeconds: s.durationSeconds);
+      if (isDuration) {
+        return SetSpec(type: s.type, durationSeconds: s.durationSeconds);
+      }
       if (isRange) {
         return SetSpec(
-            repsMin: s.repsMin, repsMax: s.repsMax, weightKg: s.weightKg);
+          type: s.type,
+          repsMin: s.repsMin,
+          repsMax: s.repsMax,
+          weightKg: s.weightKg,
+        );
       }
-      return SetSpec(reps: s.reps, weightKg: s.weightKg);
+      return SetSpec(type: s.type, reps: s.reps, weightKg: s.weightKg);
     }
 
     final week0Specs = week0.map(toSpec).toList();
@@ -634,8 +1176,9 @@ class _RoutineEditorWebScreenState
       targetRepsMax: targetRepsMax,
       restSeconds: slot.restSeconds,
       supersetGroup: supersetGroup,
-      targetWeightKg:
-          isDuration || week0Specs.isEmpty ? null : week0Specs.first.weightKg,
+      targetWeightKg: isDuration || week0Specs.isEmpty
+          ? null
+          : week0Specs.first.weightKg,
       targetReps: targetReps,
       durationSeconds: durationSeconds,
       exerciseMode: slot.exerciseMode,
@@ -649,7 +1192,9 @@ class _RoutineEditorWebScreenState
       weeklySets: _numWeeks > 1
           ? slot.weeklySets.map((wk) => wk.map(toSpec).toList()).toList()
           : const [],
-      // activeWeeks stays empty (presence mask) — Fase 4c, still out of scope.
+      // Presence mask: sorted for deterministic wire output. Empty stays
+      // empty — present in all (the only) week (Fase 4c).
+      activeWeeks: slot.activeWeeks.toList()..sort(),
     );
   }
 
@@ -688,8 +1233,11 @@ class _RoutineEditorWebScreenState
       if (_isEditing) {
         // Preserve the loaded routine's identity (id, assignedBy/To, source,
         // createdAt, …). updateAssigned only writes name/split/level/days/
-        // numWeeks — the guard [isRoutineWebEditable] already ensured the plan
-        // had no advanced `days` data to lose.
+        // numWeeks — `days` is rebuilt from a form that models 100% of
+        // RoutineSlot's schema, so nothing is lost on re-save (Fase 4c).
+        // updateTemplate/updateAssigned each write only name/split/level/days/
+        // numWeeks — `days` is rebuilt from a form that models 100% of
+        // RoutineSlot's schema, so nothing is lost on re-save.
         final draft = _loadedRoutine!.copyWith(
           name: _nameCtrl.text.trim(),
           split: _splitCtrl.text.trim(),
@@ -697,7 +1245,27 @@ class _RoutineEditorWebScreenState
           days: days,
           numWeeks: _numWeeks,
         );
-        await repo.updateAssigned(uid: trainerUid, draft: draft);
+        if (widget.isTemplate) {
+          await repo.updateTemplate(uid: trainerUid, draft: draft);
+        } else {
+          await repo.updateAssigned(uid: trainerUid, draft: draft);
+        }
+      } else if (widget.isTemplate) {
+        // A template has no athlete. createTemplate forces
+        // source=trainer-template / assignedTo=null / visibility=private to
+        // satisfy firestore.rules (templates accept ONLY 'private').
+        final template = Routine(
+          id: '',
+          name: _nameCtrl.text.trim(),
+          split: _splitCtrl.text.trim(),
+          level: _level,
+          days: days,
+          numWeeks: _numWeeks,
+          source: RoutineSource.trainerTemplate,
+          assignedBy: trainerUid,
+          visibility: RoutineVisibility.private,
+        );
+        await repo.createTemplate(template);
       } else {
         final routine = Routine(
           id: '',
@@ -717,17 +1285,19 @@ class _RoutineEditorWebScreenState
         );
         await repo.createAssigned(routine);
       }
-      // assignedRoutinesProvider is a one-shot FutureProvider (not a stream) —
-      // invalidate so the athlete detail's "Rutina activa" card picks up the
-      // change on return.
-      ref.invalidate(assignedRoutinesProvider(widget.athleteId));
+      // trainerTemplatesStreamProvider is a live stream — no invalidation
+      // needed. The assigned list is a one-shot FutureProvider, so invalidate
+      // it so the athlete detail's "Rutina activa" card refreshes on return.
+      if (!widget.isTemplate) {
+        ref.invalidate(assignedRoutinesProvider(widget.athleteId!));
+      }
       if (mounted) context.pop();
     } catch (_) {
       if (mounted) {
         setState(() {
           _submitting = false;
           _errorMessage =
-              'No pudimos guardar la rutina. Probá de nuevo.'; // i18n
+              'No pudimos guardar la $_noun. Probá de nuevo.'; // i18n
         });
       }
     }
@@ -745,24 +1315,35 @@ class _RoutineEditorWebScreenState
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: palette.bgCard,
-        title: Text('¿Descartar los cambios?', // i18n
-            style: GoogleFonts.barlowCondensed(
-                color: palette.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.w700)),
-        content: Text('Lo que armaste se va a perder.', // i18n
-            style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14)),
+        title: Text(
+          '¿Descartar los cambios?', // i18n
+          style: GoogleFonts.barlowCondensed(
+            color: palette.textPrimary,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        content: Text(
+          'Lo que armaste se va a perder.', // i18n
+          style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text('Volver', // i18n
-                style: GoogleFonts.barlow(color: palette.textMuted)),
+            child: Text(
+              'Volver', // i18n
+              style: GoogleFonts.barlow(color: palette.textMuted),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text('Descartar', // i18n
-                style: GoogleFonts.barlow(
-                    color: palette.danger, fontWeight: FontWeight.w600)),
+            child: Text(
+              'Descartar', // i18n
+              style: GoogleFonts.barlow(
+                color: palette.danger,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
@@ -775,9 +1356,15 @@ class _RoutineEditorWebScreenState
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final profileAsync = ref.watch(userPublicProfileProvider(widget.athleteId));
-    final athleteName =
-        profileAsync.valueOrNull?.displayName ?? 'el alumno'; // i18n
+    // Only resolve the athlete in assigned mode — the profile family is keyed
+    // by a non-null id, and a template has no athlete.
+    final athleteName = widget.isTemplate
+        ? null
+        : ref
+                  .watch(userPublicProfileProvider(widget.athleteId!))
+                  .valueOrNull
+                  ?.displayName ??
+              'el alumno'; // i18n
 
     return PopScope(
       canPop: !_isDirty,
@@ -802,7 +1389,7 @@ class _RoutineEditorWebScreenState
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _isEditing ? 'Editar rutina' : 'Nueva rutina', // i18n
+                        _headerTitle, // i18n
                         style: GoogleFonts.barlowCondensed(
                           fontWeight: FontWeight.w700,
                           fontSize: 20,
@@ -811,9 +1398,13 @@ class _RoutineEditorWebScreenState
                         ),
                       ),
                       Text(
-                        'Para $athleteName', // i18n
+                        widget.isTemplate
+                            ? 'Plantilla reutilizable, sin alumno' // i18n
+                            : 'Para $athleteName', // i18n
                         style: GoogleFonts.barlow(
-                            color: palette.textMuted, fontSize: 13),
+                          color: palette.textMuted,
+                          fontSize: 13,
+                        ),
                       ),
                     ],
                   ),
@@ -827,142 +1418,203 @@ class _RoutineEditorWebScreenState
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : _fatalMessage != null
-                    ? _FatalMessage(
-                        message: _fatalMessage!,
-                        palette: palette,
-                        onBack: _onBackTap,
-                      )
-                    : SingleChildScrollView(
-                        padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-                        child: Align(
-                          alignment: Alignment.topCenter,
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 720),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                if (_errorMessage != null) ...[
-                                  _ErrorBanner(
-                                      message: _errorMessage!,
-                                      palette: palette),
-                                  const SizedBox(height: 16),
-                                ],
-                                _FieldLabel('NOMBRE', palette), // i18n
-                                const SizedBox(height: 6),
-                                TextField(
-                                  key: const Key('routine_editor_name_field'),
-                                  controller: _nameCtrl,
-                                  onChanged: (_) => _markDirty(),
-                                  style: GoogleFonts.barlow(
-                                      color: palette.textPrimary),
-                                  decoration: _inputDecoration(
-                                      palette, 'Ej: Fuerza 4x semana'), // i18n
-                                ),
-                                const SizedBox(height: 16),
-                                _FieldLabel('SPLIT', palette), // i18n
-                                const SizedBox(height: 6),
-                                TextField(
-                                  key: const Key('routine_editor_split_field'),
-                                  controller: _splitCtrl,
-                                  onChanged: (_) => _markDirty(),
-                                  style: GoogleFonts.barlow(
-                                      color: palette.textPrimary),
-                                  decoration: _inputDecoration(
-                                      palette, 'Ej: Push/Pull/Legs'), // i18n
-                                ),
-                                const SizedBox(height: 16),
-                                _FieldLabel('NIVEL', palette), // i18n
-                                const SizedBox(height: 8),
-                                _LevelSelector(
-                                  selected: _level,
-                                  palette: palette,
-                                  onChanged: (l) {
-                                    _markDirty();
-                                    setState(() => _level = l);
-                                  },
-                                ),
-                                const SizedBox(height: 24),
-                                _FieldLabel('SEMANAS', palette), // i18n
-                                const SizedBox(height: 8),
-                                _WeeksStepper(
-                                  numWeeks: _numWeeks,
-                                  palette: palette,
-                                  onChanged: _setNumWeeks,
-                                ),
-                                const SizedBox(height: 24),
-                                _FieldLabel('DÍAS', palette), // i18n
-                                const SizedBox(height: 8),
-                                // Global week switcher (Fase 4b) — one row for
-                                // the whole plan since `_selectedWeek` isn't
-                                // per-day. Hidden for single-week plans.
-                                if (_numWeeks > 1) ...[
-                                  _WeekTabs(
-                                    numWeeks: _numWeeks,
-                                    selectedWeek: _selectedWeek,
-                                    palette: palette,
-                                    onSelected: (w) =>
-                                        setState(() => _selectedWeek = w),
-                                  ),
-                                  const SizedBox(height: 12),
-                                ],
-                                for (var i = 0; i < _days.length; i++) ...[
-                                  _DayCard(
-                                    day: _days[i],
-                                    palette: palette,
-                                    selectedWeek: _selectedWeek,
-                                    canRemove: _days.length > 1,
-                                    onNameChanged: (v) =>
-                                        _onDayNameChanged(i, v),
-                                    onRemove: () => _removeDay(i),
-                                    onAddExercises: () => _addExercisesToDay(i),
-                                    onRemoveSlot: (s) => _removeSlot(i, s),
-                                    onMoveSlot: (s, dir) =>
-                                        _moveSlot(i, s, dir),
-                                    onRestChanged: (s, v) =>
-                                        _onRestChanged(i, s, v),
-                                    onAddSet: (s) => _addSet(i, s),
-                                    onRemoveSet: (s, set) =>
-                                        _removeSet(i, s, set),
-                                    onSetRepsChanged: (s, set, v) =>
-                                        _onSetRepsChanged(i, s, set, v),
-                                    onSetRepsMinChanged: (s, set, v) =>
-                                        _onSetRepsMinChanged(i, s, set, v),
-                                    onSetRepsMaxChanged: (s, set, v) =>
-                                        _onSetRepsMaxChanged(i, s, set, v),
-                                    onSetDurationChanged: (s, set, v) =>
-                                        _onSetDurationChanged(i, s, set, v),
-                                    onSetWeightChanged: (s, set, v) =>
-                                        _onSetWeightChanged(i, s, set, v),
-                                    onModeChanged: (s, em, rm) =>
-                                        _setSlotMode(i, s, em, rm),
-                                    onNotesChanged: (s, v) =>
-                                        _onNotesChanged(i, s, v),
-                                    onToggleLink: (s) => _toggleSlotLink(i, s),
-                                  ),
-                                  const SizedBox(height: 12),
-                                ],
-                                if (_days.length < _kMaxDays)
-                                  OutlinedButton.icon(
-                                    key: const Key(
-                                        'routine_editor_add_day_button'),
-                                    onPressed: _addDay,
-                                    icon: Icon(TreinoIcon.plus,
-                                        size: 18, color: palette.accent),
-                                    label: Text('Agregar día', // i18n
-                                        style: GoogleFonts.barlowCondensed(
-                                            color: palette.accent,
-                                            fontWeight: FontWeight.w700)),
-                                    style: OutlinedButton.styleFrom(
-                                      side: BorderSide(color: palette.accent),
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 14),
+                ? _FatalMessage(
+                    message: _fatalMessage!,
+                    palette: palette,
+                    onBack: _onBackTap,
+                  )
+                : SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 720),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (_errorMessage != null) ...[
+                              _ErrorBanner(
+                                message: _errorMessage!,
+                                palette: palette,
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+                            _FieldLabel('NOMBRE', palette), // i18n
+                            const SizedBox(height: 6),
+                            TextField(
+                              key: const Key('routine_editor_name_field'),
+                              controller: _nameCtrl,
+                              onChanged: (_) => _markDirty(),
+                              style: GoogleFonts.barlow(
+                                color: palette.textPrimary,
+                              ),
+                              decoration: _inputDecoration(
+                                palette,
+                                'Ej: Fuerza 4x semana',
+                              ), // i18n
+                            ),
+                            const SizedBox(height: 16),
+                            _FieldLabel('SPLIT', palette), // i18n
+                            const SizedBox(height: 6),
+                            TextField(
+                              key: const Key('routine_editor_split_field'),
+                              controller: _splitCtrl,
+                              onChanged: (_) => _markDirty(),
+                              style: GoogleFonts.barlow(
+                                color: palette.textPrimary,
+                              ),
+                              decoration: _inputDecoration(
+                                palette,
+                                'Ej: Push/Pull/Legs',
+                              ), // i18n
+                            ),
+                            const SizedBox(height: 16),
+                            _FieldLabel('NIVEL', palette), // i18n
+                            const SizedBox(height: 8),
+                            _LevelSelector(
+                              selected: _level,
+                              palette: palette,
+                              onChanged: (l) {
+                                _markDirty();
+                                setState(() => _level = l);
+                              },
+                            ),
+                            const SizedBox(height: 24),
+                            _FieldLabel('SEMANAS', palette), // i18n
+                            const SizedBox(height: 8),
+                            _WeeksStepper(
+                              numWeeks: _numWeeks,
+                              palette: palette,
+                              onChanged: _setNumWeeks,
+                            ),
+                            const SizedBox(height: 24),
+                            _FieldLabel('DÍAS', palette), // i18n
+                            const SizedBox(height: 8),
+                            // Global week switcher (Fase 4b) — one row for
+                            // the whole plan since `_selectedWeek` isn't
+                            // per-day. Hidden for single-week plans.
+                            if (_numWeeks > 1) ...[
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _WeekTabs(
+                                      numWeeks: _numWeeks,
+                                      selectedWeek: _selectedWeek,
+                                      weeksWithError: _weeksWithError(),
+                                      palette: palette,
+                                      onSelected: (w) =>
+                                          setState(() => _selectedWeek = w),
                                     ),
                                   ),
-                              ],
-                            ),
-                          ),
+                                  // Nothing to copy from on week 1.
+                                  if (_selectedWeek > 0) ...[
+                                    const SizedBox(width: 8),
+                                    _DuplicateWeekButton(
+                                      sourceWeek: _selectedWeek - 1,
+                                      palette: palette,
+                                      onPressed: _duplicateWeek,
+                                    ),
+                                  ],
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                            // Live pointer to the first structural problem so a
+                            // long multi-week plan doesn't have to be submitted
+                            // blind (REQ-PERIOD-016). Name/split stay on submit.
+                            if (_firstInvalidHint() != null) ...[
+                              Container(
+                                key: const Key('invalid_week_hint'),
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: palette.danger.withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: palette.danger.withValues(alpha: 0.4),
+                                  ),
+                                ),
+                                child: Text(
+                                  _firstInvalidHint()!,
+                                  style: GoogleFonts.barlow(
+                                    color: palette.danger,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                            for (var i = 0; i < _days.length; i++) ...[
+                              _DayCard(
+                                day: _days[i],
+                                palette: palette,
+                                selectedWeek: _selectedWeek,
+                                numWeeks: _numWeeks,
+                                hasError: _dayHasError(_days[i]),
+                                slotHasError: _slotHasError,
+                                slotErrorText: _slotErrorText,
+                                canRemove: _days.length > 1,
+                                onNameChanged: (v) => _onDayNameChanged(i, v),
+                                onRemove: () => _removeDay(i),
+                                onAddExercises: () => _addExercisesToDay(i),
+                                onRemoveSlot: (s) => _onDeleteSlot(i, s),
+                                onReplaceSlot: (s) =>
+                                    _replaceSlotExercise(i, s),
+                                onMoveSlot: (s, dir) => _moveSlot(i, s, dir),
+                                onRestChanged: (s, v) =>
+                                    _onRestChanged(i, s, v),
+                                onAddSet: (s) => _addSet(i, s),
+                                onRemoveSet: (s, set) => _removeSet(i, s, set),
+                                onSetRepsChanged: (s, set, v) =>
+                                    _onSetRepsChanged(i, s, set, v),
+                                onSetRepsMinChanged: (s, set, v) =>
+                                    _onSetRepsMinChanged(i, s, set, v),
+                                onSetRepsMaxChanged: (s, set, v) =>
+                                    _onSetRepsMaxChanged(i, s, set, v),
+                                onSetDurationChanged: (s, set, v) =>
+                                    _onSetDurationChanged(i, s, set, v),
+                                onSetWeightChanged: (s, set, v) =>
+                                    _onSetWeightChanged(i, s, set, v),
+                                onSetTypeChanged: (s, set, t) =>
+                                    _onSetTypeChanged(i, s, set, t),
+                                onModeChanged: (s, em, rm) =>
+                                    _setSlotMode(i, s, em, rm),
+                                onNotesChanged: (s, v) =>
+                                    _onNotesChanged(i, s, v),
+                                onToggleLink: (s) => _toggleSlotLink(i, s),
+                                onTogglePresence: (s, w) =>
+                                    _toggleSlotWeekPresence(i, s, w),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                            if (_days.length < _kMaxDays)
+                              OutlinedButton.icon(
+                                key: const Key('routine_editor_add_day_button'),
+                                onPressed: _addDay,
+                                icon: Icon(
+                                  TreinoIcon.plus,
+                                  size: 18,
+                                  color: palette.accent,
+                                ),
+                                label: Text(
+                                  'Agregar día', // i18n
+                                  style: GoogleFonts.barlowCondensed(
+                                    color: palette.accent,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(color: palette.accent),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
+                    ),
+                  ),
           ),
           // ── Footer (hidden while loading or when blocked) ───────────────
           if (!_loading && _fatalMessage == null)
@@ -976,8 +1628,10 @@ class _RoutineEditorWebScreenState
                 children: [
                   TextButton(
                     onPressed: _submitting ? null : _onBackTap,
-                    child: Text('Cancelar', // i18n
-                        style: GoogleFonts.barlow(color: palette.textMuted)),
+                    child: Text(
+                      'Cancelar', // i18n
+                      style: GoogleFonts.barlow(color: palette.textMuted),
+                    ),
                   ),
                   const SizedBox(width: 8),
                   ElevatedButton(
@@ -987,18 +1641,22 @@ class _RoutineEditorWebScreenState
                       backgroundColor: palette.accent,
                       foregroundColor: palette.bg,
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(9999)),
+                        borderRadius: BorderRadius.circular(9999),
+                      ),
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 24, vertical: 14),
+                        horizontal: 24,
+                        vertical: 14,
+                      ),
                     ),
                     child: Text(
                       _submitting
                           ? 'Guardando…'
                           : _isEditing
-                              ? 'Guardar cambios'
-                              : 'Asignar rutina', // i18n
+                          ? 'Guardar cambios'
+                          : 'Asignar rutina', // i18n
                       style: GoogleFonts.barlowCondensed(
-                          fontWeight: FontWeight.w700),
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ],
@@ -1070,8 +1728,10 @@ class _ErrorBanner extends StatelessWidget {
           Icon(TreinoIcon.warning, color: palette.danger, size: 18),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(message,
-                style: GoogleFonts.barlow(color: palette.danger, fontSize: 13)),
+            child: Text(
+              message,
+              style: GoogleFonts.barlow(color: palette.danger, fontSize: 13),
+            ),
           ),
         ],
       ),
@@ -1112,12 +1772,18 @@ class _FatalMessage extends StatelessWidget {
               onPressed: onBack,
               style: OutlinedButton.styleFrom(
                 side: BorderSide(color: palette.border),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
               ),
-              child: Text('Volver', // i18n
-                  style: GoogleFonts.barlowCondensed(
-                      color: palette.textPrimary, fontWeight: FontWeight.w700)),
+              child: Text(
+                'Volver', // i18n
+                style: GoogleFonts.barlowCondensed(
+                  color: palette.textPrimary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
           ],
         ),
@@ -1154,9 +1820,10 @@ class _WeeksStepper extends StatelessWidget {
           child: Text(
             numWeeks == 1 ? '1 semana' : '$numWeeks semanas', // i18n
             style: GoogleFonts.barlowCondensed(
-                color: palette.textPrimary,
-                fontSize: 16,
-                fontWeight: FontWeight.w700),
+              color: palette.textPrimary,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
         _StepButton(
@@ -1169,7 +1836,9 @@ class _WeeksStepper extends StatelessWidget {
         if (numWeeks > 1)
           Expanded(
             child: Text(
-              'Misma rutina cada semana.', // i18n
+              // Fase 4b hizo cada semana independiente — el cartel viejo
+              // ("misma rutina cada semana") ya no era cierto.
+              'Cada semana se carga por separado.', // i18n
               style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 12),
             ),
           ),
@@ -1203,9 +1872,10 @@ class _StepButton extends StatelessWidget {
           color: palette.bgCard,
           borderRadius: BorderRadius.circular(9999),
           border: Border.all(
-              color: enabled
-                  ? palette.border
-                  : palette.border.withValues(alpha: 0.4)),
+            color: enabled
+                ? palette.border
+                : palette.border.withValues(alpha: 0.4),
+          ),
         ),
         child: Text(
           label,
@@ -1271,12 +1941,18 @@ class _DayCard extends StatelessWidget {
     required this.day,
     required this.palette,
     required this.selectedWeek,
+    required this.numWeeks,
+    required this.hasError,
+    required this.slotHasError,
+    required this.slotErrorText,
     required this.canRemove,
     required this.onNameChanged,
     required this.onRemove,
     required this.onAddExercises,
     required this.onRemoveSlot,
+    required this.onReplaceSlot,
     required this.onMoveSlot,
+    required this.onSetTypeChanged,
     required this.onRestChanged,
     required this.onAddSet,
     required this.onRemoveSet,
@@ -1288,6 +1964,7 @@ class _DayCard extends StatelessWidget {
     required this.onModeChanged,
     required this.onNotesChanged,
     required this.onToggleLink,
+    required this.onTogglePresence,
   });
 
   final _EditorDay day;
@@ -1296,29 +1973,46 @@ class _DayCard extends StatelessWidget {
   /// 0-based week whose `weeklySets` entry each slot card should render
   /// (Fase 4b) — threaded down to [_SlotCard].
   final int selectedWeek;
+
+  /// Total plan weeks — threaded down to [_SlotCard] so it knows whether to
+  /// render the presence chips row and whether to dim (Fase 4c).
+  final int numWeeks;
+
+  /// Live validation: the day has no exercise, or one of its slots is
+  /// incomplete. Drives the red border + header dot (REQ-PERIOD-016).
+  final bool hasError;
+
+  /// Per-slot validity, evaluated live by the parent state and threaded so each
+  /// [_SlotCard] can paint its own red border + reason without re-deriving.
+  final bool Function(_EditorSlot slot) slotHasError;
+  final String? Function(_EditorSlot slot) slotErrorText;
   final bool canRemove;
   final ValueChanged<String> onNameChanged;
   final VoidCallback onRemove;
   final VoidCallback onAddExercises;
   final void Function(int slotIndex) onRemoveSlot;
+  final void Function(int slotIndex) onReplaceSlot;
   final void Function(int slotIndex, int dir) onMoveSlot;
   final void Function(int slotIndex, String value) onRestChanged;
   final void Function(int slotIndex) onAddSet;
   final void Function(int slotIndex, int setIndex) onRemoveSet;
   final void Function(int slotIndex, int setIndex, String value)
-      onSetRepsChanged;
+  onSetRepsChanged;
   final void Function(int slotIndex, int setIndex, String value)
-      onSetRepsMinChanged;
+  onSetRepsMinChanged;
   final void Function(int slotIndex, int setIndex, String value)
-      onSetRepsMaxChanged;
+  onSetRepsMaxChanged;
   final void Function(int slotIndex, int setIndex, String value)
-      onSetDurationChanged;
+  onSetDurationChanged;
   final void Function(int slotIndex, int setIndex, String value)
-      onSetWeightChanged;
+  onSetWeightChanged;
+  final void Function(int slotIndex, int setIndex, SetType type)
+  onSetTypeChanged;
   final void Function(int slotIndex, ExerciseMode exerciseMode, RepMode repMode)
-      onModeChanged;
+  onModeChanged;
   final void Function(int slotIndex, String value) onNotesChanged;
   final void Function(int slotIndex) onToggleLink;
+  final void Function(int slotIndex, int week) onTogglePresence;
 
   @override
   Widget build(BuildContext context) {
@@ -1327,7 +2021,12 @@ class _DayCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: palette.bgCard,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: palette.border),
+        border: Border.all(
+          color: hasError
+              ? palette.danger.withValues(alpha: 0.6)
+              : palette.border,
+          width: hasError ? 1.5 : 1,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1349,11 +2048,24 @@ class _DayCard extends StatelessWidget {
                   ),
                 ),
               ),
+              if (hasError)
+                Container(
+                  width: 8,
+                  height: 8,
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    color: palette.danger,
+                    shape: BoxShape.circle,
+                  ),
+                ),
               if (canRemove)
                 IconButton(
                   tooltip: 'Eliminar día', // i18n
-                  icon: Icon(TreinoIcon.trash,
-                      size: 18, color: palette.textMuted),
+                  icon: Icon(
+                    TreinoIcon.trash,
+                    size: 18,
+                    color: palette.textMuted,
+                  ),
                   onPressed: onRemove,
                 ),
             ],
@@ -1364,14 +2076,18 @@ class _DayCard extends StatelessWidget {
               slot: day.slots[i],
               palette: palette,
               selectedWeek: selectedWeek,
+              numWeeks: numWeeks,
+              hasError: slotHasError(day.slots[i]),
+              errorText: slotErrorText(day.slots[i]),
               canMoveUp: i > 0,
               canMoveDown: i < day.slots.length - 1,
               canLink: i < day.slots.length - 1,
               linkedToNext: day.slots[i].linkedToNext,
               inSuperset:
                   (i < day.slots.length - 1 && day.slots[i].linkedToNext) ||
-                      (i > 0 && day.slots[i - 1].linkedToNext),
+                  (i > 0 && day.slots[i - 1].linkedToNext),
               onRemove: () => onRemoveSlot(i),
+              onReplace: () => onReplaceSlot(i),
               onMoveUp: () => onMoveSlot(i, -1),
               onMoveDown: () => onMoveSlot(i, 1),
               onRestChanged: (v) => onRestChanged(i, v),
@@ -1382,20 +2098,25 @@ class _DayCard extends StatelessWidget {
               onSetRepsMaxChanged: (set, v) => onSetRepsMaxChanged(i, set, v),
               onSetDurationChanged: (set, v) => onSetDurationChanged(i, set, v),
               onSetWeightChanged: (set, v) => onSetWeightChanged(i, set, v),
+              onSetTypeChanged: (set, t) => onSetTypeChanged(i, set, t),
               onModeChanged: (em, rm) => onModeChanged(i, em, rm),
               onNotesChanged: (v) => onNotesChanged(i, v),
               onToggleLink: () => onToggleLink(i),
+              onTogglePresence: (w) => onTogglePresence(i, w),
             ),
           ],
           const SizedBox(height: 10),
           OutlinedButton.icon(
             onPressed: onAddExercises,
             icon: Icon(TreinoIcon.plus, size: 16, color: palette.accent),
-            label: Text('Agregar ejercicio', // i18n
-                style: GoogleFonts.barlowCondensed(
-                    color: palette.accent,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13)),
+            label: Text(
+              'Agregar ejercicio', // i18n
+              style: GoogleFonts.barlowCondensed(
+                color: palette.accent,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
+            ),
             style: OutlinedButton.styleFrom(
               side: BorderSide(color: palette.border),
               padding: const EdgeInsets.symmetric(vertical: 10),
@@ -1414,14 +2135,19 @@ class _SlotCard extends StatelessWidget {
     required this.slot,
     required this.palette,
     required this.selectedWeek,
+    required this.numWeeks,
+    required this.hasError,
+    required this.errorText,
     required this.canMoveUp,
     required this.canMoveDown,
     required this.canLink,
     required this.linkedToNext,
     required this.inSuperset,
     required this.onRemove,
+    required this.onReplace,
     required this.onMoveUp,
     required this.onMoveDown,
+    required this.onSetTypeChanged,
     required this.onRestChanged,
     required this.onAddSet,
     required this.onRemoveSet,
@@ -1433,6 +2159,7 @@ class _SlotCard extends StatelessWidget {
     required this.onModeChanged,
     required this.onNotesChanged,
     required this.onToggleLink,
+    required this.onTogglePresence,
   });
 
   final _EditorSlot slot;
@@ -1440,12 +2167,23 @@ class _SlotCard extends StatelessWidget {
 
   /// 0-based week whose `slot.weeklySets` entry this card renders (Fase 4b).
   final int selectedWeek;
+
+  /// Total plan weeks. The presence chips row ("Semanas:") and the dimming of
+  /// exercises absent from [selectedWeek] only apply when this is > 1
+  /// (Fase 4c).
+  final int numWeeks;
+
+  /// Live validation for this exercise (a scheduled week has an incomplete set,
+  /// or it names no valid week). Paints the red border + the [errorText] line.
+  final bool hasError;
+  final String? errorText;
   final bool canMoveUp;
   final bool canMoveDown;
   final bool canLink; // false for the last slot of a day (nothing to link to)
   final bool linkedToNext;
   final bool inSuperset; // part of a >=2 superset run → accent border
   final VoidCallback onRemove;
+  final VoidCallback onReplace;
   final VoidCallback onMoveUp;
   final VoidCallback onMoveDown;
   final ValueChanged<String> onRestChanged;
@@ -1456,9 +2194,11 @@ class _SlotCard extends StatelessWidget {
   final void Function(int setIndex, String value) onSetRepsMaxChanged;
   final void Function(int setIndex, String value) onSetDurationChanged;
   final void Function(int setIndex, String value) onSetWeightChanged;
+  final void Function(int setIndex, SetType type) onSetTypeChanged;
   final void Function(ExerciseMode exerciseMode, RepMode repMode) onModeChanged;
   final ValueChanged<String> onNotesChanged;
   final VoidCallback onToggleLink;
+  final ValueChanged<int> onTogglePresence;
 
   @override
   Widget build(BuildContext context) {
@@ -1466,14 +2206,19 @@ class _SlotCard extends StatelessWidget {
     // The sets for the currently-viewed week only — other weeks' rows aren't
     // rendered while a different tab is selected (Fase 4b).
     final weekSets = slot.weeklySets[selectedWeek];
-    return Container(
+    final card = Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: palette.bg,
         borderRadius: BorderRadius.circular(10),
         // Slots in a superset run share an accent-tinted border to read as a
         // group (the "link with next" toggle is what forms the run).
-        border: inSuperset
+        border: hasError
+            ? Border.all(
+                color: palette.danger.withValues(alpha: 0.75),
+                width: 1.5,
+              )
+            : inSuperset
             ? Border.all(color: palette.accent.withValues(alpha: 0.55))
             : null,
       ),
@@ -1483,37 +2228,67 @@ class _SlotCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Text(
-                  exercise?.name ?? '—',
-                  style: GoogleFonts.barlow(
-                      color: palette.textPrimary,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14),
+                child: InkWell(
+                  onTap: onReplace,
+                  borderRadius: BorderRadius.circular(6),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Text(
+                      exercise?.name ?? '—',
+                      style: GoogleFonts.barlow(
+                        color: palette.textPrimary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
                 ),
               ),
               IconButton(
+                tooltip: 'Cambiar ejercicio', // i18n
+                icon: Icon(TreinoIcon.edit, size: 15, color: palette.textMuted),
+                onPressed: onReplace,
+                visualDensity: VisualDensity.compact,
+              ),
+              IconButton(
                 tooltip: 'Subir', // i18n
-                icon: Icon(TreinoIcon.chevronUp,
-                    size: 16, color: palette.textMuted),
+                icon: Icon(
+                  TreinoIcon.chevronUp,
+                  size: 16,
+                  color: palette.textMuted,
+                ),
                 onPressed: canMoveUp ? onMoveUp : null,
                 visualDensity: VisualDensity.compact,
               ),
               IconButton(
                 tooltip: 'Bajar', // i18n
-                icon: Icon(TreinoIcon.chevronDown,
-                    size: 16, color: palette.textMuted),
+                icon: Icon(
+                  TreinoIcon.chevronDown,
+                  size: 16,
+                  color: palette.textMuted,
+                ),
                 onPressed: canMoveDown ? onMoveDown : null,
                 visualDensity: VisualDensity.compact,
               ),
               IconButton(
                 tooltip: 'Quitar ejercicio', // i18n
-                icon:
-                    Icon(TreinoIcon.trash, size: 16, color: palette.textMuted),
+                icon: Icon(
+                  TreinoIcon.trash,
+                  size: 16,
+                  color: palette.textMuted,
+                ),
                 onPressed: onRemove,
                 visualDensity: VisualDensity.compact,
               ),
             ],
           ),
+          if (errorText != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              errorText!,
+              style: GoogleFonts.barlow(color: palette.danger, fontSize: 12),
+            ),
+          ],
           const SizedBox(height: 6),
           // Modo del ejercicio: reps fijas / rango (mín–máx) / tiempo (paridad
           // con mobile, Fases 1-2). exerciseMode + repMode combinados en 3 chips.
@@ -1521,7 +2296,8 @@ class _SlotCard extends StatelessWidget {
             children: [
               _ModeChip(
                 label: 'Reps', // i18n
-                selected: slot.exerciseMode == ExerciseMode.reps &&
+                selected:
+                    slot.exerciseMode == ExerciseMode.reps &&
                     slot.repMode == RepMode.single,
                 palette: palette,
                 onTap: () => onModeChanged(ExerciseMode.reps, RepMode.single),
@@ -1529,7 +2305,8 @@ class _SlotCard extends StatelessWidget {
               const SizedBox(width: 6),
               _ModeChip(
                 label: 'Rango', // i18n
-                selected: slot.exerciseMode == ExerciseMode.reps &&
+                selected:
+                    slot.exerciseMode == ExerciseMode.reps &&
                     slot.repMode == RepMode.range,
                 palette: palette,
                 onTap: () => onModeChanged(ExerciseMode.reps, RepMode.range),
@@ -1545,11 +2322,47 @@ class _SlotCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 6),
+          // Presence mask (Fase 4c): which weeks this exercise is present in.
+          // Only meaningful for multi-week plans.
+          if (numWeeks > 1) ...[
+            Row(
+              children: [
+                Text(
+                  'Semanas:', // i18n
+                  style: GoogleFonts.barlow(
+                    color: palette.textMuted,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (var w = 0; w < numWeeks; w++)
+                        _PresenceChip(
+                          index: w,
+                          present: slot.isPresentInWeek(w),
+                          palette: palette,
+                          onTap: () => onTogglePresence(w),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+          ],
           Row(
             children: [
-              Text('Descanso (seg)', // i18n
-                  style: GoogleFonts.barlow(
-                      color: palette.textMuted, fontSize: 12)),
+              Text(
+                'Descanso (seg)', // i18n
+                style: GoogleFonts.barlow(
+                  color: palette.textMuted,
+                  fontSize: 12,
+                ),
+              ),
               const SizedBox(width: 8),
               SizedBox(
                 width: 60,
@@ -1558,7 +2371,9 @@ class _SlotCard extends StatelessWidget {
                   keyboardType: TextInputType.number,
                   onChanged: onRestChanged,
                   style: GoogleFonts.barlow(
-                      color: palette.textPrimary, fontSize: 13),
+                    color: palette.textPrimary,
+                    fontSize: 13,
+                  ),
                   decoration: const InputDecoration(isDense: true),
                 ),
               ),
@@ -1576,6 +2391,7 @@ class _SlotCard extends StatelessWidget {
               palette: palette,
               exerciseMode: slot.exerciseMode,
               repMode: slot.repMode,
+              showErrors: hasError,
               canRemove: weekSets.length > 1,
               onRemove: () => onRemoveSet(i),
               onRepsChanged: (v) => onSetRepsChanged(i, v),
@@ -1583,17 +2399,22 @@ class _SlotCard extends StatelessWidget {
               onRepsMaxChanged: (v) => onSetRepsMaxChanged(i, v),
               onDurationChanged: (v) => onSetDurationChanged(i, v),
               onWeightChanged: (v) => onSetWeightChanged(i, v),
+              chipLabel: _setChipLabel(weekSets, i),
+              onTypeChanged: (t) => onSetTypeChanged(i, t),
             ),
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton.icon(
               onPressed: onAddSet,
               icon: Icon(TreinoIcon.plus, size: 14, color: palette.accent),
-              label: Text('Agregar set', // i18n
-                  style: GoogleFonts.barlowCondensed(
-                      color: palette.accent,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12)),
+              label: Text(
+                'Agregar set', // i18n
+                style: GoogleFonts.barlowCondensed(
+                  color: palette.accent,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                ),
+              ),
             ),
           ),
           // Coaching note for this exercise (optional). Located in tests via
@@ -1608,8 +2429,10 @@ class _SlotCard extends StatelessWidget {
             decoration: InputDecoration(
               isDense: true,
               hintText: 'Notas para el alumno (opcional)', // i18n
-              hintStyle:
-                  GoogleFonts.barlow(color: palette.textMuted, fontSize: 12),
+              hintStyle: GoogleFonts.barlow(
+                color: palette.textMuted,
+                fontSize: 12,
+              ),
               counterText: '',
             ),
           ),
@@ -1640,10 +2463,86 @@ class _SlotCard extends StatelessWidget {
         ],
       ),
     );
+    // Dim (not hide) an exercise absent from the currently-viewed week so the
+    // trainer still sees it and can re-add it via the presence chips above
+    // (Fase 4c). Opacity alone doesn't block hit-testing, so the chips stay
+    // tappable while dimmed.
+    if (numWeeks > 1 && !slot.isPresentInWeek(selectedWeek)) {
+      return Opacity(opacity: 0.45, child: card);
+    }
+    return card;
   }
 }
 
 // ── Set row ────────────────────────────────────────────────────────────────
+
+/// Tappable leading chip on a set row. Shows a running number for normal sets
+/// and the W/D/F glyph for typed ones; tapping opens a menu to change the
+/// [SetType]. This is the web editor's only way to author warm-up / drop /
+/// failure sets (before this, every set was forced to normal).
+class _SetTypeChip extends StatelessWidget {
+  const _SetTypeChip({
+    required this.label,
+    required this.type,
+    required this.palette,
+    required this.onChanged,
+  });
+
+  final String label;
+  final SetType type;
+  final AppPalette palette;
+  final ValueChanged<SetType> onChanged;
+
+  static const _options = <(SetType, String)>[
+    (SetType.normal, 'Normal'), // i18n
+    (SetType.warmup, 'Entrada en calor (W)'), // i18n
+    (SetType.drop, 'Drop (D)'), // i18n
+    (SetType.failure, 'Al fallo (F)'), // i18n
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final typed = type != SetType.normal;
+    return PopupMenuButton<SetType>(
+      tooltip: 'Tipo de serie', // i18n
+      color: palette.bgCard,
+      padding: EdgeInsets.zero,
+      initialValue: type,
+      onSelected: onChanged,
+      itemBuilder: (_) => [
+        for (final (value, text) in _options)
+          PopupMenuItem<SetType>(
+            value: value,
+            child: Text(
+              text,
+              style: GoogleFonts.barlow(color: palette.textPrimary),
+            ),
+          ),
+      ],
+      child: Container(
+        width: 26,
+        height: 26,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: typed ? palette.accent.withValues(alpha: 0.16) : null,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: typed ? palette.accent : palette.border,
+            width: 1,
+          ),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.barlowCondensed(
+            color: typed ? palette.accent : palette.textMuted,
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _SetRow extends StatelessWidget {
   const _SetRow({
@@ -1653,6 +2552,7 @@ class _SetRow extends StatelessWidget {
     required this.palette,
     required this.exerciseMode,
     required this.repMode,
+    required this.showErrors,
     required this.canRemove,
     required this.onRemove,
     required this.onRepsChanged,
@@ -1660,6 +2560,8 @@ class _SetRow extends StatelessWidget {
     required this.onRepsMaxChanged,
     required this.onDurationChanged,
     required this.onWeightChanged,
+    required this.chipLabel,
+    required this.onTypeChanged,
   });
 
   final int index;
@@ -1667,6 +2569,10 @@ class _SetRow extends StatelessWidget {
   final AppPalette palette;
   final ExerciseMode exerciseMode;
   final RepMode repMode;
+
+  /// When true, invalid number fields in this row paint a red underline — set
+  /// by the parent [_SlotCard] whenever the slot has a validation error.
+  final bool showErrors;
   final bool canRemove;
   final VoidCallback onRemove;
   final ValueChanged<String> onRepsChanged;
@@ -1675,57 +2581,82 @@ class _SetRow extends StatelessWidget {
   final ValueChanged<String> onDurationChanged;
   final ValueChanged<String> onWeightChanged;
 
+  /// Precomputed leading label: the running set number, or W/D/F for a typed
+  /// set (see [_setChipLabel]). Computed in the parent, which holds the week's
+  /// full set list.
+  final String chipLabel;
+  final ValueChanged<SetType> onTypeChanged;
+
   @override
   Widget build(BuildContext context) {
     final isDuration = exerciseMode == ExerciseMode.duration;
     final isRange = !isDuration && repMode == RepMode.range;
+    // Failure sets have no countable target, so their fields never flag red.
+    final flag = showErrors && set.type != SetType.failure;
+    final durationInvalid =
+        flag && (set.durationSeconds == null || set.durationSeconds! <= 0);
+    final repsInvalid = flag && (set.reps == null || set.reps! <= 0);
+    final rangeInvalid = flag &&
+        (set.repsMin == null ||
+            set.repsMin! <= 0 ||
+            set.repsMax == null ||
+            set.repsMax! < set.repsMin!);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
         children: [
-          SizedBox(
-            width: 20,
-            child: Text('${index + 1}',
-                style: GoogleFonts.barlowCondensed(
-                    color: palette.textMuted, fontWeight: FontWeight.w700)),
+          _SetTypeChip(
+            label: chipLabel,
+            type: set.type,
+            palette: palette,
+            onChanged: onTypeChanged,
           ),
           if (isDuration)
             // Duration exercises (planks, cardio) have no weight — just seconds.
             Expanded(
               child: _numberField(
-                  initial: set.durationSeconds?.toString() ?? '',
-                  hint: 'seg', // i18n
-                  onChanged: onDurationChanged),
+                initial: set.durationSeconds?.toString() ?? '',
+                hint: 'seg', // i18n
+                onChanged: onDurationChanged,
+                invalid: durationInvalid,
+              ),
             )
           else ...[
             if (isRange) ...[
               Expanded(
                 child: _numberField(
-                    initial: set.repsMin?.toString() ?? '',
-                    hint: 'mín', // i18n
-                    onChanged: onRepsMinChanged),
+                  initial: set.repsMin?.toString() ?? '',
+                  hint: 'mín', // i18n
+                  onChanged: onRepsMinChanged,
+                  invalid: rangeInvalid,
+                ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: _numberField(
-                    initial: set.repsMax?.toString() ?? '',
-                    hint: 'máx', // i18n
-                    onChanged: onRepsMaxChanged),
+                  initial: set.repsMax?.toString() ?? '',
+                  hint: 'máx', // i18n
+                  onChanged: onRepsMaxChanged,
+                  invalid: rangeInvalid,
+                ),
               ),
             ] else
               Expanded(
                 child: _numberField(
-                    initial: set.reps?.toString() ?? '',
-                    hint: 'reps', // i18n
-                    onChanged: onRepsChanged),
+                  initial: set.reps?.toString() ?? '',
+                  hint: 'reps', // i18n
+                  onChanged: onRepsChanged,
+                  invalid: repsInvalid,
+                ),
               ),
             const SizedBox(width: 8),
             Expanded(
               child: _numberField(
-                  initial: set.weightKg?.toString() ?? '',
-                  hint: 'kg', // i18n
-                  decimal: true,
-                  onChanged: onWeightChanged),
+                initial: set.weightKg?.toString() ?? '',
+                hint: 'kg', // i18n
+                decimal: true,
+                onChanged: onWeightChanged,
+              ),
             ),
           ],
           IconButton(
@@ -1744,7 +2675,11 @@ class _SetRow extends StatelessWidget {
     required String hint,
     required ValueChanged<String> onChanged,
     bool decimal = false,
+    bool invalid = false,
   }) {
+    final redUnderline = UnderlineInputBorder(
+      borderSide: BorderSide(color: palette.danger),
+    );
     return TextFormField(
       initialValue: initial,
       keyboardType: decimal
@@ -1756,6 +2691,8 @@ class _SetRow extends StatelessWidget {
         isDense: true,
         hintText: hint,
         hintStyle: GoogleFonts.barlow(color: palette.textMuted, fontSize: 12),
+        enabledBorder: invalid ? redUnderline : null,
+        focusedBorder: invalid ? redUnderline : null,
       ),
     );
   }
@@ -1806,16 +2743,58 @@ class _ModeChip extends StatelessWidget {
 /// more than one week: one chip per week ("Sem 1".."Sem N"). Tapping a chip
 /// changes which week's sets the day/slot cards render and edit
 /// (`_selectedWeek`) — a single global row since the selection isn't per-day.
+/// "Copiar Sem N acá" — pulls the previous week's prescription into the one
+/// being viewed. Labelled with the SOURCE week (not just "duplicar") because
+/// the direction is the whole point: a 4-week progression is built by copying
+/// forward and tweaking a number, not by re-typing every row.
+class _DuplicateWeekButton extends StatelessWidget {
+  const _DuplicateWeekButton({
+    required this.sourceWeek,
+    required this.palette,
+    required this.onPressed,
+  });
+
+  /// 0-based index of the week being copied FROM.
+  final int sourceWeek;
+  final AppPalette palette;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton.icon(
+      key: const Key('duplicate_week_button'),
+      onPressed: onPressed,
+      icon: Icon(TreinoIcon.copy, size: 16, color: palette.textMuted),
+      label: Text(
+        'Copiar Sem ${sourceWeek + 1} acá', // i18n
+        style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 13),
+      ),
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(color: palette.border),
+        ),
+      ),
+    );
+  }
+}
+
 class _WeekTabs extends StatelessWidget {
   const _WeekTabs({
     required this.numWeeks,
     required this.selectedWeek,
+    required this.weeksWithError,
     required this.palette,
     required this.onSelected,
   });
 
   final int numWeeks;
   final int selectedWeek;
+
+  /// 0-based weeks that currently have a validation error — a warning dot is
+  /// painted on those tabs so the trainer sees WHICH week to open.
+  final Set<int> weeksWithError;
   final AppPalette palette;
   final ValueChanged<int> onSelected;
 
@@ -1829,6 +2808,7 @@ class _WeekTabs extends StatelessWidget {
             _WeekChip(
               index: w,
               selected: w == selectedWeek,
+              warning: weeksWithError.contains(w),
               palette: palette,
               onTap: () => onSelected(w),
             ),
@@ -1848,11 +2828,15 @@ class _WeekChip extends StatelessWidget {
     required this.selected,
     required this.palette,
     required this.onTap,
+    this.warning = false,
   });
 
   /// 0-based week — rendered 1-based ("Sem 1").
   final int index;
   final bool selected;
+
+  /// A slot scheduled in this week has an incomplete set — show a warning dot.
+  final bool warning;
   final AppPalette palette;
   final VoidCallback onTap;
 
@@ -1861,19 +2845,88 @@ class _WeekChip extends StatelessWidget {
     return GestureDetector(
       key: Key('week_tab_$index'),
       onTap: onTap,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+            decoration: BoxDecoration(
+              color: selected ? palette.accent : palette.bgCard,
+              borderRadius: BorderRadius.circular(9999),
+              border: Border.all(
+                color: selected ? palette.accent : palette.border,
+              ),
+            ),
+            child: Text(
+              'Sem ${index + 1}', // i18n
+              style: GoogleFonts.barlowCondensed(
+                color: selected ? palette.bg : palette.textMuted,
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+              ),
+            ),
+          ),
+          if (warning)
+            Positioned(
+              top: -2,
+              right: -2,
+              child: Container(
+                key: Key('week_tab_warning_$index'),
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: palette.danger,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: palette.bg, width: 1),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Presence chips (máscara de presencia por semana, Fase 4c) ───────────────
+
+/// One per-exercise week-presence toggle — filled/accent when the slot is
+/// present in that week ([_SlotCard.slot.isPresentInWeek]), outlined/muted
+/// otherwise. Visually mirrors [_WeekChip]/[_ModeChip], just more compact
+/// since up to `_kMaxWeeks` (16) of these can render per exercise.
+class _PresenceChip extends StatelessWidget {
+  const _PresenceChip({
+    required this.index,
+    required this.present,
+    required this.palette,
+    required this.onTap,
+  });
+
+  /// 0-based week — rendered 1-based ("1".."N").
+  final int index;
+  final bool present;
+  final AppPalette palette;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      key: Key('presence_chip_$index'),
+      onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        width: 26,
+        height: 26,
+        alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: selected ? palette.accent : palette.bgCard,
+          color: present ? palette.accent : palette.bgCard,
           borderRadius: BorderRadius.circular(9999),
-          border: Border.all(color: selected ? palette.accent : palette.border),
+          border: Border.all(color: present ? palette.accent : palette.border),
         ),
         child: Text(
-          'Sem ${index + 1}', // i18n
+          '${index + 1}',
           style: GoogleFonts.barlowCondensed(
-            color: selected ? palette.bg : palette.textMuted,
+            color: present ? palette.bg : palette.textMuted,
             fontWeight: FontWeight.w700,
-            fontSize: 12,
+            fontSize: 11,
           ),
         ),
       ),

@@ -1,12 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/utils/argentina_time.dart';
 import '../../workout/application/exercise_providers.dart';
-import '../../workout/application/routine_providers.dart';
 import '../../workout/application/session_providers.dart';
 import '../../workout/domain/set_log.dart';
 import '../domain/chart_period.dart';
 import '../domain/muscle_distribution_insights.dart';
 import 'muscle_distribution_aggregator.dart';
+import 'routine_slot_groups.dart';
 
 /// Number of sessions to scan for the muscle distribution radar — mirrors
 /// [kProgressionSessionScan]'s bounded-scan convention.
@@ -27,14 +28,12 @@ typedef MuscleDistributionKey = ({String uid, ChartPeriod period});
 /// "never truncate inside the selected window" rule as
 /// [exerciseProgressionProvider]).
 ///
-/// Exercise → muscleGroup resolution mirrors [weeklyInsightsProvider]:
-/// public catalog first, then a per-SESSION routine-slot fallback for
-/// custom exercises absent from the catalog. Unlike the weekly provider
-/// (which only resolves the MOST-RECENT session's routine), this resolves
-/// EACH scanned session's own routine — a day/period window can span
-/// multiple routines (e.g. the athlete switched plans mid-period), and
-/// assuming a single routine would silently drop custom-exercise sets
-/// logged under a since-replaced routine.
+/// Exercise → muscleGroup resolution: public catalog first, then the
+/// per-SESSION routine-slot fallback shared with [weeklyInsightsProvider]
+/// and the month radar ([slotMuscleGroupsForSessions], #442) — a period
+/// window can span multiple routines (e.g. the athlete switched plans
+/// mid-period), and assuming a single routine would silently drop
+/// custom-exercise sets logged under a since-replaced routine.
 /// autoDispose: re-evaluated on screen re-mount, same as
 /// [weeklyInsightsProvider]/[exerciseProgressionProvider].
 final muscleDistributionInsightsProvider = FutureProvider.autoDispose
@@ -42,7 +41,7 @@ final muscleDistributionInsightsProvider = FutureProvider.autoDispose
         (ref, key) async {
   if (key.uid.isEmpty) return MuscleDistributionInsights.empty;
 
-  final now = DateTime.now();
+  final now = argentinaNow();
   final window = key.period.windowFor(now);
 
   final sessions = await ref.watch(sessionsByUidProvider(key.uid).future);
@@ -51,8 +50,13 @@ final muscleDistributionInsightsProvider = FutureProvider.autoDispose
   // Sessions strictly needed to cover the period window (current+previous)
   // — never truncated by the scan cap below (same rule as
   // exerciseProgressionProvider).
-  final neededForWindow =
-      sessions.where((s) => !s.startedAt.isBefore(window.previousStart)).length;
+  // toArgentina to match the aggregator's ART frame: window bounds are now
+  // DateTime.utc (ART calendar days), so the session must be compared in the
+  // same frame — a raw startedAt here would size the scan against a 3h-shifted
+  // cutoff (#379).
+  final neededForWindow = sessions
+      .where((s) => !toArgentina(s.startedAt).isBefore(window.previousStart))
+      .length;
   final scanCount = neededForWindow > kMuscleDistributionSessionScan
       ? neededForWindow
       : kMuscleDistributionSessionScan;
@@ -73,36 +77,13 @@ final muscleDistributionInsightsProvider = FutureProvider.autoDispose
   final catalogById = {for (final e in exercises) e.id: e.muscleGroup};
 
   // Per-session routine-slot fallback — resolves EACH distinct routine
-  // referenced by the scanned sessions (not just the most-recent one).
-  //
-  // [visibleRoutineByIdProvider], NOT [routineByIdProvider]: the 60-session
-  // scan reaches far enough back to hit routines that are gone (deleted, or a
-  // trainer-template whose owner revoked athlete sharing), and those reads come
-  // back as errors. An unguarded `Future.wait` propagated the first one and
-  // failed the WHOLE radar — the entire chart vanishing because of one stale
-  // session. The slot fallback is best-effort (the public catalog already
-  // resolves every non-custom exercise), so a routine that is gone degrades to
-  // "no slot fallback for ITS exercises".
-  //
-  // It does NOT swallow transient failures: those still propagate and surface
-  // the screen's error state. Silently treating a network blip as "no routine"
-  // would drop custom-exercise sets from the radar axes while `currentSets`
-  // still counted them — a wrong chart is worse than a visible error.
-  final distinctRoutineIds =
-      scanned.map((s) => s.routineId).toSet().where((id) => id.isNotEmpty);
-  final routines = await Future.wait(
-    distinctRoutineIds
-        .map((id) => ref.watch(visibleRoutineByIdProvider(id).future)),
-  );
-  final slotGroupById = <String, String>{};
-  for (final routine in routines) {
-    if (routine == null) continue;
-    for (final day in routine.days) {
-      for (final slot in day.slots) {
-        slotGroupById.putIfAbsent(slot.exerciseId, () => slot.muscleGroup);
-      }
-    }
-  }
+  // referenced by the scanned sessions (not just the most-recent one), via
+  // the resolver shared with the weekly aggregate and the month radar
+  // (#442). See [slotMuscleGroupsForSessions] for why it reads
+  // `visibleRoutineByIdProvider` (a routine that is GONE degrades to "no
+  // fallback for its exercises"; transient failures still propagate instead
+  // of silently producing a wrong chart).
+  final slotGroupById = await slotMuscleGroupsForSessions(ref, scanned);
 
   final muscleGroupByExerciseId = <String, String>{
     ...catalogById,

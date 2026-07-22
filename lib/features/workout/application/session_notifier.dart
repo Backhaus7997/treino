@@ -475,6 +475,10 @@ class SessionNotifier
       rethrow;
     }
     _finalize();
+    // #367: same session-cache refresh as finishSession — the abandoned session
+    // is now persisted, so historial and any session-derived view reflect it
+    // (and the no-longer-active session clears) without an app restart.
+    ref.invalidate(sessionsByUidProvider(uid));
     state = AsyncData(current.copyWith(
       session: current.session.copyWith(wasFullyCompleted: false),
     ));
@@ -512,6 +516,15 @@ class SessionNotifier
       rethrow;
     }
     _finalize();
+    // #367: refresh the session-derived caches so Home's "HOY" card advances to
+    // the next plan day and Insights include this session WITHOUT restarting the
+    // app. sessionsByUidProvider is a one-shot autoDispose future that never
+    // re-fetches on its own here — the session player is a top-level route ABOVE
+    // the shell, so the shell screens watching it stay mounted the whole workout
+    // and its autoDispose cache is never released. Everything downstream
+    // (todaysRoutineProvider, the Insights aggregators, historial) watches this
+    // provider, so a single invalidate cascades.
+    ref.invalidate(sessionsByUidProvider(uid));
     // Solo en el path "finished fully completed" — los abandonos no cuentan
     // como "routine_finished" para producto. Si más adelante producto pide
     // ver abandons, se agrega `routine_abandoned` aparte.

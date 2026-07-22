@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
+import 'package:treino/features/auth/data/auth_service.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/data/user_repository.dart';
@@ -23,6 +24,8 @@ import 'package:treino/l10n/app_l10n.dart';
 // ---------------------------------------------------------------------------
 
 class MockUserRepository extends Mock implements UserRepository {}
+
+class MockAuthService extends Mock implements AuthService {}
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -52,6 +55,7 @@ UserProfile _trainerProfile({bool complete = false}) => UserProfile(
 Widget _buildScreen({
   UserProfile? profile,
   MockUserRepository? repo,
+  AuthService? authService,
   String initialLocation = '/profile/edit-trainer',
 }) {
   final mockRepo = repo ?? MockUserRepository();
@@ -85,6 +89,8 @@ Widget _buildScreen({
   return ProviderScope(
     overrides: [
       authStateChangesProvider.overrideWith((_) => Stream.value(null)),
+      if (authService != null)
+        authServiceProvider.overrideWithValue(authService),
       userProfileProvider.overrideWith((_) => Stream.value(effectiveProfile)),
       userRepositoryProvider.overrideWithValue(mockRepo),
       gymsProvider.overrideWith((ref) async => const []),
@@ -374,6 +380,40 @@ void main() {
         reason:
             'Validation rules must be identical in onboarding and edit modes',
       );
+    });
+  });
+
+  // ── QA-PRO-008 (#429): onboarding must offer a sign-out escape hatch ─────
+  //
+  // The onboarding gate blocks router navigation, OS back, and the AppBar
+  // arrow — without a sign-out action the screen is a dead end for a trainer
+  // who can't/won't complete the form.
+
+  group('QA-PRO-008: sign-out escape hatch in onboarding mode', () {
+    testWidgets('AppBar shows the sign-out action in onboarding mode',
+        (tester) async {
+      await tester.pumpWidget(_buildScreen());
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('trainer_onboarding_sign_out')),
+        findsOneWidget,
+        reason: 'Onboarding mode must always offer a sign-out escape hatch',
+      );
+    });
+
+    testWidgets('tapping the sign-out action calls AuthService.signOut',
+        (tester) async {
+      final auth = MockAuthService();
+      when(() => auth.signOut()).thenAnswer((_) async {});
+
+      await tester.pumpWidget(_buildScreen(authService: auth));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('trainer_onboarding_sign_out')));
+      await tester.pumpAndSettle();
+
+      verify(() => auth.signOut()).called(1);
     });
   });
 }

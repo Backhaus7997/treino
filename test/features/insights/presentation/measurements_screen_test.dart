@@ -213,4 +213,73 @@ void main() {
 
     expect(find.byType(LogMeasurementScreen), findsOneWidget);
   });
+
+  // ── HISTORIAL: editar/borrar mediciones (#439) ──────────────────────────────
+  // El comportamiento fino (dialog, orden, cap) vive en
+  // measurement_history_list_test.dart; acá se verifica el CABLEADO: uid
+  // correcto como gate de autoría, tag del PF, y edición self-log pre-poblada.
+
+  testWidgets(
+      '#439 historial: la fila self-logged tiene acciones y la del PF es '
+      'read-only', (tester) async {
+    final coachLogged = _m(DateTime.utc(2026, 1, 1), 80); // recordedBy trainerA
+    final selfLogged = Measurement(
+      id: 'm-own',
+      athleteId: 'u1',
+      recordedBy: 'u1',
+      recordedAt: DateTime.utc(2026, 2, 1),
+      weightKg: 78,
+    );
+    await tester.pumpWidget(_wrap(overrides: [
+      ownMeasurementsProvider('u1').overrideWith(
+        (ref) => Stream.value([coachLogged, selfLogged]),
+      ),
+    ]));
+    await tester.pumpAndSettle();
+    final l10n = _l10n(tester);
+
+    await tester.scrollUntilVisible(
+      find.text(l10n.measurementsHistoryTitle),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip(l10n.measurementHistoryEditTooltip), findsOneWidget);
+    expect(
+        find.byTooltip(l10n.measurementHistoryDeleteTooltip), findsOneWidget);
+    expect(find.text(l10n.measurementHistoryTrainerLoggedTag), findsOneWidget);
+  });
+
+  testWidgets(
+      '#439 editar una medición self-logged abre el form PRE-POBLADO en modo '
+      'edición', (tester) async {
+    final selfLogged = Measurement(
+      id: 'm-own',
+      athleteId: 'u1',
+      recordedBy: 'u1',
+      recordedAt: DateTime.utc(2026, 2, 1),
+      weightKg: 78,
+    );
+    await tester.pumpWidget(_wrap(overrides: [
+      ownMeasurementsProvider('u1').overrideWith(
+        (ref) => Stream.value([_m(DateTime.utc(2026, 1, 1), 80), selfLogged]),
+      ),
+    ]));
+    await tester.pumpAndSettle();
+    final l10n = _l10n(tester);
+
+    await tester.scrollUntilVisible(
+      find.byTooltip(l10n.measurementHistoryEditTooltip),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip(l10n.measurementHistoryEditTooltip));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(LogMeasurementScreen), findsOneWidget);
+    expect(find.text('GUARDAR CAMBIOS'), findsOneWidget);
+    expect(find.text('78'), findsOneWidget); // peso pre-poblado
+  });
 }

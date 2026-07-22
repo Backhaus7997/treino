@@ -39,9 +39,7 @@ Widget _wrap(Widget child) => ProviderScope(
 
 void main() {
   group('SessionExerciseBlock (REQ-SETLOGS-006, REQ-SETLOGS-009)', () {
-    testWidgets(
-        'SCENARIO-SL-010: renders exercise name',
-        (tester) async {
+    testWidgets('SCENARIO-SL-010: renders exercise name', (tester) async {
       await tester.pumpWidget(_wrap(
         SessionExerciseBlock(
           exerciseName: 'Sentadilla',
@@ -53,8 +51,7 @@ void main() {
       expect(find.text('Sentadilla'), findsOneWidget);
     });
 
-    testWidgets(
-        'SCENARIO-SL-011: renders exactly N rows for N sets',
+    testWidgets('SCENARIO-SL-011: renders exactly N rows for N sets',
         (tester) async {
       final sets = [
         _log(id: 'sl1', setNumber: 1),
@@ -76,8 +73,7 @@ void main() {
       expect(find.text('3'), findsOneWidget);
     });
 
-    testWidgets(
-        'SCENARIO-SL-012: renders reps and weightKg per set row',
+    testWidgets('SCENARIO-SL-012: renders reps and weightKg per set row',
         (tester) async {
       await tester.pumpWidget(_wrap(
         SessionExerciseBlock(
@@ -88,7 +84,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('12'), findsWidgets);
-      expect(find.textContaining('100.0'), findsWidgets);
+      // formatWeightKg drops the .0 of whole loads (#436): "100 kg", not
+      // "100.0 kg".
+      expect(find.textContaining('100 kg'), findsWidgets);
+      expect(find.textContaining('100.0'), findsNothing);
     });
 
     testWidgets(

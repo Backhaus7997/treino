@@ -70,7 +70,7 @@ describe("SCENARIO-632: new appointment status=requested → notify trainer", ()
 
   afterEach(() => cleanup(trainerId, athleteId));
 
-  it("calls sendFcm with uids=[trainerId] and deepLink=/coach/agenda", async () => {
+  it("calls sendFcm with uids=[trainerId] and deepLink=/coach?tab=agenda", async () => {
     const mock = makeMockMessaging();
     const afterData = {
       trainerId,
@@ -85,7 +85,9 @@ describe("SCENARIO-632: new appointment status=requested → notify trainer", ()
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
     expect(callArg.tokens).toContain("trainer-token-632");
     expect(callArg.tokens).not.toContain("athlete-token-632");
-    expect(callArg.data?.deepLink).toBe("/coach/agenda");
+    // QA-NOT-002: el trainer va a SU agenda (ruta role-aware), no al host de
+    // atleta /coach/agenda que le mostraba "Necesitás un vínculo con un PF".
+    expect(callArg.data?.deepLink).toBe("/coach?tab=agenda");
   });
 });
 

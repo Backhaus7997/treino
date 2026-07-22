@@ -149,8 +149,11 @@ Session _session({
       uid: 'a1',
       routineId: 'r1',
       routineName: routineName,
-      startedAt: DateTime.utc(2026, 1, 10),
-      finishedAt: finishedAt ?? DateTime.utc(2026, 1, 10),
+      // Noon UTC (not midnight): fmtDate now localizes (#380), and noon stays
+      // on the same calendar day in both the Argentina dev box (09:00 ART) and
+      // UTC CI, so the '10/01/2026' assertion holds in either TZ.
+      startedAt: DateTime.utc(2026, 1, 10, 12),
+      finishedAt: finishedAt ?? DateTime.utc(2026, 1, 10, 12),
       status: status,
       durationMin: durationMin,
       totalVolumeKg: totalVolumeKg,

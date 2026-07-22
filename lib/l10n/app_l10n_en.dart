@@ -9,6 +9,15 @@ class AppL10nEn extends AppL10n {
   AppL10nEn([String locale = 'en']) : super(locale);
 
   @override
+  String get notFoundTitle => '';
+
+  @override
+  String get notFoundBody => '';
+
+  @override
+  String get notFoundCta => '';
+
+  @override
   String get homeAthleteFirstRunTitle => 'Start training';
 
   @override
@@ -508,6 +517,12 @@ class AppL10nEn extends AppL10n {
   String get workoutStatVolume => '';
 
   @override
+  String get workoutStatDurationMin => '';
+
+  @override
+  String get workoutStatVolumeKg => '';
+
+  @override
   String get workoutStatSets => '';
 
   @override
@@ -594,6 +609,12 @@ class AppL10nEn extends AppL10n {
   String get workoutDetailStatVolume => '';
 
   @override
+  String get workoutDetailStatDurationMin => '';
+
+  @override
+  String get workoutDetailStatVolumeKg => '';
+
+  @override
   String get workoutDetailStatPrsToday => '';
 
   @override
@@ -622,6 +643,9 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get workoutSelfEditorError => '';
+
+  @override
+  String get workoutDiscardError => '';
 
   @override
   String get workoutSelfEditorPermissionDenied => '';
@@ -899,9 +923,6 @@ class AppL10nEn extends AppL10n {
   String get dashboardCobroTrailingLabel => '+ Cobro';
 
   @override
-  String get dashboardInvitarAlumnoLabel => '+ INVITAR ALUMNO';
-
-  @override
   String get dashboardAsignarRutinaLabel => '+ ASIGNAR RUTINA';
 
   @override
@@ -1019,9 +1040,6 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get dashboardHolaSinNombre => 'HOLA';
-
-  @override
-  String get dashboardInvitarProximamente => 'Invitar alumno — próximamente.';
 
   @override
   String dashboardSolicitudesPendientesTitle(int count) {
@@ -2091,6 +2109,10 @@ class AppL10nEn extends AppL10n {
       'Fill in the reps for your sets before saving.';
 
   @override
+  String get routineEditorDuplicateExercise =>
+      'Ese ejercicio ya está en el día. Elegí otro.';
+
+  @override
   String get feedPostPublishedSuccess => 'Post published.';
 
   @override
@@ -2572,6 +2594,9 @@ class AppL10nEn extends AppL10n {
       'We couldn\'t load your muscle distribution. Try again.';
 
   @override
+  String get frequentExercisesLoadError => '';
+
+  @override
   String get exerciseProgressionScreenTitle => 'EXERCISE PROGRESSION';
 
   @override
@@ -2626,6 +2651,47 @@ class AppL10nEn extends AppL10n {
       'A single measurement is not enough to show progress. At least one more is needed.';
 
   @override
+  String get measurementsHistoryTitle => 'HISTORY';
+
+  @override
+  String get measurementHistoryEditTooltip => 'Edit measurement';
+
+  @override
+  String get measurementHistoryDeleteTooltip => 'Delete measurement';
+
+  @override
+  String measurementHistoryShowAll(int count) {
+    return 'Show all ($count)';
+  }
+
+  @override
+  String get measurementHistoryShowLess => 'Show less';
+
+  @override
+  String get measurementDeleteConfirmTitle => 'Delete measurement?';
+
+  @override
+  String measurementDeleteConfirmBody(String date) {
+    return 'The measurement from $date will be deleted. This action cannot be undone.';
+  }
+
+  @override
+  String get measurementDeleteConfirmAction => 'Delete';
+
+  @override
+  String get measurementDeleteSuccess => 'Measurement deleted';
+
+  @override
+  String get measurementDeleteError =>
+      'We couldn\'t delete the measurement. Try again.';
+
+  @override
+  String get measurementHistorySelfLoggedTag => 'Self-logged';
+
+  @override
+  String get measurementHistoryTrainerLoggedTag => 'Logged by your trainer';
+
+  @override
   String get insightsTileFrequentExercisesTitle => 'Frequent exercises';
 
   @override
@@ -2647,4 +2713,8 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get volumeByGroupScreenTitle => 'VOLUME BY GROUP';
+
+  @override
+  String get volumeByGroupEmptyTarget =>
+      'You need an assigned routine to see your target volume.';
 }

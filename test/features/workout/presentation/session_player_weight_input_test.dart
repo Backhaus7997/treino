@@ -1,13 +1,15 @@
 // Focused regression test for the weight-input stale-value bug in
 // _RepsSetRow (_onWeightChanged) inside SessionPlayerScreen.
 //
-// Bug: clearing the weight field (empty -> parsed==null) or typing a value
-// out of [0,500] left _weightKg at its previous value, so both the summary
-// row text and the value logged on check reflected a stale weight instead of
-// what the user saw/intended.
+// Bug: clearing the weight field (empty -> parsed==null) left _weightKg at its
+// previous value; and an out-of-range value (>500) was silently clamped only on
+// log while the field kept showing the typed number, so what the athlete saw
+// diverged from what got logged (QA-WKT-002).
 //
-// Fix: empty/unparseable -> 0, out-of-range -> clamped to [0,500], with
-// setState so the displayed summary stays in sync with what will be logged.
+// Fix: empty/unparseable -> 0 with setState (summary stays in sync); and a
+// BoundedNumberFormatter now rejects any keystroke over the 500 kg cap at the
+// source, so the field can never display a value that differs from what is
+// logged.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -109,8 +111,9 @@ void main() {
     expect(loggedWeight, 0.0);
   });
 
-  testWidgets('out-of-range weight (>500) is clamped to 500 on log',
-      (tester) async {
+  testWidgets(
+      'weight over the 500 cap is rejected at input; the field and the log '
+      'never diverge', (tester) async {
     double? loggedWeight;
     await tester.pumpWidget(
       _wrap(
@@ -128,12 +131,23 @@ void main() {
     await tester.pump();
 
     // Weight field is the second TextField (row now has reps + weight).
-    await tester.enterText(find.byType(TextField).last, '600');
+    final weightField = find.byType(TextField).last;
+
+    // Exactly the cap is accepted.
+    await tester.enterText(weightField, '500');
     await tester.pump();
+    expect(find.textContaining('500 kg'), findsWidgets);
+
+    // An over-cap value is rejected at the source: the field keeps the last
+    // valid value (500) instead of showing 600, so display == what gets logged.
+    await tester.enterText(weightField, '600');
+    await tester.pump();
+    expect(find.text('600'), findsNothing);
 
     await tester.tap(find.byIcon(TreinoIcon.checkCircleEmpty));
     await tester.pump();
 
+    // Logged value matches what the field showed (500), never the rejected 600.
     expect(loggedWeight, 500.0);
   });
 }

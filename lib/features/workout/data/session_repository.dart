@@ -146,9 +146,18 @@ class SessionRepository {
 
   // ─── listByUid ──────────────────────────────────────────────────────────
 
-  Future<List<Session>> listByUid(String uid) async {
-    final snap =
-        await _sessions(uid).orderBy('startedAt', descending: true).get();
+  /// Sessions for [uid], newest-first. Pass [limit] to bound the read.
+  ///
+  /// QA-WKT-008: the history read used to be unbounded, and because
+  /// `sessionsByUidProvider` is autoDispose it re-ran that full collection scan
+  /// on every re-mount of the Workout tab (plus the derived aggregate
+  /// providers). For a user with years of history that is a linear, growing
+  /// Firestore cost per visit. Callers now pass a limit; only a genuine
+  /// "show my entire history" caller should omit it.
+  Future<List<Session>> listByUid(String uid, {int? limit}) async {
+    var query = _sessions(uid).orderBy('startedAt', descending: true);
+    if (limit != null) query = query.limit(limit);
+    final snap = await query.get();
     return snap.docs.map(_sessionFromDoc).whereType<Session>().toList();
   }
 
