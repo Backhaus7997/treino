@@ -73,14 +73,29 @@ void main() {
         (tester) async {
       await _pump(tester, profile: _trainerProfile());
 
-      expect(find.byKey(const Key('perfil_publico_plano')), findsOneWidget);
-      expect(find.text('Joaquín Nadal'), findsOneWidget);
+      final plano = find.byKey(const Key('perfil_publico_plano'));
+      expect(plano, findsOneWidget);
+      // WU-02: el displayName y la tarifa también aparecen en el
+      // `CoachDiscoveryPreviewCard` de la columna derecha — se scopea la
+      // búsqueda al bloque plano de la izquierda para desambiguar.
       expect(
-        find.text('PF especializado en hipertrofia y fuerza.'),
+        find.descendant(of: plano, matching: find.text('Joaquín Nadal')),
+        findsOneWidget,
+      );
+      // WU-03: la bio también aparece editable en `IdentidadCard` (columna
+      // izquierda, arriba del bloque plano) — se scopea al bloque plano.
+      expect(
+        find.descendant(
+          of: plano,
+          matching: find.text('PF especializado en hipertrofia y fuerza.'),
+        ),
         findsOneWidget,
       );
       expect(find.text('hipertrofia'), findsOneWidget);
-      expect(find.text('\$28000/mes'), findsOneWidget);
+      expect(
+        find.descendant(of: plano, matching: find.text('\$28000/mes')),
+        findsOneWidget,
+      );
       expect(find.text('Ofrece online'), findsOneWidget);
     });
 
@@ -97,7 +112,15 @@ void main() {
         ),
       );
 
-      expect(find.text('—'), findsOneWidget);
+      // WU-02: displayName null y sin rating/reseñas también degradan a "—"
+      // en el `CoachDiscoveryPreviewCard` — se scopea al bloque plano.
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('perfil_publico_plano')),
+          matching: find.text('—'),
+        ),
+        findsOneWidget,
+      );
       expect(find.text('Todavía no cargaste una bio.'), findsOneWidget);
       expect(find.text('Sin especialidad cargada.'), findsOneWidget);
       expect(find.text('Sin tarifa cargada.'), findsOneWidget);
@@ -159,7 +182,13 @@ void main() {
         (tester) async {
       for (final theme in [AppTheme.dark(), AppTheme.light()]) {
         await _pump(tester, theme: theme, profile: _trainerProfile());
-        expect(find.text('Joaquín Nadal'), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byKey(const Key('perfil_publico_plano')),
+            matching: find.text('Joaquín Nadal'),
+          ),
+          findsOneWidget,
+        );
         // Reset del árbol entre escenarios: Riverpod no permite cambiar la
         // cantidad de overrides de un mismo `ProviderScope` entre rebuilds.
         await tester.pumpWidget(const SizedBox.shrink());
