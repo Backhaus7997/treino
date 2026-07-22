@@ -1,11 +1,17 @@
 // PerfilPublicoScreen — sección «Perfil público» del Coach Hub web
-// (Fase 11, WU-01).
+// (Fase 11, WU-01..05).
 //
-// Versión MÍNIMA pre-rediseño (ADR-F11-01): muestra en texto plano los
-// campos del PF logueado que alimentan su ficha pública en TREINO Coach
-// Discovery (displayName, bio, especialidad, tarifa, modalidad). Es el
-// baseline "before" de la fase — WU-02..05 agregan el editor tokenizado + el
-// preview de Coach Discovery reales.
+// Muestra en dos columnas los campos del PF logueado que alimentan su ficha
+// pública en TREINO Coach Discovery (displayName, bio, especialidad,
+// tarifa, modalidad): izquierda = editor tokenizado (IdentidadCard +
+// EspecialidadPrecioCard + bloque plano legado), derecha =
+// CoachDiscoveryPreviewCard (el norte visual real del mockup).
+//
+// WU-05 remata la pantalla: estados completos (loading shimmer de grilla,
+// error + retry, empty honesto) vía TreinoStateSwitcher, banner de perfil
+// incompleto (UserProfileTrainerCompleteness), motion staggered en las
+// secciones eager y layout responsive (dos columnas en desktop, apilado por
+// debajo de `_kColumnsBreakpoint`).
 //
 // Sigue el patrón de screens de sección (nutricion_screen.dart,
 // alumnos_screen.dart): `ConsumerWidget` sin `Scaffold` (ADR-CHW-005),
@@ -24,10 +30,23 @@ import '../../../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../../../core/widgets/treino_icon.dart';
 import '../../../../profile/application/user_providers.dart';
 import '../../../../profile/domain/user_profile.dart';
+import '../../../../profile/domain/user_profile_trainer_completeness.dart';
 import '../../widgets/coach_hub_widgets.dart';
 import 'widgets/coach_discovery_preview_card.dart';
 import 'widgets/especialidad_precio_card.dart';
 import 'widgets/identidad_card.dart';
+
+/// Breakpoint interno de esta sección (WU-05): por debajo, el editor
+/// (izquierda) y el preview de Coach Discovery (derecha) se apilan en una
+/// sola columna. Es un umbral PROPIO de esta sección — deliberadamente
+/// distinto de `kMobileBreakpoint`/`kDesktopBreakpoint` de
+/// `presentation/shell/responsive.dart`, que gobiernan el ancho de VENTANA
+/// completo (`CoachHubScaffold` ya oculta <768px detrás de `MobileBanner`).
+/// Acá medimos el ancho disponible para el CONTENIDO de la sección —
+/// siempre menor al de la ventana (descuenta sidebar + padding) — elegido
+/// para que el editor conserve un ancho legible (~500px) junto al preview
+/// de ancho fijo (320px) + gap.
+const double _kColumnsBreakpoint = 900;
 
 /// Pantalla «Perfil público» (`/perfil-publico`) — Fase 11 WU-01.
 class PerfilPublicoScreen extends ConsumerWidget {
@@ -82,7 +101,7 @@ class PerfilPublicoScreen extends ConsumerWidget {
                       icon: TreinoIcon.emptyState,
                       title: 'No encontramos tu perfil.', // i18n: Fase 11
                     )
-                  : _PerfilPublicoDosColumnas(profile: profile),
+                  : _PerfilPublicoContent(profile: profile),
             ),
           ),
         ],
@@ -97,15 +116,43 @@ String _stateKeyOf(AsyncValue<Object?> value) {
   return 'data';
 }
 
-/// Skeleton de carga — shimmer sobre el bloque de datos plano.
+/// Skeleton de carga (WU-05) — imita la grilla real de dos columnas (dos
+/// cards a la izquierda + una card de preview a la derecha), respetando el
+/// mismo layout responsive que el estado con datos. Nada de spinner seco.
 class _PerfilPublicoLoading extends StatelessWidget {
   const _PerfilPublicoLoading();
 
   @override
   Widget build(BuildContext context) {
+    return const _PerfilPublicoLayout(
+      key: Key('perfil_publico_loading'),
+      left: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _SkeletonCard(lines: 4),
+          SizedBox(height: AppSpacing.s18),
+          _SkeletonCard(lines: 3),
+        ],
+      ),
+      right: _SkeletonCard(lines: 5, height: 260),
+    );
+  }
+}
+
+/// Card skeleton genérica del shimmer de carga — mismo chrome (bgCard +
+/// border + radius md) que las cards reales, para que el salto
+/// loading→data no "salte" de tamaño.
+class _SkeletonCard extends StatelessWidget {
+  const _SkeletonCard({required this.lines, this.height});
+
+  final int lines;
+  final double? height;
+
+  @override
+  Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     return Container(
-      key: const Key('perfil_publico_loading'),
+      height: height,
       padding: const EdgeInsets.all(AppSpacing.s18),
       decoration: BoxDecoration(
         color: palette.bgCard,
@@ -115,11 +162,12 @@ class _PerfilPublicoLoading extends StatelessWidget {
       child: TreinoShimmer(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            for (var i = 0; i < 5; i++) ...[
+            for (var i = 0; i < lines; i++) ...[
               if (i > 0) const SizedBox(height: AppSpacing.s12),
               Container(
-                width: i.isEven ? 220.0 : 320.0,
+                width: i.isEven ? 180.0 : 260.0,
                 height: 14,
                 decoration: BoxDecoration(
                   color: palette.border,
@@ -134,9 +182,119 @@ class _PerfilPublicoLoading extends StatelessWidget {
   }
 }
 
-/// Layout de dos columnas — WU-02: izquierda edición (bloque plano
-/// pre-rediseño, WU-03/04 lo reemplaza por el editor tokenizado), derecha
-/// `CoachDiscoveryPreviewCard` (el norte visual real del mockup).
+/// Contenido con datos (WU-05): banner de perfil incompleto (si aplica) +
+/// el layout de dos columnas.
+class _PerfilPublicoContent extends StatelessWidget {
+  const _PerfilPublicoContent({required this.profile});
+
+  final UserProfile profile;
+
+  @override
+  Widget build(BuildContext context) {
+    final incomplete = !profile.trainerProfileComplete;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (incomplete) ...[
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(0),
+            child: const _PerfilIncompleteBanner(),
+          ),
+          const SizedBox(height: AppSpacing.s18),
+        ],
+        _PerfilPublicoDosColumnas(profile: profile),
+      ],
+    );
+  }
+}
+
+/// Banner honesto (WU-05) — el perfil del PF no llega al mínimo para
+/// aparecer en TREINO Coach Discovery (`UserProfileTrainerCompleteness`:
+/// falta bio, especialidad, precio o modalidad).
+class _PerfilIncompleteBanner extends StatelessWidget {
+  const _PerfilIncompleteBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Container(
+      key: const Key('perfil_publico_incomplete_banner'),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.s18,
+        vertical: AppSpacing.s14,
+      ),
+      decoration: BoxDecoration(
+        color: palette.warning.withValues(alpha: 0.12),
+        border: Border.all(color: palette.warning.withValues(alpha: 0.4)),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(TreinoIcon.warning, size: 18, color: palette.warning),
+          const SizedBox(width: AppSpacing.s12),
+          Expanded(
+            child: Text(
+              'Tu perfil todavía no aparece en TREINO Coach Discovery: '
+              'completá bio, especialidad, precio y modalidad para que '
+              'los alumnos puedan encontrarte.', // i18n: Fase 11
+              style: TextStyle(
+                color: palette.textPrimary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Layout responsive de dos columnas (WU-05): `left` flexible + `right` de
+/// ancho fijo (~320px) en desktop; apilados en una sola columna
+/// (`left` arriba, `right` abajo) por debajo de `_kColumnsBreakpoint` — la
+/// legibilidad del editor pesa más que la del preview cuando el espacio
+/// escasea, así que el editor queda primero en el orden de lectura.
+class _PerfilPublicoLayout extends StatelessWidget {
+  const _PerfilPublicoLayout({
+    super.key,
+    required this.left,
+    required this.right,
+  });
+
+  final Widget left;
+  final Widget right;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final desktop = constraints.maxWidth >= _kColumnsBreakpoint;
+        if (desktop) {
+          return Row(
+            key: const Key('perfil_publico_columns_desktop'),
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: left),
+              const SizedBox(width: AppSpacing.s18),
+              SizedBox(width: 320, child: right),
+            ],
+          );
+        }
+        return Column(
+          key: const Key('perfil_publico_columns_stacked'),
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [left, const SizedBox(height: AppSpacing.s18), right],
+        );
+      },
+    );
+  }
+}
+
+/// Layout de dos columnas con datos — WU-02..05: izquierda editor tokenizado
+/// (`IdentidadCard` + `EspecialidadPrecioCard` + bloque plano legado),
+/// derecha `CoachDiscoveryPreviewCard` (el norte visual real del mockup).
 class _PerfilPublicoDosColumnas extends StatelessWidget {
   const _PerfilPublicoDosColumnas({required this.profile});
 
@@ -144,27 +302,24 @@ class _PerfilPublicoDosColumnas extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              IdentidadCard(profile: profile),
-              const SizedBox(height: AppSpacing.s18),
-              EspecialidadPrecioCard(profile: profile),
-              const SizedBox(height: AppSpacing.s18),
-              _PerfilPublicoPlano(profile: profile),
-            ],
+    return _PerfilPublicoLayout(
+      left: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          IdentidadCard(profile: profile),
+          const SizedBox(height: AppSpacing.s18),
+          EspecialidadPrecioCard(profile: profile),
+          const SizedBox(height: AppSpacing.s18),
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(2),
+            child: _PerfilPublicoPlano(profile: profile),
           ),
-        ),
-        const SizedBox(width: AppSpacing.s18),
-        SizedBox(
-          width: 320,
-          child: CoachDiscoveryPreviewCard(profile: profile),
-        ),
-      ],
+        ],
+      ),
+      right: TreinoFadeSlideIn(
+        delay: AppMotion.stagger(0),
+        child: CoachDiscoveryPreviewCard(profile: profile),
+      ),
     );
   }
 }
