@@ -39,9 +39,9 @@ Session _makeSession({
       wasFullyCompleted: wasFullyCompleted,
     );
 
-SetLog _makeSetLog() => SetLog(
+SetLog _makeSetLog({String exerciseId = 'e1'}) => SetLog(
       id: 'sl1',
-      exerciseId: 'e1',
+      exerciseId: exerciseId,
       exerciseName: 'Press',
       setNumber: 1,
       reps: 10,
@@ -163,6 +163,12 @@ void main() {
     expect(find.text('3.2'), findsOneWidget);
     expect(find.text('22'), findsOneWidget);
     expect(find.text('—'), findsWidgets);
+
+    // Labels carry their unit (#363) — bare DURACIÓN/VOLUMEN must be gone.
+    expect(find.text('DURACIÓN MIN'), findsOneWidget);
+    expect(find.text('VOLUMEN KG'), findsOneWidget);
+    expect(find.text('DURACIÓN'), findsNothing);
+    expect(find.text('VOLUMEN'), findsNothing);
   });
 
   testWidgets('SCENARIO-346: SETS stat uses count from setLogs',
@@ -202,6 +208,58 @@ void main() {
     await tester.pumpAndSettle();
 
     // The 5 mood emojis are plain Text widgets with emoji strings
+    final emojiTexts = tester
+        .widgetList<Text>(find.byType(Text))
+        .where((t) =>
+            t.data != null &&
+            RegExp(r'[\u{1F600}-\u{1F64F}]', unicode: true).hasMatch(t.data!))
+        .toList();
+    expect(emojiTexts.length, equals(5));
+  });
+
+  // ── #456 regression: mood row must never overflow ────────────────────────
+
+  testWidgets(
+      '#456: mood row scales down instead of overflowing on a narrow screen',
+      (tester) async {
+    tester.view.physicalSize = const Size(180, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    // At this extreme width the StatTile grid cells legitimately overflow
+    // vertically before the mood row is even laid out, which would fail the
+    // test for an unrelated reason. Capture layout errors and assert that
+    // nothing overflows HORIZONTALLY — the mood row is the only horizontal
+    // Flex at risk on this screen (#456).
+    final horizontalOverflows = <FlutterErrorDetails>[];
+    final originalOnError = FlutterError.onError;
+    FlutterError.onError = (details) {
+      final message = details.exceptionAsString();
+      if (message.contains('overflowed')) {
+        if (message.contains('on the right')) {
+          horizontalOverflows.add(details);
+        }
+        return; // vertical overflows of unrelated widgets tolerated here
+      }
+      originalOnError?.call(details);
+    };
+    try {
+      await tester.pumpWidget(_buildWithRouter(
+        summaryOverride: () => (session: _makeSession(), setLogs: []),
+      ));
+      await tester.pumpAndSettle();
+    } finally {
+      // Must be restored BEFORE any expect(): the test binding reports expect
+      // failures through FlutterError.onError and asserts it wasn't replaced.
+      FlutterError.onError = originalOnError;
+    }
+
+    expect(
+      horizontalOverflows.map((d) => d.exceptionAsString()).toList(),
+      isEmpty,
+    );
+
+    // The row itself still renders its 5 emojis (scaled, not dropped).
     final emojiTexts = tester
         .widgetList<Text>(find.byType(Text))
         .where((t) =>
@@ -255,6 +313,34 @@ void main() {
     expect(shareCalled, isTrue);
   });
 
+  testWidgets(
+      'QA-FEED-364/389: COMPARTIR passes the DISTINCT-exercise count to shareWorkout',
+      (tester) async {
+    final notifier = _TrackingNotifier(onShare: () {});
+
+    // 3 set logs across 2 DISTINCT exercises → the feed card stat is "2 ej.",
+    // not 3 (that would be the sets count).
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (
+        session: _makeSession(),
+        setLogs: [
+          _makeSetLog(exerciseId: 'e1'),
+          _makeSetLog(exerciseId: 'e1'),
+          _makeSetLog(exerciseId: 'e2'),
+        ],
+      ),
+      notifierOverride: () => notifier,
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('COMPARTIR'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('COMPARTIR'));
+    await tester.pumpAndSettle();
+
+    expect(notifier.capturedExerciseCount, equals(2));
+  });
+
   // ── SCENARIO-351/352: SnackBars ──────────────────────────────────────────
 
   testWidgets(
@@ -289,7 +375,8 @@ void main() {
     await tester.tap(find.text('COMPARTIR'));
     await tester.pumpAndSettle();
 
-    expect(find.text('No pudimos compartir tu post. Intentá de nuevo.'), findsOneWidget);
+    expect(find.text('No pudimos compartir tu post. Intentá de nuevo.'),
+        findsOneWidget);
     expect(find.text('workout-home'), findsNothing);
   });
 
@@ -316,9 +403,15 @@ void main() {
 class _TrackingNotifier extends PostWorkoutNotifier {
   _TrackingNotifier({required this.onShare});
   final void Function() onShare;
+  int? capturedExerciseCount;
 
   @override
-  Future<void> shareWorkout(Session session, {required String text}) async {
+  Future<void> shareWorkout(
+    Session session, {
+    required String text,
+    required int exerciseCount,
+  }) async {
+    capturedExerciseCount = exerciseCount;
     onShare();
     state = const AsyncData(null);
   }
@@ -326,7 +419,11 @@ class _TrackingNotifier extends PostWorkoutNotifier {
 
 class _SuccessNotifier extends PostWorkoutNotifier {
   @override
-  Future<void> shareWorkout(Session session, {required String text}) async {
+  Future<void> shareWorkout(
+    Session session, {
+    required String text,
+    required int exerciseCount,
+  }) async {
     state = const AsyncLoading();
     await Future<void>.delayed(Duration.zero);
     state = const AsyncData(null);
@@ -335,7 +432,11 @@ class _SuccessNotifier extends PostWorkoutNotifier {
 
 class _ErrorNotifier extends PostWorkoutNotifier {
   @override
-  Future<void> shareWorkout(Session session, {required String text}) async {
+  Future<void> shareWorkout(
+    Session session, {
+    required String text,
+    required int exerciseCount,
+  }) async {
     state = const AsyncLoading();
     await Future<void>.delayed(Duration.zero);
     final err = Exception('fail');

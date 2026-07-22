@@ -10,7 +10,8 @@ import '../../../../core/utils/argentina_time.dart'
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../../coach_hub/presentation/sections/pagos/widgets/payment_format.dart'
-    show fmtArs;
+    show fmtArs, groupThousands;
+import '../../../coach_hub/presentation/sections/pagos/widgets/thousands_input_formatter.dart';
 import '../../../payments/application/billing_providers.dart'
     show athleteBillingProvider;
 import '../../../payments/domain/payment.dart';
@@ -19,6 +20,7 @@ import '../../../profile/application/user_providers.dart'
 import '../../application/agenda_providers.dart';
 import '../../domain/agenda_exceptions.dart';
 import '../../domain/appointment.dart';
+import '../../domain/wall_clock.dart';
 import '../agenda_formatters.dart';
 
 /// Bottom-sheet content showing the full detail of a single [Appointment].
@@ -91,7 +93,9 @@ class _AppointmentDetailSheetState
     // counterpart (appointment_detail_dialog.dart).
     ref.watch(athleteBillingProvider(appointment.athleteId));
 
-    final canCancel = appointment.startsAt.difference(DateTime.now().toUtc()) >
+    // QA-COA-003: startsAt is wall-clock UTC (ADR-7); compare against wall-clock
+    // "now" so the 24h cancel window isn't 3h short in ART.
+    final canCancel = appointment.startsAt.difference(nowWall()) >
         const Duration(hours: 24);
 
     final endTime =
@@ -371,7 +375,7 @@ class _AppointmentDetailSheetState
     final billing =
         ref.read(athleteBillingProvider(appt.athleteId)).valueOrNull;
     _amountController.text =
-        billing != null ? billing.amountArs.toString() : '';
+        billing != null ? groupThousands(billing.amountArs.toString()) : '';
     _conceptController.text = AppL10n.of(context).agendaCobrarConceptoDefault(
       AgendaFormatters.formatDate(appt.startsAt),
     );
@@ -411,7 +415,7 @@ class _AppointmentDetailSheetState
     if (_billing) return;
     final l10n = AppL10n.of(context);
     final appt = widget.appointment;
-    final amount = int.tryParse(_amountController.text.trim());
+    final amount = parseGroupedInt(_amountController.text);
     final concept = _conceptController.text.trim();
 
     if (amount == null || amount <= 0) {
@@ -528,6 +532,7 @@ class _AppointmentDetailSheetState
           TextField(
             controller: _amountController,
             keyboardType: TextInputType.number,
+            inputFormatters: [ThousandsSeparatorInputFormatter()],
             style: GoogleFonts.barlow(color: palette.textPrimary),
             decoration: deco('5000'),
           ),

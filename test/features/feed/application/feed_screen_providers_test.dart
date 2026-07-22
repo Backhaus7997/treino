@@ -91,21 +91,53 @@ void main() {
       expect(result, equals(posts));
     });
 
-    // SCENARIO-141: no friends → empty list, no crash
-    test('SCENARIO-141: returns empty list when user has no friends', () async {
+    // SCENARIO-140b: the current user's own uid is included in the friends
+    // query, so their own AMIGOS-privacy posts appear in the feed (QA-FEED-003).
+    test('SCENARIO-140b: includes the current user uid in the friends query',
+        () async {
       final user = MockUser(uid: 'u1');
+      String? capturedKey;
+
+      final container = ProviderContainer(
+        overrides: [
+          authStateChangesProvider.overrideWith((ref) => Stream.value(user)),
+          acceptedFriendsProvider('u1')
+              .overrideWith((ref) => Stream.value(['u2', 'u3'])),
+          feedForFriendsProvider.overrideWith((ref, key) {
+            capturedKey = key;
+            return Future.value(const <Post>[]);
+          }),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(myFriendsFeedProvider.future);
+      expect(capturedKey, isNotNull);
+      // friendUidsKey sorts+joins with spaces; the own uid must be present.
+      expect(capturedKey!.split(' '), containsAll(<String>['u1', 'u2', 'u3']));
+    });
+
+    // SCENARIO-141: no friends → STILL returns the user's own friends-privacy
+    // posts (QA-FEED-003). Previously returned empty (early-return), which hid
+    // the author's own AMIGOS posts.
+    test('SCENARIO-141: no friends → still returns own friends-privacy posts',
+        () async {
+      final user = MockUser(uid: 'u1');
+      final ownPosts = [makePost(id: 'own', authorUid: 'u1')];
 
       final container = ProviderContainer(
         overrides: [
           authStateChangesProvider.overrideWith((ref) => Stream.value(user)),
           acceptedFriendsProvider('u1')
               .overrideWith((ref) => Stream.value(const <String>[])),
+          feedForFriendsProvider
+              .overrideWith((ref, _) => Future.value(ownPosts)),
         ],
       );
       addTearDown(container.dispose);
 
       final result = await container.read(myFriendsFeedProvider.future);
-      expect(result, isEmpty);
+      expect(result, equals(ownPosts));
     });
 
     // SCENARIO-142: unauthenticated (auth == null) → empty list

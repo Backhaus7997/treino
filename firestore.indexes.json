@@ -47,7 +47,7 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "athleteId", "order": "ASCENDING" },
-        { "fieldPath": "scheduledAt", "order": "ASCENDING" }
+        { "fieldPath": "startsAt", "order": "ASCENDING" }
       ]
     },
     {

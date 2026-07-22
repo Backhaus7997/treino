@@ -10,6 +10,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_motion.dart';
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/utils/kg_format.dart';
 import '../../domain/muscle_distribution_insights.dart';
 import '../../domain/radar_axis.dart';
 
@@ -180,10 +181,28 @@ class _Radar extends StatelessWidget {
         .map((axis) => RadarEntry(
             value: (insights.previousSetsByAxis[axis] ?? 0).toDouble()))
         .toList();
+    // #382: fl_chart ubica el centro del radar en (min − tickSpace), no en 0,
+    // así que un dataset todo-en-cero NO colapsa al centro: se dibuja como un
+    // hexágono chico sobre el primer anillo, sugiriendo "un poco de todo" en
+    // un período que en realidad fue cero. Los mapas byAxis son sparse (solo
+    // ejes con ≥1 set están presentes), o sea `isNotEmpty` ⟺ el polígono
+    // tiene al menos un vértice real → un período sin ejes se omite del chart
+    // (su entrada de leyenda queda, apagada, igual que las flechas "→ 0" de
+    // las stat cards).
+    final hasPrevious = insights.previousSetsByAxis.isNotEmpty;
+    final hasCurrent = insights.currentSetsByAxis.isNotEmpty;
 
     return SizedBox(
       height: 240,
       child: RadarChart(
+        // #382: key estructural — si al cambiar de período/mes un dataset
+        // aparece o desaparece, cambia la CANTIDAD de dataSets y el lerp de
+        // la animación implícita empareja por ÍNDICE posicional (lerpList):
+        // el polígono gris "Anterior" morpheaba hacia el accent "Actual" a
+        // mitad de transición. Con el key, esos cambios estructurales
+        // recrean el chart (snap limpio); los cambios que conservan la
+        // estructura siguen animando el morph de siempre.
+        key: ValueKey((hasPrevious, hasCurrent)),
         // TREINO Motion PR2: anima el morph del polígono al cambiar de
         // período con los tokens del sistema. fl_chart 1.x expone
         // `duration`/`curve` (los viejos `swapAnimation*` están deprecados).
@@ -216,20 +235,29 @@ class _Radar extends StatelessWidget {
           getTitle: (index, _) =>
               RadarChartTitle(text: axes[index].displayLabel),
           dataSets: [
-            RadarDataSet(
-              dataEntries: previousEntries,
-              fillColor: palette.textMuted.withValues(alpha: 0.12),
-              borderColor: palette.textMuted,
-              borderWidth: 2,
-              entryRadius: 2.5,
-            ),
-            RadarDataSet(
-              dataEntries: currentEntries,
-              fillColor: palette.accent.withValues(alpha: 0.20),
-              borderColor: palette.accent,
-              borderWidth: 2.5,
-              entryRadius: 3.5,
-            ),
+            if (hasPrevious)
+              RadarDataSet(
+                dataEntries: previousEntries,
+                fillColor: palette.textMuted.withValues(alpha: 0.12),
+                borderColor: palette.textMuted,
+                borderWidth: 2,
+                entryRadius: 2.5,
+              ),
+            // `|| !hasPrevious`: la lista NUNCA puede quedar vacía — con
+            // `dataSets: []` fl_chart no pinta nada (ni grilla ni títulos) y
+            // su touch handler crashea (`titleCount` indexa `dataSets[0]`).
+            // Si ningún período tiene ejes (p. ej. solo cardio/full_body, que
+            // no llegan a MuscleGroupDisplay), el dataset actual todo-en-cero
+            // es inofensivo: con max == min == 0 fl_chart sí colapsa al
+            // centro, sin hexágono fantasma.
+            if (hasCurrent || !hasPrevious)
+              RadarDataSet(
+                dataEntries: currentEntries,
+                fillColor: palette.accent.withValues(alpha: 0.20),
+                borderColor: palette.accent,
+                borderWidth: 2.5,
+                entryRadius: 3.5,
+              ),
           ],
         ),
       ),
@@ -278,9 +306,9 @@ class _StatCardGrid extends StatelessWidget {
             child: _StatCard(
               label: labels.volumeLabel,
               currentValue:
-                  '${_formatVolume(insights.currentVolumeKg)} ${labels.volumeUnit}',
+                  '${formatVolumeKg(insights.currentVolumeKg)} ${labels.volumeUnit}',
               previousValue:
-                  '${_formatVolume(insights.previousVolumeKg)} ${labels.volumeUnit}',
+                  '${formatVolumeKg(insights.previousVolumeKg)} ${labels.volumeUnit}',
             ),
           ),
           const SizedBox(width: 8),
@@ -295,21 +323,6 @@ class _StatCardGrid extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Volumen compacto para que entre en UNA línea en un cuarto del ancho de
-/// pantalla: `20770` → `20.8k`. Un volumen real de gimnasio pasa los 5 dígitos
-/// enseguida, y con la unidad al lado (`20770 kg`) wrappeaba a dos líneas y
-/// estiraba esa card por encima de las otras tres.
-///
-/// El corte en 10k es deliberado: por debajo, el número entra entero y se
-/// prefiere la precisión exacta.
-String _formatVolume(double value) {
-  if (value >= 10000) {
-    final k = (value / 1000).toStringAsFixed(1);
-    return '${k.endsWith('.0') ? k.substring(0, k.length - 2) : k}k';
-  }
-  return value % 1 == 0 ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
 }
 
 /// One stat card: current value big, previous value small with a `→` arrow
@@ -347,18 +360,20 @@ class _StatCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          // maxLines 1 + ellipsis: red de seguridad. El formato compacto ya
-          // evita el wrap para volúmenes reales, pero un valor inesperadamente
-          // largo debe recortarse, NUNCA saltar de línea — eso es lo que
-          // desparejaba las alturas.
-          Text(
-            currentValue,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 16,
-              color: palette.textPrimary,
+          // FittedBox scaleDown: el valor entra SIEMPRE en una línea — se
+          // achica en vez de recortarse. El ellipsis que había acá se comía
+          // la unidad con volúmenes reales de 30 días ("49.5k …", QA #370),
+          // y saltar de línea desparejaba las alturas de las 4 cards.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              currentValue,
+              maxLines: 1,
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
+                color: palette.textPrimary,
+              ),
             ),
           ),
           Text(

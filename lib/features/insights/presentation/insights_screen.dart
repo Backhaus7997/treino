@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
+import '../../../core/utils/argentina_time.dart';
 import '../../../core/utils/date_labels.dart';
 import '../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
@@ -42,7 +43,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
   /// by the SEMANA card. Defaults to the current week; paged by the ‹ ›
   /// chevrons. Independent of `_selectedDay` — paging does NOT force-change
   /// the muscles card unless the selected day falls outside the new week.
-  late DateTime _shownWeekStart = mondayOfWeek(DateTime.now().toLocal());
+  late DateTime _shownWeekStart = mondayOfWeek(argentinaNow());
 
   /// [UX-week-day-selector] `true` once the athlete has paged away from the
   /// current week at least once. Gates the brand-new-account `_EmptyState`:
@@ -54,8 +55,8 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
   bool _hasPagedAway = false;
 
   static DateTime _todayOnly() {
-    final now = DateTime.now();
-    return DateTime(now.year, now.month, now.day);
+    final now = argentinaNow();
+    return DateTime.utc(now.year, now.month, now.day);
   }
 
   /// [UX-week-day-selector] Future days of the current week are NOT
@@ -78,12 +79,12 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
   /// selection persists until the athlete explicitly taps a day in the new
   /// week. This avoids a jarring auto-jump of the card below while paging.
   void _pageWeek(int deltaWeeks) {
-    final candidate = DateTime(
+    final candidate = DateTime.utc(
       _shownWeekStart.year,
       _shownWeekStart.month,
       _shownWeekStart.day + deltaWeeks * 7,
     );
-    final currentWeekStart = mondayOfWeek(DateTime.now().toLocal());
+    final currentWeekStart = mondayOfWeek(argentinaNow());
     if (candidate.isAfter(currentWeekStart)) return;
     setState(() {
       _shownWeekStart = candidate;
@@ -98,8 +99,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
     final async = ref.watch(
       athleteWeekInsightsProvider((uid: uid, weekStart: _shownWeekStart)),
     );
-    final isCurrentWeek =
-        _shownWeekStart == mondayOfWeek(DateTime.now().toLocal());
+    final isCurrentWeek = _shownWeekStart == mondayOfWeek(argentinaNow());
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -339,11 +339,11 @@ class _WeekStripCard extends StatelessWidget {
     final palette = AppPalette.of(context);
     final localeName = AppL10n.of(context).localeName;
     final dayLabels = weekdayInitials(localeName);
-    final today = DateTime.now().toLocal();
-    final todayOnly = DateTime(today.year, today.month, today.day);
+    final today = argentinaNow();
+    final todayOnly = DateTime.utc(today.year, today.month, today.day);
     final todayIndex = today.weekday - DateTime.monday;
     final selectedOnly =
-        DateTime(selectedDay.year, selectedDay.month, selectedDay.day);
+        DateTime.utc(selectedDay.year, selectedDay.month, selectedDay.day);
 
     return Container(
       decoration: BoxDecoration(
@@ -426,7 +426,7 @@ class _WeekStripCard extends StatelessWidget {
             children: [
               for (var i = 0; i < 7; i++)
                 Builder(builder: (context) {
-                  final day = DateTime(
+                  final day = DateTime.utc(
                     insights.weekStart.year,
                     insights.weekStart.month,
                     insights.weekStart.day + i,
@@ -618,7 +618,16 @@ class _DailyMusclesCard extends ConsumerWidget {
               height: 240,
               child: Center(child: CircularProgressIndicator()),
             ),
-            error: (_, __) => const SizedBox.shrink(),
+            // QA-INS-005: nunca `SizedBox.shrink()` en error — antes la card
+            // quedaba vacía (ni silueta ni mensaje) y no había forma de
+            // distinguir "sin datos" de "falló la carga", ni de reintentar.
+            // Reusa `_ErrorState` (compacto) con retry que invalida el
+            // provider de ESTE card (day-insights), no el semanal.
+            error: (_, __) => _ErrorState(
+              onRetry: () => ref.invalidate(
+                athleteDayInsightsProvider((uid: uid, day: selectedDay)),
+              ),
+            ),
             // [UX-back-view] `showBack: true` renders bodyfront + bodyback
             // side by side — that pair needs more horizontal room than the
             // old single-body 160px column had next to it. Stacked

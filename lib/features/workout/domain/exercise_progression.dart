@@ -1,5 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import '../../insights/domain/chart_period.dart';
+
 part 'exercise_progression.freezed.dart';
 
 /// A single time-series data point for progression charts.
@@ -93,5 +95,12 @@ class ExerciseListEntry with _$ExerciseListEntry {
   const factory ExerciseListEntry({
     required String exerciseId,
     required String exerciseName,
+
+    /// [#377] Periods whose CURRENT window holds at least one chartable set
+    /// for this exercise — same predicate the aggregator uses to build the
+    /// series (countsAsWorkout session, weightKg > 0). The section widget
+    /// bounds the default preselection to the active period with this, so
+    /// the screen never opens on the chart's empty state by itself.
+    @Default(<ChartPeriod>{}) Set<ChartPeriod> periodsWithData,
   }) = _ExerciseListEntry;
 }

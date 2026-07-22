@@ -6,10 +6,12 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
+import '../../auth/application/auth_providers.dart';
 import '../../profile/application/user_providers.dart';
 import '../application/create_post_notifier.dart';
 import '../domain/post.dart';
 import '../domain/post_privacy.dart';
+import 'routine_tag_picker_sheet.dart';
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -239,7 +241,7 @@ class _CreatePostBodyState extends ConsumerState<_CreatePostBody> {
                   _PrivacyHelperText(palette: palette),
                 ],
                 const SizedBox(height: 20),
-                const _RoutineTagStubChip(),
+                _RoutineTagField(state: state, notifier: notifier),
                 const SizedBox(height: 20),
                 if (state.errorMessage != null) ...[
                   _InlineError(
@@ -611,50 +613,146 @@ class _PrivacyHelperText extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Routine tag stub chip
+// Routine tag field
 // ---------------------------------------------------------------------------
 
-class _RoutineTagStubChip extends StatelessWidget {
-  const _RoutineTagStubChip();
+/// Lets the author attach one of their own routines to a manual post. When
+/// nothing is attached it renders the "ETIQUETAR RUTINA" chip; tapping opens
+/// [showRoutineTagPickerSheet]. Once a routine is chosen it shows the accent
+/// pill (same look as the published card) plus a control to detach it.
+class _RoutineTagField extends ConsumerWidget {
+  const _RoutineTagField({required this.state, required this.notifier});
+
+  final CreatePostState state;
+  final CreatePostNotifier notifier;
+
+  Future<void> _pick(BuildContext context, WidgetRef ref) async {
+    final uid = ref.read(authStateChangesProvider).valueOrNull?.uid ?? '';
+    final tag = await showRoutineTagPickerSheet(context: context, uid: uid);
+    if (tag != null) notifier.setRoutineTag(tag);
+  }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final tag = state.routineTag;
 
-    return Opacity(
-      opacity: 0.4,
-      child: GestureDetector(
-        onTap: null,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-          decoration: BoxDecoration(
-            color: palette.bgCard,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: palette.border),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ExcludeSemantics(
-                child: Icon(
-                  TreinoIcon.dumbbell,
-                  size: 16,
-                  color: palette.textMuted,
+    if (tag == null) {
+      return Semantics(
+        button: true,
+        label: 'Etiquetar rutina',
+        child: GestureDetector(
+          onTap: () => _pick(context, ref),
+          behavior: HitTestBehavior.opaque,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+            decoration: BoxDecoration(
+              color: palette.bgCard,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: palette.border),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ExcludeSemantics(
+                  child: Icon(
+                    TreinoIcon.dumbbell,
+                    size: 16,
+                    color: palette.textPrimary,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'ETIQUETAR RUTINA',
-                style: GoogleFonts.barlowCondensed(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                  color: palette.textMuted,
+                const SizedBox(width: 8),
+                ExcludeSemantics(
+                  child: Text(
+                    'ETIQUETAR RUTINA',
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      color: palette.textPrimary,
+                    ),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-      ),
+      );
+    }
+
+    return Row(
+      children: [
+        Flexible(
+          child: Semantics(
+            button: true,
+            label: 'Cambiar rutina etiquetada: ${tag.routineName}',
+            child: GestureDetector(
+              onTap: () => _pick(context, ref),
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: palette.accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: palette.accent.withValues(alpha: 0.35),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ExcludeSemantics(
+                      child: Icon(
+                        TreinoIcon.tabWorkout,
+                        size: 14,
+                        color: palette.accent,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: ExcludeSemantics(
+                        child: Text(
+                          tag.routineName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.barlowCondensed(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                            letterSpacing: 0.8,
+                            color: palette.accent,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Semantics(
+          button: true,
+          label: 'Quitar rutina etiquetada',
+          child: GestureDetector(
+            onTap: () => notifier.setRoutineTag(null),
+            behavior: HitTestBehavior.opaque,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+              child: Center(
+                widthFactor: 1,
+                child: ExcludeSemantics(
+                  child: Icon(
+                    TreinoIcon.close,
+                    size: 18,
+                    color: palette.textMuted,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

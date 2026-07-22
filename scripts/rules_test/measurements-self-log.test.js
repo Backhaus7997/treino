@@ -14,6 +14,11 @@
  *  - REQ-ASM-04  visibility follows the CURRENT trainer, never one frozen at consent time
  *  - REQ-ASM-05  list satisfiability for the trainer's self-logged query
  *
+ * [#439] S13–S19 add UPDATE/DELETE coverage (previously untested): both are
+ * author-pinned (`recordedBy == uid`, and update additionally freezes
+ * recordedBy/athleteId). The mobile edit/delete UI ships gated on exactly
+ * that pin, so these tests are its contract.
+ *
  * Mechanism (design.md ADR-ASM-1): dual FIXED-PATH share-doc gate —
  * session_shares/{athleteId} (live link, CF-maintained) AND
  * profile_shares/{athleteId} (athlete consent) must BOTH name the trainer.
@@ -261,5 +266,121 @@ test('S12 [REQ-ASM-05B]: non-consented trainer CANNOT list an athlete\'s self-lo
       .where('athleteId', '==', 'athleteX')
       .where('recordedBy', '==', 'athleteX')
       .get(),
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// UPDATE / DELETE — author-pinned, the contract of the mobile edit/delete UI
+// (#439) — S13–S19. The client mirrors MeasurementRepository.update(): a FULL
+// set() of the doc with recordedBy/athleteId unchanged.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// S13 — the athlete-owner path the bug report asked to verify: an athlete CAN
+// fix the values of a measurement they self-logged.
+test('S13 [#439]: athlete CAN update the values of their own self-logged measurement', async () => {
+  await seedSelfLoggedMeasurement('m1', 'athleteX');
+  const athlete = testEnv.authenticatedContext('athleteX');
+  await assertSucceeds(
+    athlete.firestore().collection('measurements').doc('m1').set({
+      recordedBy: 'athleteX',
+      athleteId: 'athleteX',
+      recordedAt: new Date(),
+      weightKg: 50, // the mistyped 500 corrected
+    }),
+  );
+});
+
+// S14 — the update pin: neither recordedBy nor athleteId may be reassigned.
+// NOTE: `.firestore()` can only be called ONCE per context (a second call
+// re-applies settings and throws "Firestore has already been started") —
+// multi-operation tests must capture the instance.
+test('S14 [#439]: update CANNOT reassign recordedBy nor athleteId', async () => {
+  await seedSelfLoggedMeasurement('m1', 'athleteX');
+  const db = testEnv.authenticatedContext('athleteX').firestore();
+  await assertFails(
+    db.collection('measurements').doc('m1').set({
+      recordedBy: 'athleteX',
+      athleteId: 'victim', // subject reassigned
+      recordedAt: new Date(),
+      weightKg: 50,
+    }),
+  );
+  await assertFails(
+    db.collection('measurements').doc('m1').set({
+      recordedBy: 'someoneElse', // author reassigned
+      athleteId: 'athleteX',
+      recordedAt: new Date(),
+      weightKg: 50,
+    }),
+  );
+});
+
+// S15 — cross-author: the SUBJECT athlete cannot touch a trainer-recorded doc.
+test('S15 [#439]: athlete CANNOT update a trainer-recorded measurement about them', async () => {
+  await seedTrainerMeasurement('m1', { trainerId: 'coach', athleteId: 'athleteX' });
+  const athlete = testEnv.authenticatedContext('athleteX');
+  await assertFails(
+    athlete.firestore().collection('measurements').doc('m1').set({
+      recordedBy: 'coach',
+      athleteId: 'athleteX',
+      recordedAt: new Date(),
+      weightKg: 50,
+    }),
+  );
+});
+
+// S16 — athlete-owner delete.
+test('S16 [#439]: athlete CAN delete their own self-logged measurement', async () => {
+  await seedSelfLoggedMeasurement('m1', 'athleteX');
+  const athlete = testEnv.authenticatedContext('athleteX');
+  await assertSucceeds(
+    athlete.firestore().collection('measurements').doc('m1').delete(),
+  );
+});
+
+// S17 — cross-author delete stays closed for the subject athlete.
+test('S17 [#439]: athlete CANNOT delete a trainer-recorded measurement about them', async () => {
+  await seedTrainerMeasurement('m1', { trainerId: 'coach', athleteId: 'athleteX' });
+  const athlete = testEnv.authenticatedContext('athleteX');
+  await assertFails(
+    athlete.firestore().collection('measurements').doc('m1').delete(),
+  );
+});
+
+// S18 — the trainer-owner path (the issue's headline scenario): the trainer
+// can correct/remove what THEY recorded.
+test('S18 [#439]: trainer CAN update and delete a measurement they recorded', async () => {
+  await seedTrainerMeasurement('m1', { trainerId: 'coach', athleteId: 'athleteX' });
+  const db = testEnv.authenticatedContext('coach').firestore();
+  await assertSucceeds(
+    db.collection('measurements').doc('m1').set({
+      recordedBy: 'coach',
+      athleteId: 'athleteX',
+      recordedAt: new Date(),
+      weightKg: 50,
+    }),
+  );
+  await assertSucceeds(
+    db.collection('measurements').doc('m1').delete(),
+  );
+});
+
+// S19 — read access ≠ write access: even a linked+consented trainer cannot
+// touch a self-logged doc (the mobile UI renders those rows read-only).
+test('S19 [#439]: linked+consented trainer CANNOT update nor delete a self-logged measurement', async () => {
+  await seedSelfLoggedMeasurement('m1', 'athleteX');
+  await seedSessionShare('athleteX', 'coach');
+  await seedProfileShare('athleteX', 'coach');
+  const db = testEnv.authenticatedContext('coach').firestore();
+  await assertFails(
+    db.collection('measurements').doc('m1').set({
+      recordedBy: 'athleteX',
+      athleteId: 'athleteX',
+      recordedAt: new Date(),
+      weightKg: 50,
+    }),
+  );
+  await assertFails(
+    db.collection('measurements').doc('m1').delete(),
   );
 });

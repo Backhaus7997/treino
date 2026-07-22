@@ -42,12 +42,20 @@ void main() {
   final now = DateTime(2025, 3, 1);
   final window = ChartPeriod.last30d.windowFor(now);
 
+  // [#379] windowFor emits UTC-flagged ART-day boundaries, and the aggregator
+  // buckets sessions via `toArgentina(startedAt)` (−3h). A session whose
+  // startedAt is EXACTLY a boundary midnight would shift OUT of the window, so
+  // place fixtures at NOON of the boundary day (→ 09:00 ART) — comfortably
+  // inside, and fully TZ-independent (all UTC-flagged, no device offset).
+  final inCurrent = window.currentStart.add(const Duration(hours: 12));
+  final inPrevious = window.previousStart.add(const Duration(hours: 12));
+
   group('aggregateMuscleDistribution', () {
     test('folds setLogs into current/previous RadarAxis buckets', () {
       // currentStart..currentEnd (last30d window ending 2025-03-01)
-      final currentSession = _session('s1', window.currentStart);
+      final currentSession = _session('s1', inCurrent);
       // previousStart..previousEnd
-      final previousSession = _session('s2', window.previousStart);
+      final previousSession = _session('s2', inPrevious);
 
       final result = aggregateMuscleDistribution(
         periodWindow: window,
@@ -71,12 +79,10 @@ void main() {
     });
 
     test('sums durationMin and totalVolumeKg per window', () {
-      final s1 = _session('s1', window.currentStart,
-          durationMin: 40, totalVolumeKg: 800);
-      final s2 = _session('s2', window.currentStart,
-          durationMin: 30, totalVolumeKg: 600);
-      final s3 = _session('s3', window.previousStart,
-          durationMin: 20, totalVolumeKg: 300);
+      final s1 = _session('s1', inCurrent, durationMin: 40, totalVolumeKg: 800);
+      final s2 = _session('s2', inCurrent, durationMin: 30, totalVolumeKg: 600);
+      final s3 =
+          _session('s3', inPrevious, durationMin: 20, totalVolumeKg: 300);
 
       final result = aggregateMuscleDistribution(
         periodWindow: window,
@@ -94,7 +100,7 @@ void main() {
     test('excludes non-finished sessions', () {
       final active = _session(
         's1',
-        window.currentStart,
+        inCurrent,
         status: SessionStatus.active,
       );
 
@@ -129,7 +135,7 @@ void main() {
     });
 
     test('unknown/legacy muscleGroup strings are skipped silently', () {
-      final s1 = _session('s1', window.currentStart);
+      final s1 = _session('s1', inCurrent);
 
       final result = aggregateMuscleDistribution(
         periodWindow: window,
@@ -146,7 +152,7 @@ void main() {
     });
 
     test('cardio/full_body sets are excluded from radar axes', () {
-      final s1 = _session('s1', window.currentStart);
+      final s1 = _session('s1', inCurrent);
 
       final result = aggregateMuscleDistribution(
         periodWindow: window,
@@ -165,7 +171,7 @@ void main() {
     });
 
     test('totalSets counts every logged set regardless of axis mapping', () {
-      final s1 = _session('s1', window.currentStart);
+      final s1 = _session('s1', inCurrent);
 
       final result = aggregateMuscleDistribution(
         periodWindow: window,

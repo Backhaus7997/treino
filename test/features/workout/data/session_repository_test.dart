@@ -169,6 +169,29 @@ void main() {
     expect(results, isEmpty);
   });
 
+  test('QA-WKT-008: listByUid bounds the read to [limit], newest-first',
+      () async {
+    for (var d = 1; d <= 3; d++) {
+      await repo.create(
+        uid: uid,
+        routineId: routineId,
+        routineName: routineName,
+        startedAt: DateTime.utc(2026, 5, 10 + d, 9),
+      );
+    }
+
+    // Bounded read returns only the N most recent (day 13, then day 12).
+    final limited = await repo.listByUid(uid, limit: 2);
+    expect(limited, hasLength(2));
+    expect(limited.first.startedAt, DateTime.utc(2026, 5, 13, 9));
+    expect(limited.last.startedAt, DateTime.utc(2026, 5, 12, 9));
+
+    // Omitting the limit still returns the full history (the "show everything"
+    // caller), so the bound is opt-in per call site.
+    final all = await repo.listByUid(uid);
+    expect(all, hasLength(3));
+  });
+
   // ─── getActive() ──────────────────────────────────────────────────────────
 
   test('SCENARIO-245: getActive returns the active session when one exists',
@@ -395,9 +418,11 @@ void main() {
     final data = profileSnap.data()!;
     // 1 fully completed session
     expect(data['workoutsCount'], equals(1));
-    // racha is computed by computeStreak using DateTime.now() — the value
-    // is correct (0 if not trained today in local TZ, 1 if trained today).
-    // We only verify it's a non-negative integer.
+    // racha is computed by computeStreak using DateTime.now(), bucketed by the
+    // Argentina calendar day (#411). Its value depends on the real "today" in
+    // ART relative to the fixed 2026-05-15 session, so we only assert it is a
+    // non-negative integer (TZ-independent). startedAt is UTC-flagged, as real
+    // data always is.
     expect(data['racha'], isA<int>());
   });
 

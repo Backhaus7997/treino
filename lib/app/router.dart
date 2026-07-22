@@ -41,6 +41,7 @@ import '../features/profile/application/account_deletion_notifier.dart';
 import '../features/feed/presentation/public_profile_screen.dart';
 import '../features/feed/presentation/search_users_screen.dart';
 import '../features/home/home_screen.dart';
+import 'not_found_screen.dart';
 import '../features/insights/presentation/exercise_progression_screen.dart';
 import '../features/insights/presentation/frequent_exercises_screen.dart';
 import '../features/insights/presentation/insights_screen.dart';
@@ -189,6 +190,9 @@ GoRouter buildRouter({
     initialLocation: '/splash',
     refreshListenable: refreshListenable,
     redirect: (ctx, state) => authRedirect(read, state.matchedLocation),
+    // QA-NAV-002: una ruta desconocida o un deep-link malformado cae acá en vez
+    // de en la pantalla de error roja default de go_router.
+    errorBuilder: (context, state) => const NotFoundScreen(),
     routes: [
       // Entry routes — full screen, NO bottom bar
       GoRoute(
@@ -349,6 +353,46 @@ GoRouter buildRouter({
         builder: (context, state) {
           final athleteId = state.pathParameters['athleteId']!;
           return _immersive(AthleteDetailScreen(athleteId: athleteId));
+        },
+      ),
+      GoRoute(
+        // Read-only plan detail reached from the coach's athlete-detail screen.
+        // MUST stay top-level (out of the shell) like its origin
+        // `/coach/athlete/:id` — pushing the in-shell `/workout/routine/:id`
+        // from an out-of-shell route rebuilds the whole shell branch and lands
+        // blank (issue #399). `coachAthleteId` tells RoutineDetailScreen it is
+        // in this out-of-shell context so exercise taps and the back fallback
+        // stay out of the shell / athlete tab (issue #410).
+        path: '/coach/athlete/:athleteId/plan/:routineId',
+        builder: (context, state) {
+          final athleteId = state.pathParameters['athleteId']!;
+          final routineId = state.pathParameters['routineId']!;
+          return _immersive(RoutineDetailScreen(
+            routineId: routineId,
+            coachAthleteId: athleteId,
+          ));
+        },
+      ),
+      GoRoute(
+        // Exercise detail reached from a coach's read-only plan detail. Like
+        // its origin (the plan route above) it MUST stay top-level (out of the
+        // shell): pushing the in-shell `/workout/exercise/:id` from an
+        // out-of-shell route rebuilds the shell branch and lands blank
+        // (issue #410 Bug 1 — the root cause #399's symptom fix left open).
+        // Mirror of the in-shell exercise route; `backFallbackRoute` sends a
+        // state-restoration back to the athlete detail instead of `/workout`.
+        path: '/coach/athlete/:athleteId/plan/:routineId/exercise/:exerciseId',
+        builder: (context, state) {
+          final athleteId = state.pathParameters['athleteId']!;
+          final exerciseId = state.pathParameters['exerciseId']!;
+          final ownerId = state.uri.queryParameters['ownerId'];
+          final exerciseName = state.uri.queryParameters['name'];
+          return _immersive(ExerciseDetailScreen(
+            exerciseId: exerciseId,
+            ownerId: ownerId,
+            exerciseName: exerciseName,
+            backFallbackRoute: '/coach/athlete/$athleteId',
+          ));
         },
       ),
       GoRoute(
@@ -516,6 +560,18 @@ GoRouter buildRouter({
                 path: 'search',
                 builder: (_, __) => _withBg(const SearchUsersScreen()),
               ),
+              GoRoute(
+                // Friend-requests inbox reached from the feed header bell.
+                // Mirror of /profile/friend-requests: _ShellScaffold derives
+                // the highlighted tab from the location's path prefix, so the
+                // same screen registered under the ORIGIN branch keeps FEED
+                // highlighted — and pop lands back on /feed — instead of
+                // jumping to PERFIL (issue #387). Same route-mirroring
+                // pattern as the coach plan/exercise routes (issue #410).
+                // ProfileScreen keeps pushing the /profile twin.
+                path: 'friend-requests',
+                builder: (_, __) => _withBg(const FriendRequestsInboxScreen()),
+              ),
               // Messages inbox moved to the top-level immersive route
               // /feed/messages (no bottom nav bar).
             ],
@@ -601,6 +657,19 @@ GoRouter buildRouter({
               GoRoute(
                 path: 'settings/appearance',
                 builder: (_, __) => _withBg(const AppearanceScreen()),
+              ),
+              GoRoute(
+                // Trainer availability editor reached from TrainerProfileView's
+                // "Disponibilidad" row. Mirror of /coach/availability-editor:
+                // registered under the ORIGIN branch so _ShellScaffold's
+                // prefix-derived tab highlight keeps PERFIL — and pop lands
+                // back on /profile — instead of jumping to COACH (issue #387).
+                // TrainerAgendaTab keeps pushing the /coach twin.
+                path: 'availability-editor',
+                builder: (context, state) {
+                  final uid = state.uri.queryParameters['trainerId'] ?? '';
+                  return _withBg(AvailabilityEditorScreen(trainerId: uid));
+                },
               ),
               // /profile/settings GoRoute REMOVED 2026-05-28 — PR#4 pivot.
               // Sign-out and eliminar-cuenta tiles now live directly in
@@ -782,11 +851,29 @@ class _VolumeByGroupRouteHost extends ConsumerWidget {
 
 /// Resuelve athleteId (currentUid) y trainerId (active link) y monta
 /// AthleteAgendaScreen. Loading state mientras se resuelve el link.
+///
+/// QA-NOT-002: role-aware. Los pushes de "Nueva solicitud de sesión" anteriores
+/// al fix del deepLink en notifyOnAppointment apuntan a /coach/agenda; para un
+/// TRAINER este host resolvía el vínculo de atleta (vacío) y mostraba
+/// "Necesitás un vínculo activo con un PF". Ahora un trainer aterriza en su
+/// propia agenda (misma vista que /coach?tab=agenda).
 class _AthleteAgendaRouteHost extends ConsumerWidget {
   const _AthleteAgendaRouteHost();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Gate por rol ANTES de resolver el vínculo: spinner mientras el profile
+    // carga (evita el flash del estado de error de atleta en cold start).
+    final profileAsync = ref.watch(userProfileProvider);
+    if (profileAsync.isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (profileAsync.valueOrNull?.role == UserRole.trainer) {
+      return const CoachScreen(initialTab: 'agenda');
+    }
+
     final athleteId = ref.watch(currentUidProvider) ?? '';
     final linkAsync = ref.watch(currentAthleteLinkProvider);
 

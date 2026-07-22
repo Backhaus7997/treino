@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
+import 'package:treino/core/utils/argentina_time.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/application/dashboard_day_counts.dart';
@@ -233,7 +234,9 @@ class _WelcomeCard extends ConsumerWidget {
 
     // Sesiones hoy count via trainerAppointmentsStreamProvider + dashboardDayCounts.
     final uid = ref.watch(currentUidProvider) ?? '';
-    final now = DateTime.now().toUtc();
+    // QA-HOME-001: appointments' startsAt is Argentina wall-clock, so bucket the
+    // "today" query range and the dashboard counts by ART wall-clock too.
+    final now = argentinaNow();
     final todayStart = DateTime.utc(now.year, now.month, now.day);
     final todayEnd = todayStart.add(const Duration(days: 1));
     final appointmentsAsync = ref.watch(

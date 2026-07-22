@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/utils/argentina_time.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../domain/day_insights.dart';
 import 'day_strip_labels.dart';
@@ -41,7 +42,10 @@ class DayStripNavigator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final today = DateTime.now();
+    // ART wall-clock: dayInsights.day is built in the aggregator from
+    // `toArgentina(...)` fields (local-flagged), so anchor "today" in the same
+    // ART frame — otherwise the isToday marker drifts on non-Argentina devices.
+    final today = argentinaNow();
     final todayOnly = DateTime(today.year, today.month, today.day);
 
     return SizedBox(

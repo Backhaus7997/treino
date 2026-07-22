@@ -9,6 +9,8 @@ library;
 import 'package:flutter/material.dart';
 import 'package:treino/app/theme/app_palette.dart';
 
+import 'thousands_input_formatter.dart';
+
 /// Diálogo de alta de un pago ad-hoc (monto + concepto). Devuelve el record o
 /// `null` si se cancela. Copy hardcodeada (CoachHubApp no tiene l10n delegates).
 class RegistrarPagoDialog extends StatefulWidget {
@@ -31,7 +33,7 @@ class _RegistrarPagoDialogState extends State<RegistrarPagoDialog> {
   }
 
   void _submit() {
-    final amount = int.tryParse(_monto.text.trim());
+    final amount = parseGroupedInt(_monto.text);
     final concept = _concepto.text.trim();
     if (amount == null || amount <= 0) {
       setState(() => _error = 'Ingresá un monto válido.'); // i18n
@@ -70,6 +72,7 @@ class _RegistrarPagoDialogState extends State<RegistrarPagoDialog> {
           TextField(
             controller: _monto,
             keyboardType: TextInputType.number,
+            inputFormatters: [ThousandsSeparatorInputFormatter()],
             style: TextStyle(color: palette.textPrimary),
             decoration: deco('Monto (ARS)', 'Ej: 5000'), // i18n
           ),

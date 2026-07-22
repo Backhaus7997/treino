@@ -24,6 +24,7 @@ void main() {
     // Default stubs — can be overridden per test.
     when(() => repo.saveToken(any(), any())).thenAnswer((_) async {});
     when(() => repo.removeToken(any(), any())).thenAnswer((_) async {});
+    when(() => messaging.deleteToken()).thenAnswer((_) async {});
     when(
       () => messaging.requestPermission(
         alert: any(named: 'alert'),
@@ -222,6 +223,27 @@ void main() {
         // getToken called again for dispose
         verify(() => messaging.getToken()).called(2);
         verify(() => repo.removeToken(uid, 'tok-current')).called(1);
+      },
+    );
+
+    // QA-NOT-001: on a forced sign-out (token revoked / password changed on
+    // another device / Admin-SDK disable) the Firestore removeToken is denied
+    // because auth is already null — but the device token must still be
+    // invalidated so the device stops receiving the closed account's pushes.
+    test(
+      'QA-NOT-001: dispose deletes the device token even when removeToken is denied',
+      () async {
+        const uid = 'user-not001';
+        when(() => messaging.getToken()).thenAnswer((_) async => 'tok-current');
+        when(() => messaging.onTokenRefresh)
+            .thenAnswer((_) => const Stream.empty());
+        when(() => repo.removeToken(any(), any()))
+            .thenThrow(Exception('permission-denied'));
+
+        await service.init(uid);
+        await service.dispose(uid);
+
+        verify(() => messaging.deleteToken()).called(1);
       },
     );
 

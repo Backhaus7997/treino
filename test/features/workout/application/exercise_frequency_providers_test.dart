@@ -17,6 +17,9 @@ class _MockSessionRepository extends Mock implements SessionRepository {}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+// #372: the frequency aggregator now counts only `countsAsWorkout` sessions
+// (finished AND wasFullyCompleted). These fixtures are COMPLETED workouts, so
+// set `wasFullyCompleted: true` — the default (false) would exclude them.
 Session _s(String id, DateTime dt) => Session(
       id: id,
       uid: 'a1',
@@ -24,6 +27,7 @@ Session _s(String id, DateTime dt) => Session(
       routineName: 'R',
       startedAt: dt,
       status: SessionStatus.finished,
+      wasFullyCompleted: true,
     );
 
 SetLog _log(String sessionId, String exId, String exName, {int setNum = 1}) =>

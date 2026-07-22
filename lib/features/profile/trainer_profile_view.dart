@@ -28,7 +28,8 @@ import 'application/user_providers.dart';
 ///   - Public profile visibility, location summary, online flag (trainerById)
 ///   - VER PREVIEW → /coach/trainer/:uid
 ///   - EDITAR → /profile/edit-personal (shared form; full trainer fields TBD)
-///   - Disponibilidad → /coach/availability-editor
+///   - Disponibilidad → /profile/availability-editor (mirror of the /coach
+///     route so the PERFIL tab stays highlighted — issue #387)
 ///   - Configuración por defecto → /profile/settings
 ///   - Cerrar sesión → AuthNotifier.signOut
 ///
@@ -115,9 +116,11 @@ class TrainerProfileView extends ConsumerWidget {
         _MenuRow(
           icon: TreinoIcon.bell,
           label: 'Disponibilidad',
+          // /profile twin of /coach/availability-editor so the bottom bar
+          // keeps PERFIL highlighted while the editor is open (issue #387).
           onTap: () => uid.isEmpty
               ? _toast(context, 'Iniciá sesión para configurar.')
-              : context.push('/coach/availability-editor?trainerId=$uid'),
+              : context.push('/profile/availability-editor?trainerId=$uid'),
           palette: palette,
         ),
         const SizedBox(height: 10),

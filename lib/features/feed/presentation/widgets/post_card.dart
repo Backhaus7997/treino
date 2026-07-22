@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/utils/kg_format.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../../auth/application/auth_providers.dart';
@@ -138,40 +139,42 @@ class PostCard extends ConsumerWidget {
             _RoutineTagChip(tag: post.routineTag!),
           ],
 
-          const SizedBox(height: 12),
-
-          // ── STATS STUB ROW ──────────────────────────────────────────
-          Row(
-            children: [
-              Text(
-                '— kg',
-                style: GoogleFonts.barlow(
-                  fontWeight: FontWeight.w400,
-                  fontSize: 12,
-                  color: palette.textMuted,
+          // QA-FEED-364/389: real workout stats when the post came from sharing
+          // a workout; otherwise the row is hidden entirely (manual + legacy
+          // posts) instead of the old permanent "— kg / — min / — ej." stub.
+          if (post.workoutStats != null) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Text(
+                  '${formatVolumeKg(post.workoutStats!.volumeKg)} kg',
+                  style: GoogleFonts.barlow(
+                    fontWeight: FontWeight.w400,
+                    fontSize: 12,
+                    color: palette.textMuted,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 18),
-              Text(
-                '— min',
-                style: GoogleFonts.barlow(
-                  fontWeight: FontWeight.w400,
-                  fontSize: 12,
-                  color: palette.textMuted,
+                const SizedBox(width: 18),
+                Text(
+                  '${post.workoutStats!.durationMin} min',
+                  style: GoogleFonts.barlow(
+                    fontWeight: FontWeight.w400,
+                    fontSize: 12,
+                    color: palette.textMuted,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 18),
-              Text(
-                '— ej.',
-                style: GoogleFonts.barlow(
-                  fontWeight: FontWeight.w400,
-                  fontSize: 12,
-                  color: palette.textMuted,
+                const SizedBox(width: 18),
+                Text(
+                  '${post.workoutStats!.exerciseCount} ej.',
+                  style: GoogleFonts.barlow(
+                    fontWeight: FontWeight.w400,
+                    fontSize: 12,
+                    color: palette.textMuted,
+                  ),
                 ),
-              ),
-              // Stub: real stats wired in Fase 4.
-            ],
-          ),
+              ],
+            ),
+          ],
         ],
       ),
     );

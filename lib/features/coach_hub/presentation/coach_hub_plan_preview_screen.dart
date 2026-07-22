@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/analytics/analytics_service.dart';
+import '../../../core/utils/kg_format.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../coach/application/trainer_link_providers.dart';
@@ -745,12 +746,9 @@ class _DayCard extends StatelessWidget {
         i.repsMin == i.repsMax ? '${i.repsMin}' : '${i.repsMin}-${i.repsMax}';
     final base = '${i.sets} × $reps';
     final rest = i.restSec != null ? ' · ${i.restSec}s' : '';
-    final w = i.weightKg != null ? ' · ${_formatWeight(i.weightKg!)} kg' : '';
+    final w = i.weightKg != null ? ' · ${formatWeightKg(i.weightKg)} kg' : '';
     return '$base$rest$w';
   }
-
-  String _formatWeight(double w) =>
-      w == w.truncateToDouble() ? w.toInt().toString() : w.toString();
 }
 
 /// Bottom sheet con search + lista del catálogo de exercises.

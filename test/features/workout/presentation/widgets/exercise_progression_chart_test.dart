@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart' as intl;
 
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/workout/domain/exercise_progression.dart';
@@ -35,6 +36,10 @@ ExerciseProgressionChartLabels _labels({
 
 ProgressionPoint _pt(int dayOffset, double value) =>
     ProgressionPoint(date: DateTime(2025, 1, dayOffset), value: value);
+
+// UTC-flagged noon: safe under TZ=UTC CI and the ART calendar frame (#398).
+ProgressionPoint _ptUtc(int month, int day, double value) =>
+    ProgressionPoint(date: DateTime.utc(2026, month, day, 12), value: value);
 
 Widget _wrap(Widget child) => MaterialApp(
       theme: AppTheme.dark(),
@@ -292,6 +297,87 @@ void main() {
       await tester.tap(find.text('Mejor serie'));
       await tester.pump();
       expect(find.byType(ExerciseProgressionChart), findsOneWidget);
+    });
+
+    // #383 — X axis is point-index-based. Without an explicit interval,
+    // fl_chart samples fractional Xs and value.round() maps neighbouring
+    // samples to the same index → duplicated labels + skipped ones.
+    testWidgets('#383: >4 points renders each visible axis date exactly once',
+        (tester) async {
+      // Issue repro: 6 sessions (19 jun … 17 jul) → label subset {0, 2, 3, 5}.
+      final series = [
+        _ptUtc(6, 19, 60.0),
+        _ptUtc(6, 25, 62.5),
+        _ptUtc(7, 1, 65.0),
+        _ptUtc(7, 7, 67.5),
+        _ptUtc(7, 13, 70.0),
+        _ptUtc(7, 17, 72.5),
+      ];
+      final progression = _progression(
+        heaviestWeightSeries: series,
+        oneRepMaxSeries: series,
+        bestSetVolumeSeries: series,
+        bestSessionVolumeSeries: series,
+        frequencyLast8Weeks: 6,
+      );
+
+      await tester.pumpWidget(_wrap(
+        ExerciseProgressionChart(
+          progression: progression,
+          labels: _labels(),
+          localeName: 'es_AR',
+        ),
+      ));
+      await tester.pump();
+
+      String label(int i) =>
+          intl.DateFormat('d MMM', 'es_AR').format(series[i].date);
+
+      // Broken sampling rendered '1 jul', '7 jul' and '17 jul' twice each.
+      for (final i in [0, 2, 3, 5]) {
+        expect(find.text(label(i)), findsOneWidget,
+            reason: 'axis label for point $i must appear exactly once');
+      }
+      // Indices outside the ≤4-label subset stay off the axis; their points
+      // remain visible as dots with tooltip.
+      for (final i in [1, 4]) {
+        expect(find.text(label(i)), findsNothing,
+            reason: 'point $i is not part of the label subset');
+      }
+    });
+
+    testWidgets('#383: ≤4 points labels every point date exactly once',
+        (tester) async {
+      final series = [
+        _ptUtc(6, 19, 60.0),
+        _ptUtc(6, 25, 62.5),
+        _ptUtc(7, 1, 65.0),
+        _ptUtc(7, 7, 67.5),
+      ];
+      final progression = _progression(
+        heaviestWeightSeries: series,
+        oneRepMaxSeries: series,
+        bestSetVolumeSeries: series,
+        bestSessionVolumeSeries: series,
+        frequencyLast8Weeks: 4,
+      );
+
+      await tester.pumpWidget(_wrap(
+        ExerciseProgressionChart(
+          progression: progression,
+          labels: _labels(),
+          localeName: 'es_AR',
+        ),
+      ));
+      await tester.pump();
+
+      String label(int i) =>
+          intl.DateFormat('d MMM', 'es_AR').format(series[i].date);
+
+      for (var i = 0; i < series.length; i++) {
+        expect(find.text(label(i)), findsOneWidget,
+            reason: 'axis label for point $i must appear exactly once');
+      }
     });
   });
 }

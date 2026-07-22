@@ -7,9 +7,12 @@ import '../../../../core/utils/date_labels.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../domain/measurement.dart';
 
-/// Short date label: '7 abr'
-String _shortDate(DateTime dt, String localeName) =>
-    '${dt.day} ${monthAbbrev(dt, localeName)}';
+/// Short date label: '7 abr'. recordedAt is a real UTC instant — localize
+/// before formatting or it reads +3h / shifts the day near midnight (#392).
+String _shortDate(DateTime dt, String localeName) {
+  final local = dt.toLocal();
+  return '${local.day} ${monthAbbrev(local, localeName)}';
+}
 
 // ── Bilateral average helper ──────────────────────────────────────────────────
 

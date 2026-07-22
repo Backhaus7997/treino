@@ -47,4 +47,59 @@ void main() {
     expect(result.single.athleteId, 'athleteX');
     expect(result.single.weightKg, 78);
   });
+
+  // ── update / delete (#439) — hasta ahora eran código muerto en mobile ─────
+
+  test('update rewrites the values of an existing doc in place (same id)',
+      () async {
+    final firestore = FakeFirebaseFirestore();
+    final repo = MeasurementRepository(firestore: firestore);
+
+    // El caso QA del bug: 500 kg tipeados en vez de 50.
+    final saved = await repo.add(Measurement(
+      id: '',
+      athleteId: 'athleteX',
+      recordedBy: 'coach',
+      recordedAt: DateTime.utc(2026, 1, 1),
+      weightKg: 500,
+      notes: 'typo',
+    ));
+
+    await repo.update(saved.copyWith(weightKg: 50, notes: null));
+
+    final result = await repo.watchForAthlete('athleteX').first;
+    expect(result, hasLength(1), reason: 'update must not duplicate the doc');
+    expect(result.single.id, saved.id);
+    expect(result.single.weightKg, 50);
+    expect(result.single.notes, isNull,
+        reason: 'update() hace set() completo: un campo vaciado queda null');
+    expect(result.single.recordedBy, 'coach');
+    expect(result.single.recordedAt, DateTime.utc(2026, 1, 1));
+  });
+
+  test('delete removes the doc', () async {
+    final firestore = FakeFirebaseFirestore();
+    final repo = MeasurementRepository(firestore: firestore);
+
+    final saved = await repo.add(Measurement(
+      id: '',
+      athleteId: 'athleteX',
+      recordedBy: 'coach',
+      recordedAt: DateTime.utc(2026, 1, 1),
+      weightKg: 80,
+    ));
+    final other = await repo.add(Measurement(
+      id: '',
+      athleteId: 'athleteX',
+      recordedBy: 'coach',
+      recordedAt: DateTime.utc(2026, 2, 1),
+      weightKg: 81,
+    ));
+
+    await repo.delete(saved.id);
+
+    final result = await repo.watchForAthlete('athleteX').first;
+    expect(result, hasLength(1), reason: 'only the targeted doc is removed');
+    expect(result.single.id, other.id);
+  });
 }

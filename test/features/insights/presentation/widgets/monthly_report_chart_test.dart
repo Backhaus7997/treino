@@ -1,3 +1,4 @@
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -150,6 +151,104 @@ void main() {
 
       expect(find.text('sep'), findsOneWidget);
       expect(find.text('sept'), findsNothing);
+    });
+  });
+
+  group('DailyDurationChart', () {
+    // Julio 2026 completo — 31 días, con entrenos alternados para que el
+    // chart tenga barras reales (31 × 26px = 806px de contenido scrolleable).
+    List<MonthlyReportDayPoint> july31() => List.generate(
+          31,
+          (i) => MonthlyReportDayPoint(
+            day: DateTime(2026, 7, i + 1),
+            durationMin: i.isEven ? 45 : 0,
+          ),
+        );
+
+    Widget chart() => DailyDurationChart(
+          points: july31(),
+          emptyHint: 'Sin entrenos este mes.',
+          dayLabel: 'Día',
+          minutesUnit: 'min',
+        );
+
+    List<int> showingTooltipsAt(WidgetTester tester, int index) => tester
+        .widget<BarChart>(find.byType(BarChart))
+        .data
+        .barGroups[index]
+        .showingTooltipIndicators;
+
+    testWidgets('el drag horizontal SOBRE las barras desplaza el scroll (#369)',
+        (tester) async {
+      // Viewport angosto tipo iPhone (400 lógicos) — como en el reporte del
+      // bug, entran ~14 de los 31 días y el resto queda detrás del scroll.
+      tester.view.physicalSize = const Size(1200, 2400);
+      tester.view.devicePixelRatio = 3.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(_wrap(chart()));
+      await tester.pumpAndSettle();
+
+      final scrollable = find.descendant(
+        of: find.byType(DailyDurationChart),
+        matching: find.byType(Scrollable),
+      );
+      final position = tester.state<ScrollableState>(scrollable).position;
+      expect(position.pixels, 0);
+
+      // Swipe real de usuario sobre el área de barras, en dos moves:
+      // 1. -60px en UN evento — reproduce el bug: supera el pan slop de
+      //    fl_chart (36px) en un solo move, y ese recognizer (registrado
+      //    antes) acepta el arena antes de que el HorizontalDrag del
+      //    SingleChildScrollView (slop 18px) vea el movimiento. `tester.drag()`
+      //    cruza el slop en pasos chicos y NO reproduce la pérdida del arena.
+      // 2. -140px — el desplazamiento observable: con DragStartBehavior.start
+      //    el scrollable absorbe el delta previo a la aceptación, así que el
+      //    scroll real lo producen los moves POSTERIORES, como en un swipe
+      //    de verdad.
+      // Ojo: NO usar getCenter(BarChart) — el chart mide 806px y su centro
+      // (x≈417) cae fuera del viewport de 400; el pointer debe arrancar sobre
+      // barras VISIBLES.
+      final gesture = await tester.startGesture(
+        Offset(200, tester.getCenter(find.byType(BarChart)).dy),
+      );
+      await gesture.moveBy(const Offset(-60, 0));
+      await gesture.moveBy(const Offset(-140, 0));
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(position.pixels, greaterThan(0));
+
+      // Y el drag NO tiene que dejar un tooltip seleccionado de rebote.
+      for (var i = 0; i < 31; i++) {
+        expect(showingTooltipsAt(tester, i), isEmpty);
+      }
+    });
+
+    testWidgets(
+        'tap sobre la columna de un día muestra su tooltip y re-tap '
+        'lo oculta', (tester) async {
+      await tester.pumpWidget(_wrap(chart()));
+      await tester.pumpAndSettle();
+
+      // Columna del día 3 (índice 2): centro de la ranura de 26px.
+      final chartTopLeft = tester.getTopLeft(find.byType(BarChart));
+      final day3Column = chartTopLeft + const Offset(2 * 26 + 13, 100);
+
+      await tester.tapAt(day3Column);
+      await tester.pumpAndSettle();
+      expect(showingTooltipsAt(tester, 2), const [0]);
+
+      // Tap en OTRA columna mueve el tooltip (día 6, índice 5).
+      await tester.tapAt(chartTopLeft + const Offset(5 * 26 + 13, 100));
+      await tester.pumpAndSettle();
+      expect(showingTooltipsAt(tester, 2), isEmpty);
+      expect(showingTooltipsAt(tester, 5), const [0]);
+
+      // Re-tap sobre la misma columna lo apaga (toggle).
+      await tester.tapAt(chartTopLeft + const Offset(5 * 26 + 13, 100));
+      await tester.pumpAndSettle();
+      expect(showingTooltipsAt(tester, 5), isEmpty);
     });
   });
 }

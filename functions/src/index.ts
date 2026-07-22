@@ -10,6 +10,8 @@
 
 export { deleteAccountHandler as deleteAccount } from "./delete-account";
 export { reviewAggregate } from "./review-aggregate";
+// #388: denormalized athleteCount on trainerPublicProfiles (active links).
+export { linkAggregate } from "./link-aggregate";
 export {
   rankingAggregateOnSession,
   rankingAggregateOnOptIn,

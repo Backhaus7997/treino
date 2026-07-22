@@ -1,3 +1,4 @@
+import '../../../core/utils/argentina_time.dart';
 import '../../workout/domain/session.dart';
 
 /// [AD6] Pure function — returns the set of unique local calendar dates
@@ -20,7 +21,7 @@ Set<DateTime> trainedDaysInMonth(List<Session> sessions, DateTime month) {
 
   for (final session in sessions) {
     if (!session.countsAsWorkout) continue;
-    final started = session.startedAt.toLocal();
+    final started = toArgentina(session.startedAt);
     if (started.year != month.year || started.month != month.month) continue;
     result.add(DateTime(started.year, started.month, started.day));
   }

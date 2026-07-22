@@ -211,6 +211,9 @@ describe("trainer_links rules — existing flows unaffected by entitlement pin",
       athleteId,
       status: "pending",
       requestedAt: 1,
+      // Real docs always carry sharedWithTrainer (app model defaults it to
+      // false); the update rule reads it directly, so the fixture must too.
+      sharedWithTrainer: false,
     });
 
     const trainer = testEnv.authenticatedContext(trainerId);
@@ -255,6 +258,7 @@ describe("trainer_links rules — existing flows unaffected by entitlement pin",
       status: "active",
       requestedAt: 1,
       acceptedAt: 2,
+      sharedWithTrainer: false,
     });
 
     const trainer = testEnv.authenticatedContext(trainerId);
@@ -276,6 +280,7 @@ describe("trainer_links rules — existing flows unaffected by entitlement pin",
       requestedAt: 1,
       acceptedAt: 2,
       pausedAt: 3,
+      sharedWithTrainer: false,
     });
 
     const trainer = testEnv.authenticatedContext(trainerId);
@@ -318,6 +323,7 @@ describe("trainer_links rules — existing flows unaffected by entitlement pin",
         athleteId,
         status: "pending",
         requestedAt: 1,
+        sharedWithTrainer: false,
       });
 
       const trainer = testEnv.authenticatedContext(trainerId);

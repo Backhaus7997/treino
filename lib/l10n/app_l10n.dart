@@ -98,6 +98,24 @@ abstract class AppL10n {
     Locale('es', 'AR')
   ];
 
+  /// No description provided for @notFoundTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Página no encontrada'**
+  String get notFoundTitle;
+
+  /// No description provided for @notFoundBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'La ruta que buscás no existe o el enlace es inválido.'**
+  String get notFoundBody;
+
+  /// No description provided for @notFoundCta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Volver al inicio'**
+  String get notFoundCta;
+
   /// Home first-run empty-state title for an athlete with no routine (usability finding 6).
   ///
   /// In es_AR, this message translates to:
@@ -1034,6 +1052,18 @@ abstract class AppL10n {
   /// **'VOLUMEN'**
   String get workoutStatVolume;
 
+  /// No description provided for @workoutStatDurationMin.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DURACIÓN MIN'**
+  String get workoutStatDurationMin;
+
+  /// No description provided for @workoutStatVolumeKg.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VOLUMEN KG'**
+  String get workoutStatVolumeKg;
+
   /// No description provided for @workoutStatSets.
   ///
   /// In es_AR, this message translates to:
@@ -1202,6 +1232,18 @@ abstract class AppL10n {
   /// **'VOLUMEN'**
   String get workoutDetailStatVolume;
 
+  /// No description provided for @workoutDetailStatDurationMin.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DURACIÓN MIN'**
+  String get workoutDetailStatDurationMin;
+
+  /// No description provided for @workoutDetailStatVolumeKg.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VOLUMEN KG'**
+  String get workoutDetailStatVolumeKg;
+
   /// No description provided for @workoutDetailStatPrsToday.
   ///
   /// In es_AR, this message translates to:
@@ -1261,6 +1303,12 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'No pudimos crear la rutina. Reintentá.'**
   String get workoutSelfEditorError;
+
+  /// No description provided for @workoutDiscardError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos descartar la sesión. Probá de nuevo.'**
+  String get workoutDiscardError;
 
   /// No description provided for @workoutSelfEditorPermissionDenied.
   ///
@@ -1784,12 +1832,6 @@ abstract class AppL10n {
   /// **'+ Cobro'**
   String get dashboardCobroTrailingLabel;
 
-  /// No description provided for @dashboardInvitarAlumnoLabel.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'+ INVITAR ALUMNO'**
-  String get dashboardInvitarAlumnoLabel;
-
   /// No description provided for @dashboardAsignarRutinaLabel.
   ///
   /// In es_AR, this message translates to:
@@ -2017,12 +2059,6 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'HOLA'**
   String get dashboardHolaSinNombre;
-
-  /// No description provided for @dashboardInvitarProximamente.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'Invitar alumno — próximamente.'**
-  String get dashboardInvitarProximamente;
 
   /// No description provided for @dashboardSolicitudesPendientesTitle.
   ///
@@ -3938,6 +3974,12 @@ abstract class AppL10n {
   /// **'Completá las reps de los sets antes de guardar.'**
   String get routineEditorMissingReps;
 
+  /// No description provided for @routineEditorDuplicateExercise.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ese ejercicio ya está en el día. Elegí otro.'**
+  String get routineEditorDuplicateExercise;
+
   /// Success snackbar after publishing a post (finding 25). Shown via the root ScaffoldMessenger since the compose screen pops on success.
   ///
   /// In es_AR, this message translates to:
@@ -4761,6 +4803,12 @@ abstract class AppL10n {
   /// **'No pudimos cargar tu distribución muscular. Probá de nuevo.'**
   String get muscleDistributionLoadError;
 
+  /// Error state for the FrequentExercisesScreen's exerciseFrequencyProvider load failure. Paired with coachRetryLabel for the retry CTA — same convention as muscleDistributionLoadError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar tus ejercicios frecuentes. Probá de nuevo.'**
+  String get frequentExercisesLoadError;
+
   /// Header title for the athlete-side ExerciseProgressionScreen.
   ///
   /// In es_AR, this message translates to:
@@ -4857,6 +4905,78 @@ abstract class AppL10n {
   /// **'Con una sola medición no hay progreso que mostrar. Falta al menos una más.'**
   String get measurementsNeedsMoreData;
 
+  /// [#439] Section label above MeasurementHistoryList on both mobile surfaces (athlete MEDIDAS screen and trainer ANTROPOMETRÍA section).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'HISTORIAL'**
+  String get measurementsHistoryTitle;
+
+  /// [#439] Tooltip/a11y label of the per-row edit action in MeasurementHistoryList. Only rendered on rows authored by the current uid (the update rule pins recordedBy).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Editar medición'**
+  String get measurementHistoryEditTooltip;
+
+  /// [#439] Tooltip/a11y label of the per-row delete action in MeasurementHistoryList. Only rendered on rows authored by the current uid (the delete rule pins recordedBy).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Eliminar medición'**
+  String get measurementHistoryDeleteTooltip;
+
+  /// [#439] Footer toggle of MeasurementHistoryList when more rows exist than the collapsed cap. {count} is the TOTAL number of measurements.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver todas ({count})'**
+  String measurementHistoryShowAll(int count);
+
+  /// [#439] Footer toggle of MeasurementHistoryList when expanded — collapses back to the capped list.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver menos'**
+  String get measurementHistoryShowLess;
+
+  /// [#439] Title of the delete-confirmation AlertDialog for a measurement (same pattern as athleteDetailPlanDeleteTitle).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Eliminar medición?'**
+  String get measurementDeleteConfirmTitle;
+
+  /// [#439] Body of the delete-confirmation dialog. {date} is the pre-formatted recordedAt day label (e.g. '3 jul 2026').
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Se eliminará la medición del {date}. Esta acción no se puede deshacer.'**
+  String measurementDeleteConfirmBody(String date);
+
+  /// [#439] Destructive confirm button of the measurement delete dialog. Cancel reuses commonCancel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Eliminar'**
+  String get measurementDeleteConfirmAction;
+
+  /// [#439] Snackbar after a measurement was deleted successfully.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Medición eliminada'**
+  String get measurementDeleteSuccess;
+
+  /// [#439] Snackbar when the measurement delete fails (network/rules).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos eliminar la medición. Probá de nuevo.'**
+  String get measurementDeleteError;
+
+  /// [#439] Read-only tag on the TRAINER's history rows the athlete self-logged: the trainer cannot edit/delete them (rules pin recordedBy), the tag explains why there are no actions.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Auto-registro'**
+  String get measurementHistorySelfLoggedTag;
+
+  /// [#439] Read-only tag on the ATHLETE's history rows a trainer recorded: the athlete cannot edit/delete them (rules pin recordedBy), the tag explains why there are no actions.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cargada por tu entrenador'**
+  String get measurementHistoryTrainerLoggedTag;
+
   /// [stats-hub] Tile title on InsightsScreen navigating to FrequentExercisesScreen (athlete's own uid).
   ///
   /// In es_AR, this message translates to:
@@ -4898,6 +5018,12 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'VOLUMEN POR GRUPO'**
   String get volumeByGroupScreenTitle;
+
+  /// [stats-hub] Empty state of the VolumeByGroupScreen card when the athlete has no target (no assigned routine). QA #371.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Necesitás una rutina asignada para ver tu volumen objetivo.'**
+  String get volumeByGroupEmptyTarget;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/utils/argentina_time.dart';
 import '../../../core/utils/date_labels.dart';
 import '../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
@@ -331,7 +332,10 @@ class _CardHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    final now = DateTime.now().toLocal();
+    // QA-PAY-100: ancla "hoy"/semana en ART fijo, para alinear con
+    // insights.daysTrained (ya bucketizado en ART). DateTime.now().toLocal()
+    // se desalineaba en devices con timezone != ART.
+    final now = argentinaNow();
     final week = isoWeekNumber(now);
     final month = monthAbbrev(now, l10n.localeName, upperCase: true);
 
@@ -399,7 +403,10 @@ class _StreakSubtext extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    final now = DateTime.now().toLocal();
+    // QA-PAY-100: ancla "hoy"/semana en ART fijo, para alinear con
+    // insights.daysTrained (ya bucketizado en ART). DateTime.now().toLocal()
+    // se desalineaba en devices con timezone != ART.
+    final now = argentinaNow();
     final todayIndex = now.weekday - DateTime.monday;
     final trainedToday =
         todayIndex >= 0 && todayIndex < 7 && insights.daysTrained[todayIndex];
@@ -426,7 +433,10 @@ class _DayStrip extends StatelessWidget {
     final palette = AppPalette.of(context);
     final localeName = AppL10n.of(context).localeName;
     final dayLabels = weekdayInitials(localeName);
-    final now = DateTime.now().toLocal();
+    // QA-PAY-100: ancla "hoy"/semana en ART fijo, para alinear con
+    // insights.daysTrained (ya bucketizado en ART). DateTime.now().toLocal()
+    // se desalineaba en devices con timezone != ART.
+    final now = argentinaNow();
     final todayIndex = now.weekday - DateTime.monday;
 
     return Row(

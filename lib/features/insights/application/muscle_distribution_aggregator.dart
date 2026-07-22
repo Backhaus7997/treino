@@ -1,3 +1,4 @@
+import '../../../core/utils/argentina_time.dart';
 import '../../workout/domain/session.dart';
 import '../../workout/domain/set_log.dart';
 import '../domain/chart_period.dart';
@@ -27,23 +28,23 @@ MuscleDistributionInsights aggregateMuscleDistribution({
   required Map<String, List<SetLog>> logsBySession,
   required Map<String, String> muscleGroupByExerciseId,
 }) {
-  final currentEndExclusive = DateTime(
+  final currentEndExclusive = DateTime.utc(
     periodWindow.currentEnd.year,
     periodWindow.currentEnd.month,
     periodWindow.currentEnd.day + 1,
   );
-  final previousEndExclusive = DateTime(
+  final previousEndExclusive = DateTime.utc(
     periodWindow.previousEnd.year,
     periodWindow.previousEnd.month,
     periodWindow.previousEnd.day + 1,
   );
 
   bool inCurrent(Session s) =>
-      !s.startedAt.isBefore(periodWindow.currentStart) &&
-      s.startedAt.isBefore(currentEndExclusive);
+      !toArgentina(s.startedAt).isBefore(periodWindow.currentStart) &&
+      toArgentina(s.startedAt).isBefore(currentEndExclusive);
   bool inPrevious(Session s) =>
-      !s.startedAt.isBefore(periodWindow.previousStart) &&
-      s.startedAt.isBefore(previousEndExclusive);
+      !toArgentina(s.startedAt).isBefore(periodWindow.previousStart) &&
+      toArgentina(s.startedAt).isBefore(previousEndExclusive);
 
   final finished = sessionsDesc.where((s) => s.countsAsWorkout).toList();
   final currentSessions = finished.where(inCurrent).toList();

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/utils/kg_format.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../domain/routine_slot.dart';
 
@@ -72,9 +73,6 @@ class _SetEntrySheetState extends State<SetEntrySheet> {
       ),
     );
   }
-
-  String _formatWeight(double w) =>
-      w == w.truncateToDouble() ? w.toInt().toString() : w.toString();
 
   @override
   Widget build(BuildContext context) {
@@ -150,7 +148,7 @@ class _SetEntrySheetState extends State<SetEntrySheet> {
           // Hint objetivo
           Text(
             'Objetivo: ${widget.slot.targetRepsMin}–${widget.slot.targetRepsMax} reps '
-            '· ${widget.slot.targetWeightKg != null ? '${widget.slot.targetWeightKg} kg' : '– kg'}',
+            '· ${widget.slot.targetWeightKg != null ? '${formatWeightKg(widget.slot.targetWeightKg)} kg' : '– kg'}',
             style: GoogleFonts.barlow(
               fontWeight: FontWeight.w400,
               fontSize: 12,
@@ -196,7 +194,7 @@ class _SetEntrySheetState extends State<SetEntrySheet> {
               _StepperButton(icon: '–', onTap: _decWeight),
               const SizedBox(width: 20),
               Text(
-                _formatWeight(_weight),
+                formatWeightKg(_weight),
                 style: GoogleFonts.barlowCondensed(
                   fontWeight: FontWeight.w700,
                   fontSize: 40,

@@ -100,7 +100,8 @@ void main() {
 
       final container = ProviderContainer(
         overrides: [
-          routineByIdProvider('test-id').overrideWith((_) async => routine),
+          routineByIdStreamProvider('test-id')
+              .overrideWith((_) => Stream.value(routine)),
         ],
       );
       addTearDown(container.dispose);
@@ -171,7 +172,8 @@ void main() {
 
       final container = ProviderContainer(
         overrides: [
-          routineByIdProvider('test-id').overrideWith((_) async => routine),
+          routineByIdStreamProvider('test-id')
+              .overrideWith((_) => Stream.value(routine)),
         ],
       );
       addTearDown(container.dispose);

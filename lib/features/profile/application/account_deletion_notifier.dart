@@ -55,8 +55,12 @@ class AccountDeletionNotifier extends AsyncNotifier<void> {
 
     state = const AsyncLoading();
     try {
-      final authService = ref.read(authServiceProvider);
-      await authService.reauthenticate(credential);
+      // QA-PRO-010: the re-auth sheet already re-authenticated with this exact
+      // credential before returning it. Re-authenticating again here is
+      // redundant and, for single-use OAuth credentials (Apple), the second
+      // reauthenticateWithCredential can throw invalid-credential and abort a
+      // deletion the user already confirmed. Trust the sheet's re-auth — just
+      // stamp the retry window and proceed to the CF.
       _lastReauthAt = DateTime.now();
       await _callCfAndFinish();
     } on AuthFailure catch (e) {

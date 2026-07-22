@@ -6,6 +6,7 @@ import '../../auth/application/auth_providers.dart';
 import '../../profile/application/user_providers.dart';
 import '../domain/post.dart';
 import '../domain/post_privacy.dart';
+import '../domain/routine_tag.dart';
 import 'feed_screen_providers.dart';
 import 'post_actions_notifier.dart';
 import 'post_providers.dart';
@@ -25,6 +26,7 @@ class CreatePostState {
     this.isSubmitting = false,
     this.errorMessage,
     this.editingPost,
+    this.routineTag,
   });
 
   final String text;
@@ -36,6 +38,11 @@ class CreatePostState {
   /// Drives edit-mode UI (title/submit label) and routes [submit] to
   /// `PostActionsNotifier.updatePost` instead of `PostRepository.create`.
   final Post? editingPost;
+
+  /// The routine the user chose to tag on this post, or `null` when none is
+  /// attached. Rendered as a navigable accent chip on the published card
+  /// (mirrors the share-workout flow).
+  final RoutineTag? routineTag;
 
   bool get isEditing => editingPost != null;
 
@@ -53,6 +60,8 @@ class CreatePostState {
     String? errorMessage,
     bool clearError = false,
     Post? editingPost,
+    RoutineTag? routineTag,
+    bool clearRoutineTag = false,
   }) =>
       CreatePostState(
         text: text ?? this.text,
@@ -60,6 +69,7 @@ class CreatePostState {
         isSubmitting: isSubmitting ?? this.isSubmitting,
         errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
         editingPost: editingPost ?? this.editingPost,
+        routineTag: clearRoutineTag ? null : (routineTag ?? this.routineTag),
       );
 }
 
@@ -81,8 +91,7 @@ class CreatePostNotifier
     // gate), fall back to compose-new mode instead of pre-filling someone
     // else's post. The 3-dot menu already gates this, and Firestore rules
     // reject the write — this guards the UI layer too.
-    final viewerUid =
-        (await ref.read(authStateChangesProvider.future))?.uid;
+    final viewerUid = (await ref.read(authStateChangesProvider.future))?.uid;
     if (viewerUid == null || viewerUid != existingPost.authorUid) {
       return const CreatePostState();
     }
@@ -90,6 +99,7 @@ class CreatePostNotifier
       text: existingPost.text,
       privacy: existingPost.privacy,
       editingPost: existingPost,
+      routineTag: existingPost.routineTag,
     );
   }
 
@@ -103,6 +113,17 @@ class CreatePostNotifier
     final current = state.valueOrNull;
     if (current == null) return;
     state = AsyncData(current.copyWith(privacy: value, clearError: true));
+  }
+
+  /// Attaches [tag] to the post, or clears the attachment when [tag] is null.
+  void setRoutineTag(RoutineTag? tag) {
+    final current = state.valueOrNull;
+    if (current == null) return;
+    state = AsyncData(
+      tag == null
+          ? current.copyWith(clearRoutineTag: true, clearError: true)
+          : current.copyWith(routineTag: tag, clearError: true),
+    );
   }
 
   /// Submits the post. Returns [true] on success, [false] on any failure.
@@ -157,6 +178,7 @@ class CreatePostNotifier
               editingPost.copyWith(
                 text: current.text.trim(),
                 privacy: current.privacy,
+                routineTag: current.routineTag,
               ),
             );
         state = AsyncData(current.copyWith(isSubmitting: false));
@@ -180,7 +202,7 @@ class CreatePostNotifier
         authorAvatarUrl: profile?.avatarUrl,
         authorGymId: profile?.gymId,
         text: current.text.trim(),
-        routineTag: null,
+        routineTag: current.routineTag,
         privacy: current.privacy,
         createdAt: DateTime.now().toUtc(),
       );

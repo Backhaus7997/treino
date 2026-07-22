@@ -11,6 +11,7 @@ import '../../application/agenda_providers.dart';
 import '../../domain/appointment.dart';
 import '../../domain/availability_override.dart';
 import '../../domain/compute_free_slots.dart';
+import '../../domain/wall_clock.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../agenda_formatters.dart';
 import 'session_detail_sheet.dart';
@@ -148,7 +149,9 @@ class TrainerDayDetailSheet extends ConsumerWidget {
         entries: slotEntries,
         trainerId: trainerId,
         palette: palette,
-        now: DateTime.now().toUtc(),
+        // QA-COA-003: slot times are wall-clock UTC (ADR-7); use wall-clock
+        // "now" so slots aren't marked "past" 3h early in ART.
+        now: nowWall(),
       ),
     );
   }

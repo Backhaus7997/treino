@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../payments/domain/payment.dart';
 import '../domain/agenda_exceptions.dart';
 import '../domain/appointment.dart';
+import '../domain/wall_clock.dart';
 
 /// Firestore-backed repository for booking and managing appointments.
 ///
@@ -35,10 +36,20 @@ class AppointmentRepository {
     required String athleteDisplayName,
     required DateTime startsAt,
     required int durationMin,
+    DateTime? now,
   }) async {
+    // QA-COA-003: startsAt is wall-clock UTC (ADR-7), so compare against a
+    // wall-clock "now", not a real UTC instant (+3h in ART). Inject [now] in
+    // tests; defaults to nowWall().
+    final reference = now ?? nowWall();
+    final startsAtWall = startsAt.toUtc();
+    // QA-COA-003: reject sessions in the past. The picker guards this in the
+    // UI (new_session_sheet.dart), but the data-layer contract must too.
+    if (!startsAtWall.isAfter(reference)) {
+      throw const BookingInThePastException();
+    }
     // REQ-COACH-AGENDA-009: booking horizon is 28 days. Guard before any read.
-    if (startsAt.toUtc().difference(DateTime.now().toUtc()) >
-        const Duration(days: 28)) {
+    if (startsAtWall.difference(reference) > const Duration(days: 28)) {
       throw const BookingTooFarAheadException();
     }
 
@@ -211,8 +222,11 @@ class AppointmentRepository {
     required Appointment appointment,
     required String actorUid,
     String? reason,
+    DateTime? now,
   }) async {
-    final remaining = appointment.startsAt.difference(DateTime.now().toUtc());
+    // QA-COA-003: startsAt is wall-clock UTC (ADR-7); compare against wall-clock
+    // "now" so the 24h gate isn't 3h short in ART. Inject [now] in tests.
+    final remaining = appointment.startsAt.difference(now ?? nowWall());
     if (remaining < const Duration(hours: 24)) {
       throw CancellationTooLateException(appointment.id);
     }
@@ -244,8 +258,15 @@ class AppointmentRepository {
     required String trainerId,
     required String actorUid,
     String? reason,
+    DateTime? now,
   }) async {
-    final realNow = DateTime.now().toUtc();
+    // QA-COA-003: the >24h gate compares each occurrence's wall-clock startsAt
+    // (ADR-7) against a wall-clock "now", not a real UTC instant (+3h in ART).
+    // Inject [now] in tests.
+    final reference = now ?? nowWall();
+    // The cancellation-log timestamp stays a TRUE UTC instant (like cancel()):
+    // it records WHEN the cancel happened, not a wall-clock comparison.
+    final atMs = DateTime.now().toUtc().millisecondsSinceEpoch;
 
     // Query only this series (equality on recurringId + trainerId + status),
     // not the trainer's entire forward booking set. Needs a composite index on
@@ -268,7 +289,7 @@ class AppointmentRepository {
       // Only the occurrences the rule will accept (>24h ahead). The batch is
       // atomic, so a single <24h write would reject the whole commit — a small
       // safety margin absorbs the client→server latency near the boundary.
-      if (appt.startsAt.difference(realNow) <=
+      if (appt.startsAt.difference(reference) <=
           const Duration(hours: 24, minutes: 2)) {
         continue;
       }
@@ -279,7 +300,7 @@ class AppointmentRepository {
         'cancellationLog': FieldValue.arrayUnion([
           <String, Object?>{
             'byUid': actorUid,
-            'atMs': realNow.millisecondsSinceEpoch,
+            'atMs': atMs,
             if (reason != null) 'reason': reason,
           },
         ]),

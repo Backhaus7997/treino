@@ -1,6 +1,13 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/insights/domain/chart_period.dart';
 
+// [#379] Window boundaries are now built with `DateTime.utc(...)` so the whole
+// Insights calendar math lives in the ART frame (UTC-flagged wall-clock),
+// matching `toArgentina(session.startedAt)` on the comparison's other side.
+// Expected boundaries are therefore `DateTime.utc(...)`. `windowFor` only reads
+// the year/month/day FIELDS of its `now` argument, so the flag of `now` in
+// these tests is irrelevant to the result — this keeps the assertions
+// TZ-independent (identical on the local UTC-3 machine and the UTC CI).
 void main() {
   group('ChartPeriod.last30d (rolling, DEFAULT)', () {
     test('current window is [now-30d, now] inclusive-start/end-of-day', () {
@@ -9,16 +16,16 @@ void main() {
 
       // Rolling 30-CALENDAR-DAY inclusive window: currentStart..currentEnd
       // spans exactly 30 days (Feb 14 through Mar 15 inclusive = 30 days).
-      expect(window.currentStart, DateTime(2026, 2, 14));
-      expect(window.currentEnd, DateTime(2026, 3, 15));
+      expect(window.currentStart, DateTime.utc(2026, 2, 14));
+      expect(window.currentEnd, DateTime.utc(2026, 3, 15));
     });
 
     test('previous window is the 30 days immediately preceding current', () {
       final now = DateTime(2026, 3, 15);
       final window = ChartPeriod.last30d.windowFor(now);
 
-      expect(window.previousEnd, DateTime(2026, 2, 13));
-      expect(window.previousStart, DateTime(2026, 1, 15));
+      expect(window.previousEnd, DateTime.utc(2026, 2, 13));
+      expect(window.previousStart, DateTime.utc(2026, 1, 15));
     });
 
     test('rolling window is NOT calendar-month aligned', () {
@@ -35,9 +42,9 @@ void main() {
       final now = DateTime(2026, 7, 7);
       final window = ChartPeriod.thisWeek.windowFor(now);
 
-      expect(window.currentStart, DateTime(2026, 7, 6)); // Monday
+      expect(window.currentStart, DateTime.utc(2026, 7, 6)); // Monday
       expect(window.currentStart.weekday, DateTime.monday);
-      expect(window.currentEnd, DateTime(2026, 7, 12)); // Sunday
+      expect(window.currentEnd, DateTime.utc(2026, 7, 12)); // Sunday
       expect(window.currentEnd.weekday, DateTime.sunday);
     });
 
@@ -45,16 +52,16 @@ void main() {
       final now = DateTime(2026, 7, 7);
       final window = ChartPeriod.thisWeek.windowFor(now);
 
-      expect(window.previousStart, DateTime(2026, 6, 29));
-      expect(window.previousEnd, DateTime(2026, 7, 5));
+      expect(window.previousStart, DateTime.utc(2026, 6, 29));
+      expect(window.previousEnd, DateTime.utc(2026, 7, 5));
     });
 
     test('when `now` is exactly Monday, current week starts on `now`', () {
       final now = DateTime(2026, 7, 6); // Monday
       final window = ChartPeriod.thisWeek.windowFor(now);
 
-      expect(window.currentStart, DateTime(2026, 7, 6));
-      expect(window.currentEnd, DateTime(2026, 7, 12));
+      expect(window.currentStart, DateTime.utc(2026, 7, 6));
+      expect(window.currentEnd, DateTime.utc(2026, 7, 12));
     });
   });
 
@@ -63,32 +70,32 @@ void main() {
       final now = DateTime(2026, 7, 15);
       final window = ChartPeriod.month.windowFor(now);
 
-      expect(window.currentStart, DateTime(2026, 7, 1));
-      expect(window.currentEnd, DateTime(2026, 7, 31));
+      expect(window.currentStart, DateTime.utc(2026, 7, 1));
+      expect(window.currentEnd, DateTime.utc(2026, 7, 31));
     });
 
     test('previous window is the immediately preceding calendar month', () {
       final now = DateTime(2026, 7, 15);
       final window = ChartPeriod.month.windowFor(now);
 
-      expect(window.previousStart, DateTime(2026, 6, 1));
-      expect(window.previousEnd, DateTime(2026, 6, 30));
+      expect(window.previousStart, DateTime.utc(2026, 6, 1));
+      expect(window.previousEnd, DateTime.utc(2026, 6, 30));
     });
 
     test('handles February in a non-leap year (28 days)', () {
       final now = DateTime(2026, 2, 10); // 2026 is not a leap year
       final window = ChartPeriod.month.windowFor(now);
 
-      expect(window.currentStart, DateTime(2026, 2, 1));
-      expect(window.currentEnd, DateTime(2026, 2, 28));
+      expect(window.currentStart, DateTime.utc(2026, 2, 1));
+      expect(window.currentEnd, DateTime.utc(2026, 2, 28));
     });
 
     test('handles February in a leap year (29 days)', () {
       final now = DateTime(2028, 2, 10); // 2028 is a leap year
       final window = ChartPeriod.month.windowFor(now);
 
-      expect(window.currentStart, DateTime(2028, 2, 1));
-      expect(window.currentEnd, DateTime(2028, 2, 29));
+      expect(window.currentStart, DateTime.utc(2028, 2, 1));
+      expect(window.currentEnd, DateTime.utc(2028, 2, 29));
     });
 
     test('handles a 30-day month (April) followed by previous 31-day month',
@@ -96,10 +103,10 @@ void main() {
       final now = DateTime(2026, 4, 5);
       final window = ChartPeriod.month.windowFor(now);
 
-      expect(window.currentStart, DateTime(2026, 4, 1));
-      expect(window.currentEnd, DateTime(2026, 4, 30));
-      expect(window.previousStart, DateTime(2026, 3, 1));
-      expect(window.previousEnd, DateTime(2026, 3, 31));
+      expect(window.currentStart, DateTime.utc(2026, 4, 1));
+      expect(window.currentEnd, DateTime.utc(2026, 4, 30));
+      expect(window.previousStart, DateTime.utc(2026, 3, 1));
+      expect(window.previousEnd, DateTime.utc(2026, 3, 31));
     });
 
     test(
@@ -108,10 +115,10 @@ void main() {
       final now = DateTime(2026, 1, 15);
       final window = ChartPeriod.month.windowFor(now);
 
-      expect(window.currentStart, DateTime(2026, 1, 1));
-      expect(window.currentEnd, DateTime(2026, 1, 31));
-      expect(window.previousStart, DateTime(2025, 12, 1));
-      expect(window.previousEnd, DateTime(2025, 12, 31));
+      expect(window.currentStart, DateTime.utc(2026, 1, 1));
+      expect(window.currentEnd, DateTime.utc(2026, 1, 31));
+      expect(window.previousStart, DateTime.utc(2025, 12, 1));
+      expect(window.previousEnd, DateTime.utc(2025, 12, 31));
     });
   });
 

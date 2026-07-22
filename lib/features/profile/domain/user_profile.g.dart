@@ -28,10 +28,13 @@ _$UserProfileImpl _$$UserProfileImplFromJson(Map<String, dynamic> json) =>
       phone: json['phone'] as String?,
       bornAt: _$JsonConverterFromJson<Timestamp, DateTime>(
           json['bornAt'], const TimestampConverter().fromJson),
+      termsAcceptedAt: _$JsonConverterFromJson<Timestamp, DateTime>(
+          json['termsAcceptedAt'], const TimestampConverter().fromJson),
       trainerBio: json['trainerBio'] as String?,
       trainerSpecialty: json['trainerSpecialty'] as String?,
       trainerMonthlyRate: (json['trainerMonthlyRate'] as num?)?.toInt(),
       paymentAlias: json['paymentAlias'] as String?,
+      trainerExperienceYears: (json['trainerExperienceYears'] as num?)?.toInt(),
       trainerLatitude: (json['trainerLatitude'] as num?)?.toDouble(),
       trainerLongitude: (json['trainerLongitude'] as num?)?.toDouble(),
       trainerGeohash: json['trainerGeohash'] as String?,
@@ -71,10 +74,13 @@ Map<String, dynamic> _$$UserProfileImplToJson(_$UserProfileImpl instance) =>
       'phone': instance.phone,
       'bornAt': _$JsonConverterToJson<Timestamp, DateTime>(
           instance.bornAt, const TimestampConverter().toJson),
+      'termsAcceptedAt': _$JsonConverterToJson<Timestamp, DateTime>(
+          instance.termsAcceptedAt, const TimestampConverter().toJson),
       'trainerBio': instance.trainerBio,
       'trainerSpecialty': instance.trainerSpecialty,
       'trainerMonthlyRate': instance.trainerMonthlyRate,
       'paymentAlias': instance.paymentAlias,
+      'trainerExperienceYears': instance.trainerExperienceYears,
       'trainerLatitude': instance.trainerLatitude,
       'trainerLongitude': instance.trainerLongitude,
       'trainerGeohash': instance.trainerGeohash,

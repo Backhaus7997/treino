@@ -20,7 +20,8 @@ import '../../../../payments/application/billing_providers.dart'
     show athleteBillingProvider;
 import '../../../../payments/domain/payment.dart';
 import '../../../../profile/application/user_public_profile_providers.dart';
-import '../pagos/widgets/payment_format.dart' show fmtArs;
+import '../pagos/widgets/payment_format.dart' show fmtArs, groupThousands;
+import '../pagos/widgets/thousands_input_formatter.dart';
 import 'agenda_web_helpers.dart';
 
 // ─── AppointmentDetailDialog ──────────────────────────────────────────────────
@@ -194,7 +195,7 @@ class _AppointmentDetailDialogState
     final billing =
         ref.read(athleteBillingProvider(appt.athleteId)).valueOrNull;
     _amountController.text =
-        billing != null ? billing.amountArs.toString() : '';
+        billing != null ? groupThousands(billing.amountArs.toString()) : '';
     _conceptController.text =
         'Sesión ${AgendaFormatters.formatDate(appt.startsAt)}'; // i18n
     setState(() {
@@ -234,7 +235,7 @@ class _AppointmentDetailDialogState
   Future<void> _confirmCobrar() async {
     if (_billing) return;
     final appt = widget.appointment;
-    final amount = int.tryParse(_amountController.text.trim());
+    final amount = parseGroupedInt(_amountController.text);
     final concept = _conceptController.text.trim();
 
     if (amount == null || amount <= 0) {
@@ -353,6 +354,7 @@ class _AppointmentDetailDialogState
           TextField(
             controller: _amountController,
             keyboardType: TextInputType.number,
+            inputFormatters: [ThousandsSeparatorInputFormatter()],
             style: GoogleFonts.barlow(fontSize: 14, color: palette.textPrimary),
             decoration: deco('Ej: 5000'), // i18n
           ),

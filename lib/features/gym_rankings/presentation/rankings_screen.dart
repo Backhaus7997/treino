@@ -545,6 +545,23 @@ class _DimensionSection extends StatelessWidget {
   }
 }
 
+/// QA-GYM-101: standard competition ranking ("1224"). [descValues] are the
+/// leaderboard metric of each row, already sorted descending. Rows tied on the
+/// metric share a rank (1, 1, 3); the next distinct value resumes at its
+/// 1-based position. Replaces index+1, which split ties by an invisible,
+/// arbitrary criterion (the Firestore doc id = uid).
+List<int> competitionRanks(List<num> descValues) {
+  final ranks = <int>[];
+  for (var i = 0; i < descValues.length; i++) {
+    if (i > 0 && descValues[i] == descValues[i - 1]) {
+      ranks.add(ranks[i - 1]);
+    } else {
+      ranks.add(i + 1);
+    }
+  }
+  return ranks;
+}
+
 class _LeaderboardList extends StatelessWidget {
   const _LeaderboardList({
     required this.profiles,
@@ -575,6 +592,8 @@ class _LeaderboardList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // QA-GYM-101: puestos con empates compartidos (1, 1, 3) en vez de índice+1.
+    final ranks = competitionRanks([for (final p in profiles) _metricValue(p)]);
     return Container(
       decoration: BoxDecoration(
         color: palette.bgCard,
@@ -588,7 +607,7 @@ class _LeaderboardList extends StatelessWidget {
               Divider(
                   height: 1, color: palette.border, indent: 14, endIndent: 14),
             _LeaderboardRow(
-              rank: i + 1,
+              rank: ranks[i],
               profile: profiles[i],
               value: _metricValue(profiles[i]),
               isMe: profiles[i].uid == myUid,

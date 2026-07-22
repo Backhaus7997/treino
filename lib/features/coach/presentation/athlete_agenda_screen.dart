@@ -8,6 +8,7 @@ import '../../../core/widgets/treino_icon.dart';
 import '../../profile/application/user_public_profile_providers.dart';
 import '../application/agenda_providers.dart';
 import '../domain/appointment.dart';
+import '../domain/wall_clock.dart';
 import '../../../l10n/app_l10n.dart';
 import 'agenda_formatters.dart';
 
@@ -90,7 +91,9 @@ class _AthleteAgendaScreenState extends ConsumerState<AthleteAgendaScreen> {
         .toList();
 
     // Upcoming list: sessions that have NOT ended yet.
-    final now = DateTime.now().toUtc();
+    // QA-COA-003: startsAt is wall-clock UTC (ADR-7); compare against wall-clock
+    // "now" so sessions don't drop from "upcoming" 3h early in ART.
+    final now = nowWall();
     final upcoming = confirmed
         .where((a) =>
             a.startsAt.add(Duration(minutes: a.durationMin)).isAfter(now))

@@ -6,7 +6,9 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../l10n/app_l10n.dart';
+import '../../../core/utils/appointment_window.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../coach_hub/presentation/sections/pagos/widgets/thousands_input_formatter.dart';
 import '../../payments/application/pagos_por_cobrar_provider.dart';
 import '../../payments/application/payment_providers.dart';
 import '../../payments/domain/athlete_billing.dart';
@@ -21,6 +23,7 @@ import '../application/recent_activity_provider.dart';
 import '../application/trained_today_provider.dart';
 import '../application/trainer_link_providers.dart';
 import '../domain/appointment.dart';
+import '../domain/wall_clock.dart';
 
 // Re-export so the mobile test (trainer_dashboard_day_counts_test.dart) that
 // imports dashboardDayCounts/DashboardDayCounts from this file keeps compiling
@@ -60,7 +63,9 @@ class TrainerDashboardTab extends ConsumerWidget {
       children: [
         const _DashboardHeader(),
         const SizedBox(height: 18),
-        const _SolicitudesPendientesSection(),
+        // #393: pending requests are NOT shown inline here anymore — they live
+        // in the bell modal (_showPendingRequestsSheet) so they don't clutter
+        // the dashboard.
         const _ResumenDelDiaCard(),
         const SizedBox(height: 20),
         _SectionHeader(
@@ -140,7 +145,11 @@ class _DashboardHeader extends ConsumerWidget {
                 ),
               ),
             ),
-            _BellWithBadge(badgeCount: pendingCount, palette: palette),
+            _BellWithBadge(
+              badgeCount: pendingCount,
+              palette: palette,
+              onTap: () => _showPendingRequestsSheet(context),
+            ),
             const SizedBox(width: 12),
             _AvatarInitials(
               initials: initials.isEmpty ? '·' : initials,
@@ -154,47 +163,87 @@ class _DashboardHeader extends ConsumerWidget {
 }
 
 class _BellWithBadge extends StatelessWidget {
-  const _BellWithBadge({required this.badgeCount, required this.palette});
+  const _BellWithBadge({
+    required this.badgeCount,
+    required this.palette,
+    required this.onTap,
+  });
   final int badgeCount;
   final AppPalette palette;
+
+  /// Fires when tapped. Only wired when [badgeCount] > 0 — a zero badge has no
+  /// pending requests to show, so the bell stays inert (#393).
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
+    // #393: the bell was a bare Icon with no tap handler. It now opens a modal
+    // sheet listing the pending link requests (accept/decline) — but only when
+    // there IS at least one (badgeCount > 0); with a zero badge it stays inert.
+    final actionable = badgeCount > 0;
     return Semantics(
       label: l10n.homePendingRequestsA11y(badgeCount),
-      child: ExcludeSemantics(
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Icon(TreinoIcon.bell, size: 22, color: palette.textPrimary),
-            if (badgeCount > 0)
-              Positioned(
-                right: -4,
-                top: -4,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: palette.accent,
-                    borderRadius: BorderRadius.circular(9999),
-                    border: Border.all(color: palette.bg, width: 1),
-                  ),
-                  child: Text(
-                    badgeCount > 9 ? '9+' : '$badgeCount',
-                    style: GoogleFonts.barlowCondensed(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 10,
-                      color: palette.bg,
+      button: actionable,
+      child: GestureDetector(
+        onTap: actionable ? onTap : null,
+        behavior: HitTestBehavior.opaque,
+        child: ExcludeSemantics(
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Icon(TreinoIcon.bell, size: 22, color: palette.textPrimary),
+              if (badgeCount > 0)
+                Positioned(
+                  right: -4,
+                  top: -4,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: palette.accent,
+                      borderRadius: BorderRadius.circular(9999),
+                      border: Border.all(color: palette.bg, width: 1),
+                    ),
+                    child: Text(
+                      badgeCount > 9 ? '9+' : '$badgeCount',
+                      style: GoogleFonts.barlowCondensed(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 10,
+                        color: palette.bg,
+                      ),
                     ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
+}
+
+/// Test-only harness that renders `_BellWithBadge` directly, so the #393
+/// tap/inert behaviour is unit-testable without the full dashboard's provider
+/// graph (mirrors [AddSueltoSheetTestHarness]).
+///
+/// @visibleForTesting
+class BellWithBadgeTestHarness extends StatelessWidget {
+  const BellWithBadgeTestHarness({
+    super.key,
+    required this.badgeCount,
+    required this.onTap,
+  });
+
+  final int badgeCount;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => _BellWithBadge(
+        badgeCount: badgeCount,
+        palette: AppPalette.of(context),
+        onTap: onTap,
+      );
 }
 
 class _AvatarInitials extends StatelessWidget {
@@ -226,35 +275,7 @@ class _AvatarInitials extends StatelessWidget {
   }
 }
 
-// ── Solicitudes pendientes (only when count > 0) ──────────────────────────────
-
-class _SolicitudesPendientesSection extends ConsumerWidget {
-  const _SolicitudesPendientesSection();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final linksAsync = ref.watch(trainerLinksStreamProvider);
-    final pending = (linksAsync.valueOrNull ?? const <TrainerLink>[])
-        .where((l) => l.status == TrainerLinkStatus.pending)
-        .toList();
-    if (pending.isEmpty) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _SectionHeader(
-            label: AppL10n.of(context)
-                .dashboardSolicitudesPendientesTitle(pending.length)),
-        const SizedBox(height: 8),
-        for (final link in pending) ...[
-          _PendingRequestCard(link: link),
-          const SizedBox(height: 8),
-        ],
-        const SizedBox(height: 12),
-      ],
-    );
-  }
-}
+// ── Pending request card (used by the bell modal, #393) ───────────────────────
 
 class _PendingRequestCard extends ConsumerStatefulWidget {
   const _PendingRequestCard({required this.link});
@@ -386,6 +407,93 @@ class _PendingRequestCardState extends ConsumerState<_PendingRequestCard> {
   }
 }
 
+// ── Pending-requests modal (opened from the header bell, #393) ────────────────
+
+/// #393: the header bell opens this sheet listing the trainer's pending link
+/// requests (accept/decline). There is no separate requests screen and no
+/// in-app notification centre (only push FCM), so this modal is the single
+/// place the trainer reviews them. (The requests used to also render inline in
+/// the dashboard, but that duplicated the modal and cluttered the home.)
+void _showPendingRequestsSheet(BuildContext context) {
+  final palette = AppPalette.of(context);
+  showModalBottomSheet<void>(
+    context: context,
+    useRootNavigator: true,
+    backgroundColor: palette.bgCard,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (_) => const _PendingRequestsSheet(),
+  );
+}
+
+class _PendingRequestsSheet extends ConsumerWidget {
+  const _PendingRequestsSheet();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    final linksAsync = ref.watch(trainerLinksStreamProvider);
+    final pending = (linksAsync.valueOrNull ?? const <TrainerLink>[])
+        .where((l) => l.status == TrainerLinkStatus.pending)
+        .toList();
+
+    // The bell only opens this when there ARE pending requests. If the trainer
+    // accepts/declines the last one while the sheet is open, the stream empties
+    // → auto-close, so the sheet never sits there with nothing in it.
+    if (pending.isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) Navigator.of(context).maybePop();
+      });
+    }
+
+    return SingleChildScrollView(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: 20 + MediaQuery.paddingOf(context).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l10n.dashboardSolicitudesPendientesTitle(pending.length),
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 18,
+                letterSpacing: 1.2,
+                color: palette.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            for (final link in pending) ...[
+              _PendingRequestCard(link: link),
+              const SizedBox(height: 8),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Test-only harness that renders the #393 pending-requests modal content
+/// directly, so its list behaviour is testable without driving the bell +
+/// bottom-sheet plumbing (mirrors [AddSueltoSheetTestHarness]).
+///
+/// @visibleForTesting
+class PendingRequestsSheetTestHarness extends StatelessWidget {
+  const PendingRequestsSheetTestHarness({super.key});
+
+  @override
+  Widget build(BuildContext context) => const _PendingRequestsSheet();
+}
+
 // ── Resumen del día (3 stat columns) ──────────────────────────────────────────
 
 class _ResumenDelDiaCard extends ConsumerWidget {
@@ -401,7 +509,8 @@ class _ResumenDelDiaCard extends ConsumerWidget {
             trainerAppointmentsStreamProvider(_appointmentsKey(trainerId)));
 
     final all = apptAsync.valueOrNull ?? const <Appointment>[];
-    final now = DateTime.now().toUtc();
+    // QA-HOME-001: startsAt is Argentina wall-clock, so "now" must be too.
+    final now = argentinaNow();
     final counts = dashboardDayCounts(all, now);
     final pending = counts.pending;
     final done = counts.done;
@@ -602,7 +711,9 @@ class _ProximasSesionesList extends ConsumerWidget {
         message: l10n.dashboardErrorTurnos,
       ),
       data: (all) {
-        final now = DateTime.now().toUtc();
+        // QA-HOME-001: startsAt is Argentina wall-clock; compare against ART
+        // wall-clock "now" so the next few hours aren't dropped.
+        final now = argentinaNow();
         final upcoming = all
             .where((a) =>
                 a.status == AppointmentStatus.confirmed &&
@@ -822,7 +933,12 @@ class _EntrenaronHoyRow extends ConsumerWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${session.routineName} · ${_formatTime(session.finishedAt!)}',
+                    // finishedAt is a real UTC instant — localize before
+                    // formatting (#380). NOTE: _formatTime is shared with
+                    // appointment.startsAt (ADR-7 wall-clock, line ~690) which
+                    // must stay raw — so convert HERE at the call site, never
+                    // inside _formatTime.
+                    '${session.routineName} · ${_formatTime(session.finishedAt!.toLocal())}',
                     style: GoogleFonts.barlow(
                       fontWeight: FontWeight.w400,
                       fontSize: 12,
@@ -1369,6 +1485,7 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
           TextField(
             controller: _amountController,
             keyboardType: TextInputType.number,
+            inputFormatters: [ThousandsSeparatorInputFormatter()],
             style: GoogleFonts.barlow(
               fontSize: 14,
               color: palette.textPrimary,
@@ -1566,7 +1683,7 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
       return;
     }
 
-    final amount = int.tryParse(amountText);
+    final amount = parseGroupedInt(amountText);
     if (amount == null || amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.dashboardMontoInvalido)),
@@ -1725,58 +1842,32 @@ class _BottomActions extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    return Row(
-      children: [
-        Expanded(
-          child: OutlinedButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(l10n.dashboardInvitarProximamente),
-                ),
-              );
-            },
-            style: OutlinedButton.styleFrom(
-              side: BorderSide(color: palette.border, width: 1),
-              foregroundColor: palette.textPrimary,
-              minimumSize: const Size.fromHeight(48),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(9999),
-              ),
-            ),
-            child: Text(
-              l10n.dashboardInvitarAlumnoLabel,
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
-                letterSpacing: 0.8,
-              ),
-            ),
+    // "Invitar alumno" removed (#397): the trainer↔athlete link is
+    // athlete-initiated only (trainer_link_repository.dart product convention),
+    // there is no invite infra, and the web equivalent was already removed. The
+    // stub only showed a "próximamente" SnackBar, so it's dropped rather than
+    // left as a dead CTA. "Asignar rutina" now spans the full width.
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: () => context.go('/coach?tab=alumnos'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: palette.accent,
+          foregroundColor: palette.bg,
+          minimumSize: const Size.fromHeight(48),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(9999),
           ),
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: ElevatedButton(
-            onPressed: () => context.go('/coach?tab=alumnos'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: palette.accent,
-              foregroundColor: palette.bg,
-              minimumSize: const Size.fromHeight(48),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(9999),
-              ),
-            ),
-            child: Text(
-              l10n.dashboardAsignarRutinaLabel,
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
-                letterSpacing: 0.8,
-              ),
-            ),
+        child: Text(
+          l10n.dashboardAsignarRutinaLabel,
+          style: GoogleFonts.barlowCondensed(
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
+            letterSpacing: 0.8,
           ),
         ),
-      ],
+      ),
     );
   }
 }
@@ -1842,7 +1933,9 @@ String _formatTime(DateTime dt) {
 }
 
 String _formatDateLabel(AppL10n l10n, DateTime dt) {
-  final now = DateTime.now().toUtc();
+  // QA-COA-003: dt is wall-clock UTC (ADR-7); use wall-clock "now" so a session
+  // tomorrow isn't labelled "Hoy" between 21:00-23:59 ART.
+  final now = nowWall();
   final isToday = _isSameLocalDay(dt, now);
   final isTomorrow = _isSameLocalDay(dt, now.add(const Duration(days: 1)));
   if (isToday) return l10n.dashboardDateToday;
@@ -1883,12 +1976,11 @@ bool _looksLikeUid(String s) {
 }
 
 TrainerAppointmentsKey _appointmentsKey(String trainerId) {
-  final now = DateTime.now().toUtc();
-  final from = DateTime.utc(now.year, now.month - 1 < 1 ? 1 : now.month - 1, 1);
-  final to = DateTime.utc(now.year + 1, now.month, 1);
+  // QA-HOME-009: misma ventana rodante que la agenda (helper compartido).
+  final window = rollingAppointmentWindow(DateTime.now().toUtc());
   return TrainerAppointmentsKey(
     trainerId: trainerId,
-    fromDate: from,
-    toDate: to,
+    fromDate: window.from,
+    toDate: window.to,
   );
 }
