@@ -4905,6 +4905,78 @@ abstract class AppL10n {
   /// **'Con una sola medición no hay progreso que mostrar. Falta al menos una más.'**
   String get measurementsNeedsMoreData;
 
+  /// [#439] Section label above MeasurementHistoryList on both mobile surfaces (athlete MEDIDAS screen and trainer ANTROPOMETRÍA section).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'HISTORIAL'**
+  String get measurementsHistoryTitle;
+
+  /// [#439] Tooltip/a11y label of the per-row edit action in MeasurementHistoryList. Only rendered on rows authored by the current uid (the update rule pins recordedBy).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Editar medición'**
+  String get measurementHistoryEditTooltip;
+
+  /// [#439] Tooltip/a11y label of the per-row delete action in MeasurementHistoryList. Only rendered on rows authored by the current uid (the delete rule pins recordedBy).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Eliminar medición'**
+  String get measurementHistoryDeleteTooltip;
+
+  /// [#439] Footer toggle of MeasurementHistoryList when more rows exist than the collapsed cap. {count} is the TOTAL number of measurements.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver todas ({count})'**
+  String measurementHistoryShowAll(int count);
+
+  /// [#439] Footer toggle of MeasurementHistoryList when expanded — collapses back to the capped list.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver menos'**
+  String get measurementHistoryShowLess;
+
+  /// [#439] Title of the delete-confirmation AlertDialog for a measurement (same pattern as athleteDetailPlanDeleteTitle).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Eliminar medición?'**
+  String get measurementDeleteConfirmTitle;
+
+  /// [#439] Body of the delete-confirmation dialog. {date} is the pre-formatted recordedAt day label (e.g. '3 jul 2026').
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Se eliminará la medición del {date}. Esta acción no se puede deshacer.'**
+  String measurementDeleteConfirmBody(String date);
+
+  /// [#439] Destructive confirm button of the measurement delete dialog. Cancel reuses commonCancel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Eliminar'**
+  String get measurementDeleteConfirmAction;
+
+  /// [#439] Snackbar after a measurement was deleted successfully.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Medición eliminada'**
+  String get measurementDeleteSuccess;
+
+  /// [#439] Snackbar when the measurement delete fails (network/rules).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos eliminar la medición. Probá de nuevo.'**
+  String get measurementDeleteError;
+
+  /// [#439] Read-only tag on the TRAINER's history rows the athlete self-logged: the trainer cannot edit/delete them (rules pin recordedBy), the tag explains why there are no actions.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Auto-registro'**
+  String get measurementHistorySelfLoggedTag;
+
+  /// [#439] Read-only tag on the ATHLETE's history rows a trainer recorded: the athlete cannot edit/delete them (rules pin recordedBy), the tag explains why there are no actions.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cargada por tu entrenador'**
+  String get measurementHistoryTrainerLoggedTag;
+
   /// [stats-hub] Tile title on InsightsScreen navigating to FrequentExercisesScreen (athlete's own uid).
   ///
   /// In es_AR, this message translates to:

@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/utils/date_labels.dart';
+import '../../../core/utils/kg_format.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../workout/application/session_providers.dart'
@@ -38,7 +39,8 @@ String _formatDateTimeEs(DateTime dt, String localeName) {
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
-/// Full-screen dialog to log a new [Measurement] for [athleteId].
+/// Full-screen dialog to log a new [Measurement] for [athleteId], or — when
+/// [initial] is set — to EDIT an existing one (#439).
 ///
 /// Opened via:
 /// ```dart
@@ -58,21 +60,32 @@ String _formatDateTimeEs(DateTime dt, String localeName) {
 ///   authenticated uid at save time, so the caller cannot inject someone
 ///   else's id → the write is always `recordedBy == athleteId == uid`, exactly
 ///   what the create rule's athlete-self branch requires.
+///
+/// Edit mode ([initial] != null) pre-populates every field and saves via
+/// `update()` preserving `id`/`athleteId`/`recordedBy`/`recordedAt` — the
+/// update rule pins the first three, and the measurement keeps its original
+/// point on the chart timeline. Only the author may edit (the update rule
+/// requires `recordedBy == uid`), so callers must gate the affordance on
+/// `initial.recordedBy == currentUid`.
 enum _LogAuthorMode { trainerForAthlete, athleteSelf }
 
 class LogMeasurementScreen extends ConsumerStatefulWidget {
-  /// Trainer logging FOR an athlete (existing behavior).
-  const LogMeasurementScreen({super.key, required this.athleteId})
+  /// Trainer logging FOR an athlete (existing behavior), or editing a
+  /// measurement they recorded when [initial] is set.
+  const LogMeasurementScreen({super.key, required this.athleteId, this.initial})
       : _mode = _LogAuthorMode.trainerForAthlete;
 
   /// Athlete logging their OWN measurement. `athleteId` resolves from the
-  /// authenticated uid at save time.
-  const LogMeasurementScreen.selfLog({super.key})
+  /// authenticated uid at save time. With [initial], edits a self-logged one.
+  const LogMeasurementScreen.selfLog({super.key, this.initial})
       : athleteId = null,
         _mode = _LogAuthorMode.athleteSelf;
 
   /// The subject athlete in trainer mode; null in self mode (derived from uid).
   final String? athleteId;
+
+  /// When set, the form edits THIS measurement instead of creating a new one.
+  final Measurement? initial;
   final _LogAuthorMode _mode;
 
   @override
@@ -132,27 +145,38 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
   @override
   void initState() {
     super.initState();
-    _weightCtrl = TextEditingController();
-    _fatCtrl = TextEditingController();
-    _muscleCtrl = TextEditingController();
-    _shouldersCtrl = TextEditingController();
-    _chestCtrl = TextEditingController();
-    _waistCtrl = TextEditingController();
-    _hipsCtrl = TextEditingController();
-    _glutesCtrl = TextEditingController();
-    _bicepsLCtrl = TextEditingController();
-    _bicepsRCtrl = TextEditingController();
-    _bicepsFlexLCtrl = TextEditingController();
-    _bicepsFlexRCtrl = TextEditingController();
-    _forearmLCtrl = TextEditingController();
-    _forearmRCtrl = TextEditingController();
-    _upperThighLCtrl = TextEditingController();
-    _upperThighRCtrl = TextEditingController();
-    _midThighLCtrl = TextEditingController();
-    _midThighRCtrl = TextEditingController();
-    _calfLCtrl = TextEditingController();
-    _calfRCtrl = TextEditingController();
-    _notesCtrl = TextEditingController();
+    // Edit mode: pre-populate every field from the measurement being edited.
+    // formatWeightKg renders the exact value with no redundant `.0` and maps
+    // null → '' (empty field) — the same prefill contract set editors use.
+    final i = widget.initial;
+    _weightCtrl = TextEditingController(text: formatWeightKg(i?.weightKg));
+    _fatCtrl = TextEditingController(text: formatWeightKg(i?.fatPercentage));
+    _muscleCtrl = TextEditingController(text: formatWeightKg(i?.muscleMassKg));
+    _shouldersCtrl =
+        TextEditingController(text: formatWeightKg(i?.shouldersCm));
+    _chestCtrl = TextEditingController(text: formatWeightKg(i?.chestCm));
+    _waistCtrl = TextEditingController(text: formatWeightKg(i?.waistCm));
+    _hipsCtrl = TextEditingController(text: formatWeightKg(i?.hipsCm));
+    _glutesCtrl = TextEditingController(text: formatWeightKg(i?.glutesCm));
+    _bicepsLCtrl = TextEditingController(text: formatWeightKg(i?.bicepsLCm));
+    _bicepsRCtrl = TextEditingController(text: formatWeightKg(i?.bicepsRCm));
+    _bicepsFlexLCtrl =
+        TextEditingController(text: formatWeightKg(i?.bicepsFlexedLCm));
+    _bicepsFlexRCtrl =
+        TextEditingController(text: formatWeightKg(i?.bicepsFlexedRCm));
+    _forearmLCtrl = TextEditingController(text: formatWeightKg(i?.forearmLCm));
+    _forearmRCtrl = TextEditingController(text: formatWeightKg(i?.forearmRCm));
+    _upperThighLCtrl =
+        TextEditingController(text: formatWeightKg(i?.upperThighLCm));
+    _upperThighRCtrl =
+        TextEditingController(text: formatWeightKg(i?.upperThighRCm));
+    _midThighLCtrl =
+        TextEditingController(text: formatWeightKg(i?.midThighLCm));
+    _midThighRCtrl =
+        TextEditingController(text: formatWeightKg(i?.midThighRCm));
+    _calfLCtrl = TextEditingController(text: formatWeightKg(i?.calfLCm));
+    _calfRCtrl = TextEditingController(text: formatWeightKg(i?.calfRCm));
+    _notesCtrl = TextEditingController(text: i?.notes ?? '');
 
     _allCtrls = <TextEditingController>[
       _weightCtrl,
@@ -180,6 +204,12 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
     for (final c in _allCtrls) {
       c.addListener(_onFieldChanged);
     }
+
+    // Edit mode starts with values already present: reflect that in the
+    // GUARDAR gate, and open the circumferences section when it holds
+    // prefilled data (otherwise those values would start hidden).
+    _hasValue = _hasAnyValue();
+    _circumferencesExpanded = _circumferenceCtrls.any((c) => c.text.isNotEmpty);
   }
 
   /// Recomputes [_hasValue] whenever any field changes so GUARDAR reflects the
@@ -350,11 +380,19 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
 
     setState(() => _saving = true);
 
+    // Edit mode: keep id/athleteId/recordedBy (the update rule pins them) and
+    // the original recordedAt (editing values must not move the point on the
+    // chart timeline). Create mode: fresh doc attributed to the current uid.
+    final initial = widget.initial;
+    assert(
+      initial == null || initial.recordedBy == uid,
+      'only the author may edit a measurement (update rule pins recordedBy)',
+    );
     final measurement = Measurement(
-      id: '',
-      athleteId: effectiveAthleteId,
-      recordedBy: uid,
-      recordedAt: DateTime.now().toUtc(),
+      id: initial?.id ?? '',
+      athleteId: initial?.athleteId ?? effectiveAthleteId,
+      recordedBy: initial?.recordedBy ?? uid,
+      recordedAt: initial?.recordedAt ?? DateTime.now().toUtc(),
       weightKg: _parseDouble(_weightCtrl),
       fatPercentage: _parseDouble(_fatCtrl),
       muscleMassKg: _parseDouble(_muscleCtrl),
@@ -379,11 +417,20 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
     );
 
     try {
-      await ref.read(measurementRepositoryProvider).add(measurement);
+      final repo = ref.read(measurementRepositoryProvider);
+      if (initial != null) {
+        await repo.update(measurement);
+      } else {
+        await repo.add(measurement);
+      }
       if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Medición guardada')),
+        SnackBar(
+          content: Text(
+            initial != null ? 'Medición actualizada' : 'Medición guardada',
+          ),
+        ),
       );
     } catch (_) {
       if (!mounted) return;
@@ -408,7 +455,10 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
     // GUARDAR stays disabled until there is at least one value to save, so an
     // accidental tap cannot persist an all-null record.
     final canSave = uid != null && !_saving && _hasValue;
-    final now = DateTime.now();
+    final isEditing = widget.initial != null;
+    // Create shows "now" (the instant being recorded); edit shows the original
+    // recordedAt of the measurement being corrected.
+    final headerDate = widget.initial?.recordedAt ?? DateTime.now();
 
     return Scaffold(
       backgroundColor: palette.bg,
@@ -437,7 +487,7 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        'Cargar medición',
+                        isEditing ? 'Editar medición' : 'Cargar medición',
                         style: GoogleFonts.barlowCondensed(
                           fontWeight: FontWeight.w700,
                           fontSize: 16,
@@ -445,7 +495,7 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
                         ),
                       ),
                       Text(
-                        _formatDateTimeEs(now, l10n.localeName),
+                        _formatDateTimeEs(headerDate, l10n.localeName),
                         style: GoogleFonts.barlow(
                           fontSize: 12,
                           color: palette.textMuted,
@@ -575,7 +625,7 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
                           ),
                         )
                       : Text(
-                          'GUARDAR MEDICIÓN',
+                          isEditing ? 'GUARDAR CAMBIOS' : 'GUARDAR MEDICIÓN',
                           style: GoogleFonts.barlowCondensed(
                             fontWeight: FontWeight.w700,
                             fontSize: 14,

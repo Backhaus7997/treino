@@ -34,6 +34,9 @@ import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/presentation/routine_detail_screen.dart';
 import 'package:treino/features/performance/application/performance_test_providers.dart';
 import 'package:treino/features/performance/domain/performance_test.dart';
+import 'package:treino/features/measurements/application/measurement_providers.dart';
+import 'package:treino/features/measurements/domain/measurement.dart';
+import 'package:treino/features/measurements/presentation/log_measurement_screen.dart';
 
 class _MockSessionRepository extends Mock implements SessionRepository {}
 
@@ -715,6 +718,83 @@ void main() {
       expect(find.text('2.9 s'), findsOneWidget);
       // Regression guard: the raw double interpolation ("30.0 cm") is gone.
       expect(find.text('30.0 cm'), findsNothing);
+    });
+  });
+
+  // ── #439 — ANTROPOMETRÍA: historial con editar/borrar por fila ────────────
+  // El comportamiento del listado (dialog de confirmación, orden, cap) se
+  // testea en measurement_history_list_test.dart; acá va el CABLEADO de la
+  // sección del PF: gate de autoría con trainerUid, tag de self-log, y que
+  // editar abre LogMeasurementScreen pre-poblado en modo edición.
+
+  group('AthleteDetailScreen — ANTROPOMETRÍA historial (#439)', () {
+    testWidgets(
+        'acciones sólo en filas registradas por ESTE PF; self-log read-only; '
+        'editar abre el form pre-poblado', (tester) async {
+      final repo = _MockSessionRepository();
+      when(() => repo.listByUid('athlete-1')).thenAnswer((_) async => []);
+
+      final mine = Measurement(
+        id: 'm-mine',
+        athleteId: 'athlete-1',
+        recordedBy: 'trainer-1',
+        recordedAt: DateTime.utc(2026, 1, 10),
+        weightKg: 82,
+      );
+      final selfLogged = Measurement(
+        id: 'm-self',
+        athleteId: 'athlete-1',
+        recordedBy: 'athlete-1',
+        recordedAt: DateTime.utc(2026, 2, 10),
+        weightKg: 78,
+      );
+
+      await _pumpScreen(
+        tester,
+        athleteId: 'athlete-1',
+        overrides: [
+          currentUidProvider.overrideWithValue('trainer-1'),
+          userPublicProfileProvider('athlete-1').overrideWith(
+            (ref) => Stream.value(_makeProfile('athlete-1', 'Martín García')),
+          ),
+          assignedRoutinesProvider('athlete-1').overrideWith(
+            (ref) async => const [],
+          ),
+          sessionsByUidProvider('athlete-1').overrideWith(
+            (ref) async => const [],
+          ),
+          sessionRepositoryProvider.overrideWithValue(repo),
+          exercisesProvider.overrideWith((ref) async => const []),
+          measurementsForAthleteProvider('athlete-1').overrideWith(
+            (ref) => Stream.value([mine, selfLogged]),
+          ),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      final l10n = AppL10n.of(tester.element(find.byType(AthleteDetailScreen)));
+
+      await tester.scrollUntilVisible(
+        find.byTooltip(l10n.measurementHistoryEditTooltip),
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+
+      // Sólo la fila registrada por este trainer ofrece acciones — el mismo
+      // pin (recordedBy == uid) que exigen las rules de update/delete.
+      expect(
+          find.byTooltip(l10n.measurementHistoryEditTooltip), findsOneWidget);
+      expect(
+          find.byTooltip(l10n.measurementHistoryDeleteTooltip), findsOneWidget);
+      expect(find.text(l10n.measurementHistorySelfLoggedTag), findsOneWidget);
+
+      await tester.tap(find.byTooltip(l10n.measurementHistoryEditTooltip));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(LogMeasurementScreen), findsOneWidget);
+      expect(find.text('GUARDAR CAMBIOS'), findsOneWidget);
+      expect(find.text('82'), findsOneWidget); // peso pre-poblado
     });
   });
 }
