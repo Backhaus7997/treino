@@ -90,8 +90,12 @@ void main() {
       currentUid: 'me',
       measurements: [
         // Entrada más vieja PRIMERO en la lista de entrada: el widget ordena.
-        _m(id: 'old', recordedBy: 'me', at: DateTime.utc(2026, 1, 1)),
-        _m(id: 'new', recordedBy: 'me', at: DateTime.utc(2026, 2, 1)),
+        // Mediodía UTC (no medianoche): el widget formatea recordedAt.toLocal(),
+        // así que una medianoche UTC salta al día anterior en timezones con
+        // offset negativo (ART/UTC-3) — este test pasaba en CI (UTC) pero fallaba
+        // localmente en Argentina. Mediodía UTC no cruza el día en ningún tz real.
+        _m(id: 'old', recordedBy: 'me', at: DateTime.utc(2026, 1, 1, 12)),
+        _m(id: 'new', recordedBy: 'me', at: DateTime.utc(2026, 2, 1, 12)),
       ],
     ));
     await tester.pumpAndSettle();
