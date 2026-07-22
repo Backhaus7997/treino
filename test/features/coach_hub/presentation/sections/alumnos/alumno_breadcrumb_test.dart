@@ -70,8 +70,7 @@ void main() {
 
       final semantics = tester.getSemantics(find.text('Alumnos'));
       expect(semantics.flagsCollection.isButton, isTrue,
-          reason:
-              'el link "Alumnos" debe exponer Semantics(button: true)');
+          reason: 'el link "Alumnos" debe exponer Semantics(button: true)');
 
       final focusNode = Focus.of(tester.element(find.text('Alumnos')));
       focusNode.requestFocus();
@@ -81,7 +80,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('page:/alumnos'), findsOneWidget,
-          reason: 'Enter (teclado) debe activar la navegación igual que el tap');
+          reason:
+              'Enter (teclado) debe activar la navegación igual que el tap');
 
       handle.dispose();
     });

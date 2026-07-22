@@ -105,9 +105,14 @@ void main() {
         'SCENARIO 1 — lista solo alumnos active/paused, excluye pending y '
         'terminated', (tester) async {
       final links = [
-        _link(id: 'l1', athleteId: 'athlete-1', status: TrainerLinkStatus.active),
-        _link(id: 'l2', athleteId: 'athlete-2', status: TrainerLinkStatus.paused),
-        _link(id: 'l3', athleteId: 'athlete-3', status: TrainerLinkStatus.pending),
+        _link(
+            id: 'l1', athleteId: 'athlete-1', status: TrainerLinkStatus.active),
+        _link(
+            id: 'l2', athleteId: 'athlete-2', status: TrainerLinkStatus.paused),
+        _link(
+            id: 'l3',
+            athleteId: 'athlete-3',
+            status: TrainerLinkStatus.pending),
         _link(
             id: 'l4',
             athleteId: 'athlete-4',
@@ -138,7 +143,8 @@ void main() {
         'SCENARIO 2 — tocar un alumno cierra el diálogo y devuelve su '
         'athleteId', (tester) async {
       final links = [
-        _link(id: 'l1', athleteId: 'athlete-1', status: TrainerLinkStatus.active),
+        _link(
+            id: 'l1', athleteId: 'athlete-1', status: TrainerLinkStatus.active),
       ];
 
       await tester.pumpWidget(_wrap(overrides: [
@@ -160,7 +166,8 @@ void main() {
     testWidgets('SCENARIO 3 — Cancelar devuelve null, no persiste nada',
         (tester) async {
       final links = [
-        _link(id: 'l1', athleteId: 'athlete-1', status: TrainerLinkStatus.active),
+        _link(
+            id: 'l1', athleteId: 'athlete-1', status: TrainerLinkStatus.active),
       ];
 
       await tester.pumpWidget(_wrap(overrides: [
@@ -182,7 +189,8 @@ void main() {
         'SCENARIO 4 — sin alumnos vinculados, mensaje honesto sin crashear',
         (tester) async {
       await tester.pumpWidget(_wrap(overrides: [
-        trainerLinksStreamProvider.overrideWith((ref) => Stream.value(const [])),
+        trainerLinksStreamProvider
+            .overrideWith((ref) => Stream.value(const [])),
         ..._profilesOverride(const {}),
       ]));
       await tester.pumpAndSettle();

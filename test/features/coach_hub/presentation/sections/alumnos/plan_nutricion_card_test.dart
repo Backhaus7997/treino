@@ -63,7 +63,8 @@ Widget _wrap({required void Function(String, Meal) onMealChanged}) =>
 
 void main() {
   group('PlanNutricionCard — selector ELEGIR UNA/TODAS —', () {
-    testWidgets('tap en "TODAS" dispara onMealChanged actualizado '
+    testWidgets(
+        'tap en "TODAS" dispara onMealChanged actualizado '
         '[SCENARIO-PNC-01]', (tester) async {
       String? changedMealId;
       Meal? changedMeal;

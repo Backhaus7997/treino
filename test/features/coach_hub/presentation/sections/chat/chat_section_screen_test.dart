@@ -446,7 +446,8 @@ void main() {
     );
   });
 
-  group('ChatSectionScreen — chat row keyboard focus ring (remediación '
+  group(
+      'ChatSectionScreen — chat row keyboard focus ring (remediación '
       'WARNING-2)', () {
     testWidgets(
       'foco de teclado en una row pinta el anillo de TreinoFocusTokens',
@@ -485,8 +486,7 @@ void main() {
         await tester.pump();
         await tester.pump();
 
-        final afterFocus =
-            tester.widget<AnimatedContainer>(rowContainerFinder);
+        final afterFocus = tester.widget<AnimatedContainer>(rowContainerFinder);
         final afterDecoration = afterFocus.decoration! as BoxDecoration;
         expect(
           afterDecoration.boxShadow,
