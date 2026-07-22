@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/tokens/components/treino_focus_tokens.dart';
+import 'package:treino/app/theme/tokens/components/treino_transparent_tokens.dart';
 import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
@@ -151,10 +152,10 @@ class _SubNavItem extends StatelessWidget {
                 ? palette.bgCard
                 : soft
                     ? palette.bgCard.withValues(alpha: 0.6)
-                    : Colors.transparent;
+                    : TreinoTransparentTokens.value;
 
             final Color borderColor =
-                selected ? palette.accent : Colors.transparent;
+                selected ? palette.accent : TreinoTransparentTokens.value;
 
             return AnimatedContainer(
               key: Key('ajustes_subnav_${tab.name}'),
