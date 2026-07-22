@@ -56,6 +56,11 @@ mixin _$UserProfile {
   String? get trainerSpecialty => throw _privateConstructorUsedError;
   int? get trainerMonthlyRate => throw _privateConstructorUsedError;
   String? get paymentAlias =>
+      throw _privateConstructorUsedError; // Años de experiencia del PF (#388). Opcional — lo carga el propio PF
+// desde el form de perfil profesional y se propaga a
+// trainerPublicProfiles vía dual-write. Null ⇒ el perfil público muestra
+// el placeholder "—" en la tile AÑOS EXP.
+  int? get trainerExperienceYears =>
       throw _privateConstructorUsedError; // ── Multi-location (Fase 6 Etapa 0) ────────────────────────────────
 //
 // `trainerLatitude/Longitude/Geohash` (singulares, marcados DEPRECATED)
@@ -142,6 +147,7 @@ abstract class $UserProfileCopyWith<$Res> {
       String? trainerSpecialty,
       int? trainerMonthlyRate,
       String? paymentAlias,
+      int? trainerExperienceYears,
       double? trainerLatitude,
       double? trainerLongitude,
       String? trainerGeohash,
@@ -191,6 +197,7 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
     Object? trainerSpecialty = freezed,
     Object? trainerMonthlyRate = freezed,
     Object? paymentAlias = freezed,
+    Object? trainerExperienceYears = freezed,
     Object? trainerLatitude = freezed,
     Object? trainerLongitude = freezed,
     Object? trainerGeohash = freezed,
@@ -286,6 +293,10 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
           ? _value.paymentAlias
           : paymentAlias // ignore: cast_nullable_to_non_nullable
               as String?,
+      trainerExperienceYears: freezed == trainerExperienceYears
+          ? _value.trainerExperienceYears
+          : trainerExperienceYears // ignore: cast_nullable_to_non_nullable
+              as int?,
       trainerLatitude: freezed == trainerLatitude
           ? _value.trainerLatitude
           : trainerLatitude // ignore: cast_nullable_to_non_nullable
@@ -370,6 +381,7 @@ abstract class _$$UserProfileImplCopyWith<$Res>
       String? trainerSpecialty,
       int? trainerMonthlyRate,
       String? paymentAlias,
+      int? trainerExperienceYears,
       double? trainerLatitude,
       double? trainerLongitude,
       String? trainerGeohash,
@@ -418,6 +430,7 @@ class __$$UserProfileImplCopyWithImpl<$Res>
     Object? trainerSpecialty = freezed,
     Object? trainerMonthlyRate = freezed,
     Object? paymentAlias = freezed,
+    Object? trainerExperienceYears = freezed,
     Object? trainerLatitude = freezed,
     Object? trainerLongitude = freezed,
     Object? trainerGeohash = freezed,
@@ -513,6 +526,10 @@ class __$$UserProfileImplCopyWithImpl<$Res>
           ? _value.paymentAlias
           : paymentAlias // ignore: cast_nullable_to_non_nullable
               as String?,
+      trainerExperienceYears: freezed == trainerExperienceYears
+          ? _value.trainerExperienceYears
+          : trainerExperienceYears // ignore: cast_nullable_to_non_nullable
+              as int?,
       trainerLatitude: freezed == trainerLatitude
           ? _value.trainerLatitude
           : trainerLatitude // ignore: cast_nullable_to_non_nullable
@@ -578,6 +595,7 @@ class _$UserProfileImpl implements _UserProfile {
       this.trainerSpecialty,
       this.trainerMonthlyRate,
       this.paymentAlias,
+      this.trainerExperienceYears,
       this.trainerLatitude,
       this.trainerLongitude,
       this.trainerGeohash,
@@ -650,6 +668,12 @@ class _$UserProfileImpl implements _UserProfile {
   final int? trainerMonthlyRate;
   @override
   final String? paymentAlias;
+// Años de experiencia del PF (#388). Opcional — lo carga el propio PF
+// desde el form de perfil profesional y se propaga a
+// trainerPublicProfiles vía dual-write. Null ⇒ el perfil público muestra
+// el placeholder "—" en la tile AÑOS EXP.
+  @override
+  final int? trainerExperienceYears;
 // ── Multi-location (Fase 6 Etapa 0) ────────────────────────────────
 //
 // `trainerLatitude/Longitude/Geohash` (singulares, marcados DEPRECATED)
@@ -726,7 +750,7 @@ class _$UserProfileImpl implements _UserProfile {
 
   @override
   String toString() {
-    return 'UserProfile(uid: $uid, email: $email, displayName: $displayName, role: $role, createdAt: $createdAt, updatedAt: $updatedAt, gymId: $gymId, bodyWeightKg: $bodyWeightKg, heightCm: $heightCm, gender: $gender, experienceLevel: $experienceLevel, avatarUrl: $avatarUrl, firstName: $firstName, lastName: $lastName, phone: $phone, bornAt: $bornAt, termsAcceptedAt: $termsAcceptedAt, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerMonthlyRate: $trainerMonthlyRate, paymentAlias: $paymentAlias, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerGeohash: $trainerGeohash, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline, activeRoutineId: $activeRoutineId, subscription: $subscription, weightedLoad: $weightedLoad)';
+    return 'UserProfile(uid: $uid, email: $email, displayName: $displayName, role: $role, createdAt: $createdAt, updatedAt: $updatedAt, gymId: $gymId, bodyWeightKg: $bodyWeightKg, heightCm: $heightCm, gender: $gender, experienceLevel: $experienceLevel, avatarUrl: $avatarUrl, firstName: $firstName, lastName: $lastName, phone: $phone, bornAt: $bornAt, termsAcceptedAt: $termsAcceptedAt, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerMonthlyRate: $trainerMonthlyRate, paymentAlias: $paymentAlias, trainerExperienceYears: $trainerExperienceYears, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerGeohash: $trainerGeohash, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline, activeRoutineId: $activeRoutineId, subscription: $subscription, weightedLoad: $weightedLoad)';
   }
 
   @override
@@ -769,6 +793,8 @@ class _$UserProfileImpl implements _UserProfile {
                 other.trainerMonthlyRate == trainerMonthlyRate) &&
             (identical(other.paymentAlias, paymentAlias) ||
                 other.paymentAlias == paymentAlias) &&
+            (identical(other.trainerExperienceYears, trainerExperienceYears) ||
+                other.trainerExperienceYears == trainerExperienceYears) &&
             (identical(other.trainerLatitude, trainerLatitude) ||
                 other.trainerLatitude == trainerLatitude) &&
             (identical(other.trainerLongitude, trainerLongitude) ||
@@ -814,6 +840,7 @@ class _$UserProfileImpl implements _UserProfile {
         trainerSpecialty,
         trainerMonthlyRate,
         paymentAlias,
+        trainerExperienceYears,
         trainerLatitude,
         trainerLongitude,
         trainerGeohash,
@@ -864,6 +891,7 @@ abstract class _UserProfile implements UserProfile {
       final String? trainerSpecialty,
       final int? trainerMonthlyRate,
       final String? paymentAlias,
+      final int? trainerExperienceYears,
       final double? trainerLatitude,
       final double? trainerLongitude,
       final String? trainerGeohash,
@@ -934,7 +962,13 @@ abstract class _UserProfile implements UserProfile {
   int? get trainerMonthlyRate;
   @override
   String?
-      get paymentAlias; // ── Multi-location (Fase 6 Etapa 0) ────────────────────────────────
+      get paymentAlias; // Años de experiencia del PF (#388). Opcional — lo carga el propio PF
+// desde el form de perfil profesional y se propaga a
+// trainerPublicProfiles vía dual-write. Null ⇒ el perfil público muestra
+// el placeholder "—" en la tile AÑOS EXP.
+  @override
+  int?
+      get trainerExperienceYears; // ── Multi-location (Fase 6 Etapa 0) ────────────────────────────────
 //
 // `trainerLatitude/Longitude/Geohash` (singulares, marcados DEPRECATED)
 // se mantienen por backward compat — clientes viejos siguen leyendo el

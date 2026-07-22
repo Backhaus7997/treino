@@ -57,6 +57,11 @@ class UserProfile with _$UserProfile {
     String? trainerSpecialty,
     int? trainerMonthlyRate,
     String? paymentAlias,
+    // Años de experiencia del PF (#388). Opcional — lo carga el propio PF
+    // desde el form de perfil profesional y se propaga a
+    // trainerPublicProfiles vía dual-write. Null ⇒ el perfil público muestra
+    // el placeholder "—" en la tile AÑOS EXP.
+    int? trainerExperienceYears,
 
     // ── Multi-location (Fase 6 Etapa 0) ────────────────────────────────
     //

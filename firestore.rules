@@ -613,6 +613,11 @@ service cloud.firestore {
     // verbatim, without the opt-in-disable exception clause (no analogous
     // disable flow exists for reviews).
     //
+    // #388 extends the same pin to `athleteCount`: derived aggregate (count
+    // of active trainer_links) written exclusively by the `linkAggregate`
+    // Cloud Function. Without the pin a trainer could forge their own
+    // student count on the discovery sales surface.
+    //
     // Deliberately NO keys().hasOnly() allowlist here (AD-3 divergence from
     // the trainer-reviews spec's "Out-of-allowlist field" scenario — see
     // tasks.md 2.7): TrainerPublicProfileRepository's write path is a
@@ -630,7 +635,8 @@ service cloud.firestore {
                     && request.auth.uid == uid
                     && request.resource.data.uid == uid
                     && request.resource.data.get('averageRating', null) == null
-                    && request.resource.data.get('reviewCount', null) == null;
+                    && request.resource.data.get('reviewCount', null) == null
+                    && request.resource.data.get('athleteCount', null) == null;
 
       // Only the owner can update; uid in body must not change (SCENARIO-418).
       // averageRating/reviewCount must be absent or unchanged from the
@@ -639,7 +645,8 @@ service cloud.firestore {
                     && request.auth.uid == uid
                     && request.resource.data.uid == resource.data.uid
                     && request.resource.data.get('averageRating', null) == resource.data.get('averageRating', null)
-                    && request.resource.data.get('reviewCount', null) == resource.data.get('reviewCount', null);
+                    && request.resource.data.get('reviewCount', null) == resource.data.get('reviewCount', null)
+                    && request.resource.data.get('athleteCount', null) == resource.data.get('athleteCount', null);
 
       // Delete denied — managed exclusively via privileged server-side operations.
       allow delete: if false;

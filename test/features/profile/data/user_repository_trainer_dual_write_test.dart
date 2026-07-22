@@ -100,6 +100,37 @@ void main() {
     });
 
     test(
+        '#388: update with trainerExperienceYears writes to '
+        'trainerPublicProfiles/{uid}', () async {
+      await seedDoc('trainer-exp');
+
+      await repo.update('trainer-exp', {'trainerExperienceYears': 7});
+
+      final snap = await firestore
+          .collection('trainerPublicProfiles')
+          .doc('trainer-exp')
+          .get();
+      expect(snap.exists, isTrue);
+      expect(snap.data()!['trainerExperienceYears'], equals(7));
+    });
+
+    test(
+        '#388: update with trainerExperienceYears null propaga el borrado '
+        'al perfil público', () async {
+      await seedDoc('trainer-exp-clear');
+      await repo.update('trainer-exp-clear', {'trainerExperienceYears': 7});
+
+      await repo.update('trainer-exp-clear', {'trainerExperienceYears': null});
+
+      final snap = await firestore
+          .collection('trainerPublicProfiles')
+          .doc('trainer-exp-clear')
+          .get();
+      expect(snap.exists, isTrue);
+      expect(snap.data()!['trainerExperienceYears'], isNull);
+    });
+
+    test(
         'SCENARIO-423e: update with displayName + a trainer field writes to '
         'BOTH userPublicProfiles AND trainerPublicProfiles', () async {
       // Hotfix 2026-05-21: displayName alone no longer triggers a trainer
