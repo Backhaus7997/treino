@@ -76,11 +76,19 @@ final athleteWeekInsightsProvider = FutureProvider.autoDispose
   // listByUid → first = más reciente), con fallback a la última del
   // historial solo cuando la semana está vacía (típico: semana calendario
   // recién empezada, o cambio de plan sin estrenarlo).
+  //
+  // QA #480: visibleRoutineByIdProvider, NO routineByIdProvider — una rutina
+  // borrada o con acceso revocado degrada a `null` (→ camino "sin target" de
+  // abajo, las progress bars ya lo soportan) en vez de propagar
+  // permission-denied y tirar la card SEMANA + Volumen por grupo enteras al
+  // error state. Era el ÚNICO fetch de rutina sin guarda que quedaba acá:
+  // el fallback de grupos ya degrada vía slotMuscleGroupsForSessions (#442).
+  // Fallas transientes SÍ propagan — ver RoutineRepository.getByIdIfVisible.
   final referenceRoutineId = weekSessions.isNotEmpty
       ? weekSessions.first.routineId
       : mostRecentSession?.routineId;
   final routine = (referenceRoutineId != null && referenceRoutineId.isNotEmpty)
-      ? await ref.watch(routineByIdProvider(referenceRoutineId).future)
+      ? await ref.watch(visibleRoutineByIdProvider(referenceRoutineId).future)
       : null;
 
   // Fallback exerciseId → muscleGroup para ejercicios custom ausentes del

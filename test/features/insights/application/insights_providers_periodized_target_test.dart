@@ -227,4 +227,84 @@ void main() {
     final result = await container.read(weeklyInsightsProvider.future);
     expect(result!.targetByGroup[MuscleGroupDisplay.pecho], 7);
   });
+
+  // ── QA #480: la rutina de referencia no visible degrada, no revienta ─────
+
+  test(
+      'QA-480a: rutina de referencia borrada/revocada → card renderiza sin '
+      'target (no propaga permission-denied)', () async {
+    final repo = MockSessionRepository();
+    when(() => repo.listByUid('u1')).thenAnswer((_) async => [
+          makeSession(
+            id: 's1',
+            startedAt: DateTime.now(),
+            status: SessionStatus.finished,
+            wasFullyCompleted: true,
+            routineId: 'r-gone',
+          ),
+        ]);
+    when(() => repo.listSetLogs(uid: 'u1', sessionId: 's1'))
+        .thenAnswer((_) async => [
+              // Set de un ejercicio del catálogo público: debe seguir
+              // contando aunque la rutina de la sesión ya no exista.
+              makeSetLog(id: 'l1', exerciseId: 'e-cat', setNumber: 1),
+            ]);
+
+    final container = ProviderContainer(overrides: [
+      currentUidProvider.overrideWithValue('u1'),
+      sessionRepositoryProvider.overrideWithValue(repo),
+      exercisesProvider.overrideWith(
+        (ref) async => const [
+          Exercise(
+            id: 'e-cat',
+            name: 'Press banca',
+            muscleGroup: 'chest',
+            category: 'compound',
+          ),
+        ],
+      ),
+      // getByIdIfVisible contract: borrada/sin acceso → null (NO lanza).
+      visibleRoutineByIdProvider('r-gone').overrideWith((ref) async => null),
+    ]);
+    addTearDown(container.dispose);
+
+    final result = await container.read(weeklyInsightsProvider.future);
+    expect(result, isNotNull,
+        reason: 'Una rutina no visible no puede tirar la card entera');
+    expect(result!.targetByGroup, isEmpty,
+        reason: 'Sin rutina de referencia → sin target (camino existente)');
+    expect(result.setsByGroup[MuscleGroupDisplay.pecho], 1,
+        reason: 'Los sets del catálogo público siguen contando');
+  });
+
+  test(
+      'QA-480b: falla transiente del fetch de referencia SÍ propaga '
+      '(error state legítimo)', () async {
+    final repo = MockSessionRepository();
+    when(() => repo.listByUid('u1')).thenAnswer((_) async => [
+          makeSession(
+            id: 's1',
+            startedAt: DateTime.now(),
+            status: SessionStatus.finished,
+            wasFullyCompleted: true,
+            routineId: 'r-flaky',
+          ),
+        ]);
+    when(() => repo.listSetLogs(uid: 'u1', sessionId: 's1'))
+        .thenAnswer((_) async => []);
+
+    final container = ProviderContainer(overrides: [
+      currentUidProvider.overrideWithValue('u1'),
+      sessionRepositoryProvider.overrideWithValue(repo),
+      exercisesProvider.overrideWith((ref) async => const <Exercise>[]),
+      visibleRoutineByIdProvider('r-flaky')
+          .overrideWith((ref) async => throw Exception('backend down')),
+    ]);
+    addTearDown(container.dispose);
+
+    await expectLater(
+      container.read(weeklyInsightsProvider.future),
+      throwsException,
+    );
+  });
 }
