@@ -8,6 +8,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/application/trainer_discovery_providers.dart'
     show trainerByIdProvider;
@@ -163,6 +164,49 @@ void main() {
         find.widgetWithText(ElevatedButton, 'Solicitar contacto'),
       );
       expect(button.onPressed, isNull);
+    });
+  });
+
+  group(
+      'CoachDiscoveryPreviewCard — CTA disabled contrast '
+      '(remediación WARNING-1 verify fase-11)', () {
+    testWidgets(
+        'CTA "Solicitar contacto" disabled resuelve foreground = '
+        'palette.textMuted en dark y en light (no palette.bg casi '
+        'invisible)', (tester) async {
+      final cases = {
+        AppTheme.dark(): AppPalette.mintMagenta,
+        AppTheme.light(): AppPalette.mintMagentaLight,
+      };
+
+      for (final entry in cases.entries) {
+        await _pump(
+          tester,
+          profile: _profile(),
+          trainerPublicProfile: const TrainerPublicProfile(uid: _trainerUid),
+          links: const [],
+          theme: entry.key,
+        );
+
+        final button = tester.widget<ElevatedButton>(
+          find.widgetWithText(ElevatedButton, 'Solicitar contacto'),
+        );
+        final resolvedFg = button.style!.foregroundColor!.resolve(
+          {WidgetState.disabled},
+        );
+
+        expect(
+          resolvedFg,
+          entry.value.textMuted,
+          reason: 'disabledForegroundColor debe ser palette.textMuted '
+              '(mismo patrón que identidad_card.dart / '
+              'especialidad_precio_card.dart / cuenta_tab.dart), no '
+              'palette.bg.withValues(alpha:0.7) — WARNING-1 midió ratio '
+              '≈1.13:1 en light sobre la evidencia AFTER.',
+        );
+
+        await tester.pumpWidget(const SizedBox.shrink());
+      }
     });
   });
 

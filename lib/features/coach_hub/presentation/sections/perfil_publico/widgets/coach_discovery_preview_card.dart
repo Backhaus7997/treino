@@ -246,8 +246,14 @@ class CoachDiscoveryPreviewCard extends ConsumerWidget {
                             disabledBackgroundColor:
                                 palette.accent.withValues(alpha: 0.4),
                             foregroundColor: palette.bg,
-                            disabledForegroundColor:
-                                palette.bg.withValues(alpha: 0.7),
+                            // WARNING-1 (verify fase-11): palette.bg casi
+                            // invisible sobre el disabledBackgroundColor
+                            // (accent tintado) — ratio ≈1.13:1 en light.
+                            // textMuted es el mismo patrón que el resto de
+                            // los botones disabled del kit (identidad_card,
+                            // especialidad_precio_card, cuenta_tab,
+                            // trainer_contact_cta_stub).
+                            disabledForegroundColor: palette.textMuted,
                             padding: const EdgeInsets.symmetric(
                               vertical: AppSpacing.s12,
                             ),
