@@ -15,11 +15,12 @@
 // archivo; este WU no tocó `_openAttachMenu` ni sus keys.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
-import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/features/coach_hub/presentation/sections/chat/widgets/chat_detail_pane.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/treino_interactive_state.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 Widget _wrapComposer(Widget child, {required bool dark}) => MediaQuery(
@@ -57,10 +58,13 @@ void main() {
         ));
         await tester.pump();
 
-        final tappable = tester.widget<TreinoTappable>(
-          find.byKey(const Key('chat_send_button')),
+        final interactive = tester.widget<TreinoInteractiveState>(
+          find.ancestor(
+            of: find.byKey(const Key('chat_send_button')),
+            matching: find.byType(TreinoInteractiveState),
+          ),
         );
-        expect(tappable.onTap, isNull,
+        expect(interactive.onTap, isNull,
             reason: 'sending==true debe deshabilitar el botón enviar');
 
         final field = tester.widget<TextField>(
@@ -95,10 +99,13 @@ void main() {
         ));
         await tester.pump();
 
-        final tappable = tester.widget<TreinoTappable>(
-          find.byKey(const Key('chat_send_button')),
+        final interactive = tester.widget<TreinoInteractiveState>(
+          find.ancestor(
+            of: find.byKey(const Key('chat_send_button')),
+            matching: find.byType(TreinoInteractiveState),
+          ),
         );
-        expect(tappable.onTap, isNotNull,
+        expect(interactive.onTap, isNotNull,
             reason: 'sending==false debe habilitar el botón enviar');
 
         final field = tester.widget<TextField>(
@@ -108,6 +115,42 @@ void main() {
 
         await tester.tap(find.byKey(const Key('chat_send_button')));
         expect(tapped, isTrue);
+      },
+    );
+
+    testWidgets(
+      'sending == false: focusable, Enter (teclado) activa onSend — '
+      'accesibilidad de teclado sistémica (barrido final)',
+      (tester) async {
+        final ctrl = TextEditingController(text: 'hola');
+        addTearDown(ctrl.dispose);
+        var tapped = false;
+
+        await tester.pumpWidget(_wrapComposer(
+          Builder(builder: (context) {
+            final palette = AppPalette.of(context);
+            return chatDetailPaneComposerForTest(
+              controller: ctrl,
+              sending: false,
+              onSend: () => tapped = true,
+              onAttach: () {},
+              palette: palette,
+            );
+          }),
+          dark: true,
+        ));
+        await tester.pump();
+
+        final focusNode = Focus.of(
+          tester.element(find.byKey(const Key('chat_send_button'))),
+        );
+        focusNode.requestFocus();
+        await tester.pump();
+
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+        await tester.pump();
+
+        expect(tapped, isTrue, reason: 'Enter debe activar onSend');
       },
     );
 

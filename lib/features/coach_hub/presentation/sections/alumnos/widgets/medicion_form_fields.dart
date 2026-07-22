@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/tokens/primitives.dart';
-import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/treino_interactive_state.dart';
 
 /// Sección colapsable de un form de mediciones/rendimiento — Fase 3 WU-06a.
 ///
@@ -62,7 +62,14 @@ class MedicionFormSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (onToggle != null)
-          TreinoTappable(onTap: onToggle, child: header)
+          // TreinoInteractiveState (resolver de Focus/Semantics del kit) —
+          // REEMPLAZA al TreinoTappable crudo, que no exponía Focus ni
+          // Semantics(button) — inalcanzable por teclado (barrido final,
+          // accesibilidad de teclado sistémica).
+          TreinoInteractiveState(
+            onTap: onToggle,
+            builder: (ctx, states) => header,
+          )
         else
           header,
         if (expanded)
