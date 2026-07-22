@@ -2177,5 +2177,9 @@
   "volumeByGroupScreenTitle": "VOLUMEN POR GRUPO",
   "@volumeByGroupScreenTitle": {
     "description": "[stats-hub] Header title for the dedicated VolumeByGroupScreen."
+  },
+  "volumeByGroupEmptyTarget": "Necesitás una rutina asignada para ver tu volumen objetivo.",
+  "@volumeByGroupEmptyTarget": {
+    "description": "[stats-hub] Empty state of the VolumeByGroupScreen card when the athlete has no target (no assigned routine). QA #371."
   }
 }

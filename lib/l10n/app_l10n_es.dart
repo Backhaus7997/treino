@@ -2730,6 +2730,10 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get volumeByGroupScreenTitle => 'VOLUMEN POR GRUPO';
+
+  @override
+  String get volumeByGroupEmptyTarget =>
+      'Necesitás una rutina asignada para ver tu volumen objetivo.';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -5456,4 +5460,8 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get volumeByGroupScreenTitle => 'VOLUMEN POR GRUPO';
+
+  @override
+  String get volumeByGroupEmptyTarget =>
+      'Necesitás una rutina asignada para ver tu volumen objetivo.';
 }

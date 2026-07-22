@@ -4946,6 +4946,12 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'VOLUMEN POR GRUPO'**
   String get volumeByGroupScreenTitle;
+
+  /// [stats-hub] Empty state of the VolumeByGroupScreen card when the athlete has no target (no assigned routine). QA #371.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Necesitás una rutina asignada para ver tu volumen objetivo.'**
+  String get volumeByGroupEmptyTarget;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

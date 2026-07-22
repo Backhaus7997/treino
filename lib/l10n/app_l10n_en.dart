@@ -2672,4 +2672,8 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get volumeByGroupScreenTitle => 'VOLUME BY GROUP';
+
+  @override
+  String get volumeByGroupEmptyTarget =>
+      'You need an assigned routine to see your target volume.';
 }
