@@ -1,12 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../workout/application/exercise_providers.dart';
-import '../../workout/application/routine_providers.dart';
 import '../../workout/application/session_providers.dart';
 import '../../workout/domain/set_log.dart';
 import '../domain/chart_period.dart';
 import '../domain/muscle_distribution_insights.dart';
 import 'muscle_distribution_aggregator.dart';
+import 'routine_slot_groups.dart';
 
 /// [AD6/PR5c] Family key for [athleteMonthRadarInsightsProvider]. Explicit
 /// [uid] (NOT `currentUidProvider`) — same explicit-uid family pattern as
@@ -62,30 +62,12 @@ final athleteMonthRadarInsightsProvider = FutureProvider.autoDispose
   final catalogById = {for (final e in exercises) e.id: e.muscleGroup};
 
   // Per-session routine-slot fallback for custom exercises absent from the
-  // catalog — resolves EACH distinct routine referenced by the sessions in
-  // scope (mirrors muscleDistributionInsightsProvider's per-session
-  // resolution, since a full-month window can span multiple routines).
-  //
-  // [visibleRoutineByIdProvider], NOT [routineByIdProvider] — same reasoning as
-  // muscleDistributionInsightsProvider, and this provider is even MORE exposed:
-  // it resolves routines for the athlete's ENTIRE session history (no bounded
-  // scan), so it is likelier to reach one that is gone. Transient failures still
-  // propagate rather than silently producing a wrong radar.
-  final distinctRoutineIds =
-      sessions.map((s) => s.routineId).toSet().where((id) => id.isNotEmpty);
-  final routines = await Future.wait(
-    distinctRoutineIds
-        .map((id) => ref.watch(visibleRoutineByIdProvider(id).future)),
-  );
-  final slotGroupById = <String, String>{};
-  for (final routine in routines) {
-    if (routine == null) continue;
-    for (final day in routine.days) {
-      for (final slot in day.slots) {
-        slotGroupById.putIfAbsent(slot.exerciseId, () => slot.muscleGroup);
-      }
-    }
-  }
+  // catalog — the resolver shared with muscleDistributionInsightsProvider and
+  // the weekly aggregate (#442), since a full-month window can span multiple
+  // routines. This provider is even MORE exposed to gone routines than the
+  // bounded radar scan (it resolves the athlete's ENTIRE session history) —
+  // see [slotMuscleGroupsForSessions] for the degrade-vs-propagate contract.
+  final slotGroupById = await slotMuscleGroupsForSessions(ref, sessions);
 
   final muscleGroupByExerciseId = <String, String>{
     ...catalogById,

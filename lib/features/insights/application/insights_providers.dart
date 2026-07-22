@@ -11,6 +11,7 @@ import '../../workout/domain/session.dart';
 import '../../workout/domain/session_status.dart';
 import '../domain/muscle_group.dart';
 import '../domain/weekly_insights.dart';
+import 'routine_slot_groups.dart';
 
 /// [UX-week-day-selector] Family key for [athleteWeekInsightsProvider].
 /// Explicit [uid] (NOT `currentUidProvider`) and explicit [weekStart] (must
@@ -70,53 +71,35 @@ final athleteWeekInsightsProvider = FutureProvider.autoDispose
   final exercises = await ref.watch(exercisesProvider.future);
   final byId = {for (final e in exercises) e.id: e};
 
-  // QA #373: la rutina de referencia y el fallback de grupos se resolvían
-  // desde UNA sola rutina (la de la última sesión de TODO el historial).
-  // Una semana calendario puede mezclar rutinas (cambio de plan a mitad de
-  // semana) y el atleta puede haber cambiado de plan sin entrenar aún — así
-  // que: (a) el fallback de muscleGroup se resuelve POR RUTINA DE LA SEMANA
-  // (patrón de muscleDistributionInsightsProvider, ver su doc-comment);
-  // (b) la rutina de referencia del target es la de la sesión más reciente
-  // DE LA SEMANA pedida, con fallback a la última del historial solo cuando
-  // la semana está vacía.
-  final routineIds = <String>{
-    for (final s in weekSessions) s.routineId,
-    if (mostRecentSession != null) mostRecentSession.routineId,
-  }..removeWhere((id) => id.isEmpty);
-  final fetchedRoutines = await Future.wait(
-    routineIds.map((id) => ref.watch(routineByIdProvider(id).future)),
-  );
-  final routinesById = {
-    for (final r in fetchedRoutines)
-      if (r != null) r.id: r,
-  };
-
-  // weekSessions preserva el orden DESC de listByUid → first = más reciente.
+  // Rutina de REFERENCIA para targets (QA #373): la de la sesión más
+  // reciente DE LA SEMANA pedida (weekSessions preserva el orden DESC de
+  // listByUid → first = más reciente), con fallback a la última del
+  // historial solo cuando la semana está vacía (típico: semana calendario
+  // recién empezada, o cambio de plan sin estrenarlo).
   final referenceRoutineId = weekSessions.isNotEmpty
       ? weekSessions.first.routineId
       : mostRecentSession?.routineId;
-  final routine =
-      referenceRoutineId != null ? routinesById[referenceRoutineId] : null;
+  final routine = (referenceRoutineId != null && referenceRoutineId.isNotEmpty)
+      ? await ref.watch(routineByIdProvider(referenceRoutineId).future)
+      : null;
 
-  // Fallback exerciseId → muscleGroup String desde los slots de TODAS las
-  // rutinas de la semana. Cubre ejercicios custom ausentes del catálogo,
-  // cuyos setLogs sólo guardan exerciseId (SetLog no denormaliza el grupo).
-  // La rutina de referencia se vuelca primero: ante un exerciseId repetido
-  // entre rutinas, gana el mapeo del plan más fresco (putIfAbsent).
-  final slotGroupById = <String, String>{};
-  void addSlotGroups(Routine? r) {
-    if (r == null) return;
-    for (final day in r.days) {
-      for (final slot in day.slots) {
-        slotGroupById.putIfAbsent(slot.exerciseId, () => slot.muscleGroup);
-      }
-    }
-  }
-
-  addSlotGroups(routine);
-  for (final id in routineIds) {
-    if (id != referenceRoutineId) addSlotGroups(routinesById[id]);
-  }
+  // Fallback exerciseId → muscleGroup para ejercicios custom ausentes del
+  // catálogo, cuyos setLogs sólo guardan exerciseId (SetLog no denormaliza
+  // el grupo). Resuelve la rutina de CADA sesión de la semana — no sólo una:
+  // una semana puede abarcar un cambio de plan (o el paging aterrizar en
+  // semanas de una rutina ya reemplazada), y asumir una única rutina
+  // descartaba en silencio los sets custom de las otras (#442). Resolver
+  // COMPARTIDO con muscle distribution / month radar, para que las
+  // superficies no puedan volver a divergir; a diferencia del fetch de
+  // targets de arriba, degrada rutinas borradas/revocadas sin tirar la card
+  // entera (ver [slotMuscleGroupsForSessions]). La sesión más reciente del
+  // historial se antepone para que los custom ad-hoc que sólo el plan
+  // vigente conoce sigan resolviendo, con la misma precedencia
+  // más-reciente-primero que el scan del radar.
+  final slotGroupById = await slotMuscleGroupsForSessions(
+    ref,
+    [if (mostRecentSession != null) mostRecentSession, ...weekSessions],
+  );
 
   // setsByGroup — los setLogs de cada session de la semana. Las lecturas por
   // sesión se paralelizan con Future.wait (una subcolección por sesión) para

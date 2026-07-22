@@ -110,6 +110,7 @@ void main() {
             ),
           ]),
       routineByIdProvider('r1').overrideWith((ref) async => null),
+      visibleRoutineByIdProvider('r1').overrideWith((ref) async => null),
       weeklyInsightsProvider.overrideWith((ref) async => WeeklyInsights(
             weekStart: weekStart,
             weekEnd: weekStart.add(const Duration(days: 6)),
@@ -234,6 +235,7 @@ void main() {
             ),
           ]),
       routineByIdProvider('r1').overrideWith((ref) async => null),
+      visibleRoutineByIdProvider('r1').overrideWith((ref) async => null),
       weeklyInsightsProvider.overrideWith((ref) async => WeeklyInsights(
             weekStart: weekStart,
             weekEnd: weekStart.add(const Duration(days: 6)),
@@ -324,6 +326,7 @@ void main() {
             ),
           ]),
       routineByIdProvider('r1').overrideWith((ref) async => null),
+      visibleRoutineByIdProvider('r1').overrideWith((ref) async => null),
     ];
 
     await tester.pumpWidget(_wrap(const InsightsScreen(), overrides));
@@ -381,6 +384,7 @@ void main() {
             ),
           ]),
       routineByIdProvider('r1').overrideWith((ref) async => null),
+      visibleRoutineByIdProvider('r1').overrideWith((ref) async => null),
     ];
 
     await tester.pumpWidget(_wrap(const InsightsScreen(), overrides));
@@ -449,6 +453,7 @@ void main() {
             ),
           ]),
       routineByIdProvider('r1').overrideWith((ref) async => null),
+      visibleRoutineByIdProvider('r1').overrideWith((ref) async => null),
     ];
 
     await tester.pumpWidget(_wrap(const InsightsScreen(), overrides));
@@ -513,6 +518,7 @@ void main() {
             ),
           ]),
       routineByIdProvider('r1').overrideWith((ref) async => null),
+      visibleRoutineByIdProvider('r1').overrideWith((ref) async => null),
     ];
 
     // Narrow width — the regression this test guards against is a
@@ -571,6 +577,7 @@ void main() {
             ),
           ]),
       routineByIdProvider('r1').overrideWith((ref) async => null),
+      visibleRoutineByIdProvider('r1').overrideWith((ref) async => null),
     ];
 
     await tester.pumpWidget(_wrap(const InsightsScreen(), overrides));
@@ -626,6 +633,7 @@ void main() {
       sessionRepositoryProvider.overrideWithValue(repo),
       exercisesProvider.overrideWith((ref) async => const []),
       routineByIdProvider('r1').overrideWith((ref) async => null),
+      visibleRoutineByIdProvider('r1').overrideWith((ref) async => null),
     ];
 
     await tester.pumpWidget(_wrap(const InsightsScreen(), overrides));
@@ -698,6 +706,7 @@ void main() {
             ),
           ]),
       routineByIdProvider('r1').overrideWith((ref) async => null),
+      visibleRoutineByIdProvider('r1').overrideWith((ref) async => null),
     ];
 
     final router = GoRouter(
