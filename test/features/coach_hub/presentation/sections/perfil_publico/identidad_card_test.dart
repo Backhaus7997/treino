@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/app/theme/tokens/components/treino_focus_tokens.dart';
 import 'package:treino/features/coach_hub/presentation/sections/perfil_publico/widgets/identidad_card.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/data/user_repository.dart';
@@ -159,6 +160,47 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('AJUSTES_SCREEN_MARKER'), findsOneWidget);
+    });
+  });
+
+  group(
+      'IdentidadCard — «Editar foto y nombre» focus ring '
+      '(remediación WARNING-2 verify fase-11)', () {
+    testWidgets(
+        'foco de teclado en el link pinta el anillo de TreinoFocusTokens '
+        '(mismo patrón que section_header.dart / filter_chips.dart)',
+        (tester) async {
+      await _pump(tester, profile: _trainerProfile());
+
+      final linkFinder = find.byKey(const Key('identidad_card_edit_link'));
+
+      final beforeContainer = tester.widget<Container>(linkFinder);
+      final beforeDecoration = beforeContainer.decoration! as BoxDecoration;
+      expect(
+        beforeDecoration.border,
+        isNull,
+        reason: 'sin foco no debe haber anillo pintado',
+      );
+
+      final focusTokens = TreinoFocusTokens.of(tester.element(linkFinder));
+
+      Focus.of(tester.element(linkFinder)).requestFocus();
+      await tester.pump();
+      await tester.pump();
+
+      final afterContainer = tester.widget<Container>(linkFinder);
+      final afterDecoration = afterContainer.decoration! as BoxDecoration;
+      expect(
+        afterDecoration.border,
+        isNotNull,
+        reason: 'link enfocado por teclado debe pintar un anillo visible '
+            '(ADR-SH-002, mismo patrón que section_header.dart '
+            '/ filter_chips.dart / chat_list_pane.dart)',
+      );
+      expect(
+        afterDecoration.border,
+        Border.all(color: focusTokens.ring),
+      );
     });
   });
 
