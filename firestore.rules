@@ -355,7 +355,13 @@ service cloud.firestore {
                     && request.resource.data.trainerId == resource.data.trainerId
                     && request.resource.data.athleteId == resource.data.athleteId
                     && request.resource.data.requestedAt == resource.data.requestedAt
-                    && (request.resource.data.sharedWithTrainer == resource.data.sharedWithTrainer
+                    // get(...,null) para tolerar links SIN el campo opcional
+                    // `sharedWithTrainer` (accept/pause/resume/decline no lo
+                    // incluyen; docs viejos no lo tienen). Con acceso directo la
+                    // regla explotaba (Null value error → PERMISSION_DENIED) y
+                    // false-denegaba updates legítimos del trainer. Mismo idioma
+                    // seguro que las cláusulas de entitlement de abajo (L360-362).
+                    && (request.resource.data.get('sharedWithTrainer', null) == resource.data.get('sharedWithTrainer', null)
                         || request.auth.uid == resource.data.athleteId)
                     && request.resource.data.get('entitlement', null) == resource.data.get('entitlement', null)
                     && request.resource.data.get('blockedAt', null) == resource.data.get('blockedAt', null)
