@@ -11,7 +11,7 @@ import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
-import 'package:treino/features/coach_hub/presentation/shell/section_header.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 
 /// Sección «Rutinas» del Coach Hub web.
@@ -35,7 +35,7 @@ class RutinasScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SectionHeader(title: 'Rutinas'), // i18n
+          const TreinoSectionHeader(title: 'Rutinas'), // i18n
           const SizedBox(height: 6),
           Text(
             'Elegí un alumno para armarle una rutina.', // i18n

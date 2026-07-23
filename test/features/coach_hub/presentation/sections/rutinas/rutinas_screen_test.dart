@@ -101,7 +101,8 @@ void main() {
         'a1': 'Ana Activa',
       });
 
-      expect(find.text('Rutinas'), findsOneWidget);
+      // TreinoSectionHeader uppercasea el título (kit Fase 1, REQ-CK-002).
+      expect(find.text('RUTINAS'), findsOneWidget);
       expect(
         find.text('Elegí un alumno para armarle una rutina.'),
         findsOneWidget,

@@ -1,9 +1,40 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/widget_previews.dart';
 
 import '../../../../../app/theme/app_motion.dart';
 import '../../../../../app/theme/app_palette.dart';
+import '../../../../../app/theme/tokens/components/treino_focus_tokens.dart';
 import '../../../../../app/theme/tokens/components/treino_table_tokens.dart';
+import '../../../../../app/theme/tokens/primitives.dart';
 import '../../../../../core/widgets/motion/treino_shimmer.dart';
+import '../../../../../core/widgets/treino_icon.dart';
+import '../empty_state/empty_state.dart';
+import '../preview_wrapper.dart';
+import '../treino_interactive_state.dart';
+
+/// Previews del kit — Finding W3.
+@Preview(name: 'DataTable — normal', wrapper: coachHubPreviewWrapper)
+Widget coachHubDataTablePreview() => CoachHubDataTable(
+      columns: const [
+        CoachHubColumn(key: 'name', label: 'Nombre', sortable: true),
+        CoachHubColumn(key: 'status', label: 'Estado'),
+      ],
+      rows: const [
+        CoachHubRow(id: '1', cells: {'name': 'Ana García', 'status': 'Activo'}),
+        CoachHubRow(
+          id: '2',
+          cells: {'name': 'Carlos López', 'status': 'Inactivo'},
+        ),
+      ],
+      onRowTap: (_) {},
+    );
+
+@Preview(name: 'DataTable — vacío', wrapper: coachHubPreviewWrapper)
+Widget coachHubDataTableEmptyPreview() => const CoachHubDataTable(
+      columns: [CoachHubColumn(key: 'name', label: 'Nombre')],
+      rows: [],
+      emptyMessage: 'Sin alumnos todavía',
+    );
 
 /// Modelo de columna para [CoachHubDataTable].
 @immutable
@@ -47,6 +78,9 @@ class CoachHubRow {
 ///
 /// Estados soportados:
 /// - Normal: filas con hover alternado (TreinoTableTokens).
+/// - Fila con `onRowTap`: focusable, activable por teclado (Enter/Space) y
+///   expone Semantics(button: true) — vía TreinoInteractiveState
+///   (fuente única de verdad, ADR-SH-002).
 /// - Loading: TreinoShimmer skeleton rows.
 /// - Vacío: EmptyState slot con mensaje configurable.
 /// - Error: mensaje de error + botón retry.
@@ -73,6 +107,10 @@ class CoachHubDataTable extends StatelessWidget {
     required this.rows,
     this.loading = false,
     this.emptyMessage,
+    this.emptyIcon = TreinoIcon.emptyState,
+    this.emptyDescription,
+    this.emptyCtaLabel,
+    this.onEmptyCtaTap,
     this.errorMessage,
     this.onRetry,
     this.sortColumnKey,
@@ -91,7 +129,23 @@ class CoachHubDataTable extends StatelessWidget {
   final bool loading;
 
   /// Mensaje a mostrar cuando [rows] está vacío y no hay error ni loading.
+  /// Se pasa como `title` a [TreinoEmptyState] (fuente única de verdad,
+  /// Finding C3).
   final String? emptyMessage;
+
+  /// Ícono del estado vacío. Pasa a [TreinoEmptyState.icon].
+  final IconData emptyIcon;
+
+  /// Descripción opcional debajo del título del estado vacío. Pasa a
+  /// [TreinoEmptyState.description].
+  final String? emptyDescription;
+
+  /// Texto del CTA opcional del estado vacío. Pasa a
+  /// [TreinoEmptyState.ctaLabel].
+  final String? emptyCtaLabel;
+
+  /// Callback del CTA del estado vacío. Ignorado si [emptyCtaLabel] es null.
+  final VoidCallback? onEmptyCtaTap;
 
   /// Mensaje de error. Si no-null, muestra el estado error.
   final String? errorMessage;
@@ -139,7 +193,13 @@ class CoachHubDataTable extends StatelessWidget {
             else if (errorMessage != null)
               _ErrorState(message: errorMessage!, onRetry: onRetry)
             else if (rows.isEmpty)
-              _EmptyState(message: emptyMessage)
+              TreinoEmptyState(
+                icon: emptyIcon,
+                title: emptyMessage ?? 'Sin datos',
+                description: emptyDescription,
+                ctaLabel: emptyCtaLabel,
+                onCtaTap: onEmptyCtaTap,
+              )
             else
               _DataRows(
                 columns: columns,
@@ -228,29 +288,29 @@ class _HeaderCell extends StatelessWidget {
           Text(
             column.label,
             style: TextStyle(
-              fontFamily: 'Barlow',
+              fontFamily: AppFonts.barlow,
               fontWeight: FontWeight.w600,
               fontSize: 12,
               color: tokens.headerTextColor,
             ),
           ),
           if (column.sortable && isSorted) ...[
-            const SizedBox(width: 4),
+            const SizedBox(width: AppSpacing.hairline),
             AnimatedRotation(
               key: Key('sort_indicator_${column.key}'),
               turns: sortAscending ? 0 : 0.5,
               duration: AppMotion.resolve(context, AppMotion.fast),
               child: Icon(
-                Icons.arrow_upward,
+                TreinoIcon.sortAscending,
                 size: 12,
                 color: tokens.sortIndicatorColor,
               ),
             ),
           ],
           if (column.sortable && !isSorted) ...[
-            const SizedBox(width: 4),
+            const SizedBox(width: AppSpacing.hairline),
             Icon(
-              Icons.unfold_more,
+              TreinoIcon.sortable,
               size: 12,
               color: tokens.headerTextColor.withValues(alpha: 0.5),
             ),
@@ -304,8 +364,11 @@ class _DataRows extends StatelessWidget {
   }
 }
 
-/// Fila de datos individual con hover.
-class _DataRow extends StatefulWidget {
+/// Fila de datos individual — estado de interacción vía
+/// [TreinoInteractiveState] (fuente única de verdad, ADR-SH-002): cuando
+/// `onTap` existe, la fila es focusable, activable por teclado (Enter/Space)
+/// y expone Semantics(button: true). Sin `onTap` → fila estática, sin hover.
+class _DataRow extends StatelessWidget {
   const _DataRow({
     required this.row,
     required this.columns,
@@ -321,40 +384,33 @@ class _DataRow extends StatefulWidget {
   final VoidCallback? onTap;
 
   @override
-  State<_DataRow> createState() => _DataRowState();
-}
-
-class _DataRowState extends State<_DataRow> {
-  bool _hovered = false;
-
-  @override
   Widget build(BuildContext context) {
-    Color bg;
-    if (_hovered) {
-      bg = widget.tokens.rowHoverBackground;
-    } else if (widget.isAlt) {
-      bg = widget.tokens.rowAltBackground;
-    } else {
-      bg = widget.tokens.rowBackground;
-    }
+    final focusTokens = TreinoFocusTokens.of(context);
 
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      cursor: widget.onTap != null
-          ? SystemMouseCursors.click
-          : SystemMouseCursors.basic,
-      child: AnimatedContainer(
-        duration: AppMotion.resolve(context, AppMotion.fast),
-        curve: AppMotion.standard,
-        color: bg,
-        height: TreinoTableTokens.rowHeight,
-        child: GestureDetector(
-          onTap: widget.onTap,
-          behavior: HitTestBehavior.opaque,
+    return TreinoInteractiveState(
+      onTap: onTap,
+      builder: (ctx, states) {
+        Color bg;
+        if (states.hovered) {
+          bg = tokens.rowHoverBackground;
+        } else if (isAlt) {
+          bg = tokens.rowAltBackground;
+        } else {
+          bg = tokens.rowBackground;
+        }
+
+        return AnimatedContainer(
+          key: Key('data_table_row_${row.id}'),
+          duration: AppMotion.resolve(ctx, AppMotion.fast),
+          curve: AppMotion.standard,
+          decoration: BoxDecoration(
+            color: bg,
+            border: states.focused ? Border.all(color: focusTokens.ring) : null,
+          ),
+          height: TreinoTableTokens.rowHeight,
           child: Row(
             children: [
-              for (final col in widget.columns)
+              for (final col in columns)
                 Expanded(
                   flex: col.flex,
                   child: Padding(
@@ -363,12 +419,12 @@ class _DataRowState extends State<_DataRow> {
                       vertical: TreinoTableTokens.cellPaddingV,
                     ),
                     child: Text(
-                      widget.row.cells[col.key] ?? '',
+                      row.cells[col.key] ?? '',
                       style: TextStyle(
-                        fontFamily: 'Barlow',
+                        fontFamily: AppFonts.barlow,
                         fontWeight: FontWeight.w400,
                         fontSize: 14,
-                        color: AppPalette.of(context).textPrimary,
+                        color: AppPalette.of(ctx).textPrimary,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -376,8 +432,8 @@ class _DataRowState extends State<_DataRow> {
                 ),
             ],
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -420,7 +476,7 @@ class _SkeletonRows extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: AppSpacing.s12),
                   Expanded(
                     child: Container(
                       height: 14,
@@ -440,31 +496,6 @@ class _SkeletonRows extends StatelessWidget {
   }
 }
 
-/// Estado vacío.
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({this.message});
-
-  final String? message;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    return Padding(
-      padding: const EdgeInsets.all(32),
-      child: Center(
-        child: Text(
-          message ?? 'Sin datos',
-          style: TextStyle(
-            fontFamily: 'Barlow',
-            fontSize: 14,
-            color: palette.textMuted,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// Estado de error con retry.
 class _ErrorState extends StatelessWidget {
   const _ErrorState({required this.message, this.onRetry});
@@ -476,23 +507,24 @@ class _ErrorState extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     return Padding(
-      padding: const EdgeInsets.all(32),
+      key: const Key('data_table_error_content'),
+      padding: const EdgeInsets.all(AppSpacing.s20),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.error_outline, size: 32, color: palette.danger),
-          const SizedBox(height: 8),
+          Icon(TreinoIcon.errorState, size: 32, color: palette.danger),
+          const SizedBox(height: AppSpacing.s8),
           Text(
             message,
             style: TextStyle(
-              fontFamily: 'Barlow',
+              fontFamily: AppFonts.barlow,
               fontSize: 14,
               color: palette.textMuted,
             ),
             textAlign: TextAlign.center,
           ),
           if (onRetry != null) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.s12),
             TextButton(
               key: const Key('data_table_retry'),
               onPressed: onRetry,

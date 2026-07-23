@@ -19,6 +19,7 @@
 //
 // Matriz: dark 1440x900, dark 420x900, light 1440x900, light 420x900.
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -30,12 +31,14 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/core/persistence/shared_prefs_provider.dart';
 import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach_hub/presentation/shell/coach_hub_scaffold.dart';
+import 'package:treino/features/coach_hub/presentation/shell/sidebar_item.dart';
 import 'package:treino/features/coach_hub/presentation/shell/sidebar_registry.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
@@ -67,6 +70,36 @@ class _StubAuthNotifier extends AuthNotifier {
   }
 }
 
+// Badges falsos para la evidencia (Pagos=3, Chat=6, como el mockup
+// sidebar.png). W1 no wiring de datos reales todavía — no se inventa un
+// provider de negocio, solo se demuestra el diseño con un StateProvider fijo.
+final _pagosBadgeProvider = StateProvider<int?>((ref) => 3);
+final _chatBadgeProvider = StateProvider<int?>((ref) => 6);
+
+List<SidebarItem> get _evidenceSidebarItems => [
+      for (final item in sidebarRegistry)
+        if (item.id == 'pagos')
+          SidebarItem(
+            id: item.id,
+            label: item.label,
+            route: item.route,
+            iconBuilder: item.iconBuilder,
+            group: item.group,
+            badgeProvider: _pagosBadgeProvider,
+          )
+        else if (item.id == 'chat')
+          SidebarItem(
+            id: item.id,
+            label: item.label,
+            route: item.route,
+            iconBuilder: item.iconBuilder,
+            group: item.group,
+            badgeProvider: _chatBadgeProvider,
+          )
+        else
+          item,
+    ];
+
 UserProfile _trainerProfile() => UserProfile(
       uid: 'evidence-uid',
       email: 'trainer@treino.app',
@@ -78,21 +111,27 @@ UserProfile _trainerProfile() => UserProfile(
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Carga de fuentes TTF reales desde test/fonts/
-// Registramos los bytes bajo las familias "Barlow" y "BarlowCondensed" para que
-// Flutter las encuentre cuando el tema las declare via fontFamily/fontFamilyFallback.
+// Registramos los bytes bajo los nombres de familia EXACTOS que los widgets
+// resuelven en runtime: AppFonts.barlow ("Barlow") y AppFonts.barlowCondensed
+// ("Barlow Condensed", con espacio — el mismo nombre que registra google_fonts
+// para GoogleFonts.barlowCondensed()). Si el nombre de familia no coincide
+// exactamente, Flutter no encuentra la fuente y renderiza tofu (glifos vacíos)
+// aunque el FontLoader haya cargado el TTF correcto.
 // ──────────────────────────────────────────────────────────────────────────────
 Future<void> _loadTestFonts() async {
-  await _loadFontFamily('Barlow', [
+  await _loadFontFamily(AppFonts.barlow, [
     'test/fonts/Barlow-Regular.ttf',
     'test/fonts/Barlow-Medium.ttf',
     'test/fonts/Barlow-SemiBold.ttf',
     'test/fonts/Barlow-Bold.ttf',
   ]);
 
-  await _loadFontFamily('BarlowCondensed', [
+  await _loadFontFamily(AppFonts.barlowCondensed, [
     'test/fonts/BarlowCondensed-Regular.ttf',
     'test/fonts/BarlowCondensed-Bold.ttf',
   ]);
+
+  await _loadPhosphorFonts();
 }
 
 Future<ByteData?> _readTtf(String path) async {
@@ -111,6 +150,70 @@ Future<void> _loadFontFamily(String family, List<String> paths) async {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
+// Carga de la fuente de phosphor_flutter (Finding H2).
+//
+// `TreinoIcon` (lib/core/widgets/treino_icon.dart) es la única puerta de
+// entrada a los íconos del kit y solo usa 3 estilos de Phosphor: Regular,
+// Fill y Bold (ver PhosphorIconsRegular/Fill/Bold en treino_icon.dart — Light,
+// Thin y Duotone no se usan en ningún lugar del código).
+//
+// `PhosphorFlatIconData` (phosphor_flutter/lib/src/phosphor_icon_data.dart)
+// construye cada `IconData` con `fontFamily: 'Phosphor$style'` y
+// `fontPackage: 'phosphor_flutter'`. Flutter resuelve el nombre de familia
+// EFECTIVO como `packages/<fontPackage>/<fontFamily>` (ver
+// `TextStyle._effectiveFontFamily` en el SDK) — por eso el `FontLoader` se
+// registra con el nombre YA prefijado (`packages/phosphor_flutter/PhosphorX`),
+// no con el nombre "pelado" (`PhosphorX`); de lo contrario el texto no
+// encuentra la fuente y sigue renderizando tofu aunque el TTF esté cargado.
+//
+// Los TTF de `phosphor_flutter` están declarados en su pubspec.yaml bajo
+// `flutter: fonts:` (no `assets:`), por lo que NO quedan expuestos vía
+// `rootBundle.load('packages/phosphor_flutter/...')` durante `flutter test`
+// (el bundle de test solo sirve assets declarados explícitamente — falla con
+// "Unable to load asset"). En su lugar resolvemos la ubicación real del
+// paquete leyendo `.dart_tool/package_config.json` (generado por `pub get`,
+// siempre apunta a la ubicación correcta en CADA máquina/CI — pub-cache,
+// path override, monorepo, etc.) y leemos el TTF directo del disco, el mismo
+// mecanismo que usa el propio SDK de Dart para resolver `package:`.
+// ──────────────────────────────────────────────────────────────────────────────
+Future<String> _resolvePackageRoot(String packageName) async {
+  final configFile = File('.dart_tool/package_config.json');
+  final config =
+      jsonDecode(await configFile.readAsString()) as Map<String, dynamic>;
+  final packages = config['packages'] as List<dynamic>;
+  final pkg = packages.cast<Map<String, dynamic>>().firstWhere(
+        (p) => p['name'] == packageName,
+        orElse: () => throw StateError(
+          'Package "$packageName" not found in .dart_tool/package_config.json',
+        ),
+      );
+  final rootUri = pkg['rootUri'] as String;
+  // rootUri puede ser absoluto (file:///...) o relativo a package_config.json
+  // — Uri.resolve maneja ambos casos correctamente.
+  final resolved = configFile.absolute.uri.resolve(rootUri);
+  return resolved.toFilePath();
+}
+
+Future<void> _loadPhosphorFonts() async {
+  const styleToAsset = {
+    'Regular': 'Phosphor.ttf',
+    'Fill': 'Phosphor-Fill.ttf',
+    'Bold': 'Phosphor-Bold.ttf',
+  };
+
+  final packageRoot = await _resolvePackageRoot('phosphor_flutter');
+
+  for (final entry in styleToAsset.entries) {
+    final loader = FontLoader('packages/phosphor_flutter/Phosphor${entry.key}');
+    final ttfPath =
+        '$packageRoot/lib/fonts/${entry.value}'.replaceAll('\\', '/');
+    final bytes = await _readTtf(ttfPath);
+    if (bytes != null) loader.addFont(Future.value(bytes));
+    await loader.load();
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 // Tema de evidencia: construye el theme directamente con fontFamily 'Barlow'
 // (registrada via FontLoader) en lugar de pasar por google_fonts, que intentaría
 // cargar fonts de la red (bloqueada en entorno de test). El resultado visual es
@@ -123,14 +226,14 @@ ThemeData _evidenceTheme({required AppPalette palette, required bool dark}) {
 
   // TextTheme con Barlow (cargada desde TTF local) en lugar de GoogleFonts.barlow.
   final textTheme = base.textTheme.apply(
-    fontFamily: 'Barlow',
+    fontFamily: AppFonts.barlow,
     bodyColor: palette.textPrimary,
     displayColor: palette.textPrimary,
   );
 
-  // Headings con BarlowCondensed Bold (igual que AppTheme).
+  // Headings con Barlow Condensed Bold (igual que AppTheme).
   const condensedStyle = TextStyle(
-    fontFamily: 'BarlowCondensed',
+    fontFamily: AppFonts.barlowCondensed,
     fontWeight: FontWeight.w700,
     letterSpacing: 0.5,
   );
@@ -204,7 +307,10 @@ Future<void> _pumpShell(
     initialLocation: '/dashboard',
     routes: [
       ShellRoute(
-        builder: (ctx, state, child) => CoachHubScaffold(child: child),
+        builder: (ctx, state, child) => CoachHubScaffold(
+          itemsOverride: _evidenceSidebarItems,
+          child: child,
+        ),
         routes: [
           for (final p in paths)
             GoRoute(

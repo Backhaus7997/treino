@@ -5,7 +5,7 @@ import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/cuenta_tab.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/facturacion_tab.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/notificaciones_tab.dart';
-import 'package:treino/features/coach_hub/presentation/shell/section_header.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 
 /// Tabs internos de la sección «Configuración» (Ajustes) del Coach Hub web.
 ///
@@ -54,7 +54,7 @@ class AjustesScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SectionHeader(title: 'CONFIGURACIÓN'), // i18n: Fase W3
+          const TreinoSectionHeader(title: 'CONFIGURACIÓN'), // i18n: Fase W3
           const SizedBox(height: 4),
           Text(
             'Cuenta · Negocio · Preferencias', // i18n: Fase W3

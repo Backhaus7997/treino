@@ -46,3 +46,16 @@ const List<SidebarItem> sidebarRegistry = [
   // AJUSTES (pinneado al fondo, fuera de grupo visual)
   ...ajustesSidebarItems,
 ];
+
+/// Devuelve el [SidebarItem] de `sidebarRegistry` cuya `route` matchea
+/// [location] (exacta o como prefijo `route/...`), o `null` si ninguna
+/// matchea. Misma regla de "activo" que usa el sidebar para resaltar el
+/// ítem; el top bar la reusa para el título de sección (REQ-SH-007).
+SidebarItem? activeSidebarItem(String location) {
+  for (final item in sidebarRegistry) {
+    if (location == item.route || location.startsWith('${item.route}/')) {
+      return item;
+    }
+  }
+  return null;
+}

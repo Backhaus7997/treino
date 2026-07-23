@@ -4,9 +4,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/app/theme/tokens/components/coach_hub_layout_tokens.dart';
+import 'package:treino/app/theme/tokens/components/coach_hub_sidebar_item_tokens.dart';
+import 'package:treino/app/theme/tokens/components/treino_badge_tokens.dart';
 import 'package:treino/core/persistence/shared_prefs_provider.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/features/coach_hub/presentation/shell/coach_hub_sidebar.dart';
+import 'package:treino/features/coach_hub/presentation/shell/sidebar_item.dart';
 import 'package:treino/features/coach_hub/presentation/shell/sidebar_registry.dart';
 
 /// Monta el sidebar dentro de un `ShellRoute` real (necesita `GoRouterState`).
@@ -17,6 +22,7 @@ Future<void> _pumpSidebar(
   WidgetTester tester, {
   Map<String, Object> prefs = const {},
   String initial = '/dashboard',
+  ThemeData? theme,
 }) async {
   SharedPreferences.setMockInitialValues(prefs);
   final sp = await SharedPreferences.getInstance();
@@ -45,7 +51,10 @@ Future<void> _pumpSidebar(
       overrides: [
         sharedPreferencesProvider.overrideWith((ref) => Future.value(sp)),
       ],
-      child: MaterialApp.router(theme: AppTheme.dark(), routerConfig: router),
+      child: MaterialApp.router(
+        theme: theme ?? AppTheme.dark(),
+        routerConfig: router,
+      ),
     ),
   );
   await tester.pumpAndSettle();
@@ -53,13 +62,16 @@ Future<void> _pumpSidebar(
 
 void main() {
   testWidgets(
-      'expandido → 264px, 2 headers (GESTIÓN, RECURSOS) y todos los labels '
-      'del registry [SCENARIO-750]', (tester) async {
+      'expandido → 240px, header TREINO, 2 headers (GESTIÓN, RECURSOS) y '
+      'todos los labels del registry [SCENARIO-750]', (tester) async {
     await _pumpSidebar(tester);
 
     final size =
         tester.getSize(find.byKey(const Key('coach_hub_sidebar_container')));
-    expect(size.width, 264);
+    expect(size.width, CoachHubLayoutTokens.sidebarExpandedWidth);
+    expect(size.width, 240);
+
+    expect(find.text('TREINO'), findsOneWidget);
 
     // W2 reduce 2026-07-02: el sidebar pasó a 2 grupos activos (GESTIÓN y
     // RECURSOS) + Ajustes pinneado abajo. Reportes (grupo CUENTA) también
@@ -86,17 +98,22 @@ void main() {
     }
   });
 
-  testWidgets('colapsado → 72px, headers y labels ocultos [SCENARIO-754]',
-      (tester) async {
+  testWidgets(
+      'colapsado → 72px, header/headers/labels ocultos, avatar sigue visible '
+      '[SCENARIO-754]', (tester) async {
     await _pumpSidebar(tester, prefs: {'coach_hub.sidebar.collapsed': true});
 
     final size =
         tester.getSize(find.byKey(const Key('coach_hub_sidebar_container')));
+    expect(size.width, CoachHubLayoutTokens.sidebarCollapsedWidth);
     expect(size.width, 72);
 
+    expect(find.text('TREINO'), findsNothing);
     expect(find.text('RESUMEN'), findsNothing);
     expect(find.text('Dashboard'), findsNothing);
     expect(find.byType(Icon), findsWidgets);
+    // El avatar del perfil sigue visible, centrado, sin nombre/subtítulo.
+    expect(find.byType(CircleAvatar), findsOneWidget);
   });
 
   testWidgets('tap en item navega via context.go [SCENARIO-752]',
@@ -110,34 +127,65 @@ void main() {
   });
 
   testWidgets(
-      'el toggle comparte fila con "GESTIÓN" (misma altura, sin fila propia)',
-      (tester) async {
+      'item activo (Dashboard en /dashboard) usa AnimatedContainer para la '
+      'píldora — ADR-SH-004', (tester) async {
     await _pumpSidebar(tester);
 
-    final toggleY =
-        tester.getCenter(find.byTooltip('Contraer/expandir menú')).dy;
-    final labelY = tester.getCenter(find.text('GESTIÓN')).dy;
-    // Misma fila → centros verticalmente alineados (tolerancia por line-height).
-    expect((toggleY - labelY).abs(), lessThan(4));
+    // El label activo se pinta con weight 600 (vs 400 inactivo).
+    final dashboardText = tester.widget<Text>(find.text('Dashboard'));
+    expect(dashboardText.style?.fontWeight, FontWeight.w600);
 
-    // El toggle queda al final de la fila (a la derecha del label).
-    final toggleX =
-        tester.getCenter(find.byTooltip('Contraer/expandir menú')).dx;
-    final labelX = tester.getCenter(find.text('GESTIÓN')).dx;
-    expect(toggleX, greaterThan(labelX));
+    final alumnosText = tester.widget<Text>(find.text('Alumnos'));
+    expect(alumnosText.style?.fontWeight, FontWeight.w400);
+
+    // La píldora activa vive dentro de un AnimatedContainer (motion token).
+    final pillFinder = find.ancestor(
+      of: find.text('Dashboard'),
+      matching: find.byType(AnimatedContainer),
+    );
+    expect(pillFinder, findsWidgets);
+
+    // REQ-SH-003a: variante elegida = píldora completa (relleno bgCard en
+    // todo el ancho de la fila), no barra lateral. El AnimatedContainer más
+    // interno (el que aplica el fondo/radius) debe tener el color/radio del
+    // token activo.
+    final tokens = CoachHubSidebarItemTokens.of(
+      tester.element(find.text('Dashboard')),
+    );
+    final pill = tester.widget<AnimatedContainer>(pillFinder.first);
+    final decoration = pill.decoration as BoxDecoration;
+    expect(decoration.color, tokens.activeBackground);
+    expect(
+      decoration.borderRadius,
+      BorderRadius.circular(CoachHubSidebarItemTokens.borderRadius),
+    );
+
+    // NO debe existir la barra lateral de 3px de acento — variante
+    // descartada por REQ-SH-003a (el mockup muestra relleno completo).
+    final leftBar = find.byWidgetPredicate(
+      (w) =>
+          w is Container &&
+          w.constraints == null &&
+          (w.decoration is BoxDecoration) &&
+          ((w.decoration as BoxDecoration).borderRadius ==
+              BorderRadius.circular(2)),
+    );
+    expect(leftBar, findsNothing);
   });
 
-  testWidgets('el toggle (dentro del sidebar) contrae al tocarlo',
-      (tester) async {
+  testWidgets(
+      'el toggle (botón dedicado en footer) contrae/expande al tocarlo — '
+      'REQ-SH-006', (tester) async {
     await _pumpSidebar(tester); // expandido
     expect(
       tester
           .getSize(find.byKey(const Key('coach_hub_sidebar_container')))
           .width,
-      264,
+      240,
     );
+    expect(find.byTooltip('Contraer menú'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Contraer/expandir menú'));
+    await tester.tap(find.byKey(const Key('sidebar_toggle_button')));
     await tester.pumpAndSettle();
 
     expect(
@@ -146,25 +194,123 @@ void main() {
           .width,
       72,
     );
+    expect(find.byTooltip('Expandir menú'), findsOneWidget);
   });
 
-  // Nota: no probamos la animación de RE-expandir por widget aquí porque
-  // `_SidebarRow` desborda unos px de forma transitoria durante ese tween
-  // (el label aparece mientras el ancho todavía es angosto; `Clip.hardEdge`
-  // lo oculta en prod). En cambio verificamos que el toggle esté habilitado y
-  // apunte a expandir cuando el sidebar está colapsado — `toggle()` es
-  // simétrico, así que el test de "contrae" ya prueba el flip real.
-  testWidgets('colapsado → el toggle está habilitado y apunta a expandir',
-      (tester) async {
+  testWidgets(
+      'colapsado → el toggle está habilitado, apunta a expandir y NO está '
+      'fusionado con el header de grupo (REQ-SH-004/006)', (tester) async {
     await _pumpSidebar(tester, prefs: {'coach_hub.sidebar.collapsed': true});
 
     final toggle = tester.widget<IconButton>(
-      find.ancestor(
-        of: find.byTooltip('Contraer/expandir menú'),
-        matching: find.byType(IconButton),
-      ),
+      find.byKey(const Key('sidebar_toggle_button')),
     );
     expect(toggle.onPressed, isNotNull); // se puede re-expandir
     expect((toggle.icon as Icon).icon, TreinoIcon.menu);
+    // El header GESTIÓN ya no aparece en absoluto colapsado (no hay toggle
+    // fusionado que lo mantenga visible).
+    expect(find.text('GESTIÓN'), findsNothing);
+  });
+
+  testWidgets('footer muestra avatar + nombre + subtítulo — REQ-SH-005',
+      (tester) async {
+    await _pumpSidebar(tester);
+
+    expect(find.byKey(const Key('sidebar_profile_row')), findsOneWidget);
+    expect(find.byType(CircleAvatar), findsOneWidget);
+    expect(find.byIcon(TreinoIcon.chevronDown), findsOneWidget);
+  });
+
+  testWidgets('entrada del shell usa TreinoFadeSlideIn (REQ-SH-010)',
+      (tester) async {
+    await _pumpSidebar(tester);
+    expect(find.byType(TreinoFadeSlideIn), findsWidgets);
+  });
+
+  testWidgets(
+      'reduce-motion → sin animación de entrada visible tras el primer frame',
+      (tester) async {
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(disableAnimations: true);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+
+    await _pumpSidebar(tester);
+
+    // Con reduce-motion, TreinoFadeSlideIn salta directo a opacidad 1 sin
+    // necesidad de pumpAndSettle adicional — ya lo hace _pumpSidebar.
+    expect(find.text('Dashboard'), findsOneWidget);
+  });
+
+  testWidgets('smoke visual en tema claro (mintMagentaLight) — REQ-SH-011',
+      (tester) async {
+    await _pumpSidebar(tester, theme: AppTheme.light());
+    expect(find.text('TREINO'), findsOneWidget);
+    expect(find.text('Dashboard'), findsOneWidget);
+  });
+
+  testWidgets(
+      'badge numérico se renderiza cuando el item expone badgeProvider '
+      '(Pagos/Chat, ADR-SH-004)', (tester) async {
+    final testBadgeProvider = StateProvider<int?>((ref) => 3);
+    final item = sidebarRegistry.firstWhere((i) => i.id == 'pagos');
+    final badgedItem = SidebarItem(
+      id: item.id,
+      label: item.label,
+      route: item.route,
+      iconBuilder: item.iconBuilder,
+      group: item.group,
+      badgeProvider: testBadgeProvider,
+    );
+
+    SharedPreferences.setMockInitialValues({});
+    final sp = await SharedPreferences.getInstance();
+    final router = GoRouter(
+      initialLocation: '/pagos',
+      routes: [
+        ShellRoute(
+          builder: (ctx, state, child) => Scaffold(
+            body: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                CoachHubSidebar(itemsOverride: [badgedItem]),
+                Expanded(child: child),
+              ],
+            ),
+          ),
+          routes: [
+            GoRoute(path: '/pagos', builder: (_, __) => const Text('pagos')),
+          ],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          sharedPreferencesProvider.overrideWith((ref) => Future.value(sp)),
+        ],
+        child: MaterialApp.router(theme: AppTheme.dark(), routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('3'), findsOneWidget);
+
+    // El badge usa los tokens semánticos (highlight magenta + texto claro),
+    // no colores hardcodeados — ADR-SH-003/mockup sidebar.png.
+    final badgeTokens =
+        TreinoBadgeTokens.of(tester.element(find.text('3')));
+    final badgeContainer = tester.widget<Container>(
+      find
+          .ancestor(
+            of: find.text('3'),
+            matching: find.byType(Container),
+          )
+          .first,
+    );
+    final badgeDecoration = badgeContainer.decoration as BoxDecoration;
+    expect(badgeDecoration.color, badgeTokens.background);
+    final badgeText = tester.widget<Text>(find.text('3'));
+    expect(badgeText.style?.color, badgeTokens.foreground);
   });
 }

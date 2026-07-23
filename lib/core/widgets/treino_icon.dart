@@ -177,4 +177,13 @@ class TreinoIcon {
 
   // Coach Hub Web — Kit de componentes (Fase 1, EmptyState)
   static const IconData emptyState = PhosphorIconsRegular.empty;
+
+  // Coach Hub Web — Kit de componentes (Fase 1, CoachHubDataTable)
+  // Indicador de columna ordenada (ascendente/descendente); la rotación de
+  // 180° la aplica el consumidor via AnimatedRotation sobre sortAscending.
+  static const IconData sortAscending = PhosphorIconsRegular.sortAscending;
+  // Indicador de columna ordenable sin orden activo (caret doble).
+  static const IconData sortable = PhosphorIconsRegular.caretUpDown;
+  // Ícono del estado de error (tabla, dialogs, etc.).
+  static const IconData errorState = PhosphorIconsRegular.warningCircle;
 }

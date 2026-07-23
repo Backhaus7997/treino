@@ -1,10 +1,37 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widget_previews.dart';
 
 import '../../../../../app/theme/app_palette.dart';
 import '../../../../../app/theme/tokens/components/treino_dialog_tokens.dart';
+import '../../../../../app/theme/tokens/components/treino_focus_tokens.dart';
 import '../../../../../app/theme/tokens/motion_tokens.dart';
+import '../../../../../app/theme/tokens/primitives.dart';
 import '../../../../../core/widgets/treino_icon.dart';
+import '../preview_wrapper.dart';
+import '../treino_interactive_state.dart';
+
+/// Previews del kit — Finding W3.
+@Preview(name: 'Dialog — normal', wrapper: coachHubPreviewWrapper)
+Widget treinoDialogPreview() => TreinoDialog(
+      title: 'Confirmar baja',
+      body: const Text('¿Seguro que querés dar de baja al alumno?'),
+      primaryLabel: 'Confirmar',
+      secondaryLabel: 'Cancelar',
+      onPrimaryTap: () {},
+      onSecondaryTap: () {},
+    );
+
+@Preview(name: 'Dialog — destructive', wrapper: coachHubPreviewWrapper)
+Widget treinoDialogDestructivePreview() => TreinoDialog(
+      title: 'Eliminar alumno',
+      body: const Text('Esta acción no se puede deshacer.'),
+      primaryLabel: 'Eliminar',
+      secondaryLabel: 'Cancelar',
+      destructive: true,
+      onPrimaryTap: () {},
+      onSecondaryTap: () {},
+    );
 
 /// Abre un [TreinoDialog] (o cualquier widget) con la anatomía y motion del
 /// kit Coach Hub Web — Fase 1.
@@ -146,29 +173,29 @@ class TreinoDialog extends StatelessWidget {
                 borderRadius:
                     BorderRadius.circular(TreinoDialogTokens.borderRadius),
                 child: Padding(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(AppSpacing.s20),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _Header(title: title, tokens: tokens),
                       if (body != null) ...[
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.s12),
                         body!,
                       ],
                       if (errorMessage != null) ...[
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.s12),
                         Text(
                           errorMessage!,
                           style: TextStyle(
-                            fontFamily: 'Barlow',
+                            fontFamily: AppFonts.barlow,
                             fontSize: 13,
                             color: palette.danger,
                           ),
                         ),
                       ],
                       if (primaryLabel != null || secondaryLabel != null) ...[
-                        const SizedBox(height: 20),
+                        const SizedBox(height: AppSpacing.s20),
                         _Actions(
                           primaryLabel: primaryLabel,
                           onPrimaryTap: onPrimaryTap,
@@ -207,7 +234,7 @@ class _Header extends StatelessWidget {
           child: Text(
             title,
             style: TextStyle(
-              fontFamily: 'BarlowCondensed',
+              fontFamily: AppFonts.barlowCondensed,
               fontWeight: FontWeight.w700,
               fontSize: 20,
               color: tokens.titleColor,
@@ -255,34 +282,91 @@ class _Actions extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
         if (secondaryLabel != null)
-          TextButton(
-            key: const Key('dialog_secondary_button'),
-            onPressed: onSecondaryTap,
-            child: Text(
-              secondaryLabel!,
-              style: TextStyle(color: tokens.contentColor),
-            ),
+          _DialogActionButton(
+            actionKey: const Key('dialog_secondary_button'),
+            onTap: onSecondaryTap,
+            color: tokens.contentColor,
+            label: secondaryLabel!,
           ),
         if (primaryLabel != null) ...[
-          const SizedBox(width: 8),
-          TextButton(
-            key: const Key('dialog_primary_button'),
-            onPressed: loading ? null : onPrimaryTap,
-            style: TextButton.styleFrom(foregroundColor: primaryColor),
-            child: loading
-                ? SizedBox(
-                    key: const Key('dialog_primary_spinner'),
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: primaryColor,
-                    ),
-                  )
-                : Text(primaryLabel!),
+          const SizedBox(width: AppSpacing.s8),
+          _DialogActionButton(
+            actionKey: const Key('dialog_primary_button'),
+            onTap: loading ? null : onPrimaryTap,
+            color: primaryColor,
+            label: primaryLabel!,
+            loading: loading,
           ),
         ],
       ],
+    );
+  }
+}
+
+/// Botón de acción del [TreinoDialog] (primario/secundario).
+///
+/// Estado de interacción vía [TreinoInteractiveState] (fuente única de
+/// verdad, ADR-SH-002): focusable, activable por teclado (Enter/Space),
+/// expone Semantics(button: true) y resalta fondo en hover/pressed + anillo
+/// de foco en focus. Con [loading]=true muestra un spinner en vez del label
+/// y queda deshabilitado (sin gesto ni foco), delegando al `onTap: null` de
+/// [TreinoInteractiveState].
+class _DialogActionButton extends StatelessWidget {
+  const _DialogActionButton({
+    required this.actionKey,
+    required this.onTap,
+    required this.color,
+    required this.label,
+    this.loading = false,
+  });
+
+  final Key actionKey;
+  final VoidCallback? onTap;
+  final Color color;
+  final String label;
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context) {
+    final focusTokens = TreinoFocusTokens.of(context);
+
+    return TreinoInteractiveState(
+      onTap: onTap,
+      builder: (ctx, states) {
+        final highlighted = states.hovered || states.pressed;
+
+        return Container(
+          key: actionKey,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.s8,
+            vertical: AppSpacing.s8,
+          ),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(6),
+            color: highlighted ? color.withValues(alpha: 0.08) : null,
+            border: states.focused ? Border.all(color: focusTokens.ring) : null,
+          ),
+          child: loading
+              ? SizedBox(
+                  key: const Key('dialog_primary_spinner'),
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: color,
+                  ),
+                )
+              : Text(
+                  label,
+                  style: TextStyle(
+                    fontFamily: AppFonts.barlow,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: color,
+                  ),
+                ),
+        );
+      },
     );
   }
 }

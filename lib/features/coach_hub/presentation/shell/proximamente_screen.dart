@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:treino/app/theme/app_palette.dart';
-
-import 'section_header.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 
 /// Placeholder único reutilizable para las secciones aún no shipeadas
 /// (ADR-CHW-009). Cada `sections/<section>/routes.dart` lo construye con su
@@ -21,7 +20,7 @@ class ProximamenteScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SectionHeader(title: label),
+          TreinoSectionHeader(title: label),
           const SizedBox(height: 18),
           Text(
             'Próximamente.', // i18n: Fase W1
