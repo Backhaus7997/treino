@@ -3,15 +3,20 @@
 // mocking pattern of the dashboard section tests (stub trainerLinksStreamProvider
 // + userPublicProfileProvider per athlete).
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/rutinas/rutinas_screen.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 
@@ -90,6 +95,31 @@ Future<void> _pumpRutinas(
   await tester.pumpAndSettle();
 }
 
+/// Pumps RutinasScreen behind a controllable [StreamController] — no
+/// `pumpAndSettle`, así el frame queda congelado en el estado que el
+/// controller todavía no resolvió (loading indefinido mientras no emita).
+Future<void> _pumpRutinasWithController(
+  WidgetTester tester,
+  StreamController<List<TrainerLink>> controller,
+) async {
+  tester.view.physicalSize = const Size(1400, 900);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        trainerLinksStreamProvider.overrideWith((ref) => controller.stream),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.dark(),
+        home: const Scaffold(body: RutinasScreen()),
+      ),
+    ),
+  );
+}
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 void main() {
@@ -107,6 +137,51 @@ void main() {
         find.text('Elegí un alumno para armarle una rutina.'),
         findsOneWidget,
       );
+      // count = alumnos no-pending deduplicados.
+      expect(find.text('1'), findsOneWidget);
+    });
+
+    testWidgets(
+        'the subtitle uses AppFonts.barlow directly instead of '
+        'GoogleFonts.barlow() — the latter loads the variant asynchronously '
+        '(fontFamily "Barlow_400", not "Barlow") and renders as tofu in the '
+        'evidence goldens before the async load resolves',
+        (tester) async {
+      await _pumpRutinas(tester, links: [
+        _link(id: '1', status: TrainerLinkStatus.active),
+      ], names: {
+        'a1': 'Ana Activa',
+      });
+
+      final subtitle = tester.widget<Text>(
+        find.text('Elegí un alumno para armarle una rutina.'),
+      );
+      expect(subtitle.style?.fontFamily, AppFonts.barlow);
+    });
+
+    testWidgets(
+        'shows shimmer TreinoListRow skeletons keyed "loading" while the '
+        'stream has not emitted yet', (tester) async {
+      final controller = StreamController<List<TrainerLink>>();
+      addTearDown(controller.close);
+
+      await _pumpRutinasWithController(tester, controller);
+
+      expect(find.byKey(const ValueKey('loading')), findsOneWidget);
+      expect(find.byType(TreinoStateSwitcher), findsOneWidget);
+      // Skeletons: TreinoListRow(loading: true) — mismo widget, sin data.
+      expect(find.byType(TreinoListRow), findsWidgets);
+    });
+
+    testWidgets('renders athletes with TreinoListRow', (tester) async {
+      await _pumpRutinas(tester, links: [
+        _link(id: '1', status: TrainerLinkStatus.active, athleteId: 'a1'),
+      ], names: {
+        'a1': 'Ana Activa',
+      });
+
+      expect(find.byKey(const ValueKey('data')), findsOneWidget);
+      expect(find.byType(TreinoListRow), findsOneWidget);
     });
 
     testWidgets(
@@ -132,6 +207,8 @@ void main() {
         (tester) async {
       await _pumpRutinas(tester, links: const []);
 
+      expect(find.byKey(const ValueKey('empty')), findsOneWidget);
+      expect(find.byType(TreinoEmptyState), findsOneWidget);
       expect(
         find.text('Todavía no tenés alumnos vinculados.'),
         findsOneWidget,
