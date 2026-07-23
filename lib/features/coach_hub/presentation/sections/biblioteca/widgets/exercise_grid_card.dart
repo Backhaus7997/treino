@@ -12,12 +12,15 @@ import '../../../../../../core/widgets/treino_icon.dart';
 import '../../../../../workout/domain/exercise.dart';
 import '../../../../../workout/domain/muscle_group.dart';
 import '../../../widgets/coach_hub_widgets.dart';
+import 'exercise_thumbnail.dart';
 
 /// Grid card for a single exercise in the Biblioteca web section.
 ///
 /// Displays:
-/// - Thumbnail (assets/exercises/{id}.png with icon fallback; custom exercises
-///   skip the asset and show the dumbbell icon directly).
+/// - Thumbnail ([ExerciseThumbnail] — imagen de demostración real del
+///   catálogo curado cuando hay match confiable, ícono placeholder si no;
+///   custom exercises skip the resolver and show the accent-tinted dumbbell
+///   icon directly).
 /// - Exercise name (bold, maxLines 2).
 /// - "Músculo · Categoría" subtitle.
 /// - Equipment chip (omitted when null).
@@ -88,19 +91,7 @@ class ExerciseGridCard extends StatelessWidget {
                                 color: palette.accent,
                               ),
                             )
-                          : Image.asset(
-                              'assets/exercises/${exercise.id}.png',
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
-                                color: palette.bgCard,
-                                alignment: Alignment.center,
-                                child: Icon(
-                                  TreinoIcon.dumbbell,
-                                  size: 40,
-                                  color: palette.textMuted,
-                                ),
-                              ),
-                            ),
+                          : ExerciseThumbnail(exercise: exercise),
                     ),
                     // CUSTOM badge top-right
                     if (_isCustom)
