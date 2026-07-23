@@ -1,6 +1,8 @@
 // Tests for AthleteDetailScreen — SCENARIO-455, 456, REQ-SETLOGS-008..010
 // REQ-COACH-PLANS-020, 021, 022
 
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseException;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -795,6 +797,154 @@ void main() {
       expect(find.byType(LogMeasurementScreen), findsOneWidget);
       expect(find.text('GUARDAR CAMBIOS'), findsOneWidget);
       expect(find.text('82'), findsOneWidget); // peso pre-poblado
+    });
+  });
+
+  // ── #503 — el detalle NO puede explotar entero si falla UNA sección ───────
+  //
+  // El bug: `_AthleteDetailBody.build()` gateaba TODO (header, planes,
+  // antropometría, rendimiento, historial, cobro, nota) detrás de
+  // `plansAsync.hasError` / `profileAsync.hasError`, sin scope por sección.
+  // Repro real: el alumno corta con el PF A y se vincula con el PF B; B abre
+  // el detalle antes de que la CF `cleanupAssignedPlansOnUnlink` borre las
+  // rutinas viejas → las rules niegan la query entera → `permission-denied` →
+  // toda la pantalla (incluidos cobro y notas) mostraba la excepción cruda.
+  // Cada sección tiene que degradar sola, como ya hacen antropometría,
+  // rendimiento, historial, cobro y nota.
+
+  group('AthleteDetailScreen — degradación por sección (#503)', () {
+    List<Override> baseOverrides(_MockSessionRepository repo) => [
+          currentUidProvider.overrideWithValue('trainer-1'),
+          sessionsByUidProvider('athlete-1').overrideWith(
+            (ref) async => const [],
+          ),
+          sessionRepositoryProvider.overrideWithValue(repo),
+          exercisesProvider.overrideWith((ref) async => const []),
+        ];
+
+    testWidgets(
+        'un permission-denied en planes degrada SOLO la sección de planes',
+        (tester) async {
+      final repo = _MockSessionRepository();
+      when(() => repo.listByUid('athlete-1')).thenAnswer((_) async => []);
+
+      await _pumpScreen(
+        tester,
+        athleteId: 'athlete-1',
+        overrides: [
+          ...baseOverrides(repo),
+          userPublicProfileProvider('athlete-1').overrideWith(
+            (ref) => Stream.value(_makeProfile('athlete-1', 'Martín García')),
+          ),
+          assignedRoutinesProvider('athlete-1').overrideWith(
+            (ref) => Future<List<Routine>>.error(
+              FirebaseException(
+                plugin: 'cloud_firestore',
+                code: 'permission-denied',
+                message: 'Missing or insufficient permissions.',
+              ),
+            ),
+          ),
+        ],
+      );
+
+      await tester.pumpAndSettle();
+
+      // La sección de planes degrada con un mensaje propio…
+      expect(
+        find.text(
+          'No pudimos cargar los planes. Puede que el vínculo con este '
+          'alumno se haya actualizado recién.',
+        ),
+        findsOneWidget,
+      );
+      // …y ya no filtra la excepción cruda a la UI del PF.
+      expect(find.textContaining('permission-denied'), findsNothing);
+      expect(find.textContaining('FirebaseException'), findsNothing);
+
+      // El resto de la pantalla sigue viva.
+      expect(find.text('Martín García'), findsWidgets);
+      expect(find.text('PLANES ASIGNADOS'), findsOneWidget);
+      expect(find.text('ANTROPOMETRÍA'), findsOneWidget);
+      expect(find.text('MENSAJE'), findsOneWidget);
+      expect(find.text('CREAR PLAN'), findsOneWidget);
+
+      // Cobro y nota viven abajo de todo en el ListView — son justo las
+      // secciones que el gate global se llevaba puestas.
+      await tester.scrollUntilVisible(
+        find.text('NOTA DEL ALUMNO'),
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('COBRO'), findsOneWidget);
+      expect(find.text('NOTA DEL ALUMNO'), findsOneWidget);
+    });
+
+    testWidgets('un error de perfil degrada SOLO el header', (tester) async {
+      final repo = _MockSessionRepository();
+      when(() => repo.listByUid('athlete-1')).thenAnswer((_) async => []);
+
+      await _pumpScreen(
+        tester,
+        athleteId: 'athlete-1',
+        overrides: [
+          ...baseOverrides(repo),
+          userPublicProfileProvider('athlete-1').overrideWith(
+            (ref) => Stream<UserPublicProfile?>.error(
+              FirebaseException(
+                plugin: 'cloud_firestore',
+                code: 'permission-denied',
+              ),
+            ),
+          ),
+          assignedRoutinesProvider('athlete-1').overrideWith(
+            (ref) async => const [],
+          ),
+        ],
+      );
+
+      await tester.pumpAndSettle();
+
+      final l10n = AppL10n.of(tester.element(find.byType(AthleteDetailScreen)));
+
+      // Aviso acotado al header…
+      expect(find.text(l10n.athleteDetailProfileLoadError), findsOneWidget);
+      // …y el resto de la pantalla sigue operativa.
+      expect(find.text('Todavía no le asignaste planes.'), findsOneWidget);
+      expect(find.text('ANTROPOMETRÍA'), findsOneWidget);
+      expect(find.text('CREAR PLAN'), findsOneWidget);
+    });
+
+    testWidgets('planes colgado en loading no bloquea el resto de la pantalla',
+        (tester) async {
+      final repo = _MockSessionRepository();
+      when(() => repo.listByUid('athlete-1')).thenAnswer((_) async => []);
+
+      await _pumpScreen(
+        tester,
+        athleteId: 'athlete-1',
+        overrides: [
+          ...baseOverrides(repo),
+          userPublicProfileProvider('athlete-1').overrideWith(
+            (ref) => Stream.value(_makeProfile('athlete-1', 'Martín García')),
+          ),
+          // Nunca resuelve: simula la query de rutinas colgada.
+          assignedRoutinesProvider('athlete-1').overrideWith(
+            (ref) => Completer<List<Routine>>().future,
+          ),
+        ],
+      );
+
+      await tester.pumpAndSettle();
+
+      // Sin el scope, un plansAsync.isLoading dejaba toda la pantalla en un
+      // spinner infinito (y pumpAndSettle ni siquiera podía asentar).
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.text('PLANES ASIGNADOS'), findsOneWidget);
+      expect(find.text('ANTROPOMETRÍA'), findsOneWidget);
+      expect(find.text('CREAR PLAN'), findsOneWidget);
     });
   });
 }
