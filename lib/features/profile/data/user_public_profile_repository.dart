@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart'
-    show CollectionReference, FieldPath, FirebaseFirestore, SetOptions;
+    show CollectionReference, FieldPath, FirebaseFirestore, Query, SetOptions;
 
 import '../../gyms/domain/gym.dart' show kNoGymId;
 import '../domain/user_public_profile.dart';
@@ -135,7 +135,8 @@ class UserPublicProfileRepository {
   /// them from every OTHER gym's leaderboard too.
   ///
   /// A gym with zero opted-in athletes simply yields an empty snapshot — not
-  /// an error (spec: Empty States).
+  /// an error (spec: Empty States). So does a gym where every opted-in athlete
+  /// is missing the metric — see [_presenceRequiredMetrics].
   Future<List<UserPublicProfile>> leaderboard({
     required String gymId,
     required String metricField,
@@ -143,15 +144,41 @@ class UserPublicProfileRepository {
   }) async {
     if (gymId.isEmpty || gymId == kNoGymId) return const [];
 
-    final snap = await _col
+    Query<Map<String, Object?>> query = _col
         .where('gymId', isEqualTo: gymId)
-        .where('rankingOptIn', isEqualTo: true)
-        .orderBy(metricField, descending: true)
-        .limit(limit)
-        .get();
+        .where('rankingOptIn', isEqualTo: true);
+
+    if (_presenceRequiredMetrics.contains(metricField)) {
+      // Compiles to a `!= null` filter, which reuses the SAME composite index
+      // the `orderBy` below already requires (gymId ASC, rankingOptIn ASC,
+      // metricField DESC) — no `firestore.indexes.json` change needed.
+      query = query.where(metricField, isNull: false);
+    }
+
+    final snap =
+        await query.orderBy(metricField, descending: true).limit(limit).get();
 
     return snap.docs.map((d) => UserPublicProfile.fromJson(d.data())).toList();
   }
+
+  /// QA-GYM-506 — the metric fields whose `null` means "el atleta no tiene ese
+  /// dato", NOT "cero". Exactly the three [clearRankingMetrics] resets to an
+  /// explicit `null`, which is also what the opt-in backfill leaves behind for
+  /// a lift the athlete never performed.
+  ///
+  /// `orderBy` alone does NOT exclude them: Firestore only skips documents
+  /// where the field is ABSENT, so an explicit `null` still matched the query
+  /// and (under `descending: true`) landed at the tail of the board, where the
+  /// client rendered it as a fabricated "0 kg" PR.
+  ///
+  /// `racha` and `lifetimeVolumeKg` are deliberately NOT in this set: no
+  /// streak IS a 0-day streak and no volume IS 0 kg lifted, so their 0 floor
+  /// is honest and those athletes stay on their boards.
+  static const _presenceRequiredMetrics = {
+    'bestSquatKg',
+    'bestBenchKg',
+    'bestDeadliftKg',
+  };
 
   /// Flips the trainer's `sharedTemplatesWithAthletes` flag. When `true`,
   /// the Firestore rule on `routines` lets any authenticated user read this

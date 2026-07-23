@@ -529,13 +529,20 @@ class _DimensionSection extends StatelessWidget {
           loading: () => _LoadingBlock(palette: palette),
           error: (_, __) => _ErrorBlock(palette: palette),
           data: (profiles) {
-            if (profiles.isEmpty) {
-              return _EmptyLeaderboard(emptyKey: emptyKey, palette: palette);
+            // QA-GYM-506: filtrar ANTES de decidir vacío-vs-tabla, para que un
+            // board donde nadie registró el lift caiga en el estado vacío en
+            // vez de renderizar una tarjeta con cero filas.
+            final entries = rankableEntries(dimension, profiles);
+            if (entries.isEmpty) {
+              return _EmptyLeaderboard(
+                emptyKey: emptyKey,
+                palette: palette,
+                dimension: dimension,
+              );
             }
             return _LeaderboardList(
-              profiles: profiles,
+              entries: entries,
               myUid: myUid,
-              dimension: dimension,
               palette: palette,
             );
           },
@@ -562,38 +569,69 @@ List<int> competitionRanks(List<num> descValues) {
   return ranks;
 }
 
+/// QA-GYM-506: the value [profile] is ranked by on [dimension], or `null` when
+/// the athlete has NO value to rank there at all.
+///
+/// `best<Lift>Kg` is `null` for an athlete who opted into rankings but never
+/// registered that lift — "no aplica", not "0 kg". The old `?? 0` invented a
+/// real-looking PR and, worse, parked every such athlete in a fabricated tie at
+/// the bottom of the board. `racha`/`lifetimeVolumeKg` keep their 0 floor: no
+/// streak IS a 0-day streak, and no volume IS 0 kg lifted.
+num? rankingMetricValue(RankingDimension dimension, UserPublicProfile profile) {
+  switch (dimension) {
+    case RankingDimension.streak:
+      return profile.racha ?? 0;
+    case RankingDimension.volume:
+      return profile.lifetimeVolumeKg;
+    case RankingDimension.squat:
+      return profile.bestSquatKg;
+    case RankingDimension.bench:
+      return profile.bestBenchKg;
+    case RankingDimension.deadlift:
+      return profile.bestDeadliftKg;
+  }
+}
+
+/// One leaderboard row: a profile paired with the metric it ranks on. Built by
+/// [rankableEntries] so the metric is resolved once and can never be `null`
+/// downstream.
+typedef RankedEntry = ({UserPublicProfile profile, num value});
+
+/// QA-GYM-506: drops the profiles with no value on [dimension], preserving the
+/// server-side order of the rest.
+///
+/// [UserPublicProfileRepository.leaderboard] already excludes them in the
+/// query; this is the client-side half of the same rule, so a stale cache, a
+/// doc written before that filter existed, or a provider override in a test
+/// still cannot fabricate a PR nobody lifted.
+List<RankedEntry> rankableEntries(
+  RankingDimension dimension,
+  List<UserPublicProfile> profiles,
+) {
+  final entries = <RankedEntry>[];
+  for (final profile in profiles) {
+    final value = rankingMetricValue(dimension, profile);
+    if (value == null) continue;
+    entries.add((profile: profile, value: value));
+  }
+  return entries;
+}
+
 class _LeaderboardList extends StatelessWidget {
   const _LeaderboardList({
-    required this.profiles,
+    required this.entries,
     required this.myUid,
-    required this.dimension,
     required this.palette,
   });
 
-  final List<UserPublicProfile> profiles;
+  final List<RankedEntry> entries;
   final String myUid;
-  final RankingDimension dimension;
   final AppPalette palette;
-
-  num _metricValue(UserPublicProfile profile) {
-    switch (dimension) {
-      case RankingDimension.streak:
-        return profile.racha ?? 0;
-      case RankingDimension.volume:
-        return profile.lifetimeVolumeKg;
-      case RankingDimension.squat:
-        return profile.bestSquatKg ?? 0;
-      case RankingDimension.bench:
-        return profile.bestBenchKg ?? 0;
-      case RankingDimension.deadlift:
-        return profile.bestDeadliftKg ?? 0;
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
     // QA-GYM-101: puestos con empates compartidos (1, 1, 3) en vez de índice+1.
-    final ranks = competitionRanks([for (final p in profiles) _metricValue(p)]);
+    final ranks = competitionRanks([for (final e in entries) e.value]);
     return Container(
       decoration: BoxDecoration(
         color: palette.bgCard,
@@ -602,15 +640,15 @@ class _LeaderboardList extends StatelessWidget {
       ),
       child: Column(
         children: [
-          for (var i = 0; i < profiles.length; i++) ...[
+          for (var i = 0; i < entries.length; i++) ...[
             if (i > 0)
               Divider(
                   height: 1, color: palette.border, indent: 14, endIndent: 14),
             _LeaderboardRow(
               rank: ranks[i],
-              profile: profiles[i],
-              value: _metricValue(profiles[i]),
-              isMe: profiles[i].uid == myUid,
+              profile: entries[i].profile,
+              value: entries[i].value,
+              isMe: entries[i].profile.uid == myUid,
               palette: palette,
             ),
           ],
@@ -688,10 +726,31 @@ class _LeaderboardRow extends StatelessWidget {
 }
 
 class _EmptyLeaderboard extends StatelessWidget {
-  const _EmptyLeaderboard({required this.emptyKey, required this.palette});
+  const _EmptyLeaderboard({
+    required this.emptyKey,
+    required this.palette,
+    required this.dimension,
+  });
 
   final Key emptyKey;
   final AppPalette palette;
+  final RankingDimension dimension;
+
+  /// QA-GYM-506: a lift board now empties out whenever nobody REGISTERED the
+  /// movement, which is a different thing from nobody having joined the
+  /// rankings — telling an athlete "nadie se sumó" while five gym mates are
+  /// opted in on the Rachas board right above would be plainly false.
+  String get _message {
+    switch (dimension) {
+      case RankingDimension.streak:
+      case RankingDimension.volume:
+        return 'Todavía nadie de tu gym se sumó a este ranking.';
+      case RankingDimension.squat:
+      case RankingDimension.bench:
+      case RankingDimension.deadlift:
+        return 'Todavía nadie de tu gym registró este levantamiento.';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -704,7 +763,7 @@ class _EmptyLeaderboard extends StatelessWidget {
         border: Border.all(color: palette.border),
       ),
       child: Text(
-        'Todavía nadie de tu gym se sumó a este ranking.',
+        _message,
         textAlign: TextAlign.center,
         style: GoogleFonts.barlow(
           fontWeight: FontWeight.w400,
