@@ -4,7 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart'
         DocumentSnapshot,
         FieldValue,
         FirebaseFirestore,
-        Query;
+        Query,
+        Timestamp;
 
 import '../domain/chat.dart';
 import '../domain/media_type.dart';
@@ -51,6 +52,9 @@ class ChatRepository {
   //
   // Idempotente. Si el doc ya existe lo devuelve tal cual; si no, lo crea
   // con createdAt:serverTimestamp + members ordenados.
+  //
+  // #501: nunca desreferencia con `!`. `createdAt` es un serverTimestamp y
+  // puede llegar sin resolver — ver [_chatFromDocOrPending].
 
   Future<Chat> getOrCreate({
     required String selfId,
@@ -58,11 +62,11 @@ class ChatRepository {
   }) async {
     final id = chatIdFor(selfId, otherId);
     final ref = _chats.doc(id);
+    final members = [selfId, otherId]..sort();
     final existing = await ref.get();
     if (existing.exists) {
-      return _chatFromDoc(existing)!;
+      return _chatFromDocOrPending(existing, membersFallback: members);
     }
-    final members = [selfId, otherId]..sort();
     // QA-CHAT-004: firestore.rules only allows the chat when the two members
     // have a real relationship. A friendship is checked by the doc id; a
     // coach↔athlete chat instead needs the id of their active trainer_link
@@ -75,7 +79,7 @@ class ChatRepository {
       if (linkId != null) 'linkId': linkId,
     });
     final created = await ref.get();
-    return _chatFromDoc(created)!;
+    return _chatFromDocOrPending(created, membersFallback: members);
   }
 
   /// Returns the id of the active [TrainerLink] between [self] and [other], or
@@ -213,6 +217,35 @@ class ChatRepository {
     // posterior ya tiene el valor real.
     if (data['createdAt'] == null) return null;
     return Chat.fromJson({...data, 'chatId': snap.id});
+  }
+
+  /// Variante one-shot de [_chatFromDoc] que NUNCA devuelve null.
+  ///
+  /// #501: `createdAt` es un serverTimestamp y queda en null en la cache local
+  /// hasta que el server acusa recibo del write — offline eso puede no pasar
+  /// en toda la sesión. Los streams se dan el lujo de descartar ese doc
+  /// (`whereType`) porque el próximo snapshot lo trae resuelto; [getOrCreate]
+  /// es one-shot y no tiene próximo snapshot: si descarta, el usuario se queda
+  /// sin chat ("no pudimos abrir el chat") por un campo que ni se renderiza.
+  ///
+  /// Por eso el pending se degrada a un Chat provisional: mismos datos del
+  /// doc, con `createdAt` aproximado por el reloj local. Lo que el caller
+  /// necesita es el `chatId` (determinístico, ya lo tenemos) para abrir la
+  /// pantalla; el valor real del server llega en la próxima lectura. No se
+  /// espera ni se reintenta a propósito: offline no hay nada que esperar.
+  Chat _chatFromDocOrPending(
+    DocumentSnapshot<Map<String, Object?>> snap, {
+    required List<String> membersFallback,
+  }) {
+    final resolved = _chatFromDoc(snap);
+    if (resolved != null) return resolved;
+    final data = snap.data() ?? const <String, Object?>{};
+    return Chat.fromJson({
+      ...data,
+      'chatId': snap.id,
+      'members': data['members'] ?? membersFallback,
+      'createdAt': Timestamp.fromDate(DateTime.now().toUtc()),
+    });
   }
 
   Message? _messageFromDoc(DocumentSnapshot<Map<String, Object?>> snap) {
