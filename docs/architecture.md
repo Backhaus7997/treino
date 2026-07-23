@@ -26,7 +26,7 @@ lib/
 │   ├── app.dart                 # MaterialApp.router
 │   ├── router.dart              # go_router con ShellRoute (5 tabs)
 │   └── theme/
-│       ├── app_palette.dart     # AppPalette ThemeExtension (mintMagenta + electricViolet)
+│       ├── app_palette.dart     # AppPalette ThemeExtension (mintMagenta + mintMagentaLight)
 │       ├── app_theme.dart       # ThemeData con Barlow
 │       └── app_background.dart  # Container con ink full-bleed
 ├── core/
