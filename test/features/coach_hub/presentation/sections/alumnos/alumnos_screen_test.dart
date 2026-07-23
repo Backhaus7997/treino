@@ -162,8 +162,11 @@ Future<void> _pump(
   // propósito (TreinoShimmer corre en loop infinito — pumpAndSettle no
   // termina nunca ahí; el caller pumpea manualmente en su lugar).
   bool settle = true,
+  // Ancho lógico de la ventana (px) — default 1200 (wide, breakpoint 900px).
+  // Los tests de responsive lo bajan a <900 para forzar el layout angosto.
+  double width = 1200,
 }) async {
-  tester.view.physicalSize = const Size(1200, 900);
+  tester.view.physicalSize = Size(width, 900);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
@@ -720,7 +723,21 @@ void main() {
         profiles: [_prof('a1', 'Sofía')],
       );
 
-      await tester.tap(find.byKey(const Key('data_table_row_a1')));
+      // Tap sobre el nombre (celda «Alumno», sin InkWell propio) en vez del
+      // centro geométrico de la fila completa (`tester.tap` por Key tapea el
+      // centro del widget): con el breakpoint responsive de esta pieza el
+      // ancho de columna varía, y el centro de la fila puede caer sobre
+      // Rutina/Nutrición (celdas con su propio `InkWell`, que a propósito
+      // absorben el tap y no deben disparar la navegación de la fila — no es
+      // un bug, es el mismo criterio que ya usan esos tests dedicados más
+      // abajo). Tapear el nombre es un target estable independiente del
+      // ancho de columna.
+      await tester.tap(
+        find.descendant(
+          of: find.byKey(const Key('data_table_row_a1')),
+          matching: find.text('Sofía'),
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('DETALLE a1'), findsOneWidget);
@@ -1031,6 +1048,57 @@ void main() {
       await tester.pumpAndSettle();
 
       verifyNever(() => repo.add(any()));
+    });
+  });
+
+  group('AlumnosScreen roster — responsive (breakpoint 900px)', () {
+    testWidgets(
+        'angosto (<900px) → colapsa último entreno/rutina/nutrición/'
+        'vencimiento, mantiene alumno/estado/acciones', (tester) async {
+      await _pump(
+        tester,
+        width: 800,
+        links: [_link('a1', TrainerLinkStatus.active)],
+        profiles: [_prof('a1', 'Sofía')],
+        routinesByAthleteId: {
+          'a1': [_routine('r1')],
+        },
+        plansByAthleteId: {'a1': _plan('a1')},
+      );
+
+      expect(find.text('ALUMNO'), findsOneWidget);
+      expect(find.text('ESTADO'), findsOneWidget);
+      expect(find.text('ACCIONES'), findsOneWidget);
+      expect(find.text('ÚLTIMO ENTRENO'), findsNothing);
+      expect(find.text('Rutina'), findsNothing);
+      expect(find.text('Plan'), findsNothing);
+      expect(find.text('Vence'), findsNothing);
+      // Las celdas de las columnas colapsadas tampoco se renderizan.
+      expect(find.text('Sin entrenos'), findsNothing);
+      expect(find.text('Activa'), findsNothing);
+      expect(find.text('Con plan'), findsNothing);
+      // El núcleo sigue intacto: nombre + estado + acciones rápidas.
+      expect(find.text('Sofía'), findsOneWidget);
+      expect(find.text('Activo'), findsOneWidget);
+      expect(find.byTooltip('Chat'), findsOneWidget);
+    });
+
+    testWidgets('ancho (>=900px, borde inclusive) → muestra todas las columnas',
+        (tester) async {
+      await _pump(
+        tester,
+        width: 900,
+        links: [_link('a1', TrainerLinkStatus.active)],
+        profiles: [_prof('a1', 'Sofía')],
+      );
+
+      expect(find.text('ALUMNO'), findsOneWidget);
+      expect(find.text('ESTADO'), findsOneWidget);
+      expect(find.text('ÚLTIMO ENTRENO'), findsOneWidget);
+      expect(find.text('Rutina'), findsOneWidget);
+      expect(find.text('Plan'), findsOneWidget);
+      expect(find.text('Vence'), findsOneWidget);
+      expect(find.text('ACCIONES'), findsOneWidget);
     });
   });
 }

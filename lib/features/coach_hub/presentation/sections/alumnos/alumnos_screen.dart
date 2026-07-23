@@ -249,55 +249,66 @@ class _RosterFrame extends ConsumerWidget {
 
     final activos = roster.where((e) => e.estado == AlumnoEstado.activo).length;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.s20,
-        vertical: AppSpacing.s20,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          TreinoFadeSlideIn(
-            delay: AppMotion.stagger(0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TreinoSectionHeader(
-                  title: l10n.coachHubAlumnosTitle,
-                  count: roster.length,
+    // Breakpoint responsive (900px, mismo estándar que el resto del hub —
+    // ver `agenda_web_screen.dart`): el `LayoutBuilder` capta el ancho
+    // ANTES del padding horizontal propio de esta sección, igual que el
+    // patrón de agenda, para que el corte coincida con el ancho real de
+    // pantalla/panel y no con el ancho ya recortado por el padding interno.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= 900;
+        return SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.s20,
+            vertical: AppSpacing.s20,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TreinoFadeSlideIn(
+                delay: AppMotion.stagger(0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TreinoSectionHeader(
+                      title: l10n.coachHubAlumnosTitle,
+                      count: roster.length,
+                    ),
+                    const SizedBox(height: AppSpacing.hairline),
+                    Text(
+                      l10n.coachHubAlumnosSummary(roster.length, activos),
+                      style: TextStyle(color: palette.textMuted, fontSize: 13),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: AppSpacing.hairline),
-                Text(
-                  l10n.coachHubAlumnosSummary(roster.length, activos),
-                  style: TextStyle(color: palette.textMuted, fontSize: 13),
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(height: AppSpacing.s18),
+              TreinoFadeSlideIn(
+                delay: AppMotion.stagger(1),
+                child: _FiltroChips(filtro: filtro, countFor: countFor),
+              ),
+              const SizedBox(height: AppSpacing.s12),
+              TreinoFadeSlideIn(
+                delay: AppMotion.stagger(2),
+                child: const _SearchField(),
+              ),
+              const SizedBox(height: AppSpacing.s14),
+              _RosterTable(
+                visibles: visibles,
+                profiles: profiles,
+                gymNameFor: gymNameFor,
+                loading: tableLoading,
+                errorMessage: errorMessage,
+                onRetry: onRetry,
+                wide: wide,
+                emptyMessage: roster.isEmpty
+                    ? l10n.coachHubAlumnosEmpty
+                    : l10n.coachHubAlumnosEmptyFiltered,
+              ),
+            ],
           ),
-          const SizedBox(height: AppSpacing.s18),
-          TreinoFadeSlideIn(
-            delay: AppMotion.stagger(1),
-            child: _FiltroChips(filtro: filtro, countFor: countFor),
-          ),
-          const SizedBox(height: AppSpacing.s12),
-          TreinoFadeSlideIn(
-            delay: AppMotion.stagger(2),
-            child: const _SearchField(),
-          ),
-          const SizedBox(height: AppSpacing.s14),
-          _RosterTable(
-            visibles: visibles,
-            profiles: profiles,
-            gymNameFor: gymNameFor,
-            loading: tableLoading,
-            errorMessage: errorMessage,
-            onRetry: onRetry,
-            emptyMessage: roster.isEmpty
-                ? l10n.coachHubAlumnosEmpty
-                : l10n.coachHubAlumnosEmptyFiltered,
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -401,6 +412,7 @@ class _RosterTable extends ConsumerWidget {
     required this.loading,
     required this.errorMessage,
     required this.emptyMessage,
+    required this.wide,
     this.onRetry,
   });
 
@@ -411,6 +423,16 @@ class _RosterTable extends ConsumerWidget {
   final String? errorMessage;
   final String emptyMessage;
   final VoidCallback? onRetry;
+
+  /// `true` con >=900px de ancho disponible (breakpoint del hub). En angosto
+  /// colapsan las columnas agregadas por esta revisión (último entreno,
+  /// rutina, nutrición, vencimiento) y sólo quedan alumno/estado/acciones —
+  /// las 3 que el mockup original ya trataba como núcleo del roster. Las
+  /// celdas colapsadas siguen viajando en `cellWidgets`/`cells` (no se
+  /// filtran los rows): `CoachHubDataTable` sólo renderiza lo que aparece en
+  /// `columns`, así que basta con no declarar la columna acá — no hace falta
+  /// tocar el kit compartido (prohibido para esta pieza).
+  final bool wide;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -427,45 +449,64 @@ class _RosterTable extends ConsumerWidget {
 
     return CoachHubDataTable(
       columns: [
-        // flex:3 (antes 4) — cede una unidad a la nueva columna Vencimiento;
-        // «Alumno» ya trunca con ellipsis (`_AlumnoCell`), así que absorbe el
-        // recorte sin riesgo de overflow del header («ALUMNO», 6 caracteres,
-        // igual de corto que «ESTADO»/«Rutina», que ya fit en flex:1).
+        // Densidad de fila revisada para esta pieza (responsive-gates): los
+        // flex de TODAS las columnas se recalibraron a un común denominador
+        // más fino (suman 114) — ya no alcanza con enteros chicos (1-4) para
+        // que el header de cada columna respire con las 7 columnas visibles
+        // a la vez en el peor caso (900px, el propio breakpoint: con los
+        // flex 3/1/2/1/1/1/2 originales, el header más largo del roster
+        // («ÚLTIMO ENTRENO») desbordaba por 43px ahí). «Alumno» ya trunca
+        // con ellipsis (`_AlumnoCell`, avatar 36 + gap 12 fijos, el resto es
+        // Flexible) — absorbe el recorte sin riesgo real de overflow (a
+        // diferencia del resto, cuyo header es un `Text` sin ellipsis en el
+        // kit compartido).
         CoachHubColumn(
           key: 'alumno',
           label: l10n.coachHubAlumnosColumnStudent,
-          flex: 3,
+          flex: 14,
         ),
-        // flex:1 (antes 2) — cede una unidad a la nueva columna Nutrición
-        // («Estado» es un header de 6 caracteres, igual de corto que
-        // «Rutina», que ya fit en flex:1; el badge de la celda sigue con
-        // ellipsis vía `_DotLabel`, sin riesgo de overflow ahí).
+        // «ESTADO» (l10n, 6 mayúsculas) necesita más aire que un flex:1
+        // sobre 11 columnas totales — mismo criterio que «Rutina».
         CoachHubColumn(
           key: 'estado',
           label: l10n.coachHubAlumnosColumnStatus,
-          flex: 1,
+          flex: 14,
         ),
-        CoachHubColumn(
-          key: 'ultimoEntreno',
-          label: l10n.coachHubAlumnosColumnLastWorkout,
-          flex: 2,
-        ),
-        const CoachHubColumn(key: 'rutina', label: 'Rutina', flex: 1), // i18n
-        // Header corto ("Plan") en vez de "Nutrición": el ancho de columna
-        // disponible (flex compartido con el resto de la fila, sin
-        // ellipsis en `_HeaderCell` del kit) no entra con la palabra
-        // completa — el chip de la celda ("Con plan"/"Sin plan") ya deja
-        // clara la semántica.
-        const CoachHubColumn(key: 'nutricion', label: 'Plan', flex: 1), // i18n
-        // Header corto ("Vence") por la misma razón que "Plan"/"Rutina": el
-        // total de flex de la fila se mantiene en 11 (recortando 1 de
-        // «Alumno») para no encoger el resto de columnas ya validado contra
-        // overflow del header (ver Learned de la pieza col-nutricion).
-        const CoachHubColumn(key: 'vencimiento', label: 'Vence', flex: 1),
+        // Responsive (breakpoint 900px): último entreno/rutina/nutrición/
+        // vencimiento colapsan en angosto — alumno/estado/acciones quedan
+        // como el núcleo siempre visible del roster. En angosto hay bastante
+        // menos flex total compitiendo por el ancho disponible, así que cada
+        // columna que queda se lleva más espacio relativo aunque comparta
+        // los mismos números de flex que en ancho (mismo mecanismo de
+        // `Expanded(flex:)` del kit, sin tocarlo).
+        if (wide) ...[
+          // «ÚLTIMO ENTRENO» (l10n, 14 caracteres con espacio) es el header
+          // más largo del roster — el que más flex necesita.
+          CoachHubColumn(
+            key: 'ultimoEntreno',
+            label: l10n.coachHubAlumnosColumnLastWorkout,
+            flex: 27,
+          ),
+          const CoachHubColumn(
+              key: 'rutina', label: 'Rutina', flex: 14), // i18n
+          // Header corto ("Plan") en vez de "Nutrición": el ancho de columna
+          // disponible (flex compartido con el resto de la fila, sin
+          // ellipsis en `_HeaderCell` del kit) no entra con la palabra
+          // completa — el chip de la celda ("Con plan"/"Sin plan") ya deja
+          // clara la semántica. "Plan" (4 caracteres) es el header más corto
+          // del roster — el que menos flex necesita.
+          const CoachHubColumn(
+              key: 'nutricion', label: 'Plan', flex: 12), // i18n
+          // Header corto ("Vence") por la misma razón que "Plan"/"Rutina".
+          const CoachHubColumn(key: 'vencimiento', label: 'Vence', flex: 13),
+        ],
+        // «ACCIONES» (l10n) + hasta 5 icon-buttons en la fila (pieza
+        // «acciones» previa) — necesita el flex más alto después de
+        // «Último entreno» para que los 5 íconos no se apiñen.
         CoachHubColumn(
           key: 'acciones',
           label: l10n.coachHubAlumnosColumnActions,
-          flex: 2,
+          flex: 20,
         ),
       ],
       rows: [
@@ -656,13 +697,10 @@ class _RutinaCell extends ConsumerWidget {
     final routines =
         ref.watch(assignedRoutinesProvider(athleteId)).valueOrNull ?? const [];
     final activa = routines.any((r) => r.status == RoutineStatus.active);
-    return InkWell(
-      borderRadius: BorderRadius.circular(AppRadius.sm),
+    return _TappableDotLabel(
+      color: activa ? palette.accent : palette.textMuted,
+      label: activa ? 'Activa' : 'Sin rutina', // i18n
       onTap: () => context.go('/rutinas/$athleteId'),
-      child: _DotLabel(
-        color: activa ? palette.accent : palette.textMuted,
-        label: activa ? 'Activa' : 'Sin rutina', // i18n
-      ),
     );
   }
 }
@@ -695,13 +733,10 @@ class _NutricionCell extends ConsumerWidget {
       }
     }
     final conPlan = entry != null && !entry.planLoading && entry.plan != null;
-    return InkWell(
-      borderRadius: BorderRadius.circular(AppRadius.sm),
+    return _TappableDotLabel(
+      color: conPlan ? palette.accent : palette.textMuted,
+      label: conPlan ? 'Con plan' : 'Sin plan', // i18n
       onTap: () => context.go('/alumnos/$athleteId'),
-      child: _DotLabel(
-        color: conPlan ? palette.accent : palette.textMuted,
-        label: conPlan ? 'Con plan' : 'Sin plan', // i18n
-      ),
     );
   }
 }
@@ -805,6 +840,65 @@ class _DotLabel extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Variante tappable de [_DotLabel] — usada por `_RutinaCell`/
+/// `_NutricionCell` (tap navega a otra pantalla, absorbiendo el gesto para
+/// que no dispare el `onRowTap` de la fila).
+///
+/// A diferencia de envolver `InkWell(child: _DotLabel(...))` (como antes de
+/// la pieza responsive-gates), acá el `Align` queda AFUERA del `InkWell`: el
+/// `InkWell` sólo envuelve el `Row` de contenido (`mainAxisSize: min`), así
+/// que su área tappable es del tamaño del dot+label, no de toda la celda. El
+/// `Align` (fuera) sigue posicionando ese contenido angosto a la izquierda
+/// dentro del ancho completo de la columna. Bug real encontrado al recalibrar
+/// los flex de columna para el breakpoint de 900px: con `InkWell` envolviendo
+/// `_DotLabel` (que internamente ya usaba `Align`), el `InkWell` heredaba el
+/// ancho COMPLETO de la celda (el `Align` interno se expande a llenar el
+/// espacio tight que le da el `Padding`/`Expanded` del kit) — cualquier tap
+/// en el espacio vacío a la derecha del label (no sólo sobre el texto) caía
+/// dentro del `InkWell` y navegaba, en vez de burbujear al tap de la fila.
+/// Eso rompió un test pre-existente (tap en el centro de la fila, que ahora
+/// caía dentro de la columna Rutina/Nutrición al mover los flex).
+class _TappableDotLabel extends StatelessWidget {
+  const _TappableDotLabel({
+    required this.color,
+    required this.label,
+    required this.onTap,
+  });
+
+  final Color color;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        onTap: onTap,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: AppSpacing.hairline + AppSpacing.hairline),
+            Flexible(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: color, fontSize: 13),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
