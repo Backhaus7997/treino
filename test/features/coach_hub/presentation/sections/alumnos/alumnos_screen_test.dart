@@ -16,8 +16,10 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/features/coach/application/nutrition_plan_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/data/trainer_link_repository.dart';
+import 'package:treino/features/coach/domain/nutrition_plan.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/alumnos/alumnos_screen.dart';
@@ -39,10 +41,16 @@ import 'package:treino/features/workout/domain/session_status.dart';
 
 class _MockRepo extends Mock implements TrainerLinkRepository {}
 
+// Trainer fijo del roster de test — usado tanto en `TrainerLink.trainerId`
+// como en el override de `currentUidProvider` que consume
+// `nutricionEntriesProvider` para armar la key de `nutritionPlanProvider`
+// (columna «Nutrición»).
+const _trainerId = 't1';
+
 TrainerLink _link(String athleteId, TrainerLinkStatus status, {String? id}) =>
     TrainerLink(
       id: id ?? 'l_$athleteId',
-      trainerId: 't1',
+      trainerId: _trainerId,
       athleteId: athleteId,
       status: status,
       requestedAt: DateTime.utc(2026, 1, 1),
@@ -81,6 +89,18 @@ Routine _routine(String id, {RoutineStatus status = RoutineStatus.active}) =>
       status: status,
     );
 
+/// Plan de nutrición del alumno — usada para overridear
+/// `nutritionPlanProvider` (columna «Nutrición», vía `nutricionEntriesProvider`
+/// de Fase 6, reutilizado — no se duplica la agregación).
+NutritionPlan _plan(String athleteId) => NutritionPlan(
+      id: '${_trainerId}_$athleteId',
+      trainerId: _trainerId,
+      athleteId: athleteId,
+      title: 'Plan de $athleteId',
+      updatedAt: DateTime.utc(2026, 1, 5),
+      meals: const [],
+    );
+
 /// Pumpea `AlumnosScreen` detrás de un GoRouter (para que `onRowTap` →
 /// `context.go('/alumnos/:id')` tenga a dónde ir) con los providers stub.
 Future<void> _pump(
@@ -96,6 +116,11 @@ Future<void> _pump(
   Map<String, List<Session>> sessionsInWindowByAthleteId = const {},
   // Rutinas asignadas por athleteId (columna «Rutina»).
   Map<String, List<Routine>> routinesByAthleteId = const {},
+  // Plan de nutrición por athleteId (columna «Nutrición»). Los alumnos que
+  // no aparecen acá quedan en `null` (Fase 6: "sin plan") — evita que
+  // `nutricionEntriesProvider` pegue contra el repo real (sin Firebase en
+  // los tests).
+  Map<String, NutritionPlan?> plansByAthleteId = const {},
   TrainerLinkRepository? repo,
   // `false` para casos donde el stream de links queda colgado en loading a
   // propósito (TreinoShimmer corre en loop infinito — pumpAndSettle no
@@ -147,6 +172,15 @@ Future<void> _pump(
           (ref, athleteId) async =>
               routinesByAthleteId[athleteId] ?? const <Routine>[],
         ),
+        currentUidProvider.overrideWithValue(_trainerId),
+        for (final athleteId in {
+          for (final l in links ?? const []) l.athleteId
+        })
+          nutritionPlanProvider(
+            (trainerId: _trainerId, athleteId: athleteId),
+          ).overrideWith(
+            (ref) => Stream.value(plansByAthleteId[athleteId]),
+          ),
         if (repo != null) trainerLinkRepositoryProvider.overrideWithValue(repo),
       ],
       child: MaterialApp.router(
@@ -581,6 +615,48 @@ void main() {
 
       expect(find.text('RUTINAS a1'), findsOneWidget);
       expect(find.text('DETALLE a1'), findsNothing);
+    });
+  });
+
+  group('AlumnosScreen roster — columna Nutrición', () {
+    testWidgets('alumno con plan de nutrición → chip "Con plan"',
+        (tester) async {
+      await _pump(
+        tester,
+        links: [_link('a1', TrainerLinkStatus.active)],
+        profiles: [_prof('a1', 'Sofía')],
+        plansByAthleteId: {'a1': _plan('a1')},
+      );
+
+      expect(find.text('Con plan'), findsOneWidget);
+    });
+
+    testWidgets('alumno sin plan de nutrición → chip "Sin plan"',
+        (tester) async {
+      await _pump(
+        tester,
+        links: [_link('a1', TrainerLinkStatus.active)],
+        profiles: [_prof('a1', 'Sofía')],
+      );
+
+      expect(find.text('Sin plan'), findsOneWidget);
+    });
+
+    testWidgets(
+        'tap en el chip Nutrición navega a /alumnos/:id sin disparar '
+        'la navegación de la fila (mismo destino, no duplica evento)',
+        (tester) async {
+      await _pump(
+        tester,
+        links: [_link('a1', TrainerLinkStatus.active)],
+        profiles: [_prof('a1', 'Sofía')],
+        plansByAthleteId: {'a1': _plan('a1')},
+      );
+
+      await tester.tap(find.text('Con plan'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('DETALLE a1'), findsOneWidget);
     });
   });
 }

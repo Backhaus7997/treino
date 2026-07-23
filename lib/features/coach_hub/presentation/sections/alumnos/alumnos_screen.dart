@@ -10,6 +10,7 @@ import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
+import 'package:treino/features/coach_hub/presentation/sections/nutricion/nutricion_providers.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
 import '../../../../../l10n/app_l10n.dart';
@@ -422,10 +423,14 @@ class _RosterTable extends ConsumerWidget {
           label: l10n.coachHubAlumnosColumnStudent,
           flex: 4,
         ),
+        // flex:1 (antes 2) — cede una unidad a la nueva columna Nutrición
+        // («Estado» es un header de 6 caracteres, igual de corto que
+        // «Rutina», que ya fit en flex:1; el badge de la celda sigue con
+        // ellipsis vía `_DotLabel`, sin riesgo de overflow ahí).
         CoachHubColumn(
           key: 'estado',
           label: l10n.coachHubAlumnosColumnStatus,
-          flex: 2,
+          flex: 1,
         ),
         CoachHubColumn(
           key: 'ultimoEntreno',
@@ -433,6 +438,12 @@ class _RosterTable extends ConsumerWidget {
           flex: 2,
         ),
         const CoachHubColumn(key: 'rutina', label: 'Rutina', flex: 1), // i18n
+        // Header corto ("Plan") en vez de "Nutrición": el ancho de columna
+        // disponible (flex compartido con el resto de la fila, sin
+        // ellipsis en `_HeaderCell` del kit) no entra con la palabra
+        // completa — el chip de la celda ("Con plan"/"Sin plan") ya deja
+        // clara la semántica.
+        const CoachHubColumn(key: 'nutricion', label: 'Plan', flex: 1), // i18n
         CoachHubColumn(
           key: 'acciones',
           label: l10n.coachHubAlumnosColumnActions,
@@ -504,6 +515,8 @@ class _RosterTable extends ConsumerWidget {
         ),
         'estado': _EstadoBadge(estado: estado, palette: palette),
         'rutina': _RutinaCell(athleteId: link.athleteId, palette: palette),
+        'nutricion':
+            _NutricionCell(athleteId: link.athleteId, palette: palette),
         'acciones': _RowActions(link: link, palette: palette),
       },
     );
@@ -629,6 +642,45 @@ class _RutinaCell extends ConsumerWidget {
       child: _DotLabel(
         color: activa ? palette.accent : palette.textMuted,
         label: activa ? 'Activa' : 'Sin rutina', // i18n
+      ),
+    );
+  }
+}
+
+/// Celda «Nutrición»: chip compacto (dot + label) que deriva su estado del
+/// overview cross-alumno de Fase 6 (`nutricionEntriesProvider`) — REUTILIZA
+/// esa agregación en vez de cruzar `nutritionPlanProvider` por fila (no
+/// duplica el patrón N-streams ya resuelto ahí, ADR-F6-04). "Con plan" si
+/// existe una entry para este alumno con un `NutritionPlan` resuelto (no
+/// loading); "Sin plan" en cualquier otro caso — incluye ausencia de entry
+/// (alumno no `active`, la agregación sólo cubre vínculos activos), loading
+/// o error (mismo criterio "barato" que `_RutinaCell`/último entreno). Tap
+/// navega al detalle del alumno (`/alumnos/:athleteId`, deep-link al editor
+/// real de Fase 3 — NO se edita en el hub, ADR-F6-03), envuelto en `InkWell`
+/// para que absorba el gesto y no dispare el `onRowTap` de la fila.
+class _NutricionCell extends ConsumerWidget {
+  const _NutricionCell({required this.athleteId, required this.palette});
+
+  final String athleteId;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final entries = ref.watch(nutricionEntriesProvider).valueOrNull ?? const [];
+    NutricionEntry? entry;
+    for (final e in entries) {
+      if (e.link.athleteId == athleteId) {
+        entry = e;
+        break;
+      }
+    }
+    final conPlan = entry != null && !entry.planLoading && entry.plan != null;
+    return InkWell(
+      borderRadius: BorderRadius.circular(AppRadius.sm),
+      onTap: () => context.go('/alumnos/$athleteId'),
+      child: _DotLabel(
+        color: conPlan ? palette.accent : palette.textMuted,
+        label: conPlan ? 'Con plan' : 'Sin plan', // i18n
       ),
     );
   }
