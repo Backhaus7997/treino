@@ -99,11 +99,19 @@ final todaysRoutineProvider = FutureProvider.autoDispose<TodaysRoutine?>(
       weekNumber = 0;
     } else {
       nextDayNumber = (lastFinished.dayNumber % numDays) + 1;
-      // Week rolls over only when day wraps. numWeeks defaults to 1 so the
-      // modulo is a no-op for non-periodized plans.
+      // Runtime guard: a corrupt/legacy Firestore doc with an EXPLICIT
+      // `numWeeks: 0` bypasses the `?? 1` in the generated fromJson (which
+      // only covers an ABSENT field), and `% 0` throws
+      // IntegerDivisionByZeroException — killing the card's "empezar en 1 tap".
+      // A negative value doesn't throw but yields an out-of-range week.
+      // Treat anything <= 0 as 1, same criterion as `derivePlanProgress`
+      // (plan_progress.dart) and `SessionNotifier._buildFresh`.
+      final numWeeks = routine.numWeeks > 0 ? routine.numWeeks : 1;
+      // Week rolls over only when day wraps. numWeeks is 1 for non-periodized
+      // plans, so the modulo is a no-op there.
       final rolledOver = lastFinished.dayNumber >= numDays;
       weekNumber = rolledOver
-          ? (lastFinished.weekNumber + 1) % routine.numWeeks
+          ? (lastFinished.weekNumber + 1) % numWeeks
           : lastFinished.weekNumber;
     }
 
