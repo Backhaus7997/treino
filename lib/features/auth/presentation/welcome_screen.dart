@@ -38,7 +38,12 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     final authState = ref.watch(authNotifierProvider);
-    final isLoading = authState.isLoading;
+    // El spinner del botón tapeado sigue girando después de un OAuth exitoso:
+    // la pantalla queda montada hasta que `authRedirect` resuelve el perfil, y
+    // un botón que vuelve a su glifo en ese hueco lee como que el tap no hizo
+    // nada (issue #499). Estando logueado en una ruta pública el único
+    // desenlace es el redirect.
+    final isLoading = authState.isLoading || authState.valueOrNull != null;
     final failure = authState.hasError && authState.error is AuthFailure
         ? authState.error as AuthFailure
         : null;
@@ -277,25 +282,26 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
     );
   }
 
+  // La navegación post-OAuth NO vive acá: la resuelve `authRedirect`
+  // (app/router.dart). Ni bien authNotifier emite el user, RouterRefreshNotifier
+  // re-dispara el redirect; ese gate se bloquea mientras userProfileProvider
+  // carga y recién con el snapshot real manda a /profile-setup (alta nueva por
+  // OAuth) o a /home (usuario existente). El viejo `context.go('/home')` manual
+  // corría una carrera contra ese stream: adelantaba el redirect, HomeScreen
+  // alcanzaba a pintar y el gate rebotaba a /profile-setup — flicker visible en
+  // el 100% de los registros nuevos (issue #499). Mismo criterio que ya se
+  // aplicó en ProfileSetupFlow (audit F3).
+
   Future<void> _signInWithGoogle() async {
-    // No intent gating on Welcome — both new and existing users land in /home.
+    // No intent gating on Welcome — el mismo botón sirve para alta y para
+    // login; el destino lo decide el redirect según el perfil que llegue.
     setState(() => _pendingProvider = _SocialProvider.google);
     await ref.read(authNotifierProvider.notifier).signInWithGoogle();
-    if (!mounted) return;
-    final s = ref.read(authNotifierProvider);
-    if (s.hasValue && s.valueOrNull != null) {
-      context.go('/home');
-    }
   }
 
   Future<void> _signInWithApple() async {
     setState(() => _pendingProvider = _SocialProvider.apple);
     await ref.read(authNotifierProvider.notifier).signInWithApple();
-    if (!mounted) return;
-    final s = ref.read(authNotifierProvider);
-    if (s.hasValue && s.valueOrNull != null) {
-      context.go('/home');
-    }
   }
 
   Widget _headlineLine(AppPalette palette,

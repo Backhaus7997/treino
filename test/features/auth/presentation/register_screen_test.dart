@@ -176,9 +176,17 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
-  // Scenario 1.1: happy path → /home
+  // Scenario 1.1: happy path → la pantalla NO navega sola.
+  //
+  // El `context.go('/home')` manual se sacó en issue #499: adelantaba el
+  // redirect del router y HomeScreen flasheaba antes del rebote a
+  // /profile-setup — que en un alta nueva es SIEMPRE el destino real. Acá el
+  // router del test no tiene redirect, así que un alta exitosa tiene que dejar
+  // todo quieto. La navegación end-to-end (contra el `authRedirect` real) se
+  // cubre en post_login_navigation_test.dart.
   // ---------------------------------------------------------------------------
-  testWidgets('scenario 1.1 — happy path navigates to /home', (tester) async {
+  testWidgets('scenario 1.1 — happy path delega la navegación en authRedirect',
+      (tester) async {
     final notifier = _TestAuthNotifier();
     notifier.onSignUp = (email, password) async {
       notifier.state = AsyncData(mockUser);
@@ -198,11 +206,23 @@ void main() {
     await tester.tap(find.byType(Checkbox));
     await tester.pump();
 
+    // Sin pumpAndSettle: el CTA queda en loading hasta que el router mueve al
+    // usuario, y el spinner es una animación infinita.
     await tester.ensureVisible(find.byType(AuthPillButton));
     await tester.tap(find.byType(AuthPillButton));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump();
 
-    expect(find.text('HOME'), findsOneWidget);
+    expect(find.text('HOME'), findsNothing,
+        reason: 'la pantalla no puede navegar a mano (issue #499)');
+    expect(
+      find.descendant(
+        of: find.byType(AuthPillButton),
+        matching: find.byType(CircularProgressIndicator),
+      ),
+      findsOneWidget,
+      reason: 'el CTA sigue en loading hasta que el redirect resuelve',
+    );
   });
 
   // ---------------------------------------------------------------------------

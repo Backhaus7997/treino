@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../l10n/app_l10n.dart';
+import '../../profile/application/user_providers.dart';
 import '../application/auth_providers.dart';
 import 'widgets/treino_logo.dart';
 
@@ -27,10 +28,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   }
 
   Future<void> _navigate() async {
-    // Wait only for auth to resolve — no artificial minimum delay (audit Q8:
-    // the 1500ms was an accidental placeholder, not a brand requirement). The
-    // router's authRedirect does NOT move users off /splash (it is a public
-    // route with no redirect rule for it), so this manual navigation is
+    // Wait for auth (and, when logged in, for the profile) to resolve — no
+    // artificial minimum delay (audit Q8: the 1500ms was an accidental
+    // placeholder, not a brand requirement). The router's authRedirect does NOT
+    // move a user with a COMPLETE profile off /splash (it is a public route
+    // excluded from the `/public → /home` rule), so this manual navigation is
     // load-bearing — without it the splash would never hand off.
     if (_hasError && mounted) {
       setState(() => _hasError = false);
@@ -49,11 +51,30 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     if (!mounted) return;
 
     final user = ref.read(authNotifierProvider).valueOrNull;
-    if (user != null) {
-      context.go('/home');
-    } else {
+    if (user == null) {
       context.go('/welcome');
+      return;
     }
+
+    // Esperamos TAMBIÉN al perfil antes de mandar a /home. authRedirect bloquea
+    // el redirect mientras userProfileProvider carga, así que un `go('/home')`
+    // acá se adelantaría al gate: HomeScreen alcanza a pintar y recién después
+    // el snapshot rebota a /profile-setup — flicker visible en el 100% de los
+    // registros nuevos (issue #499). Con el snapshot ya resuelto, el redirect se
+    // evalúa con el dato real y /profile-setup queda resuelto en la MISMA
+    // navegación, sin frame intermedio de Home.
+    //
+    // Si el stream del perfil falla navegamos igual: authRedirect trata un
+    // perfil ausente como incompleto y manda a /profile-setup. Preferible a
+    // dejar al usuario clavado en el splash por un error de Firestore.
+    try {
+      await ref.read(userProfileProvider.future);
+    } catch (_) {
+      // Intencional: el redirect decide con lo que haya.
+    }
+    if (!mounted) return;
+
+    context.go('/home');
   }
 
   @override
