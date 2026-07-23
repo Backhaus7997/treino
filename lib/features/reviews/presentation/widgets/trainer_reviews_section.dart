@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../l10n/app_l10n.dart';
 import '../../../profile/application/user_public_profile_providers.dart';
 import '../../application/review_providers.dart';
 import 'review_tile.dart';
@@ -21,14 +22,14 @@ class TrainerReviewsSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final reviewsAsync = ref.watch(trainerReviewsProvider(trainerId));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          // i18n: Fase 6 Etapa 7
-          'RESEÑAS',
+          l10n.reviewsSectionTitle,
           style: GoogleFonts.barlowCondensed(
             fontWeight: FontWeight.w700,
             fontSize: 14,
@@ -43,8 +44,7 @@ class TrainerReviewsSection extends ConsumerWidget {
           data: (reviews) {
             if (reviews.isEmpty) {
               return Text(
-                // i18n: Fase 6 Etapa 7
-                'Sin reseñas todavía',
+                l10n.reviewsSectionEmpty,
                 style: GoogleFonts.barlow(
                   fontSize: 13,
                   color: palette.textMuted,

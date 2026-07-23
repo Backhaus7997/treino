@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../l10n/app_l10n.dart';
 import '../../../feed/presentation/widgets/post_avatar.dart';
 import '../../../profile/application/user_public_profile_providers.dart';
 import '../../../profile/domain/user_public_profile.dart';
@@ -44,20 +45,17 @@ class ReviewTile extends ConsumerWidget {
 
   /// Returns a human-readable relative date string.
   /// Format: "hace X días" / "hace X meses" / "DD/MM/YYYY" (>1 year).
-  static String _formatRelativeDate(DateTime date) {
+  static String _formatRelativeDate(AppL10n l10n, DateTime date) {
     final now = DateTime.now();
     final diff = now.difference(date);
     final days = diff.inDays;
     if (days < 1) {
-      // i18n: Fase 6 Etapa 7
-      return 'hoy';
+      return l10n.reviewTileDateToday;
     } else if (days < 30) {
-      // i18n: Fase 6 Etapa 7
-      return 'hace $days ${days == 1 ? 'día' : 'días'}';
+      return l10n.reviewTileDateDaysAgo(days);
     } else if (days < 365) {
       final months = (days / 30).floor();
-      // i18n: Fase 6 Etapa 7
-      return 'hace $months ${months == 1 ? 'mes' : 'meses'}';
+      return l10n.reviewTileDateMonthsAgo(months);
     } else {
       // DD/MM/YYYY for > 1 year
       return '${date.day.toString().padLeft(2, '0')}/'
@@ -86,12 +84,12 @@ class ReviewTile extends ConsumerWidget {
 
   Widget _content(BuildContext context, UserPublicProfile? profile) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
 
     // ADR-RV-009: the deleted-account signal is a null profile, NOT a null
     // displayName. A live profile with an avatar but no name still shows its
     // avatar; only a missing profile falls back to "Usuario eliminado".
-    // i18n: Fase 6 Etapa 7
-    final name = profile?.displayName ?? 'Usuario eliminado';
+    final name = profile?.displayName ?? l10n.reviewTileDeletedUser;
     final avatarUrl = profile?.avatarUrl;
 
     return Padding(
@@ -125,7 +123,7 @@ class ReviewTile extends ConsumerWidget {
                 ),
               ),
               Text(
-                _formatRelativeDate(review.createdAt),
+                _formatRelativeDate(l10n, review.createdAt),
                 style: GoogleFonts.barlow(
                   fontSize: 11,
                   color: palette.textMuted,

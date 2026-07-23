@@ -2498,7 +2498,10 @@ class AppL10nEn extends AppL10n {
 
   @override
   String dashboardAlertBannerSummary(
-      int vencidos, int solicitudes, int inactivos) {
+    int vencidos,
+    int solicitudes,
+    int inactivos,
+  ) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,
@@ -2717,4 +2720,237 @@ class AppL10nEn extends AppL10n {
   @override
   String get volumeByGroupEmptyTarget =>
       'You need an assigned routine to see your target volume.';
+
+  @override
+  String get measurementChartSectionLabel => 'PROGRESS';
+
+  @override
+  String measurementChartSpanDays(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'days',
+      one: 'day',
+    );
+    return '($count $_temp0)';
+  }
+
+  @override
+  String measurementChartSpanWeeks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'weeks',
+      one: 'week',
+    );
+    return '($count $_temp0)';
+  }
+
+  @override
+  String get measurementChartMetricWeight => 'Weight';
+
+  @override
+  String get measurementChartMetricBodyFat => 'Body fat %';
+
+  @override
+  String get measurementChartMetricMuscleMass => 'Muscle mass';
+
+  @override
+  String get measurementChartMetricWaist => 'Waist';
+
+  @override
+  String get measurementChartMetricChest => 'Chest';
+
+  @override
+  String get measurementChartMetricHips => 'Hips';
+
+  @override
+  String get measurementChartMetricShoulders => 'Shoulders';
+
+  @override
+  String get measurementChartMetricGlutes => 'Glutes';
+
+  @override
+  String get measurementChartMetricBiceps => 'Biceps';
+
+  @override
+  String get measurementChartMetricBicepsFlexed => 'Biceps flex';
+
+  @override
+  String get measurementChartMetricForearm => 'Forearm';
+
+  @override
+  String get measurementChartMetricUpperThigh => 'Upper thigh';
+
+  @override
+  String get measurementChartMetricMidThigh => 'Mid thigh';
+
+  @override
+  String get measurementChartMetricCalf => 'Calf';
+
+  @override
+  String get measurementLogTitleCreate => 'Log measurement';
+
+  @override
+  String get measurementLogTitleEdit => 'Edit measurement';
+
+  @override
+  String get measurementLogNoSession => 'No active session. Can\'t save.';
+
+  @override
+  String get measurementLogSaveSuccess => 'Measurement saved';
+
+  @override
+  String get measurementLogUpdateSuccess => 'Measurement updated';
+
+  @override
+  String get measurementLogSaveError =>
+      'We couldn\'t save the measurement. Try again.';
+
+  @override
+  String get measurementLogSaveCta => 'SAVE MEASUREMENT';
+
+  @override
+  String get measurementLogUpdateCta => 'SAVE CHANGES';
+
+  @override
+  String get measurementLogSectionBodyComposition => 'BODY COMPOSITION';
+
+  @override
+  String get measurementLogSectionNotes => 'NOTES';
+
+  @override
+  String get measurementLogNotesHint => 'Trainer notes…';
+
+  @override
+  String get measurementLogFieldWeight => 'Weight (kg)';
+
+  @override
+  String get measurementLogFieldBodyFat => 'Body fat (%)';
+
+  @override
+  String get measurementLogFieldMuscleMass => 'Muscle mass (kg)';
+
+  @override
+  String get measurementLogCircumferencesTitle => 'CIRCUMFERENCES';
+
+  @override
+  String get measurementLogCircumferencesHint =>
+      'Optional. Log the ones you want.';
+
+  @override
+  String get measurementLogGroupTrunk => 'TRUNK';
+
+  @override
+  String get measurementLogGroupUpperBody => 'UPPER BODY';
+
+  @override
+  String get measurementLogGroupLowerBody => 'LOWER BODY';
+
+  @override
+  String get measurementLogFieldShoulders => 'Shoulders';
+
+  @override
+  String get measurementLogFieldChest => 'Chest';
+
+  @override
+  String get measurementLogFieldWaist => 'Waist';
+
+  @override
+  String get measurementLogFieldHips => 'Hips';
+
+  @override
+  String get measurementLogFieldGlutes => 'Glutes';
+
+  @override
+  String get measurementLogFieldBiceps => 'Biceps';
+
+  @override
+  String get measurementLogFieldBicepsFlexed => 'Biceps (flexed)';
+
+  @override
+  String get measurementLogFieldForearm => 'Forearm';
+
+  @override
+  String get measurementLogFieldUpperThigh => 'Upper thigh';
+
+  @override
+  String get measurementLogFieldMidThigh => 'Mid thigh';
+
+  @override
+  String get measurementLogFieldCalf => 'Calf';
+
+  @override
+  String get measurementLogBilateralLeftHint => 'L (cm)';
+
+  @override
+  String get measurementLogBilateralRightHint => 'R (cm)';
+
+  @override
+  String get reviewSheetTitleEdit => 'Edit your review';
+
+  @override
+  String reviewSheetTitleThirtyDay(String trainerName) {
+    return 'You\'ve been training with $trainerName for a month. How\'s it going?';
+  }
+
+  @override
+  String reviewSheetTitleStandard(String trainerName) {
+    return 'How was your experience with $trainerName?';
+  }
+
+  @override
+  String get reviewSheetCommentHint => 'Tell us how it went (optional)';
+
+  @override
+  String get reviewSheetCancel => 'CANCEL';
+
+  @override
+  String get reviewSheetSubmit => 'SUBMIT';
+
+  @override
+  String get reviewSnackBarError => 'We couldn\'t save your review. Try again.';
+
+  @override
+  String get reviewCtaCreate => 'LEAVE A REVIEW';
+
+  @override
+  String get reviewCtaEdit => 'EDIT MY REVIEW';
+
+  @override
+  String get reviewTrainerFallbackName => 'your personal trainer';
+
+  @override
+  String get reviewsSectionTitle => 'REVIEWS';
+
+  @override
+  String get reviewsSectionEmpty => 'No reviews yet';
+
+  @override
+  String get reviewTileDeletedUser => 'Deleted user';
+
+  @override
+  String get reviewTileDateToday => 'today';
+
+  @override
+  String reviewTileDateDaysAgo(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count days',
+      one: '1 day',
+    );
+    return '$_temp0 ago';
+  }
+
+  @override
+  String reviewTileDateMonthsAgo(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count months',
+      one: '1 month',
+    );
+    return '$_temp0 ago';
+  }
 }

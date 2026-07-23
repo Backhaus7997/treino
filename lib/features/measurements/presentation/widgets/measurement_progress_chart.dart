@@ -30,7 +30,8 @@ class _ChartMetric {
     required this.extractor,
   });
 
-  final String label;
+  /// Resolves the display label for the active locale.
+  final String Function(AppL10n) label;
   final String unit;
   final double? Function(Measurement) extractor;
 }
@@ -38,76 +39,91 @@ class _ChartMetric {
 /// All candidate metrics in preferred display order.
 const _kAllMetrics = <_ChartMetric>[
   _ChartMetric(
-    label: 'Peso',
+    label: _labelWeight,
     unit: 'kg',
     extractor: _extractWeight,
   ),
   _ChartMetric(
-    label: '% Graso',
+    label: _labelFat,
     unit: '%',
     extractor: _extractFat,
   ),
   _ChartMetric(
-    label: 'Masa muscular',
+    label: _labelMuscle,
     unit: 'kg',
     extractor: _extractMuscle,
   ),
   _ChartMetric(
-    label: 'Cintura',
+    label: _labelWaist,
     unit: 'cm',
     extractor: _extractWaist,
   ),
   _ChartMetric(
-    label: 'Pecho',
+    label: _labelChest,
     unit: 'cm',
     extractor: _extractChest,
   ),
   _ChartMetric(
-    label: 'Cadera',
+    label: _labelHips,
     unit: 'cm',
     extractor: _extractHips,
   ),
   _ChartMetric(
-    label: 'Hombros',
+    label: _labelShoulders,
     unit: 'cm',
     extractor: _extractShoulders,
   ),
   _ChartMetric(
-    label: 'Glúteos',
+    label: _labelGlutes,
     unit: 'cm',
     extractor: _extractGlutes,
   ),
   _ChartMetric(
-    label: 'Bíceps',
+    label: _labelBiceps,
     unit: 'cm',
     extractor: _extractBiceps,
   ),
   _ChartMetric(
-    label: 'Bíceps flex',
+    label: _labelBicepsFlexed,
     unit: 'cm',
     extractor: _extractBicepsFlexed,
   ),
   _ChartMetric(
-    label: 'Antebrazo',
+    label: _labelForearm,
     unit: 'cm',
     extractor: _extractForearm,
   ),
   _ChartMetric(
-    label: 'Muslo sup',
+    label: _labelUpperThigh,
     unit: 'cm',
     extractor: _extractUpperThigh,
   ),
   _ChartMetric(
-    label: 'Muslo medio',
+    label: _labelMidThigh,
     unit: 'cm',
     extractor: _extractMidThigh,
   ),
   _ChartMetric(
-    label: 'Gemelo',
+    label: _labelCalf,
     unit: 'cm',
     extractor: _extractCalf,
   ),
 ];
+
+String _labelWeight(AppL10n l) => l.measurementChartMetricWeight;
+String _labelFat(AppL10n l) => l.measurementChartMetricBodyFat;
+String _labelMuscle(AppL10n l) => l.measurementChartMetricMuscleMass;
+String _labelWaist(AppL10n l) => l.measurementChartMetricWaist;
+String _labelChest(AppL10n l) => l.measurementChartMetricChest;
+String _labelHips(AppL10n l) => l.measurementChartMetricHips;
+String _labelShoulders(AppL10n l) => l.measurementChartMetricShoulders;
+String _labelGlutes(AppL10n l) => l.measurementChartMetricGlutes;
+String _labelBiceps(AppL10n l) => l.measurementChartMetricBiceps;
+String _labelBicepsFlexed(AppL10n l) => l.measurementChartMetricBicepsFlexed;
+String _labelForearm(AppL10n l) => l.measurementChartMetricForearm;
+String _labelUpperThigh(AppL10n l) => l.measurementChartMetricUpperThigh;
+String _labelMidThigh(AppL10n l) => l.measurementChartMetricMidThigh;
+String _labelCalf(AppL10n l) => l.measurementChartMetricCalf;
 
 double? _extractWeight(Measurement m) => m.weightKg;
 double? _extractFat(Measurement m) => m.fatPercentage;
@@ -128,11 +144,11 @@ double? _extractCalf(Measurement m) => _avg(m.calfLCm, m.calfRCm);
 
 // ── Weeks / days delta helper ─────────────────────────────────────────────────
 
-String _spanLabel(DateTime first, DateTime last) {
+String _spanLabel(AppL10n l10n, DateTime first, DateTime last) {
   final days = last.difference(first).inDays.abs();
-  if (days < 7) return '($days ${days == 1 ? "día" : "días"})';
+  if (days < 7) return l10n.measurementChartSpanDays(days);
   final weeks = (days / 7).round();
-  return '($weeks ${weeks == 1 ? "semana" : "semanas"})';
+  return l10n.measurementChartSpanWeeks(weeks);
 }
 
 // ── Public widget ─────────────────────────────────────────────────────────────
@@ -172,8 +188,10 @@ class _MeasurementProgressChartState extends State<MeasurementProgressChart> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.measurements != widget.measurements) {
       _available = _buildAvailable(widget.measurements);
-      // Keep current selection if still valid, else reset
-      final stillValid = _available.any((m) => m.label == _selected.label);
+      // Keep current selection if still valid, else reset. Metrics are const
+      // instances from [_kAllMetrics], so identity comparison is stable — and
+      // unlike the localized label, it does not change with the locale.
+      final stillValid = _available.any((m) => identical(m, _selected));
       if (!stillValid) _selected = _available.first;
     }
   }
@@ -207,7 +225,8 @@ class _MeasurementProgressChartState extends State<MeasurementProgressChart> {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final localeName = AppL10n.of(context).localeName;
+    final l10n = AppL10n.of(context);
+    final localeName = l10n.localeName;
     final points = _dataPoints();
 
     return Container(
@@ -223,7 +242,7 @@ class _MeasurementProgressChartState extends State<MeasurementProgressChart> {
         children: [
           // ── Section label ──────────────────────────────────────────────
           Text(
-            'PROGRESO',
+            l10n.measurementChartSectionLabel,
             style: GoogleFonts.barlowCondensed(
               fontWeight: FontWeight.w700,
               fontSize: 12,
@@ -238,13 +257,19 @@ class _MeasurementProgressChartState extends State<MeasurementProgressChart> {
             available: _available,
             selected: _selected,
             palette: palette,
+            l10n: l10n,
             onSelect: (m) => setState(() => _selected = m),
           ),
           const SizedBox(height: 12),
 
           // ── Header: current value + delta ──────────────────────────────
           if (points.isNotEmpty)
-            _ChartHeader(points: points, metric: _selected, palette: palette),
+            _ChartHeader(
+              points: points,
+              metric: _selected,
+              palette: palette,
+              l10n: l10n,
+            ),
           const SizedBox(height: 12),
 
           // ── Line chart ─────────────────────────────────────────────────
@@ -269,12 +294,14 @@ class _MetricChipRow extends StatelessWidget {
     required this.available,
     required this.selected,
     required this.palette,
+    required this.l10n,
     required this.onSelect,
   });
 
   final List<_ChartMetric> available;
   final _ChartMetric selected;
   final AppPalette palette;
+  final AppL10n l10n;
   final void Function(_ChartMetric) onSelect;
 
   @override
@@ -287,8 +314,9 @@ class _MetricChipRow extends StatelessWidget {
             if (i > 0) const SizedBox(width: 6),
             _Chip(
               metric: available[i],
-              isSelected: available[i].label == selected.label,
+              isSelected: identical(available[i], selected),
               palette: palette,
+              l10n: l10n,
               onTap: () => onSelect(available[i]),
             ),
           ],
@@ -303,12 +331,14 @@ class _Chip extends StatelessWidget {
     required this.metric,
     required this.isSelected,
     required this.palette,
+    required this.l10n,
     required this.onTap,
   });
 
   final _ChartMetric metric;
   final bool isSelected;
   final AppPalette palette;
+  final AppL10n l10n;
   final VoidCallback onTap;
 
   @override
@@ -325,7 +355,7 @@ class _Chip extends StatelessWidget {
           ),
         ),
         child: Text(
-          metric.label,
+          metric.label(l10n),
           style: GoogleFonts.barlow(
             fontSize: 12,
             fontWeight: FontWeight.w600,
@@ -344,11 +374,13 @@ class _ChartHeader extends StatelessWidget {
     required this.points,
     required this.metric,
     required this.palette,
+    required this.l10n,
   });
 
   final List<({int idx, double value, Measurement m})> points;
   final _ChartMetric metric;
   final AppPalette palette;
+  final AppL10n l10n;
 
   @override
   Widget build(BuildContext context) {
@@ -357,7 +389,7 @@ class _ChartHeader extends StatelessWidget {
     final delta = last.value - first.value;
     final absDelta = delta.abs();
     final glyph = delta >= 0 ? '▲' : '▼';
-    final span = _spanLabel(first.m.recordedAt, last.m.recordedAt);
+    final span = _spanLabel(l10n, first.m.recordedAt, last.m.recordedAt);
     final currentStr = last.value % 1 == 0
         ? last.value.toStringAsFixed(0)
         : last.value.toStringAsFixed(1);
