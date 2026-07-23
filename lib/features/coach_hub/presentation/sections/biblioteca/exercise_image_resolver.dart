@@ -6,13 +6,9 @@ library;
 import '../../../../workout/application/exercise_filter.dart' show foldSearch;
 import 'exercise_media_catalog.dart';
 
-/// Sufijo de equipamiento: un único grupo `(...)` pegado al final del
-/// nombre, con espacio opcional antes (ej. `"Sentadilla (Barra)"`).
-/// Precompilado a nivel de librería — NUNCA construir un `RegExp` dentro de
-/// [exerciseImageUrl] (se llama por card, potencialmente por frame).
-final RegExp _trailingEquipmentSuffix = RegExp(r'\s*\([^)]*\)\s*$');
-
-/// Espacios (uno o más) — también precompilado, mismo motivo.
+/// Espacios (uno o más) — precompilado a nivel de librería. NUNCA construir
+/// un `RegExp` dentro de [exerciseImageUrl] (se llama por card,
+/// potencialmente por frame).
 final RegExp _whitespaceRun = RegExp(r'\s+');
 
 /// Resuelve la URL de imagen de demostración de un ejercicio del catálogo,
@@ -20,33 +16,26 @@ final RegExp _whitespaceRun = RegExp(r'\s+');
 ///
 /// Función pura — sin dependencias de Flutter/BuildContext, testeable con
 /// `package:test`. Devuelve `null` cuando no hay match confiable (ejercicios
-/// CUSTOM, o del catálogo sin media de confianza alta/media) — el caller
-/// debe caer al ícono placeholder, JAMÁS mostrar una imagen equivocada.
+/// CUSTOM, o del catálogo sin verificación visual) — el caller debe caer al
+/// ícono placeholder, JAMÁS mostrar una imagen equivocada.
 ///
-/// Resolución en capas:
-/// (a) lookup exacto contra [exerciseMediaCatalog];
-/// (b) si el nombre trae un sufijo de equipamiento `(...)`, lookup de la
-///     base (nombre sin ese sufijo) contra [exerciseMediaBaseCatalog]
-///     (SOLO bases inequívocas — un único ejercicio fuente por base, ver
-///     `scripts/generate_exercise_media_catalog.py`);
-/// (c) sin match confiable → `null`.
+/// Lookup EXACTO únicamente contra [exerciseMediaCatalog] — NO hay fallback
+/// por "nombre base"/variante de equipamiento. Una ronda anterior tuvo ese
+/// fallback (bases inequívocas del catálogo), pero una verificación visual
+/// imagen-por-imagen (ver `scripts/exercise_media_verified.json`) demostró
+/// que variantes de equipamiento (ej. "Curl de Bíceps (Barra)" vs
+/// "(Mancuerna)" vs "(Polea)") casi nunca pueden compartir imagen sin
+/// mostrar el equipamiento equivocado — se removió el fallback.
 ///
-/// Fuente de datos: [exerciseMediaCatalog] + [exerciseMediaBaseCatalog]
-/// (generados por `scripts/generate_exercise_media_catalog.py` desde
-/// `docs/exercises_catalog.json`, solo entradas `has_media == true &&
-/// media_confidence` en `{"high", "medium"}`).
+/// Fuente de datos: [exerciseMediaCatalog] (generado por
+/// `scripts/generate_exercise_media_catalog.py` desde
+/// `docs/exercises_catalog.json`, filtrado por
+/// `scripts/exercise_media_verified.json` — SOLO ejercicios cuya foto fue
+/// verificada visualmente como correcta, sin importar `media_confidence`).
 String? exerciseImageUrl(String nombre) {
   final key = _normalizeExerciseKey(nombre);
   if (key.isEmpty) return null;
-
-  final exact = exerciseMediaCatalog[key];
-  if (exact != null) return exact;
-
-  final withoutEquipment = _stripEquipmentSuffix(nombre);
-  if (withoutEquipment == null) return null;
-  final baseKey = _normalizeExerciseKey(withoutEquipment);
-  if (baseKey.isEmpty) return null;
-  return exerciseMediaBaseCatalog[baseKey];
+  return exerciseMediaCatalog[key];
 }
 
 /// Normalización de clave — DEBE mantenerse en paridad con `normalize_key`
@@ -60,15 +49,4 @@ String? exerciseImageUrl(String nombre) {
 String _normalizeExerciseKey(String input) {
   final folded = foldSearch(input);
   return folded.replaceAll(_whitespaceRun, ' ').trim();
-}
-
-/// Remueve un sufijo de equipamiento final `(...)` de [input] — DEBE
-/// mantenerse en paridad con `base_key` en
-/// `scripts/generate_exercise_media_catalog.py`.
-///
-/// Devuelve `null` cuando [input] NO trae ese sufijo (nada que remover), así
-/// [exerciseImageUrl] sabe cuándo el paso (b) no aplica.
-String? _stripEquipmentSuffix(String input) {
-  if (!_trailingEquipmentSuffix.hasMatch(input)) return null;
-  return input.replaceFirst(_trailingEquipmentSuffix, '');
 }
