@@ -40,8 +40,11 @@
  * ────────────────────────────────────────────────────────────────────────────
  * SAFETY
  * ────────────────────────────────────────────────────────────────────────────
- * - Uses {merge: true} — existing fields in userPublicProfiles are NOT
- *   overwritten if the users/{uid} doc is missing a field.
+ * - Uses {merge: true} AND omits every key the users/{uid} doc doesn't have.
+ *   Both halves matter: merge only preserves keys ABSENT from the payload, so
+ *   sending `avatarUrl: null` would still wipe an existing public avatar.
+ *   Absent private field → key omitted → existing public value untouched.
+ * - Never deletes a public field. Clearing one is a deliberate, separate op.
  * - Logs progress every 100 documents.
  * - Halts on any Firestore error — fix the error and re-run (idempotent).
  * - Processes users in batches of 500 (Firestore WriteBatch limit).
@@ -99,17 +102,27 @@ async function backfill() {
     for (const doc of snapshot.docs) {
       const data = doc.data();
       const uid = data.uid ?? doc.id;
-      const displayName = data.displayName ?? null;
-      const publicData = {
-        uid,
-        displayName,
-        displayNameLowercase:
+      const displayName = data.displayName;
+
+      // Only include keys the source `users/{uid}` doc actually has.
+      // `{merge: true}` preserves keys that are ABSENT from the payload — it
+      // does NOT protect a key written as `null`. Building the object with
+      // all 5 keys always present therefore clobbered an existing public
+      // `avatarUrl`/`gymId`/`displayName` whenever the private doc lacked it.
+      const publicData = { uid };
+      if (displayName !== undefined && displayName !== null) {
+        publicData.displayName = displayName;
+        publicData.displayNameLowercase =
           typeof displayName === 'string'
             ? displayName.trim().toLowerCase()
-            : null,
-        avatarUrl: data.avatarUrl ?? null,
-        gymId: data.gymId ?? null,
-      };
+            : null;
+      }
+      if (data.avatarUrl !== undefined && data.avatarUrl !== null) {
+        publicData.avatarUrl = data.avatarUrl;
+      }
+      if (data.gymId !== undefined && data.gymId !== null) {
+        publicData.gymId = data.gymId;
+      }
 
       batch.set(publicProfilesRef.doc(uid), publicData, { merge: true });
       processedCount++;
