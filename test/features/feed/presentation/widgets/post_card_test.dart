@@ -159,6 +159,37 @@ void main() {
       expect(timestampFinder, findsAtLeastNWidgets(1));
     });
 
+    // Regression #500: la fecha absoluta (>7d) se formatea en zona local.
+    // createdAt viaja en UTC (Post.createdAt -> toUtc()); leer .day/.month
+    // sobre el instante UTC adelanta un día todo post nocturno en zonas de
+    // offset negativo — Argentina (UTC-3) es el mercado objetivo.
+    testWidgets(
+        'fecha absoluta (>7d) usa el día local, no el UTC '
+        '[tz-local-date-regression]', (tester) async {
+      // 02:30 UTC: en ART cae a las 23:30 del día ANTERIOR. Hora elegida a
+      // propósito (no medianoche por inercia): es justo el caso que rompe.
+      final utcInstant = DateTime.now()
+          .toUtc()
+          .subtract(const Duration(days: 10))
+          .copyWith(hour: 2, minute: 30, second: 0, millisecond: 0);
+
+      // El esperado sale del MISMO instante convertido a local, así el test
+      // vale en cualquier zona del runner y solo se pone rojo donde el bug
+      // realmente se manifiesta.
+      final local = utcInstant.toLocal();
+      final expected = '${local.day.toString().padLeft(2, '0')}/'
+          '${local.month.toString().padLeft(2, '0')}';
+
+      final post = makePost(createdAt: utcInstant);
+      await tester.pumpWidget(_wrap(PostCard(post: post)));
+      await tester.pump();
+
+      final dateFinder = find.byWidgetPredicate(
+        (w) => w is Text && w.data != null && w.data!.contains(expected),
+      );
+      expect(dateFinder, findsAtLeastNWidgets(1));
+    });
+
     // SCENARIO-169: body text rendered
     testWidgets('SCENARIO-169: renders post body text', (tester) async {
       final post = makePost(text: 'Gran sesión hoy');
