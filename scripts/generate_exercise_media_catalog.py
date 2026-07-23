@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# EXPLORACIÓN ARCHIVADA 2026-07-23: el producto usa placeholder de marca; ver
+# git log para el contexto. Este script y `exercise_media_verified.json` se
+# conservan committeados como registro histórico de la exploración de
+# imágenes de red para Biblioteca (rondas 3-5 de la revisión "imágenes de
+# ejercicios en Biblioteca"), pero YA NO se ejecutan en el flujo de
+# producción — `exercise_grid_card.dart` ya no consume ningún catálogo
+# generado por este script (ver `_BrandPlaceholder` en ese archivo).
 """Genera el catálogo Dart de imágenes de ejercicios de Biblioteca (Coach Hub web).
 
 Lee DOS fuentes:
