@@ -2,10 +2,14 @@ import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../../../app/theme/app_palette.dart';
+import '../../../../../../app/theme/tokens/primitives.dart';
+import '../../../../../../core/widgets/motion/treino_shimmer.dart';
+import '../../../../../../core/widgets/motion/treino_state_switcher.dart';
+import '../../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../../../core/widgets/treino_icon.dart';
 import '../../../../../chat/application/chat_providers.dart';
 import '../../../../../chat/domain/media_type.dart';
@@ -13,6 +17,7 @@ import '../../../../../chat/domain/message.dart';
 import '../../../../../profile/application/user_public_profile_providers.dart';
 import '../../../../../workout/application/session_providers.dart'
     show currentUidProvider;
+import '../../../widgets/coach_hub_widgets.dart';
 import 'chat_message_bubble.dart';
 
 /// Panel derecho del split-pane: header con el otro user + lista invertida
@@ -122,7 +127,12 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
               leading: Icon(TreinoIcon.image, color: palette.textPrimary),
               title: Text(
                 'Foto', // i18n: Fase W2
-                style: GoogleFonts.barlow(color: palette.textPrimary),
+                style: TextStyle(
+                  fontFamily: AppFonts.barlow,
+                  fontWeight: AppFonts.w400,
+                  fontSize: 14,
+                  color: palette.textPrimary,
+                ),
               ),
               onTap: () => Navigator.of(ctx).pop(MediaType.image),
             ),
@@ -131,7 +141,12 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
               leading: Icon(TreinoIcon.play, color: palette.textPrimary),
               title: Text(
                 'Video', // i18n: Fase W2
-                style: GoogleFonts.barlow(color: palette.textPrimary),
+                style: TextStyle(
+                  fontFamily: AppFonts.barlow,
+                  fontWeight: AppFonts.w400,
+                  fontSize: 14,
+                  color: palette.textPrimary,
+                ),
               ),
               onTap: () => Navigator.of(ctx).pop(MediaType.video),
             ),
@@ -230,23 +245,27 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
           _Header(chatId: widget.chatId),
           const Divider(height: 1),
           Expanded(
-            child: messagesAsync.when(
-              loading: () => Center(
-                child: CircularProgressIndicator(color: palette.accent),
-              ),
-              error: (_, __) => Center(
-                child: Text(
-                  'No pudimos cargar los mensajes.', // i18n: Fase W2
-                  style: GoogleFonts.barlow(
-                    fontWeight: FontWeight.w400,
-                    fontSize: 13,
-                    color: palette.textMuted,
-                  ),
+            child: TreinoStateSwitcher(
+              childKey: ValueKey(_messagesStateKey(messagesAsync)),
+              child: messagesAsync.when(
+                loading: () => const _MessagesSkeleton(),
+                error: (_, __) => const TreinoEmptyState(
+                  icon: TreinoIcon.errorState,
+                  title: 'No pudimos cargar los mensajes.', // i18n: Fase W2
                 ),
-              ),
-              data: (messages) => _MessagesList(
-                messages: messages,
-                currentUid: currentUid ?? '',
+                data: (messages) {
+                  if (messages.isEmpty) {
+                    return const TreinoEmptyState(
+                      icon: TreinoIcon.chatEmpty,
+                      title: 'Sin mensajes todavía', // i18n: Fase W2
+                      description: 'Escribí el primero abajo.', // i18n: Fase W2
+                    );
+                  }
+                  return _MessagesList(
+                    messages: messages,
+                    currentUid: currentUid ?? '',
+                  );
+                },
               ),
             ),
           ),
@@ -269,6 +288,114 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
       ),
     );
   }
+}
+
+/// Discrimina el estado actual del stream de mensajes para
+/// [TreinoStateSwitcher] — mismo patrón que `_ChatListPaneState._stateKey`.
+String _messagesStateKey(AsyncValue<List<Message>> messagesAsync) {
+  if (messagesAsync.hasError) return 'error';
+  if (messagesAsync.isLoading && !messagesAsync.hasValue) return 'loading';
+  return 'data';
+}
+
+/// Skeleton de carga de la lista de mensajes — burbujas placeholder
+/// alternando alineación izquierda/derecha, envueltas en [TreinoShimmer], en
+/// vez del `CircularProgressIndicator` seco anterior.
+class _MessagesSkeleton extends StatelessWidget {
+  const _MessagesSkeleton();
+
+  static const _widths = [220.0, 160.0, 200.0];
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return TreinoShimmer(
+      child: ListView(
+        key: const Key('chat_messages_skeleton'),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.s20,
+          vertical: AppSpacing.s18,
+        ),
+        children: [
+          for (var i = 0; i < _widths.length; i++) ...[
+            if (i > 0) const SizedBox(height: AppSpacing.s12),
+            Align(
+              // Alterna izq/der para insinuar la conversación sin datos
+              // reales — misma idea que el shimmer de la lista de chats.
+              alignment:
+                  i.isEven ? Alignment.centerLeft : Alignment.centerRight,
+              child: Container(
+                width: _widths[i],
+                height: 36,
+                decoration: BoxDecoration(
+                  color: palette.bgCard,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Separador de fecha centrado entre mensajes de días distintos (mockup:
+/// "HOY - 23 ABR"). Solo formato de presentación — sin llamadas a backend.
+class _DateSeparator extends StatelessWidget {
+  const _DateSeparator({super.key, required this.date});
+
+  final DateTime date;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.s12),
+      child: Center(
+        child: Text(
+          _formatDateSeparatorLabel(date),
+          style: TextStyle(
+            fontFamily: AppFonts.barlow,
+            fontWeight: AppFonts.w600,
+            fontSize: 11,
+            letterSpacing: 0.4,
+            color: palette.textMuted,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// `HOY - 23 ABR` / `AYER - 22 ABR` / `20 ABR` (sin label para días más
+  /// viejos) — locale `es`, sin backend, solo formato.
+  static String _formatDateSeparatorLabel(DateTime date) {
+    final now = DateTime.now();
+    final local = date.toLocal();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(local.year, local.month, local.day);
+    final diffDays = today.difference(day).inDays;
+    final dateStr = DateFormat('d MMM', 'es').format(local).toUpperCase();
+    if (diffDays == 0) return 'HOY - $dateStr';
+    if (diffDays == 1) return 'AYER - $dateStr';
+    return dateStr;
+  }
+}
+
+/// `yyyy-MM-dd` local del mensaje — usado como sufijo de [Key] del
+/// separador para que cada día tenga una key distinta dentro del mismo
+/// `ListView.builder` (evita colisión de keys entre hermanos visibles).
+String _dayKeySuffix(DateTime date) {
+  final local = date.toLocal();
+  return '${local.year.toString().padLeft(4, '0')}-'
+      '${local.month.toString().padLeft(2, '0')}-'
+      '${local.day.toString().padLeft(2, '0')}';
+}
+
+bool _isSameDay(DateTime a, DateTime b) {
+  final la = a.toLocal();
+  final lb = b.toLocal();
+  return la.year == lb.year && la.month == lb.month && la.day == lb.day;
 }
 
 /// Header del pane derecho — avatar + displayName del otro user.
@@ -301,8 +428,12 @@ class _Header extends ConsumerWidget {
         : const AsyncValue.data(null);
 
     return Container(
+      key: const Key('chat_detail_header'),
       color: palette.bgCard,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.s20,
+        vertical: AppSpacing.s14,
+      ),
       child: Row(
         children: [
           CircleAvatar(
@@ -321,8 +452,9 @@ class _Header extends ConsumerWidget {
                           (p?.displayName ?? '?').isNotEmpty
                               ? (p?.displayName ?? '?')[0].toUpperCase()
                               : '?',
-                          style: GoogleFonts.barlowCondensed(
-                            fontWeight: FontWeight.w700,
+                          style: TextStyle(
+                            fontFamily: AppFonts.barlowCondensed,
+                            fontWeight: AppFonts.w700,
                             fontSize: 14,
                             color: palette.textMuted,
                           ),
@@ -331,7 +463,7 @@ class _Header extends ConsumerWidget {
               orElse: () => const SizedBox.shrink(),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.s12),
           Expanded(
             child: Text(
               pubAsync.maybeWhen(
@@ -340,8 +472,9 @@ class _Header extends ConsumerWidget {
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.barlow(
-                fontWeight: FontWeight.w600,
+              style: TextStyle(
+                fontFamily: AppFonts.barlow,
+                fontWeight: AppFonts.w600,
                 fontSize: 15,
                 color: palette.textPrimary,
               ),
@@ -356,41 +489,29 @@ class _Header extends ConsumerWidget {
 class _MessagesList extends StatelessWidget {
   const _MessagesList({required this.messages, required this.currentUid});
 
+  /// No-vacío — el thread vacío lo resuelve el `TreinoEmptyState` del
+  /// `.when()` en `_ChatDetailPaneState.build` antes de llegar acá.
   final List<Message> messages;
   final String currentUid;
 
   @override
   Widget build(BuildContext context) {
-    if (messages.isEmpty) {
-      final palette = AppPalette.of(context);
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            'Sin mensajes todavía. Escribí el primero abajo.', // i18n: Fase W2
-            textAlign: TextAlign.center,
-            style: GoogleFonts.barlow(
-              fontWeight: FontWeight.w400,
-              fontSize: 13,
-              color: palette.textMuted,
-            ),
-          ),
-        ),
-      );
-    }
     return ListView.builder(
       // `watchMessages` viene DESC por createdAt — el índice 0 es el más
       // nuevo. `reverse: true` lo pinta abajo, sin tener que invertir la
       // lista en memoria.
       reverse: true,
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.s20,
+        vertical: AppSpacing.s14,
+      ),
       itemCount: messages.length,
       itemBuilder: (context, index) {
         final m = messages[index];
         final hasMedia = m.mediaUrl != null && m.mediaUrl!.isNotEmpty;
         final isImage = hasMedia && m.mediaType == MediaType.image;
         final isVideo = hasMedia && m.mediaType == MediaType.video;
-        return ChatMessageBubble(
+        final bubble = ChatMessageBubble(
           key: ValueKey(m.id),
           text: m.text,
           isOwn: m.senderId == currentUid,
@@ -401,6 +522,26 @@ class _MessagesList extends StatelessWidget {
           videoUrl: isVideo ? m.mediaUrl : null,
           mediaPlaceholderLabel:
               hasMedia && !isImage && !isVideo ? _mediaLabel(m) : null,
+        );
+
+        // Separador arriba del mensaje más viejo de cada día: el último
+        // índice (más viejo del thread) o cuando el próximo índice (más
+        // viejo aún) cae en otro día.
+        final isOldestOfItsDay = index == messages.length - 1 ||
+            !_isSameDay(m.createdAt, messages[index + 1].createdAt);
+        if (!isOldestOfItsDay) return bubble;
+
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _DateSeparator(
+              key: ValueKey('chat_date_separator_${_dayKeySuffix(
+                m.createdAt,
+              )}'),
+              date: m.createdAt,
+            ),
+            bubble,
+          ],
         );
       },
     );
@@ -442,9 +583,19 @@ class _Composer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Único gate de estado del composer: `sending` llega ya combinado
+    // (`_sending || _uploading`) desde `_ChatDetailPaneState.build` — acá
+    // solo lo traducimos a los tres widgets interactivos (adjuntar, campo,
+    // enviar).
+    final fieldEnabled = !sending;
     return Container(
       color: palette.bgCard,
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.s20,
+        AppSpacing.s12,
+        AppSpacing.s20,
+        AppSpacing.s14,
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
@@ -466,7 +617,7 @@ class _Composer extends StatelessWidget {
               padding: EdgeInsets.zero,
             ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: AppSpacing.hairline),
           Expanded(
             child: TextField(
               key: const Key('chat_composer_field'),
@@ -475,61 +626,112 @@ class _Composer extends StatelessWidget {
               maxLines: 6,
               textInputAction: TextInputAction.send,
               onSubmitted: (_) => onSend(),
-              enabled: !sending,
-              style: GoogleFonts.barlow(
+              enabled: fieldEnabled,
+              style: TextStyle(
+                fontFamily: AppFonts.barlow,
                 fontWeight: FontWeight.w400,
                 fontSize: 14,
                 color: palette.textPrimary,
               ),
               decoration: InputDecoration(
                 hintText: 'Escribí un mensaje…', // i18n: Fase W2
-                hintStyle: GoogleFonts.barlow(
+                hintStyle: TextStyle(
+                  fontFamily: AppFonts.barlow,
                   fontWeight: FontWeight.w400,
                   fontSize: 14,
                   color: palette.textMuted,
                 ),
                 filled: true,
-                fillColor: palette.bg,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                // Apagado con tokens mientras sending: fill semitransparente
+                // en vez de un segundo color hardcodeado.
+                fillColor: fieldEnabled
+                    ? palette.bg
+                    : palette.bg.withValues(alpha: 0.6),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.s14,
+                  vertical: AppSpacing.s12,
+                ),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
                   borderSide: BorderSide(color: palette.border),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
                   borderSide: BorderSide(color: palette.border),
                 ),
+                disabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                  borderSide: BorderSide(
+                    color: palette.border.withValues(alpha: 0.5),
+                  ),
+                ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
                   borderSide: BorderSide(color: palette.accent),
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 6),
-          IconButton(
-            key: const Key('chat_send_button'),
-            icon: sending
-                ? SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: palette.accent,
-                    ),
-                  )
-                : Icon(
-                    TreinoIcon.send,
-                    size: 20,
-                    color: palette.accent,
-                  ),
-            onPressed: sending ? null : onSend,
-            constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-            padding: EdgeInsets.zero,
+          const SizedBox(width: AppSpacing.hairline),
+          // TreinoTappable REEMPLAZA el IconButton (no lo envuelve): con
+          // `onTap: null` (sending) devuelve el child pelado sin gesture —
+          // mismo comportamiento disabled que `onPressed: null` antes, más
+          // el feedback de escala 0.97 al presionar cuando está habilitado.
+          //
+          // Semantics(button:true, label:'Enviar') explícito porque
+          // TreinoTappable es un GestureDetector puro (sin rol ni label
+          // propios) — sin este wrapper el CTA principal del composer no se
+          // anuncia como botón para lectores de pantalla (remediación
+          // adversarial WARNING-1).
+          Semantics(
+            button: true,
+            enabled: !sending,
+            label: 'Enviar', // i18n: Fase W2
+            child: TreinoTappable(
+              key: const Key('chat_send_button'),
+              onTap: sending ? null : onSend,
+              child: Container(
+                constraints:
+                    const BoxConstraints(minWidth: 40, minHeight: 40),
+                alignment: Alignment.center,
+                child: sending
+                    ? SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: palette.accent,
+                        ),
+                      )
+                    : Icon(
+                        TreinoIcon.send,
+                        size: 20,
+                        color: palette.accent,
+                      ),
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 }
+
+/// Expone [_Composer] a tests de widget (WU-08) sin hacerlo público — el
+/// resto del árbol de `chat_detail_pane.dart` sigue armándolo desde
+/// `_ChatDetailPaneState.build`, este helper es solo para tests.
+@visibleForTesting
+Widget chatDetailPaneComposerForTest({
+  required TextEditingController controller,
+  required bool sending,
+  required VoidCallback onSend,
+  required VoidCallback onAttach,
+  required AppPalette palette,
+}) =>
+    _Composer(
+      controller: controller,
+      sending: sending,
+      onSend: onSend,
+      onAttach: onAttach,
+      palette: palette,
+    );
