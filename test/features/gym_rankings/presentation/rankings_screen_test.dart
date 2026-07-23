@@ -33,6 +33,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/gym_rankings/application/ranking_providers.dart';
+import 'package:treino/features/gym_rankings/domain/ranking_dimension.dart';
 import 'package:treino/features/gym_rankings/presentation/rankings_screen.dart';
 import 'package:treino/features/gyms/domain/gym.dart' show kNoGymId;
 import 'package:treino/features/profile/application/ranking_optin_controller_provider.dart';
@@ -256,6 +257,95 @@ void main() {
       await tester.pump();
 
       expect(find.byType(CircularProgressIndicator), findsWidgets);
+    });
+
+    // ────────────────────────────────────────────────────────────────────
+    // QA-GYM-506 — un lift que el atleta nunca registró es `null`
+    // ("no aplica"), NO 0 kg. Ver `rankingMetricValue`.
+    // ────────────────────────────────────────────────────────────────────
+    group('QA-GYM-506: lifts never registered', () {
+      testWidgets(
+          'athletes with no squat PR are dropped from the board instead of '
+          'rendering a fabricated "0"', (tester) async {
+        await tester.pumpWidget(_buildScreen(
+          overrides: baseOverrides(
+            squat: [
+              _rankedProfile(uid: 'u2', displayName: 'Lu', bestSquatKg: 120),
+              _rankedProfile(uid: 'u3', displayName: 'Coti', bestSquatKg: 100),
+              _rankedProfile(uid: 'u4', displayName: 'Ana'),
+              _rankedProfile(uid: 'u5', displayName: 'Nico'),
+              _rankedProfile(uid: 'u6', displayName: 'Sofi'),
+            ],
+          ),
+        ));
+        await tester.pumpAndSettle();
+
+        expect(find.text('120'), findsOneWidget);
+        expect(find.text('100'), findsOneWidget);
+        // Los 3 sin sentadilla no aparecen — ni como fila ni como "0 kg".
+        expect(find.text('0'), findsNothing);
+        expect(find.text('Ana'), findsNothing);
+        expect(find.text('Nico'), findsNothing);
+        expect(find.text('Sofi'), findsNothing);
+        expect(find.byKey(const Key('rankings_row_u4')), findsNothing);
+      });
+
+      testWidgets(
+          'a gym where nobody registered the lift falls through to the empty '
+          'state, not a podium of zeros', (tester) async {
+        await tester.pumpWidget(_buildScreen(
+          overrides: baseOverrides(
+            squat: [
+              _rankedProfile(uid: 'u2', displayName: 'Lu'),
+              _rankedProfile(uid: 'u3', displayName: 'Coti'),
+            ],
+          ),
+        ));
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const Key('rankings_empty_squat')), findsOneWidget);
+        expect(find.text('Lu'), findsNothing);
+        expect(find.text('0'), findsNothing);
+      });
+
+      testWidgets(
+          'QA-GYM-101 still holds after the null rows are dropped: survivors '
+          'tied on the metric share a rank', (tester) async {
+        await tester.pumpWidget(_buildScreen(
+          overrides: baseOverrides(
+            squat: [
+              _rankedProfile(uid: 'u2', displayName: 'Lu', bestSquatKg: 120),
+              _rankedProfile(uid: 'u3', displayName: 'Coti', bestSquatKg: 120),
+              _rankedProfile(uid: 'u4', displayName: 'Ana', bestSquatKg: 90),
+              _rankedProfile(uid: 'u5', displayName: 'Nico'),
+            ],
+          ),
+        ));
+        await tester.pumpAndSettle();
+
+        expect(find.text('1'), findsNWidgets(2));
+        expect(find.text('2'), findsNothing);
+        expect(find.text('3'), findsOneWidget);
+        expect(find.byKey(const Key('rankings_row_u5')), findsNothing);
+      });
+
+      testWidgets(
+          'the empty lift board says nobody REGISTERED the lift — "nadie se '
+          'sumó" would be false with opted-in athletes on the board',
+          (tester) async {
+        await tester.pumpWidget(_buildScreen(overrides: baseOverrides()));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text('Todavía nadie de tu gym registró este levantamiento.'),
+          findsOneWidget,
+        );
+        // Rachas/Volumen conservan el copy genérico.
+        expect(
+          find.text('Todavía nadie de tu gym se sumó a este ranking.'),
+          findsNWidgets(2),
+        );
+      });
     });
 
     // ────────────────────────────────────────────────────────────────────
@@ -518,6 +608,64 @@ void main() {
     });
     test('empty → []', () {
       expect(competitionRanks(<num>[]), <int>[]);
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────
+  // QA-GYM-506 — pure metric/filter unit tests (no widget pumping).
+  // ──────────────────────────────────────────────────────────────────────
+  group('rankingMetricValue (QA-GYM-506)', () {
+    test('a lift never registered is null, NOT 0', () {
+      const profile = UserPublicProfile(uid: 'u1', rankingOptIn: true);
+      expect(rankingMetricValue(RankingDimension.squat, profile), isNull);
+      expect(rankingMetricValue(RankingDimension.bench, profile), isNull);
+      expect(rankingMetricValue(RankingDimension.deadlift, profile), isNull);
+    });
+
+    test('a registered lift returns its weight', () {
+      const profile = UserPublicProfile(uid: 'u1', bestSquatKg: 120);
+      expect(rankingMetricValue(RankingDimension.squat, profile), 120);
+    });
+
+    test('streak and volume keep their 0 floor', () {
+      const profile = UserPublicProfile(uid: 'u1');
+      expect(rankingMetricValue(RankingDimension.streak, profile), 0);
+      expect(rankingMetricValue(RankingDimension.volume, profile), 0);
+    });
+  });
+
+  group('rankableEntries (QA-GYM-506)', () {
+    test('drops the profiles with no value on the dimension, keeping order',
+        () {
+      const withPr = UserPublicProfile(uid: 'u1', bestSquatKg: 120);
+      const withoutPr = UserPublicProfile(uid: 'u2');
+
+      final entries =
+          rankableEntries(RankingDimension.squat, [withPr, withoutPr]);
+
+      expect(entries.map((e) => e.profile.uid), ['u1']);
+      expect(entries.single.value, 120);
+    });
+
+    test('keeps everyone on a dimension with a legitimate 0 floor', () {
+      const withStreak = UserPublicProfile(uid: 'u1', racha: 5);
+      const withoutStreak = UserPublicProfile(uid: 'u2');
+
+      expect(
+        rankableEntries(RankingDimension.streak, [withStreak, withoutStreak])
+            .map((e) => e.value),
+        [5, 0],
+      );
+    });
+
+    test('all-null in → empty out (so the empty state wins)', () {
+      const a = UserPublicProfile(uid: 'u1');
+      const b = UserPublicProfile(uid: 'u2');
+      expect(rankableEntries(RankingDimension.bench, [a, b]), isEmpty);
+    });
+
+    test('empty in → empty out', () {
+      expect(rankableEntries(RankingDimension.squat, const []), isEmpty);
     });
   });
 }
