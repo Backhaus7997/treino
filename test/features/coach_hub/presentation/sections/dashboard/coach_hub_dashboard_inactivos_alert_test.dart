@@ -196,7 +196,8 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Todo al día'), findsOneWidget);
+      // WU-02: el título del banner se muestra en CAPS (Barlow Condensed 700).
+      expect(find.textContaining('TODO AL DÍA'), findsOneWidget);
     });
   });
 
@@ -240,8 +241,8 @@ void main() {
       await tester.pumpAndSettle();
 
       // The composed summary should be present with counts.
-      // "1 vencido(s)" or similar substring.
-      expect(find.textContaining('vencido'), findsAtLeastNWidgets(1));
+      // "1 VENCIDO(S)" or similar substring — WU-02: CAPS (Barlow Condensed 700).
+      expect(find.textContaining('VENCIDO'), findsAtLeastNWidgets(1));
     });
   });
 }

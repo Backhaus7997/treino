@@ -148,8 +148,9 @@ void main() {
       await tester.pumpAndSettle();
 
       // With 0 vencidos, 0 solicitudes, 0 inactivos → "Todo al día".
+      // WU-02: el título del banner se muestra en CAPS (Barlow Condensed 700).
       expect(
-        find.textContaining('Todo al día'),
+        find.textContaining('TODO AL DÍA'),
         findsOneWidget,
       );
     });
