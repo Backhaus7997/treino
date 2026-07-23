@@ -35,6 +35,11 @@ const ATHLETE_FIELD_COLLECTIONS = [
   "performance_tests",
   "athlete_billing",
   "athlete_notes",
+  // QA-507: faltaba. `cascade/storage.ts` borra el objeto físico del archivo,
+  // pero sin esto el doc de metadatos sobrevivía al borrado de cuenta con un
+  // `downloadUrl` roto y el PF lo seguía viendo listado. Mismo patrón que
+  // athlete_notes (no es retención legal) y tiene campo `athleteId`.
+  "athlete_files",
   "follow_up_entries",
   "nutrition_plans",
 ];

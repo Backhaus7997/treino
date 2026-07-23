@@ -34,6 +34,9 @@ const FIELD_COLLECTIONS = [
   "performance_tests",
   "athlete_billing",
   "athlete_notes",
+  // QA-507: faltaba en el cascade — el doc de metadatos sobrevivía al borrado
+  // de cuenta con un downloadUrl roto y el PF lo seguía viendo listado.
+  "athlete_files",
   "follow_up_entries",
   "nutrition_plans",
 ];
