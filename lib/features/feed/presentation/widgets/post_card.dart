@@ -277,8 +277,13 @@ String _relativeTime(DateTime createdAt) {
   if (delta.inHours < 1) return 'hace ${delta.inMinutes}m';
   if (delta.inDays < 1) return 'hace ${delta.inHours}h';
   if (delta.inDays < 7) return 'hace ${delta.inDays}d';
-  final d = createdAt.day.toString().padLeft(2, '0');
-  final m = createdAt.month.toString().padLeft(2, '0');
+  // createdAt viaja en UTC (Post.createdAt -> toUtc()); la fecha absoluta se
+  // formatea en la zona del usuario para que las zonas de offset negativo
+  // (Argentina, UTC-3) no muestren el día siguiente en los posts nocturnos.
+  // Mismo criterio que el gemelo de chat_list_screen.
+  final local = createdAt.toLocal();
+  final d = local.day.toString().padLeft(2, '0');
+  final m = local.month.toString().padLeft(2, '0');
   return '$d/$m';
 }
 

@@ -192,8 +192,15 @@ class _PublicProfileFollowButtonState
         profileAsync.valueOrNull?.displayName ?? 'Usuario anónimo';
 
     final repo = ref.read(friendshipRepositoryProvider);
-    // Capture messenger + copy BEFORE awaiting the sheet: the delete runs from
-    // the sheet's onConfirm and the profile route may be gone by then.
+    // Capture the root container + messenger + copy BEFORE awaiting the sheet:
+    // the delete runs from the sheet's onConfirm (a root route that outlives
+    // this profile) and the profile may already be popped by then. This
+    // widget's `ref` THROWS once the State is disposed ("Cannot use ref after
+    // the widget was disposed"), and the catch below would report a committed
+    // delete as a failure while Feed AMIGOS keeps the ex-friend. Same capture
+    // as _onAccept (ADR-FPS-006); the container and messenger live at the root
+    // and survive disposal.
+    final container = ProviderScope.containerOf(context, listen: false);
     final messenger = ScaffoldMessenger.of(context);
     final errorMessage = AppL10n.of(context).feedFriendActionError;
 
@@ -213,7 +220,7 @@ class _PublicProfileFollowButtonState
             // myFriendsFeedProvider (FutureProvider) MUST be invalidated
             // explicitly — accepted friends list changed, Feed AMIGOS must
             // refresh.
-            ref.invalidate(myFriendsFeedProvider);
+            container.invalidate(myFriendsFeedProvider);
           } catch (_) {
             // The friendship is still present (the delete did not commit);
             // surface the failure so the user can retry instead of swallowing.

@@ -648,4 +648,50 @@ void main() {
       expect(captured.routineTag, tag);
     });
   });
+
+  // ── #500 / linaje #435 — submit sobrevive al dispose de la pantalla ──────
+
+  group('CreatePostNotifier — dispose mid-submit (#500)', () {
+    test(
+        'el envío en vuelo sigue vivo si el composer se desmonta: al volver, '
+        'el estado sigue siendo "publicando" y no un formulario vacío',
+        () async {
+      final createGate = Completer<Post>();
+      final mockRepo = MockPostRepository();
+      when(() => mockRepo.create(any())).thenAnswer((_) => createGate.future);
+      final container = _makeContainer(mockRepo: mockRepo);
+      addTearDown(container.dispose);
+
+      final provider = createPostNotifierProvider(null);
+      // "Composer montado": la pantalla hace ref.watch del notifier.
+      final screen = container.listen(provider, (_, __) {});
+      await container.read(provider.future);
+      container.read(provider.notifier).setText('Buena sesión!');
+
+      final submit = container.read(provider.notifier).submit();
+      await Future<void>.delayed(Duration.zero);
+
+      // El usuario toca back con el create todavía en vuelo. Este family es
+      // autoDispose: sin el pin, el notifier muere acá y se lleva el estado.
+      screen.close();
+      await Future<void>.delayed(Duration.zero);
+
+      // Vuelve a abrir el composer mientras el post sigue subiendo.
+      final inFlight = container.read(provider).valueOrNull;
+      expect(
+        inFlight?.isSubmitting,
+        isTrue,
+        reason: 'Sin el pin el notifier se reconstruye desde cero y el usuario '
+            've un formulario vacío, como si hubiera perdido el texto',
+      );
+      expect(inFlight?.text, 'Buena sesión!');
+
+      final sent =
+          verify(() => mockRepo.create(captureAny())).captured.single as Post;
+      createGate.complete(sent.copyWith(id: 'generated-id'));
+
+      expect(await submit, isTrue, reason: 'El post se creó igual');
+      expect(sent.text, 'Buena sesión!');
+    });
+  });
 }
