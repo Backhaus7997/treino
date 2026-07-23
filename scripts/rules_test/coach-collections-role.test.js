@@ -187,10 +187,14 @@ test('SCENARIO-CC-06b: real trainer CAN create a measurement for an athlete', as
 
   const coach = testEnv.authenticatedContext('coach2');
   await assertSucceeds(
+    // QA #508: `recordedAt`, not `createdAt` — Measurement.toJson() has never
+    // emitted a `createdAt`. The stray name was harmless while the rules
+    // validated nothing but the role gate; now that create enforces the
+    // toJson() key set it would (correctly) be rejected as an unknown field.
     coach.firestore().collection('measurements').doc('legit2').set({
       recordedBy: 'coach2',
       athleteId: 'athlete',
-      createdAt: new Date(),
+      recordedAt: new Date(),
     }),
   );
 });
@@ -204,10 +208,12 @@ test('SCENARIO-CC-06c: real trainer CAN create a performance_test for an athlete
 
   const coach = testEnv.authenticatedContext('coach3');
   await assertSucceeds(
+    // QA #508: same correction as SCENARIO-CC-06b — PerformanceTest.toJson()
+    // emits `recordedAt`, never `createdAt`.
     coach.firestore().collection('performance_tests').doc('legit3').set({
       recordedBy: 'coach3',
       athleteId: 'athlete',
-      createdAt: new Date(),
+      recordedAt: new Date(),
     }),
   );
 });
