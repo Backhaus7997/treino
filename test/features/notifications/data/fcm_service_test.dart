@@ -295,4 +295,62 @@ void main() {
       },
     );
   });
+
+  // ── QA-502: race entre init/dispose (el lifecycle provider los dispara
+  // fire-and-forget, así que se intercalan en sus huecos `await`) ────────────
+  group('FcmService — race de ciclo de vida (QA-502)', () {
+    setUp(() {
+      when(() => messaging.onTokenRefresh)
+          .thenAnswer((_) => const Stream<String>.empty());
+    });
+
+    test(
+      'un init en vuelo superado por dispose NO resucita el token borrado',
+      () async {
+        // getToken del init queda colgado; el de dispose resuelve enseguida.
+        final initGetToken = Completer<String?>();
+        var calls = 0;
+        when(() => messaging.getToken()).thenAnswer((_) {
+          calls++;
+          return calls == 1
+              ? initGetToken.future
+              : Future<String?>.value('tok-dispose');
+        });
+
+        final initFuture = service.init('A'); // queda esperando getToken
+        await service.dispose('A'); // lo supera: borra el token
+        initGetToken.complete('tok-a'); // el getToken del init resuelve TARDE
+        await initFuture;
+
+        // Sin la guarda de generación, el init reescribía el token que dispose
+        // acababa de borrar (y el device seguía recibiendo pushes de A).
+        verifyNever(() => repo.saveToken('A', 'tok-a'));
+      },
+    );
+
+    test(
+      'un dispose en vuelo superado por un login nuevo NO toca el token del '
+      'usuario nuevo',
+      () async {
+        final disposeGetToken = Completer<String?>();
+        var calls = 0;
+        when(() => messaging.getToken()).thenAnswer((_) {
+          calls++;
+          return calls == 1
+              ? disposeGetToken.future
+              : Future<String?>.value('tok-b');
+        });
+
+        final disposeFuture = service.dispose('A'); // esperando getToken
+        await service.init('B'); // login de B lo supera
+        disposeGetToken.complete('tok-a');
+        await disposeFuture;
+
+        // Ni borra en Firestore con el uid viejo…
+        verifyNever(() => repo.removeToken('A', 'tok-a'));
+        // …ni invalida en el device el token que B acaba de registrar.
+        verifyNever(() => messaging.deleteToken());
+      },
+    );
+  });
 }
