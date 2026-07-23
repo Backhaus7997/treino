@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
+import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
 import '../../../../../l10n/app_l10n.dart';
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart';
@@ -68,12 +73,18 @@ final _filtroProvider =
     StateProvider.autoDispose<RosterFiltro>((_) => RosterFiltro.todos);
 final _queryProvider = StateProvider.autoDispose<String>((_) => '');
 
-/// Roster del Coach Hub web (`/alumnos`, Fase W2 PR1).
+/// Alumno + su estado compuesto ya resuelto (evita recalcular
+/// `estadoForLink` por columna/celda).
+typedef _RosterEntry = ({TrainerLink link, AlumnoEstado estado});
+
+/// Roster del Coach Hub web (`/alumnos`).
 ///
-/// Tabla de alumnos vinculados con estado compuesto, último entreno (Hoy) y
-/// acciones de vínculo (pausar/reanudar/terminar). Renderiza DENTRO del shell —
-/// sin Scaffold (ADR-CHW-005). Columnas Plan/Objetivo/Adherencia y el toggle de
-/// cards llegan en PRs siguientes (dependen de data nueva).
+/// Tabla de alumnos vinculados (kit v2, Fase 3 WU-03: `CoachHubDataTable` +
+/// `TreinoFilterChips`) con estado compuesto, último entreno (Hoy) y acciones
+/// de vínculo (pausar/reanudar/terminar). Renderiza DENTRO del shell — sin
+/// Scaffold (ADR-CHW-005). Columnas Plan/Objetivo/Adherencia y el toggle de
+/// cards del mockup quedan fuera de alcance: dependen de data inexistente
+/// (ADR-A3-01).
 class AlumnosScreen extends ConsumerWidget {
   const AlumnosScreen({super.key});
 
@@ -81,50 +92,120 @@ class AlumnosScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppL10n.of(context);
     final linksAsync = ref.watch(trainerLinksStreamProvider);
-    return linksAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => _CenteredMuted(l10n.coachHubAlumnosLoadError),
-      data: (links) {
-        // Un alumno = una fila: colapsamos a su link más reciente (el stream
-        // viene requestedAt DESC) y excluimos `pending` (esos son solicitudes,
-        // sección aparte). Sin esto, un alumno re-vinculado (terminado + nuevo
-        // activo) aparecería dos veces e infla los contadores.
-        final seen = <String>{};
-        final roster = [
-          for (final l in links)
-            if (l.status != TrainerLinkStatus.pending && seen.add(l.athleteId))
-              l,
-        ];
-        final ids = (roster.map((l) => l.athleteId).toSet().toList()..sort());
-        final profilesAsync =
-            ref.watch(userPublicProfilesBatchProvider(ids.join(',')));
-        final conDeudaIds = <String>{
-          for (final c
-              in ref.watch(pagosPorCobrarProvider).valueOrNull ?? const [])
-            c.athleteId,
-        };
-        return profilesAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) =>
-              _CenteredMuted(l10n.coachHubAlumnosProfilesLoadError),
-          data: (profiles) => _RosterView(
-              roster: roster, profiles: profiles, conDeudaIds: conDeudaIds),
-        );
-      },
+
+    return TreinoStateSwitcher(
+      childKey: ValueKey('alumnos_links_${_stateKeyOf(linksAsync)}'),
+      child: linksAsync.when(
+        loading: () => const _RosterFrame(
+          roster: [],
+          profiles: {},
+          gymNameById: {},
+          tableLoading: true,
+        ),
+        error: (e, _) => _RosterFrame(
+          roster: const [],
+          profiles: const {},
+          gymNameById: const {},
+          errorMessage: l10n.coachHubAlumnosLoadError,
+          onRetry: () => ref.invalidate(trainerLinksStreamProvider),
+        ),
+        data: (links) => _LinksLoaded(links: links),
+      ),
     );
   }
 }
 
-class _RosterView extends ConsumerWidget {
-  const _RosterView({
+String _stateKeyOf(AsyncValue<Object?> value) {
+  if (value.hasError) return 'error';
+  if (value.isLoading && !value.hasValue) return 'loading';
+  return 'data';
+}
+
+/// Resuelve perfiles + gyms + deuda una vez que el stream de links ya emitió,
+/// y cross-fadea la tabla entre loading/error/data de los perfiles.
+class _LinksLoaded extends ConsumerWidget {
+  const _LinksLoaded({required this.links});
+
+  final List<TrainerLink> links;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppL10n.of(context);
+
+    // Un alumno = una fila: colapsamos a su link más reciente (el stream
+    // viene requestedAt DESC) y excluimos `pending` (esos son solicitudes,
+    // sección aparte). Sin esto, un alumno re-vinculado (terminado + nuevo
+    // activo) aparecería dos veces e infla los contadores.
+    final seen = <String>{};
+    final roster = [
+      for (final l in links)
+        if (l.status != TrainerLinkStatus.pending && seen.add(l.athleteId)) l,
+    ];
+    final ids = (roster.map((l) => l.athleteId).toSet().toList()..sort());
+    final profilesAsync =
+        ref.watch(userPublicProfilesBatchProvider(ids.join(',')));
+    final conDeudaIds = <String>{
+      for (final c in ref.watch(pagosPorCobrarProvider).valueOrNull ?? const [])
+        c.athleteId,
+    };
+
+    // Una sola lectura del catálogo de gimnasios (~20 docs) en vez de un
+    // gymByIdProvider por fila (N+1) — mismo criterio que el batch de perfiles.
+    final gyms = ref.watch(gymsProvider).valueOrNull ?? const [];
+    final gymNameById = {for (final g in gyms) g.id: g.name};
+
+    final rosterWithEstado = [
+      for (final l in roster) (link: l, estado: estadoForLink(l, conDeudaIds)),
+    ];
+
+    return TreinoStateSwitcher(
+      childKey: ValueKey('alumnos_profiles_${_stateKeyOf(profilesAsync)}'),
+      child: profilesAsync.when(
+        loading: () => _RosterFrame(
+          roster: rosterWithEstado,
+          profiles: const {},
+          gymNameById: gymNameById,
+          tableLoading: true,
+        ),
+        error: (e, _) => _RosterFrame(
+          roster: rosterWithEstado,
+          profiles: const {},
+          gymNameById: gymNameById,
+          errorMessage: l10n.coachHubAlumnosProfilesLoadError,
+          onRetry: () =>
+              ref.invalidate(userPublicProfilesBatchProvider(ids.join(','))),
+        ),
+        data: (profiles) => _RosterFrame(
+          roster: rosterWithEstado,
+          profiles: profiles,
+          gymNameById: gymNameById,
+        ),
+      ),
+    );
+  }
+}
+
+/// Header (título CAPS + subtítulo) + filtros + búsqueda + tabla.
+///
+/// El bloque header/filtros/búsqueda entra con `TreinoFadeSlideIn` staggered
+/// (índices 0/1/2); la tabla queda fuera de ese stagger — su propio
+/// cross-fade lo resuelve el `TreinoStateSwitcher` del caller.
+class _RosterFrame extends ConsumerWidget {
+  const _RosterFrame({
     required this.roster,
     required this.profiles,
-    required this.conDeudaIds,
+    required this.gymNameById,
+    this.tableLoading = false,
+    this.errorMessage,
+    this.onRetry,
   });
 
-  final List<TrainerLink> roster;
+  final List<_RosterEntry> roster;
   final Map<String, UserPublicProfile> profiles;
-  final Set<String> conDeudaIds;
+  final Map<String, String> gymNameById;
+  final bool tableLoading;
+  final String? errorMessage;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -133,82 +214,79 @@ class _RosterView extends ConsumerWidget {
     final filtro = ref.watch(_filtroProvider);
     final query = ref.watch(_queryProvider).trim().toLowerCase();
 
-    // Una sola lectura del catálogo de gimnasios (~20 docs) en vez de un
-    // gymByIdProvider por fila (N+1) — mismo criterio que el batch de perfiles.
-    final gyms = ref.watch(gymsProvider).valueOrNull ?? const [];
-    final gymNameById = {for (final g in gyms) g.id: g.name};
     String? gymNameFor(TrainerLink l) {
       final gid = profiles[l.athleteId]?.gymId;
       return gid == null ? null : gymNameById[gid];
     }
 
-    int countFor(RosterFiltro f) => roster
-        .where((l) => _matchesFiltro(estadoForLink(l, conDeudaIds), f))
-        .length;
+    int countFor(RosterFiltro f) =>
+        roster.where((e) => _matchesFiltro(e.estado, f)).length;
 
-    final visibles = roster.where((l) {
-      final estado = estadoForLink(l, conDeudaIds);
-      if (!_matchesFiltro(estado, filtro)) return false;
+    final visibles = roster.where((e) {
+      if (!_matchesFiltro(e.estado, filtro)) return false;
       if (query.isEmpty) return true;
-      final name = (profiles[l.athleteId]?.displayName ?? '').toLowerCase();
+      final name =
+          (profiles[e.link.athleteId]?.displayName ?? '').toLowerCase();
       return name.contains(query);
     }).toList();
 
-    final activos = roster
-        .where((l) => estadoForLink(l, conDeudaIds) == AlumnoEstado.activo)
-        .length;
+    final activos = roster.where((e) => e.estado == AlumnoEstado.activo).length;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.s20,
+        vertical: AppSpacing.s20,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            l10n.coachHubAlumnosTitle,
-            style: TextStyle(
-              color: palette.textPrimary,
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.8,
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TreinoSectionHeader(
+                  title: l10n.coachHubAlumnosTitle,
+                  count: roster.length,
+                ),
+                const SizedBox(height: AppSpacing.hairline),
+                Text(
+                  l10n.coachHubAlumnosSummary(roster.length, activos),
+                  style: TextStyle(color: palette.textMuted, fontSize: 13),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            l10n.coachHubAlumnosSummary(roster.length, activos),
-            style: TextStyle(color: palette.textMuted, fontSize: 13),
+          const SizedBox(height: AppSpacing.s18),
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(1),
+            child: _FiltroChips(filtro: filtro, countFor: countFor),
           ),
-          const SizedBox(height: 18),
-          _FilterBar(filtro: filtro, countFor: countFor),
-          const SizedBox(height: 12),
-          _SearchField(),
-          const SizedBox(height: 14),
-          if (visibles.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 40),
-              child: _CenteredMuted(
-                roster.isEmpty
-                    ? l10n.coachHubAlumnosEmpty
-                    : l10n.coachHubAlumnosEmptyFiltered,
-              ),
-            )
-          else ...[
-            const _RosterHeaderRow(),
-            for (final link in visibles)
-              _RosterRow(
-                link: link,
-                profile: profiles[link.athleteId],
-                estado: estadoForLink(link, conDeudaIds),
-                gymName: gymNameFor(link),
-              ),
-          ],
+          const SizedBox(height: AppSpacing.s12),
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(2),
+            child: const _SearchField(),
+          ),
+          const SizedBox(height: AppSpacing.s14),
+          _RosterTable(
+            visibles: visibles,
+            profiles: profiles,
+            gymNameFor: gymNameFor,
+            loading: tableLoading,
+            errorMessage: errorMessage,
+            onRetry: onRetry,
+            emptyMessage: roster.isEmpty
+                ? l10n.coachHubAlumnosEmpty
+                : l10n.coachHubAlumnosEmptyFiltered,
+          ),
         ],
       ),
     );
   }
 }
 
-class _FilterBar extends ConsumerWidget {
-  const _FilterBar({required this.filtro, required this.countFor});
+class _FiltroChips extends ConsumerWidget {
+  const _FiltroChips({required this.filtro, required this.countFor});
 
   final RosterFiltro filtro;
   final int Function(RosterFiltro) countFor;
@@ -224,63 +302,32 @@ class _FilterBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        for (final (f, label) in _chips(l10n))
-          _Chip(
-            label: '$label ${countFor(f)}',
-            selected: f == filtro,
-            onTap: () => ref.read(_filtroProvider.notifier).state = f,
-            palette: palette,
-          ),
-      ],
-    );
-  }
-}
+    final chips = _chips(l10n);
+    final labelByFiltro = {for (final (f, label) in chips) f: label};
+    final filtroByLabel = {for (final (f, label) in chips) label: f};
 
-class _Chip extends StatelessWidget {
-  const _Chip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-    required this.palette,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-  final AppPalette palette;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-        decoration: BoxDecoration(
-          color: selected ? palette.bgCard : palette.bg,
-          border: Border.all(color: selected ? palette.accent : palette.border),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected ? palette.accent : palette.textMuted,
-            fontSize: 13,
-            fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-          ),
-        ),
-      ),
+    return TreinoFilterChips(
+      options: [for (final (_, label) in chips) label],
+      selected: {labelByFiltro[filtro]!},
+      badgeCounts: {
+        for (final (f, label) in chips) label: countFor(f),
+      },
+      onChanged: (newSelected) {
+        // Single-select: TreinoFilterChips permite deseleccionar el chip
+        // activo (queda `{}`) — el roster siempre necesita un filtro activo,
+        // así que un tap que vacía la selección es un no-op.
+        if (newSelected.isEmpty) return;
+        final f = filtroByLabel[newSelected.first];
+        if (f != null) ref.read(_filtroProvider.notifier).state = f;
+      },
     );
   }
 }
 
 class _SearchField extends ConsumerStatefulWidget {
+  const _SearchField();
+
   @override
   ConsumerState<_SearchField> createState() => _SearchFieldState();
 }
@@ -310,15 +357,15 @@ class _SearchFieldState extends ConsumerState<_SearchField> {
         filled: true,
         fillColor: palette.bgCard,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           borderSide: BorderSide(color: palette.border),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           borderSide: BorderSide(color: palette.border),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           borderSide: BorderSide(color: palette.accent),
         ),
       ),
@@ -326,131 +373,157 @@ class _SearchFieldState extends ConsumerState<_SearchField> {
   }
 }
 
-class _RosterHeaderRow extends StatelessWidget {
-  const _RosterHeaderRow();
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    final l10n = AppL10n.of(context);
-    TextStyle s() => TextStyle(
-          color: palette.textMuted,
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.8,
-        );
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
-      child: Row(
-        children: [
-          Expanded(
-              flex: 4,
-              child: Text(l10n.coachHubAlumnosColumnStudent, style: s())),
-          Expanded(
-              flex: 2,
-              child: Text(l10n.coachHubAlumnosColumnStatus, style: s())),
-          Expanded(
-              flex: 2,
-              child: Text(l10n.coachHubAlumnosColumnLastWorkout, style: s())),
-          Expanded(
-            flex: 2,
-            child: Text(l10n.coachHubAlumnosColumnActions,
-                style: s(), textAlign: TextAlign.right),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RosterRow extends ConsumerWidget {
-  const _RosterRow({
-    required this.link,
-    required this.profile,
-    required this.estado,
-    required this.gymName,
+/// Tabla del roster — `CoachHubDataTable` con celdas-widget (ADR-A3-02) para
+/// Alumno (avatar + nombre + gym), Estado (dot + label) y Acciones (íconos).
+/// Loading/error/empty los resuelve el kit (shimmer/retry/EmptyState).
+class _RosterTable extends ConsumerWidget {
+  const _RosterTable({
+    required this.visibles,
+    required this.profiles,
+    required this.gymNameFor,
+    required this.loading,
+    required this.errorMessage,
+    required this.emptyMessage,
+    this.onRetry,
   });
 
-  final TrainerLink link;
-  final UserPublicProfile? profile;
-  final AlumnoEstado estado;
-  final String? gymName;
+  final List<_RosterEntry> visibles;
+  final Map<String, UserPublicProfile> profiles;
+  final String? Function(TrainerLink) gymNameFor;
+  final bool loading;
+  final String? errorMessage;
+  final String emptyMessage;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
+
+    return CoachHubDataTable(
+      columns: [
+        CoachHubColumn(
+          key: 'alumno',
+          label: l10n.coachHubAlumnosColumnStudent,
+          flex: 4,
+        ),
+        CoachHubColumn(
+          key: 'estado',
+          label: l10n.coachHubAlumnosColumnStatus,
+          flex: 2,
+        ),
+        CoachHubColumn(
+          key: 'ultimoEntreno',
+          label: l10n.coachHubAlumnosColumnLastWorkout,
+          flex: 2,
+        ),
+        CoachHubColumn(
+          key: 'acciones',
+          label: l10n.coachHubAlumnosColumnActions,
+          flex: 2,
+        ),
+      ],
+      rows: [
+        for (final entry in visibles)
+          _rowFor(context, ref, palette, l10n, entry, gymNameFor(entry.link)),
+      ],
+      loading: loading,
+      errorMessage: errorMessage,
+      onRetry: onRetry,
+      emptyMessage: emptyMessage,
+      onRowTap: (id) => context.go('/alumnos/$id'),
+    );
+  }
+
+  CoachHubRow _rowFor(
+    BuildContext context,
+    WidgetRef ref,
+    AppPalette palette,
+    AppL10n l10n,
+    _RosterEntry entry,
+    String? gymName,
+  ) {
+    final link = entry.link;
+    final estado = entry.estado;
+    final profile = profiles[link.athleteId];
     final name = profile?.displayName ?? l10n.coachHubAlumnosNameFallback;
     final trainedToday =
         (ref.watch(finishedTodayByUidProvider(link.athleteId)).valueOrNull ??
                 const [])
             .isNotEmpty;
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => context.go('/alumnos/${link.athleteId}'),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: palette.bgCard,
-          border: Border.all(color: palette.border),
-          borderRadius: BorderRadius.circular(12),
+    return CoachHubRow(
+      id: link.athleteId,
+      cells: {
+        'alumno': name,
+        'estado': estado.label(l10n),
+        'ultimoEntreno':
+            trainedToday ? l10n.coachHubAlumnosLastWorkoutToday : '—',
+      },
+      cellWidgets: {
+        'alumno': _AlumnoCell(
+          name: name,
+          url: profile?.avatarUrl,
+          gymName: gymName,
+          palette: palette,
         ),
-        child: Row(
-          children: [
-            Expanded(
-              flex: 4,
-              child: Row(
-                children: [
-                  _Avatar(
-                      name: name, url: profile?.avatarUrl, palette: palette),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          name,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: palette.textPrimary,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        if (gymName != null)
-                          Text(
-                            gymName!,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                                color: palette.textMuted, fontSize: 12),
-                          ),
-                      ],
-                    ),
+        'estado': _EstadoBadge(estado: estado, palette: palette),
+        'acciones': _RowActions(link: link, palette: palette),
+      },
+    );
+  }
+}
+
+/// Celda «Alumno»: avatar + nombre + gym (si se conoce).
+class _AlumnoCell extends StatelessWidget {
+  const _AlumnoCell({
+    required this.name,
+    required this.url,
+    required this.gymName,
+    required this.palette,
+  });
+
+  final String name;
+  final String? url;
+  final String? gymName;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    // Fila del kit fija en TreinoTableTokens.rowHeight (48px, ADR-SH-003) →
+    // sólo 24px de alto disponibles tras el padding vertical de la celda.
+    // Nombre + gym en dos líneas (mockup original) no entra sin overflow;
+    // se combinan en una sola línea con separador para respetar el token
+    // de altura del kit (design system > mockup cuando chocan, CLAUDE.md).
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _Avatar(name: name, url: url, palette: palette),
+        const SizedBox(width: AppSpacing.s12),
+        Flexible(
+          child: Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: name,
+                  style: TextStyle(
+                    color: palette.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
                   ),
-                ],
-              ),
-            ),
-            Expanded(
-                flex: 2, child: _EstadoBadge(estado: estado, palette: palette)),
-            Expanded(
-              flex: 2,
-              child: Text(
-                trainedToday ? l10n.coachHubAlumnosLastWorkoutToday : '—',
-                style: TextStyle(
-                  color: trainedToday ? palette.accent : palette.textMuted,
-                  fontSize: 13,
                 ),
-              ),
+                if (gymName != null)
+                  TextSpan(
+                    text: '  ·  $gymName',
+                    style: TextStyle(color: palette.textMuted, fontSize: 12),
+                  ),
+              ],
             ),
-            Expanded(
-              flex: 2,
-              child: _RowActions(link: link, palette: palette),
-            ),
-          ],
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
-      ),
+      ],
     );
   }
 }
@@ -504,7 +577,7 @@ class _EstadoBadge extends StatelessWidget {
             height: 8,
             decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: AppSpacing.hairline + AppSpacing.hairline),
           Flexible(
             child: Text(
               estado.label(l10n),
@@ -583,6 +656,7 @@ class _RowActions extends ConsumerWidget {
       ));
     }
     return Row(
+      mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.end,
       children: buttons,
     );
@@ -613,22 +687,8 @@ class _IconAction extends StatelessWidget {
   }
 }
 
-class _CenteredMuted extends StatelessWidget {
-  const _CenteredMuted(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    return Center(
-      child:
-          Text(text, style: TextStyle(color: palette.textMuted, fontSize: 14)),
-    );
-  }
-}
-
-/// Diálogo de confirmación (mismo patrón que el dashboard, ADR-CHLM-06).
+/// Diálogo de confirmación — kit v2 (`showTreinoDialog`/`TreinoDialog`,
+/// mismo patrón que el resto del Coach Hub web).
 Future<bool> _confirmAction(
   BuildContext context, {
   required String title,
@@ -636,21 +696,15 @@ Future<bool> _confirmAction(
   required String confirmLabel,
 }) async {
   final l10n = AppL10n.of(context);
-  final result = await showDialog<bool>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: Text(title),
-      content: Text(body),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(ctx).pop(false),
-          child: Text(l10n.coachHubActionCancel),
-        ),
-        TextButton(
-          onPressed: () => Navigator.of(ctx).pop(true),
-          child: Text(confirmLabel),
-        ),
-      ],
+  final result = await showTreinoDialog<bool>(
+    context,
+    builder: (ctx) => TreinoDialog(
+      title: title,
+      body: Text(body),
+      primaryLabel: confirmLabel,
+      onPrimaryTap: () => Navigator.of(ctx).pop(true),
+      secondaryLabel: l10n.coachHubActionCancel,
+      onSecondaryTap: () => Navigator.of(ctx).pop(false),
     ),
   );
   return result ?? false;

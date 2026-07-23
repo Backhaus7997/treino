@@ -13,6 +13,9 @@
 //   - populated list → one row per file with size + date subtitle
 //   - delete flow → confirm dialog + repository call
 //   - too-large upload → repository throws → localized snackbar
+//   - Fase 3 WU-07b: rows render via the kit's TreinoListRow (mockup
+//     archivos.png — ícono + peso + fecha), delete confirm via
+//     showTreinoDialog.
 //
 // The upload happy path (file_picker + repo.upload) requires mocking the
 // file_picker plugin. We keep that for smoke, not for widget tests.
@@ -24,6 +27,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/coach/application/athlete_file_providers.dart';
 import 'package:treino/features/coach/application/athlete_note_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
@@ -80,7 +84,8 @@ AthleteFile _file({
       athleteId: _athleteUid,
       fileName: fileName,
       kind: kind,
-      contentType: kind == AthleteFileKind.pdf ? 'application/pdf' : 'image/jpeg',
+      contentType:
+          kind == AthleteFileKind.pdf ? 'application/pdf' : 'image/jpeg',
       sizeBytes: sizeBytes,
       storagePath: 'athleteFiles/${_trainerUid}_$_athleteUid/$id.pdf',
       downloadUrl: 'https://example.com/$id',
@@ -96,6 +101,7 @@ class _StubNoteRepo implements AthleteNoteRepository {
 }
 
 class _StubFileRepo implements AthleteFileRepository {
+  // ignore: unused_element_parameter
   _StubFileRepo({this.tooLargeOnUpload = false});
 
   final bool tooLargeOnUpload;
@@ -133,16 +139,14 @@ List<Override> _baseOverrides({
 }) =>
     [
       currentUidProvider.overrideWithValue(_trainerUid),
-      trainerLinksStreamProvider
-          .overrideWith((ref) => Stream.value([_link()])),
+      trainerLinksStreamProvider.overrideWith((ref) => Stream.value([_link()])),
       userPublicProfilesBatchProvider
           .overrideWith((ref, key) => {_athleteUid: _profile()}),
       userPublicProfileProvider
           .overrideWith((ref, id) => Stream.value(_profile())),
       pagosPorCobrarProvider
           .overrideWith((ref) => const AsyncData(<CobroPendiente>[])),
-      finishedTodayByUidProvider
-          .overrideWith((ref, uid) => const <Session>[]),
+      finishedTodayByUidProvider.overrideWith((ref, uid) => const <Session>[]),
       measurementsForAthleteProvider
           .overrideWith((ref, id) => Stream.value(const <Measurement>[])),
       performanceTestsForAthleteProvider
@@ -150,8 +154,7 @@ List<Override> _baseOverrides({
       gymsProvider.overrideWith((ref) => const <Gym>[]),
       athleteBillingProvider.overrideWith((ref, id) => Stream.value(null)),
       sessionsByUidProvider.overrideWith((ref, id) => const <Session>[]),
-      assignedRoutinesProvider
-          .overrideWith((ref, id) => const <Routine>[]),
+      assignedRoutinesProvider.overrideWith((ref, id) => const <Routine>[]),
       athleteNoteProvider(
         (trainerId: _trainerUid, athleteId: _athleteUid),
       ).overrideWith((ref) => const Stream.empty()),
@@ -230,12 +233,12 @@ void main() {
     )));
     await _selectArchivosTab(tester);
 
-    expect(
-        find.text('Todavía no subiste archivos sobre este alumno.'),
+    expect(find.text('Todavía no subiste archivos sobre este alumno.'),
         findsOneWidget);
   });
 
-  testWidgets('populated list renders one row per file with size + date subtitle',
+  testWidgets(
+      'populated list renders one row per file with size + date subtitle',
       (tester) async {
     final files = [
       _file(
@@ -297,8 +300,8 @@ void main() {
     expect(repo.deleted.single.id, 'f1');
   });
 
-  testWidgets(
-      'delete flow: cancel dialog → repository NOT called', (tester) async {
+  testWidgets('delete flow: cancel dialog → repository NOT called',
+      (tester) async {
     final files = [
       _file(id: 'f1', fileName: 'análisis.pdf'),
     ];
@@ -316,5 +319,20 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repo.deleted, isEmpty);
+  });
+
+  testWidgets('Fase 3 WU-07b: populated rows render via the kit TreinoListRow',
+      (tester) async {
+    final files = [
+      _file(id: 'f1', fileName: 'analisis.pdf'),
+      _file(id: 'f2', fileName: 'postura.jpg', kind: AthleteFileKind.image),
+    ];
+    _useDesktopViewport(tester);
+    await tester.pumpWidget(_wrap(_baseOverrides(
+      filesState: AsyncData(files),
+    )));
+    await _selectArchivosTab(tester);
+
+    expect(find.byType(TreinoListRow), findsNWidgets(2));
   });
 }
