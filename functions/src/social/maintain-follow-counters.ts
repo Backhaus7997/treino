@@ -43,7 +43,6 @@
 import * as admin from "firebase-admin";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
-import { FieldValue } from "firebase-admin/firestore";
 
 function getApp(): admin.app.App {
   try {
@@ -116,11 +115,43 @@ export function resolveCounterDelta(
 }
 
 /**
- * Pure handler extracted for jest testability. Applies the resolved delta to
+ * Pure handler extracted for jest testability. QA-507: recomputa los contadores
+ * desde los vínculos aceptados (idempotente ante reentrega) y los escribe en
  * both userPublicProfiles docs in a single transaction. Missing profile docs
  * are skipped (the counter is re-established by backfill / next write) rather
  * than created here, to avoid resurrecting a deleted user's public profile.
  */
+/**
+ * QA-507: cuenta los vínculos ACEPTADOS de [uid] desde la fuente de verdad.
+ *
+ * `requesterId === uid` → uid sigue a alguien (following); si no, alguien sigue
+ * a uid (followers). Una sola query por uid y se parte en memoria, porque
+ * Firestore no combina `array-contains` con `!=` en la misma query.
+ */
+async function countAcceptedFor(
+  tx: admin.firestore.Transaction,
+  db: admin.firestore.Firestore,
+  uid: string,
+): Promise<{ followingCount: number; followersCount: number }> {
+  const snap = await tx.get(
+    db
+      .collection("friendships")
+      .where("members", "array-contains", uid)
+      .where("status", "==", "accepted"),
+  );
+
+  let followingCount = 0;
+  let followersCount = 0;
+  for (const doc of snap.docs) {
+    if (doc.data().requesterId === uid) {
+      followingCount++;
+    } else {
+      followersCount++;
+    }
+  }
+  return { followingCount, followersCount };
+}
+
 export async function maintainFollowCountersHandler(
   app: admin.app.App,
   before: FriendshipData | undefined,
@@ -143,18 +174,24 @@ export async function maintainFollowCountersHandler(
       tx.get(otherRef),
     ]);
 
-    // followingCount lives on the requester; followersCount on the other.
+    // QA-507 (idempotencia): recomputamos desde cero en vez de
+    // FieldValue.increment(delta). Eventarc entrega at-least-once: una
+    // reentrega del MISMO evento sumaba +1 dos veces y dejaba
+    // following/followersCount inflados de forma permanente. Contar los
+    // vínculos aceptados es idempotente — mismo criterio que las otras 3
+    // aggregates (link / review / ranking), que ya recomputan.
+    const [requesterCounts, otherCounts] = await Promise.all([
+      countAcceptedFor(tx, db, requesterUid),
+      countAcceptedFor(tx, db, otherUid),
+    ]);
+
     // Only touch docs that exist — a follow against a deleted account should
     // not recreate that account's public profile.
     if (requesterSnap.exists) {
-      tx.update(requesterRef, {
-        followingCount: FieldValue.increment(delta),
-      });
+      tx.update(requesterRef, requesterCounts);
     }
     if (otherSnap.exists) {
-      tx.update(otherRef, {
-        followersCount: FieldValue.increment(delta),
-      });
+      tx.update(otherRef, otherCounts);
     }
   });
 

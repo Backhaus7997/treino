@@ -136,6 +136,24 @@ async function cleanup(...uids: string[]): Promise<void> {
   }
 }
 
+// QA-507: el handler ya no aplica un delta ciego — recomputa los contadores
+// desde la colección `friendships`. El trigger corre DESPUÉS de que el write
+// commitea, así que estos helpers dejan la colección en el estado FINAL que el
+// handler va a ver (antes los tests solo pasaban el doc como argumento).
+const FRIENDSHIP_ID = "mfc-req_mfc-other";
+
+async function seedFriendship(data: Record<string, unknown>): Promise<void> {
+  await db().collection("friendships").doc(FRIENDSHIP_ID).set(data);
+}
+
+async function removeFriendship(): Promise<void> {
+  await db()
+    .collection("friendships")
+    .doc(FRIENDSHIP_ID)
+    .delete()
+    .catch(() => undefined);
+}
+
 describe("maintainFollowCountersHandler — integration", () => {
   const req = "mfc-req";
   const other = "mfc-other";
@@ -144,13 +162,18 @@ describe("maintainFollowCountersHandler — integration", () => {
   const pendingDoc = { status: "pending", requesterId: req, members: pair };
 
   beforeEach(async () => {
+    await removeFriendship(); // pizarra limpia para el recompute
     await seedProfile(req, { followingCount: 0, followersCount: 0 });
     await seedProfile(other, { followingCount: 0, followersCount: 0 });
   });
 
-  afterEach(() => cleanup(req, other));
+  afterEach(async () => {
+    await removeFriendship();
+    await cleanup(req, other);
+  });
 
   it("accept increments requester.following AND other.followers (symmetry)", async () => {
+    await seedFriendship(acceptedDoc); // estado post-write que ve el trigger
     await maintainFollowCountersHandler(testApp, pendingDoc, acceptedDoc);
 
     expect(await counters(req)).toEqual({ followers: 0, following: 1 });
@@ -171,6 +194,7 @@ describe("maintainFollowCountersHandler — integration", () => {
   });
 
   it("auto-accept (create accepted) increments both", async () => {
+    await seedFriendship(acceptedDoc);
     await maintainFollowCountersHandler(testApp, undefined, acceptedDoc);
 
     expect(await counters(req)).toEqual({ followers: 0, following: 1 });
@@ -184,8 +208,23 @@ describe("maintainFollowCountersHandler — integration", () => {
     expect(await counters(other)).toEqual({ followers: 0, following: 0 });
   });
 
+  // QA-507: Eventarc entrega at-least-once. Antes, reprocesar el MISMO evento
+  // sumaba +1 otra vez y dejaba los contadores inflados de forma permanente.
+  it("es idempotente ante una reentrega del mismo evento", async () => {
+    await seedFriendship(acceptedDoc);
+
+    await maintainFollowCountersHandler(testApp, pendingDoc, acceptedDoc);
+    // Reentrega del mismo evento (Eventarc at-least-once).
+    await maintainFollowCountersHandler(testApp, pendingDoc, acceptedDoc);
+
+    // Sigue siendo 1, no 2.
+    expect(await counters(req)).toEqual({ followers: 0, following: 1 });
+    expect(await counters(other)).toEqual({ followers: 1, following: 0 });
+  });
+
   it("skips a missing profile doc without throwing", async () => {
     await cleanup(other); // other has no public profile
+    await seedFriendship(acceptedDoc);
     await maintainFollowCountersHandler(testApp, undefined, acceptedDoc);
 
     // requester still updated; missing other silently skipped.
