@@ -16,7 +16,9 @@ import '../../../../../l10n/app_l10n.dart';
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
+import 'package:treino/features/workout/application/assigned_routine_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
+import 'package:treino/features/workout/domain/routine_status.dart';
 
 /// Estado compuesto de un alumno en el roster (link + billing).
 ///
@@ -430,6 +432,7 @@ class _RosterTable extends ConsumerWidget {
           label: l10n.coachHubAlumnosColumnLastWorkout,
           flex: 2,
         ),
+        const CoachHubColumn(key: 'rutina', label: 'Rutina', flex: 1), // i18n
         CoachHubColumn(
           key: 'acciones',
           label: l10n.coachHubAlumnosColumnActions,
@@ -500,6 +503,7 @@ class _RosterTable extends ConsumerWidget {
           palette: palette,
         ),
         'estado': _EstadoBadge(estado: estado, palette: palette),
+        'rutina': _RutinaCell(athleteId: link.athleteId, palette: palette),
         'acciones': _RowActions(link: link, palette: palette),
       },
     );
@@ -596,6 +600,37 @@ class _EstadoBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
     return _DotLabel(color: estado.color(palette), label: estado.label(l10n));
+  }
+}
+
+/// Celda «Rutina»: chip compacto (dot + label) que deriva su estado de
+/// `assignedRoutinesProvider(athleteId)` — "Activa" si el alumno tiene al
+/// menos una rutina con `status == active` asignada, "Sin rutina" en
+/// cualquier otro caso (incluye loading/error, `valueOrNull` — mismo
+/// criterio "barato" que la celda de último entreno). Tap navega al detalle
+/// de rutinas del alumno (`/rutinas/:athleteId`, deep-link) envuelto en
+/// `InkWell` para que absorba el gesto y no dispare el `onRowTap` de la fila
+/// (mismo patrón que `_IconAction`/`_RowActions`, que ya conviven con el
+/// `onRowTap` de `CoachHubDataTable`).
+class _RutinaCell extends ConsumerWidget {
+  const _RutinaCell({required this.athleteId, required this.palette});
+
+  final String athleteId;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final routines =
+        ref.watch(assignedRoutinesProvider(athleteId)).valueOrNull ?? const [];
+    final activa = routines.any((r) => r.status == RoutineStatus.active);
+    return InkWell(
+      borderRadius: BorderRadius.circular(AppRadius.sm),
+      onTap: () => context.go('/rutinas/$athleteId'),
+      child: _DotLabel(
+        color: activa ? palette.accent : palette.textMuted,
+        label: activa ? 'Activa' : 'Sin rutina', // i18n
+      ),
+    );
   }
 }
 

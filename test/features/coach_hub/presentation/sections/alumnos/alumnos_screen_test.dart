@@ -29,7 +29,11 @@ import 'package:treino/features/payments/domain/athlete_billing.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
+import 'package:treino/features/profile/domain/experience_level.dart';
+import 'package:treino/features/workout/application/assigned_routine_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
+import 'package:treino/features/workout/domain/routine.dart';
+import 'package:treino/features/workout/domain/routine_status.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
 
@@ -66,6 +70,17 @@ Session _sessionAt(String uid, DateTime finishedAt) => Session(
       status: SessionStatus.finished,
     );
 
+/// Rutina asignada — usada para overridear `assignedRoutinesProvider`
+/// (columna «Rutina»).
+Routine _routine(String id, {RoutineStatus status = RoutineStatus.active}) =>
+    Routine(
+      id: id,
+      name: 'Hipertrofia',
+      level: ExperienceLevel.intermediate,
+      days: const [],
+      status: status,
+    );
+
 /// Pumpea `AlumnosScreen` detrás de un GoRouter (para que `onRowTap` →
 /// `context.go('/alumnos/:id')` tenga a dónde ir) con los providers stub.
 Future<void> _pump(
@@ -79,6 +94,8 @@ Future<void> _pump(
   // dependen del wall-clock del widget) — mismo criterio que
   // inactivos_provider_test.dart.
   Map<String, List<Session>> sessionsInWindowByAthleteId = const {},
+  // Rutinas asignadas por athleteId (columna «Rutina»).
+  Map<String, List<Routine>> routinesByAthleteId = const {},
   TrainerLinkRepository? repo,
   // `false` para casos donde el stream de links queda colgado en loading a
   // propósito (TreinoShimmer corre en loop infinito — pumpAndSettle no
@@ -102,6 +119,12 @@ Future<void> _pump(
         builder: (_, state) =>
             Scaffold(body: Text('DETALLE ${state.pathParameters['id']}')),
       ),
+      GoRoute(
+        path: '/rutinas/:athleteId',
+        builder: (_, state) => Scaffold(
+          body: Text('RUTINAS ${state.pathParameters['athleteId']}'),
+        ),
+      ),
     ],
   );
 
@@ -120,6 +143,10 @@ Future<void> _pump(
               sessionsInWindowByAthleteId[key.athleteId] ?? const <Session>[],
         ),
         gymsProvider.overrideWith((ref) => const <Gym>[]),
+        assignedRoutinesProvider.overrideWith(
+          (ref, athleteId) async =>
+              routinesByAthleteId[athleteId] ?? const <Routine>[],
+        ),
         if (repo != null) trainerLinkRepositoryProvider.overrideWithValue(repo),
       ],
       child: MaterialApp.router(
@@ -495,6 +522,65 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('DETALLE a1'), findsOneWidget);
+    });
+  });
+
+  group('AlumnosScreen roster — columna Rutina', () {
+    testWidgets('alumno con rutina activa → chip "Activa"', (tester) async {
+      await _pump(
+        tester,
+        links: [_link('a1', TrainerLinkStatus.active)],
+        profiles: [_prof('a1', 'Sofía')],
+        routinesByAthleteId: {
+          'a1': [_routine('r1')],
+        },
+      );
+
+      expect(find.text('Activa'), findsOneWidget);
+    });
+
+    testWidgets('alumno sin rutina asignada → chip "Sin rutina"',
+        (tester) async {
+      await _pump(
+        tester,
+        links: [_link('a1', TrainerLinkStatus.active)],
+        profiles: [_prof('a1', 'Sofía')],
+      );
+
+      expect(find.text('Sin rutina'), findsOneWidget);
+    });
+
+    testWidgets('rutina asignada pero pausada (no activa) → chip "Sin rutina"',
+        (tester) async {
+      await _pump(
+        tester,
+        links: [_link('a1', TrainerLinkStatus.active)],
+        profiles: [_prof('a1', 'Sofía')],
+        routinesByAthleteId: {
+          'a1': [_routine('r1', status: RoutineStatus.archived)],
+        },
+      );
+
+      expect(find.text('Sin rutina'), findsOneWidget);
+    });
+
+    testWidgets(
+        'tap en el chip Rutina navega a /rutinas/:athleteId sin disparar '
+        'la navegación de la fila', (tester) async {
+      await _pump(
+        tester,
+        links: [_link('a1', TrainerLinkStatus.active)],
+        profiles: [_prof('a1', 'Sofía')],
+        routinesByAthleteId: {
+          'a1': [_routine('r1')],
+        },
+      );
+
+      await tester.tap(find.text('Activa'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('RUTINAS a1'), findsOneWidget);
+      expect(find.text('DETALLE a1'), findsNothing);
     });
   });
 }
