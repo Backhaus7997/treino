@@ -11,6 +11,9 @@ import '../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
+import '../../workout/application/exercise_providers.dart';
+import '../../workout/application/session_providers.dart'
+    show sessionsByUidProvider;
 import '../application/month_radar_providers.dart';
 import '../application/monthly_report_providers.dart';
 import '../application/workout_days_providers.dart';
@@ -487,8 +490,7 @@ class _MonthRadarSection extends ConsumerWidget {
       error: (_, __) => _ErrorState(
         message: l10n.muscleDistributionLoadError,
         retryLabel: l10n.coachRetryLabel,
-        onRetry: () => ref.invalidate(
-            athleteMonthRadarInsightsProvider((uid: uid, month: month))),
+        onRetry: () => _retryMonthRadar(ref, uid, month),
       ),
       data: (insights) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -542,6 +544,18 @@ String _monthLegendLabel(DateTime month, String localeName) {
 }
 
 // ── Error state ───────────────────────────────────────────────────────────────
+
+/// QA-498: `ref.invalidate` NO cascada a las dependencias. El radar mensual lee
+/// `sessionsByUidProvider` Y `exercisesProvider` — este último NO es autoDispose
+/// y cachea su `AsyncError` para toda la vida del container. Invalidar solo el
+/// provider del radar re-leía los MISMOS errores cacheados: un reintentar que
+/// nunca podía recuperar. Mismo criterio que el `_retry` de
+/// MuscleDistributionScreen (#376).
+void _retryMonthRadar(WidgetRef ref, String uid, DateTime month) {
+  ref.invalidate(exercisesProvider);
+  ref.invalidate(sessionsByUidProvider(uid));
+  ref.invalidate(athleteMonthRadarInsightsProvider((uid: uid, month: month)));
+}
 
 class _ErrorState extends StatelessWidget {
   const _ErrorState({
