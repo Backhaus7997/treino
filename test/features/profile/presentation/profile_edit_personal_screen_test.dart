@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -85,6 +86,19 @@ MockUser _makeAuthUser({String uid = 'uid-test'}) {
   final user = MockUser();
   when(() => user.uid).thenReturn(uid);
   return user;
+}
+
+/// Delivers the engine's `popRoute` notification — the same path an Android
+/// hardware back or an iOS swipe-back takes. Unlike a header-back tap this
+/// bypasses the widget's own handlers and goes straight to the Navigator, so
+/// only a [PopScope] can stop it.
+Future<void> _simulateSystemBack(WidgetTester tester) async {
+  await tester.binding.defaultBinaryMessenger.handlePlatformMessage(
+    SystemChannels.navigation.name,
+    SystemChannels.navigation.codec
+        .encodeMethodCall(const MethodCall('popRoute')),
+    (_) {},
+  );
 }
 
 Widget _buildScreen({
@@ -507,6 +521,92 @@ void main() {
       updateCompleter.complete();
       await tester.pumpAndSettle();
       expect(find.text('PROFILE_SCREEN'), findsOneWidget);
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // SCENARIO-517: an in-flight save survives a mid-flight dispose (#504)
+  // The header back-tap is already gated (SCENARIO-516), but the system back
+  // gesture bypasses it: it disposes the screen — and `_saveState` with it —
+  // while the avatar upload / Firestore write are still awaiting.
+  // ──────────────────────────────────────────────────────────────────────────
+  group('SCENARIO-517: in-flight save survives a mid-flight dispose', () {
+    testWidgets('the system back gesture does not pop the route while saving',
+        (tester) async {
+      final updateCompleter = Completer<void>();
+      final repo = MockUserRepository();
+      when(() => repo.update(any(), any()))
+          .thenAnswer((_) => updateCompleter.future);
+
+      await tester.pumpWidget(
+        _buildScreen(
+          profile: _profile(displayName: 'Carlos'),
+          userRepository: repo,
+          authenticated: true,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+          find.byKey(const Key('edit_personal_display_name')), 'Carlos R.');
+      await tester.pump();
+
+      await tester
+          .ensureVisible(find.byKey(const Key('edit_personal_save_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('edit_personal_save_button')));
+      await tester.pump(); // let _save() reach the awaited update()
+
+      // Swipe-back / hardware back while the write is in flight.
+      await _simulateSystemBack(tester);
+      await tester.pumpAndSettle();
+
+      // The route must still be there — popping it would dispose the screen
+      // mid-await, losing the save and orphaning any uploaded avatar.
+      expect(
+          find.text('EDITAR PERFIL'), findsOneWidget); // i18n: Fase 6 Etapa 3
+      expect(find.text('PROFILE_SCREEN'), findsNothing);
+
+      // Once the write lands the screen pops on its own.
+      updateCompleter.complete();
+      await tester.pumpAndSettle();
+      expect(find.text('PROFILE_SCREEN'), findsOneWidget);
+    });
+
+    testWidgets('a save that fails after the screen is gone does not throw',
+        (tester) async {
+      final updateCompleter = Completer<void>();
+      final repo = MockUserRepository();
+      when(() => repo.update(any(), any()))
+          .thenAnswer((_) => updateCompleter.future);
+
+      await tester.pumpWidget(
+        _buildScreen(
+          profile: _profile(displayName: 'Carlos'),
+          userRepository: repo,
+          authenticated: true,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+          find.byKey(const Key('edit_personal_display_name')), 'Carlos R.');
+      await tester.pump();
+
+      await tester
+          .ensureVisible(find.byKey(const Key('edit_personal_save_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('edit_personal_save_button')));
+      await tester.pump();
+
+      // Tear the whole tree down mid-await — the route-level PopScope cannot
+      // help here (app shutdown, auth redirect, router rebuild). `_saveState`
+      // is disposed, so every post-await write to it must be guarded.
+      await tester.pumpWidget(const SizedBox.shrink());
+      updateCompleter.completeError(Exception('offline'));
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
     });
   });
 }

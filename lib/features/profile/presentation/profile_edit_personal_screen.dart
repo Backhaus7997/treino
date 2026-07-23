@@ -182,11 +182,23 @@ class _ProfileEditPersonalScreenState
       '${d.month.toString().padLeft(2, '0')}/${d.year}';
 
   /// True while an avatar upload or Firestore update is in flight.
-  /// Used to gate the save handler, the header back-tap and the avatar
-  /// picker so an in-flight save cannot be interrupted (orphaned uploads).
+  /// Used to gate the save handler, the header back-tap, the system back
+  /// (via `PopScope`) and the avatar picker so an in-flight save cannot be
+  /// interrupted (orphaned uploads).
   bool get _isBusy =>
       _saveState.value == _SaveState.uploading ||
       _saveState.value == _SaveState.saving;
+
+  /// Writes to [_saveState] only while the screen is still mounted.
+  ///
+  /// [_saveState] is disposed in [dispose], but `_save()` deliberately runs to
+  /// completion after a mid-flight dispose so an already-uploaded avatar is
+  /// still persisted instead of being orphaned in Storage. Every write that
+  /// happens after an `await` MUST go through here.
+  void _setSaveState(_SaveState next) {
+    if (!mounted) return;
+    _saveState.value = next;
+  }
 
   // ── Avatar pick ──────────────────────────────────────────────────────────
 
@@ -216,14 +228,14 @@ class _ProfileEditPersonalScreenState
     if (_isBusy) return; // re-entrancy guard — a save is already in flight
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    _saveState.value = _SaveState.saving;
+    _setSaveState(_SaveState.saving);
 
     // Prefer uid from seeded initial profile (available synchronously from
     // initState read). Fall back to auth state for robustness.
     final uid = _initialProfile?.uid ??
         ref.read(authStateChangesProvider).valueOrNull?.uid;
     if (uid == null) {
-      _saveState.value = _SaveState.error;
+      _setSaveState(_SaveState.error);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -241,7 +253,7 @@ class _ProfileEditPersonalScreenState
 
     // Upload new avatar if one was staged
     if (_pendingLocalPath != null) {
-      _saveState.value = _SaveState.uploading;
+      _setSaveState(_SaveState.uploading);
       try {
         avatarUrl = await ref
             .read(avatarUploadServiceProvider)
@@ -269,12 +281,12 @@ class _ProfileEditPersonalScreenState
             ),
           );
         }
-        _saveState.value = _SaveState.idle;
+        _setSaveState(_SaveState.idle);
         return;
       }
     }
 
-    _saveState.value = _SaveState.saving;
+    _setSaveState(_SaveState.saving);
 
     // Build partial — only changed fields
     final partial = <String, Object?>{};
@@ -353,7 +365,7 @@ class _ProfileEditPersonalScreenState
           ),
         );
       }
-      _saveState.value = _SaveState.idle;
+      _setSaveState(_SaveState.idle);
     }
   }
 
@@ -476,7 +488,7 @@ class _ProfileEditPersonalScreenState
       );
     }
 
-    return Column(
+    final content = Column(
       children: [
         // ── Header ──────────────────────────────────────────────────────────
         Padding(
@@ -684,6 +696,21 @@ class _ProfileEditPersonalScreenState
           ),
         ),
       ],
+    );
+
+    // The header back-tap and the DESCARTAR pill are already gated by
+    // `_isBusy`, but a system back (Android hardware back, iOS swipe-back)
+    // bypasses both and pops the route straight from the Navigator — which
+    // disposes the screen mid-upload, losing the save and orphaning the
+    // freshly-uploaded avatar in Storage. Block the pop while busy so the
+    // in-flight save is the only thing that can end this route.
+    return ValueListenableBuilder<_SaveState>(
+      valueListenable: _saveState,
+      builder: (context, _, child) => PopScope(
+        canPop: !_isBusy,
+        child: child!,
+      ),
+      child: content,
     );
   }
 
