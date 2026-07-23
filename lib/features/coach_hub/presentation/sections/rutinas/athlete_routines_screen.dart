@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_palette.dart';
-import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
@@ -57,71 +57,81 @@ class AthleteRoutinesScreen extends ConsumerWidget {
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // ── Header: back + título + "Nueva rutina" ──────────────────────
-          TreinoFadeSlideIn(
-            delay: AppMotion.stagger(0),
-            child: Row(
-              children: [
-                IconButton(
-                  icon: Icon(TreinoIcon.arrowLeft, color: palette.textMuted),
-                  onPressed: () => context.pop(),
-                ),
-                const SizedBox(width: AppSpacing.hairline),
-                Expanded(
-                  child: TreinoSectionHeader(
-                    title: 'Rutinas de $name', // i18n
-                    count: routinesAsync.hasValue ? visible.length : null,
-                    action: TreinoSectionHeaderAction(
-                      label: 'Nueva rutina', // i18n
-                      onTap: () => context.push('/routine-editor/$athleteId'),
+      // Ancho máximo: misma columna angosta alineada a la izquierda que
+      // RutinasScreen — se acabó el borde a borde.
+      child: Align(
+        alignment: Alignment.topLeft,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 820),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // ── Header: back + título + "Nueva rutina" ──────────────────
+              TreinoFadeSlideIn(
+                delay: AppMotion.stagger(0),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon:
+                          Icon(TreinoIcon.arrowLeft, color: palette.textMuted),
+                      onPressed: () => context.pop(),
                     ),
-                  ),
+                    const SizedBox(width: AppSpacing.hairline),
+                    Expanded(
+                      child: TreinoSectionHeader(
+                        title: 'Rutinas de $name', // i18n
+                        count: routinesAsync.hasValue ? visible.length : null,
+                        action: TreinoSectionHeaderAction(
+                          label: 'Nueva rutina', // i18n
+                          onTap: () =>
+                              context.push('/routine-editor/$athleteId'),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(height: AppSpacing.s18),
+              TreinoFadeSlideIn(
+                delay: AppMotion.stagger(1),
+                child: TreinoFilterChips(
+                  options: const [_kActivasLabel, _kArchivadasLabel],
+                  selected: {
+                    statusFilter == RoutineStatus.active
+                        ? _kActivasLabel
+                        : _kArchivadasLabel,
+                  },
+                  badgeCounts: {
+                    _kActivasLabel: active.length,
+                    _kArchivadasLabel: archived.length,
+                  },
+                  onChanged: (newSelected) {
+                    // Single-select: TreinoFilterChips permite deseleccionar
+                    // el chip activo (queda `{}`) — siempre necesitamos un
+                    // filtro activo, así que un tap que vacía la selección es
+                    // un no-op (mismo criterio que AlumnosScreen._FiltroChips).
+                    if (newSelected.isEmpty) return;
+                    final f = newSelected.first == _kActivasLabel
+                        ? RoutineStatus.active
+                        : RoutineStatus.archived;
+                    ref.read(_statusFilterProvider.notifier).state = f;
+                  },
+                ),
+              ),
+              const SizedBox(height: AppSpacing.s20),
+              TreinoStateSwitcher(
+                childKey:
+                    ValueKey(_stateKeyOf(routinesAsync, visible, statusFilter)),
+                child: _AthleteRoutinesBody(
+                  routinesAsync: routinesAsync,
+                  visible: visible,
+                  statusFilter: statusFilter,
+                  athleteId: athleteId,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: AppSpacing.s18),
-          TreinoFadeSlideIn(
-            delay: AppMotion.stagger(1),
-            child: TreinoFilterChips(
-              options: const [_kActivasLabel, _kArchivadasLabel],
-              selected: {
-                statusFilter == RoutineStatus.active
-                    ? _kActivasLabel
-                    : _kArchivadasLabel,
-              },
-              badgeCounts: {
-                _kActivasLabel: active.length,
-                _kArchivadasLabel: archived.length,
-              },
-              onChanged: (newSelected) {
-                // Single-select: TreinoFilterChips permite deseleccionar el
-                // chip activo (queda `{}`) — siempre necesitamos un filtro
-                // activo, así que un tap que vacía la selección es un no-op
-                // (mismo criterio que AlumnosScreen._FiltroChips).
-                if (newSelected.isEmpty) return;
-                final f = newSelected.first == _kActivasLabel
-                    ? RoutineStatus.active
-                    : RoutineStatus.archived;
-                ref.read(_statusFilterProvider.notifier).state = f;
-              },
-            ),
-          ),
-          const SizedBox(height: AppSpacing.s20),
-          TreinoStateSwitcher(
-            childKey:
-                ValueKey(_stateKeyOf(routinesAsync, visible, statusFilter)),
-            child: _AthleteRoutinesBody(
-              routinesAsync: routinesAsync,
-              visible: visible,
-              statusFilter: statusFilter,
-              athleteId: athleteId,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -193,7 +203,7 @@ class _AthleteRoutinesBody extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (var i = 0; i < visible.length; i++) ...[
-          if (i != 0) const SizedBox(height: AppSpacing.s8),
+          if (i != 0) const SizedBox(height: AppSpacing.s12),
           TreinoFadeSlideIn(
             delay: AppMotion.stagger(i),
             child: _RoutineRow(
@@ -334,15 +344,87 @@ class _RoutineRowState extends ConsumerState<_RoutineRow> {
       );
     }
 
-    return TreinoListRow(
-      title: routine.name,
-      subtitle:
-          '${routine.days.length} días · ${routine.numWeeks} $weeks', // i18n
-      trailing: trailing,
+    // Color de estado del dot (feedback de revisión en vivo: "más colores"):
+    // activa web-editable = accent, activa periodizada (se edita en mobile) =
+    // highlight, archivada = textMuted — mismo mapeo semántico que el dot de
+    // RutinasScreen.
+    final statusColor = archived
+        ? palette.textMuted
+        : editable
+            ? palette.accent
+            : palette.highlight;
+
+    return TreinoInteractiveState(
+      key: Key('routine_row_${routine.id}'),
       onTap: editable
           ? () =>
               context.push('/routine-editor/${widget.athleteId}/${routine.id}')
           : null,
+      builder: (ctx, states) {
+        final highlighted = states.hovered || states.pressed;
+
+        return AnimatedContainer(
+          duration:
+              AppMotionTokens.resolve(ctx, AppMotionTokens.cardStateChange),
+          curve: AppMotionTokens.enter,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.s20,
+            vertical: AppSpacing.s18,
+          ),
+          decoration: BoxDecoration(
+            color: highlighted
+                ? TreinoCardTokens.border(ctx).withValues(alpha: 0.08)
+                : TreinoCardTokens.background(ctx),
+            borderRadius: BorderRadius.circular(TreinoCardTokens.borderRadius),
+            border: Border.all(
+              color: highlighted
+                  ? palette.borderHover
+                  : TreinoCardTokens.border(ctx),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: AppSpacing.s8,
+                height: AppSpacing.s8,
+                decoration:
+                    BoxDecoration(color: statusColor, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: AppSpacing.s12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      routine.name,
+                      style: TextStyle(
+                        fontFamily: AppFonts.barlow,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        color: palette.textPrimary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: AppSpacing.hairline),
+                    Text(
+                      '${routine.days.length} días · ${routine.numWeeks} $weeks', // i18n
+                      style: TextStyle(
+                        fontFamily: AppFonts.barlow,
+                        fontSize: 12,
+                        color: palette.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.s12),
+              trailing,
+            ],
+          ),
+        );
+      },
     );
   }
 }

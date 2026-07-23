@@ -172,7 +172,9 @@ void main() {
       expect(find.byType(TreinoListRow), findsWidgets);
     });
 
-    testWidgets('renders athletes with TreinoListRow', (tester) async {
+    testWidgets(
+        'renders athletes as cards (not TreinoListRow) with a status dot',
+        (tester) async {
       await _pumpRutinas(tester, links: [
         _link(id: '1', status: TrainerLinkStatus.active, athleteId: 'a1'),
       ], names: {
@@ -180,7 +182,15 @@ void main() {
       });
 
       expect(find.byKey(const ValueKey('data')), findsOneWidget);
-      expect(find.byType(TreinoListRow), findsOneWidget);
+      // Redesign (revisión en vivo): la fila pelada TreinoListRow pasó a una
+      // card propia con avatar tintado + dot de estado — TreinoListRow ya
+      // no se usa en el estado con data (solo sigue vivo en el skeleton).
+      expect(find.byType(TreinoListRow), findsNothing);
+      expect(find.byKey(const ValueKey('athlete_row_a1')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('athlete_row_status_dot_a1')),
+        findsOneWidget,
+      );
     });
 
     testWidgets(
