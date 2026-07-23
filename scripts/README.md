@@ -16,6 +16,19 @@ Admin SDK utilities operated by the team against `treino-dev` and (rarely) `trei
   cd scripts && npm install
   ```
 
+### Running against the emulator (no service-account key)
+
+Every Admin SDK script here checks `FIRESTORE_EMULATOR_HOST` **before** loading
+`sa-key.json`. Set it and the script initializes against the local emulator
+(`projectId: 'treino-dev'`) with no credentials at all:
+
+```sh
+FIRESTORE_EMULATOR_HOST=localhost:8080 node scripts/<script>.js
+```
+
+Without that env var the key is required, and a missing `sa-key.json` fails
+with an actionable message instead of a raw `MODULE_NOT_FOUND`.
+
 ---
 
 ## promote_user_to_trainer.js
@@ -128,7 +141,8 @@ node scripts/backfill_gym_names.js
 ```
 
 Both scripts:
-- Print the target `project_id` (from `sa-key.json`) before doing anything,
+- Print the target `project_id` (from `sa-key.json`, or `treino-dev` when
+  `FIRESTORE_EMULATOR_HOST` is set) before doing anything,
   and **refuse to run** unless the project id looks like a dev project
   (contains "dev"). Pass `--allow-prod` to override, only after dev
   verification + maintainer sign-off.
