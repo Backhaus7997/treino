@@ -14,7 +14,6 @@ import '../../../../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../../../widgets/coach_hub_widgets.dart';
 import '../chat_section_screen.dart' show selectedChatIdProvider;
-import 'chat_avatar.dart';
 
 /// Panel izquierdo del split-pane: lista de conversaciones del PF.
 ///
@@ -331,7 +330,7 @@ class _ChatRow extends ConsumerWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              ChatAvatar(
+              TreinoAvatar(
                 displayName: resolvedName,
                 avatarUrl: resolvedAvatarUrl,
               ),

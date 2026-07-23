@@ -17,7 +17,6 @@ import '../../../../../profile/application/user_public_profile_providers.dart';
 import '../../../../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../../../widgets/coach_hub_widgets.dart';
-import 'chat_avatar.dart';
 import 'chat_message_bubble.dart';
 
 /// Panel derecho del split-pane: header con el otro user + lista invertida
@@ -434,7 +433,7 @@ class _Header extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          ChatAvatar(
+          TreinoAvatar(
             displayName: pubAsync.maybeWhen(
               data: (p) => p?.displayName ?? '?',
               orElse: () => null,

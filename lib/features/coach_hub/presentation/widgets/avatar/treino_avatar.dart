@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
 
-import '../../../../../../app/theme/app_palette.dart';
-import '../../../../../../app/theme/tokens/primitives.dart';
+import '../../../../../app/theme/app_palette.dart';
+import '../../../../../app/theme/tokens/primitives.dart';
 
-/// Avatar de chat con tinte derivado del nombre — reemplaza el círculo
-/// apagado (fondo neutro + inicial gris) del diseño anterior.
+/// Avatar del kit Coach Hub Web con tinte derivado del nombre — reemplaza el
+/// círculo apagado (fondo neutro + inicial gris) del diseño anterior.
 ///
 /// Paleta ACOTADA de 3 tintes construidos desde [AppPalette] (mint/magenta/
 /// sage, sin hex nuevos): el mismo [displayName] siempre resuelve al mismo
-/// tinte (hash determinístico), así que un alumno mantiene su color entre
-/// la lista y el header del detail pane. Usado por `_ChatRow`
-/// (chat_list_pane.dart) y `_Header` (chat_detail_pane.dart).
-class ChatAvatar extends StatelessWidget {
-  const ChatAvatar({
+/// tinte (hash determinístico), así un alumno mantiene su color en cualquier
+/// pantalla que lo muestre (chat, rutinas, ...).
+///
+/// Introducido en la ronda de revisión de Chat (list pane + detail header,
+/// `ADR` implícito: "reusar > copiar") y promovido a este kit compartido para
+/// que Rutinas lo consuma sin duplicar la lógica de tinte.
+class TreinoAvatar extends StatelessWidget {
+  const TreinoAvatar({
     super.key,
     required this.displayName,
     required this.avatarUrl,
@@ -41,7 +44,7 @@ class ChatAvatar extends StatelessWidget {
       );
     }
 
-    final tint = _ChatAvatarTint.of(context, name);
+    final tint = _TreinoAvatarTint.of(context, name);
     final hasImage = avatarUrl != null && avatarUrl!.isNotEmpty;
 
     return CircleAvatar(
@@ -65,10 +68,13 @@ class ChatAvatar extends StatelessWidget {
 
 String _initial(String name) => name.isNotEmpty ? name[0].toUpperCase() : '?';
 
-/// Tinte resuelto (fondo con alpha + texto sólido) para un [ChatAvatar].
+/// Tinte resuelto (fondo con alpha + texto sólido) para un [TreinoAvatar].
 @immutable
-class _ChatAvatarTint {
-  const _ChatAvatarTint._({required this.background, required this.foreground});
+class _TreinoAvatarTint {
+  const _TreinoAvatarTint._({
+    required this.background,
+    required this.foreground,
+  });
 
   final Color background;
   final Color foreground;
@@ -77,12 +83,12 @@ class _ChatAvatarTint {
   /// sage — a partir de la suma de code units de [seed]. Mismo nombre, mismo
   /// tinte, siempre; sin diccionario ni estado, solo aritmética sobre
   /// [AppPalette].
-  static _ChatAvatarTint of(BuildContext context, String seed) {
+  static _TreinoAvatarTint of(BuildContext context, String seed) {
     final palette = AppPalette.of(context);
     final tones = [palette.accent, palette.highlight, palette.sage];
     final sum = seed.codeUnits.fold<int>(0, (acc, unit) => acc + unit);
     final tone = tones[sum % tones.length];
-    return _ChatAvatarTint._(
+    return _TreinoAvatarTint._(
       // 20% de opacidad: visible sobre bgCard en ambos temas sin competir
       // con el texto del row.
       background: tone.withValues(alpha: 0.20),
