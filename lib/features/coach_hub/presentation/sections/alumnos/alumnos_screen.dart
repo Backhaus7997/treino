@@ -32,10 +32,15 @@ extension AlumnoEstadoX on AlumnoEstado {
         AlumnoEstado.inactivo => l10n.coachHubAlumnosStatusInactive,
       };
 
+  // Feedback de revisión ("dot de estado con color semántico"): activo=mint,
+  // pausado=warning (antes highlight — no es un estado de riesgo, pero
+  // tampoco "normal"), conDeuda=danger (antes warning — más severo que un
+  // pago por vencer), inactivo=textMuted. Alinea con la paleta danger/warning
+  // que ya usa Pagos (`pagos_estado.dart`).
   Color color(AppPalette p) => switch (this) {
         AlumnoEstado.activo => p.accent,
-        AlumnoEstado.conDeuda => p.warning,
-        AlumnoEstado.pausado => p.highlight,
+        AlumnoEstado.pausado => p.warning,
+        AlumnoEstado.conDeuda => p.danger,
         AlumnoEstado.inactivo => p.textMuted,
       };
 }
@@ -498,7 +503,10 @@ class _AlumnoCell extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _Avatar(name: name, url: url, palette: palette),
+        // Feedback de revisión: avatar tintado del kit (barrel) en vez del
+        // círculo apagado (fondo neutro + inicial gris) — mismo componente
+        // que Chat/Rutinas, tinte determinístico por nombre.
+        TreinoAvatar(displayName: name, avatarUrl: url, diameter: 36),
         const SizedBox(width: AppSpacing.s12),
         Flexible(
           child: Text.rich(
@@ -528,35 +536,6 @@ class _AlumnoCell extends StatelessWidget {
   }
 }
 
-class _Avatar extends StatelessWidget {
-  const _Avatar({required this.name, required this.url, required this.palette});
-
-  final String name;
-  final String? url;
-  final AppPalette palette;
-
-  @override
-  Widget build(BuildContext context) {
-    final initial = name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
-    return CircleAvatar(
-      radius: 18,
-      backgroundColor: palette.bg,
-      backgroundImage:
-          (url != null && url!.isNotEmpty) ? NetworkImage(url!) : null,
-      child: (url == null || url!.isEmpty)
-          ? Text(
-              initial,
-              style: TextStyle(
-                color: palette.accent,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            )
-          : null,
-    );
-  }
-}
-
 class _EstadoBadge extends StatelessWidget {
   const _EstadoBadge({required this.estado, required this.palette});
 
@@ -566,7 +545,22 @@ class _EstadoBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
-    final color = estado.color(palette);
+    return _DotLabel(color: estado.color(palette), label: estado.label(l10n));
+  }
+}
+
+/// Dot + texto — celda compacta compartida por Estado/Rutina/Nutrición/
+/// Vencimiento (mismo idioma visual, columna angosta de la fila fija a
+/// `TreinoTableTokens.rowHeight`). Extraído tras el 2do copy-paste
+/// (Estado→Rutina) — regla del kit (ADR-A3-04).
+class _DotLabel extends StatelessWidget {
+  const _DotLabel({required this.color, required this.label});
+
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
     return Align(
       alignment: Alignment.centerLeft,
       child: Row(
@@ -580,7 +574,7 @@ class _EstadoBadge extends StatelessWidget {
           const SizedBox(width: AppSpacing.hairline + AppSpacing.hairline),
           Flexible(
             child: Text(
-              estado.label(l10n),
+              label,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(color: color, fontSize: 13),
             ),

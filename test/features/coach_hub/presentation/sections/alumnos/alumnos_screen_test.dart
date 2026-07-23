@@ -14,6 +14,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/data/trainer_link_repository.dart';
@@ -154,6 +155,22 @@ void main() {
     test('pending → inactivo (no es parte del roster activo)', () {
       expect(estadoForLink(_link('a4', TrainerLinkStatus.pending), const {}),
           AlumnoEstado.inactivo);
+    });
+  });
+
+  group('AlumnoEstadoX.color (dot semántico — feedback de revisión)', () {
+    const p = AppPalette.mintMagenta;
+    test('activo → accent (mint)', () {
+      expect(AlumnoEstado.activo.color(p), p.accent);
+    });
+    test('pausado → warning', () {
+      expect(AlumnoEstado.pausado.color(p), p.warning);
+    });
+    test('conDeuda → danger', () {
+      expect(AlumnoEstado.conDeuda.color(p), p.danger);
+    });
+    test('inactivo → textMuted', () {
+      expect(AlumnoEstado.inactivo.color(p), p.textMuted);
     });
   });
 
