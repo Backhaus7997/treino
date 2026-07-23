@@ -12,6 +12,7 @@ import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
+import '../../workout/application/exercise_providers.dart';
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../application/day_insights_providers.dart';
@@ -122,11 +123,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                 child: CircularProgressIndicator(color: palette.accent),
               ),
               error: (_, __) => _ErrorState(
-                onRetry: () => ref.invalidate(
-                  athleteWeekInsightsProvider(
-                    (uid: uid, weekStart: _shownWeekStart),
-                  ),
-                ),
+                onRetry: () => _retryWeek(ref, uid, _shownWeekStart),
               ),
               data: (insights) {
                 // Bug fix (abandoned-session-streak-reports): el CTA de
@@ -270,6 +267,27 @@ class _EmptyState extends StatelessWidget {
       ),
     );
   }
+}
+
+// ── Retry ─────────────────────────────────────────────────────────────────────
+
+/// QA-498: `ref.invalidate` NO cascada a las dependencias, y [exercisesProvider]
+/// NO es autoDispose — cachea su `AsyncError` para toda la vida del container.
+/// Invalidar solo el provider de la card lo rebuildeaba, re-leía el MISMO error
+/// cacheado del catálogo y re-renderizaba el mismo estado de error: un botón de
+/// reintentar que no podía recuperar nunca, justo en el caso que trae al usuario
+/// acá (offline / fallo al cargar el catálogo en frío). Mismo criterio que el
+/// `_retry` de MuscleDistributionScreen y FrequentExercisesScreen (#376).
+void _retryWeek(WidgetRef ref, String uid, DateTime weekStart) {
+  ref.invalidate(exercisesProvider);
+  ref.invalidate(athleteWeekInsightsProvider((uid: uid, weekStart: weekStart)));
+}
+
+/// Ver [_retryWeek] — [athleteDayInsightsProvider] también lee
+/// `exercisesProvider.future`.
+void _retryDay(WidgetRef ref, String uid, DateTime day) {
+  ref.invalidate(exercisesProvider);
+  ref.invalidate(athleteDayInsightsProvider((uid: uid, day: day)));
 }
 
 // ── Error state ───────────────────────────────────────────────────────────────
@@ -624,9 +642,7 @@ class _DailyMusclesCard extends ConsumerWidget {
             // Reusa `_ErrorState` (compacto) con retry que invalida el
             // provider de ESTE card (day-insights), no el semanal.
             error: (_, __) => _ErrorState(
-              onRetry: () => ref.invalidate(
-                athleteDayInsightsProvider((uid: uid, day: selectedDay)),
-              ),
+              onRetry: () => _retryDay(ref, uid, selectedDay),
             ),
             // [UX-back-view] `showBack: true` renders bodyfront + bodyback
             // side by side — that pair needs more horizontal room than the

@@ -12,6 +12,7 @@ import 'package:treino/features/workout/application/exercise_providers.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/data/session_repository.dart';
+import 'package:treino/features/workout/domain/exercise.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
@@ -138,6 +139,75 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Reintentar'), findsOneWidget);
+  });
+
+  // QA-498: `ref.invalidate` NO cascada a las dependencias, y exercisesProvider
+  // NO es autoDispose — cachea su AsyncError para toda la vida del container.
+  // Invalidando SOLO el provider del radar se re-leía el MISMO error del
+  // catálogo: un botón que no podía recuperar justo el caso que trae al usuario
+  // acá (catálogo frío que falló / offline).
+  testWidgets(
+      'QA-498: Reintentar en el radar RECUPERA — re-fetchea el catálogo, '
+      'no repite su error cacheado', (tester) async {
+    final repo = MockSessionRepository();
+    final now = DateTime.now();
+    when(() => repo.listByUid('u1', limit: any(named: 'limit')))
+        .thenAnswer((_) async => [
+              makeSession(
+                id: 's1',
+                startedAt: now,
+                status: SessionStatus.finished,
+                wasFullyCompleted: true,
+                routineId: 'r1',
+              ),
+            ]);
+    when(() => repo.listSetLogs(uid: 'u1', sessionId: 's1'))
+        .thenAnswer((_) async => [makeSetLog(id: 'l1', exerciseId: 'e-chest')]);
+
+    // El catálogo falla en frío una vez y después anda.
+    var catalogAttempts = 0;
+
+    await tester.pumpWidget(wrap(
+      const SizedBox.shrink(),
+      overrides: [
+        sessionRepositoryProvider.overrideWithValue(repo),
+        exercisesProvider.overrideWith((ref) async {
+          catalogAttempts++;
+          if (catalogAttempts == 1) throw Exception('catalogue fetch failed');
+          return [
+            const Exercise(
+              id: 'e-chest',
+              name: 'Press',
+              muscleGroup: 'chest',
+              category: 'compound',
+            ),
+          ];
+        }),
+      ],
+    ));
+    await tester.pumpAndSettle();
+
+    // El radar vive al fondo del scroll: hay que llegar hasta él para que se
+    // construya (mismo criterio que el test del legend del radar).
+    await tester.scrollUntilVisible(
+      find.text('Reintentar'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    // El radar cayó en error (las sesiones sí cargaron).
+    expect(find.text('Reintentar'), findsOneWidget);
+
+    await tester.tap(find.text('Reintentar'));
+    await tester.pumpAndSettle();
+
+    expect(
+      catalogAttempts,
+      2,
+      reason: 'el retry debe re-fetchear el catálogo, no repetir su error '
+          'cacheado (sin el fix queda en 1)',
+    );
   });
 
   testWidgets('switching to POR DÍA renders the daily duration chart',
