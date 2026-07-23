@@ -1,3 +1,5 @@
+import 'dart:async' show Completer;
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +9,7 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/chat/data/chat_repository.dart';
+import 'package:treino/features/chat/domain/media_type.dart';
 import 'package:treino/features/chat/domain/message.dart';
 import 'package:treino/features/chat/presentation/chat_screen.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
@@ -34,6 +37,25 @@ UserPublicProfile _pub(String uid, String name) => UserPublicProfile(
       displayName: name,
       displayNameLowercase: name.toLowerCase(),
     );
+
+/// Repo real salvo por `sendMessage`, que queda colgado hasta que el test
+/// completa [gate]. Sirve para tener un envío en vuelo mientras la pantalla
+/// se destruye.
+class _GatedChatRepository extends ChatRepository {
+  _GatedChatRepository({required super.firestore, required this.gate});
+
+  final Completer<void> gate;
+
+  @override
+  Future<void> sendMessage({
+    required String chatId,
+    required String senderId,
+    String text = '',
+    String? mediaUrl,
+    MediaType? mediaType,
+  }) =>
+      gate.future;
+}
 
 Message _msg({
   required String id,
@@ -194,6 +216,63 @@ void main() {
       expect(tf.controller!.text, '');
 
       // Analytics event disparado.
+      expect(analytics.events, contains('chat_message_sent'));
+    });
+
+    testWidgets(
+        'send que termina después de cerrar la pantalla no toca el controller '
+        '(#501)', (tester) async {
+      final firestore = FakeFirebaseFirestore();
+      await firestore.collection('chats').doc('aaa_bbb').set({
+        'chatId': 'aaa_bbb',
+        'members': ['aaa', 'bbb'],
+        'createdAt': Timestamp.fromDate(DateTime.utc(2026, 5, 20)),
+      });
+      // El envío queda en vuelo hasta que el test abre la compuerta, así el
+      // await sobrevive al dispose de la pantalla.
+      final gate = Completer<void>();
+      final analytics = FakeAnalyticsService();
+
+      // Riverpod no admite cambiar la cantidad de overrides entre pumps: el
+      // segundo pumpWidget reusa exactamente la misma lista.
+      final overrides = <Override>[
+        firestoreProvider.overrideWithValue(firestore),
+        chatRepositoryProvider.overrideWithValue(
+          _GatedChatRepository(firestore: firestore, gate: gate),
+        ),
+        currentUidProvider.overrideWith((_) => 'aaa'),
+        messagesProvider('aaa_bbb').overrideWith(
+          (_) => Stream.value(const <Message>[]),
+        ),
+        userPublicProfileProvider('bbb').overrideWith(
+          (_) => Stream.value(_pub('bbb', 'Coach Joe')),
+        ),
+        analyticsServiceProvider.overrideWithValue(analytics),
+      ];
+
+      await tester.pumpWidget(_wrap(
+        const ChatScreen(chatId: 'aaa_bbb', otherUid: 'bbb'),
+        overrides: overrides,
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField), 'hola');
+      await tester.tap(find.byTooltip('Enviar'));
+      await tester.pump();
+
+      // La pantalla muere con el envío todavía en vuelo (back, deep-link,
+      // logout): el TextEditingController queda disposed.
+      await tester.pumpWidget(
+        _wrap(const SizedBox.shrink(), overrides: overrides),
+      );
+      await tester.pump();
+
+      gate.complete();
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      // El mensaje salió igual, así que el evento corresponde: lo único que
+      // no debe pasar es que se toque la UI ya muerta.
       expect(analytics.events, contains('chat_message_sent'));
     });
 

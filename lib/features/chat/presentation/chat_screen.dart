@@ -85,16 +85,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (currentUid == null) return;
 
     setState(() => _sending = true);
+    // Capturados antes del await (mismo criterio que _onAttach / issue #435):
+    // el envío pertenece a ESTE chat y `ref` no se puede usar una vez que la
+    // pantalla murió, pero el mensaje igual salió y el evento corresponde.
+    final chatId = widget.chatId;
+    final repository = ref.read(chatRepositoryProvider);
+    final analytics = ref.read(analyticsServiceProvider);
     try {
-      await ref.read(chatRepositoryProvider).sendMessage(
-            chatId: widget.chatId,
-            senderId: currentUid,
-            text: text,
-          );
-      ref.read(analyticsServiceProvider).logChatMessageSent(
-            chatId: widget.chatId,
-            senderId: currentUid,
-          );
+      await repository.sendMessage(
+        chatId: chatId,
+        senderId: currentUid,
+        text: text,
+      );
+      analytics.logChatMessageSent(chatId: chatId, senderId: currentUid);
+      // #501: el await pudo sobrevivir a la pantalla (back, deep-link,
+      // logout). Tocar el controller ya disposed tira "used after being
+      // disposed" y el catch de abajo lo reporta como envío fallido cuando en
+      // realidad salió.
+      if (!mounted) return;
       _textController.clear();
     } catch (e, st) {
       developer.log(
