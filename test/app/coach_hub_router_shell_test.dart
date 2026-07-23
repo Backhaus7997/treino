@@ -201,7 +201,10 @@ void main() {
           ),
         );
 
-        router.go('/nutricion');
+        // `/nutricion` dejó de ser placeholder en Fase 6 (WU-04,
+        // `NutricionScreen`) — `/planes` sigue sin screen real, sirve de
+        // fixture estable para este invariante estructural del shell.
+        router.go('/planes');
         await tester.pumpAndSettle();
 
         // Placeholder renders WITHIN the shell (sidebar stays visible).
