@@ -11,10 +11,14 @@ import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/nutricion/nutricion_providers.dart';
+import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pagos_buckets_provider.dart';
+import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pagos_estado.dart';
+import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/payment_format.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
 import '../../../../../l10n/app_l10n.dart';
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart';
+import 'package:treino/features/payments/domain/payment.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
@@ -418,10 +422,14 @@ class _RosterTable extends ConsumerWidget {
 
     return CoachHubDataTable(
       columns: [
+        // flex:3 (antes 4) — cede una unidad a la nueva columna Vencimiento;
+        // «Alumno» ya trunca con ellipsis (`_AlumnoCell`), así que absorbe el
+        // recorte sin riesgo de overflow del header («ALUMNO», 6 caracteres,
+        // igual de corto que «ESTADO»/«Rutina», que ya fit en flex:1).
         CoachHubColumn(
           key: 'alumno',
           label: l10n.coachHubAlumnosColumnStudent,
-          flex: 4,
+          flex: 3,
         ),
         // flex:1 (antes 2) — cede una unidad a la nueva columna Nutrición
         // («Estado» es un header de 6 caracteres, igual de corto que
@@ -444,6 +452,11 @@ class _RosterTable extends ConsumerWidget {
         // completa — el chip de la celda ("Con plan"/"Sin plan") ya deja
         // clara la semántica.
         const CoachHubColumn(key: 'nutricion', label: 'Plan', flex: 1), // i18n
+        // Header corto ("Vence") por la misma razón que "Plan"/"Rutina": el
+        // total de flex de la fila se mantiene en 11 (recortando 1 de
+        // «Alumno») para no encoger el resto de columnas ya validado contra
+        // overflow del header (ver Learned de la pieza col-nutricion).
+        const CoachHubColumn(key: 'vencimiento', label: 'Vence', flex: 1),
         CoachHubColumn(
           key: 'acciones',
           label: l10n.coachHubAlumnosColumnActions,
@@ -517,6 +530,8 @@ class _RosterTable extends ConsumerWidget {
         'rutina': _RutinaCell(athleteId: link.athleteId, palette: palette),
         'nutricion':
             _NutricionCell(athleteId: link.athleteId, palette: palette),
+        'vencimiento':
+            _VencimientoCell(athleteId: link.athleteId, palette: palette),
         'acciones': _RowActions(link: link, palette: palette),
       },
     );
@@ -681,6 +696,74 @@ class _NutricionCell extends ConsumerWidget {
       child: _DotLabel(
         color: conPlan ? palette.accent : palette.textMuted,
         label: conPlan ? 'Con plan' : 'Sin plan', // i18n
+      ),
+    );
+  }
+}
+
+/// Info derivada para la celda «Vencimiento»: agrega los pagos del alumno vía
+/// [pagoEstadoOf] (mismo criterio dueAt-aware que Pagos, ADR-PGW-002/
+/// REQ-VENC-11) y resuelve el peor caso — un pago vencido tiene prioridad
+/// sobre cualquier pago por vencer (más urgente, no tiene sentido mostrar una
+/// fecha futura si ya hay una cuota vencida); sin pago vencido, se toma el
+/// `dueAt` más próximo entre los pagos por vencer (los legacy sin `dueAt` no
+/// aportan fecha); sin ningún pago del alumno, no hay cuota
+/// (`vencido: false, proximaFecha: null` → celda "—").
+///
+/// Pública para testear sin pump (mismo patrón que [estadoForLink] /
+/// [lastWorkoutLabel]).
+({bool vencido, DateTime? proximaFecha}) vencimientoInfoFor(
+  List<Payment> payments,
+  String athleteId,
+  DateTime now,
+) {
+  var vencido = false;
+  DateTime? proxima;
+  for (final p in payments) {
+    if (p.athleteId != athleteId) continue;
+    final estado = pagoEstadoOf(p, now).estado;
+    if (estado == PagoEstado.vencido) {
+      vencido = true;
+    } else if (estado == PagoEstado.porVencer && p.dueAt != null) {
+      final dueAt = p.dueAt!;
+      if (proxima == null || dueAt.isBefore(proxima)) proxima = dueAt;
+    }
+  }
+  return (vencido: vencido, proximaFecha: vencido ? null : proxima);
+}
+
+/// Celda «Vencimiento»: badge "Vencido" (danger, mismo token que
+/// `AlumnoEstado.conDeuda`) si el alumno tiene al menos un pago vencido; si
+/// no, la fecha del próximo vencimiento pendiente (formato "22 mayo", mismo
+/// `fmtDayMonth` que la sección Pagos); "—" si no tiene ninguna cuota
+/// pendiente. Deriva de `pagosBucketsProvider` — a diferencia de
+/// `pagosPorCobrarProvider` (usado en `_LinksLoaded` sólo para derivar el
+/// estado "Con deuda"), éste SÍ trae `dueAt` (ver plan-fase9).
+class _VencimientoCell extends ConsumerWidget {
+  const _VencimientoCell({required this.athleteId, required this.palette});
+
+  final String athleteId;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final payments =
+        ref.watch(pagosBucketsProvider).valueOrNull?.todos ?? const [];
+    final info =
+        vencimientoInfoFor(payments, athleteId, DateTime.now().toUtc());
+
+    if (info.vencido) {
+      return _DotLabel(color: palette.danger, label: 'Vencido'); // i18n
+    }
+    final proxima = info.proximaFecha;
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Text(
+        proxima == null ? '—' : fmtDayMonth(proxima), // i18n
+        style: TextStyle(
+          color: proxima == null ? palette.textMuted : palette.textPrimary,
+          fontSize: 13,
+        ),
       ),
     );
   }

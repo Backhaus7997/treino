@@ -23,11 +23,14 @@ import 'package:treino/features/coach/domain/nutrition_plan.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/alumnos/alumnos_screen.dart';
+import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/payment_format.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
 import 'package:treino/features/gyms/domain/gym.dart';
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart';
+import 'package:treino/features/payments/application/payment_providers.dart';
 import 'package:treino/features/payments/domain/athlete_billing.dart';
+import 'package:treino/features/payments/domain/payment.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
@@ -64,6 +67,27 @@ CobroPendiente _cobro(String athleteId) => CobroPendiente(
       amountArs: 1000,
       cadence: BillingCadence.mensual,
       concept: 'Mensualidad',
+    );
+
+/// Pago del alumno — usado para overridear `trainerPaymentsProvider`
+/// (columna «Vencimiento», vía `pagosBucketsProvider` — dueAt-aware, a
+/// diferencia de `pagosPorCobrarProvider`).
+Payment _payment(
+  String athleteId, {
+  required PaymentStatus status,
+  DateTime? dueAt,
+  DateTime? createdAt,
+  String id = 'p1',
+}) =>
+    Payment(
+      id: id,
+      trainerId: _trainerId,
+      athleteId: athleteId,
+      amountArs: 1000,
+      concept: 'Mensualidad',
+      status: status,
+      createdAt: createdAt ?? DateTime.utc(2026, 1, 1),
+      dueAt: dueAt,
     );
 
 /// Sesión finalizada en [finishedAt] — usada para overridear
@@ -121,6 +145,8 @@ Future<void> _pump(
   // `nutricionEntriesProvider` pegue contra el repo real (sin Firebase en
   // los tests).
   Map<String, NutritionPlan?> plansByAthleteId = const {},
+  // Pagos del trainer (columna «Vencimiento», vía `pagosBucketsProvider`).
+  List<Payment> payments = const [],
   TrainerLinkRepository? repo,
   // `false` para casos donde el stream de links queda colgado en loading a
   // propósito (TreinoShimmer corre en loop infinito — pumpAndSettle no
@@ -163,6 +189,7 @@ Future<void> _pump(
           (ref, key) => {for (final p in profiles) p.uid: p},
         ),
         pagosPorCobrarProvider.overrideWith((ref) => AsyncData(cobros)),
+        trainerPaymentsProvider.overrideWith((ref) => Stream.value(payments)),
         finishedInWindowByUidProvider.overrideWith(
           (ref, key) =>
               sessionsInWindowByAthleteId[key.athleteId] ?? const <Session>[],
@@ -270,6 +297,113 @@ void main() {
     test('sesión finalizada hace 1 día exacto (borde) → "Ayer"', () {
       final finishedAt = todayStart.subtract(const Duration(hours: 1));
       expect(lastWorkoutLabel(l10n, finishedAt, todayStart), 'Ayer');
+    });
+  });
+
+  group('vencimientoInfoFor (columna «Vencimiento»)', () {
+    final now = DateTime.utc(2026, 6, 15);
+
+    test('sin pagos del alumno → sin cuota', () {
+      final info = vencimientoInfoFor(const [], 'a1', now);
+      expect(info.vencido, isFalse);
+      expect(info.proximaFecha, isNull);
+    });
+
+    test('pago vencido → vencido true, sin fecha', () {
+      final info = vencimientoInfoFor(
+        [
+          _payment(
+            'a1',
+            status: PaymentStatus.pending,
+            dueAt: now.subtract(const Duration(days: 2)),
+          ),
+        ],
+        'a1',
+        now,
+      );
+      expect(info.vencido, isTrue);
+      expect(info.proximaFecha, isNull);
+    });
+
+    test('pago por vencer → toma su dueAt', () {
+      final dueAt = now.add(const Duration(days: 4));
+      final info = vencimientoInfoFor(
+        [_payment('a1', status: PaymentStatus.pending, dueAt: dueAt)],
+        'a1',
+        now,
+      );
+      expect(info.vencido, isFalse);
+      expect(info.proximaFecha, dueAt);
+    });
+
+    test('varios pagos por vencer → toma el dueAt más próximo', () {
+      final lejos = now.add(const Duration(days: 20));
+      final cerca = now.add(const Duration(days: 2));
+      final info = vencimientoInfoFor(
+        [
+          _payment('a1', id: 'p1', status: PaymentStatus.pending, dueAt: lejos),
+          _payment('a1', id: 'p2', status: PaymentStatus.pending, dueAt: cerca),
+        ],
+        'a1',
+        now,
+      );
+      expect(info.vencido, isFalse);
+      expect(info.proximaFecha, cerca);
+    });
+
+    test('vencido y por vencer a la vez → prioriza vencido (peor caso)', () {
+      final info = vencimientoInfoFor(
+        [
+          _payment(
+            'a1',
+            id: 'p_venc',
+            status: PaymentStatus.pending,
+            dueAt: now.subtract(const Duration(days: 1)),
+          ),
+          _payment(
+            'a1',
+            id: 'p_por_vencer',
+            status: PaymentStatus.pending,
+            dueAt: now.add(const Duration(days: 10)),
+          ),
+        ],
+        'a1',
+        now,
+      );
+      expect(info.vencido, isTrue);
+      expect(info.proximaFecha, isNull);
+    });
+
+    test('pago de otro alumno no cuenta', () {
+      final info = vencimientoInfoFor(
+        [
+          _payment(
+            'otro',
+            status: PaymentStatus.pending,
+            dueAt: now.subtract(const Duration(days: 5)),
+          ),
+        ],
+        'a1',
+        now,
+      );
+      expect(info.vencido, isFalse);
+      expect(info.proximaFecha, isNull);
+    });
+
+    test('pago pagado no cuenta ni como vencido ni como por vencer', () {
+      final info = vencimientoInfoFor(
+        [
+          _payment(
+            'a1',
+            status: PaymentStatus.paid,
+            dueAt: now.subtract(const Duration(days: 5)),
+          ),
+        ],
+        'a1',
+        now,
+      );
+      expect(info.vencido, isFalse);
+      expect(info.proximaFecha, isNull);
     });
   });
 
@@ -657,6 +791,95 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('DETALLE a1'), findsOneWidget);
+    });
+  });
+
+  group('AlumnosScreen roster — columna Vencimiento', () {
+    testWidgets('alumno con pago vencido → badge "Vencido"', (tester) async {
+      await _pump(
+        tester,
+        links: [_link('a1', TrainerLinkStatus.active)],
+        profiles: [_prof('a1', 'Sofía')],
+        payments: [
+          _payment(
+            'a1',
+            status: PaymentStatus.pending,
+            dueAt: DateTime.now().toUtc().subtract(const Duration(days: 3)),
+          ),
+        ],
+      );
+
+      expect(find.text('Vencido'), findsOneWidget);
+    });
+
+    testWidgets(
+        'alumno con pago pendiente por vencer → muestra la próxima fecha',
+        (tester) async {
+      final dueAt = DateTime.now().toUtc().add(const Duration(days: 5));
+      await _pump(
+        tester,
+        links: [_link('a1', TrainerLinkStatus.active)],
+        profiles: [_prof('a1', 'Sofía')],
+        payments: [
+          _payment('a1', status: PaymentStatus.pending, dueAt: dueAt),
+        ],
+      );
+
+      expect(find.text(fmtDayMonth(dueAt)), findsOneWidget);
+    });
+
+    testWidgets('alumno sin ninguna cuota pendiente → "—"', (tester) async {
+      await _pump(
+        tester,
+        links: [_link('a1', TrainerLinkStatus.active)],
+        profiles: [_prof('a1', 'Sofía')],
+      );
+
+      expect(find.text('—'), findsOneWidget);
+    });
+
+    testWidgets(
+        'vencido y por vencer a la vez → la fila muestra "Vencido" (peor caso)',
+        (tester) async {
+      await _pump(
+        tester,
+        links: [_link('a1', TrainerLinkStatus.active)],
+        profiles: [_prof('a1', 'Sofía')],
+        payments: [
+          _payment(
+            'a1',
+            id: 'p_venc',
+            status: PaymentStatus.pending,
+            dueAt: DateTime.now().toUtc().subtract(const Duration(days: 1)),
+          ),
+          _payment(
+            'a1',
+            id: 'p_por_vencer',
+            status: PaymentStatus.pending,
+            dueAt: DateTime.now().toUtc().add(const Duration(days: 10)),
+          ),
+        ],
+      );
+
+      expect(find.text('Vencido'), findsOneWidget);
+    });
+
+    testWidgets('pago ya pagado no cuenta como vencimiento → "—"',
+        (tester) async {
+      await _pump(
+        tester,
+        links: [_link('a1', TrainerLinkStatus.active)],
+        profiles: [_prof('a1', 'Sofía')],
+        payments: [
+          _payment(
+            'a1',
+            status: PaymentStatus.paid,
+            dueAt: DateTime.now().toUtc().subtract(const Duration(days: 1)),
+          ),
+        ],
+      );
+
+      expect(find.text('—'), findsOneWidget);
     });
   });
 }
