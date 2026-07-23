@@ -4,12 +4,14 @@
 library;
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../../../app/theme/app_motion.dart';
 import '../../../../../../app/theme/app_palette.dart';
+import '../../../../../../app/theme/tokens/primitives.dart';
 import '../../../../../../core/widgets/treino_icon.dart';
 import '../../../../../workout/domain/exercise.dart';
 import '../../../../../workout/domain/muscle_group.dart';
+import '../../../widgets/coach_hub_widgets.dart';
 
 /// Grid card for a single exercise in the Biblioteca web section.
 ///
@@ -21,6 +23,11 @@ import '../../../../../workout/domain/muscle_group.dart';
 /// - Equipment chip (omitted when null).
 /// - Rest badge (omitted when null).
 /// - "CUSTOM" badge when `category == 'custom'`.
+///
+/// Hover/press vía [TreinoInteractiveState] (fuente única de verdad,
+/// ADR-SH-002): borde + tinte de fondo sutiles en hover; el feedback de
+/// presión (scale 0.97) lo hereda de `TreinoTappable`. Sin `GestureDetector`
+/// crudo — el resolver del kit centraliza mouse/foco/teclado.
 ///
 /// REQ-BIBW-04, SCENARIO-BIBW-04a, SCENARIO-BIBW-03a.
 class ExerciseGridCard extends StatelessWidget {
@@ -37,119 +44,140 @@ class ExerciseGridCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    return GestureDetector(
+    return TreinoInteractiveState(
       onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: palette.bgCard,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: palette.border),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // ── Thumbnail header ─────────────────────────────────────────────
-            Expanded(
-              flex: 5,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  ClipRRect(
-                    borderRadius:
-                        const BorderRadius.vertical(top: Radius.circular(12)),
-                    child: _isCustom
-                        ? Container(
-                            color: palette.accent.withValues(alpha: 0.12),
-                            alignment: Alignment.center,
-                            child: Icon(
-                              TreinoIcon.dumbbell,
-                              size: 40,
-                              color: palette.accent,
-                            ),
-                          )
-                        : Image.asset(
-                            'assets/exercises/${exercise.id}.png',
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
-                              color: palette.bgCard,
+      builder: (ctx, states) {
+        final palette = AppPalette.of(ctx);
+        final highlighted = states.hovered || states.pressed;
+
+        return AnimatedContainer(
+          key: const Key('exercise_grid_card_root'),
+          duration: AppMotion.resolve(ctx, AppMotion.micro),
+          curve: AppMotion.standard,
+          decoration: BoxDecoration(
+            color: highlighted
+                ? palette.accent.withValues(alpha: 0.06)
+                : palette.bgCard,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(
+              color: highlighted
+                  ? palette.accent.withValues(alpha: 0.5)
+                  : palette.border,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // ── Thumbnail header ─────────────────────────────────────────
+              Expanded(
+                flex: 5,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    ClipRRect(
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(AppRadius.md),
+                      ),
+                      child: _isCustom
+                          ? Container(
+                              color: palette.accent.withValues(alpha: 0.12),
                               alignment: Alignment.center,
                               child: Icon(
                                 TreinoIcon.dumbbell,
                                 size: 40,
-                                color: palette.textMuted,
+                                color: palette.accent,
+                              ),
+                            )
+                          : Image.asset(
+                              'assets/exercises/${exercise.id}.png',
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                color: palette.bgCard,
+                                alignment: Alignment.center,
+                                child: Icon(
+                                  TreinoIcon.dumbbell,
+                                  size: 40,
+                                  color: palette.textMuted,
+                                ),
                               ),
                             ),
-                          ),
-                  ),
-                  // CUSTOM badge top-right
-                  if (_isCustom)
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: _CustomBadge(palette: palette),
                     ),
-                ],
-              ),
-            ),
-            // ── Info section ─────────────────────────────────────────────────
-            Expanded(
-              flex: 4,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Name
-                    Text(
-                      exercise.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.barlow(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: palette.textPrimary,
-                        height: 1.25,
+                    // CUSTOM badge top-right
+                    if (_isCustom)
+                      Positioned(
+                        top: AppSpacing.s8,
+                        right: AppSpacing.s8,
+                        child: _CustomBadge(palette: palette),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    // "Músculo · Categoría"
-                    Text(
-                      '${muscleGroupLabel(exercise.muscleGroup)} · '
-                      '${_categoryLabel(exercise.category)}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.barlow(
-                        fontSize: 11,
-                        color: palette.textMuted,
-                      ),
-                    ),
-                    const Spacer(),
-                    // Equipment chip + rest badge row
-                    Row(
-                      children: [
-                        if (exercise.equipment != null)
-                          _InfoChip(
-                            label: exercise.equipment!.label,
-                            palette: palette,
-                          ),
-                        if (exercise.equipment != null &&
-                            exercise.defaultRestSeconds != null)
-                          const SizedBox(width: 4),
-                        if (exercise.defaultRestSeconds != null)
-                          _InfoChip(
-                            label: '${exercise.defaultRestSeconds}s', // i18n
-                            palette: palette,
-                          ),
-                      ],
-                    ),
                   ],
                 ),
               ),
-            ),
-          ],
-        ),
-      ),
+              // ── Info section ─────────────────────────────────────────────────
+              Expanded(
+                flex: 4,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.s12,
+                    AppSpacing.s8,
+                    AppSpacing.s12,
+                    AppSpacing.s12,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Name
+                      Text(
+                        exercise.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontFamily: AppFonts.barlow,
+                          fontWeight: AppFonts.w700,
+                          fontSize: 13,
+                          color: palette.textPrimary,
+                          height: 1.25,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.hairline),
+                      // "Músculo · Categoría"
+                      Text(
+                        '${muscleGroupLabel(exercise.muscleGroup)} · '
+                        '${_categoryLabel(exercise.category)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontFamily: AppFonts.barlow,
+                          fontSize: 11,
+                          color: palette.textMuted,
+                        ),
+                      ),
+                      const Spacer(),
+                      // Equipment chip + rest badge row
+                      Row(
+                        children: [
+                          if (exercise.equipment != null)
+                            _InfoChip(
+                              label: exercise.equipment!.label,
+                              palette: palette,
+                            ),
+                          if (exercise.equipment != null &&
+                              exercise.defaultRestSeconds != null)
+                            const SizedBox(width: AppSpacing.hairline),
+                          if (exercise.defaultRestSeconds != null)
+                            _InfoChip(
+                              label: '${exercise.defaultRestSeconds}s', // i18n
+                              palette: palette,
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -172,16 +200,20 @@ class _CustomBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.s8,
+        vertical: AppSpacing.hairline - 2,
+      ),
       decoration: BoxDecoration(
         color: palette.accent,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(AppRadius.full),
       ),
       child: Text(
         'CUSTOM', // i18n
-        style: GoogleFonts.barlowCondensed(
+        style: TextStyle(
+          fontFamily: AppFonts.barlowCondensed,
+          fontWeight: AppFonts.w700,
           fontSize: 10,
-          fontWeight: FontWeight.w700,
           color: palette.bg,
           letterSpacing: 0.8,
         ),
@@ -198,17 +230,21 @@ class _InfoChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.s8,
+        vertical: AppSpacing.hairline - 2,
+      ),
       decoration: BoxDecoration(
         color: palette.border.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(AppRadius.full),
       ),
       child: Text(
         label,
-        style: GoogleFonts.barlowCondensed(
-          fontSize: 10,
+        style: TextStyle(
+          fontFamily: AppFonts.barlowCondensed,
           color: palette.textMuted,
-          fontWeight: FontWeight.w600,
+          fontWeight: AppFonts.w600,
+          fontSize: 10,
         ),
       ),
     );

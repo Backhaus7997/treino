@@ -5,21 +5,28 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../../../app/theme/app_palette.dart';
+import '../../../../../../app/theme/tokens/primitives.dart';
 import '../../../../../workout/domain/equipment_type.dart';
 import '../../../../../workout/domain/muscle_group.dart';
+import '../../../widgets/coach_hub_widgets.dart';
 import '../providers/biblioteca_providers.dart';
+
+/// Etiqueta constante del chip que limpia el filtro de una dimensión.
+const _kTodosLabel = 'TODOS'; // i18n
 
 /// Inline filter chips for the Biblioteca Ejercicios tab.
 ///
-/// Two [Wrap] rows:
+/// Two rows built with [TreinoFilterChips] (kit — ADR-SH-002 interaction
+/// states, animación de selección vía AppMotionTokens):
 /// 1. MÚSCULO — 12 [MuscleGroup.displayOrder] chips + "TODOS" (clear set).
 /// 2. EQUIPAMIENTO — 13 [EquipmentType.values] chips + "TODOS" (clear set).
 ///
-/// Chips toggle membership in [bibliotecaMuscleFilterProvider] /
-/// [bibliotecaEquipmentFilterProvider] (OR within dimension, AND across).
+/// [TreinoFilterChips] trabaja con `Set<String>` — este widget es el
+/// adapter typed↔String que preserva la semántica de
+/// [bibliotecaMuscleFilterProvider] / [bibliotecaEquipmentFilterProvider]
+/// (OR dentro de la dimensión, AND entre dimensiones).
 ///
 /// ADR-CHW-005: NO bottom sheet. Inline chips only.
 /// REQ-BIBW-06, SCENARIO-BIBW-06a, SCENARIO-BIBW-06b, SCENARIO-BIBW-06c,
@@ -33,82 +40,112 @@ class BibliotecaFilterChips extends ConsumerWidget {
     final selectedMuscles = ref.watch(bibliotecaMuscleFilterProvider);
     final selectedEquipment = ref.watch(bibliotecaEquipmentFilterProvider);
 
+    final muscleOptions = [
+      _kTodosLabel,
+      ...MuscleGroup.displayOrder.map((m) => m.label.toUpperCase()),
+    ];
+    final selectedMuscleLabels = selectedMuscles.isEmpty
+        ? {_kTodosLabel}
+        : selectedMuscles.map((m) => m.label.toUpperCase()).toSet();
+
+    final equipmentOptions = [
+      _kTodosLabel,
+      ...EquipmentType.values.map((e) => e.label.toUpperCase()),
+    ];
+    final selectedEquipmentLabels = selectedEquipment.isEmpty
+        ? {_kTodosLabel}
+        : selectedEquipment.map((e) => e.label.toUpperCase()).toSet();
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // ── Muscle row ────────────────────────────────────────────────────
           _SectionLabel(label: 'MÚSCULO', palette: palette), // i18n
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _TodosChip(
-                active: selectedMuscles.isEmpty,
-                palette: palette,
-                onTap: () {
-                  ref.read(bibliotecaMuscleFilterProvider.notifier).state =
-                      const {};
-                },
-              ),
-              for (final muscle in MuscleGroup.displayOrder)
-                _FilterChip(
-                  label: muscle.label.toUpperCase(), // i18n
-                  active: selectedMuscles.contains(muscle),
-                  palette: palette,
-                  onTap: () {
-                    final current = Set<MuscleGroup>.from(selectedMuscles);
-                    if (current.contains(muscle)) {
-                      current.remove(muscle);
-                    } else {
-                      current.add(muscle);
-                    }
-                    ref.read(bibliotecaMuscleFilterProvider.notifier).state =
-                        current;
-                  },
-                ),
-            ],
+          const SizedBox(height: AppSpacing.hairline),
+          TreinoFilterChips(
+            options: muscleOptions,
+            selected: selectedMuscleLabels,
+            multiSelect: true,
+            onChanged: (newSelected) {
+              ref.read(bibliotecaMuscleFilterProvider.notifier).state =
+                  _resolveMuscleSelection(
+                previousSelected: selectedMuscleLabels,
+                newSelected: newSelected,
+              );
+            },
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.s12),
           // ── Equipment row ─────────────────────────────────────────────────
           _SectionLabel(label: 'EQUIPAMIENTO', palette: palette), // i18n
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _TodosChip(
-                active: selectedEquipment.isEmpty,
-                palette: palette,
-                onTap: () {
-                  ref.read(bibliotecaEquipmentFilterProvider.notifier).state =
-                      const {};
-                },
-              ),
-              for (final equip in EquipmentType.values)
-                _FilterChip(
-                  label: equip.label.toUpperCase(), // i18n
-                  active: selectedEquipment.contains(equip),
-                  palette: palette,
-                  onTap: () {
-                    final current = Set<EquipmentType>.from(selectedEquipment);
-                    if (current.contains(equip)) {
-                      current.remove(equip);
-                    } else {
-                      current.add(equip);
-                    }
-                    ref.read(bibliotecaEquipmentFilterProvider.notifier).state =
-                        current;
-                  },
-                ),
-            ],
+          const SizedBox(height: AppSpacing.hairline),
+          TreinoFilterChips(
+            options: equipmentOptions,
+            selected: selectedEquipmentLabels,
+            multiSelect: true,
+            onChanged: (newSelected) {
+              ref.read(bibliotecaEquipmentFilterProvider.notifier).state =
+                  _resolveEquipmentSelection(
+                previousSelected: selectedEquipmentLabels,
+                newSelected: newSelected,
+              );
+            },
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.s12),
         ],
       ),
     );
+  }
+
+  /// Resuelve el nuevo `Set<MuscleGroup>` a escribir en el provider a partir
+  /// del `Set<String>` que devuelve [TreinoFilterChips].
+  ///
+  /// Regla de desambiguación de "TODOS": si el usuario tocó el chip TODOS
+  /// (pasa a estar seleccionado y antes no lo estaba), se limpia el filtro.
+  /// En cualquier otro caso, se mapean las etiquetas != TODOS de vuelta a
+  /// [MuscleGroup] (por [MuscleGroup.label] en mayúsculas).
+  static Set<MuscleGroup> _resolveMuscleSelection({
+    required Set<String> previousSelected,
+    required Set<String> newSelected,
+  }) {
+    if (newSelected.contains(_kTodosLabel) &&
+        !previousSelected.contains(_kTodosLabel)) {
+      return const {};
+    }
+    final resolved = <MuscleGroup>{};
+    for (final label in newSelected) {
+      if (label == _kTodosLabel) continue;
+      for (final muscle in MuscleGroup.displayOrder) {
+        if (muscle.label.toUpperCase() == label) {
+          resolved.add(muscle);
+          break;
+        }
+      }
+    }
+    return resolved;
+  }
+
+  /// Análogo a [_resolveMuscleSelection] para [EquipmentType].
+  static Set<EquipmentType> _resolveEquipmentSelection({
+    required Set<String> previousSelected,
+    required Set<String> newSelected,
+  }) {
+    if (newSelected.contains(_kTodosLabel) &&
+        !previousSelected.contains(_kTodosLabel)) {
+      return const {};
+    }
+    final resolved = <EquipmentType>{};
+    for (final label in newSelected) {
+      if (label == _kTodosLabel) continue;
+      for (final equipment in EquipmentType.values) {
+        if (equipment.label.toUpperCase() == label) {
+          resolved.add(equipment);
+          break;
+        }
+      }
+    }
+    return resolved;
   }
 }
 
@@ -123,95 +160,12 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       label,
-      style: GoogleFonts.barlowCondensed(
+      style: TextStyle(
+        fontFamily: AppFonts.barlowCondensed,
         fontSize: 11,
         fontWeight: FontWeight.w700,
         color: palette.textMuted,
         letterSpacing: 1.0,
-      ),
-    );
-  }
-}
-
-/// "TODOS" chip — always-present, clears the filter set.
-class _TodosChip extends StatelessWidget {
-  const _TodosChip({
-    required this.active,
-    required this.palette,
-    required this.onTap,
-  });
-
-  final bool active;
-  final AppPalette palette;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: active ? palette.accent : palette.border,
-            width: active ? 1.5 : 1,
-          ),
-          color:
-              active ? palette.accent.withValues(alpha: 0.12) : palette.bgCard,
-        ),
-        child: Text(
-          'TODOS', // i18n
-          style: GoogleFonts.barlowCondensed(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: active ? palette.accent : palette.textMuted,
-            letterSpacing: 0.8,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Individual filter chip — toggles in/out of the active filter set.
-class _FilterChip extends StatelessWidget {
-  const _FilterChip({
-    required this.label,
-    required this.active,
-    required this.palette,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool active;
-  final AppPalette palette;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: active ? palette.accent : palette.border,
-            width: active ? 1.5 : 1,
-          ),
-          color:
-              active ? palette.accent.withValues(alpha: 0.12) : palette.bgCard,
-        ),
-        child: Text(
-          label,
-          style: GoogleFonts.barlowCondensed(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: active ? palette.accent : palette.textPrimary,
-            letterSpacing: 0.8,
-          ),
-        ),
       ),
     );
   }

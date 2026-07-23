@@ -10,7 +10,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/widgets/motion/treino_shimmer.dart';
 import 'package:treino/features/coach_hub/presentation/sections/biblioteca/widgets/templates_tab.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
@@ -182,11 +184,11 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(GridView), findsNothing);
+      expect(find.byType(TreinoEmptyState), findsOneWidget);
       expect(find.textContaining('plantilla'), findsWidgets);
     });
 
-    testWidgets(
-        'shows CircularProgressIndicator when loading — SCENARIO-BIBW-11b',
+    testWidgets('shows TreinoShimmer skeleton when loading — SCENARIO-BIBW-11b',
         (tester) async {
       tester.view.physicalSize = const Size(1280, 900);
       tester.view.devicePixelRatio = 1.0;
@@ -211,7 +213,8 @@ void main() {
       );
       await tester.pump(); // single frame — stream still pending
 
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.byType(TreinoShimmer), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
     });
 
     testWidgets('shows error text when stream errors — SCENARIO-BIBW-11b',
@@ -232,7 +235,7 @@ void main() {
   });
 
   group('TemplatesTab — template detail dialog', () {
-    testWidgets('tap template card opens AlertDialog — SCENARIO-BIBW-10a',
+    testWidgets('tap template card opens TreinoDialog — SCENARIO-BIBW-10a',
         (tester) async {
       tester.view.physicalSize = const Size(1280, 900);
       tester.view.devicePixelRatio = 1.0;
@@ -247,7 +250,7 @@ void main() {
       await tester.tap(find.text('Fuerza Total'));
       await tester.pumpAndSettle();
 
-      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.byType(TreinoDialog), findsOneWidget);
       expect(find.byType(BottomSheet), findsNothing);
     });
 
@@ -292,7 +295,7 @@ void main() {
       await tester.tap(find.text('Cerrar'));
       await tester.pumpAndSettle();
 
-      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.byType(TreinoDialog), findsNothing);
     });
   });
 }

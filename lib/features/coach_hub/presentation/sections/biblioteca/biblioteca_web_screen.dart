@@ -13,6 +13,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
@@ -81,23 +84,41 @@ class _BibliotecaWebScreenState extends ConsumerState<BibliotecaWebScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── Section header ─────────────────────────────────────────────────
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-          child: Text(
-            'BIBLIOTECA', // i18n
-            style: TextStyle(
-              color: palette.textPrimary,
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.2,
+        // ── Section header + subtítulo honesto ──────────────────────────────
+        TreinoFadeSlideIn(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.s20,
+              AppSpacing.s20,
+              AppSpacing.s20,
+              0,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const TreinoSectionHeader(title: 'Biblioteca'), // i18n
+                const SizedBox(height: AppSpacing.hairline),
+                Text(
+                  '$ejerciciosN ejercicios · $templatesN templates', // i18n
+                  style: TextStyle(
+                    fontFamily: AppFonts.barlow,
+                    fontSize: 13,
+                    color: palette.textMuted,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
 
         // ── TabBar ──────────────────────────────────────────────────────────
         Padding(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.s18,
+            AppSpacing.s20,
+            AppSpacing.s18,
+            0,
+          ),
           child: TabBar(
             controller: _tabController,
             isScrollable: false,
@@ -105,7 +126,10 @@ class _BibliotecaWebScreenState extends ConsumerState<BibliotecaWebScreen>
             unselectedLabelColor: palette.textMuted,
             indicatorColor: palette.accent,
             indicatorWeight: 2,
-            labelStyle: const TextStyle(fontWeight: FontWeight.w600),
+            labelStyle: const TextStyle(
+              fontFamily: AppFonts.barlow,
+              fontWeight: FontWeight.w600,
+            ),
             tabs: tabLabels.map((l) => Tab(text: l)).toList(),
           ),
         ),
