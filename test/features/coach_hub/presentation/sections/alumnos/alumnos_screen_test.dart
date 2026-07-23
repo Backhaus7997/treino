@@ -54,12 +54,15 @@ CobroPendiente _cobro(String athleteId) => CobroPendiente(
       concept: 'Mensualidad',
     );
 
-Session _session(String uid) => Session(
+/// Sesión finalizada en [finishedAt] — usada para overridear
+/// `finishedInWindowByUidProvider` (columna «Último entreno»).
+Session _sessionAt(String uid, DateTime finishedAt) => Session(
       id: 's_$uid',
       uid: uid,
       routineId: 'r1',
       routineName: 'Push',
-      startedAt: DateTime.utc(2026, 1, 1),
+      startedAt: finishedAt.subtract(const Duration(hours: 1)),
+      finishedAt: finishedAt,
       status: SessionStatus.finished,
     );
 
@@ -71,7 +74,11 @@ Future<void> _pump(
   List<TrainerLink>? links,
   List<UserPublicProfile> profiles = const [],
   List<CobroPendiente> cobros = const [],
-  Set<String> trainedTodayIds = const {},
+  // Sesiones finalizadas dentro de la ventana de 30d (columna «Último
+  // entreno»), por athleteId. Ignora los bounds exactos de la key (from/to
+  // dependen del wall-clock del widget) — mismo criterio que
+  // inactivos_provider_test.dart.
+  Map<String, List<Session>> sessionsInWindowByAthleteId = const {},
   TrainerLinkRepository? repo,
   // `false` para casos donde el stream de links queda colgado en loading a
   // propósito (TreinoShimmer corre en loop infinito — pumpAndSettle no
@@ -108,10 +115,9 @@ Future<void> _pump(
           (ref, key) => {for (final p in profiles) p.uid: p},
         ),
         pagosPorCobrarProvider.overrideWith((ref) => AsyncData(cobros)),
-        finishedTodayByUidProvider.overrideWith(
-          (ref, uid) => trainedTodayIds.contains(uid)
-              ? [_session(uid)]
-              : const <Session>[],
+        finishedInWindowByUidProvider.overrideWith(
+          (ref, key) =>
+              sessionsInWindowByAthleteId[key.athleteId] ?? const <Session>[],
         ),
         gymsProvider.overrideWith((ref) => const <Gym>[]),
         if (repo != null) trainerLinkRepositoryProvider.overrideWithValue(repo),
@@ -171,6 +177,38 @@ void main() {
     });
     test('inactivo → textMuted', () {
       expect(AlumnoEstado.inactivo.color(p), p.textMuted);
+    });
+  });
+
+  group('lastWorkoutLabel (columna «Último entreno», ventana 30d)', () {
+    final l10n = lookupAppL10n(const Locale('es', 'AR'));
+    final todayStart = DateTime.utc(2026, 6, 15);
+
+    test('sin sesión en la ventana → "Sin entrenos" (honesto, no "—")', () {
+      expect(lastWorkoutLabel(l10n, null, todayStart), 'Sin entrenos');
+    });
+
+    test('sesión finalizada hoy → "Hoy" (l10n existente)', () {
+      final finishedAt = DateTime.utc(2026, 6, 15, 20, 0);
+      expect(
+        lastWorkoutLabel(l10n, finishedAt, todayStart),
+        l10n.coachHubAlumnosLastWorkoutToday,
+      );
+    });
+
+    test('sesión finalizada ayer → "Ayer"', () {
+      final finishedAt = DateTime.utc(2026, 6, 14, 9, 0);
+      expect(lastWorkoutLabel(l10n, finishedAt, todayStart), 'Ayer');
+    });
+
+    test('sesión finalizada hace 5 días → "Hace 5 días"', () {
+      final finishedAt = DateTime.utc(2026, 6, 10, 9, 0);
+      expect(lastWorkoutLabel(l10n, finishedAt, todayStart), 'Hace 5 días');
+    });
+
+    test('sesión finalizada hace 1 día exacto (borde) → "Ayer"', () {
+      final finishedAt = todayStart.subtract(const Duration(hours: 1));
+      expect(lastWorkoutLabel(l10n, finishedAt, todayStart), 'Ayer');
     });
   });
 
@@ -266,9 +304,57 @@ void main() {
         tester,
         links: [_link('a1', TrainerLinkStatus.active)],
         profiles: [_prof('a1', 'Sofía')],
-        trainedTodayIds: const {'a1'},
+        sessionsInWindowByAthleteId: {
+          'a1': [_sessionAt('a1', DateTime.now().toUtc())],
+        },
       );
       expect(find.text('Hoy'), findsOneWidget);
+    });
+
+    testWidgets('entrenó ayer → columna muestra "Ayer"', (tester) async {
+      await _pump(
+        tester,
+        links: [_link('a1', TrainerLinkStatus.active)],
+        profiles: [_prof('a1', 'Sofía')],
+        sessionsInWindowByAthleteId: {
+          'a1': [
+            _sessionAt(
+              'a1',
+              DateTime.now().toUtc().subtract(const Duration(days: 1)),
+            ),
+          ],
+        },
+      );
+      expect(find.text('Ayer'), findsOneWidget);
+    });
+
+    testWidgets(
+        'entrenó hace varios días (dentro de la ventana) → "Hace N días"',
+        (tester) async {
+      await _pump(
+        tester,
+        links: [_link('a1', TrainerLinkStatus.active)],
+        profiles: [_prof('a1', 'Sofía')],
+        sessionsInWindowByAthleteId: {
+          'a1': [
+            _sessionAt(
+              'a1',
+              DateTime.now().toUtc().subtract(const Duration(days: 5)),
+            ),
+          ],
+        },
+      );
+      expect(find.text('Hace 5 días'), findsOneWidget);
+    });
+
+    testWidgets('sin entrenos en la ventana → columna muestra "Sin entrenos"',
+        (tester) async {
+      await _pump(
+        tester,
+        links: [_link('a1', TrainerLinkStatus.active)],
+        profiles: [_prof('a1', 'Sofía')],
+      );
+      expect(find.text('Sin entrenos'), findsOneWidget);
     });
 
     testWidgets('terminar abre diálogo y al confirmar llama repo.terminate',

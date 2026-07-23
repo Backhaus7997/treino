@@ -405,6 +405,14 @@ class _RosterTable extends ConsumerWidget {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
 
+    // Ventana de 30 días, día-truncada (UTC) — se computa UNA vez acá (no por
+    // fila) para que la family key de finishedInWindowByUidProvider quede
+    // estable entre rebuilds (mismo criterio que inactivosProvider).
+    final now = DateTime.now().toUtc();
+    final todayStart = DateTime.utc(now.year, now.month, now.day);
+    final windowFrom = todayStart.subtract(const Duration(days: 30));
+    final windowTo = todayStart.add(const Duration(days: 1));
+
     return CoachHubDataTable(
       columns: [
         CoachHubColumn(
@@ -430,7 +438,17 @@ class _RosterTable extends ConsumerWidget {
       ],
       rows: [
         for (final entry in visibles)
-          _rowFor(context, ref, palette, l10n, entry, gymNameFor(entry.link)),
+          _rowFor(
+            context,
+            ref,
+            palette,
+            l10n,
+            entry,
+            gymNameFor(entry.link),
+            todayStart: todayStart,
+            windowFrom: windowFrom,
+            windowTo: windowTo,
+          ),
       ],
       loading: loading,
       errorMessage: errorMessage,
@@ -446,24 +464,33 @@ class _RosterTable extends ConsumerWidget {
     AppPalette palette,
     AppL10n l10n,
     _RosterEntry entry,
-    String? gymName,
-  ) {
+    String? gymName, {
+    required DateTime todayStart,
+    required DateTime windowFrom,
+    required DateTime windowTo,
+  }) {
     final link = entry.link;
     final estado = entry.estado;
     final profile = profiles[link.athleteId];
     final name = profile?.displayName ?? l10n.coachHubAlumnosNameFallback;
-    final trainedToday =
-        (ref.watch(finishedTodayByUidProvider(link.athleteId)).valueOrNull ??
-                const [])
-            .isNotEmpty;
+
+    // Camino barato (sin campo denormalizado): bounded query por-alumno vía
+    // finishedInWindowByUidProvider, ordenada finishedAt DESC — el primer
+    // elemento ya es la sesión más reciente dentro de la ventana.
+    final windowKey =
+        (athleteId: link.athleteId, from: windowFrom, to: windowTo);
+    final sessionsInWindow =
+        ref.watch(finishedInWindowByUidProvider(windowKey)).valueOrNull ??
+            const [];
+    final lastFinishedAt =
+        sessionsInWindow.isEmpty ? null : sessionsInWindow.first.finishedAt;
 
     return CoachHubRow(
       id: link.athleteId,
       cells: {
         'alumno': name,
         'estado': estado.label(l10n),
-        'ultimoEntreno':
-            trainedToday ? l10n.coachHubAlumnosLastWorkoutToday : '—',
+        'ultimoEntreno': lastWorkoutLabel(l10n, lastFinishedAt, todayStart),
       },
       cellWidgets: {
         'alumno': _AlumnoCell(
@@ -477,6 +504,29 @@ class _RosterTable extends ConsumerWidget {
       },
     );
   }
+}
+
+/// Etiqueta relativa de la columna «Último entreno», dado el `finishedAt` de
+/// la sesión más reciente dentro de la ventana de 30 días (o `null` si no
+/// hay ninguna) y el "hoy" ya día-truncado (UTC) usado para computar esa
+/// ventana. Pública para testear sin pump (mismo patrón que [estadoForLink]).
+///
+/// "Sin entrenos" es honesto sobre el límite de la ventana: NO implica que el
+/// alumno nunca entrenó, sólo que no hay sesión finalizada en los últimos 30
+/// días. Labels nuevos hardcodeados es-AR (ADR-A3-03: l10n congelado, sólo
+/// columnas existentes usan AppL10n) — excepto "Hoy", que ya tenía key.
+String lastWorkoutLabel(
+  AppL10n l10n,
+  DateTime? lastFinishedAt,
+  DateTime todayStart,
+) {
+  if (lastFinishedAt == null) return 'Sin entrenos'; // i18n
+  final utc = lastFinishedAt.toUtc();
+  final day = DateTime.utc(utc.year, utc.month, utc.day);
+  final daysAgo = todayStart.difference(day).inDays;
+  if (daysAgo <= 0) return l10n.coachHubAlumnosLastWorkoutToday;
+  if (daysAgo == 1) return 'Ayer'; // i18n
+  return 'Hace $daysAgo días'; // i18n
 }
 
 /// Celda «Alumno»: avatar + nombre + gym (si se conoce).
