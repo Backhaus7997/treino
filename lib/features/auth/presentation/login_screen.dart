@@ -53,6 +53,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool get _fieldsEmpty =>
       _emailCtrl.text.trim().isEmpty || _passwordCtrl.text.isEmpty;
 
+  // La navegación post-login NO vive acá: la resuelve `authRedirect`
+  // (app/router.dart). Ni bien authNotifier emite el user, RouterRefreshNotifier
+  // re-dispara el redirect; ese gate se bloquea mientras userProfileProvider
+  // carga y recién con el snapshot real manda a /profile-setup (perfil
+  // incompleto) o a /home. El viejo `context.go('/home')` manual corría una
+  // carrera contra ese stream: adelantaba el redirect, HomeScreen alcanzaba a
+  // pintar y el gate rebotaba a /profile-setup — flicker visible en el 100% de
+  // los registros nuevos (issue #499). Mismo criterio que ya se aplicó en
+  // ProfileSetupFlow (audit F3).
+
   Future<void> _submit() async {
     // Error prevention (Nielsen): validate format client-side before the
     // network round-trip, mirroring register_screen.dart.
@@ -61,35 +71,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           email: _emailCtrl.text.trim(),
           password: _passwordCtrl.text,
         );
-    if (!mounted) return;
-    final s = ref.read(authNotifierProvider);
-    if (s.hasValue && s.valueOrNull != null) {
-      context.go('/home');
-    }
   }
 
   Future<void> _signInWithGoogle() async {
     await ref.read(authNotifierProvider.notifier).signInWithGoogle();
-    if (!mounted) return;
-    final s = ref.read(authNotifierProvider);
-    if (s.hasValue && s.valueOrNull != null) {
-      context.go('/home');
-    }
   }
 
   Future<void> _signInWithApple() async {
     await ref.read(authNotifierProvider.notifier).signInWithApple();
-    if (!mounted) return;
-    final s = ref.read(authNotifierProvider);
-    if (s.hasValue && s.valueOrNull != null) {
-      context.go('/home');
-    }
   }
 
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authNotifierProvider);
-    final isLoading = authState.isLoading;
+    // El spinner sigue girando después de un login exitoso: la pantalla queda
+    // montada hasta que `authRedirect` resuelve el perfil, y un CTA que vuelve
+    // a "listo" en ese hueco lee como que el tap no hizo nada (issue #499).
+    // Estando logueado en una ruta pública el único desenlace es el redirect.
+    final isLoading = authState.isLoading || authState.valueOrNull != null;
     final failure = authState.hasError && authState.error is AuthFailure
         ? authState.error as AuthFailure
         : null;

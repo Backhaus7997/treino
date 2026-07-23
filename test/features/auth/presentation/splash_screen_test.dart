@@ -8,6 +8,9 @@ import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/auth/presentation/splash_screen.dart';
 import 'package:treino/features/auth/presentation/widgets/treino_logo.dart';
+import 'package:treino/features/profile/application/user_providers.dart';
+import 'package:treino/features/profile/domain/user_profile.dart';
+import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 class MockUser extends Mock implements User {}
@@ -35,11 +38,28 @@ GoRouter _makeRouter(Widget splash) => GoRouter(
       ],
     );
 
+/// Perfil ya completo (displayName seteado). Desde issue #499 el splash espera
+/// TAMBIÉN al perfil antes de mandar a /home, así que estos tests tienen que
+/// proveerlo — si no, el provider real iría a Firestore.
+UserProfile _completeProfile() => UserProfile(
+      uid: 'test-uid',
+      email: 'test@example.com',
+      displayName: 'tincho',
+      role: UserRole.athlete,
+      createdAt: DateTime.utc(2026, 1, 1),
+      updatedAt: DateTime.utc(2026, 1, 1),
+    );
+
 Widget _buildApp({required _TestAuthNotifier notifier}) {
   const screen = SplashScreen();
   final router = _makeRouter(screen);
   return ProviderScope(
-    overrides: [authNotifierProvider.overrideWith(() => notifier)],
+    overrides: [
+      authNotifierProvider.overrideWith(() => notifier),
+      userProfileProvider.overrideWith(
+        (ref) => Stream<UserProfile?>.value(_completeProfile()),
+      ),
+    ],
     child: MaterialApp.router(
       routerConfig: router,
       localizationsDelegates: AppL10n.localizationsDelegates,

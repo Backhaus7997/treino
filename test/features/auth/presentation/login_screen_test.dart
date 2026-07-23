@@ -17,8 +17,7 @@ class MockUser extends Mock implements User {}
 // Notifier stub that immediately resolves to a fixed state and exposes
 // controllable signIn behaviour via a callback.
 class _TestAuthNotifier extends AuthNotifier {
-  _TestAuthNotifier({this.onSignIn, User? initialUser})
-      : _initialUser = initialUser;
+  _TestAuthNotifier({User? initialUser}) : _initialUser = initialUser;
 
   final User? _initialUser;
   Future<void> Function(String email, String password)? onSignIn;
@@ -101,18 +100,17 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
-  // Scenario 6.1: happy path → spinner → /home
+  // Scenario 6.1: happy path → la pantalla NO navega sola.
+  //
+  // El `context.go('/home')` manual se sacó en issue #499: adelantaba el
+  // redirect del router y HomeScreen flasheaba antes del rebote a
+  // /profile-setup. Acá el router del test no tiene redirect, así que un login
+  // exitoso tiene que dejar todo quieto. La navegación end-to-end (contra el
+  // `authRedirect` real) se cubre en post_login_navigation_test.dart.
   // ---------------------------------------------------------------------------
-  testWidgets('scenario 6.1 — happy path submit navigates to /home',
+  testWidgets('scenario 6.1 — happy path delega la navegación en authRedirect',
       (tester) async {
-    final notifier = _TestAuthNotifier(
-      onSignIn: (email, password) async {
-        // Simulate state transition to AsyncData(user)
-        // The notifier's state will be set by the action
-      },
-    );
-
-    // Override signIn to simulate success
+    final notifier = _TestAuthNotifier();
     notifier.onSignIn = (email, password) async {
       notifier.state = AsyncData(mockUser);
     };
@@ -126,12 +124,22 @@ void main() {
     await tester.enterText(fields.at(1), 'Pass1234');
     await tester.pump();
 
-    // Tap submit
+    // Tap submit. Sin pumpAndSettle: el CTA queda en loading hasta que el
+    // router mueve al usuario, y el spinner es una animación infinita.
     await tester.tap(find.byType(AuthPillButton));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump();
 
-    // Should have navigated to /home
-    expect(find.text('HOME'), findsOneWidget);
+    expect(find.text('HOME'), findsNothing,
+        reason: 'la pantalla no puede navegar a mano (issue #499)');
+    expect(
+      find.descendant(
+        of: find.byType(AuthPillButton),
+        matching: find.byType(CircularProgressIndicator),
+      ),
+      findsOneWidget,
+      reason: 'el CTA sigue en loading hasta que el redirect resuelve',
+    );
   });
 
   // ---------------------------------------------------------------------------
