@@ -162,14 +162,15 @@ void main() {
     });
 
     test(
-        'solo Solicitudes (fase 4, ADR-F4-04) expone badgeProvider; el '
-        'resto sigue sin badge', () {
+        'Solicitudes (fase 4, ADR-F4-04) y Pagos (fase 9, WU-08) exponen '
+        'badgeProvider; el resto sigue sin badge', () {
+      const withBadge = {'invitaciones', 'pagos'};
       for (final item in sidebarRegistry) {
-        if (item.id == 'invitaciones') {
+        if (withBadge.contains(item.id)) {
           expect(
             item.badgeProvider,
             isNotNull,
-            reason: 'Solicitudes cablea invitacionesPendingCountProvider',
+            reason: '${item.id} cablea su badgeProvider real',
           );
         } else {
           expect(item.badgeProvider, isNull);
