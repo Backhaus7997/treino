@@ -7,10 +7,15 @@ import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
+import 'package:treino/features/coach_hub/presentation/sections/chat/chat_section_screen.dart'
+    show selectedChatIdProvider;
 import 'package:treino/features/coach_hub/presentation/sections/nutricion/nutricion_providers.dart';
+import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/marcar_pagado_actions.dart'
+    show registrarPago;
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pagos_buckets_provider.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pagos_estado.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/payment_format.dart';
@@ -840,11 +845,49 @@ class _RowActions extends ConsumerWidget {
         .terminate(link.id, reason: 'trainer-terminated');
   }
 
+  /// Resuelve (o crea) el chat 1-1 con el alumno vía [chatForOtherUidProvider]
+  /// — mismo provider que la tab «Chat» del detalle — y navega al Chat global
+  /// del Coach Hub dejando la conversación ya seleccionada
+  /// (`selectedChatIdProvider`, mismo mecanismo que usa `ChatListPane` al
+  /// tocar un ítem de la lista).
+  Future<void> _openChat(BuildContext context, WidgetRef ref) async {
+    final chat = await ref.read(chatForOtherUidProvider(link.athleteId).future);
+    ref.read(selectedChatIdProvider.notifier).state = chat.chatId;
+    if (!context.mounted) return;
+    context.go('/chat');
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppL10n.of(context);
     final status = link.status;
-    final buttons = <Widget>[];
+    // Acciones rápidas — SIEMPRE visibles (no dependen del estado del
+    // vínculo, a diferencia de pausar/reanudar/terminar más abajo): el kit
+    // (`CoachHubDataTable`) no propaga hover a `cellWidgets`, así que no hay
+    // forma de revelarlas sólo al pasar el mouse — quedan fijas con tooltip.
+    final buttons = <Widget>[
+      _IconAction(
+        icon: TreinoIcon.chat,
+        tooltip: 'Chat', // i18n
+        color: palette.textMuted,
+        onPressed: () => _openChat(context, ref),
+      ),
+      _IconAction(
+        icon: TreinoIcon.dumbbell,
+        tooltip: 'Rutinas', // i18n
+        color: palette.textMuted,
+        onPressed: () => context.go('/rutinas/${link.athleteId}'),
+      ),
+      _IconAction(
+        icon: TreinoIcon.money,
+        tooltip: 'Registrar pago', // i18n
+        color: palette.textMuted,
+        // Reusa `registrarPago` de la sección Pagos (mismo diálogo +
+        // `paymentRepositoryProvider.add`) — evita duplicar el flujo de alta
+        // de un pago ad-hoc ya resuelto ahí.
+        onPressed: () => registrarPago(context, ref, link.athleteId),
+      ),
+    ];
     if (status == TrainerLinkStatus.active) {
       buttons.add(_IconAction(
         icon: TreinoIcon.pause,
@@ -892,11 +935,25 @@ class _IconAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Hasta 5 botones conviven en la columna «Acciones» (3 acciones rápidas
+    // siempre visibles + hasta 2 de vínculo pausar/reanudar + terminar). Con
+    // Material 3 (ADR de tema, `useMaterial3: true`), `constraints`/`padding`
+    // por sí solos NO alcanzan: `MaterialTapTargetSize.padded` (default del
+    // tema) fuerza un tap target mínimo de 48x48 vía `_InputPadding` —
+    // invisible pero SÍ cuenta para el layout del `Row` padre, y overflowea
+    // igual aunque el `IconButton` se vea de 32x32. `tapTargetSize:
+    // shrinkWrap` en el `style` es lo que realmente reduce el tamaño de caja
+    // que el botón reporta al `Row`.
     return IconButton(
       tooltip: tooltip,
       icon: Icon(icon, size: 18, color: color),
       onPressed: onPressed,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
       visualDensity: VisualDensity.compact,
+      style: IconButton.styleFrom(
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
     );
   }
 }

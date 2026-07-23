@@ -16,6 +16,8 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/features/chat/application/chat_providers.dart';
+import 'package:treino/features/chat/domain/chat.dart';
 import 'package:treino/features/coach/application/nutrition_plan_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/data/trainer_link_repository.dart';
@@ -23,12 +25,15 @@ import 'package:treino/features/coach/domain/nutrition_plan.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/alumnos/alumnos_screen.dart';
+import 'package:treino/features/coach_hub/presentation/sections/chat/chat_section_screen.dart'
+    show selectedChatIdProvider;
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/payment_format.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
 import 'package:treino/features/gyms/domain/gym.dart';
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart';
 import 'package:treino/features/payments/application/payment_providers.dart';
+import 'package:treino/features/payments/data/payment_repository.dart';
 import 'package:treino/features/payments/domain/athlete_billing.dart';
 import 'package:treino/features/payments/domain/payment.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
@@ -43,6 +48,8 @@ import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
 
 class _MockRepo extends Mock implements TrainerLinkRepository {}
+
+class _MockPaymentRepo extends Mock implements PaymentRepository {}
 
 // Trainer fijo del roster de test — usado tanto en `TrainerLink.trainerId`
 // como en el override de `currentUidProvider` que consume
@@ -148,6 +155,9 @@ Future<void> _pump(
   // Pagos del trainer (columna «Vencimiento», vía `pagosBucketsProvider`).
   List<Payment> payments = const [],
   TrainerLinkRepository? repo,
+  // Repo de pagos — usado por el botón «Registrar pago» del roster (reusa
+  // `registrarPago` de la sección Pagos).
+  PaymentRepository? paymentRepo,
   // `false` para casos donde el stream de links queda colgado en loading a
   // propósito (TreinoShimmer corre en loop infinito — pumpAndSettle no
   // termina nunca ahí; el caller pumpea manualmente en su lugar).
@@ -176,6 +186,16 @@ Future<void> _pump(
           body: Text('RUTINAS ${state.pathParameters['athleteId']}'),
         ),
       ),
+      GoRoute(
+        path: '/chat',
+        // Muestra el `chatId` seleccionado (vía `selectedChatIdProvider`) para
+        // verificar que el botón «Chat» del roster lo fijó antes de navegar.
+        builder: (_, __) => Consumer(
+          builder: (context, ref, __) => Scaffold(
+            body: Text('CHAT ${ref.watch(selectedChatIdProvider)}'),
+          ),
+        ),
+      ),
     ],
   );
 
@@ -200,6 +220,17 @@ Future<void> _pump(
               routinesByAthleteId[athleteId] ?? const <Routine>[],
         ),
         currentUidProvider.overrideWithValue(_trainerId),
+        // Botón «Chat» del roster: resuelve/crea el chat 1-1 con el alumno
+        // sin pegar contra Firestore real.
+        chatForOtherUidProvider.overrideWith(
+          (ref, otherUid) async => Chat(
+            chatId: 'chat_$otherUid',
+            members: [_trainerId, otherUid],
+            createdAt: DateTime.utc(2026, 1, 1),
+          ),
+        ),
+        if (paymentRepo != null)
+          paymentRepositoryProvider.overrideWithValue(paymentRepo),
         for (final athleteId in {
           for (final l in links ?? const []) l.athleteId
         })
@@ -227,7 +258,10 @@ Future<void> _pump(
 }
 
 void main() {
-  setUpAll(() => registerFallbackValue(''));
+  setUpAll(() {
+    registerFallbackValue('');
+    registerFallbackValue(_payment('fallback', status: PaymentStatus.paid));
+  });
 
   group('estadoForLink (estado compuesto)', () {
     test('active sin deuda → activo', () {
@@ -880,6 +914,123 @@ void main() {
       );
 
       expect(find.text('—'), findsOneWidget);
+    });
+  });
+
+  group('AlumnosScreen roster — acciones rápidas (chat/rutina/pago)', () {
+    testWidgets(
+        'siempre muestra los 3 botones con tooltip, sin importar el estado '
+        'del link (no reemplazan pausar/reanudar/terminar)', (tester) async {
+      await _pump(
+        tester,
+        links: [
+          _link('a1', TrainerLinkStatus.active),
+          _link('a2', TrainerLinkStatus.paused),
+          _link('a3', TrainerLinkStatus.terminated),
+        ],
+        profiles: [
+          _prof('a1', 'Sofía'),
+          _prof('a2', 'Diego'),
+          _prof('a3', 'Ana'),
+        ],
+      );
+
+      expect(find.byTooltip('Chat'), findsNWidgets(3));
+      expect(find.byTooltip('Rutinas'), findsNWidgets(3));
+      expect(find.byTooltip('Registrar pago'), findsNWidgets(3));
+      // Las acciones de vínculo siguen intactas (activo → pausar+terminar).
+      expect(find.byTooltip('Pausar'), findsOneWidget);
+      expect(find.byTooltip('Terminar'), findsNWidgets(2)); // active+paused
+      expect(find.byTooltip('Reanudar'), findsOneWidget);
+    });
+
+    testWidgets('tap en Chat resuelve/crea el chat y navega a /chat',
+        (tester) async {
+      await _pump(
+        tester,
+        links: [_link('a1', TrainerLinkStatus.active)],
+        profiles: [_prof('a1', 'Sofía')],
+      );
+
+      await tester.tap(find.byTooltip('Chat'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('CHAT chat_a1'), findsOneWidget);
+      expect(find.text('DETALLE a1'), findsNothing);
+    });
+
+    testWidgets(
+        'tap en Rutinas navega a /rutinas/:athleteId sin disparar la '
+        'navegación de la fila', (tester) async {
+      await _pump(
+        tester,
+        links: [_link('a1', TrainerLinkStatus.active)],
+        profiles: [_prof('a1', 'Sofía')],
+      );
+
+      await tester.tap(find.byTooltip('Rutinas'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('RUTINAS a1'), findsOneWidget);
+      expect(find.text('DETALLE a1'), findsNothing);
+    });
+
+    testWidgets(
+        'tap en Registrar pago abre el diálogo y al confirmar crea el pago '
+        'del alumno de esa fila', (tester) async {
+      final repo = _MockPaymentRepo();
+      when(() => repo.add(any())).thenAnswer((_) async {});
+
+      await _pump(
+        tester,
+        links: [
+          _link('a1', TrainerLinkStatus.active),
+          _link('a2', TrainerLinkStatus.active),
+        ],
+        profiles: [_prof('a1', 'Sofía'), _prof('a2', 'Diego')],
+        paymentRepo: repo,
+      );
+
+      await tester.tap(find.byTooltip('Registrar pago').first);
+      await tester.pumpAndSettle();
+      expect(find.text('Registrar pago'), findsOneWidget); // título
+
+      // Acotado al diálogo: el roster tiene su propio TextField (buscador),
+      // así que `find.byType(TextField)` sin scope agarra ese como índice 0
+      // y desalinea Monto/Concepto.
+      final dialogFields = find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
+      );
+      await tester.enterText(dialogFields.at(0), '5000');
+      await tester.enterText(dialogFields.at(1), 'Clase suelta');
+      await tester.tap(find.text('Registrar'));
+      await tester.pumpAndSettle();
+
+      final p = verify(() => repo.add(captureAny())).captured.single as Payment;
+      expect(p.athleteId, 'a1');
+      expect(p.amountArs, 5000);
+      expect(p.concept, 'Clase suelta');
+      expect(p.status, PaymentStatus.paid);
+    });
+
+    testWidgets('cancelar el diálogo de Registrar pago NO crea el pago',
+        (tester) async {
+      final repo = _MockPaymentRepo();
+
+      await _pump(
+        tester,
+        links: [_link('a1', TrainerLinkStatus.active)],
+        profiles: [_prof('a1', 'Sofía')],
+        paymentRepo: repo,
+      );
+
+      await tester.tap(find.byTooltip('Registrar pago'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+
+      verifyNever(() => repo.add(any()));
     });
   });
 }
