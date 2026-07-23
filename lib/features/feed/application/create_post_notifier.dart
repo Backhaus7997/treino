@@ -140,6 +140,24 @@ class CreatePostNotifier
     final current = state.valueOrNull;
     if (current == null || !current.canSubmit) return false;
 
+    // Pin del notifier durante todo el envío (linaje #435): este family es
+    // autoDispose y el composer puede popearse con el write en vuelo. Sin el
+    // pin el notifier muere ahí, y quien vuelve al composer encuentra un
+    // formulario vacío como si hubiera perdido el texto — además de que en
+    // Riverpod 3.x el ref-después-del-dispose deja de ser un no-op tolerado y
+    // pasa a ser error. El link se cierra en el finally: recién ahí vuelve a
+    // regir el autoDispose.
+    final keepAlive = ref.keepAlive();
+    try {
+      return await _runSubmit(current);
+    } finally {
+      keepAlive.close();
+    }
+  }
+
+  /// Cuerpo del envío. Separado de [submit] para que el manejo del ciclo de
+  /// vida (el pin de arriba) no se mezcle con la lógica de publicación.
+  Future<bool> _runSubmit(CreatePostState current) async {
     // Mark as submitting immediately — prevents double-tap (SCENARIO-228)
     state = AsyncData(
       current.copyWith(isSubmitting: true, clearError: true),
