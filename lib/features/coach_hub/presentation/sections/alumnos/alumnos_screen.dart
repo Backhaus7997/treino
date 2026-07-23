@@ -945,10 +945,14 @@ class _RowActions extends ConsumerWidget {
   /// (`selectedChatIdProvider`, mismo mecanismo que usa `ChatListPane` al
   /// tocar un ítem de la lista).
   Future<void> _openChat(BuildContext context, WidgetRef ref) async {
+    // El router se captura ANTES del await: las filas del roster se
+    // rebuildean por sus streams y el context de la fila puede morir mientras
+    // getOrCreate resuelve — con `if (!context.mounted) return` la navegación
+    // se perdía silenciosamente (bug reportado en revisión en vivo).
+    final router = GoRouter.of(context);
     final chat = await ref.read(chatForOtherUidProvider(link.athleteId).future);
     ref.read(selectedChatIdProvider.notifier).state = chat.chatId;
-    if (!context.mounted) return;
-    context.go('/chat');
+    router.go('/chat');
   }
 
   @override
