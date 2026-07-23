@@ -174,4 +174,7 @@ class TreinoIcon {
   // Alumno detail — Archivos tab (upload/download/trash/image ya existen arriba)
   static const IconData file = PhosphorIconsRegular.file;
   static const IconData filePdf = PhosphorIconsRegular.filePdf;
+
+  // Coach Hub Web — Kit de componentes (Fase 1, EmptyState)
+  static const IconData emptyState = PhosphorIconsRegular.empty;
 }
