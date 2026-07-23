@@ -6,8 +6,10 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../../../app/theme/app_motion.dart';
 import '../../../../../../app/theme/app_palette.dart';
 import '../../../../../../app/theme/tokens/primitives.dart';
+import '../../../../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../../../../core/widgets/treino_icon.dart';
@@ -101,7 +103,12 @@ class EjerciciosTab extends ConsumerWidget {
           ),
         ),
         // ── Filter chips ───────────────────────────────────────────────────
-        const BibliotecaFilterChips(),
+        // Bloque eager con stagger real (ADR-B7-03): chips = índice 1,
+        // continúa el header (índice 0) de BibliotecaWebScreen.
+        TreinoFadeSlideIn(
+          delay: AppMotion.stagger(1),
+          child: const BibliotecaFilterChips(),
+        ),
         // ── Exercise grid (loading/error/empty/data) ──────────────────────
         Expanded(
           child: TreinoStateSwitcher(

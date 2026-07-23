@@ -51,7 +51,10 @@ class _TemplateDetailBody extends StatelessWidget {
           children: [
             // ── Level chip ───────────────────────────────────────────────
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.s8,
+                vertical: AppSpacing.hairline,
+              ),
               decoration: BoxDecoration(
                 color: palette.accent.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(AppRadius.sm),

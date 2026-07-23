@@ -145,8 +145,7 @@ void main() {
         'the subtitle uses AppFonts.barlow directly instead of '
         'GoogleFonts.barlow() — the latter loads the variant asynchronously '
         '(fontFamily "Barlow_400", not "Barlow") and renders as tofu in the '
-        'evidence goldens before the async load resolves',
-        (tester) async {
+        'evidence goldens before the async load resolves', (tester) async {
       await _pumpRutinas(tester, links: [
         _link(id: '1', status: TrainerLinkStatus.active),
       ], names: {

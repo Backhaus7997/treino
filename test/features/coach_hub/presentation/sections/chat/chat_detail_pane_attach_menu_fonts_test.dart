@@ -81,8 +81,7 @@ void main() {
         await tester.pumpWidget(_wrapSection(container));
         await tester.pumpAndSettle();
 
-        await tester
-            .tap(find.byKey(const Key('chat_composer_attach_button')));
+        await tester.tap(find.byKey(const Key('chat_composer_attach_button')));
         await tester.pumpAndSettle();
 
         final photoText = tester.widget<Text>(

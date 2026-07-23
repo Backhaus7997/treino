@@ -9,7 +9,6 @@ import '../../../../../../app/theme/app_palette.dart';
 import '../../../../../../app/theme/tokens/primitives.dart';
 import '../../../../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../../../../core/widgets/motion/treino_state_switcher.dart';
-import '../../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../../../core/widgets/treino_icon.dart';
 import '../../../../../chat/application/chat_providers.dart';
 import '../../../../../chat/domain/media_type.dart';
@@ -673,41 +672,55 @@ class _Composer extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppSpacing.hairline),
-          // TreinoTappable REEMPLAZA el IconButton (no lo envuelve): con
-          // `onTap: null` (sending) devuelve el child pelado sin gesture —
-          // mismo comportamiento disabled que `onPressed: null` antes, más
-          // el feedback de escala 0.97 al presionar cuando está habilitado.
+          // TreinoInteractiveState REEMPLAZA el TreinoTappable crudo: además
+          // del feedback de escala 0.97 al presionar, ahora resuelve
+          // Focus/hover/pressed y activación por teclado (Enter/Space) —
+          // el TreinoTappable pelado no exponía Focus (barrido final,
+          // accesibilidad de teclado sistémica). Con `onTap: null` (sending)
+          // TreinoInteractiveState devuelve el child sin gestos ni foco —
+          // mismo comportamiento disabled que antes.
           //
-          // Semantics(button:true, label:'Enviar') explícito porque
-          // TreinoTappable es un GestureDetector puro (sin rol ni label
-          // propios) — sin este wrapper el CTA principal del composer no se
-          // anuncia como botón para lectores de pantalla (remediación
-          // adversarial WARNING-1).
-          Semantics(
-            button: true,
-            enabled: !sending,
-            label: 'Enviar', // i18n: Fase W2
-            child: TreinoTappable(
-              key: const Key('chat_send_button'),
-              onTap: sending ? null : onSend,
-              child: Container(
-                constraints:
-                    const BoxConstraints(minWidth: 40, minHeight: 40),
-                alignment: Alignment.center,
-                child: sending
-                    ? SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
+          // Semantics(button:true, label:'Enviar') explícito porque el
+          // child es un ícono sin texto — sin este wrapper el CTA principal
+          // del composer no se anuncia como botón para lectores de pantalla
+          // (remediación adversarial WARNING-1). Se mantiene explícito (en
+          // vez de delegar al Semantics interno de TreinoInteractiveState)
+          // porque debe seguir anunciándose como botón deshabilitado
+          // (`enabled: !sending`) incluso mientras `sending == true`, cuando
+          // TreinoInteractiveState (onTap null) no expone Semantics propio.
+          //
+          // MergeSemantics: TreinoInteractiveState (cuando onTap != null)
+          // agrega su propio nodo Semantics(button:true) interno, que sin
+          // fusión queda como un nodo separado del Semantics(label:'Enviar')
+          // explícito de acá afuera — el lector de pantalla anunciaría un
+          // botón sin label. MergeSemantics colapsa ambos nodos en uno solo.
+          MergeSemantics(
+            child: Semantics(
+              button: true,
+              enabled: !sending,
+              label: 'Enviar', // i18n: Fase W2
+              child: TreinoInteractiveState(
+                onTap: sending ? null : onSend,
+                builder: (ctx, states) => Container(
+                  key: const Key('chat_send_button'),
+                  constraints:
+                      const BoxConstraints(minWidth: 40, minHeight: 40),
+                  alignment: Alignment.center,
+                  child: sending
+                      ? SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: palette.accent,
+                          ),
+                        )
+                      : Icon(
+                          TreinoIcon.send,
+                          size: 20,
                           color: palette.accent,
                         ),
-                      )
-                    : Icon(
-                        TreinoIcon.send,
-                        size: 20,
-                        color: palette.accent,
-                      ),
+                ),
               ),
             ),
           ),

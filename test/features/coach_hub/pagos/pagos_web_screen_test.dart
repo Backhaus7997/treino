@@ -278,7 +278,8 @@ void main() {
     });
   });
 
-  group('CTA "Registrar pago" persiste de verdad (REQ-PAGW-ACTION-003, '
+  group(
+      'CTA "Registrar pago" persiste de verdad (REQ-PAGW-ACTION-003, '
       'ADR-F9-06 — remediación CRITICAL-1 verify ronda 1)', () {
     // Antes de esta pieza, `_onRegistrarPago` abría RegistrarPagoDialog y
     // descartaba el resultado: el trainer completaba el form, tocaba
@@ -309,7 +310,8 @@ void main() {
           ..._emptyOverrides(),
           paymentRepositoryProvider.overrideWithValue(mockRepo),
           currentUidProvider.overrideWithValue('trainer-1'),
-          trainerLinksStreamProvider.overrideWith((ref) => Stream.value([link])),
+          trainerLinksStreamProvider
+              .overrideWith((ref) => Stream.value([link])),
           userPublicProfilesBatchProvider.overrideWith(
             (ref, key) async => {
               'athlete-1': const UserPublicProfile(

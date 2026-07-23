@@ -322,8 +322,7 @@ void main() {
         find.byKey(const Key('quick_action_nuevo_alumno')),
       );
       expect(semantics.flagsCollection.isButton, isTrue,
-          reason:
-              '"+ Nuevo alumno" debe exponer Semantics(button: true)');
+          reason: '"+ Nuevo alumno" debe exponer Semantics(button: true)');
 
       final focusNode = Focus.of(
         tester.element(find.byKey(const Key('quick_action_nuevo_alumno'))),

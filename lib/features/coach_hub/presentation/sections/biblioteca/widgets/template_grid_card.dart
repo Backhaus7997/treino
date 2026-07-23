@@ -134,7 +134,7 @@ class _LevelChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.s8,
-        vertical: AppSpacing.hairline - 1,
+        vertical: AppSpacing.hairline,
       ),
       decoration: BoxDecoration(
         color: palette.accent.withValues(alpha: 0.12),

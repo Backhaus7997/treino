@@ -4,9 +4,9 @@ import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/tokens/components/treino_transparent_tokens.dart';
 import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/core/widgets/motion/treino_shimmer.dart';
-import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/domain/nutrition_plan.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/treino_interactive_state.dart';
 
 /// Card del plan de nutrición activo — tab Nutrición, Fase 3 WU-08
 /// (extraído de `_NutricionTabState.build`, `alumno_detail_screen.dart`,
@@ -438,10 +438,16 @@ class _SelectionModeSelector extends StatelessWidget {
   final AppPalette palette;
   final ValueChanged<SelectionMode> onChanged;
 
+  // TreinoInteractiveState (resolver de Focus/Semantics del kit) —
+  // REEMPLAZA al TreinoTappable crudo, que no exponía Focus ni
+  // Semantics(button) — inalcanzable por teclado (barrido final,
+  // accesibilidad de teclado sistémica). `find.byType(TreinoTappable)` en
+  // `nutricion_tab_test.dart` sigue encontrando un match: TreinoInteractiveState
+  // envuelve un TreinoTappable internamente.
   Widget _pill(String label, bool active, VoidCallback onTap) {
-    return TreinoTappable(
+    return TreinoInteractiveState(
       onTap: onTap,
-      child: Container(
+      builder: (ctx, states) => Container(
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.s8,
           vertical: AppSpacing.hairline - 1,
