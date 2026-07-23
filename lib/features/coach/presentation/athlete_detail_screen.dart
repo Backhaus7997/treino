@@ -133,50 +133,12 @@ class _AthleteDetailBody extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
 
-    if (profileAsync.isLoading || plansAsync.isLoading) {
-      return Center(
-        child: CircularProgressIndicator(color: palette.accent),
-      );
-    }
-
-    if (profileAsync.hasError) {
-      return Center(
-        child: Text(
-          AppL10n.of(context).athleteDetailProfileLoadError,
-          style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
-        ),
-      );
-    }
-
-    if (plansAsync.hasError) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Error cargando planes:',
-                style:
-                    GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                plansAsync.error.toString(),
-                style:
-                    GoogleFonts.barlow(color: palette.textMuted, fontSize: 12),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    // Client-side filter: only show plans assigned by current trainer
-    final allPlans = plansAsync.valueOrNull ?? const [];
-    final myPlans = allPlans.where((r) => r.assignedBy == trainerUid).toList();
-
+    // #503: NO whole-screen loading/error gate. Cada sección resuelve su propio
+    // async (igual que antropometría, rendimiento, historial, cobro y nota), así
+    // un `permission-denied` en `assignedRoutinesProvider` — el que dispara el PF
+    // nuevo cuando entra al detalle antes de que la CF
+    // `cleanupAssignedPlansOnUnlink` borre las rutinas del PF anterior — degrada
+    // sólo esa sección en vez de llevarse la pantalla entera puesta.
     return Column(
       children: [
         Expanded(
@@ -185,43 +147,24 @@ class _AthleteDetailBody extends ConsumerWidget {
             children: [
               // ── Athlete header ──────────────────────────────────────
               _AthleteHeader(profileAsync: profileAsync),
+              if (profileAsync.hasError) ...[
+                const SizedBox(height: 8),
+                Text(
+                  AppL10n.of(context).athleteDetailProfileLoadError,
+                  style: GoogleFonts.barlow(
+                    fontSize: 13,
+                    color: palette.textMuted,
+                  ),
+                ),
+              ],
               const SizedBox(height: 20),
 
               // ── Planes section ──────────────────────────────────────
-              Text(
-                AppL10n.of(context).athleteDetailPlansSection,
-                style: GoogleFonts.barlowCondensed(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 12,
-                  letterSpacing: 1.2,
-                  color: palette.textMuted,
-                ),
+              _PlanesSection(
+                athleteId: athleteId,
+                trainerUid: trainerUid,
+                plansAsync: plansAsync,
               ),
-              const SizedBox(height: 12),
-              if (myPlans.isEmpty)
-                Text(
-                  AppL10n.of(context).coachAthleteDetailNoPlans,
-                  style: GoogleFonts.barlow(
-                    fontWeight: FontWeight.w400,
-                    fontSize: 14,
-                    color: palette.textMuted,
-                  ),
-                )
-              else
-                for (final plan in myPlans) ...[
-                  _PlanCard(
-                    plan: plan,
-                    onTap: () => context.push(
-                      '/coach/athlete/$athleteId/plan/${plan.id}',
-                    ),
-                    onEdit: () => context.push(
-                      '/workout/routine-editor/$athleteId',
-                      extra: plan.id,
-                    ),
-                    onDelete: () => _onDeletePlan(context, ref, plan),
-                  ),
-                  const SizedBox(height: 12),
-                ],
 
               // ── Antropometría section ────────────────────────────────
               const SizedBox(height: 8),
@@ -350,6 +293,121 @@ class _AthleteDetailBody extends ConsumerWidget {
         ),
       );
     }
+  }
+}
+
+// ── Planes section ────────────────────────────────────────────────────────────
+
+/// PLANES ASIGNADOS section — the plans [trainerUid] assigned to [athleteId].
+///
+/// Owns its own loading/error rendering (#503). `assignedRoutinesProvider` hits
+/// `RoutineRepository.listAssignedTo()`, and the rules deny the WHOLE query when
+/// a single doc doesn't match — which happens for real while the athlete is
+/// re-linking trainers and `cleanupAssignedPlansOnUnlink` hasn't purged the
+/// previous trainer's routines yet. Scoping the failure here keeps antropometría,
+/// rendimiento, historial, cobro and nota usable instead of replacing the entire
+/// screen with a raw exception dump.
+class _PlanesSection extends ConsumerWidget {
+  const _PlanesSection({
+    required this.athleteId,
+    required this.trainerUid,
+    required this.plansAsync,
+  });
+
+  final String athleteId;
+  final String trainerUid;
+  final AsyncValue<List<Routine>> plansAsync;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Section header ─────────────────────────────────────────────────
+        Text(
+          AppL10n.of(context).athleteDetailPlansSection,
+          style: GoogleFonts.barlowCondensed(
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
+            letterSpacing: 1.2,
+            color: palette.textMuted,
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // ── Async content ──────────────────────────────────────────────────
+        plansAsync.when(
+          loading: () => _card(
+            palette: palette,
+            child: Text(
+              'Cargando…',
+              style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+            ),
+          ),
+          error: (e, __) => _card(
+            palette: palette,
+            child: Text(
+              (e is FirebaseException && e.code == 'permission-denied')
+                  ? 'No pudimos cargar los planes. Puede que el vínculo con '
+                      'este alumno se haya actualizado recién.'
+                  : 'No pudimos cargar los planes.',
+              style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+            ),
+          ),
+          data: (allPlans) {
+            // Client-side filter: only show plans assigned by current trainer
+            final myPlans =
+                allPlans.where((r) => r.assignedBy == trainerUid).toList();
+
+            if (myPlans.isEmpty) {
+              return Text(
+                AppL10n.of(context).coachAthleteDetailNoPlans,
+                style: GoogleFonts.barlow(
+                  fontWeight: FontWeight.w400,
+                  fontSize: 14,
+                  color: palette.textMuted,
+                ),
+              );
+            }
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final plan in myPlans) ...[
+                  _PlanCard(
+                    plan: plan,
+                    onTap: () => context.push(
+                      '/coach/athlete/$athleteId/plan/${plan.id}',
+                    ),
+                    onEdit: () => context.push(
+                      '/workout/routine-editor/$athleteId',
+                      extra: plan.id,
+                    ),
+                    onDelete: () => _onDeletePlan(context, ref, plan),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _card({required AppPalette palette, required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: palette.border),
+      ),
+      child: child,
+    );
   }
 
   /// Confirms then deletes a plan the trainer assigned to this athlete, and
