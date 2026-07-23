@@ -3,7 +3,9 @@
 //
 // Cobertura: nombres reales del catálogo (ES con tilde, EN, mayúsculas,
 // espacios extra) + casos sin match confiable → null. Ronda de revisión
-// "imágenes de ejercicios en Biblioteca".
+// "imágenes de ejercicios en Biblioteca" (rondas 3 y 4: cobertura ampliada a
+// media_confidence high+medium + fallback de variantes de equipamiento vía
+// nombre base inequívoco).
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/coach_hub/presentation/sections/biblioteca/exercise_image_resolver.dart';
@@ -11,6 +13,18 @@ import 'package:treino/features/coach_hub/presentation/sections/biblioteca/exerc
 
 const _bicepCurlUrl =
     'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Bicep_Curl/0.jpg';
+
+// "Sentadilla búlgara" / "Bulgarian Split Squat" es `media_confidence:
+// "medium"` en el JSON fuente (sin sufijo de equipamiento) — cubre la capa
+// (a) exacta ahora que el generador incluye high+medium.
+const _bulgarianSplitSquatUrl =
+    'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Smith_Single-Leg_Split_Squat/0.jpg';
+
+// "Press Arnold (Mancuerna)" / "Arnold Press (Dumbbell)" es la ÚNICA entrada
+// del catálogo para la base "press arnold" (high) — cubre la capa (b),
+// fallback de variante de equipamiento vía base inequívoca.
+const _arnoldPressUrl =
+    'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Arnold_Dumbbell_Press/0.jpg';
 
 void main() {
   group('exerciseImageUrl —', () {
@@ -66,17 +80,71 @@ void main() {
     });
 
     test(
-        'ejercicio con media_confidence medium/low NO está en el catálogo '
-        '(el generador filtra solo "high")', () {
-      // "Bulgarian Split Squat" / "Sentadilla búlgara" es medium en el JSON
-      // fuente — no debe aparecer en el mapa generado.
-      expect(exerciseImageUrl('Sentadilla búlgara'), isNull);
-      expect(exerciseImageUrl('Bulgarian Split Squat'), isNull);
+        'ejercicio con media_confidence "medium" SÍ matchea (capa a — '
+        'exacta, ronda 4 amplía el filtro de high a high+medium)', () {
+      expect(exerciseImageUrl('Sentadilla búlgara'), _bulgarianSplitSquatUrl);
+      expect(
+          exerciseImageUrl('Bulgarian Split Squat'), _bulgarianSplitSquatUrl);
+    });
+
+    test('ejercicio con media_confidence "low" sigue excluido (nunca low/none)',
+        () {
+      // "Extensión de espalda" solo tiene entradas "low" en el catálogo
+      // fuente (Hiperextensión / Máquina / Hiperextensión con peso) — ni la
+      // clave exacta ni el fallback de base deben resolver nada acá.
+      expect(exerciseImageUrl('Extensión de espalda (Hiperextensión)'), isNull);
+      expect(exerciseImageUrl('Back Extension (Hyperextension)'), isNull);
+      expect(exerciseImageUrl('Extensión de espalda (Barra)'), isNull);
+    });
+
+    test(
+        'variante de equipamiento que no matchea exacto cae al fallback de '
+        'base inequívoca (capa b)', () {
+      // El catálogo curado SOLO tiene "Press Arnold (Mancuerna)" — es la
+      // única entrada para la base "press arnold", así que un nombre de
+      // Biblioteca con un equipamiento distinto ("Polea") igual matchea esa
+      // imagen en vez de quedarse sin ninguna.
+      expect(exerciseImageUrl('Press Arnold (Polea)'), _arnoldPressUrl);
+      expect(exerciseImageUrl('Arnold Press (Cable)'), _arnoldPressUrl);
+      // La entrada exacta con el equipamiento real del catálogo sigue
+      // resolviendo por la capa (a), sin pasar por el fallback.
+      expect(exerciseImageUrl('Press Arnold (Mancuerna)'), _arnoldPressUrl);
+    });
+
+    test(
+        'base AMBIGUA (2+ ejercicios distintos comparten la base) → null, '
+        'jamás una imagen que podría ser del equipamiento equivocado', () {
+      // El catálogo tiene 7 variantes distintas de "Curl de Bíceps"
+      // (Barra/Barra Z/Mancuerna/TRX/Máquina/Polea + sin equipamiento) — la
+      // base "curl de biceps" es ambigua, así que un equipamiento no
+      // catalogado ("Cuerda") NO debe resolver a ninguna de esas imágenes.
+      expect(exerciseImageUrl('Curl de Bíceps (Cuerda)'), isNull);
+      expect(exerciseImageUrl('Bicep Curl (Rope)'), isNull);
+    });
+
+    test(
+        'nombre sin sufijo de equipamiento y sin match exacto → null (capa '
+        'b no aplica, va directo a c)', () {
+      expect(exerciseImageUrl('Ejercicio Totalmente Inventado'), isNull);
     });
 
     test('el catálogo generado no está vacío (regresión de generación)', () {
       expect(exerciseMediaCatalog, isNotEmpty);
       expect(exerciseMediaCatalog.length, greaterThan(100));
+      expect(exerciseMediaBaseCatalog, isNotEmpty);
+    });
+
+    test(
+        'el mapa de base NO contiene claves ya cubiertas por el mapa exacto '
+        '(no aportan valor, ver generador)', () {
+      for (final baseKeyEntry in exerciseMediaBaseCatalog.keys) {
+        expect(
+          exerciseMediaCatalog.containsKey(baseKeyEntry),
+          isFalse,
+          reason: '"$baseKeyEntry" ya está en el mapa exacto — redundante '
+              'en el mapa base.',
+        );
+      }
     });
   });
 }
