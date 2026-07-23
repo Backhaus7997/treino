@@ -937,6 +937,17 @@ class _WeekSelector extends StatelessWidget {
 /// unconditional ACTION button. Completion only ever changes the signal and
 /// the action's label — it never removes, disables, or hides the action
 /// (periodized-plan-repeat, AD-1/AD-2).
+///
+/// A FAILED progress fetch does not hide it either (#497). Plan progress
+/// decides the signal and the button's label; it is not needed to START a
+/// workout, which only needs the routine and day the parent already resolved.
+/// The earlier design let `error` return `SizedBox.shrink()` on the assumption
+/// the failure was transient — it was not: [routineByIdProvider] cached the
+/// AsyncError for the container's lifetime, so the screen's only control
+/// vanished until the app restarted. Unknown progress now degrades to "no
+/// signal, label EMPEZAR", never to "no way to train".
+/// Only the very first load still reserves blank space, so the bar does not
+/// jump while progress lands.
 class _PeriodizedCTABar extends ConsumerWidget {
   const _PeriodizedCTABar({
     required this.routine,
@@ -963,35 +974,38 @@ class _PeriodizedCTABar extends ConsumerWidget {
       planProgressProvider((uid: uid, routineId: routine.id)),
     );
 
-    return progressAsync.when(
-      loading: () => const SizedBox(height: 56),
-      error: (_, __) => const SizedBox.shrink(),
-      data: (progress) {
-        final alreadyDone = progress.completed.contains((
-          week: viewedWeek,
-          day: day.dayNumber,
-        ));
+    // First load only: nothing known yet, so reserve the action's height
+    // instead of jumping. A RELOAD keeps showing the previous progress, and a
+    // failure falls through with `progress == null` (#497).
+    if (progressAsync.isLoading && !progressAsync.hasValue) {
+      return const SizedBox(height: 56);
+    }
 
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 18),
-          child: Column(
-            children: [
-              // SIGNAL — never gates. Plan-scoped wins over day-scoped
-              // (banner XOR chip): "PLAN COMPLETADO" stacked above
-              // "COMPLETADO" would say the same fact twice.
-              if (progress.planComplete)
-                const _PlanCompleteBanner()
-              else if (alreadyDone)
-                const _CompletedDayChip(),
-              if (progress.planComplete || alreadyDone)
-                const SizedBox(height: 12),
-              // ACTION — unconditional. No completion state removes it
-              // (AD-2); only the label changes, keyed off the day.
-              _buildSessionCTA(context, ref, isRepeat: alreadyDone),
-            ],
-          ),
-        );
-      },
+    // null == progress unknown (the fetch failed). Degrade to the safe
+    // defaults: no signal, and the action labelled EMPEZAR.
+    final progress = progressAsync.valueOrNull;
+    final planComplete = progress?.planComplete ?? false;
+    final alreadyDone = progress != null &&
+        progress.completed.contains((week: viewedWeek, day: day.dayNumber));
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 18),
+      child: Column(
+        children: [
+          // SIGNAL — never gates. Plan-scoped wins over day-scoped
+          // (banner XOR chip): "PLAN COMPLETADO" stacked above
+          // "COMPLETADO" would say the same fact twice.
+          if (planComplete)
+            const _PlanCompleteBanner()
+          else if (alreadyDone)
+            const _CompletedDayChip(),
+          if (planComplete || alreadyDone) const SizedBox(height: 12),
+          // ACTION — unconditional. Neither a completion state (AD-2) nor a
+          // failed progress fetch (#497) removes it; only the label changes,
+          // keyed off the day.
+          _buildSessionCTA(context, ref, isRepeat: alreadyDone),
+        ],
+      ),
     );
   }
 

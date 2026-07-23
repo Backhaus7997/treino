@@ -478,6 +478,7 @@ class SessionNotifier
     // #367: same session-cache refresh as finishSession — the abandoned session
     // is now persisted, so historial and any session-derived view reflect it
     // (and the no-longer-active session clears) without an app restart.
+    // Same audited post-dispose contract as finishSession (#497) — see there.
     ref.invalidate(sessionsByUidProvider(uid));
     state = AsyncData(current.copyWith(
       session: current.session.copyWith(wasFullyCompleted: false),
@@ -516,6 +517,16 @@ class SessionNotifier
       rethrow;
     }
     _finalize();
+    // #497 (audited, riverpod 2.6.1): everything below runs AFTER an await, and
+    // the player's `PopScope(canPop: _isFinalizing)` lets the route pop while
+    // the write is in flight — so this notifier can already be disposed here.
+    // That is survivable, not broken: `Ref.invalidate`/`Ref.read` delegate to
+    // the container (still alive), and assigning `state` on a disposed element
+    // is a tolerated no-op. The refresh and the analytics event both land.
+    // Riverpod 3.x turns ref-after-dispose into an error — the tripwires in
+    // session_notifier_dispose_race_test.dart go red when that day comes, and
+    // the fix is a `ref.keepAlive()` across the write plus a `_disposed` guard.
+    //
     // #367: refresh the session-derived caches so Home's "HOY" card advances to
     // the next plan day and Insights include this session WITHOUT restarting the
     // app. sessionsByUidProvider is a one-shot autoDispose future that never

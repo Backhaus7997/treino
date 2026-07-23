@@ -38,9 +38,14 @@ final trainerTemplatesStreamProvider =
 /// insights radars via `.future`) rely on this NOT holding an open stream.
 /// Screens that must AUTO-REFRESH after an edit use [routineByIdStreamProvider]
 /// instead.
-final routineByIdProvider = FutureProvider.family<Routine?, String>(
+///
+/// Caches SUCCESS, never caches FAILURE (#497) — see [_cacheOnlyOnSuccess].
+final routineByIdProvider = FutureProvider.autoDispose.family<Routine?, String>(
   (ref, id) async {
-    return ref.watch(routineRepositoryProvider).getById(id);
+    return _cacheOnlyOnSuccess(
+      ref,
+      () => ref.watch(routineRepositoryProvider).getById(id),
+    );
   },
 );
 
@@ -67,11 +72,51 @@ final routineByIdStreamProvider =
 /// resolve the routine of every scanned session, so one stale session pointing
 /// at a routine that is gone must degrade that session's custom-exercise
 /// mapping, not fail the whole chart.
-final visibleRoutineByIdProvider = FutureProvider.family<Routine?, String>(
+///
+/// Caches SUCCESS (including the `null` "not visible" answer), never caches
+/// the transient failures it rethrows (#497) — see [_cacheOnlyOnSuccess].
+final visibleRoutineByIdProvider =
+    FutureProvider.autoDispose.family<Routine?, String>(
   (ref, id) async {
-    return ref.watch(routineRepositoryProvider).getByIdIfVisible(id);
+    return _cacheOnlyOnSuccess(
+      ref,
+      () => ref.watch(routineRepositoryProvider).getByIdIfVisible(id),
+    );
   },
 );
+
+/// Runs [fetch] under a cache policy of "keep the answer, drop the failure".
+///
+/// Both single-doc providers above are read one-shot from many places (session
+/// start/resume, `planProgressProvider`, the insights radars) and MUST keep
+/// caching their result: making them plainly `autoDispose` would re-hit
+/// Firestore on every mount of every consumer.
+///
+/// But a NON-autoDispose provider caches its `AsyncError` just as durably as
+/// its data, and nothing ever invalidated these (#497). One timeout in a gym
+/// with bad signal, or a `permission-denied` on a trainer-template that was
+/// just un-shared, and every consumer stayed broken until the app restarted —
+/// "empezar/continuar sesión" included. The screens' own retry buttons could
+/// not fix it either: `ref.invalidate` on a WRAPPER (`planProgressProvider`)
+/// does NOT cascade to its dependencies. Same family as #376.
+///
+/// So: [Ref.keepAlive] is taken on entry and released ONLY when the fetch
+/// throws. On success the link is held and the element behaves exactly as the
+/// old non-autoDispose provider did. Taking the link BEFORE the first await
+/// also means an in-flight fetch is never disposed mid-air by a consumer that
+/// unmounted while waiting.
+Future<Routine?> _cacheOnlyOnSuccess(
+  Ref<AsyncValue<Routine?>> ref,
+  Future<Routine?> Function() fetch,
+) async {
+  final link = ref.keepAlive();
+  try {
+    return await fetch();
+  } catch (_) {
+    link.close();
+    rethrow;
+  }
+}
 
 /// Currently selected level filter for the Plantillas section.
 /// `null` means "Todas" (no filter applied).
