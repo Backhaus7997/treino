@@ -368,4 +368,55 @@ void main() {
               'week loops back to 0 after the last week of a periodized plan');
     });
   });
+
+  // A corrupt/legacy Firestore doc can carry an EXPLICIT `numWeeks: 0` — the
+  // `?? 1` in the generated fromJson only covers an ABSENT field, so 0 reaches
+  // the provider intact and `% 0` throws IntegerDivisionByZeroException.
+  // Same criterion as derivePlanProgress and SessionNotifier._buildFresh.
+  group('todaysRoutineProvider — corrupt numWeeks (<= 0)', () {
+    test('numWeeks == 0 + day rollover → no crash, behaves like numWeeks == 1',
+        () async {
+      final r = _routine(id: 'r1', numDays: 5, numWeeks: 0);
+      final c = _container(
+        assigned: [r],
+        sessions: [_session(routineId: 'r1', dayNumber: 5, weekNumber: 2)],
+      );
+
+      final today = await c.read(todaysRoutineProvider.future);
+      expect(today, isNotNull,
+          reason: 'a corrupt numWeeks must not blow up the home card — '
+              'the athlete keeps the "empezar en 1 tap" affordance');
+      expect(today!.dayNumber, equals(1));
+      expect(today.weekNumber, equals(0),
+          reason: 'numWeeks <= 0 is normalized to 1, so the week loops to 0');
+    });
+
+    test('numWeeks == 0 without rollover → next day, week untouched', () async {
+      final r = _routine(id: 'r1', numDays: 5, numWeeks: 0);
+      final c = _container(
+        assigned: [r],
+        sessions: [_session(routineId: 'r1', dayNumber: 3, weekNumber: 2)],
+      );
+
+      final today = await c.read(todaysRoutineProvider.future);
+      expect(today, isNotNull);
+      expect(today!.dayNumber, equals(4));
+      expect(today.weekNumber, equals(2),
+          reason: 'the guard only normalizes the modulo divisor — it must not '
+              'reach into the non-rollover path');
+    });
+
+    test('negative numWeeks → no crash, week loops to 0 on rollover', () async {
+      final r = _routine(id: 'r1', numDays: 5, numWeeks: -3);
+      final c = _container(
+        assigned: [r],
+        sessions: [_session(routineId: 'r1', dayNumber: 5, weekNumber: 1)],
+      );
+
+      final today = await c.read(todaysRoutineProvider.future);
+      expect(today, isNotNull);
+      expect(today!.dayNumber, equals(1));
+      expect(today.weekNumber, equals(0));
+    });
+  });
 }
