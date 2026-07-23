@@ -42,8 +42,12 @@
  *   # (e.g. treino-prod), after dev verification + maintainer sign-off:
  *   node scripts/backfill_gym_ids.js --allow-prod
  *
+ *   # Against the local emulator — no service-account key needed:
+ *   FIRESTORE_EMULATOR_HOST=localhost:8080 node scripts/backfill_gym_ids.js
+ *
  * Requires `sa-key.json` (Firebase service account, gitignored) in scripts/
- * — see scripts/README.md / backfill_user_public_profiles.js for setup.
+ * UNLESS `FIRESTORE_EMULATOR_HOST` is set — see scripts/README.md /
+ * backfill_user_public_profiles.js for setup.
  *
  * ────────────────────────────────────────────────────────────────────────────
  * SAFETY
@@ -57,14 +61,31 @@
  */
 
 const admin = require('firebase-admin');
-const serviceAccount = require('./sa-key.json');
 
-const PROJECT_ID = serviceAccount.project_id;
+let PROJECT_ID;
+if (process.env.FIRESTORE_EMULATOR_HOST) {
+  // Admin SDK with emulator — no service account needed.
+  PROJECT_ID = 'treino-dev';
+  admin.initializeApp({ projectId: PROJECT_ID });
+} else {
+  let serviceAccount;
+  try {
+    serviceAccount = require('./sa-key.json');
+  } catch (err) {
+    if (err.code !== 'MODULE_NOT_FOUND') throw err;
+    console.error(
+      '\nERROR: scripts/sa-key.json not found — required to run against production.\n' +
+      'Download a service-account key from the Firebase console and save it as\n' +
+      'scripts/sa-key.json (gitignored), or target the local emulator instead:\n\n' +
+      '  FIRESTORE_EMULATOR_HOST=localhost:8080 node scripts/backfill_gym_ids.js\n',
+    );
+    process.exit(1);
+  }
+  PROJECT_ID = serviceAccount.project_id;
+  admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+}
+
 const NO_GYM = 'no-gym';
-
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
 
 const db = admin.firestore();
 

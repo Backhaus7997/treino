@@ -34,6 +34,10 @@
  * 3. Run:
  *      node scripts/backfill_routines_source_visibility.js
  *
+ *    Against the local emulator no key is needed — step 2 is skippable:
+ *      FIRESTORE_EMULATOR_HOST=localhost:8080 \
+ *      node scripts/backfill_routines_source_visibility.js
+ *
  * 4. Verify: check logs for "Backfill complete" and the count of docs
  *    updated vs skipped.
  *
@@ -52,12 +56,25 @@
 
 const admin = require('firebase-admin');
 
-// Adjust the path to your service account key file.
-const serviceAccount = require('./sa-key.json');
-
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
+if (process.env.FIRESTORE_EMULATOR_HOST) {
+  // Admin SDK with emulator — no service account needed.
+  admin.initializeApp({ projectId: 'treino-dev' });
+} else {
+  let serviceAccount;
+  try {
+    serviceAccount = require('./sa-key.json');
+  } catch (err) {
+    if (err.code !== 'MODULE_NOT_FOUND') throw err;
+    console.error(
+      '\nERROR: scripts/sa-key.json not found — required to run against production.\n' +
+      'Download a service-account key from the Firebase console and save it as\n' +
+      'scripts/sa-key.json (gitignored), or target the local emulator instead:\n\n' +
+      '  FIRESTORE_EMULATOR_HOST=localhost:8080 node scripts/backfill_routines_source_visibility.js\n',
+    );
+    process.exit(1);
+  }
+  admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+}
 
 const db = admin.firestore();
 
