@@ -79,17 +79,18 @@ class _ReviewBottomSheetState extends ConsumerState<ReviewBottomSheet> {
         athleteId: widget.athleteId,
       );
 
-  String _title() {
+  String _title(AppL10n l10n) {
     if (widget.existing != null) {
-      return 'Editá tu reseña'; // i18n: Fase 6 Etapa 7
+      return l10n.reviewSheetTitleEdit;
     }
     if (widget.triggerVariant == ReviewTriggerVariant.thirtyDay) {
-      return 'Ya llevás un mes entrenando con ${widget.trainerName}. ¿Cómo va?'; // i18n: Fase 6 Etapa 7
+      return l10n.reviewSheetTitleThirtyDay(widget.trainerName);
     }
-    return '¿Cómo fue tu experiencia con ${widget.trainerName}?'; // i18n: Fase 6 Etapa 7
+    return l10n.reviewSheetTitleStandard(widget.trainerName);
   }
 
   Future<void> _onSubmit() async {
+    final l10n = AppL10n.of(context);
     final notifier = ref.read(reviewNotifierProvider(_args).notifier);
     await notifier.submit(
       rating: _rating,
@@ -100,18 +101,12 @@ class _ReviewBottomSheetState extends ConsumerState<ReviewBottomSheet> {
     final state = ref.read(reviewNotifierProvider(_args));
     if (state is AsyncError) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'No pudimos guardar tu reseña. Probá de nuevo.', // i18n: Fase 6 Etapa 7
-          ),
-        ),
+        SnackBar(content: Text(l10n.reviewSnackBarError)),
       );
     } else {
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppL10n.of(context).reviewSnackBarSuccess),
-        ),
+        SnackBar(content: Text(l10n.reviewSnackBarSuccess)),
       );
     }
   }
@@ -119,6 +114,7 @@ class _ReviewBottomSheetState extends ConsumerState<ReviewBottomSheet> {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final notifierState = ref.watch(reviewNotifierProvider(_args));
     final isLoading = notifierState is AsyncLoading;
 
@@ -148,7 +144,7 @@ class _ReviewBottomSheetState extends ConsumerState<ReviewBottomSheet> {
             const SizedBox(height: 18),
             // Title
             Text(
-              _title(),
+              _title(l10n),
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
                 fontSize: 18,
@@ -172,8 +168,7 @@ class _ReviewBottomSheetState extends ConsumerState<ReviewBottomSheet> {
               minLines: 2,
               style: GoogleFonts.barlow(color: palette.textPrimary),
               decoration: InputDecoration(
-                hintText:
-                    'Contanos cómo fue (opcional)', // i18n: Fase 6 Etapa 7
+                hintText: l10n.reviewSheetCommentHint,
                 hintStyle: GoogleFonts.barlow(color: palette.textMuted),
                 enabledBorder: OutlineInputBorder(
                   borderSide: BorderSide(color: palette.border),
@@ -194,7 +189,7 @@ class _ReviewBottomSheetState extends ConsumerState<ReviewBottomSheet> {
                     onPressed:
                         isLoading ? null : () => Navigator.of(context).pop(),
                     child: Text(
-                      'CANCELAR', // i18n: Fase 6 Etapa 7
+                      l10n.reviewSheetCancel,
                       style: GoogleFonts.barlowCondensed(
                         fontWeight: FontWeight.w700,
                         fontSize: 14,
@@ -226,7 +221,7 @@ class _ReviewBottomSheetState extends ConsumerState<ReviewBottomSheet> {
                             ),
                           )
                         : Text(
-                            'ENVIAR', // i18n: Fase 6 Etapa 7
+                            l10n.reviewSheetSubmit,
                             style: GoogleFonts.barlowCondensed(
                               fontWeight: FontWeight.w700,
                               fontSize: 14,

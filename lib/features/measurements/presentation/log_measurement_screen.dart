@@ -338,11 +338,7 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
     final uid = ref.read(currentUidProvider);
     if (uid == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'No hay sesión activa. No se puede guardar.',
-          ),
-        ),
+        SnackBar(content: Text(l10n.measurementLogNoSession)),
       );
       return;
     }
@@ -428,7 +424,9 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            initial != null ? 'Medición actualizada' : 'Medición guardada',
+            initial != null
+                ? l10n.measurementLogUpdateSuccess
+                : l10n.measurementLogSaveSuccess,
           ),
         ),
       );
@@ -436,11 +434,7 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'No pudimos guardar la medición. Probá de nuevo.',
-          ),
-        ),
+        SnackBar(content: Text(l10n.measurementLogSaveError)),
       );
     }
   }
@@ -474,7 +468,7 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
                     onPressed:
                         _saving ? null : () => Navigator.of(context).pop(),
                     child: Text(
-                      'Cancelar',
+                      l10n.commonCancel,
                       style: GoogleFonts.barlow(
                         color: _saving ? palette.textMuted : palette.highlight,
                         fontSize: 14,
@@ -487,7 +481,9 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        isEditing ? 'Editar medición' : 'Cargar medición',
+                        isEditing
+                            ? l10n.measurementLogTitleEdit
+                            : l10n.measurementLogTitleCreate,
                         style: GoogleFonts.barlowCondensed(
                           fontWeight: FontWeight.w700,
                           fontSize: 16,
@@ -517,24 +513,27 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Body composition
-                      _sectionLabel('COMPOSICIÓN CORPORAL', palette),
+                      _sectionLabel(
+                        l10n.measurementLogSectionBodyComposition,
+                        palette,
+                      ),
                       const SizedBox(height: 12),
                       _numericField(
-                        label: 'Peso (kg)',
+                        label: l10n.measurementLogFieldWeight,
                         controller: _weightCtrl,
                         palette: palette,
                         validator: (v) => _validateMetric(v, l10n),
                       ),
                       const SizedBox(height: 12),
                       _numericField(
-                        label: 'Grasa (%)',
+                        label: l10n.measurementLogFieldBodyFat,
                         controller: _fatCtrl,
                         palette: palette,
                         validator: (v) => _validateMetric(v, l10n),
                       ),
                       const SizedBox(height: 12),
                       _numericField(
-                        label: 'Masa muscular (kg)',
+                        label: l10n.measurementLogFieldMuscleMass,
                         controller: _muscleCtrl,
                         palette: palette,
                         validator: (v) => _validateMetric(v, l10n),
@@ -571,7 +570,7 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
                       const SizedBox(height: 20),
 
                       // Notes
-                      _sectionLabel('NOTAS', palette),
+                      _sectionLabel(l10n.measurementLogSectionNotes, palette),
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _notesCtrl,
@@ -586,7 +585,7 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
                           palette: palette,
                           hint: widget._mode == _LogAuthorMode.athleteSelf
                               ? l10n.measurementsSelfLogNotesHint
-                              : 'Observaciones del entrenador…',
+                              : l10n.measurementLogNotesHint,
                         ),
                       ),
 
@@ -625,7 +624,9 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
                           ),
                         )
                       : Text(
-                          isEditing ? 'GUARDAR CAMBIOS' : 'GUARDAR MEDICIÓN',
+                          isEditing
+                              ? l10n.measurementLogUpdateCta
+                              : l10n.measurementLogSaveCta,
                           style: GoogleFonts.barlowCondensed(
                             fontWeight: FontWeight.w700,
                             fontSize: 14,
@@ -743,6 +744,7 @@ Widget _bilateralField({
   required TextEditingController leftCtrl,
   required TextEditingController rightCtrl,
   required AppPalette palette,
+  required AppL10n l10n,
   FormFieldValidator<String>? validator,
 }) {
   return Column(
@@ -773,7 +775,7 @@ Widget _bilateralField({
               ),
               decoration: _inputDecoration(
                 palette: palette,
-                hint: 'I (cm)',
+                hint: l10n.measurementLogBilateralLeftHint,
               ),
             ),
           ),
@@ -791,7 +793,7 @@ Widget _bilateralField({
               ),
               decoration: _inputDecoration(
                 palette: palette,
-                hint: 'D (cm)',
+                hint: l10n.measurementLogBilateralRightHint,
               ),
             ),
           ),
@@ -853,6 +855,7 @@ class _CircumferencesSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = palette;
+    final l10n = AppL10n.of(context);
 
     return Container(
       decoration: BoxDecoration(
@@ -876,7 +879,7 @@ class _CircumferencesSection extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'CIRCUNFERENCIAS',
+                          l10n.measurementLogCircumferencesTitle,
                           style: GoogleFonts.barlowCondensed(
                             fontWeight: FontWeight.w700,
                             fontSize: 13,
@@ -886,7 +889,7 @@ class _CircumferencesSection extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          'Opcional. Cargá las que quieras.',
+                          l10n.measurementLogCircumferencesHint,
                           style: GoogleFonts.barlow(
                             fontSize: 12,
                             color: p.textMuted,
@@ -913,10 +916,10 @@ class _CircumferencesSection extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _subGroupLabel('TRONCO', p),
+                  _subGroupLabel(l10n.measurementLogGroupTrunk, p),
                   const SizedBox(height: 12),
                   _numericField(
-                    label: 'Hombros',
+                    label: l10n.measurementLogFieldShoulders,
                     controller: shouldersCtrl,
                     palette: p,
                     suffix: 'cm',
@@ -924,7 +927,7 @@ class _CircumferencesSection extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   _numericField(
-                    label: 'Pecho',
+                    label: l10n.measurementLogFieldChest,
                     controller: chestCtrl,
                     palette: p,
                     suffix: 'cm',
@@ -932,7 +935,7 @@ class _CircumferencesSection extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   _numericField(
-                    label: 'Cintura',
+                    label: l10n.measurementLogFieldWaist,
                     controller: waistCtrl,
                     palette: p,
                     suffix: 'cm',
@@ -940,7 +943,7 @@ class _CircumferencesSection extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   _numericField(
-                    label: 'Cadera',
+                    label: l10n.measurementLogFieldHips,
                     controller: hipsCtrl,
                     palette: p,
                     suffix: 'cm',
@@ -948,62 +951,68 @@ class _CircumferencesSection extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   _numericField(
-                    label: 'Glúteos',
+                    label: l10n.measurementLogFieldGlutes,
                     controller: glutesCtrl,
                     palette: p,
                     suffix: 'cm',
                     validator: validateMetric,
                   ),
                   const SizedBox(height: 20),
-                  _subGroupLabel('TREN SUPERIOR', p),
+                  _subGroupLabel(l10n.measurementLogGroupUpperBody, p),
                   const SizedBox(height: 12),
                   _bilateralField(
-                    label: 'Bíceps',
+                    label: l10n.measurementLogFieldBiceps,
                     leftCtrl: bicepsLCtrl,
                     rightCtrl: bicepsRCtrl,
                     palette: p,
+                    l10n: l10n,
                     validator: validateMetric,
                   ),
                   const SizedBox(height: 12),
                   _bilateralField(
-                    label: 'Bíceps (flex)',
+                    label: l10n.measurementLogFieldBicepsFlexed,
                     leftCtrl: bicepsFlexLCtrl,
                     rightCtrl: bicepsFlexRCtrl,
                     palette: p,
+                    l10n: l10n,
                     validator: validateMetric,
                   ),
                   const SizedBox(height: 12),
                   _bilateralField(
-                    label: 'Antebrazo',
+                    label: l10n.measurementLogFieldForearm,
                     leftCtrl: forearmLCtrl,
                     rightCtrl: forearmRCtrl,
                     palette: p,
+                    l10n: l10n,
                     validator: validateMetric,
                   ),
                   const SizedBox(height: 20),
-                  _subGroupLabel('TREN INFERIOR', p),
+                  _subGroupLabel(l10n.measurementLogGroupLowerBody, p),
                   const SizedBox(height: 12),
                   _bilateralField(
-                    label: 'Muslo superior',
+                    label: l10n.measurementLogFieldUpperThigh,
                     leftCtrl: upperThighLCtrl,
                     rightCtrl: upperThighRCtrl,
                     palette: p,
+                    l10n: l10n,
                     validator: validateMetric,
                   ),
                   const SizedBox(height: 12),
                   _bilateralField(
-                    label: 'Muslo medio',
+                    label: l10n.measurementLogFieldMidThigh,
                     leftCtrl: midThighLCtrl,
                     rightCtrl: midThighRCtrl,
                     palette: p,
+                    l10n: l10n,
                     validator: validateMetric,
                   ),
                   const SizedBox(height: 12),
                   _bilateralField(
-                    label: 'Gemelo',
+                    label: l10n.measurementLogFieldCalf,
                     leftCtrl: calfLCtrl,
                     rightCtrl: calfRCtrl,
                     palette: p,
+                    l10n: l10n,
                     validator: validateMetric,
                   ),
                 ],

@@ -8,6 +8,7 @@ import 'package:treino/features/reviews/application/review_providers.dart';
 import 'package:treino/features/reviews/domain/review.dart';
 import 'package:treino/features/reviews/presentation/widgets/review_tile.dart';
 import 'package:treino/features/reviews/presentation/widgets/trainer_reviews_section.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 const _trainerId = 'trainer-1';
 const _athleteId = 'athlete-1';
@@ -50,6 +51,9 @@ Widget _wrap({required List<Review> reviews}) => ProviderScope(
       ],
       child: MaterialApp(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
         home: const Scaffold(
           body: SingleChildScrollView(
             child: TrainerReviewsSection(trainerId: _trainerId),

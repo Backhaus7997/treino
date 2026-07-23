@@ -2554,7 +2554,10 @@ class AppL10nEs extends AppL10n {
 
   @override
   String dashboardAlertBannerSummary(
-      int vencidos, int solicitudes, int inactivos) {
+    int vencidos,
+    int solicitudes,
+    int inactivos,
+  ) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,
@@ -2776,6 +2779,241 @@ class AppL10nEs extends AppL10n {
   @override
   String get volumeByGroupEmptyTarget =>
       'Necesitás una rutina asignada para ver tu volumen objetivo.';
+
+  @override
+  String get measurementChartSectionLabel => 'PROGRESO';
+
+  @override
+  String measurementChartSpanDays(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'días',
+      one: 'día',
+    );
+    return '($count $_temp0)';
+  }
+
+  @override
+  String measurementChartSpanWeeks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'semanas',
+      one: 'semana',
+    );
+    return '($count $_temp0)';
+  }
+
+  @override
+  String get measurementChartMetricWeight => 'Peso';
+
+  @override
+  String get measurementChartMetricBodyFat => '% Graso';
+
+  @override
+  String get measurementChartMetricMuscleMass => 'Masa muscular';
+
+  @override
+  String get measurementChartMetricWaist => 'Cintura';
+
+  @override
+  String get measurementChartMetricChest => 'Pecho';
+
+  @override
+  String get measurementChartMetricHips => 'Cadera';
+
+  @override
+  String get measurementChartMetricShoulders => 'Hombros';
+
+  @override
+  String get measurementChartMetricGlutes => 'Glúteos';
+
+  @override
+  String get measurementChartMetricBiceps => 'Bíceps';
+
+  @override
+  String get measurementChartMetricBicepsFlexed => 'Bíceps flex';
+
+  @override
+  String get measurementChartMetricForearm => 'Antebrazo';
+
+  @override
+  String get measurementChartMetricUpperThigh => 'Muslo sup';
+
+  @override
+  String get measurementChartMetricMidThigh => 'Muslo medio';
+
+  @override
+  String get measurementChartMetricCalf => 'Gemelo';
+
+  @override
+  String get measurementLogTitleCreate => 'Cargar medición';
+
+  @override
+  String get measurementLogTitleEdit => 'Editar medición';
+
+  @override
+  String get measurementLogNoSession =>
+      'No hay sesión activa. No se puede guardar.';
+
+  @override
+  String get measurementLogSaveSuccess => 'Medición guardada';
+
+  @override
+  String get measurementLogUpdateSuccess => 'Medición actualizada';
+
+  @override
+  String get measurementLogSaveError =>
+      'No pudimos guardar la medición. Probá de nuevo.';
+
+  @override
+  String get measurementLogSaveCta => 'GUARDAR MEDICIÓN';
+
+  @override
+  String get measurementLogUpdateCta => 'GUARDAR CAMBIOS';
+
+  @override
+  String get measurementLogSectionBodyComposition => 'COMPOSICIÓN CORPORAL';
+
+  @override
+  String get measurementLogSectionNotes => 'NOTAS';
+
+  @override
+  String get measurementLogNotesHint => 'Observaciones del entrenador…';
+
+  @override
+  String get measurementLogFieldWeight => 'Peso (kg)';
+
+  @override
+  String get measurementLogFieldBodyFat => 'Grasa (%)';
+
+  @override
+  String get measurementLogFieldMuscleMass => 'Masa muscular (kg)';
+
+  @override
+  String get measurementLogCircumferencesTitle => 'CIRCUNFERENCIAS';
+
+  @override
+  String get measurementLogCircumferencesHint =>
+      'Opcional. Cargá las que quieras.';
+
+  @override
+  String get measurementLogGroupTrunk => 'TRONCO';
+
+  @override
+  String get measurementLogGroupUpperBody => 'TREN SUPERIOR';
+
+  @override
+  String get measurementLogGroupLowerBody => 'TREN INFERIOR';
+
+  @override
+  String get measurementLogFieldShoulders => 'Hombros';
+
+  @override
+  String get measurementLogFieldChest => 'Pecho';
+
+  @override
+  String get measurementLogFieldWaist => 'Cintura';
+
+  @override
+  String get measurementLogFieldHips => 'Cadera';
+
+  @override
+  String get measurementLogFieldGlutes => 'Glúteos';
+
+  @override
+  String get measurementLogFieldBiceps => 'Bíceps';
+
+  @override
+  String get measurementLogFieldBicepsFlexed => 'Bíceps (flex)';
+
+  @override
+  String get measurementLogFieldForearm => 'Antebrazo';
+
+  @override
+  String get measurementLogFieldUpperThigh => 'Muslo superior';
+
+  @override
+  String get measurementLogFieldMidThigh => 'Muslo medio';
+
+  @override
+  String get measurementLogFieldCalf => 'Gemelo';
+
+  @override
+  String get measurementLogBilateralLeftHint => 'I (cm)';
+
+  @override
+  String get measurementLogBilateralRightHint => 'D (cm)';
+
+  @override
+  String get reviewSheetTitleEdit => 'Editá tu reseña';
+
+  @override
+  String reviewSheetTitleThirtyDay(String trainerName) {
+    return 'Ya llevás un mes entrenando con $trainerName. ¿Cómo va?';
+  }
+
+  @override
+  String reviewSheetTitleStandard(String trainerName) {
+    return '¿Cómo fue tu experiencia con $trainerName?';
+  }
+
+  @override
+  String get reviewSheetCommentHint => 'Contanos cómo fue (opcional)';
+
+  @override
+  String get reviewSheetCancel => 'CANCELAR';
+
+  @override
+  String get reviewSheetSubmit => 'ENVIAR';
+
+  @override
+  String get reviewSnackBarError =>
+      'No pudimos guardar tu reseña. Probá de nuevo.';
+
+  @override
+  String get reviewCtaCreate => 'DEJAR UNA RESEÑA';
+
+  @override
+  String get reviewCtaEdit => 'EDITAR MI RESEÑA';
+
+  @override
+  String get reviewTrainerFallbackName => 'tu Personal Trainer';
+
+  @override
+  String get reviewsSectionTitle => 'RESEÑAS';
+
+  @override
+  String get reviewsSectionEmpty => 'Sin reseñas todavía';
+
+  @override
+  String get reviewTileDeletedUser => 'Usuario eliminado';
+
+  @override
+  String get reviewTileDateToday => 'hoy';
+
+  @override
+  String reviewTileDateDaysAgo(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'días',
+      one: 'día',
+    );
+    return 'hace $count $_temp0';
+  }
+
+  @override
+  String reviewTileDateMonthsAgo(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'meses',
+      one: 'mes',
+    );
+    return 'hace $count $_temp0';
+  }
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -5326,7 +5564,10 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String dashboardAlertBannerSummary(
-      int vencidos, int solicitudes, int inactivos) {
+    int vencidos,
+    int solicitudes,
+    int inactivos,
+  ) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,
@@ -5547,4 +5788,239 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get volumeByGroupEmptyTarget =>
       'Necesitás una rutina asignada para ver tu volumen objetivo.';
+
+  @override
+  String get measurementChartSectionLabel => 'PROGRESO';
+
+  @override
+  String measurementChartSpanDays(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'días',
+      one: 'día',
+    );
+    return '($count $_temp0)';
+  }
+
+  @override
+  String measurementChartSpanWeeks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'semanas',
+      one: 'semana',
+    );
+    return '($count $_temp0)';
+  }
+
+  @override
+  String get measurementChartMetricWeight => 'Peso';
+
+  @override
+  String get measurementChartMetricBodyFat => '% Graso';
+
+  @override
+  String get measurementChartMetricMuscleMass => 'Masa muscular';
+
+  @override
+  String get measurementChartMetricWaist => 'Cintura';
+
+  @override
+  String get measurementChartMetricChest => 'Pecho';
+
+  @override
+  String get measurementChartMetricHips => 'Cadera';
+
+  @override
+  String get measurementChartMetricShoulders => 'Hombros';
+
+  @override
+  String get measurementChartMetricGlutes => 'Glúteos';
+
+  @override
+  String get measurementChartMetricBiceps => 'Bíceps';
+
+  @override
+  String get measurementChartMetricBicepsFlexed => 'Bíceps flex';
+
+  @override
+  String get measurementChartMetricForearm => 'Antebrazo';
+
+  @override
+  String get measurementChartMetricUpperThigh => 'Muslo sup';
+
+  @override
+  String get measurementChartMetricMidThigh => 'Muslo medio';
+
+  @override
+  String get measurementChartMetricCalf => 'Gemelo';
+
+  @override
+  String get measurementLogTitleCreate => 'Cargar medición';
+
+  @override
+  String get measurementLogTitleEdit => 'Editar medición';
+
+  @override
+  String get measurementLogNoSession =>
+      'No hay sesión activa. No se puede guardar.';
+
+  @override
+  String get measurementLogSaveSuccess => 'Medición guardada';
+
+  @override
+  String get measurementLogUpdateSuccess => 'Medición actualizada';
+
+  @override
+  String get measurementLogSaveError =>
+      'No pudimos guardar la medición. Probá de nuevo.';
+
+  @override
+  String get measurementLogSaveCta => 'GUARDAR MEDICIÓN';
+
+  @override
+  String get measurementLogUpdateCta => 'GUARDAR CAMBIOS';
+
+  @override
+  String get measurementLogSectionBodyComposition => 'COMPOSICIÓN CORPORAL';
+
+  @override
+  String get measurementLogSectionNotes => 'NOTAS';
+
+  @override
+  String get measurementLogNotesHint => 'Observaciones del entrenador…';
+
+  @override
+  String get measurementLogFieldWeight => 'Peso (kg)';
+
+  @override
+  String get measurementLogFieldBodyFat => 'Grasa (%)';
+
+  @override
+  String get measurementLogFieldMuscleMass => 'Masa muscular (kg)';
+
+  @override
+  String get measurementLogCircumferencesTitle => 'CIRCUNFERENCIAS';
+
+  @override
+  String get measurementLogCircumferencesHint =>
+      'Opcional. Cargá las que quieras.';
+
+  @override
+  String get measurementLogGroupTrunk => 'TRONCO';
+
+  @override
+  String get measurementLogGroupUpperBody => 'TREN SUPERIOR';
+
+  @override
+  String get measurementLogGroupLowerBody => 'TREN INFERIOR';
+
+  @override
+  String get measurementLogFieldShoulders => 'Hombros';
+
+  @override
+  String get measurementLogFieldChest => 'Pecho';
+
+  @override
+  String get measurementLogFieldWaist => 'Cintura';
+
+  @override
+  String get measurementLogFieldHips => 'Cadera';
+
+  @override
+  String get measurementLogFieldGlutes => 'Glúteos';
+
+  @override
+  String get measurementLogFieldBiceps => 'Bíceps';
+
+  @override
+  String get measurementLogFieldBicepsFlexed => 'Bíceps (flex)';
+
+  @override
+  String get measurementLogFieldForearm => 'Antebrazo';
+
+  @override
+  String get measurementLogFieldUpperThigh => 'Muslo superior';
+
+  @override
+  String get measurementLogFieldMidThigh => 'Muslo medio';
+
+  @override
+  String get measurementLogFieldCalf => 'Gemelo';
+
+  @override
+  String get measurementLogBilateralLeftHint => 'I (cm)';
+
+  @override
+  String get measurementLogBilateralRightHint => 'D (cm)';
+
+  @override
+  String get reviewSheetTitleEdit => 'Editá tu reseña';
+
+  @override
+  String reviewSheetTitleThirtyDay(String trainerName) {
+    return 'Ya llevás un mes entrenando con $trainerName. ¿Cómo va?';
+  }
+
+  @override
+  String reviewSheetTitleStandard(String trainerName) {
+    return '¿Cómo fue tu experiencia con $trainerName?';
+  }
+
+  @override
+  String get reviewSheetCommentHint => 'Contanos cómo fue (opcional)';
+
+  @override
+  String get reviewSheetCancel => 'CANCELAR';
+
+  @override
+  String get reviewSheetSubmit => 'ENVIAR';
+
+  @override
+  String get reviewSnackBarError =>
+      'No pudimos guardar tu reseña. Probá de nuevo.';
+
+  @override
+  String get reviewCtaCreate => 'DEJAR UNA RESEÑA';
+
+  @override
+  String get reviewCtaEdit => 'EDITAR MI RESEÑA';
+
+  @override
+  String get reviewTrainerFallbackName => 'tu Personal Trainer';
+
+  @override
+  String get reviewsSectionTitle => 'RESEÑAS';
+
+  @override
+  String get reviewsSectionEmpty => 'Sin reseñas todavía';
+
+  @override
+  String get reviewTileDeletedUser => 'Usuario eliminado';
+
+  @override
+  String get reviewTileDateToday => 'hoy';
+
+  @override
+  String reviewTileDateDaysAgo(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'días',
+      one: 'día',
+    );
+    return 'hace $count $_temp0';
+  }
+
+  @override
+  String reviewTileDateMonthsAgo(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'meses',
+      one: 'mes',
+    );
+    return 'hace $count $_temp0';
+  }
 }

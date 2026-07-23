@@ -63,7 +63,7 @@ import 'app_l10n_es.dart';
 /// property.
 abstract class AppL10n {
   AppL10n(String locale)
-      : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+    : localeName = intl.Intl.canonicalizedLocale(locale.toString());
 
   final String localeName;
 
@@ -85,17 +85,17 @@ abstract class AppL10n {
   /// of delegates is preferred or required.
   static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
       <LocalizationsDelegate<dynamic>>[
-    delegate,
-    GlobalMaterialLocalizations.delegate,
-    GlobalCupertinoLocalizations.delegate,
-    GlobalWidgetsLocalizations.delegate,
-  ];
+        delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ];
 
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
     Locale('en'),
     Locale('es'),
-    Locale('es', 'AR')
+    Locale('es', 'AR'),
   ];
 
   /// No description provided for @notFoundTitle.
@@ -4669,7 +4669,10 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'{vencidos, plural, =1{1 vencido} other{{vencidos} vencidos}} · {solicitudes, plural, =1{1 solicitud} other{{solicitudes} solicitudes}} · {inactivos, plural, =1{1 inactivo} other{{inactivos} inactivos}}'**
   String dashboardAlertBannerSummary(
-      int vencidos, int solicitudes, int inactivos);
+    int vencidos,
+    int solicitudes,
+    int inactivos,
+  );
 
   /// Formatted adherencia percentage value shown in the adherencia ring and KPI tile once the aggregate provider has data.
   ///
@@ -5024,6 +5027,396 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Necesitás una rutina asignada para ver tu volumen objetivo.'**
   String get volumeByGroupEmptyTarget;
+
+  /// [#510] Section eyebrow above the MeasurementProgressChart. Mirrors performanceChartSectionLabel in the sibling performance chart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PROGRESO'**
+  String get measurementChartSectionLabel;
+
+  /// [#510] Elapsed span between the first and last plotted measurement when it is under a week. Rendered next to the delta in the chart header.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'({count} {count, plural, =1{día} other{días}})'**
+  String measurementChartSpanDays(int count);
+
+  /// [#510] Elapsed span between the first and last plotted measurement, rounded to weeks once it reaches 7 days.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'({count} {count, plural, =1{semana} other{semanas}})'**
+  String measurementChartSpanWeeks(int count);
+
+  /// [#510] Chip label for the body-weight series in MeasurementProgressChart. Shorter than the log-form label (measurementLogFieldWeight) because the unit is shown separately.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Peso'**
+  String get measurementChartMetricWeight;
+
+  /// [#510] Chip label for the body-fat percentage series in MeasurementProgressChart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'% Graso'**
+  String get measurementChartMetricBodyFat;
+
+  /// [#510] Chip label for the muscle-mass series in MeasurementProgressChart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Masa muscular'**
+  String get measurementChartMetricMuscleMass;
+
+  /// [#510] Chip label for the waist circumference series in MeasurementProgressChart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cintura'**
+  String get measurementChartMetricWaist;
+
+  /// [#510] Chip label for the chest circumference series in MeasurementProgressChart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Pecho'**
+  String get measurementChartMetricChest;
+
+  /// [#510] Chip label for the hips circumference series in MeasurementProgressChart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cadera'**
+  String get measurementChartMetricHips;
+
+  /// [#510] Chip label for the shoulders circumference series in MeasurementProgressChart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Hombros'**
+  String get measurementChartMetricShoulders;
+
+  /// [#510] Chip label for the glutes circumference series in MeasurementProgressChart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Glúteos'**
+  String get measurementChartMetricGlutes;
+
+  /// [#510] Chip label for the biceps series in MeasurementProgressChart. The plotted value is the average of the left/right entries.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Bíceps'**
+  String get measurementChartMetricBiceps;
+
+  /// [#510] Chip label for the flexed-biceps series in MeasurementProgressChart. Abbreviated on purpose — chips are laid out in a single horizontal scroll row.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Bíceps flex'**
+  String get measurementChartMetricBicepsFlexed;
+
+  /// [#510] Chip label for the forearm series in MeasurementProgressChart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Antebrazo'**
+  String get measurementChartMetricForearm;
+
+  /// [#510] Chip label for the upper-thigh series in MeasurementProgressChart. Abbreviated on purpose — chips are laid out in a single horizontal scroll row.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Muslo sup'**
+  String get measurementChartMetricUpperThigh;
+
+  /// [#510] Chip label for the mid-thigh series in MeasurementProgressChart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Muslo medio'**
+  String get measurementChartMetricMidThigh;
+
+  /// [#510] Chip label for the calf series in MeasurementProgressChart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Gemelo'**
+  String get measurementChartMetricCalf;
+
+  /// [#510] Header title of LogMeasurementScreen when creating a new measurement. Kept separate from measurementsAddSelfLog (the "+" affordance on MEDIDAS) so the screen title and the button can diverge per locale.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cargar medición'**
+  String get measurementLogTitleCreate;
+
+  /// [#510] Header title of LogMeasurementScreen in edit mode (#439). Kept separate from measurementHistoryEditTooltip, which labels the row's edit icon.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Editar medición'**
+  String get measurementLogTitleEdit;
+
+  /// [#510] Snackbar shown when saving is attempted with no authenticated uid. Mirrors performanceLogNoSession.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No hay sesión activa. No se puede guardar.'**
+  String get measurementLogNoSession;
+
+  /// [#510] Snackbar after a new measurement was created successfully.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Medición guardada'**
+  String get measurementLogSaveSuccess;
+
+  /// [#510] Snackbar after an existing measurement was edited successfully (#439).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Medición actualizada'**
+  String get measurementLogUpdateSuccess;
+
+  /// [#510] Snackbar when the measurement create/update write fails (network/rules). Mirrors performanceLogSaveError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos guardar la medición. Probá de nuevo.'**
+  String get measurementLogSaveError;
+
+  /// [#510] Pinned primary button of LogMeasurementScreen in create mode.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'GUARDAR MEDICIÓN'**
+  String get measurementLogSaveCta;
+
+  /// [#510] Pinned primary button of LogMeasurementScreen in edit mode (#439).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'GUARDAR CAMBIOS'**
+  String get measurementLogUpdateCta;
+
+  /// [#510] Section eyebrow above the weight / body-fat / muscle-mass fields.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'COMPOSICIÓN CORPORAL'**
+  String get measurementLogSectionBodyComposition;
+
+  /// [#510] Section eyebrow above the free-text notes field of LogMeasurementScreen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'NOTAS'**
+  String get measurementLogSectionNotes;
+
+  /// [#510] Notes field hint in trainer mode. Self-log mode uses measurementsSelfLogNotesHint instead.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Observaciones del entrenador…'**
+  String get measurementLogNotesHint;
+
+  /// [#510] Body-weight field label in LogMeasurementScreen. Carries its unit inline, unlike the circumference fields which render `cm` as a suffix.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Peso (kg)'**
+  String get measurementLogFieldWeight;
+
+  /// [#510] Body-fat percentage field label in LogMeasurementScreen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Grasa (%)'**
+  String get measurementLogFieldBodyFat;
+
+  /// [#510] Muscle-mass field label in LogMeasurementScreen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Masa muscular (kg)'**
+  String get measurementLogFieldMuscleMass;
+
+  /// [#510] Header of the collapsible circumferences section in LogMeasurementScreen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CIRCUNFERENCIAS'**
+  String get measurementLogCircumferencesTitle;
+
+  /// [#510] Subtitle under the circumferences header clarifying that every field in the section is optional.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Opcional. Cargá las que quieras.'**
+  String get measurementLogCircumferencesHint;
+
+  /// [#510] Sub-group eyebrow for the trunk circumferences (shoulders, chest, waist, hips, glutes).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TRONCO'**
+  String get measurementLogGroupTrunk;
+
+  /// [#510] Sub-group eyebrow for the upper-body bilateral circumferences (biceps, flexed biceps, forearm).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TREN SUPERIOR'**
+  String get measurementLogGroupUpperBody;
+
+  /// [#510] Sub-group eyebrow for the lower-body bilateral circumferences (upper thigh, mid thigh, calf).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TREN INFERIOR'**
+  String get measurementLogGroupLowerBody;
+
+  /// [#510] Shoulders circumference field label in LogMeasurementScreen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Hombros'**
+  String get measurementLogFieldShoulders;
+
+  /// [#510] Chest circumference field label in LogMeasurementScreen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Pecho'**
+  String get measurementLogFieldChest;
+
+  /// [#510] Waist circumference field label in LogMeasurementScreen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cintura'**
+  String get measurementLogFieldWaist;
+
+  /// [#510] Hips circumference field label in LogMeasurementScreen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cadera'**
+  String get measurementLogFieldHips;
+
+  /// [#510] Glutes circumference field label in LogMeasurementScreen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Glúteos'**
+  String get measurementLogFieldGlutes;
+
+  /// [#510] Biceps bilateral field label in LogMeasurementScreen (one input per side).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Bíceps'**
+  String get measurementLogFieldBiceps;
+
+  /// [#510] Flexed-biceps bilateral field label in LogMeasurementScreen (one input per side).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Bíceps (flex)'**
+  String get measurementLogFieldBicepsFlexed;
+
+  /// [#510] Forearm bilateral field label in LogMeasurementScreen (one input per side).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Antebrazo'**
+  String get measurementLogFieldForearm;
+
+  /// [#510] Upper-thigh bilateral field label in LogMeasurementScreen (one input per side).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Muslo superior'**
+  String get measurementLogFieldUpperThigh;
+
+  /// [#510] Mid-thigh bilateral field label in LogMeasurementScreen (one input per side).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Muslo medio'**
+  String get measurementLogFieldMidThigh;
+
+  /// [#510] Calf bilateral field label in LogMeasurementScreen (one input per side).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Gemelo'**
+  String get measurementLogFieldCalf;
+
+  /// [#510] Hint of the LEFT-side input of a bilateral circumference pair. `I` = izquierda; translate to the local initial for "left".
+  ///
+  /// In es_AR, this message translates to:
+  /// **'I (cm)'**
+  String get measurementLogBilateralLeftHint;
+
+  /// [#510] Hint of the RIGHT-side input of a bilateral circumference pair. `D` = derecha; translate to the local initial for "right".
+  ///
+  /// In es_AR, this message translates to:
+  /// **'D (cm)'**
+  String get measurementLogBilateralRightHint;
+
+  /// [#510] ReviewBottomSheet title when the athlete already has a review for this link and is editing it.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Editá tu reseña'**
+  String get reviewSheetTitleEdit;
+
+  /// [#510] ReviewBottomSheet title when opened by the automatic 30-day prompt (ReviewTriggerVariant.thirtyDay).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ya llevás un mes entrenando con {trainerName}. ¿Cómo va?'**
+  String reviewSheetTitleThirtyDay(String trainerName);
+
+  /// [#510] Default ReviewBottomSheet title (opened from the profile CTA or after a link terminates).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Cómo fue tu experiencia con {trainerName}?'**
+  String reviewSheetTitleStandard(String trainerName);
+
+  /// [#510] Hint of the optional free-text comment field in ReviewBottomSheet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Contanos cómo fue (opcional)'**
+  String get reviewSheetCommentHint;
+
+  /// [#510] Dismiss action of ReviewBottomSheet. Uppercase by design — commonCancel is sentence case and cannot be reused here.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CANCELAR'**
+  String get reviewSheetCancel;
+
+  /// [#510] Primary submit action of ReviewBottomSheet, enabled only once a star rating is picked.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ENVIAR'**
+  String get reviewSheetSubmit;
+
+  /// [#510] Snackbar when the review write fails. Counterpart of reviewSnackBarSuccess; there is no auto-retry.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos guardar tu reseña. Probá de nuevo.'**
+  String get reviewSnackBarError;
+
+  /// [#510] ReviewCta label on the trainer's public profile when the athlete has NOT reviewed this link yet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DEJAR UNA RESEÑA'**
+  String get reviewCtaCreate;
+
+  /// [#510] ReviewCta label when a review already exists for the link — tapping reopens the sheet prefilled.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'EDITAR MI RESEÑA'**
+  String get reviewCtaEdit;
+
+  /// [#510] Stands in for the trainer's display name in the review sheet title when the public profile has not resolved yet. Reads naturally inside reviewSheetTitleStandard / reviewSheetTitleThirtyDay.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'tu Personal Trainer'**
+  String get reviewTrainerFallbackName;
+
+  /// [#510] Header of TrainerReviewsSection on the trainer's public profile.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'RESEÑAS'**
+  String get reviewsSectionTitle;
+
+  /// [#510] Empty state of TrainerReviewsSection when the trainer has no reviews.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sin reseñas todavía'**
+  String get reviewsSectionEmpty;
+
+  /// [#510] Author name fallback in ReviewTile when the public profile is missing (deleted account, ADR-RV-009).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Usuario eliminado'**
+  String get reviewTileDeletedUser;
+
+  /// [#510] Relative date in ReviewTile for a review posted less than a day ago.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'hoy'**
+  String get reviewTileDateToday;
+
+  /// [#510] Relative date in ReviewTile for reviews between 1 and 29 days old.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'hace {count} {count, plural, =1{día} other{días}}'**
+  String reviewTileDateDaysAgo(int count);
+
+  /// [#510] Relative date in ReviewTile for reviews between 1 and 11 months old. Beyond a year the tile falls back to a numeric DD/MM/YYYY date.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'hace {count} {count, plural, =1{mes} other{meses}}'**
+  String reviewTileDateMonthsAgo(int count);
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {
@@ -5064,8 +5457,9 @@ AppL10n lookupAppL10n(Locale locale) {
   }
 
   throw FlutterError(
-      'AppL10n.delegate failed to load unsupported locale "$locale". This is likely '
-      'an issue with the localizations generation tool. Please file an issue '
-      'on GitHub with a reproducible sample app and the gen-l10n configuration '
-      'that was used.');
+    'AppL10n.delegate failed to load unsupported locale "$locale". This is likely '
+    'an issue with the localizations generation tool. Please file an issue '
+    'on GitHub with a reproducible sample app and the gen-l10n configuration '
+    'that was used.',
+  );
 }

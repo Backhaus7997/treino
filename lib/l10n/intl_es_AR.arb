@@ -2239,5 +2239,295 @@
   "volumeByGroupEmptyTarget": "Necesitás una rutina asignada para ver tu volumen objetivo.",
   "@volumeByGroupEmptyTarget": {
     "description": "[stats-hub] Empty state of the VolumeByGroupScreen card when the athlete has no target (no assigned routine). QA #371."
+  },
+  "measurementChartSectionLabel": "PROGRESO",
+  "@measurementChartSectionLabel": {
+    "description": "[#510] Section eyebrow above the MeasurementProgressChart. Mirrors performanceChartSectionLabel in the sibling performance chart."
+  },
+  "measurementChartSpanDays": "({count} {count, plural, =1{día} other{días}})",
+  "@measurementChartSpanDays": {
+    "description": "[#510] Elapsed span between the first and last plotted measurement when it is under a week. Rendered next to the delta in the chart header.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "measurementChartSpanWeeks": "({count} {count, plural, =1{semana} other{semanas}})",
+  "@measurementChartSpanWeeks": {
+    "description": "[#510] Elapsed span between the first and last plotted measurement, rounded to weeks once it reaches 7 days.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "measurementChartMetricWeight": "Peso",
+  "@measurementChartMetricWeight": {
+    "description": "[#510] Chip label for the body-weight series in MeasurementProgressChart. Shorter than the log-form label (measurementLogFieldWeight) because the unit is shown separately."
+  },
+  "measurementChartMetricBodyFat": "% Graso",
+  "@measurementChartMetricBodyFat": {
+    "description": "[#510] Chip label for the body-fat percentage series in MeasurementProgressChart."
+  },
+  "measurementChartMetricMuscleMass": "Masa muscular",
+  "@measurementChartMetricMuscleMass": {
+    "description": "[#510] Chip label for the muscle-mass series in MeasurementProgressChart."
+  },
+  "measurementChartMetricWaist": "Cintura",
+  "@measurementChartMetricWaist": {
+    "description": "[#510] Chip label for the waist circumference series in MeasurementProgressChart."
+  },
+  "measurementChartMetricChest": "Pecho",
+  "@measurementChartMetricChest": {
+    "description": "[#510] Chip label for the chest circumference series in MeasurementProgressChart."
+  },
+  "measurementChartMetricHips": "Cadera",
+  "@measurementChartMetricHips": {
+    "description": "[#510] Chip label for the hips circumference series in MeasurementProgressChart."
+  },
+  "measurementChartMetricShoulders": "Hombros",
+  "@measurementChartMetricShoulders": {
+    "description": "[#510] Chip label for the shoulders circumference series in MeasurementProgressChart."
+  },
+  "measurementChartMetricGlutes": "Glúteos",
+  "@measurementChartMetricGlutes": {
+    "description": "[#510] Chip label for the glutes circumference series in MeasurementProgressChart."
+  },
+  "measurementChartMetricBiceps": "Bíceps",
+  "@measurementChartMetricBiceps": {
+    "description": "[#510] Chip label for the biceps series in MeasurementProgressChart. The plotted value is the average of the left/right entries."
+  },
+  "measurementChartMetricBicepsFlexed": "Bíceps flex",
+  "@measurementChartMetricBicepsFlexed": {
+    "description": "[#510] Chip label for the flexed-biceps series in MeasurementProgressChart. Abbreviated on purpose — chips are laid out in a single horizontal scroll row."
+  },
+  "measurementChartMetricForearm": "Antebrazo",
+  "@measurementChartMetricForearm": {
+    "description": "[#510] Chip label for the forearm series in MeasurementProgressChart."
+  },
+  "measurementChartMetricUpperThigh": "Muslo sup",
+  "@measurementChartMetricUpperThigh": {
+    "description": "[#510] Chip label for the upper-thigh series in MeasurementProgressChart. Abbreviated on purpose — chips are laid out in a single horizontal scroll row."
+  },
+  "measurementChartMetricMidThigh": "Muslo medio",
+  "@measurementChartMetricMidThigh": {
+    "description": "[#510] Chip label for the mid-thigh series in MeasurementProgressChart."
+  },
+  "measurementChartMetricCalf": "Gemelo",
+  "@measurementChartMetricCalf": {
+    "description": "[#510] Chip label for the calf series in MeasurementProgressChart."
+  },
+  "measurementLogTitleCreate": "Cargar medición",
+  "@measurementLogTitleCreate": {
+    "description": "[#510] Header title of LogMeasurementScreen when creating a new measurement. Kept separate from measurementsAddSelfLog (the \"+\" affordance on MEDIDAS) so the screen title and the button can diverge per locale."
+  },
+  "measurementLogTitleEdit": "Editar medición",
+  "@measurementLogTitleEdit": {
+    "description": "[#510] Header title of LogMeasurementScreen in edit mode (#439). Kept separate from measurementHistoryEditTooltip, which labels the row's edit icon."
+  },
+  "measurementLogNoSession": "No hay sesión activa. No se puede guardar.",
+  "@measurementLogNoSession": {
+    "description": "[#510] Snackbar shown when saving is attempted with no authenticated uid. Mirrors performanceLogNoSession."
+  },
+  "measurementLogSaveSuccess": "Medición guardada",
+  "@measurementLogSaveSuccess": {
+    "description": "[#510] Snackbar after a new measurement was created successfully."
+  },
+  "measurementLogUpdateSuccess": "Medición actualizada",
+  "@measurementLogUpdateSuccess": {
+    "description": "[#510] Snackbar after an existing measurement was edited successfully (#439)."
+  },
+  "measurementLogSaveError": "No pudimos guardar la medición. Probá de nuevo.",
+  "@measurementLogSaveError": {
+    "description": "[#510] Snackbar when the measurement create/update write fails (network/rules). Mirrors performanceLogSaveError."
+  },
+  "measurementLogSaveCta": "GUARDAR MEDICIÓN",
+  "@measurementLogSaveCta": {
+    "description": "[#510] Pinned primary button of LogMeasurementScreen in create mode."
+  },
+  "measurementLogUpdateCta": "GUARDAR CAMBIOS",
+  "@measurementLogUpdateCta": {
+    "description": "[#510] Pinned primary button of LogMeasurementScreen in edit mode (#439)."
+  },
+  "measurementLogSectionBodyComposition": "COMPOSICIÓN CORPORAL",
+  "@measurementLogSectionBodyComposition": {
+    "description": "[#510] Section eyebrow above the weight / body-fat / muscle-mass fields."
+  },
+  "measurementLogSectionNotes": "NOTAS",
+  "@measurementLogSectionNotes": {
+    "description": "[#510] Section eyebrow above the free-text notes field of LogMeasurementScreen."
+  },
+  "measurementLogNotesHint": "Observaciones del entrenador…",
+  "@measurementLogNotesHint": {
+    "description": "[#510] Notes field hint in trainer mode. Self-log mode uses measurementsSelfLogNotesHint instead."
+  },
+  "measurementLogFieldWeight": "Peso (kg)",
+  "@measurementLogFieldWeight": {
+    "description": "[#510] Body-weight field label in LogMeasurementScreen. Carries its unit inline, unlike the circumference fields which render `cm` as a suffix."
+  },
+  "measurementLogFieldBodyFat": "Grasa (%)",
+  "@measurementLogFieldBodyFat": {
+    "description": "[#510] Body-fat percentage field label in LogMeasurementScreen."
+  },
+  "measurementLogFieldMuscleMass": "Masa muscular (kg)",
+  "@measurementLogFieldMuscleMass": {
+    "description": "[#510] Muscle-mass field label in LogMeasurementScreen."
+  },
+  "measurementLogCircumferencesTitle": "CIRCUNFERENCIAS",
+  "@measurementLogCircumferencesTitle": {
+    "description": "[#510] Header of the collapsible circumferences section in LogMeasurementScreen."
+  },
+  "measurementLogCircumferencesHint": "Opcional. Cargá las que quieras.",
+  "@measurementLogCircumferencesHint": {
+    "description": "[#510] Subtitle under the circumferences header clarifying that every field in the section is optional."
+  },
+  "measurementLogGroupTrunk": "TRONCO",
+  "@measurementLogGroupTrunk": {
+    "description": "[#510] Sub-group eyebrow for the trunk circumferences (shoulders, chest, waist, hips, glutes)."
+  },
+  "measurementLogGroupUpperBody": "TREN SUPERIOR",
+  "@measurementLogGroupUpperBody": {
+    "description": "[#510] Sub-group eyebrow for the upper-body bilateral circumferences (biceps, flexed biceps, forearm)."
+  },
+  "measurementLogGroupLowerBody": "TREN INFERIOR",
+  "@measurementLogGroupLowerBody": {
+    "description": "[#510] Sub-group eyebrow for the lower-body bilateral circumferences (upper thigh, mid thigh, calf)."
+  },
+  "measurementLogFieldShoulders": "Hombros",
+  "@measurementLogFieldShoulders": {
+    "description": "[#510] Shoulders circumference field label in LogMeasurementScreen."
+  },
+  "measurementLogFieldChest": "Pecho",
+  "@measurementLogFieldChest": {
+    "description": "[#510] Chest circumference field label in LogMeasurementScreen."
+  },
+  "measurementLogFieldWaist": "Cintura",
+  "@measurementLogFieldWaist": {
+    "description": "[#510] Waist circumference field label in LogMeasurementScreen."
+  },
+  "measurementLogFieldHips": "Cadera",
+  "@measurementLogFieldHips": {
+    "description": "[#510] Hips circumference field label in LogMeasurementScreen."
+  },
+  "measurementLogFieldGlutes": "Glúteos",
+  "@measurementLogFieldGlutes": {
+    "description": "[#510] Glutes circumference field label in LogMeasurementScreen."
+  },
+  "measurementLogFieldBiceps": "Bíceps",
+  "@measurementLogFieldBiceps": {
+    "description": "[#510] Biceps bilateral field label in LogMeasurementScreen (one input per side)."
+  },
+  "measurementLogFieldBicepsFlexed": "Bíceps (flex)",
+  "@measurementLogFieldBicepsFlexed": {
+    "description": "[#510] Flexed-biceps bilateral field label in LogMeasurementScreen (one input per side)."
+  },
+  "measurementLogFieldForearm": "Antebrazo",
+  "@measurementLogFieldForearm": {
+    "description": "[#510] Forearm bilateral field label in LogMeasurementScreen (one input per side)."
+  },
+  "measurementLogFieldUpperThigh": "Muslo superior",
+  "@measurementLogFieldUpperThigh": {
+    "description": "[#510] Upper-thigh bilateral field label in LogMeasurementScreen (one input per side)."
+  },
+  "measurementLogFieldMidThigh": "Muslo medio",
+  "@measurementLogFieldMidThigh": {
+    "description": "[#510] Mid-thigh bilateral field label in LogMeasurementScreen (one input per side)."
+  },
+  "measurementLogFieldCalf": "Gemelo",
+  "@measurementLogFieldCalf": {
+    "description": "[#510] Calf bilateral field label in LogMeasurementScreen (one input per side)."
+  },
+  "measurementLogBilateralLeftHint": "I (cm)",
+  "@measurementLogBilateralLeftHint": {
+    "description": "[#510] Hint of the LEFT-side input of a bilateral circumference pair. `I` = izquierda; translate to the local initial for \"left\"."
+  },
+  "measurementLogBilateralRightHint": "D (cm)",
+  "@measurementLogBilateralRightHint": {
+    "description": "[#510] Hint of the RIGHT-side input of a bilateral circumference pair. `D` = derecha; translate to the local initial for \"right\"."
+  },
+  "reviewSheetTitleEdit": "Editá tu reseña",
+  "@reviewSheetTitleEdit": {
+    "description": "[#510] ReviewBottomSheet title when the athlete already has a review for this link and is editing it."
+  },
+  "reviewSheetTitleThirtyDay": "Ya llevás un mes entrenando con {trainerName}. ¿Cómo va?",
+  "@reviewSheetTitleThirtyDay": {
+    "description": "[#510] ReviewBottomSheet title when opened by the automatic 30-day prompt (ReviewTriggerVariant.thirtyDay).",
+    "placeholders": {
+      "trainerName": {
+        "type": "String"
+      }
+    }
+  },
+  "reviewSheetTitleStandard": "¿Cómo fue tu experiencia con {trainerName}?",
+  "@reviewSheetTitleStandard": {
+    "description": "[#510] Default ReviewBottomSheet title (opened from the profile CTA or after a link terminates).",
+    "placeholders": {
+      "trainerName": {
+        "type": "String"
+      }
+    }
+  },
+  "reviewSheetCommentHint": "Contanos cómo fue (opcional)",
+  "@reviewSheetCommentHint": {
+    "description": "[#510] Hint of the optional free-text comment field in ReviewBottomSheet."
+  },
+  "reviewSheetCancel": "CANCELAR",
+  "@reviewSheetCancel": {
+    "description": "[#510] Dismiss action of ReviewBottomSheet. Uppercase by design — commonCancel is sentence case and cannot be reused here."
+  },
+  "reviewSheetSubmit": "ENVIAR",
+  "@reviewSheetSubmit": {
+    "description": "[#510] Primary submit action of ReviewBottomSheet, enabled only once a star rating is picked."
+  },
+  "reviewSnackBarError": "No pudimos guardar tu reseña. Probá de nuevo.",
+  "@reviewSnackBarError": {
+    "description": "[#510] Snackbar when the review write fails. Counterpart of reviewSnackBarSuccess; there is no auto-retry."
+  },
+  "reviewCtaCreate": "DEJAR UNA RESEÑA",
+  "@reviewCtaCreate": {
+    "description": "[#510] ReviewCta label on the trainer's public profile when the athlete has NOT reviewed this link yet."
+  },
+  "reviewCtaEdit": "EDITAR MI RESEÑA",
+  "@reviewCtaEdit": {
+    "description": "[#510] ReviewCta label when a review already exists for the link — tapping reopens the sheet prefilled."
+  },
+  "reviewTrainerFallbackName": "tu Personal Trainer",
+  "@reviewTrainerFallbackName": {
+    "description": "[#510] Stands in for the trainer's display name in the review sheet title when the public profile has not resolved yet. Reads naturally inside reviewSheetTitleStandard / reviewSheetTitleThirtyDay."
+  },
+  "reviewsSectionTitle": "RESEÑAS",
+  "@reviewsSectionTitle": {
+    "description": "[#510] Header of TrainerReviewsSection on the trainer's public profile."
+  },
+  "reviewsSectionEmpty": "Sin reseñas todavía",
+  "@reviewsSectionEmpty": {
+    "description": "[#510] Empty state of TrainerReviewsSection when the trainer has no reviews."
+  },
+  "reviewTileDeletedUser": "Usuario eliminado",
+  "@reviewTileDeletedUser": {
+    "description": "[#510] Author name fallback in ReviewTile when the public profile is missing (deleted account, ADR-RV-009)."
+  },
+  "reviewTileDateToday": "hoy",
+  "@reviewTileDateToday": {
+    "description": "[#510] Relative date in ReviewTile for a review posted less than a day ago."
+  },
+  "reviewTileDateDaysAgo": "hace {count} {count, plural, =1{día} other{días}}",
+  "@reviewTileDateDaysAgo": {
+    "description": "[#510] Relative date in ReviewTile for reviews between 1 and 29 days old.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reviewTileDateMonthsAgo": "hace {count} {count, plural, =1{mes} other{meses}}",
+  "@reviewTileDateMonthsAgo": {
+    "description": "[#510] Relative date in ReviewTile for reviews between 1 and 11 months old. Beyond a year the tile falls back to a numeric DD/MM/YYYY date.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   }
 }
