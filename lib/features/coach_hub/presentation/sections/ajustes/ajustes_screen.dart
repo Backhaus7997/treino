@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/app/theme/tokens/components/treino_focus_tokens.dart';
+import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/cuenta_tab.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/facturacion_tab.dart';
@@ -83,6 +87,8 @@ class AjustesScreen extends ConsumerWidget {
   }
 }
 
+// Candidato futuro a componente del kit: es el único rail vertical del hub
+// hoy — si aparece un segundo caso de uso, extraer a coach_hub_widgets.
 class _SubNav extends StatelessWidget {
   const _SubNav({required this.selected, required this.onSelect});
 
@@ -91,19 +97,20 @@ class _SubNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
+    const tabs = AjustesTab.values;
     return SizedBox(
       width: 220,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          for (final tab in AjustesTab.values)
-            _SubNavItem(
-              icon: tab.icon,
-              label: tab.label,
-              selected: tab == selected,
-              onTap: () => onSelect(tab),
-              palette: palette,
+          for (var i = 0; i < tabs.length; i++)
+            TreinoFadeSlideIn(
+              delay: AppMotion.stagger(i),
+              child: _SubNavItem(
+                tab: tabs[i],
+                selected: tabs[i] == selected,
+                onTap: () => onSelect(tabs[i]),
+              ),
             ),
         ],
       ),
@@ -111,57 +118,92 @@ class _SubNav extends StatelessWidget {
   }
 }
 
+/// Item de la sub-nav vertical de Ajustes — interacción vía
+/// [TreinoInteractiveState] (fuente única de verdad, ADR-SH-002): hover,
+/// pressed, focus por teclado + Semantics(button) + activación por
+/// Enter/Space. `selected` se expone también en Semantics para que el
+/// estado de selección sea consultable por lectores de pantalla y tests.
 class _SubNavItem extends StatelessWidget {
   const _SubNavItem({
-    required this.icon,
-    required this.label,
+    required this.tab,
     required this.selected,
     required this.onTap,
-    required this.palette,
   });
 
-  final IconData icon;
-  final String label;
+  final AjustesTab tab;
   final bool selected;
   final VoidCallback onTap;
-  final AppPalette palette;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-        decoration: BoxDecoration(
-          color: selected ? palette.bgCard : Colors.transparent,
-          border: Border.all(
-            color: selected ? palette.accent : Colors.transparent,
-          ),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              size: 18,
-              color: selected ? palette.accent : palette.textMuted,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: selected ? palette.textPrimary : palette.textMuted,
-                  fontSize: 14,
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                ),
+    final palette = AppPalette.of(context);
+    final focusTokens = TreinoFocusTokens.of(context);
+
+    return MergeSemantics(
+      child: Semantics(
+        selected: selected,
+        child: TreinoInteractiveState(
+          onTap: onTap,
+          builder: (ctx, states) {
+            final soft = states.hovered || states.pressed;
+
+            final Color background = selected
+                ? palette.bgCard
+                : soft
+                    ? palette.bgCard.withValues(alpha: 0.6)
+                    : Colors.transparent;
+
+            final Color borderColor =
+                selected ? palette.accent : Colors.transparent;
+
+            return AnimatedContainer(
+              key: Key('ajustes_subnav_${tab.name}'),
+              duration: AppMotion.resolve(ctx, AppMotion.fast),
+              curve: AppMotion.standard,
+              margin: const EdgeInsets.only(bottom: AppSpacing.hairline),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.s14,
+                vertical: AppSpacing.s12,
               ),
-            ),
-          ],
+              decoration: BoxDecoration(
+                color: background,
+                border: Border.all(color: borderColor),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+                boxShadow: states.focused
+                    ? [
+                        BoxShadow(
+                          color: focusTokens.ring.withValues(alpha: 0.5),
+                          spreadRadius: TreinoFocusTokens.ringWidth,
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    tab.icon,
+                    size: 18,
+                    color: selected ? palette.accent : palette.textMuted,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      tab.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color:
+                            selected ? palette.textPrimary : palette.textMuted,
+                        fontSize: 14,
+                        fontWeight:
+                            selected ? FontWeight.w600 : FontWeight.w400,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
         ),
       ),
     );

@@ -1,4 +1,7 @@
+import 'dart:ui' show Tristate;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -88,6 +91,47 @@ void main() {
       expect(find.text('NOTIFICACIONES'), findsOneWidget);
       expect(find.text('PUSH'), findsOneWidget);
       expect(find.text('INFORMACIÓN PERSONAL'), findsNothing);
+    });
+
+    testWidgets(
+        'sub-nav: item seleccionado expone Semantics(button + selected), '
+        'y Enter sobre el item enfocado activa el tab', (tester) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(_harness());
+      // Deja completar la entrada TreinoFadeSlideIn (stagger + fade) de la
+      // sub-nav antes de inspeccionar semantics — a opacidad 0 el subárbol
+      // queda excluido del árbol de semantics.
+      await tester.pumpAndSettle();
+
+      final cuentaSemantics = tester.getSemantics(
+        find.byKey(const Key('ajustes_subnav_cuenta')),
+      );
+      expect(cuentaSemantics.flagsCollection.isButton, isTrue,
+          reason: 'el item de sub-nav debe exponer Semantics(button: true)');
+      expect(cuentaSemantics.flagsCollection.isSelected, Tristate.isTrue,
+          reason: 'Cuenta está seleccionado por default');
+
+      final notifSemantics = tester.getSemantics(
+        find.byKey(const Key('ajustes_subnav_notificaciones')),
+      );
+      expect(notifSemantics.flagsCollection.isButton, isTrue);
+      expect(notifSemantics.flagsCollection.isSelected, isNot(Tristate.isTrue),
+          reason: 'Notificaciones no está seleccionado por default');
+
+      // Foco por teclado: Tab dos veces (Cuenta -> Notificaciones) + Enter
+      // activa el tab enfocado, sin necesidad de tap de mouse.
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      await tester.pump(); // deja emitir el StreamProvider de prefs
+
+      expect(find.text('NOTIFICACIONES'), findsOneWidget);
+      expect(find.text('INFORMACIÓN PERSONAL'), findsNothing);
+
+      handle.dispose();
     });
 
     testWidgets('Notificaciones: togglear un canal persiste notificationPrefs',
