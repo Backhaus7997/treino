@@ -3,6 +3,36 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ── Shared value guards (QA #508) ────────────────────────────────────────
+    // Generic optional-field validators, visible to every nested match. Unlike
+    // the domain helpers further down (postFriendAccepted, chatRelationshipOk,
+    // …) these carry no collection knowledge, so they live at the top scope
+    // instead of being duplicated per block.
+    //
+    // They take the VALUE, not the field name — always call them as
+    // `optNumInRange(request.resource.data.get('weightKg', null), 0, 500)`.
+    // Reading through `get(field, null)` collapses "key absent" and "key
+    // present but null" into the same null, which matters because
+    // json_serializable emits EVERY optional key with an explicit null (no
+    // `includeIfNull: false` on these models) — a present-null key is the
+    // NORMAL wire shape, not an anomaly, so the guards must accept it and
+    // constrain only non-null values.
+
+    // Optional number within an inclusive [minV, maxV] range.
+    function optNumInRange(v, minV, maxV) {
+      return v == null || (v is number && v >= minV && v <= maxV);
+    }
+
+    // Optional number that must be strictly positive, capped at maxV.
+    function optPositiveNum(v, maxV) {
+      return v == null || (v is number && v > 0 && v <= maxV);
+    }
+
+    // Optional string no longer than maxLen.
+    function optStrMaxLen(v, maxLen) {
+      return v == null || (v is string && v.size() <= maxLen);
+    }
+
     match /users/{uid} {
       // Owner-only read.
       allow read: if request.auth != null
@@ -1083,6 +1113,76 @@ service cloud.firestore {
     // (athlete-self-measurements). The athlete always reads their own; a
     // linked+consented trainer reads the athlete's self-logged ones.
     match /measurements/{measurementId} {
+      // QA #508 — value type/range validation, following the payments /
+      // athlete_billing idiom (QA-PAY-007). Before this, `measurements` only
+      // validated athleteId/recordedBy: no value field was checked at all, so a
+      // modified client could persist a negative weight, a string where a
+      // number belongs, or an unbounded `notes` blob.
+      //
+      // Shared by create AND update: MeasurementRepository.add and .update both
+      // write the FULL model via `set(m.toJson())` (no merge), so
+      // request.resource.data is the complete document on both paths and a
+      // single guard covers both — no need for the diff()/affectedKeys() split
+      // athlete_billing requires for its merge writes.
+      //
+      // Bounds MIRROR the client validator (`parsed < 0 || parsed >
+      // _kMaxMetricValue`, _kMaxMetricValue = 500 in log_measurement_screen.dart)
+      // instead of inventing physiological per-field ranges. The hole being
+      // closed is a modified client SKIPPING that form validator, so the rule
+      // enforces exactly what the legit form already enforces — a tighter bound
+      // would reject values the real UI happily accepts. Every numeric field
+      // shares one validator there, hence one uniform [0, 500] here.
+      //
+      // Optional fields are read via get(field, null): json_serializable emits
+      // every optional key with an explicit null, and an all-null-but-one doc
+      // is the normal shape (the form saves whatever subset was filled in).
+      //
+      // `id` is type-checked but deliberately NOT pinned to the doc id (unlike
+      // payments). MeasurementRepository._fromDoc rebuilds the model with
+      // `{...data, 'id': snap.id}`, so the body copy is never read — pinning it
+      // would add a field-PRESENCE requirement that protects nothing observable
+      // while rejecting the legitimately id-less docs that
+      // scripts/rules_test/measurements-self-log.test.js writes.
+      //
+      // ⚠️  COUPLING WARNING — the hasOnly list below is the exact key set of
+      // Measurement.toJson() (measurement.g.dart). Adding a field to the Dart
+      // model without adding it here makes EVERY write to this collection fail.
+      function measurementShapeOk(d) {
+        return d.keys().hasOnly([
+                 'id', 'athleteId', 'recordedBy', 'recordedAt',
+                 'weightKg', 'fatPercentage', 'muscleMassKg',
+                 'shouldersCm', 'chestCm', 'waistCm', 'hipsCm', 'glutesCm',
+                 'bicepsLCm', 'bicepsRCm', 'bicepsFlexedLCm', 'bicepsFlexedRCm',
+                 'forearmLCm', 'forearmRCm',
+                 'upperThighLCm', 'upperThighRCm', 'midThighLCm', 'midThighRCm',
+                 'calfLCm', 'calfRCm',
+                 'notes'
+               ])
+               && optStrMaxLen(d.get('id', null), 128)
+               && d.get('recordedAt', null) is timestamp
+               && optNumInRange(d.get('weightKg', null), 0, 500)
+               && optNumInRange(d.get('fatPercentage', null), 0, 500)
+               && optNumInRange(d.get('muscleMassKg', null), 0, 500)
+               && optNumInRange(d.get('shouldersCm', null), 0, 500)
+               && optNumInRange(d.get('chestCm', null), 0, 500)
+               && optNumInRange(d.get('waistCm', null), 0, 500)
+               && optNumInRange(d.get('hipsCm', null), 0, 500)
+               && optNumInRange(d.get('glutesCm', null), 0, 500)
+               && optNumInRange(d.get('bicepsLCm', null), 0, 500)
+               && optNumInRange(d.get('bicepsRCm', null), 0, 500)
+               && optNumInRange(d.get('bicepsFlexedLCm', null), 0, 500)
+               && optNumInRange(d.get('bicepsFlexedRCm', null), 0, 500)
+               && optNumInRange(d.get('forearmLCm', null), 0, 500)
+               && optNumInRange(d.get('forearmRCm', null), 0, 500)
+               && optNumInRange(d.get('upperThighLCm', null), 0, 500)
+               && optNumInRange(d.get('upperThighRCm', null), 0, 500)
+               && optNumInRange(d.get('midThighLCm', null), 0, 500)
+               && optNumInRange(d.get('midThighRCm', null), 0, 500)
+               && optNumInRange(d.get('calfLCm', null), 0, 500)
+               && optNumInRange(d.get('calfRCm', null), 0, 500)
+               && optStrMaxLen(d.get('notes', null), 2000);
+      }
+
       // READ branches, cheapest first so get()s only run for the trainer path:
       //   1. author (trainer OR self-logging athlete) — pure field compare.
       //   2. subject athlete — own vantage — pure field compare.
@@ -1116,6 +1216,10 @@ service cloud.firestore {
                     && request.resource.data.recordedBy == request.auth.uid
                     && request.resource.data.athleteId is string
                     && request.resource.data.athleteId.size() > 0
+                    // QA #508 — value shape. Placed BEFORE the branch below so
+                    // a malformed doc is rejected without paying for the role
+                    // get() on the trainer path.
+                    && measurementShapeOk(request.resource.data)
                     && (
                          // Athlete-self branch: may log ONLY about themselves.
                          request.resource.data.athleteId == request.auth.uid
@@ -1125,7 +1229,8 @@ service cloud.firestore {
       allow update: if request.auth != null
                     && resource.data.recordedBy == request.auth.uid
                     && request.resource.data.recordedBy == resource.data.recordedBy
-                    && request.resource.data.athleteId == resource.data.athleteId;
+                    && request.resource.data.athleteId == resource.data.athleteId
+                    && measurementShapeOk(request.resource.data);
       allow delete: if request.auth != null
                     && resource.data.recordedBy == request.auth.uid;
     }
@@ -1133,6 +1238,63 @@ service cloud.firestore {
     // Performance tests / physical assessments. Owned by the TRAINER who recorded
     // them (recordedBy). The athlete gets read-only of their own. No one else.
     match /performance_tests/{testId} {
+      // QA #508 — value type/range validation. Same rationale as the
+      // measurements guard above (both collections were left unvalidated by
+      // rules-hardening Slice C, which only added the role gate), and likewise
+      // shared by create and update: PerformanceTestRepository.add and .update
+      // both `set(t.toJson())` the full model, no merge.
+      //
+      // Bounds mirror this screen's OWN validator, which differs from the
+      // measurements one: log_performance_test_screen.dart rejects
+      // `parsed <= 0` and sets NO ceiling. So the floor here is strictly
+      // positive — note that includes sitAndReachCm, which is conventionally a
+      // SIGNED metric but which the form already refuses to take negative; the
+      // rule deliberately tracks the app's contract, not the textbook one.
+      // The 100000 ceiling is the part the client lacks: it exists purely to
+      // block absurd magnitudes (same spirit as payments' amountArs cap) and
+      // sits ~25x above the largest plausible value in the set (cooperMeters,
+      // ~4000 m for a world-class 12-minute test), so it cannot reject real data.
+      //
+      // `id` is type-checked but NOT pinned to the doc id — same reasoning as
+      // the measurements guard above (PerformanceTestRepository._fromDoc also
+      // rebuilds the model with the snapshot id, so the body copy is inert).
+      //
+      // ⚠️  COUPLING WARNING — the hasOnly list below is the exact key set of
+      // PerformanceTest.toJson() (performance_test.g.dart). Adding a field to
+      // the Dart model without adding it here makes EVERY write fail.
+      function performanceTestShapeOk(d) {
+        return d.keys().hasOnly([
+                 'id', 'athleteId', 'recordedBy', 'recordedAt',
+                 'cmjCm', 'squatJumpCm', 'abalakovCm', 'broadJumpCm',
+                 'sprint10mS', 'sprint20mS', 'sprint30mS', 'sprint40mS',
+                 'squat1rmKg', 'benchPress1rmKg', 'deadlift1rmKg',
+                 'overheadPress1rmKg', 'pullUp1rmKg',
+                 'vo2maxMlKgMin', 'courseNavetteLevel', 'cooperMeters',
+                 'sitAndReachCm',
+                 'notes'
+               ])
+               && optStrMaxLen(d.get('id', null), 128)
+               && d.get('recordedAt', null) is timestamp
+               && optPositiveNum(d.get('cmjCm', null), 100000)
+               && optPositiveNum(d.get('squatJumpCm', null), 100000)
+               && optPositiveNum(d.get('abalakovCm', null), 100000)
+               && optPositiveNum(d.get('broadJumpCm', null), 100000)
+               && optPositiveNum(d.get('sprint10mS', null), 100000)
+               && optPositiveNum(d.get('sprint20mS', null), 100000)
+               && optPositiveNum(d.get('sprint30mS', null), 100000)
+               && optPositiveNum(d.get('sprint40mS', null), 100000)
+               && optPositiveNum(d.get('squat1rmKg', null), 100000)
+               && optPositiveNum(d.get('benchPress1rmKg', null), 100000)
+               && optPositiveNum(d.get('deadlift1rmKg', null), 100000)
+               && optPositiveNum(d.get('overheadPress1rmKg', null), 100000)
+               && optPositiveNum(d.get('pullUp1rmKg', null), 100000)
+               && optPositiveNum(d.get('vo2maxMlKgMin', null), 100000)
+               && optPositiveNum(d.get('courseNavetteLevel', null), 100000)
+               && optPositiveNum(d.get('cooperMeters', null), 100000)
+               && optPositiveNum(d.get('sitAndReachCm', null), 100000)
+               && optStrMaxLen(d.get('notes', null), 2000);
+      }
+
       allow read: if request.auth != null
                   && (request.auth.uid == resource.data.recordedBy
                       || request.auth.uid == resource.data.athleteId);
@@ -1145,11 +1307,13 @@ service cloud.firestore {
                     && request.resource.data.recordedBy == request.auth.uid
                     && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
                     && request.resource.data.athleteId is string
-                    && request.resource.data.athleteId.size() > 0;
+                    && request.resource.data.athleteId.size() > 0
+                    && performanceTestShapeOk(request.resource.data);
       allow update: if request.auth != null
                     && resource.data.recordedBy == request.auth.uid
                     && request.resource.data.recordedBy == resource.data.recordedBy
-                    && request.resource.data.athleteId == resource.data.athleteId;
+                    && request.resource.data.athleteId == resource.data.athleteId
+                    && performanceTestShapeOk(request.resource.data);
       allow delete: if request.auth != null
                     && resource.data.recordedBy == request.auth.uid;
     }
