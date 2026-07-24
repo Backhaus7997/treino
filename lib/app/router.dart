@@ -7,6 +7,7 @@ import '../core/widgets/treino_bottom_bar.dart';
 import '../features/auth/application/auth_providers.dart';
 import '../features/auth/presentation/forgot_password_screen.dart';
 import '../features/auth/presentation/login_screen.dart';
+import '../features/auth/presentation/profile_unavailable_screen.dart';
 import '../features/auth/presentation/register_screen.dart';
 import '../features/auth/presentation/splash_screen.dart';
 import '../features/auth/presentation/welcome_screen.dart';
@@ -137,6 +138,25 @@ String? authRedirect(
 
     final profileAsync = read(userProfileProvider);
     if (profileAsync.isLoading) return null;
+
+    // Issue #544: autenticado pero el stream del perfil TERMINÓ EN ERROR
+    // (permission-denied por backend switch / rules regression / cuenta
+    // inaccesible / quota). Sin esta rama el estado era invisible: con valor
+    // retenido por `copyWithPrevious` (snapshot cacheado) el gate de
+    // displayName de abajo no dispara y el usuario queda en skeletons
+    // perpetuos; sin valor retenido caía en /profile-setup, donde el submit
+    // fallaría con el mismo permission-denied. Degradamos explícito:
+    // pantalla con mensaje + reintentar / cerrar sesión.
+    if (profileAsync.hasError) {
+      return location == '/profile-unavailable'
+          ? null // ya está ahí — sin loop
+          : '/profile-unavailable';
+    }
+    // Recovery exit: el reintento resolvió el perfil → salir del estado
+    // degradado. go_router re-evalúa el redirect sobre /home, así que los
+    // gates de abajo (setup incompleto, trainer onboarding) re-aplican solos.
+    if (location == '/profile-unavailable') return '/home';
+
     final profile = profileAsync.valueOrNull;
     if (profile == null || profile.displayName == null) {
       return '/profile-setup';
@@ -221,6 +241,14 @@ GoRouter buildRouter({
       GoRoute(
         path: '/profile-setup',
         pageBuilder: (_, __) => _noAnim(const ProfileSetupFlow()),
+      ),
+
+      // Estado degradado "autenticado pero sin perfil accesible" (#544).
+      // Solo se llega vía la rama hasError de authRedirect. Fullscreen,
+      // sin bottom bar — igual que /profile-setup.
+      GoRoute(
+        path: '/profile-unavailable',
+        pageBuilder: (_, __) => _noAnim(const ProfileUnavailableScreen()),
       ),
 
       // ─── Session player — TOP-LEVEL ROUTES (outside ShellRoute) ───────────
