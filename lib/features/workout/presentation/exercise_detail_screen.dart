@@ -173,6 +173,7 @@ class _ExerciseDetailContent extends StatelessWidget {
               : _HeroStrip(
                   exerciseId: exercise.id,
                   muscleGroup: exercise.muscleGroup,
+                  thumbnailUrl: exercise.thumbnailUrl,
                   badgeText: badgeText,
                   titleText: exercise.name.toUpperCase(),
                 ),
@@ -258,10 +259,16 @@ class _HeroStrip extends StatelessWidget {
     required this.muscleGroup,
     required this.badgeText,
     required this.titleText,
+    this.thumbnailUrl,
   });
 
   final String exerciseId;
   final String muscleGroup;
+
+  /// Foto real del ejercicio (frame de su video, #565). Presente → el hero
+  /// muestra el ejercicio de verdad; ausente/falla → cascada de assets como
+  /// siempre (pedido de producto 2026-07-24).
+  final String? thumbnailUrl;
   final String badgeText;
   final String titleText;
 
@@ -297,6 +304,7 @@ class _HeroStrip extends StatelessWidget {
           ExerciseAssetImage(
             exerciseId: exerciseId,
             muscleGroup: muscleGroup,
+            thumbnailUrl: thumbnailUrl,
             fallback: gradient,
           ),
           // Top scrim — keeps the floating back button legible on bright photos.

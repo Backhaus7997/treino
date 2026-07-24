@@ -39,13 +39,16 @@ Future<List<Exercise>?> showExercisePicker(
   BuildContext context, {
   Set<String> alreadySelectedIds = const {},
 }) {
-  return showModalBottomSheet<List<Exercise>>(
-    context: context,
-    useRootNavigator: true,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (_) =>
-        _ExercisePickerSheetContent(alreadySelectedIds: alreadySelectedIds),
+  // Pantalla completa en vez de bottom sheet: con la foto real de cada
+  // ejercicio (#565) la lista merece toda la altura y una vista clara
+  // (pedido de producto 2026-07-24). Mismo contrato: resuelve con la
+  // selección, o null si se cierra sin agregar.
+  return Navigator.of(context, rootNavigator: true).push<List<Exercise>>(
+    MaterialPageRoute(
+      fullscreenDialog: true,
+      builder: (_) =>
+          _ExercisePickerSheetContent(alreadySelectedIds: alreadySelectedIds),
+    ),
   );
 }
 
@@ -68,6 +71,9 @@ class _ExercisePickerSheetContentState
   Set<EquipmentType> _equipmentFilters = {};
   late Set<String> _selected;
   final TextEditingController _searchController = TextEditingController();
+  // Propio desde que el picker es pantalla completa (el bottom sheet lo
+  // recibía del DraggableScrollableSheet).
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -78,6 +84,7 @@ class _ExercisePickerSheetContentState
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -172,162 +179,158 @@ class _ExercisePickerSheetContentState
         ? const AsyncValue<List<CustomExercise>>.data(<CustomExercise>[])
         : ref.watch(customExercisesForTrainerStreamProvider(uid));
 
-    return DraggableScrollableSheet(
-      initialChildSize: 0.75,
-      minChildSize: 0.4,
-      maxChildSize: 0.95,
-      expand: false,
-      builder: (sheetCtx, scrollController) {
-        final defaults = defaultsAsync.valueOrNull ?? const <Exercise>[];
-        final customs = customsAsync.valueOrNull ?? const <CustomExercise>[];
+    final defaults = defaultsAsync.valueOrNull ?? const <Exercise>[];
+    final customs = customsAsync.valueOrNull ?? const <CustomExercise>[];
 
-        return Padding(
-          // Lift the whole sheet above the keyboard so the exercise list
-          // stays visible while filtering by name (device feedback
-          // 2026-06-11).
-          padding:
-              EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(sheetCtx).bottom),
-          child: Container(
-            decoration: BoxDecoration(
-              // Was palette.espresso (#3C3534) — too warm, read as gray over
-              // the near-black bg behind it. Using `bg` (#0A0A0A) so the sheet
-              // sits flush in the dark theme; the rounded top + drag handle
-              // mark the sheet edge instead of color contrast.
-              color: palette.bg,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(20)),
-            ),
-            child: Column(
-              children: [
-                // ── Drag handle ───────────────────────────────────────────────
-                Padding(
-                  padding: const EdgeInsets.only(top: 12, bottom: 8),
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: palette.border,
-                      borderRadius: BorderRadius.circular(2),
+    // Pantalla completa (antes: bottom sheet al 75%). Con foto real por
+    // ejercicio (#565) la lista pide toda la altura disponible; el Scaffold
+    // además resuelve el teclado (resizeToAvoidBottomInset) que el sheet
+    // manejaba a mano con viewInsets.
+    return Scaffold(
+      backgroundColor: palette.bg,
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            // ── Header: cerrar + título ───────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 4, 16, 0),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: Icon(
+                      TreinoIcon.close,
+                      color: palette.textPrimary,
+                    ),
+                    tooltip: 'Cerrar',
+                  ),
+                  Expanded(
+                    child: Text(
+                      l10n.routineEditorAddExercise.toUpperCase(),
+                      style: GoogleFonts.barlow(
+                        color: palette.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.2,
+                      ),
                     ),
                   ),
-                ),
-
-                // ── Search field ──────────────────────────────────────────────
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: TextField(
-                    controller: _searchController,
-                    autofocus: false,
-                    style: GoogleFonts.barlow(
-                        color: palette.textPrimary, fontSize: 14),
-                    decoration: InputDecoration(
-                      prefixIcon:
-                          Icon(TreinoIcon.search, color: palette.textMuted),
-                      suffixIcon: _query.isEmpty
-                          ? null
-                          : IconButton(
-                              icon: Icon(TreinoIcon.close,
-                                  color: palette.textMuted, size: 18),
-                              tooltip: 'Borrar',
-                              splashRadius: 18,
-                              onPressed: _clearQuery,
-                            ),
-                      hintText: 'Buscar ejercicio…',
-                      hintStyle: GoogleFonts.barlow(
-                          color: palette.textMuted, fontSize: 14),
-                      filled: true,
-                      fillColor: palette.bgCard,
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 10),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: palette.border),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: palette.border),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: palette.accent),
-                      ),
-                    ),
-                    onChanged: (v) => setState(() => _query = v),
-                  ),
-                ),
-
-                // ── Filter buttons row (more visible than chips) ──────────────
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _FilterButton(
-                          baseLabel: l10n.workoutPickerMuscleFilter,
-                          count: _muscleFilters.length,
-                          palette: palette,
-                          onTap: () => _openMuscleSheet(sheetCtx),
-                          onClear: _muscleFilters.isNotEmpty
-                              ? () => setState(_muscleFilters.clear)
-                              : null,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _FilterButton(
-                          baseLabel: l10n.workoutPickerEquipmentFilter,
-                          count: _equipmentFilters.length,
-                          palette: palette,
-                          onTap: () => _openEquipmentSheet(sheetCtx),
-                          onClear: _equipmentFilters.isNotEmpty
-                              ? () => setState(_equipmentFilters.clear)
-                              : null,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // ── Create new CTA ────────────────────────────────────────────
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                  child: _CreateNewTile(
-                    palette: palette,
-                    enabled: uid.isNotEmpty,
-                    onTap: uid.isEmpty
-                        ? null
-                        : () => _openCreateNew(sheetCtx, defaults, customs),
-                  ),
-                ),
-
-                // ── Exercise list ─────────────────────────────────────────────
-                Expanded(
-                  child: _buildList(
-                    scrollController: scrollController,
-                    palette: palette,
-                    l10n: l10n,
-                    defaults: defaultsAsync,
-                    customs: customsAsync,
-                    uid: uid,
-                  ),
-                ),
-
-                // ── Sticky add CTA ────────────────────────────────────────────
-                if (_selected.isNotEmpty)
-                  _StickyAddBar(
-                    count: _selected.length,
-                    palette: palette,
-                    onTap: () => _confirm(defaults, customs),
-                  ),
-
-                SizedBox(height: MediaQuery.of(context).viewPadding.bottom + 8),
-              ],
+                ],
+              ),
             ),
-          ),
-        );
-      },
+
+            // ── Search field ──────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: TextField(
+                controller: _searchController,
+                autofocus: false,
+                style: GoogleFonts.barlow(
+                    color: palette.textPrimary, fontSize: 14),
+                decoration: InputDecoration(
+                  prefixIcon: Icon(TreinoIcon.search, color: palette.textMuted),
+                  suffixIcon: _query.isEmpty
+                      ? null
+                      : IconButton(
+                          icon: Icon(TreinoIcon.close,
+                              color: palette.textMuted, size: 18),
+                          tooltip: 'Borrar',
+                          splashRadius: 18,
+                          onPressed: _clearQuery,
+                        ),
+                  hintText: 'Buscar ejercicio…',
+                  hintStyle: GoogleFonts.barlow(
+                      color: palette.textMuted, fontSize: 14),
+                  filled: true,
+                  fillColor: palette.bgCard,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: palette.border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: palette.border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: palette.accent),
+                  ),
+                ),
+                onChanged: (v) => setState(() => _query = v),
+              ),
+            ),
+
+            // ── Filter buttons row (more visible than chips) ──────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _FilterButton(
+                      baseLabel: l10n.workoutPickerMuscleFilter,
+                      count: _muscleFilters.length,
+                      palette: palette,
+                      onTap: () => _openMuscleSheet(context),
+                      onClear: _muscleFilters.isNotEmpty
+                          ? () => setState(_muscleFilters.clear)
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _FilterButton(
+                      baseLabel: l10n.workoutPickerEquipmentFilter,
+                      count: _equipmentFilters.length,
+                      palette: palette,
+                      onTap: () => _openEquipmentSheet(context),
+                      onClear: _equipmentFilters.isNotEmpty
+                          ? () => setState(_equipmentFilters.clear)
+                          : null,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // ── Create new CTA ────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: _CreateNewTile(
+                palette: palette,
+                enabled: uid.isNotEmpty,
+                onTap: uid.isEmpty
+                    ? null
+                    : () => _openCreateNew(context, defaults, customs),
+              ),
+            ),
+
+            // ── Exercise list ─────────────────────────────────────────────
+            Expanded(
+              child: _buildList(
+                scrollController: _scrollController,
+                palette: palette,
+                l10n: l10n,
+                defaults: defaultsAsync,
+                customs: customsAsync,
+                uid: uid,
+              ),
+            ),
+
+            // ── Sticky add CTA ────────────────────────────────────────────
+            if (_selected.isNotEmpty)
+              _StickyAddBar(
+                count: _selected.length,
+                palette: palette,
+                onTap: () => _confirm(defaults, customs),
+              ),
+
+            SizedBox(height: MediaQuery.of(context).viewPadding.bottom + 8),
+          ],
+        ),
+      ),
     );
   }
 
@@ -510,7 +513,10 @@ class _ExerciseRow extends StatelessWidget {
         ),
         child: ListTile(
           contentPadding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          // El leading de 68px necesita su propio mínimo vertical para no
+          // recortarse dentro del alto default del tile.
+          minVerticalPadding: 10,
           leading: _ExerciseThumbnail(
             id: id,
             muscleGroup: muscleGroup,
@@ -592,19 +598,21 @@ class _ExerciseThumbnail extends StatelessWidget {
   Widget build(BuildContext context) {
     final fallbackIcon = Icon(
       TreinoIcon.dumbbell,
-      size: 22,
+      size: 30,
       color: palette.textMuted,
     );
+    // 68px (antes 44): con foto real (#565) el círculo chico no dejaba
+    // apreciar el ejercicio (pedido de producto 2026-07-24).
     return SizedBox(
-      width: 44,
-      height: 44,
+      width: 68,
+      height: 68,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           ClipOval(
             child: Container(
-              width: 44,
-              height: 44,
+              width: 68,
+              height: 68,
               color: palette.bgCard,
               alignment: Alignment.center,
               child: isCustom
@@ -613,8 +621,8 @@ class _ExerciseThumbnail extends StatelessWidget {
                       exerciseId: id,
                       muscleGroup: muscleGroup,
                       thumbnailUrl: thumbnailUrl,
-                      width: 44,
-                      height: 44,
+                      width: 68,
+                      height: 68,
                       fallback: fallbackIcon,
                     ),
             ),
@@ -624,8 +632,8 @@ class _ExerciseThumbnail extends StatelessWidget {
               right: -2,
               bottom: -2,
               child: Container(
-                width: 18,
-                height: 18,
+                width: 22,
+                height: 22,
                 decoration: BoxDecoration(
                   color: palette.accent,
                   shape: BoxShape.circle,
@@ -633,7 +641,7 @@ class _ExerciseThumbnail extends StatelessWidget {
                 ),
                 child: Icon(
                   TreinoIcon.check,
-                  size: 10,
+                  size: 12,
                   color: palette.bg,
                 ),
               ),
