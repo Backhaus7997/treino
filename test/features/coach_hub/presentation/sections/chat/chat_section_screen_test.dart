@@ -6,6 +6,8 @@
 //   - Empty list state when the PF has zero chats.
 //   - Tap on a chat row updates `selectedChatIdProvider`.
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -347,6 +349,96 @@ void main() {
 
         expect(find.text('No pudimos cargar tus chats.'), findsOneWidget);
         expect(find.byType(TreinoEmptyState), findsWidgets);
+      },
+    );
+
+    testWidgets(
+      'rows persist through a transient stream error when data was already '
+      'loaded (stale-while-refresh, bug revisión en vivo 2026-07-24)',
+      (tester) async {
+        final chat = _stubChat(lastMessageText: 'Hola PF');
+        final controller = StreamController<List<Chat>>();
+        addTearDown(controller.close);
+
+        await tester.pumpWidget(_wrap(
+          overrides: [
+            currentUidProvider.overrideWithValue(_pfUid),
+            chatsForCurrentUserProvider.overrideWith(
+              (ref) => controller.stream,
+            ),
+            userPublicProfileProvider(_athleteUid).overrideWith(
+              (ref) => Stream<UserPublicProfile?>.value(_stubPub()),
+            ),
+          ],
+        ));
+
+        controller.add([chat]);
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const Key('chat_row_$_chatId')), findsOneWidget);
+
+        // Re-suscripción / hiccup transitorio del stream: Riverpod 2.5
+        // preserva el `value` previo dentro del AsyncError vía
+        // `copyWithPrevious` — la lista YA tiene datos (`hasValue == true`)
+        // aunque el AsyncValue actual sea un error. No debe taparse con el
+        // estado de error de pantalla completa mientras haya datos.
+        controller.addError('transient');
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text('No pudimos cargar tus chats.'),
+          findsNothing,
+          reason: 'un error transitorio con datos ya cargados no debe tapar '
+              'la lista con el estado de error (stale-while-refresh)',
+        );
+        expect(find.byKey(const Key('chat_row_$_chatId')), findsOneWidget);
+
+        // Recupera: la lista sigue mostrando la data sin haber parpadeado.
+        controller.add([chat]);
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const Key('chat_row_$_chatId')), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'a broken profile stream on one row does not bubble into the list '
+      "error state (hipótesis 'Usuario eliminado' — bug revisión en vivo "
+      '2026-07-24)',
+      (tester) async {
+        final chatBroken = _stubChat(lastMessageText: 'Hola PF');
+        final chatOk = Chat(
+          chatId: 'chat-2',
+          members: const [_pfUid, 'athlete-2'],
+          createdAt: DateTime(2026, 6, 1),
+          lastMessageText: 'Otro mensaje',
+        );
+        await tester.pumpWidget(_wrap(
+          overrides: [
+            currentUidProvider.overrideWithValue(_pfUid),
+            chatsForCurrentUserProvider.overrideWith(
+              (ref) => Stream<List<Chat>>.value([chatBroken, chatOk]),
+            ),
+            // El perfil del otro miembro de chatBroken falla (ej. usuario
+            // eliminado / lectura denegada) — no debe tapar la lista
+            // entera con el estado de error de pantalla completa.
+            userPublicProfileProvider(_athleteUid).overrideWith(
+              (ref) => Stream<UserPublicProfile?>.error('profile down'),
+            ),
+            userPublicProfileProvider('athlete-2').overrideWith(
+              (ref) => Stream<UserPublicProfile?>.value(
+                _stubPub(displayName: 'Mica'),
+              ),
+            ),
+          ],
+        ));
+        await tester.pumpAndSettle();
+
+        expect(tester.takeException(), isNull);
+        expect(find.text('No pudimos cargar tus chats.'), findsNothing);
+        expect(find.byKey(const Key('chat_row_$_chatId')), findsOneWidget);
+        expect(find.byKey(const Key('chat_row_chat-2')), findsOneWidget);
+        expect(find.text('Mica'), findsOneWidget);
       },
     );
 

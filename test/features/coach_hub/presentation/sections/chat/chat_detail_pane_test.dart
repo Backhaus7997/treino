@@ -13,6 +13,8 @@
 //   - Robustez al cambiar de chat seleccionado sin desmontar el pane
 //     (didUpdateWidget).
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -236,6 +238,62 @@ void main() {
           find.byKey(const ValueKey('chat_date_separator_2026-06-29')),
           findsOneWidget,
         );
+      },
+    );
+  });
+
+  group(
+      'ChatDetailPane — messages stale-while-refresh (bug revisión en '
+      'vivo 2026-07-24)', () {
+    testWidgets(
+      'thread persists through a transient stream error when messages were '
+      'already loaded',
+      (tester) async {
+        final controller = StreamController<List<Message>>();
+        addTearDown(controller.close);
+
+        final container = ProviderContainer(overrides: [
+          currentUidProvider.overrideWithValue(_pfUid),
+          chatsForCurrentUserProvider.overrideWith(
+            (ref) => Stream<List<Chat>>.value([_stubChat()]),
+          ),
+          userPublicProfileProvider(_athleteUid).overrideWith(
+            (ref) => Stream<UserPublicProfile?>.value(_stubPub()),
+          ),
+          messagesProvider(_chatId).overrideWith(
+            (ref) => controller.stream,
+          ),
+        ]);
+        addTearDown(container.dispose);
+        container.read(selectedChatIdProvider.notifier).state = _chatId;
+
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: _appFor(const Scaffold(body: ChatSectionScreen())),
+          ),
+        );
+
+        controller.add([
+          _msg(id: 'm1', text: 'hola A', createdAt: DateTime(2026, 7, 1)),
+        ]);
+        await tester.pumpAndSettle();
+
+        expect(find.text('hola A'), findsOneWidget);
+
+        // Re-suscripción/hiccup transitorio del stream de mensajes: igual
+        // que la lista de chats, un error transitorio con mensajes ya
+        // cacheados no debe vaciar el hilo (stale-while-refresh).
+        controller.addError('transient');
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text('No pudimos cargar los mensajes.'),
+          findsNothing,
+          reason: 'un error transitorio con mensajes ya cargados no debe '
+              'vaciar el hilo',
+        );
+        expect(find.text('hola A'), findsOneWidget);
       },
     );
   });

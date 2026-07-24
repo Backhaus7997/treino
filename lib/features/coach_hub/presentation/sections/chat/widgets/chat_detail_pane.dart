@@ -245,26 +245,7 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
           Expanded(
             child: TreinoStateSwitcher(
               childKey: ValueKey(_messagesStateKey(messagesAsync)),
-              child: messagesAsync.when(
-                loading: () => const _MessagesSkeleton(),
-                error: (_, __) => const TreinoEmptyState(
-                  icon: TreinoIcon.errorState,
-                  title: 'No pudimos cargar los mensajes.', // i18n: Fase W2
-                ),
-                data: (messages) {
-                  if (messages.isEmpty) {
-                    return const TreinoEmptyState(
-                      icon: TreinoIcon.chatEmpty,
-                      title: 'Sin mensajes todavía', // i18n: Fase W2
-                      description: 'Escribí el primero abajo.', // i18n: Fase W2
-                    );
-                  }
-                  return _MessagesList(
-                    messages: messages,
-                    currentUid: currentUid ?? '',
-                  );
-                },
-              ),
+              child: _buildMessagesBody(messagesAsync, currentUid),
             ),
           ),
           if (_uploading)
@@ -287,12 +268,46 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
   }
 }
 
+/// Selecciona el contenido del hilo con precedencia **stale-while-refresh**
+/// — mismo criterio que `_ChatListPaneState._buildBody`: si el stream YA
+/// tiene mensajes cargados, siempre los mostramos, incluso si el
+/// `AsyncValue` actual está en `error` por una re-suscripción/hiccup
+/// transitorio (Riverpod preserva el `value` previo vía
+/// `copyWithPrevious`). El spinner/skeleton de carga real (sin mensajes
+/// cacheados todavía) sigue intacto para el primer load de un chat nuevo.
+Widget _buildMessagesBody(
+  AsyncValue<List<Message>> messagesAsync,
+  String? currentUid,
+) {
+  if (messagesAsync.hasValue) {
+    final messages = messagesAsync.value!;
+    if (messages.isEmpty) {
+      return const TreinoEmptyState(
+        icon: TreinoIcon.chatEmpty,
+        title: 'Sin mensajes todavía', // i18n: Fase W2
+        description: 'Escribí el primero abajo.', // i18n: Fase W2
+      );
+    }
+    return _MessagesList(messages: messages, currentUid: currentUid ?? '');
+  }
+
+  if (messagesAsync.hasError) {
+    return const TreinoEmptyState(
+      icon: TreinoIcon.errorState,
+      title: 'No pudimos cargar los mensajes.', // i18n: Fase W2
+    );
+  }
+
+  return const _MessagesSkeleton();
+}
+
 /// Discrimina el estado actual del stream de mensajes para
-/// [TreinoStateSwitcher] — mismo patrón que `_ChatListPaneState._stateKey`.
+/// [TreinoStateSwitcher] — misma precedencia hasValue-first que
+/// `_ChatListPaneState._stateKey`.
 String _messagesStateKey(AsyncValue<List<Message>> messagesAsync) {
+  if (messagesAsync.hasValue) return 'data';
   if (messagesAsync.hasError) return 'error';
-  if (messagesAsync.isLoading && !messagesAsync.hasValue) return 'loading';
-  return 'data';
+  return 'loading';
 }
 
 /// Skeleton de carga de la lista de mensajes — burbujas placeholder

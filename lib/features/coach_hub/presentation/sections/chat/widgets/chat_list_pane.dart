@@ -106,45 +106,7 @@ class _ChatListPaneState extends ConsumerState<ChatListPane> {
           Expanded(
             child: TreinoStateSwitcher(
               childKey: ValueKey(_stateKey(chatsAsync)),
-              child: chatsAsync.when(
-                loading: () => const _ChatListSkeleton(),
-                error: (_, __) => const TreinoEmptyState(
-                  icon: TreinoIcon.errorState,
-                  title: 'No pudimos cargar tus chats.', // i18n: Fase W2
-                ),
-                data: (chats) {
-                  if (chats.isEmpty) {
-                    return const TreinoEmptyState(
-                      icon: TreinoIcon.chatEmpty,
-                      title:
-                          'Todavía no tenés conversaciones.', // i18n: Fase W2
-                      description:
-                          'Los chats aparecen cuando un alumno te escribe.', // i18n: Fase W2
-                    );
-                  }
-                  if (uid == null) return const SizedBox.shrink();
-
-                  final filtered = _filterChats(chats, _query, uid);
-                  if (filtered.isEmpty) {
-                    return const TreinoEmptyState(
-                      icon: TreinoIcon.chatEmpty,
-                      title: 'Sin resultados', // i18n: Fase W2
-                    );
-                  }
-
-                  return ListView.builder(
-                    itemCount: filtered.length,
-                    itemBuilder: (context, index) {
-                      final chat = filtered[index];
-                      return _ChatRow(
-                        chat: chat,
-                        currentUid: uid,
-                        isSelected: chat.chatId == widget.selectedChatId,
-                      );
-                    },
-                  );
-                },
-              ),
+              child: _buildBody(chatsAsync, uid),
             ),
           ),
         ],
@@ -172,11 +134,66 @@ class _ChatListPaneState extends ConsumerState<ChatListPane> {
     }).toList();
   }
 
-  /// Discrimina el estado actual del stream para [TreinoStateSwitcher].
+  /// Selecciona el contenido del pane con precedencia **stale-while-
+  /// refresh**: si el stream YA tiene datos, siempre los mostramos —
+  /// incluso si el `AsyncValue` actual está en `error` o `loading` por una
+  /// re-suscripción/hiccup transitorio. Riverpod preserva el `value`
+  /// anterior dentro de un `AsyncError` (`copyWithPrevious`), así que
+  /// `hasValue` sigue siendo `true` en ese caso — el estado de error de
+  /// pantalla completa queda reservado solo para el primer load fallido
+  /// (todavía sin datos). Bug revisión en vivo 2026-07-24: al cambiar de
+  /// conversación, un error transitorio tapaba la lista ya cargada con el
+  /// ícono/mensaje de error durante unos segundos hasta recuperarse sola.
+  Widget _buildBody(AsyncValue<List<Chat>> chatsAsync, String? uid) {
+    if (chatsAsync.hasValue) {
+      final chats = chatsAsync.value!;
+      if (chats.isEmpty) {
+        return const TreinoEmptyState(
+          icon: TreinoIcon.chatEmpty,
+          title: 'Todavía no tenés conversaciones.', // i18n: Fase W2
+          description:
+              'Los chats aparecen cuando un alumno te escribe.', // i18n: Fase W2
+        );
+      }
+      if (uid == null) return const SizedBox.shrink();
+
+      final filtered = _filterChats(chats, _query, uid);
+      if (filtered.isEmpty) {
+        return const TreinoEmptyState(
+          icon: TreinoIcon.chatEmpty,
+          title: 'Sin resultados', // i18n: Fase W2
+        );
+      }
+
+      return ListView.builder(
+        itemCount: filtered.length,
+        itemBuilder: (context, index) {
+          final chat = filtered[index];
+          return _ChatRow(
+            chat: chat,
+            currentUid: uid,
+            isSelected: chat.chatId == widget.selectedChatId,
+          );
+        },
+      );
+    }
+
+    if (chatsAsync.hasError) {
+      return const TreinoEmptyState(
+        icon: TreinoIcon.errorState,
+        title: 'No pudimos cargar tus chats.', // i18n: Fase W2
+      );
+    }
+
+    return const _ChatListSkeleton();
+  }
+
+  /// Discrimina el estado actual del stream para [TreinoStateSwitcher] —
+  /// misma precedencia hasValue-first de [_buildBody].
   static String _stateKey(AsyncValue<List<Chat>> chatsAsync) {
+    if (chatsAsync.hasValue) return 'data';
     if (chatsAsync.hasError) return 'error';
-    if (chatsAsync.isLoading && !chatsAsync.hasValue) return 'loading';
-    return 'data';
+    return 'loading';
   }
 }
 
