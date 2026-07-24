@@ -42,7 +42,12 @@ RoutineDay _day({
     RoutineDay(
       dayNumber: dayNumber,
       name: name,
-      slots: slots ?? [_slot(), _slot(muscleGroup: 'shoulders'), _slot(muscleGroup: 'triceps')],
+      slots: slots ??
+          [
+            _slot(),
+            _slot(muscleGroup: 'shoulders'),
+            _slot(muscleGroup: 'triceps')
+          ],
       estimatedMinutes: estimatedMinutes,
     );
 
@@ -181,6 +186,57 @@ void main() {
       final txt = (tester.widget<Text>(minTexts)).data ?? '';
       expect(txt.startsWith('~'), isTrue,
           reason: 'computed duration should be prefixed with ~, got "$txt"');
+    });
+
+    testWidgets(
+        '#550: slot without muscleGroup is dropped — subtitle has no '
+        'dangling leading separator', (tester) async {
+      // Custom exercise persisted with muscleGroup: '' (no group assigned).
+      // Before the fix the empty label joined as a segment and the subtitle
+      // rendered " · Pecho · Hombros".
+      final day = _day(
+        slots: [
+          _slot(exerciseId: 'custom-1', muscleGroup: ''),
+          _slot(muscleGroup: 'chest'),
+          _slot(muscleGroup: 'shoulders'),
+        ],
+      );
+      await tester.pumpWidget(
+        _wrap(
+          const EmpezarEntrenamientoCard(),
+          today: _today(routine: _routine(days: [day]), day: day),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Exact match — a leading " · " would fail this find.
+      expect(find.text('Pecho · Hombros'), findsOneWidget);
+    });
+
+    testWidgets(
+        '#550: day whose slots ALL lack a group → subtitle row hidden, '
+        'no stray separator anywhere', (tester) async {
+      final day = _day(
+        slots: [
+          _slot(exerciseId: 'c1', muscleGroup: ''),
+          _slot(exerciseId: 'c2', muscleGroup: ''),
+        ],
+      );
+      await tester.pumpWidget(
+        _wrap(
+          const EmpezarEntrenamientoCard(),
+          today: _today(routine: _routine(days: [day]), day: day),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // No rendered Text may start with the separator.
+      expect(
+        find.byWidgetPredicate(
+          (w) => w is Text && (w.data ?? '').trimLeft().startsWith('·'),
+        ),
+        findsNothing,
+      );
     });
 
     testWidgets(

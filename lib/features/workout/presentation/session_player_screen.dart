@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
+import '../../../core/utils/join_non_empty.dart';
 import '../../../core/utils/kg_format.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
@@ -621,7 +622,12 @@ class _SessionHeader extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              '${routineSplit.toUpperCase()} · DÍA $dayNumber',
+              // joinNonEmpty: while the routine resolves (or has no split)
+              // the header degrades to "DÍA N" instead of " · DÍA N" (#550).
+              joinNonEmpty(
+                [routineSplit.toUpperCase(), 'DÍA $dayNumber'],
+                ' · ',
+              ),
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
                 fontSize: 20,
@@ -1031,7 +1037,7 @@ class _CompletedSupersetSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final names = entries.map((e) => e.slot.exerciseName).join(' · ');
+    final names = joinNonEmpty(entries.map((e) => e.slot.exerciseName), ' · ');
     return Container(
       decoration: BoxDecoration(
         color: palette.highlight.withValues(alpha: 0.06),
@@ -1169,7 +1175,7 @@ class _FutureSupersetPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final names = entries.map((e) => e.slot.exerciseName).join(' · ');
+    final names = joinNonEmpty(entries.map((e) => e.slot.exerciseName), ' · ');
     return Material(
       color: Colors.transparent,
       child: InkWell(

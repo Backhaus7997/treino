@@ -13,6 +13,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/features/workout/application/routine_providers.dart';
 import 'package:treino/features/workout/application/session_init.dart';
 import 'package:treino/features/workout/application/session_notifier.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
@@ -178,6 +179,42 @@ void main() {
       await tester.pump();
       // El header contiene 'DÍA 4' (dayNumber=4 viene del estado)
       expect(find.textContaining('DÍA 4'), findsOneWidget);
+    });
+
+    // #550: sin split resuelto (rutina no cargada o split null — típico de
+    // rutinas creadas por el atleta) el header NO arranca con " · ": degrada
+    // a "DÍA 4" limpio.
+    testWidgets(
+        '#550: header sin split renderiza "DÍA 4" sin separador colgando',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(_defaultState()),
+        ),
+      );
+      await tester.pump();
+      // Match exacto — el " · DÍA 4" previo al fix falla este find.
+      expect(find.text('DÍA 4'), findsOneWidget);
+    });
+
+    // #550 (regresión): con split presente el header conserva el formato
+    // completo "SPLIT · DÍA N".
+    testWidgets('#550: header con split renderiza "PPL · DÍA 4"',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          [
+            ..._stateOverride(_defaultState()),
+            routineByIdProvider('r1')
+                .overrideWith((ref) async => makeRoutine()),
+          ],
+        ),
+      );
+      await tester.pump(); // frame 1: provider loading
+      await tester.pump(); // frame 2: future resuelto → split visible
+      expect(find.text('PPL · DÍA 4'), findsOneWidget);
     });
 
     // SCENARIO-275: botón ABANDONAR presente
