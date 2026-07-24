@@ -226,7 +226,7 @@ void main() {
   // ── Unread dot on alumno card ─────────────────────────────────────────────
 
   group('TrainerCoachView — unread dot on alumno card', () {
-    List<Override> _stubLinksWithUnread(
+    List<Override> stubLinksWithUnread(
       List<TrainerLink> links, {
       required bool hasUnread,
     }) =>
@@ -244,7 +244,7 @@ void main() {
         (tester) async {
       await tester.pumpWidget(_wrap(
         const TrainerCoachView(),
-        overrides: _stubLinksWithUnread(
+        overrides: stubLinksWithUnread(
           [_link(id: 'l1', status: TrainerLinkStatus.active, athleteId: 'a1')],
           hasUnread: true,
         ),
@@ -261,7 +261,7 @@ void main() {
         (tester) async {
       await tester.pumpWidget(_wrap(
         const TrainerCoachView(),
-        overrides: _stubLinksWithUnread(
+        overrides: stubLinksWithUnread(
           [_link(id: 'l1', status: TrainerLinkStatus.active, athleteId: 'a1')],
           hasUnread: false,
         ),

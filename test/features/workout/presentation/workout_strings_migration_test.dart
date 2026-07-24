@@ -15,11 +15,11 @@ import 'package:treino/l10n/app_l10n.dart';
 AppL10n _l10n(WidgetTester tester) =>
     AppL10n.of(tester.element(find.byType(SizedBox)));
 
-Widget _harness() => MaterialApp(
+Widget _harness() => const MaterialApp(
       localizationsDelegates: AppL10n.localizationsDelegates,
       supportedLocales: AppL10n.supportedLocales,
-      locale: const Locale('es', 'AR'),
-      home: const Scaffold(body: SizedBox.shrink()),
+      locale: Locale('es', 'AR'),
+      home: Scaffold(body: SizedBox.shrink()),
     );
 
 // ── Tests ──────────────────────────────────────────────────────────────────

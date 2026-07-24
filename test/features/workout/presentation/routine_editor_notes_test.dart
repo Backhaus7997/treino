@@ -7,7 +7,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -62,11 +61,6 @@ const _kDefaultSets = [
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-class _FakeAnalytics extends Fake implements AnalyticsService {
-  @override
-  Future<void> logEvent(String name, {Map<String, Object?>? parameters}) async {}
-}
 
 List<Override> _baseOverrides({
   RoutineRepository? repo,
@@ -304,7 +298,8 @@ void main() {
 
   group('TASK-2 — 200-char cap enforcement', () {
     // SCENARIO-806: cap enforced — text beyond 200 chars is rejected
-    test('SCENARIO-806: buildSlotBridge trims whitespace-only notes to null', () {
+    test('SCENARIO-806: buildSlotBridge trims whitespace-only notes to null',
+        () {
       // The cap is enforced by the TextFormField at input time.
       // At the bridge level we verify whitespace → null normalization.
       final slot = RoutineEditorTestBridge.buildSlotBridge(

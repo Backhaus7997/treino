@@ -469,7 +469,7 @@ void main() {
 
   group('AthleteDetailScreen — historial de sesiones (REQ-SETLOGS-010)', () {
     // Overrides shared by all history tests (profile + plans stay fixed).
-    List<Override> _base() => [
+    List<Override> base() => [
           currentUidProvider.overrideWithValue('trainer-1'),
           userPublicProfileProvider('athlete-1').overrideWith(
             (ref) => Stream.value(_makeProfile('athlete-1', 'Martín García')),
@@ -489,7 +489,7 @@ void main() {
         tester,
         athleteId: 'athlete-1',
         overrides: [
-          ..._base(),
+          ...base(),
           sessionsByUidProvider('athlete-1').overrideWith(
             (ref) async => [finished, abandoned],
           ),
@@ -519,7 +519,7 @@ void main() {
         tester,
         athleteId: 'athlete-1',
         overrides: [
-          ..._base(),
+          ...base(),
           sessionsByUidProvider('athlete-1').overrideWith(
             (ref) async => [finished],
           ),
@@ -548,7 +548,7 @@ void main() {
         tester,
         athleteId: 'athlete-1',
         overrides: [
-          ..._base(),
+          ...base(),
           sessionsByUidProvider('athlete-1').overrideWith(
             (ref) async => [finished],
           ),
@@ -582,7 +582,7 @@ void main() {
         tester,
         athleteId: 'athlete-1',
         overrides: [
-          ..._base(),
+          ...base(),
           sessionsByUidProvider('athlete-1').overrideWith(
             (ref) async => [finished],
           ),
@@ -611,7 +611,7 @@ void main() {
         tester,
         athleteId: 'athlete-1',
         overrides: [
-          ..._base(),
+          ...base(),
           sessionsByUidProvider('athlete-1').overrideWith(
             (ref) async => [finished],
           ),

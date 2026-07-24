@@ -15,7 +15,7 @@ import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach_hub/application/inactivos_provider.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
-    show finishedInWindowByUidProvider, FinishedInWindowKey;
+    show finishedInWindowByUidProvider;
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
 

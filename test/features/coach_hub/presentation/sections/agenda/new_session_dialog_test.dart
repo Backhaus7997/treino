@@ -27,7 +27,6 @@ import 'package:treino/l10n/app_l10n.dart';
 
 const _kTrainerId = 'trainer-uid-pr2';
 const _kAthleteId1 = 'athlete-uid-aa1';
-const _kAthleteId2 = 'athlete-uid-bb2';
 const _kAthleteIdPaused = 'athlete-uid-paused';
 
 // ─── Stub repository ─────────────────────────────────────────────────────────
