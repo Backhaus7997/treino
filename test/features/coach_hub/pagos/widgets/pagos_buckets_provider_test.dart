@@ -201,5 +201,65 @@ void main() {
       expect(buckets.porVencer, isEmpty);
       expect(buckets.todos.length, 5);
     });
+
+    // Regression (pulido-post-revision): trainerPaymentsProvider is a live
+    // Firestore StreamProvider. Riverpod 2.5+ preserves the previous emitted
+    // value inside a subsequent AsyncError (copyWithPrevious/"seamless") —
+    // `paymentsAsync.hasValue == true` AND `hasError == true` can both hold
+    // after a transient stream error. `whenData()`/`.map()` branch on the
+    // AsyncValue's RUNTIME SUBTYPE (ignoring `hasValue`), so on that compound
+    // state they hit the `error:` branch and explicitly return
+    // `hasValue: false` — DROPPING the already-computed buckets even though
+    // the upstream stream still had them cached. Locks in the hasValue-first
+    // fix (same defect class as the Chat pane, commit cdd41949).
+    test(
+        'SCENARIO-STALE — buckets persist through a transient stream error '
+        'when data was already loaded (stale-while-refresh)', () async {
+      final payment = _payment(
+        id: 'v1',
+        status: PaymentStatus.pending,
+        createdAt: _periodStart.subtract(const Duration(days: 1)),
+      );
+      final controller = StreamController<List<Payment>>();
+      addTearDown(controller.close);
+      final container = ProviderContainer(
+        overrides: [
+          trainerPaymentsProvider.overrideWith((ref) => controller.stream),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final sub = container.listen<AsyncValue<PagosBuckets>>(
+        pagosBucketsProvider,
+        (_, __) {},
+        fireImmediately: true,
+      );
+      addTearDown(sub.close);
+
+      controller.add([payment]);
+      await Future<void>.delayed(Duration.zero);
+
+      final afterData = container.read(pagosBucketsProvider);
+      expect(afterData.hasValue, isTrue);
+      expect(afterData.value!.vencidos.map((p) => p.id), contains('v1'));
+
+      controller.addError(Exception('transient stream hiccup'));
+      await Future<void>.delayed(Duration.zero);
+
+      final afterError = container.read(pagosBucketsProvider);
+      expect(
+        afterError.hasValue,
+        isTrue,
+        reason: 'a transient stream error must not blank cached buckets',
+      );
+      expect(afterError.value!.vencidos.map((p) => p.id), contains('v1'));
+
+      controller.add([payment]);
+      await Future<void>.delayed(Duration.zero);
+
+      final afterRecover = container.read(pagosBucketsProvider);
+      expect(afterRecover.hasValue, isTrue);
+      expect(afterRecover.value!.vencidos.map((p) => p.id), contains('v1'));
+    });
   });
 }
