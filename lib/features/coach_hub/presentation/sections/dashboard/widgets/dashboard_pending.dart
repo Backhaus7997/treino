@@ -64,14 +64,23 @@ class DashboardPendingSection extends ConsumerWidget {
 
   /// Discrimina el estado actual para [TreinoStateSwitcher] — necesita keys
   /// distintas por estado o el cross-fade no anima el cambio.
+  ///
+  /// hasValue-first (pulido-post-revision, mismo defecto que Chat, commit
+  /// cdd41949): `trainerLinksStreamProvider` es un `StreamProvider` en
+  /// vivo — Riverpod 2.5+ preserva el valor previo dentro de un
+  /// `AsyncError` subsiguiente (`copyWithPrevious`/"seamless"), así que
+  /// `linksAsync.hasValue == true` Y `hasError == true` pueden darse a la
+  /// vez tras un error transitorio del stream. Antes se chequeaba
+  /// `hasError` ANTES que `pending == null`, así que ese error transitorio
+  /// tapaba las solicitudes ya cargadas con el estado de error de pantalla
+  /// completa. Se chequea `pending` (derivado de `valueOrNull`) primero.
   String _stateKey(
     AsyncValue<List<TrainerLink>> linksAsync,
     List<TrainerLink>? pending,
   ) {
+    if (pending != null) return pending.isEmpty ? 'empty' : 'data';
     if (linksAsync.hasError) return 'error';
-    if (pending == null) return 'loading';
-    if (pending.isEmpty) return 'empty';
-    return 'data';
+    return 'loading';
   }
 }
 
@@ -113,15 +122,17 @@ class _PendingContent extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppL10n.of(context);
 
-    if (linksAsync.hasError) {
-      return _SectionError(
-        message: l10n.coachHubSectionLoadError,
-        onRetry: () => ref.invalidate(trainerLinksStreamProvider),
-      );
-    }
-
+    // hasValue-first: si ya hay `pending` (derivado de `valueOrNull`), se
+    // muestra siempre — el error de pantalla completa queda solo para el
+    // primer load sin datos todavía. Ver doc de `_stateKey` arriba.
     final list = pending;
     if (list == null) {
+      if (linksAsync.hasError) {
+        return _SectionError(
+          message: l10n.coachHubSectionLoadError,
+          onRetry: () => ref.invalidate(trainerLinksStreamProvider),
+        );
+      }
       // Loading: columna de TreinoListRow skeleton (shimmer del kit).
       return const Column(
         children: [

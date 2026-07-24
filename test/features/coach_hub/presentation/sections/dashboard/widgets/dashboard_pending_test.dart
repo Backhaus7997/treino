@@ -190,6 +190,64 @@ void main() {
     });
   });
 
+  group(
+      'SCENARIO-STALE — pendientes persisten ante error transitorio '
+      '(pulido-post-revision)', () {
+    // Regression: trainerLinksStreamProvider es un StreamProvider en vivo.
+    // Riverpod 2.5+ preserva el valor previo dentro de un AsyncError
+    // subsiguiente (copyWithPrevious/"seamless") — hasValue==true Y
+    // hasError==true pueden darse a la vez tras un hiccup transitorio del
+    // stream. _stateKey/_PendingContent chequeaban hasError ANTES que
+    // pending==null, así que un error transitorio con data ya cargada
+    // tapaba las solicitudes pendientes con el estado de error de pantalla
+    // completa. Fix: precedencia hasValue-first (mismo patrón que Chat,
+    // commit cdd41949).
+    testWidgets(
+        'solicitud ya cargada no desaparece tras un error transitorio del '
+        'stream (stale-while-refresh)', (tester) async {
+      final controller = StreamController<List<TrainerLink>>();
+      addTearDown(controller.close);
+
+      final container = ProviderContainer(overrides: [
+        trainerLinksStreamProvider.overrideWith((ref) => controller.stream),
+        userPublicProfileProvider('a1').overrideWith(
+          (ref) => Stream.value(_pub('a1', 'Ana')),
+        ),
+      ]);
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: AppTheme.dark(),
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('es', 'AR'),
+            home: const Scaffold(body: DashboardPendingSection()),
+          ),
+        ),
+      );
+
+      controller.add([_link(id: 'r1', athleteId: 'a1')]);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('pending_request_r1')), findsOneWidget);
+
+      controller.addError(Exception('transient stream hiccup'));
+      await tester.pumpAndSettle();
+
+      final l10n = AppL10n.of(tester.element(find.byType(Scaffold)));
+      expect(
+        find.byKey(const Key('pending_request_r1')),
+        findsOneWidget,
+        reason: 'un error transitorio con data ya cargada no debe tapar '
+            'la solicitud pendiente',
+      );
+      expect(find.text(l10n.coachHubSectionLoadError), findsNothing);
+    });
+  });
+
   group('SCENARIO-PEND-05 — accept/decline llaman al repo real', () {
     late FakeFirebaseFirestore firestore;
     late TrainerLinkRepository repo;
