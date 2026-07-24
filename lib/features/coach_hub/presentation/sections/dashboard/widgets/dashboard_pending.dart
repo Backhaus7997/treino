@@ -18,6 +18,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/app/theme/tokens/components/treino_card_tokens.dart';
 import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
@@ -25,10 +26,7 @@ import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
-import 'package:treino/features/coach_hub/presentation/widgets/empty_state/empty_state.dart';
-import 'package:treino/features/coach_hub/presentation/widgets/list_row/list_row.dart';
-import 'package:treino/features/coach_hub/presentation/widgets/section_header/section_header.dart';
-import 'package:treino/features/feed/presentation/widgets/post_avatar.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
@@ -46,19 +44,21 @@ class DashboardPendingSection extends ConsumerWidget {
         ?.where((l) => l.status == TrainerLinkStatus.pending)
         .toList();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        TreinoSectionHeader(
-          title: 'Pendientes de HOY',
-          count: pending?.length,
-        ),
-        const SizedBox(height: AppSpacing.s12),
-        TreinoStateSwitcher(
-          childKey: ValueKey(_stateKey(linksAsync, pending)),
-          child: _PendingContent(linksAsync: linksAsync, pending: pending),
-        ),
-      ],
+    return _SectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TreinoSectionHeader(
+            title: 'Pendientes de HOY',
+            count: pending?.length,
+          ),
+          const SizedBox(height: AppSpacing.s12),
+          TreinoStateSwitcher(
+            childKey: ValueKey(_stateKey(linksAsync, pending)),
+            child: _PendingContent(linksAsync: linksAsync, pending: pending),
+          ),
+        ],
+      ),
     );
   }
 
@@ -72,6 +72,33 @@ class DashboardPendingSection extends ConsumerWidget {
     if (pending == null) return 'loading';
     if (pending.isEmpty) return 'empty';
     return 'data';
+  }
+}
+
+// ─── Card wrapper (cards flotantes, revisión) ───────────────────────────────
+
+/// Card flotante compartida — mismo contrato visual que `_SectionCard` de
+/// `dashboard_right_column.dart` (TreinoCardTokens: bgCard + borde + radio
+/// md). Duplicada localmente en vez de extraída a un widget compartido, igual
+/// criterio que `_SectionError` en este mismo archivo (ver comentario arriba)
+/// — Pendientes antes no tenía superficie propia (header + filas pegados
+/// directo al fondo, "borde a borde"), quedaba visualmente desalineado de
+/// las 3 cards de la columna derecha.
+class _SectionCard extends StatelessWidget {
+  const _SectionCard({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.s18),
+      decoration: BoxDecoration(
+        color: TreinoCardTokens.background(context),
+        borderRadius: BorderRadius.circular(TreinoCardTokens.borderRadius),
+        border: Border.all(color: TreinoCardTokens.border(context)),
+      ),
+      child: child,
+    );
   }
 }
 
@@ -239,8 +266,8 @@ class _PendingRequestTileState extends ConsumerState<_PendingRequestTile> {
         vertical: AppSpacing.s12,
       ),
       decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(AppRadius.md),
+        color: TreinoCardTokens.background(context),
+        borderRadius: BorderRadius.circular(TreinoCardTokens.borderRadius),
         border: Border.all(color: palette.highlight.withValues(alpha: 0.4)),
       ),
       child: Row(
@@ -248,10 +275,11 @@ class _PendingRequestTileState extends ConsumerState<_PendingRequestTile> {
           Semantics(
             image: true,
             label: l10n.a11yAvatarLabel(name),
-            child: PostAvatar(
-              authorDisplayName: name,
-              authorAvatarUrl: avatar,
-              size: 40,
+            child: TreinoAvatar(
+              displayName: name,
+              avatarUrl: avatar,
+              diameter: 40,
+              initialFontSize: 15,
             ),
           ),
           const SizedBox(width: AppSpacing.s12),
