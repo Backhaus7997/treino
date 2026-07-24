@@ -77,15 +77,20 @@ List<PersonalRecord> derivePersonalRecords(
 /// [sessionsDesc] sessions ordered DESC by startedAt (most-recent first),
 ///                already bounded to the last 60 (caller's responsibility).
 /// [logsBySession] map from sessionId → list of SetLogs for that session.
-/// [now]          injectable reference time for the 8-week Frecuencia window.
+/// [now]          injectable reference time for the legacy 8-week Frecuencia
+///                window (only used when [periodWindow] is null).
 /// [periodWindow] [AD7] optional current-period window (see [ChartPeriod]).
 ///                When non-null, sessions with `startedAt` outside
 ///                `[currentStart, currentEnd]` (inclusive, by calendar day)
-///                are excluded from all 4 series. When null (default), ALL
-///                scanned sessions are included — backward-compatible with
-///                callers that don't yet select a period.
-///                [frequencyLast8Weeks] is NEVER affected by this filter —
-///                it is an independent `now`-relative 56-day stat.
+///                are excluded from all 4 series AND from
+///                [frequencySessionCount] (#555 — the Frecuencia stat used
+///                to be a fixed `now`-relative 56-day count regardless of
+///                the selector, so "3 sesiones en las últimas 8 semanas"
+///                could coexist with a 1-point chart + "necesitás al menos
+///                2 sesiones" for the active period). When null (default),
+///                ALL scanned sessions are included and Frecuencia keeps
+///                the legacy 56-day window — backward-compatible with
+///                callers that don't select a period.
 ///
 /// [AD3] Returns [ExerciseProgression] with 4 distinct client-computed
 /// series (all ASC by startedAt):
@@ -105,8 +110,9 @@ List<PersonalRecord> derivePersonalRecords(
 ///   all-reps<=0 sessions drop out of the 1RM series.
 ///   - [ExerciseProgression.personalRecords]: first-achieved-date record per
 ///     series that has data, via [derivePersonalRecords].
-///   - [ExerciseProgression.frequencyLast8Weeks]: count of sessions within
-///     the last 56 days that have ≥1 set for [exerciseId]. Uses
+///   - [ExerciseProgression.frequencySessionCount]: count of sessions with
+///     ≥1 set for [exerciseId] inside [periodWindow]'s current window (or,
+///     legacy, the last 56 days when no window is given). Uses
 ///     [Session.startedAt], NEVER weekNumber.
 ExerciseProgression aggregateExerciseProgression({
   required String exerciseId,
@@ -124,15 +130,16 @@ ExerciseProgression aggregateExerciseProgression({
 
   // Reverse DESC→ASC once — traverse in ascending date order for output.
   // [AD7] `sessionsAsc` is what the 4 metric series iterate over (subject to
-  // periodWindow filtering below). `frecuencia` deliberately uses this
-  // UNFILTERED list separately — Frecuencia is an independent "last 8 weeks"
-  // stat, not scoped to the display period selector.
+  // periodWindow filtering below). `frecuencia` traverses the UNFILTERED
+  // list separately and resolves its own window per session (#555: the
+  // active period's when a periodWindow is given, the legacy 56 days when
+  // not) — see the frecuencia loop below.
   // #372: exclude sessions that don't count as a completed workout (abandoned
   // `wasFullyCompleted=false` / in-progress `active`) BEFORE deriving anything —
-  // both the 4 metric series AND the independent frecuencia-8-weeks stat must
-  // ignore them, matching the criterion the other Insights screens use. Without
-  // this an abandoned session's sets inflated progression/PRs while the same
-  // session was absent from the radar/monthly report.
+  // both the 4 metric series AND the frecuencia stat must ignore them,
+  // matching the criterion the other Insights screens use. Without this an
+  // abandoned session's sets inflated progression/PRs while the same session
+  // was absent from the radar/monthly report.
   final countsSessionsDesc =
       sessionsDesc.where((s) => s.countsAsWorkout).toList();
   final sessionsAscUnfiltered = countsSessionsDesc.reversed.toList();
@@ -218,15 +225,21 @@ ExerciseProgression aggregateExerciseProgression({
     }
   }
 
-  // [AD7] Frecuencia: count sessions with startedAt >= cutoff (inclusive
-  // lower bound), matching [exerciseId]'s logs — computed over the
-  // UNFILTERED session list, independent of periodWindow (see comment above
-  // `sessionsAscUnfiltered`).
+  // [AD7]/[#555] Frecuencia: count sessions matching [exerciseId]'s logs
+  // inside the ACTIVE period window when one is given — the stat renders
+  // right above a period selector, so it must answer for the same window the
+  // chart draws (the old fixed 8-week count contradicted the period-scoped
+  // single-point hint). Without a periodWindow, keep the legacy 56-day
+  // cutoff (inclusive lower bound). Weight-agnostic on purpose: a session
+  // whose sets are all bodyweight still counts as having trained.
   for (final session in sessionsAscUnfiltered) {
     final logs = logsBySession[session.id] ?? const [];
     final hasExerciseLog = logs.any((l) => l.exerciseId == exerciseId);
     if (!hasExerciseLog) continue;
-    if (!toArgentina(session.startedAt).isBefore(cutoff)) {
+    final inFrequencyWindow = periodWindow != null
+        ? sessionInCurrentWindow(session, periodWindow)
+        : !toArgentina(session.startedAt).isBefore(cutoff);
+    if (inFrequencyWindow) {
       frecuencia++;
     }
   }
@@ -250,6 +263,6 @@ ExerciseProgression aggregateExerciseProgression({
     bestSetVolumeSeries: bestSetVolumePoints,
     bestSessionVolumeSeries: bestSessionVolumePoints,
     personalRecords: personalRecords,
-    frequencyLast8Weeks: frecuencia,
+    frequencySessionCount: frecuencia,
   );
 }

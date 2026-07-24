@@ -20,6 +20,7 @@ WeeklyInsights _makeInsights({
   int streak = 5,
   int monthSessionsCount = 12,
   List<bool>? daysTrained,
+  bool hasEverCompletedAnyWorkout = false,
 }) {
   final start = DateTime(2026, 5, 18); // Monday
   return WeeklyInsights(
@@ -34,6 +35,7 @@ WeeklyInsights _makeInsights({
     targetByGroup: const {},
     streak: streak,
     monthSessionsCount: monthSessionsCount,
+    hasEverCompletedAnyWorkout: hasEverCompletedAnyWorkout,
   );
 }
 
@@ -424,5 +426,134 @@ void main() {
 
       expect(navigated, '/workout');
     });
+
+    // ── #551: semana en 0 CON historial ≠ cuenta nueva ────────────────────────
+
+    testWidgets(
+      '#551: semana en 0 con historial → copy de retomar, no de onboarding',
+      (tester) async {
+        await tester.pumpWidget(
+          _wrapCard(
+            overrides: [
+              weeklyInsightsProvider.overrideWith(
+                (_) async => _makeInsights(
+                  sessionsCount: 0,
+                  streak: 0,
+                  monthSessionsCount: 0,
+                  hasEverCompletedAnyWorkout: true,
+                ),
+              ),
+            ],
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 50));
+
+        // Pill de retomar, no de primer paso.
+        expect(find.text('A RETOMAR'), findsOneWidget);
+        expect(find.text('PRIMER PASO'), findsNothing);
+        // Titular + copy de retomar — nada de "Hacé el primero".
+        expect(find.text('TU RACHA\nTE ESPERA'), findsOneWidget);
+        expect(find.textContaining('retomá hoy'), findsOneWidget);
+        expect(find.textContaining('Hacé el primero'), findsNothing);
+        // CTA propio.
+        expect(find.text('VOLVER A ENTRENAR  →'), findsOneWidget);
+        expect(find.text('EXPLORAR RUTINAS  →'), findsNothing);
+      },
+    );
+
+    testWidgets('#551: cuenta nueva (0 totales) sigue viendo onboarding', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrapCard(
+          overrides: [
+            weeklyInsightsProvider.overrideWith(
+              (_) async => _makeInsights(
+                sessionsCount: 0,
+                streak: 0,
+                monthSessionsCount: 0,
+                hasEverCompletedAnyWorkout: false,
+              ),
+            ),
+          ],
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.text('PRIMER PASO'), findsOneWidget);
+      expect(find.text('A RETOMAR'), findsNothing);
+      expect(find.text('TU RACHA\nEMPIEZA ACÁ'), findsOneWidget);
+      expect(find.text('EXPLORAR RUTINAS  →'), findsOneWidget);
+    });
+
+    testWidgets('#551: tap VOLVER A ENTRENAR navega a /workout', (
+      tester,
+    ) async {
+      String? navigated;
+      final router = GoRouter(
+        routes: [
+          GoRoute(
+            path: '/',
+            builder: (_, __) => const Scaffold(
+              body: SingleChildScrollView(child: EstaSemanaCard()),
+            ),
+          ),
+          GoRoute(
+            path: '/workout',
+            builder: (_, __) {
+              navigated = '/workout';
+              return const Scaffold(body: Text('Workout'));
+            },
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        _wrapCard(
+          overrides: [
+            weeklyInsightsProvider.overrideWith(
+              (_) async => _makeInsights(
+                sessionsCount: 0,
+                streak: 0,
+                monthSessionsCount: 0,
+                hasEverCompletedAnyWorkout: true,
+              ),
+            ),
+          ],
+          router: router,
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      await tester.tap(find.text('VOLVER A ENTRENAR  →'));
+      await tester.pumpAndSettle();
+
+      expect(navigated, '/workout');
+    });
+
+    testWidgets(
+      '#551: semana con sesiones muestra data aunque el DTO diga '
+      'hasEverCompletedAnyWorkout=false (sessionsCount manda)',
+      (tester) async {
+        await tester.pumpWidget(
+          _wrapCard(
+            overrides: [
+              weeklyInsightsProvider.overrideWith(
+                (_) async => _makeInsights(sessionsCount: 2),
+              ),
+            ],
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 50));
+
+        expect(find.text('RACHA ACTUAL'), findsOneWidget);
+        expect(find.text('PRIMER PASO'), findsNothing);
+        expect(find.text('A RETOMAR'), findsNothing);
+      },
+    );
   });
 }

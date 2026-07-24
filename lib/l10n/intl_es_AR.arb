@@ -59,6 +59,14 @@
   "@homeEstaSemanaEmptyBody": {"description": "Home 'Esta Semana' card empty-state body copy encouraging the first workout."},
   "homeEstaSemanaEmptyCta": "EXPLORAR RUTINAS  →",
   "@homeEstaSemanaEmptyCta": {"description": "Home 'Esta Semana' card empty-state CTA button navigating to routines."},
+  "homeEstaSemanaHeaderPillResume": "A RETOMAR",
+  "@homeEstaSemanaHeaderPillResume": {"description": "Home 'Esta Semana' card header pill label when the athlete has history but zero sessions this week (#551)."},
+  "homeEstaSemanaResumeTitle": "TU RACHA\nTE ESPERA",
+  "@homeEstaSemanaResumeTitle": {"description": "Home 'Esta Semana' card resume-state title for an athlete with past sessions but none this week."},
+  "homeEstaSemanaResumeBody": "Ya tenés historial construido. Esta semana todavía está en cero — retomá hoy y seguí sumando progreso.",
+  "@homeEstaSemanaResumeBody": {"description": "Home 'Esta Semana' card resume-state body copy encouraging a returning athlete to train again."},
+  "homeEstaSemanaResumeCta": "VOLVER A ENTRENAR  →",
+  "@homeEstaSemanaResumeCta": {"description": "Home 'Esta Semana' card resume-state CTA button navigating to routines."},
   "@@locale": "es_AR",
   "authSplashTagline": "ENTRENÁ. COMPARTÍ. CRECÉ.",
   "authWelcomeEyebrow": "ENTRENAMIENTO · GYM · COACH",
@@ -1744,6 +1752,15 @@
   "progressionFrequency": "{count, plural, =0{Sin sesiones en las últimas 8 semanas} =1{1 sesión en las últimas 8 semanas} other{{count} sesiones en las últimas 8 semanas}}",
   "@progressionFrequency": {
     "description": "Frecuencia stat label showing session count in the last 8 weeks.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "progressionFrequencyPeriod": "{count, plural, =0{Sin sesiones en este período} =1{1 sesión en este período} other{{count} sesiones en este período}}",
+  "@progressionFrequencyPeriod": {
+    "description": "Frecuencia stat label scoped to the active chart period selected in the period selector (#555).",
     "placeholders": {
       "count": {
         "type": "int"

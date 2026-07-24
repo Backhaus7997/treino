@@ -43,6 +43,10 @@
   "homeEstaSemanaEmptyTitle": "TU RACHA\nEMPIEZA AQUÍ",
   "homeEstaSemanaEmptyBody": "Cada entrenamiento alimenta tu racha. Haz el primero y empieza a construir tu progreso.",
   "homeEstaSemanaEmptyCta": "EXPLORAR RUTINAS  →",
+  "homeEstaSemanaHeaderPillResume": "A RETOMAR",
+  "homeEstaSemanaResumeTitle": "TU RACHA\nTE ESPERA",
+  "homeEstaSemanaResumeBody": "Ya tienes historial construido. Esta semana aún está en cero — retoma hoy y sigue sumando progreso.",
+  "homeEstaSemanaResumeCta": "VOLVER A ENTRENAR  →",
   "@@locale": "es",
   "@@x-note": "Copia defensiva de intl_es_AR.arb (decisión Q3 del audit). El locale real lo fija locale_resolver.dart → es-AR; esto es seguro de muerte: si algún día se quita ese lock, plain-`es` muestra español válido en vez de strings vacíos.",
   "authSplashTagline": "ENTRENÁ. COMPARTÍ. CRECÉ.",
@@ -494,6 +498,14 @@
   "progressionMetricVolume": "Volumen",
   "progressionFrequency": "{count, plural, =0{Sin sesiones en las últimas 8 semanas} =1{1 sesión en las últimas 8 semanas} other{{count} sesiones en las últimas 8 semanas}}",
   "@progressionFrequency": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "progressionFrequencyPeriod": "{count, plural, =0{Sin sesiones en este período} =1{1 sesión en este período} other{{count} sesiones en este período}}",
+  "@progressionFrequencyPeriod": {
     "placeholders": {
       "count": {
         "type": "int"

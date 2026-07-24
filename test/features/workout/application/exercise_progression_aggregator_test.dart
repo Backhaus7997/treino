@@ -248,7 +248,7 @@ void main() {
       expect(
           result.heaviestWeightSeries.every((p) => p.value != 200.0), isTrue);
       // frecuencia-8-weeks counts only the completed session.
-      expect(result.frequencyLast8Weeks, 1);
+      expect(result.frequencySessionCount, 1);
     });
 
     // #368 — bodyweight sets (player logs them with weightKg = 0) must not
@@ -289,7 +289,7 @@ void main() {
       expect(result.personalRecords, isEmpty);
       // The workouts still happened: frecuencia and the resolved name are
       // weight-agnostic.
-      expect(result.frequencyLast8Weeks, 2);
+      expect(result.frequencySessionCount, 2);
       expect(result.exerciseName, 'Dominadas');
     });
 
@@ -381,7 +381,7 @@ void main() {
         sWeighted.startedAt.toLocal(),
       );
       // The 0kg session still counts for frecuencia.
-      expect(result.frequencyLast8Weeks, 2);
+      expect(result.frequencySessionCount, 2);
     });
 
     // T2 — Best Session Volume series (renamed from volumeSeries)
@@ -514,7 +514,7 @@ void main() {
         logsBySession: _logsBySession,
         now: now,
       );
-      expect(result.frequencyLast8Weeks, 2); // s1 and s2 have squat sets
+      expect(result.frequencySessionCount, 2); // s1 and s2 have squat sets
     });
 
     test('SCENARIO-PROG-03A-outside: session older than 56 days excluded', () {
@@ -525,7 +525,7 @@ void main() {
         logsBySession: _logsBySession,
         now: now,
       );
-      expect(result.frequencyLast8Weeks, 1); // only s2
+      expect(result.frequencySessionCount, 1); // only s2
     });
 
     test(
@@ -558,7 +558,7 @@ void main() {
         logsBySession: logs,
         now: now,
       );
-      expect(result.frequencyLast8Weeks, 1); // inclusive lower bound
+      expect(result.frequencySessionCount, 1); // inclusive lower bound
     });
 
     // T5 — Filter + empty key
@@ -574,7 +574,7 @@ void main() {
       expect(result.bestSetVolumeSeries, isEmpty);
       expect(result.bestSessionVolumeSeries, isEmpty);
       expect(result.personalRecords, isEmpty);
-      expect(result.frequencyLast8Weeks, 0);
+      expect(result.frequencySessionCount, 0);
     });
 
     // T5 — exerciseName from SetLog
@@ -598,7 +598,7 @@ void main() {
         logsBySession: _logsBySession,
         now: now,
       );
-      expect(result.frequencyLast8Weeks, 2);
+      expect(result.frequencySessionCount, 2);
     });
 
     test(
@@ -615,7 +615,7 @@ void main() {
       expect(result.bestSetVolumeSeries, isEmpty);
       expect(result.bestSessionVolumeSeries, isEmpty);
       expect(result.personalRecords, isEmpty);
-      expect(result.frequencyLast8Weeks, 0);
+      expect(result.frequencySessionCount, 0);
     });
 
     // AD3 — derivePersonalRecords is wired into the aggregator's output.
@@ -827,34 +827,88 @@ void main() {
       expect(result.heaviestWeightSeries.length, 2);
     });
 
-    test(
-        'frequencyLast8Weeks is unaffected by periodWindow (still uses the '
-        '56-day `now`-relative cutoff, not the period window)', () {
+    // [#555] Frecuencia follows the ACTIVE period window when one is given.
+    // The old behavior (fixed 56-day count regardless of the selector) let
+    // "3 sesiones en las últimas 8 semanas" coexist with a 1-point chart and
+    // "necesitás al menos 2 sesiones" for the same exercise — both true,
+    // reading as a contradiction. UTC-noon fixtures per the #379 convention.
+    test('#555: frequencySessionCount is scoped to periodWindow when provided',
+        () {
+      final sA = _session('sA', DateTime.utc(2025, 1, 5, 12)); // ART day Jan 5
+      final sB =
+          _session('sB', DateTime.utc(2025, 1, 10, 12)); // ART day Jan 10
+      final logs = <String, List<SetLog>>{
+        'sA': [
+          _log(
+              sessionId: 'sA',
+              exerciseId: 'squat',
+              exerciseName: 'S',
+              reps: 5,
+              weightKg: 80)
+        ],
+        'sB': [
+          _log(
+              sessionId: 'sB',
+              exerciseId: 'squat',
+              exerciseName: 'S',
+              reps: 5,
+              weightKg: 85)
+        ],
+      };
+      // Window Jan 8..20 → only sB falls inside.
       final window = ChartPeriodWindow(
-        currentStart: DateTime(2025, 1, 8),
-        currentEnd: DateTime(2025, 1, 20),
-        previousStart: DateTime(2024, 12, 1),
-        previousEnd: DateTime(2025, 1, 7),
+        currentStart: DateTime.utc(2025, 1, 8),
+        currentEnd: DateTime.utc(2025, 1, 20),
+        previousStart: DateTime.utc(2024, 12, 1),
+        previousEnd: DateTime.utc(2025, 1, 7),
       );
 
       final withWindow = aggregateExerciseProgression(
         exerciseId: 'squat',
-        sessionsDesc: _sessionsDesc,
-        logsBySession: _logsBySession,
-        now: DateTime(2025, 1, 20),
+        sessionsDesc: [sB, sA],
+        logsBySession: logs,
+        now: DateTime.utc(2025, 1, 20, 12),
         periodWindow: window,
       );
+
+      // Only sB is inside the active window — sA trained the exercise but
+      // outside the period, so the stat must not count it (#555).
+      expect(withWindow.frequencySessionCount, 1);
+    });
+
+    test(
+        '#555: without a periodWindow the legacy 56-day cutoff still applies '
+        '(backward compat)', () {
+      final sA = _session('sA', DateTime.utc(2025, 1, 5, 12));
+      final sB = _session('sB', DateTime.utc(2025, 1, 10, 12));
+      final logs = <String, List<SetLog>>{
+        'sA': [
+          _log(
+              sessionId: 'sA',
+              exerciseId: 'squat',
+              exerciseName: 'S',
+              reps: 5,
+              weightKg: 80)
+        ],
+        'sB': [
+          _log(
+              sessionId: 'sB',
+              exerciseId: 'squat',
+              exerciseName: 'S',
+              reps: 5,
+              weightKg: 85)
+        ],
+      };
+
       final withoutWindow = aggregateExerciseProgression(
         exerciseId: 'squat',
-        sessionsDesc: _sessionsDesc,
-        logsBySession: _logsBySession,
-        now: DateTime(2025, 1, 20),
+        sessionsDesc: [sB, sA],
+        logsBySession: logs,
+        now: DateTime.utc(2025, 1, 20, 12),
       );
 
-      // Frecuencia counts sessions regardless of the display period window —
-      // it is an independent "last 8 weeks" stat, not filtered by the chart
-      // period selector.
-      expect(withWindow.frequencyLast8Weeks, withoutWindow.frequencyLast8Weeks);
+      // Both sessions are inside the 56-day legacy window.
+      expect(withoutWindow.frequencySessionCount, 2);
     });
   });
 }

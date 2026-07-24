@@ -82,7 +82,10 @@ class ExerciseProgressionScreen extends ConsumerWidget {
                     bestSessionVolumeLabel: l10n.progressionMetricVolume,
                     volumeUnit: 'kg·reps',
                     weightUnit: 'kg',
-                    frequencyLabel: (n) => l10n.progressionFrequency(n),
+                    // #555: el count viene acotado al período activo del
+                    // selector — el label habla de esa misma ventana, no de
+                    // "las últimas 8 semanas".
+                    frequencyLabel: (n) => l10n.progressionFrequencyPeriod(n),
                     singlePointHint: l10n.progressionSinglePointHint,
                     emptyHint: l10n.progressionEmptyExercise,
                   ),

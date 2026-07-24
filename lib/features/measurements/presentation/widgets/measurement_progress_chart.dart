@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/utils/chart_point_index.dart';
 import '../../../../core/utils/date_labels.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../domain/measurement.dart';
@@ -526,9 +527,14 @@ class _ProgressLineChart extends StatelessWidget {
               sideTitles: SideTitles(
                 showTitles: true,
                 reservedSize: 28,
+                // El eje X es índice-de-punto: sin interval fijo, fl_chart
+                // samplea Xs fraccionarias y value.round() duplica/saltea
+                // etiquetas de fecha (#554 — mismo defecto que #383 en el
+                // chart de progresión). Ver chart_point_index.dart.
+                interval: 1,
                 getTitlesWidget: (value, meta) {
-                  final idx = value.round();
-                  if (!labelIndices.contains(idx)) {
+                  final idx = exactPointIndex(value);
+                  if (idx == null || !labelIndices.contains(idx)) {
                     return const SizedBox.shrink();
                   }
                   final date = indexToDate[idx];

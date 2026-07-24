@@ -1793,9 +1793,10 @@ class _ProgressionTabSectionState extends State<_ProgressionTabSection> {
               bestSessionVolumeLabel: 'Volumen', // i18n: Fase W2
               volumeUnit: 'kg·reps', // i18n: Fase W2
               weightUnit: 'kg', // i18n: Fase W2
+              // #555: el count viene acotado al período activo del selector.
               frequencyLabel: (n) => n == 1
-                  ? '1 sesión en las últimas 8 semanas' // i18n: Fase W2
-                  : '$n sesiones en las últimas 8 semanas', // i18n: Fase W2
+                  ? '1 sesión en este período' // i18n: Fase W2
+                  : '$n sesiones en este período', // i18n: Fase W2
               singlePointHint:
                   'Necesitás al menos 2 sesiones para ver la evolución.', // i18n: Fase W2
               emptyHint:

@@ -95,6 +95,19 @@ class AppL10nEs extends AppL10n {
   String get homeEstaSemanaEmptyCta => 'EXPLORAR RUTINAS  →';
 
   @override
+  String get homeEstaSemanaHeaderPillResume => 'A RETOMAR';
+
+  @override
+  String get homeEstaSemanaResumeTitle => 'TU RACHA\nTE ESPERA';
+
+  @override
+  String get homeEstaSemanaResumeBody =>
+      'Ya tienes historial construido. Esta semana aún está en cero — retoma hoy y sigue sumando progreso.';
+
+  @override
+  String get homeEstaSemanaResumeCta => 'VOLVER A ENTRENAR  →';
+
+  @override
   String get authSplashTagline => 'ENTRENÁ. COMPARTÍ. CRECÉ.';
 
   @override
@@ -2377,6 +2390,18 @@ class AppL10nEs extends AppL10n {
   }
 
   @override
+  String progressionFrequencyPeriod(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sesiones en este período',
+      one: '1 sesión en este período',
+      zero: 'Sin sesiones en este período',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get progressionSinglePointHint =>
       'Necesitas al menos 2 sesiones para ver la evolución.';
 
@@ -2554,10 +2579,7 @@ class AppL10nEs extends AppL10n {
 
   @override
   String dashboardAlertBannerSummary(
-    int vencidos,
-    int solicitudes,
-    int inactivos,
-  ) {
+      int vencidos, int solicitudes, int inactivos) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,
@@ -3105,6 +3127,19 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get homeEstaSemanaEmptyCta => 'EXPLORAR RUTINAS  →';
+
+  @override
+  String get homeEstaSemanaHeaderPillResume => 'A RETOMAR';
+
+  @override
+  String get homeEstaSemanaResumeTitle => 'TU RACHA\nTE ESPERA';
+
+  @override
+  String get homeEstaSemanaResumeBody =>
+      'Ya tenés historial construido. Esta semana todavía está en cero — retomá hoy y seguí sumando progreso.';
+
+  @override
+  String get homeEstaSemanaResumeCta => 'VOLVER A ENTRENAR  →';
 
   @override
   String get authSplashTagline => 'ENTRENÁ. COMPARTÍ. CRECÉ.';
@@ -5387,6 +5422,18 @@ class AppL10nEsAr extends AppL10nEs {
   }
 
   @override
+  String progressionFrequencyPeriod(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sesiones en este período',
+      one: '1 sesión en este período',
+      zero: 'Sin sesiones en este período',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get progressionSinglePointHint =>
       'Necesitás al menos 2 sesiones para ver la evolución.';
 
@@ -5564,10 +5611,7 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String dashboardAlertBannerSummary(
-    int vencidos,
-    int solicitudes,
-    int inactivos,
-  ) {
+      int vencidos, int solicitudes, int inactivos) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,
