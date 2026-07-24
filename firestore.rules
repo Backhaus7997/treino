@@ -438,11 +438,12 @@ service cloud.firestore {
     }
 
     // Public identity documents — one per user, public-readable by any
-    // authenticated user, writable only by the owner. Contains ONLY the 15
+    // authenticated user, writable only by the owner. Contains ONLY the
     // known fields (uid, displayName, displayNameLowercase, avatarUrl,
-    // gymId, gymName, workoutsCount, racha, followersCount, followingCount,
-    // sharedTemplatesWithAthletes, rankingOptIn, lifetimeVolumeKg,
-    // bestSquatKg, bestBenchKg, bestDeadliftKg).
+    // gymId, gymName, workoutsCount, racha, rachaUpdatedAt, followersCount,
+    // followingCount, sharedTemplatesWithAthletes, rankingOptIn,
+    // isProfilePublic, lifetimeVolumeKg, bestSquatKg, bestBenchKg,
+    // bestDeadliftKg).
     // REQ-UPP-014, REQ-UPP-015. GAP-1, GAP-2, GAP-3 from design Section C.
     //
     // rankings-integrity Phase 2 (PR#2) hardening — AD-3, AD-4, AD-6, AD-8:
@@ -503,6 +504,7 @@ service cloud.firestore {
                          'racha', 'rachaUpdatedAt', 'followersCount',
                          'followingCount',
                          'sharedTemplatesWithAthletes', 'rankingOptIn',
+                         'isProfilePublic',
                          'lifetimeVolumeKg', 'bestSquatKg', 'bestBenchKg',
                          'bestDeadliftKg'
                        ])
@@ -511,6 +513,12 @@ service cloud.firestore {
                     // timestamp) — timestamp when present.
                     && (!('rachaUpdatedAt' in request.resource.data)
                         || request.resource.data.rachaUpdatedAt is timestamp)
+                    // #563: Instagram-style privacy flag, flipped by
+                    // UserPublicProfileRepository.setProfilePublic — bool
+                    // when present. Docs without the field read as public
+                    // (`.get('isProfilePublic', true)` in friendships).
+                    && (!('isProfilePublic' in request.resource.data)
+                        || request.resource.data.isProfilePublic is bool)
                     && (!('gymId' in request.resource.data)
                         || request.resource.data.gymId
                            == getAfter(/databases/$(database)/documents/users/$(uid)).data.gymId)
@@ -542,6 +550,7 @@ service cloud.firestore {
                          'racha', 'rachaUpdatedAt', 'followersCount',
                          'followingCount',
                          'sharedTemplatesWithAthletes', 'rankingOptIn',
+                         'isProfilePublic',
                          'lifetimeVolumeKg', 'bestSquatKg', 'bestBenchKg',
                          'bestDeadliftKg'
                        ])
@@ -550,6 +559,10 @@ service cloud.firestore {
                     // UserPublicProfileRepository.updateCounters).
                     && (!('rachaUpdatedAt' in request.resource.data)
                         || request.resource.data.rachaUpdatedAt is timestamp)
+                    // #563: Instagram-style privacy flag — bool when
+                    // present. See the create-branch comment above.
+                    && (!('isProfilePublic' in request.resource.data)
+                        || request.resource.data.isProfilePublic is bool)
                     // gymId Integrity (AD-4): when the write touches gymId,
                     // it must equal the athlete's own private gymId.
                     // getAfter(), not get() — see the create-branch comment
