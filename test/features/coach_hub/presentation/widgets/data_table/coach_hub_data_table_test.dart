@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/app/theme/tokens/components/treino_table_tokens.dart';
 import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/data_table/coach_hub_data_table.dart';
@@ -251,6 +252,137 @@ void main() {
       final hoverColor = decorationColor();
       expect(hoverColor, isNot(equals(normalColor)),
           reason: 'el color de fondo debe cambiar realmente en hover');
+    });
+
+    // -------------------------------------------------------------------------
+    // Hover fila ALTERNADA (zebra-striping): el tint de hover debe
+    // COMPONERSE sobre el fondo real de la fila (alt u opaco), no
+    // reemplazarlo por un valor absoluto — root cause real del bug
+    // reportado en revisión en vivo: `rowHoverBackground` (accent @ 6%
+    // sobre `rowBackground`) es un color CASI IDÉNTICO a `rowAltBackground`
+    // en el tema dark (delta de 2-3 por canal, imperceptible), así que en
+    // cada fila impar (2da, 4ta, ...) el hover se ve "apagado"/sin efecto
+    // al pasar el mouse — el usuario lo percibe como "no funciona bien
+    // cuando paso por los distintos alumnos" porque la mitad de las filas
+    // (las alternadas) no muestran ningún cambio visible.
+    // -------------------------------------------------------------------------
+    testWidgets(
+        'hover en fila alternada (impar) → el color se compone sobre '
+        'rowAltBackground, no lo reemplaza por un valor absoluto '
+        '[SCENARIO-CK-DT-18]', (tester) async {
+      await tester.pumpWidget(_wrap(
+        CoachHubDataTable(
+          columns: _columns,
+          rows: _rows,
+          onRowTap: (_) {},
+        ),
+      ));
+      await tester.pump();
+
+      final tokens = TreinoTableTokens.of(
+        tester.element(find.byType(CoachHubDataTable)),
+      );
+
+      Color decorationColorOf(String rowId) {
+        final container = tester.widget<AnimatedContainer>(
+          find.byKey(Key('data_table_row_$rowId')),
+        );
+        return (container.decoration! as BoxDecoration).color!;
+      }
+
+      // Fila '2' es la 2da (índice impar → isAlt: true → rowAltBackground).
+      final altNormalColor = decorationColorOf('2');
+      expect(altNormalColor, tokens.rowAltBackground);
+
+      final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await gesture.addPointer(location: Offset.zero);
+      addTearDown(gesture.removePointer);
+      await gesture.moveTo(tester.getCenter(find.text('Carlos López')));
+      await tester.pump();
+
+      final altHoverColor = decorationColorOf('2');
+      final expectedComposedColor =
+          Color.alphaBlend(tokens.rowHoverBackground, tokens.rowAltBackground);
+
+      expect(altHoverColor, expectedComposedColor,
+          reason: 'el hover de una fila alternada debe componerse sobre su '
+              'propio fondo (rowAltBackground), no ser el valor absoluto de '
+              'rowHoverBackground — si no, el cambio es casi imperceptible '
+              'en el tema dark');
+      // Cambio perceptible real: al menos 8 unidades (sobre 255) en el
+      // canal G (mint es predominantemente verde) respecto del fondo
+      // alternado sin hover.
+      int channelG(Color c) => (c.g * 255.0).round().clamp(0, 255);
+      expect(
+        (channelG(altHoverColor) - channelG(altNormalColor)).abs() >= 8,
+        isTrue,
+        reason: 'el hover en fila alternada debe ser perceptible '
+            '(delta >= 8 en el canal verde), no un cambio de 2-3 unidades',
+      );
+    });
+
+    // -------------------------------------------------------------------------
+    // Hover fila: se mantiene estable al mover el puntero sobre un
+    // cellWidget interactivo de la MISMA fila (bug reportado en revisión en
+    // vivo del roster de Alumnos — chips/acciones apagaban el hover de fila).
+    // -------------------------------------------------------------------------
+    testWidgets(
+        'hover fila con cellWidget interactivo → hover de fila persiste al '
+        'pasar sobre el hijo [SCENARIO-CK-DT-17]', (tester) async {
+      await tester.pumpWidget(_wrap(
+        CoachHubDataTable(
+          columns: _columns,
+          rows: [
+            CoachHubRow(
+              id: '1',
+              cells: const {
+                'name': 'Ana García',
+                'status': 'Activo',
+                'sessions': '12',
+              },
+              cellWidgets: {
+                'status': IconButton(
+                  key: const Key('row1_action_btn'),
+                  icon: const Icon(Icons.chat),
+                  onPressed: () {},
+                ),
+              },
+            ),
+            _rows[1],
+          ],
+          onRowTap: (_) {},
+        ),
+      ));
+      await tester.pump();
+
+      Color decorationColor() {
+        final container = tester.widget<AnimatedContainer>(
+          find.byKey(const Key('data_table_row_1')),
+        );
+        return (container.decoration! as BoxDecoration).color!;
+      }
+
+      final normalColor = decorationColor();
+
+      final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await gesture.addPointer(location: Offset.zero);
+      addTearDown(gesture.removePointer);
+      await gesture.moveTo(tester.getCenter(find.text('Ana García')));
+      await tester.pump();
+
+      final hoverColor = decorationColor();
+      expect(hoverColor, isNot(equals(normalColor)),
+          reason: 'entrar a la fila debe activar el hover');
+
+      // Mueve el puntero al botón de acción DENTRO de la misma fila.
+      await gesture
+          .moveTo(tester.getCenter(find.byKey(const Key('row1_action_btn'))));
+      await tester.pump();
+
+      final hoverColorOverChild = decorationColor();
+      expect(hoverColorOverChild, equals(hoverColor),
+          reason: 'el hover de la fila NO debe apagarse al pasar sobre un '
+              'cellWidget interactivo de la misma fila');
     });
 
     // -------------------------------------------------------------------------

@@ -9,6 +9,7 @@
 
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -1048,6 +1049,117 @@ void main() {
       await tester.pumpAndSettle();
 
       verifyNever(() => repo.add(any()));
+    });
+  });
+
+  group('AlumnosScreen roster — hover de fila (bug revisión en vivo)', () {
+    /// Color de fondo actual de la fila `data_table_row_a1`.
+    Color rowDecorationColor(WidgetTester tester) {
+      final container = tester.widget<AnimatedContainer>(
+        find.byKey(const Key('data_table_row_a1')),
+      );
+      return (container.decoration! as BoxDecoration).color!;
+    }
+
+    testWidgets(
+        'hover sobre el chip Rutina (InkWell propio) → el hover de la fila '
+        'NO se apaga', (tester) async {
+      await _pump(
+        tester,
+        links: [_link('a1', TrainerLinkStatus.active)],
+        profiles: [_prof('a1', 'Sofía')],
+        routinesByAthleteId: {
+          'a1': [_routine('r1')],
+        },
+      );
+
+      final normalColor = rowDecorationColor(tester);
+
+      final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await gesture.addPointer(location: Offset.zero);
+      addTearDown(gesture.removePointer);
+
+      await gesture.moveTo(tester.getCenter(find.text('Sofía')));
+      await tester.pump();
+      final hoverColor = rowDecorationColor(tester);
+      expect(hoverColor, isNot(equals(normalColor)),
+          reason: 'entrar a la fila debe activar el hover');
+
+      // Mueve el puntero al chip "Activa" (Rutina) DENTRO de la misma fila.
+      await gesture.moveTo(tester.getCenter(find.text('Activa')));
+      await tester.pump();
+      final hoverColorOverChip = rowDecorationColor(tester);
+      expect(hoverColorOverChip, equals(hoverColor),
+          reason: 'el hover de la fila no debe apagarse al pasar sobre el '
+              'chip Rutina (InkWell propio de la celda)');
+    });
+
+    testWidgets(
+        'hover sobre un icon-button de Acciones (con tooltip) → el hover de '
+        'la fila NO se apaga', (tester) async {
+      await _pump(
+        tester,
+        links: [_link('a1', TrainerLinkStatus.active)],
+        profiles: [_prof('a1', 'Sofía')],
+      );
+
+      final normalColor = rowDecorationColor(tester);
+
+      final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await gesture.addPointer(location: Offset.zero);
+      addTearDown(gesture.removePointer);
+
+      await gesture.moveTo(tester.getCenter(find.text('Sofía')));
+      await tester.pump();
+      final hoverColor = rowDecorationColor(tester);
+      expect(hoverColor, isNot(equals(normalColor)),
+          reason: 'entrar a la fila debe activar el hover');
+
+      // Mueve el puntero al botón "Chat" DENTRO de la misma fila.
+      await gesture.moveTo(tester.getCenter(find.byTooltip('Chat')));
+      await tester.pump();
+      final hoverColorOverButton = rowDecorationColor(tester);
+      expect(hoverColorOverButton, equals(hoverColor),
+          reason: 'el hover de la fila no debe apagarse al pasar sobre un '
+              'icon-button de Acciones');
+    });
+
+    testWidgets(
+        'mover el puntero de una fila a otra → apaga el hover de la primera '
+        'y prende el de la segunda', (tester) async {
+      await _pump(
+        tester,
+        links: [
+          _link('a1', TrainerLinkStatus.active),
+          _link('a2', TrainerLinkStatus.active),
+        ],
+        profiles: [_prof('a1', 'Sofía'), _prof('a2', 'Diego')],
+      );
+
+      Color row2Color() {
+        final container = tester.widget<AnimatedContainer>(
+          find.byKey(const Key('data_table_row_a2')),
+        );
+        return (container.decoration! as BoxDecoration).color!;
+      }
+
+      final row1Normal = rowDecorationColor(tester);
+      final row2Normal = row2Color();
+
+      final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await gesture.addPointer(location: Offset.zero);
+      addTearDown(gesture.removePointer);
+
+      await gesture.moveTo(tester.getCenter(find.text('Sofía')));
+      await tester.pump();
+      expect(rowDecorationColor(tester), isNot(equals(row1Normal)));
+
+      await gesture.moveTo(tester.getCenter(find.text('Diego')));
+      await tester.pump();
+      expect(rowDecorationColor(tester), equals(row1Normal),
+          reason: 'la fila anterior debe apagar su hover');
+      expect(row2Color(), isNot(equals(row2Normal)),
+          reason: 'la fila nueva debe prender su hover');
     });
   });
 

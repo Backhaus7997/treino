@@ -424,14 +424,19 @@ class _DataRow extends StatelessWidget {
     return TreinoInteractiveState(
       onTap: onTap,
       builder: (ctx, states) {
-        Color bg;
-        if (states.hovered) {
-          bg = tokens.rowHoverBackground;
-        } else if (isAlt) {
-          bg = tokens.rowAltBackground;
-        } else {
-          bg = tokens.rowBackground;
-        }
+        // `rowHoverBackground` es translúcido (accent @ 6%) — hay que
+        // COMPONERLO sobre el fondo real de la fila (alt u opaco), nunca
+        // pintarlo solo: como color absoluto, en filas alternadas
+        // (`rowAltBackground`) el resultado visible terminaba mezclándose
+        // contra lo que hay DETRÁS de la fila (el fondo de página), no
+        // contra `rowAltBackground` — en el tema dark eso da un cambio casi
+        // imperceptible (o hasta un oscurecimiento) en vez de un highlight,
+        // que es el bug reportado en revisión en vivo ("el hover no
+        // funciona bien" al pasar por alumnos en filas pares vs impares).
+        final baseBg = isAlt ? tokens.rowAltBackground : tokens.rowBackground;
+        final bg = states.hovered
+            ? Color.alphaBlend(tokens.rowHoverBackground, baseBg)
+            : baseBg;
 
         return AnimatedContainer(
           key: Key('data_table_row_${row.id}'),
