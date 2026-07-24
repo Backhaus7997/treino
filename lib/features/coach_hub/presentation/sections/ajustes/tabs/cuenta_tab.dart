@@ -29,23 +29,34 @@ class CuentaTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profileAsync = ref.watch(userProfileProvider);
-    // Cross-fade entre loading→data→error (ADR-F12-03) — cada estado con su
-    // propia key para que TreinoStateSwitcher detecte el cambio y anime.
-    final stateKey = switch (profileAsync) {
-      AsyncData() => const ValueKey('data'),
-      AsyncError() => const ValueKey('error'),
-      _ => const ValueKey('loading'),
-    };
+    // hasValue-first (pulido-post-revision, mismo defecto que el picker de
+    // alumnos, commit cf1cc143): `userProfileProvider` es un StreamProvider
+    // en vivo — Riverpod 2.5+ preserva el valor previo dentro de un
+    // `AsyncError` subsiguiente (copyWithPrevious/"seamless"), así que
+    // `hasValue==true` Y `hasError==true` pueden darse a la vez tras un
+    // error transitorio. `switch`/`.when()` despachan por SUBTIPO runtime
+    // (ignoran `hasValue`) — se prioriza el valor cacheado.
+    final stateKey = profileAsync.hasValue
+        ? const ValueKey('data')
+        : profileAsync.hasError
+            ? const ValueKey('error')
+            : const ValueKey('loading');
+
+    final Widget content;
+    if (profileAsync.hasValue) {
+      final profile = profileAsync.requireValue;
+      content = profile == null
+          ? const _Muted('No se pudo cargar tu cuenta.') // i18n: Fase W3
+          : _CuentaForm(profile: profile);
+    } else if (profileAsync.hasError) {
+      content = const _Muted('No se pudo cargar tu cuenta.'); // i18n: Fase W3
+    } else {
+      content = const _CuentaSkeleton();
+    }
+
     return TreinoStateSwitcher(
       childKey: stateKey,
-      child: profileAsync.when(
-        loading: () => const _CuentaSkeleton(),
-        error: (_, __) =>
-            const _Muted('No se pudo cargar tu cuenta.'), // i18n: Fase W3
-        data: (profile) => profile == null
-            ? const _Muted('No se pudo cargar tu cuenta.') // i18n: Fase W3
-            : _CuentaForm(profile: profile),
-      ),
+      child: content,
     );
   }
 }

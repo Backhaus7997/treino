@@ -215,4 +215,42 @@ void main() {
       verifyNever(() => repo.update(any(), any()));
     });
   });
+
+  group(
+      'SCENARIO-STALE — cuenta sostiene el perfil ante error transitorio '
+      '(pulido-post-revision)', () {
+    // Regression: `CuentaTab.build` despachaba con `profileAsync.when()` —
+    // dispatch por SUBTIPO runtime, ignora `hasValue`. `userProfileProvider`
+    // es un StreamProvider en vivo — Riverpod 2.5+ preserva el valor previo
+    // dentro de un `AsyncError` subsiguiente (copyWithPrevious/"seamless"),
+    // así que un error transitorio (con perfil ya cargado) caía en la rama
+    // `error:` y tapaba el formulario con "No se pudo cargar tu cuenta.".
+    testWidgets(
+        'el perfil ya cargado no desaparece tras un error transitorio del '
+        'stream (stale-while-refresh)', (tester) async {
+      final controller = StreamController<UserProfile?>();
+      addTearDown(controller.close);
+
+      await tester.pumpWidget(_harness(profileStream: controller.stream));
+      await tester.pump();
+
+      controller.add(_trainer());
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sofía Ramírez'), findsOneWidget);
+      expect(find.text('No se pudo cargar tu cuenta.'), findsNothing);
+
+      controller.addError(Exception('transient stream hiccup'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Sofía Ramírez'),
+        findsOneWidget,
+        reason: 'un error transitorio con perfil ya cargado no debe tapar '
+            'el formulario de cuenta',
+      );
+      expect(find.text('No se pudo cargar tu cuenta.'), findsNothing);
+    });
+  });
 }

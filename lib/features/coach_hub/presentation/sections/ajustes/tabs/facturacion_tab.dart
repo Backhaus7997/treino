@@ -29,14 +29,32 @@ class FacturacionTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final linksAsync = ref.watch(trainerLinksStreamProvider);
-    // Cross-fade entre loading→data→error (ADR-F12-03), mismo patrón que
-    // CuentaTab/NotificacionesTab — cada estado con su propia key para que
-    // TreinoStateSwitcher detecte el cambio y anime.
-    final stateKey = switch (linksAsync) {
-      AsyncData() => const ValueKey('data'),
-      AsyncError() => const ValueKey('error'),
-      _ => const ValueKey('loading'),
-    };
+    // hasValue-first (pulido-post-revision, mismo defecto que el picker de
+    // alumnos, commit cf1cc143): `trainerLinksStreamProvider` es un
+    // StreamProvider en vivo — Riverpod 2.5+ preserva el valor previo
+    // dentro de un `AsyncError` subsiguiente (copyWithPrevious/"seamless"),
+    // así que `hasValue==true` Y `hasError==true` pueden darse a la vez
+    // tras un error transitorio. `switch`/`.when()` despachan por SUBTIPO
+    // runtime (ignoran `hasValue`) — se prioriza el valor cacheado.
+    final stateKey = linksAsync.hasValue
+        ? const ValueKey('data')
+        : linksAsync.hasError
+            ? const ValueKey('error')
+            : const ValueKey('loading');
+
+    final Widget kpiChild;
+    if (linksAsync.hasValue) {
+      final activos = linksAsync.requireValue
+          .where((l) => l.status == TrainerLinkStatus.active)
+          .map((l) => l.athleteId)
+          .toSet()
+          .length;
+      kpiChild = KpiCard(value: '$activos', label: 'Alumnos activos'); // i18n
+    } else if (linksAsync.hasError) {
+      kpiChild = const KpiCard(value: '—', label: 'Alumnos activos');
+    } else {
+      kpiChild = const KpiCard(value: '', label: '', loading: true);
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -61,22 +79,7 @@ class FacturacionTab extends ConsumerWidget {
           delay: AppMotion.stagger(0),
           child: TreinoStateSwitcher(
             childKey: stateKey,
-            child: linksAsync.when(
-              loading: () => const KpiCard(value: '', label: '', loading: true),
-              error: (_, __) =>
-                  const KpiCard(value: '—', label: 'Alumnos activos'),
-              data: (links) {
-                final activos = links
-                    .where((l) => l.status == TrainerLinkStatus.active)
-                    .map((l) => l.athleteId)
-                    .toSet()
-                    .length;
-                return KpiCard(
-                  value: '$activos',
-                  label: 'Alumnos activos', // i18n: Fase W3
-                );
-              },
-            ),
+            child: kpiChild,
           ),
         ),
         const SizedBox(height: 16),

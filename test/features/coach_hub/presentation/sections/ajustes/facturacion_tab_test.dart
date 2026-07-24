@@ -94,4 +94,42 @@ void main() {
       expect(find.byKey(const Key('kpi_card_skeleton')), findsOneWidget);
     });
   });
+
+  group(
+      'SCENARIO-STALE — facturación sostiene el KpiCard ante error '
+      'transitorio (pulido-post-revision)', () {
+    // Regression: `FacturacionTab.build` despachaba con `linksAsync.when()`
+    // — dispatch por SUBTIPO runtime, ignora `hasValue`.
+    // `trainerLinksStreamProvider` es un StreamProvider en vivo — Riverpod
+    // 2.5+ preserva el valor previo dentro de un `AsyncError` subsiguiente
+    // (copyWithPrevious/"seamless"), así que un error transitorio (con data
+    // ya cargada) caía en la rama `error:` y tapaba el KpiCard con '—'.
+    testWidgets(
+        'el KpiCard de alumnos activos ya cargado no cae a "—" tras un '
+        'error transitorio del stream (stale-while-refresh)', (tester) async {
+      final controller = StreamController<List<TrainerLink>>();
+      addTearDown(controller.close);
+
+      await tester.pumpWidget(_harness(controller.stream));
+      await tester.pump();
+
+      controller.add([_activeLink('a1'), _activeLink('a2')]);
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      var kpiCard = tester.widget<KpiCard>(find.byType(KpiCard));
+      expect(kpiCard.value, '2');
+
+      controller.addError(Exception('transient stream hiccup'));
+      await tester.pumpAndSettle();
+
+      kpiCard = tester.widget<KpiCard>(find.byType(KpiCard));
+      expect(
+        kpiCard.value,
+        '2',
+        reason: 'un error transitorio con data ya cargada no debe tapar el '
+            'KpiCard con "—"',
+      );
+    });
+  });
 }

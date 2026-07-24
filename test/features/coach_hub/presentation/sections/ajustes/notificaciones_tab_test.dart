@@ -130,4 +130,49 @@ void main() {
       );
     });
   });
+
+  group(
+      'SCENARIO-STALE — notificaciones sostiene la matriz ante error '
+      'transitorio (pulido-post-revision)', () {
+    // Regression: `NotificacionesTab.build` despachaba con
+    // `prefsAsync.when()` — dispatch por SUBTIPO runtime, ignora `hasValue`.
+    // `webNotificationPreferencesProvider` es un StreamProvider en vivo —
+    // Riverpod 2.5+ preserva el valor previo dentro de un `AsyncError`
+    // subsiguiente (copyWithPrevious/"seamless"), así que un error
+    // transitorio (con prefs ya cargadas) caía en la rama `error:` y tapaba
+    // la matriz con "No se pudieron cargar tus preferencias.".
+    testWidgets(
+        'la matriz ya cargada no desaparece tras un error transitorio del '
+        'stream (stale-while-refresh)', (tester) async {
+      final controller = StreamController<NotifPrefs>();
+      addTearDown(controller.close);
+
+      await tester.pumpWidget(_harness(prefsStream: controller.stream));
+      await tester.pump();
+
+      controller.add(NotifPrefs.fromFirestore(null));
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Pago recibido'), findsOneWidget);
+      expect(
+        find.text('No se pudieron cargar tus preferencias.'),
+        findsNothing,
+      );
+
+      controller.addError(Exception('transient stream hiccup'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Pago recibido'),
+        findsOneWidget,
+        reason: 'un error transitorio con prefs ya cargadas no debe tapar '
+            'la matriz',
+      );
+      expect(
+        find.text('No se pudieron cargar tus preferencias.'),
+        findsNothing,
+      );
+    });
+  });
 }
