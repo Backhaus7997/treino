@@ -500,11 +500,17 @@ service cloud.firestore {
                     && request.resource.data.keys().hasOnly([
                          'uid', 'displayName', 'displayNameLowercase',
                          'avatarUrl', 'gymId', 'gymName', 'workoutsCount',
-                         'racha', 'followersCount', 'followingCount',
+                         'racha', 'rachaUpdatedAt', 'followersCount',
+                         'followingCount',
                          'sharedTemplatesWithAthletes', 'rankingOptIn',
                          'lifetimeVolumeKg', 'bestSquatKg', 'bestBenchKg',
                          'bestDeadliftKg'
                        ])
+                    // #552: freshness stamp for `racha`, always derived by
+                    // UserPublicProfileRepository.updateCounters (server
+                    // timestamp) — timestamp when present.
+                    && (!('rachaUpdatedAt' in request.resource.data)
+                        || request.resource.data.rachaUpdatedAt is timestamp)
                     && (!('gymId' in request.resource.data)
                         || request.resource.data.gymId
                            == getAfter(/databases/$(database)/documents/users/$(uid)).data.gymId)
@@ -533,11 +539,17 @@ service cloud.firestore {
                     && request.resource.data.keys().hasOnly([
                          'uid', 'displayName', 'displayNameLowercase',
                          'avatarUrl', 'gymId', 'gymName', 'workoutsCount',
-                         'racha', 'followersCount', 'followingCount',
+                         'racha', 'rachaUpdatedAt', 'followersCount',
+                         'followingCount',
                          'sharedTemplatesWithAthletes', 'rankingOptIn',
                          'lifetimeVolumeKg', 'bestSquatKg', 'bestBenchKg',
                          'bestDeadliftKg'
                        ])
+                    // #552: freshness stamp for `racha` — timestamp when
+                    // present (always serverTimestamp() derived in
+                    // UserPublicProfileRepository.updateCounters).
+                    && (!('rachaUpdatedAt' in request.resource.data)
+                        || request.resource.data.rachaUpdatedAt is timestamp)
                     // gymId Integrity (AD-4): when the write touches gymId,
                     // it must equal the athlete's own private gymId.
                     // getAfter(), not get() — see the create-branch comment
