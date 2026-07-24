@@ -5,7 +5,6 @@
 /// evitar es que "10.000" formateado rompa `int.tryParse` al guardar.
 library;
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/thousands_input_formatter.dart';
 

@@ -18,7 +18,6 @@ import 'package:treino/features/feed/application/public_profile_providers.dart';
 import 'package:treino/features/feed/domain/friendship.dart';
 import 'package:treino/features/feed/domain/friendship_status.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
-import 'package:treino/features/profile/data/user_public_profile_repository.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/profile/application/user_providers.dart'
     show firestoreProvider;
@@ -71,12 +70,9 @@ ProviderContainer _makeContainer({
       // Other uids fall through to the fake Firestore (empty by default).
       userPublicProfileProvider.overrideWith((ref, uid) async* {
         if (uid == viewerUid) {
-          yield viewerProfile ??
-              UserPublicProfile(uid: viewerUid, gymId: null);
+          yield viewerProfile ?? UserPublicProfile(uid: viewerUid, gymId: null);
         } else {
-          yield* ref
-              .watch(userPublicProfileRepositoryProvider)
-              .watch(uid);
+          yield* ref.watch(userPublicProfileRepositoryProvider).watch(uid);
         }
       }),
     ],
@@ -174,10 +170,7 @@ void main() {
         () async {
       final firestore = FakeFirebaseFirestore();
       await _seedPost(firestore,
-          id: 'p-gym',
-          authorUid: target,
-          privacy: 'gym',
-          authorGymId: 'gym-A');
+          id: 'p-gym', authorUid: target, privacy: 'gym', authorGymId: 'gym-A');
       await _seedPost(firestore,
           id: 'p-gym-other',
           authorUid: target,
@@ -187,7 +180,7 @@ void main() {
       final container = _makeContainer(
         firestore: firestore,
         viewerUid: viewer,
-        viewerProfile: UserPublicProfile(uid: viewer, gymId: 'gym-A'),
+        viewerProfile: const UserPublicProfile(uid: viewer, gymId: 'gym-A'),
       );
 
       final posts =
@@ -198,15 +191,12 @@ void main() {
     test('gym posts are hidden when viewer has no gym', () async {
       final firestore = FakeFirebaseFirestore();
       await _seedPost(firestore,
-          id: 'p-gym',
-          authorUid: target,
-          privacy: 'gym',
-          authorGymId: 'gym-A');
+          id: 'p-gym', authorUid: target, privacy: 'gym', authorGymId: 'gym-A');
 
       final container = _makeContainer(
         firestore: firestore,
         viewerUid: viewer,
-        viewerProfile: UserPublicProfile(uid: viewer, gymId: null),
+        viewerProfile: const UserPublicProfile(uid: viewer, gymId: null),
       );
 
       final posts =
@@ -222,10 +212,7 @@ void main() {
       await _seedPost(firestore,
           id: 'p-friends', authorUid: viewer, privacy: 'friends');
       await _seedPost(firestore,
-          id: 'p-gym',
-          authorUid: viewer,
-          privacy: 'gym',
-          authorGymId: 'gym-X');
+          id: 'p-gym', authorUid: viewer, privacy: 'gym', authorGymId: 'gym-X');
 
       final container = _makeContainer(
         firestore: firestore,
@@ -234,8 +221,7 @@ void main() {
 
       final posts =
           await container.read(visiblePostsByAuthorProvider(viewer).future);
-      expect(posts.map((p) => p.id).toSet(),
-          {'p-pub', 'p-friends', 'p-gym'});
+      expect(posts.map((p) => p.id).toSet(), {'p-pub', 'p-friends', 'p-gym'});
     });
 
     test('result is sorted newest-first', () async {
