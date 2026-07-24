@@ -8,10 +8,28 @@ import '../../../../core/utils/kg_format.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../../auth/application/auth_providers.dart';
+import '../../../gyms/application/gym_providers.dart';
+import '../../../gyms/domain/gym.dart' show kNoGymId;
+import '../../../gyms/domain/gym_display_name.dart';
 import '../../application/post_actions_notifier.dart';
 import '../../domain/post.dart';
 import '../../domain/routine_tag.dart';
 import 'post_avatar.dart';
+
+/// #547: the theme's Barlow families carry no emoji glyphs, so an emoji inside
+/// user-authored (or auto-generated) post content renders as tofu "▯". Pinning
+/// the system emoji font per platform makes the engine fall back correctly —
+/// same root cause and fix as `post_workout_summary_screen.dart` (PR #465),
+/// applied here to the STYLE rather than to one string, so any emoji a user
+/// types into a manual post renders too.
+const List<String> _kEmojiFallback = ['Apple Color Emoji', 'Noto Color Emoji'];
+
+/// Appends the emoji fonts to [style]'s existing `fontFamilyFallback` instead
+/// of replacing it — `GoogleFonts.*()` styles already carry `[<base family>]`
+/// there (the package's own variant→family fallback), which must survive.
+TextStyle _withEmojiFallback(TextStyle style) => style.copyWith(
+      fontFamilyFallback: [...?style.fontFamilyFallback, ..._kEmojiFallback],
+    );
 
 class PostCard extends ConsumerWidget {
   const PostCard({
@@ -28,6 +46,23 @@ class PostCard extends ConsumerWidget {
     final palette = AppPalette.of(context);
     final viewerUid = ref.watch(authStateChangesProvider).valueOrNull?.uid;
     final isOwner = viewerUid != null && viewerUid == post.authorUid;
+
+    // #549: `authorGymId` is an OPAQUE id, never a display name — gyms coming
+    // from Google Places carry a place id (`ChIJ…`) and the card used to print
+    // it uppercased as if it were the name. Resolve it against the `gyms/`
+    // catalog instead, the same `gymByIdProvider` + `gymDisplayNameFromGym`
+    // pattern `PublicProfileHero` and `PinnedCurrentGym` already use. The
+    // provider is a non-autoDispose family, so a feed of N posts across K
+    // distinct gyms costs K reads, cached for the app's lifetime.
+    //
+    // An unresolvable id (deleted gym, place id never upserted into the
+    // catalog) yields '' → the gym segment is omitted and only the date shows.
+    // Rendering the raw id is not a fallback we accept.
+    final gymId = post.authorGymId;
+    final gymAsync = (gymId == null || gymId.isEmpty || gymId == kNoGymId)
+        ? null
+        : ref.watch(gymByIdProvider(gymId));
+    final gymName = gymDisplayNameFromGym(gymAsync?.valueOrNull);
 
     return Container(
       decoration: BoxDecoration(
@@ -74,18 +109,20 @@ class PostCard extends ConsumerWidget {
                           children: [
                             Text(
                               post.authorDisplayName,
-                              style: GoogleFonts.barlowCondensed(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
-                                letterSpacing: 0.5,
-                                color: palette.textPrimary,
+                              style: _withEmojiFallback(
+                                GoogleFonts.barlowCondensed(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                  letterSpacing: 0.5,
+                                  color: palette.textPrimary,
+                                ),
                               ),
                               overflow: TextOverflow.ellipsis,
                               maxLines: 1,
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              _formatMeta(post.authorGymId, post.createdAt),
+                              _formatMeta(gymName, post.createdAt),
                               style: GoogleFonts.barlow(
                                 fontWeight: FontWeight.w400,
                                 fontSize: 12,
@@ -127,10 +164,12 @@ class PostCard extends ConsumerWidget {
           // ── BODY TEXT ───────────────────────────────────────────────
           Text(
             post.text,
-            style: GoogleFonts.barlow(
-              fontWeight: FontWeight.w400,
-              fontSize: 14,
-              color: palette.textPrimary,
+            style: _withEmojiFallback(
+              GoogleFonts.barlow(
+                fontWeight: FontWeight.w400,
+                fontSize: 14,
+                color: palette.textPrimary,
+              ),
             ),
           ),
 
@@ -287,10 +326,14 @@ String _relativeTime(DateTime createdAt) {
   return '$d/$m';
 }
 
-String _formatMeta(String? gymId, DateTime createdAt) {
-  final gym = (gymId == null || gymId.isEmpty) ? null : gymId.toUpperCase();
+/// Meta line under the author name: `"GIMNASIO · hace 2h"`, or just the time
+/// when the gym is unknown.
+///
+/// #549: takes the RESOLVED gym name, never an id. The signature is the guard —
+/// the helper can no longer be handed a `gymId` to print by mistake.
+String _formatMeta(String gymName, DateTime createdAt) {
   final time = _relativeTime(createdAt);
-  return gym == null ? time : '$gym · $time';
+  return gymName.isEmpty ? time : '${gymName.toUpperCase()} · $time';
 }
 
 // ── Private widgets ────────────────────────────────────────────────────────
@@ -324,11 +367,13 @@ class _RoutineTagChip extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               tag.routineName,
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
-                letterSpacing: 0.8,
-                color: palette.accent,
+              style: _withEmojiFallback(
+                GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                  letterSpacing: 0.8,
+                  color: palette.accent,
+                ),
               ),
             ),
           ],
