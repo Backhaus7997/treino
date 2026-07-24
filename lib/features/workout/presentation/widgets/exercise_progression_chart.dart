@@ -9,6 +9,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart' as intl;
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/utils/chart_point_index.dart';
 import '../../application/exercise_progression_aggregator.dart';
 import '../../domain/exercise_progression.dart';
 
@@ -79,8 +80,9 @@ class ExerciseProgressionChartLabels {
   /// E.g. 'kg'. Used by both weight metrics (Heaviest Weight, 1RM).
   final String weightUnit;
 
-  /// Converts a session count to a Frecuencia string.
-  /// E.g. (n) => '$n sesiones en las últimas 8 semanas'
+  /// Converts a session count to a Frecuencia string. The count is scoped
+  /// to the active chart period (#555), so the label must speak of that
+  /// same window. E.g. (n) => '$n sesiones en este período'
   final String Function(int count) frequencyLabel;
 
   /// Hint when exactly 1 data point exists (no trend line).
@@ -170,7 +172,7 @@ class _ExerciseProgressionChartState extends State<ExerciseProgressionChart> {
         children: [
           // ── Frecuencia stat ABOVE chip row (SCENARIO-PROG-06C) ────────
           Text(
-            labels.frequencyLabel(widget.progression.frequencyLast8Weeks),
+            labels.frequencyLabel(widget.progression.frequencySessionCount),
             style: GoogleFonts.barlow(
               fontSize: 12,
               color: palette.textMuted,
@@ -457,14 +459,12 @@ class _ProgressLineChart extends StatelessWidget {
                 // at whole indices. Without a fixed interval fl_chart samples
                 // fractional Xs sized to the chart width, and value.round()
                 // maps neighbouring samples onto the same index → duplicated
-                // and skipped date labels (#383).
+                // and skipped date labels (#383, shared with #554 — see
+                // chart_point_index.dart).
                 interval: 1,
                 getTitlesWidget: (value, meta) {
-                  final idx = value.round();
-                  if ((value - idx).abs() > 0.01) {
-                    return const SizedBox.shrink();
-                  }
-                  if (!labelIndices.contains(idx)) {
+                  final idx = exactPointIndex(value);
+                  if (idx == null || !labelIndices.contains(idx)) {
                     return const SizedBox.shrink();
                   }
                   if (idx < 0 || idx >= points.length) {

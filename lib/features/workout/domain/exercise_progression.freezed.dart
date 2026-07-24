@@ -346,7 +346,7 @@ mixin _$ExerciseProgression {
       throw _privateConstructorUsedError;
   List<PersonalRecord> get personalRecords =>
       throw _privateConstructorUsedError;
-  int get frequencyLast8Weeks => throw _privateConstructorUsedError;
+  int get frequencySessionCount => throw _privateConstructorUsedError;
 
   /// Create a copy of ExerciseProgression
   /// with the given fields replaced by the non-null parameter values.
@@ -369,7 +369,7 @@ abstract class $ExerciseProgressionCopyWith<$Res> {
       List<ProgressionPoint> bestSetVolumeSeries,
       List<ProgressionPoint> bestSessionVolumeSeries,
       List<PersonalRecord> personalRecords,
-      int frequencyLast8Weeks});
+      int frequencySessionCount});
 }
 
 /// @nodoc
@@ -394,7 +394,7 @@ class _$ExerciseProgressionCopyWithImpl<$Res, $Val extends ExerciseProgression>
     Object? bestSetVolumeSeries = null,
     Object? bestSessionVolumeSeries = null,
     Object? personalRecords = null,
-    Object? frequencyLast8Weeks = null,
+    Object? frequencySessionCount = null,
   }) {
     return _then(_value.copyWith(
       exerciseId: null == exerciseId
@@ -425,9 +425,9 @@ class _$ExerciseProgressionCopyWithImpl<$Res, $Val extends ExerciseProgression>
           ? _value.personalRecords
           : personalRecords // ignore: cast_nullable_to_non_nullable
               as List<PersonalRecord>,
-      frequencyLast8Weeks: null == frequencyLast8Weeks
-          ? _value.frequencyLast8Weeks
-          : frequencyLast8Weeks // ignore: cast_nullable_to_non_nullable
+      frequencySessionCount: null == frequencySessionCount
+          ? _value.frequencySessionCount
+          : frequencySessionCount // ignore: cast_nullable_to_non_nullable
               as int,
     ) as $Val);
   }
@@ -449,7 +449,7 @@ abstract class _$$ExerciseProgressionImplCopyWith<$Res>
       List<ProgressionPoint> bestSetVolumeSeries,
       List<ProgressionPoint> bestSessionVolumeSeries,
       List<PersonalRecord> personalRecords,
-      int frequencyLast8Weeks});
+      int frequencySessionCount});
 }
 
 /// @nodoc
@@ -472,7 +472,7 @@ class __$$ExerciseProgressionImplCopyWithImpl<$Res>
     Object? bestSetVolumeSeries = null,
     Object? bestSessionVolumeSeries = null,
     Object? personalRecords = null,
-    Object? frequencyLast8Weeks = null,
+    Object? frequencySessionCount = null,
   }) {
     return _then(_$ExerciseProgressionImpl(
       exerciseId: null == exerciseId
@@ -503,9 +503,9 @@ class __$$ExerciseProgressionImplCopyWithImpl<$Res>
           ? _value._personalRecords
           : personalRecords // ignore: cast_nullable_to_non_nullable
               as List<PersonalRecord>,
-      frequencyLast8Weeks: null == frequencyLast8Weeks
-          ? _value.frequencyLast8Weeks
-          : frequencyLast8Weeks // ignore: cast_nullable_to_non_nullable
+      frequencySessionCount: null == frequencySessionCount
+          ? _value.frequencySessionCount
+          : frequencySessionCount // ignore: cast_nullable_to_non_nullable
               as int,
     ));
   }
@@ -522,7 +522,7 @@ class _$ExerciseProgressionImpl implements _ExerciseProgression {
       required final List<ProgressionPoint> bestSetVolumeSeries,
       required final List<ProgressionPoint> bestSessionVolumeSeries,
       required final List<PersonalRecord> personalRecords,
-      required this.frequencyLast8Weeks})
+      required this.frequencySessionCount})
       : _heaviestWeightSeries = heaviestWeightSeries,
         _oneRepMaxSeries = oneRepMaxSeries,
         _bestSetVolumeSeries = bestSetVolumeSeries,
@@ -577,11 +577,11 @@ class _$ExerciseProgressionImpl implements _ExerciseProgression {
   }
 
   @override
-  final int frequencyLast8Weeks;
+  final int frequencySessionCount;
 
   @override
   String toString() {
-    return 'ExerciseProgression(exerciseId: $exerciseId, exerciseName: $exerciseName, heaviestWeightSeries: $heaviestWeightSeries, oneRepMaxSeries: $oneRepMaxSeries, bestSetVolumeSeries: $bestSetVolumeSeries, bestSessionVolumeSeries: $bestSessionVolumeSeries, personalRecords: $personalRecords, frequencyLast8Weeks: $frequencyLast8Weeks)';
+    return 'ExerciseProgression(exerciseId: $exerciseId, exerciseName: $exerciseName, heaviestWeightSeries: $heaviestWeightSeries, oneRepMaxSeries: $oneRepMaxSeries, bestSetVolumeSeries: $bestSetVolumeSeries, bestSessionVolumeSeries: $bestSessionVolumeSeries, personalRecords: $personalRecords, frequencySessionCount: $frequencySessionCount)';
   }
 
   @override
@@ -603,8 +603,8 @@ class _$ExerciseProgressionImpl implements _ExerciseProgression {
                 other._bestSessionVolumeSeries, _bestSessionVolumeSeries) &&
             const DeepCollectionEquality()
                 .equals(other._personalRecords, _personalRecords) &&
-            (identical(other.frequencyLast8Weeks, frequencyLast8Weeks) ||
-                other.frequencyLast8Weeks == frequencyLast8Weeks));
+            (identical(other.frequencySessionCount, frequencySessionCount) ||
+                other.frequencySessionCount == frequencySessionCount));
   }
 
   @override
@@ -617,7 +617,7 @@ class _$ExerciseProgressionImpl implements _ExerciseProgression {
       const DeepCollectionEquality().hash(_bestSetVolumeSeries),
       const DeepCollectionEquality().hash(_bestSessionVolumeSeries),
       const DeepCollectionEquality().hash(_personalRecords),
-      frequencyLast8Weeks);
+      frequencySessionCount);
 
   /// Create a copy of ExerciseProgression
   /// with the given fields replaced by the non-null parameter values.
@@ -638,7 +638,7 @@ abstract class _ExerciseProgression implements ExerciseProgression {
       required final List<ProgressionPoint> bestSetVolumeSeries,
       required final List<ProgressionPoint> bestSessionVolumeSeries,
       required final List<PersonalRecord> personalRecords,
-      required final int frequencyLast8Weeks}) = _$ExerciseProgressionImpl;
+      required final int frequencySessionCount}) = _$ExerciseProgressionImpl;
 
   @override
   String get exerciseId;
@@ -655,7 +655,7 @@ abstract class _ExerciseProgression implements ExerciseProgression {
   @override
   List<PersonalRecord> get personalRecords;
   @override
-  int get frequencyLast8Weeks;
+  int get frequencySessionCount;
 
   /// Create a copy of ExerciseProgression
   /// with the given fields replaced by the non-null parameter values.

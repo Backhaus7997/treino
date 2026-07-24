@@ -1415,7 +1415,7 @@ void main() {
           ProgressionPoint(date: DateTime.utc(2026, 1, 8), value: 475),
         ],
         personalRecords: const [],
-        frequencyLast8Weeks: 3,
+        frequencySessionCount: 3,
       );
 
       await _pump(

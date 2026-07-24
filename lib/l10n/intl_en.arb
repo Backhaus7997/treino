@@ -44,6 +44,10 @@
   "homeEstaSemanaEmptyTitle": "YOUR STREAK\nSTARTS HERE",
   "homeEstaSemanaEmptyBody": "Every workout feeds your streak. Do your first one and start building your progress.",
   "homeEstaSemanaEmptyCta": "EXPLORE ROUTINES  →",
+  "homeEstaSemanaHeaderPillResume": "BACK AT IT",
+  "homeEstaSemanaResumeTitle": "YOUR STREAK\nAWAITS",
+  "homeEstaSemanaResumeBody": "Your history is already built. This week is still at zero — get back in today and keep adding progress.",
+  "homeEstaSemanaResumeCta": "BACK TO TRAINING  →",
   "@@locale": "en",
   "@@x-translation-status": "TODO — EN launch deferred (audit Q4). Strings intentionally empty; locale_resolver.dart locks the app to es-AR so these are never shown. Populate before re-enabling English in the resolver.",
   "authSplashTagline": "",
@@ -876,6 +880,14 @@
   "progressionMetricVolume": "Volume",
   "progressionFrequency": "{count, plural, =0{No sessions in the last 8 weeks} =1{1 session in the last 8 weeks} other{{count} sessions in the last 8 weeks}}",
   "@progressionFrequency": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "progressionFrequencyPeriod": "{count, plural, =0{No sessions in this period} =1{1 session in this period} other{{count} sessions in this period}}",
+  "@progressionFrequencyPeriod": {
     "placeholders": {
       "count": {
         "type": "int"

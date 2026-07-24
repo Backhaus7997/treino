@@ -159,8 +159,17 @@ class _Loaded extends StatelessWidget {
     final l10n = AppL10n.of(context);
     final wi = insights;
 
+    // #551: "0 esta semana" y "cuenta nueva" son dos estados distintos.
+    // `sessionsCount` cuenta SÓLO la semana corriente, así que por sí solo no
+    // alcanza para elegir copy — un usuario con historial que no entrenó esta
+    // semana veía "Hacé el primero". El fork real lo da
+    // [WeeklyInsights.hasEverCompletedAnyWorkout] (mismo criterio que ya usa
+    // el `_EmptyState` de insights_screen): sin historial → onboarding; con
+    // historial → retomar.
     if (wi == null || wi.sessionsCount == 0) {
-      return const _EmptyState();
+      return _ZeroWeekState(
+        hasHistory: wi?.hasEverCompletedAnyWorkout ?? false,
+      );
     }
 
     return Padding(
@@ -244,15 +253,24 @@ class _Loaded extends StatelessWidget {
   }
 }
 
-// ── Empty state — para users con 0 sesiones (cuenta nueva) ───────────────────
+// ── Zero-week state — semana corriente sin sesiones ──────────────────────────
 //
 // Replace al placeholder "Tocá para ver tus insights" con un layout más
 // motivador: titular grande + ícono de llama (TreinoIcon.streak) + copy
 // invitante + CTA explícito que lleva a la tab Entrenar. Diseño 2026-05-22:
 // no mostramos "0 días / 0 entrenos" porque desmotiva al primer login.
+//
+// #551: dos variantes del mismo layout según [hasHistory]:
+// - `false` → cuenta nueva (0 sesiones TOTALES): copy de onboarding
+//   ("Hacé el primero").
+// - `true` → historial previo pero semana en 0: copy de retomar — decirle
+//   "hacé el primero" a alguien con 19 sesiones borra simbólicamente su
+//   historial.
 
-class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+class _ZeroWeekState extends StatelessWidget {
+  const _ZeroWeekState({required this.hasHistory});
+
+  final bool hasHistory;
 
   @override
   Widget build(BuildContext context) {
@@ -263,11 +281,17 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _CardHeader(emptyState: true),
+          _CardHeader(
+            pillLabel: hasHistory
+                ? l10n.homeEstaSemanaHeaderPillResume
+                : l10n.homeEstaSemanaHeaderPillEmpty,
+          ),
           const SizedBox(height: 18),
           Center(
             child: Text(
-              l10n.homeEstaSemanaEmptyTitle,
+              hasHistory
+                  ? l10n.homeEstaSemanaResumeTitle
+                  : l10n.homeEstaSemanaEmptyTitle,
               textAlign: TextAlign.center,
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
@@ -285,7 +309,9 @@ class _EmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           Text(
-            l10n.homeEstaSemanaEmptyBody,
+            hasHistory
+                ? l10n.homeEstaSemanaResumeBody
+                : l10n.homeEstaSemanaEmptyBody,
             textAlign: TextAlign.center,
             style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
           ),
@@ -303,7 +329,9 @@ class _EmptyState extends StatelessWidget {
                 ),
               ),
               child: Text(
-                l10n.homeEstaSemanaEmptyCta,
+                hasHistory
+                    ? l10n.homeEstaSemanaResumeCta
+                    : l10n.homeEstaSemanaEmptyCta,
                 style: GoogleFonts.barlowCondensed(
                   fontWeight: FontWeight.w700,
                   fontSize: 13,
@@ -320,13 +348,14 @@ class _EmptyState extends StatelessWidget {
 
 // ── Card header: pill (left) + SEM N · MMM (right) ───────────────────────────
 //
-// `emptyState=true` cambia el label a "PRIMER PASO" — versión empty state.
-// `emptyState=false` (default) muestra "RACHA ACTUAL" — versión con data.
+// [pillLabel] permite a los estados de semana-en-cero elegir su propio pill
+// ("PRIMER PASO" / "A RETOMAR", #551). Null (default) muestra "RACHA ACTUAL"
+// — versión con data.
 
 class _CardHeader extends StatelessWidget {
-  const _CardHeader({this.emptyState = false});
+  const _CardHeader({this.pillLabel});
 
-  final bool emptyState;
+  final String? pillLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -365,9 +394,7 @@ class _CardHeader extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                emptyState
-                    ? l10n.homeEstaSemanaHeaderPillEmpty
-                    : l10n.homeEstaSemanaHeaderPill,
+                pillLabel ?? l10n.homeEstaSemanaHeaderPill,
                 style: GoogleFonts.barlowCondensed(
                   fontWeight: FontWeight.w700,
                   fontSize: 12,

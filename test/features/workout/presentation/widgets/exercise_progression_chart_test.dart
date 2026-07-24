@@ -28,8 +28,7 @@ ExerciseProgressionChartLabels _labels({
       bestSessionVolumeLabel: bestSessionVolumeLabel,
       volumeUnit: volumeUnit,
       weightUnit: weightUnit,
-      frequencyLabel:
-          frequencyLabel ?? (n) => '$n sesiones en las últimas 8 semanas',
+      frequencyLabel: frequencyLabel ?? (n) => '$n sesiones en este período',
       singlePointHint: singlePointHint,
       emptyHint: emptyHint,
     );
@@ -54,7 +53,7 @@ ExerciseProgression _progression({
   List<ProgressionPoint> oneRepMaxSeries = const [],
   List<ProgressionPoint> bestSetVolumeSeries = const [],
   List<ProgressionPoint> bestSessionVolumeSeries = const [],
-  int frequencyLast8Weeks = 0,
+  int frequencySessionCount = 0,
 }) =>
     ExerciseProgression(
       exerciseId: 'squat',
@@ -64,7 +63,7 @@ ExerciseProgression _progression({
       bestSetVolumeSeries: bestSetVolumeSeries,
       bestSessionVolumeSeries: bestSessionVolumeSeries,
       personalRecords: const [],
-      frequencyLast8Weeks: frequencyLast8Weeks,
+      frequencySessionCount: frequencySessionCount,
     );
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -83,7 +82,7 @@ void main() {
           _pt(10, 285.0),
           _pt(15, 475.0)
         ],
-        frequencyLast8Weeks: 3,
+        frequencySessionCount: 3,
       );
 
       await tester.pumpWidget(_wrap(
@@ -111,7 +110,7 @@ void main() {
         oneRepMaxSeries: [_pt(5, 81.7)],
         bestSetVolumeSeries: [_pt(5, 350.0)],
         bestSessionVolumeSeries: [_pt(5, 350.0)],
-        frequencyLast8Weeks: 1,
+        frequencySessionCount: 1,
       );
 
       await tester.pumpWidget(_wrap(
@@ -160,14 +159,13 @@ void main() {
         oneRepMaxSeries: [_pt(5, 93.3), _pt(10, 99.0)],
         bestSetVolumeSeries: [_pt(5, 400.0), _pt(10, 270.0)],
         bestSessionVolumeSeries: [_pt(5, 400.0), _pt(10, 285.0)],
-        frequencyLast8Weeks: 5,
+        frequencySessionCount: 5,
       );
 
       await tester.pumpWidget(_wrap(
         ExerciseProgressionChart(
           progression: progression,
-          labels: _labels(
-              frequencyLabel: (n) => '$n sesiones en las últimas 8 semanas'),
+          labels: _labels(frequencyLabel: (n) => '$n sesiones en este período'),
           localeName: 'es_AR',
         ),
       ));
@@ -240,7 +238,7 @@ void main() {
         oneRepMaxSeries: [_pt(5, 116.6667)],
         bestSetVolumeSeries: [_pt(5, 500.0)],
         bestSessionVolumeSeries: [_pt(5, 500.0)],
-        frequencyLast8Weeks: 1,
+        frequencySessionCount: 1,
       );
 
       await tester.pumpWidget(_wrap(
@@ -269,7 +267,7 @@ void main() {
         oneRepMaxSeries: [_pt(5, 93.3), _pt(10, 99.0)],
         bestSetVolumeSeries: [_pt(5, 400.0), _pt(10, 270.0)],
         bestSessionVolumeSeries: [_pt(5, 400.0), _pt(10, 285.0)],
-        frequencyLast8Weeks: 2,
+        frequencySessionCount: 2,
       );
 
       await tester.pumpWidget(_wrap(
@@ -318,7 +316,7 @@ void main() {
         oneRepMaxSeries: series,
         bestSetVolumeSeries: series,
         bestSessionVolumeSeries: series,
-        frequencyLast8Weeks: 6,
+        frequencySessionCount: 6,
       );
 
       await tester.pumpWidget(_wrap(
@@ -359,7 +357,7 @@ void main() {
         oneRepMaxSeries: series,
         bestSetVolumeSeries: series,
         bestSessionVolumeSeries: series,
-        frequencyLast8Weeks: 4,
+        frequencySessionCount: 4,
       );
 
       await tester.pumpWidget(_wrap(

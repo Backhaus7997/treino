@@ -143,5 +143,63 @@ void main() {
       expect(find.text('Peso'), findsOneWidget);
       expect(find.text('75'), findsOneWidget);
     });
+
+    // ── #554: dedupe de etiquetas del eje X ───────────────────────────────────
+    //
+    // Mismo defecto que #383 arregló en el chart de progresión (PR #463): sin
+    // `interval` fijo, fl_chart samplea Xs fraccionarias y value.round() mapea
+    // samples vecinos al mismo índice → '21 abr | 21 abr | 19 may | 19 may'.
+
+    testWidgets(
+        '#554: métrica con huecos (5 puntos sobre 7 mediciones) renderiza '
+        'cada etiqueta visible exactamente una vez', (tester) async {
+      // Repro del issue: 7 mediciones quincenales, la serie Peso sólo tiene
+      // valor en 5 (índices 0, 2, 3, 5, 6). UTC-flagged noon (frame ART).
+      final measurements = [
+        _m(DateTime.utc(2026, 4, 7, 12), weightKg: 80),
+        _m(DateTime.utc(2026, 4, 21, 12), fatPercentage: 18),
+        _m(DateTime.utc(2026, 5, 5, 12), weightKg: 79),
+        _m(DateTime.utc(2026, 5, 19, 12), weightKg: 78.5),
+        _m(DateTime.utc(2026, 6, 2, 12), fatPercentage: 17),
+        _m(DateTime.utc(2026, 6, 16, 12), weightKg: 78),
+        _m(DateTime.utc(2026, 6, 30, 12), weightKg: 77.5),
+      ];
+
+      await tester.pumpWidget(_wrap(
+        MeasurementProgressChart(measurements: measurements),
+      ));
+      await tester.pumpAndSettle();
+
+      // Con puntos en los índices [0, 2, 3, 5, 6], _labelIndices elige
+      // {primero, último, ~2 intermedios} → {0, 2, 5, 6}.
+      for (final label in ['7 abr', '5 may', '16 jun', '30 jun']) {
+        expect(find.text(label), findsOneWidget,
+            reason: 'la etiqueta "$label" debe aparecer exactamente una vez');
+      }
+      // Fuera del subset (o sin punto de Peso) → sin etiqueta.
+      for (final label in ['21 abr', '19 may', '2 jun']) {
+        expect(find.text(label), findsNothing,
+            reason: '"$label" no integra el subset de etiquetas');
+      }
+    });
+
+    testWidgets('#554: ≤4 puntos etiqueta cada medición exactamente una vez',
+        (tester) async {
+      final measurements = [
+        _m(DateTime.utc(2026, 4, 7, 12), weightKg: 80),
+        _m(DateTime.utc(2026, 4, 21, 12), weightKg: 79),
+        _m(DateTime.utc(2026, 5, 5, 12), weightKg: 78),
+      ];
+
+      await tester.pumpWidget(_wrap(
+        MeasurementProgressChart(measurements: measurements),
+      ));
+      await tester.pumpAndSettle();
+
+      for (final label in ['7 abr', '21 abr', '5 may']) {
+        expect(find.text(label), findsOneWidget,
+            reason: 'la etiqueta "$label" debe aparecer exactamente una vez');
+      }
+    });
   });
 }

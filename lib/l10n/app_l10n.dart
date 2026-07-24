@@ -63,7 +63,7 @@ import 'app_l10n_es.dart';
 /// property.
 abstract class AppL10n {
   AppL10n(String locale)
-    : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+      : localeName = intl.Intl.canonicalizedLocale(locale.toString());
 
   final String localeName;
 
@@ -85,17 +85,17 @@ abstract class AppL10n {
   /// of delegates is preferred or required.
   static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
       <LocalizationsDelegate<dynamic>>[
-        delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-      ];
+    delegate,
+    GlobalMaterialLocalizations.delegate,
+    GlobalCupertinoLocalizations.delegate,
+    GlobalWidgetsLocalizations.delegate,
+  ];
 
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
     Locale('en'),
     Locale('es'),
-    Locale('es', 'AR'),
+    Locale('es', 'AR')
   ];
 
   /// No description provided for @notFoundTitle.
@@ -223,6 +223,30 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'EXPLORAR RUTINAS  →'**
   String get homeEstaSemanaEmptyCta;
+
+  /// Home 'Esta Semana' card header pill label when the athlete has history but zero sessions this week (#551).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'A RETOMAR'**
+  String get homeEstaSemanaHeaderPillResume;
+
+  /// Home 'Esta Semana' card resume-state title for an athlete with past sessions but none this week.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TU RACHA\nTE ESPERA'**
+  String get homeEstaSemanaResumeTitle;
+
+  /// Home 'Esta Semana' card resume-state body copy encouraging a returning athlete to train again.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ya tenés historial construido. Esta semana todavía está en cero — retomá hoy y seguí sumando progreso.'**
+  String get homeEstaSemanaResumeBody;
+
+  /// Home 'Esta Semana' card resume-state CTA button navigating to routines.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VOLVER A ENTRENAR  →'**
+  String get homeEstaSemanaResumeCta;
 
   /// No description provided for @authSplashTagline.
   ///
@@ -4352,6 +4376,12 @@ abstract class AppL10n {
   /// **'{count, plural, =0{Sin sesiones en las últimas 8 semanas} =1{1 sesión en las últimas 8 semanas} other{{count} sesiones en las últimas 8 semanas}}'**
   String progressionFrequency(int count);
 
+  /// Frecuencia stat label scoped to the active chart period selected in the period selector (#555).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =0{Sin sesiones en este período} =1{1 sesión en este período} other{{count} sesiones en este período}}'**
+  String progressionFrequencyPeriod(int count);
+
   /// Hint shown when only 1 data point exists — no trend line can be drawn.
   ///
   /// In es_AR, this message translates to:
@@ -4669,10 +4699,7 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'{vencidos, plural, =1{1 vencido} other{{vencidos} vencidos}} · {solicitudes, plural, =1{1 solicitud} other{{solicitudes} solicitudes}} · {inactivos, plural, =1{1 inactivo} other{{inactivos} inactivos}}'**
   String dashboardAlertBannerSummary(
-    int vencidos,
-    int solicitudes,
-    int inactivos,
-  );
+      int vencidos, int solicitudes, int inactivos);
 
   /// Formatted adherencia percentage value shown in the adherencia ring and KPI tile once the aggregate provider has data.
   ///
@@ -5457,9 +5484,8 @@ AppL10n lookupAppL10n(Locale locale) {
   }
 
   throw FlutterError(
-    'AppL10n.delegate failed to load unsupported locale "$locale". This is likely '
-    'an issue with the localizations generation tool. Please file an issue '
-    'on GitHub with a reproducible sample app and the gen-l10n configuration '
-    'that was used.',
-  );
+      'AppL10n.delegate failed to load unsupported locale "$locale". This is likely '
+      'an issue with the localizations generation tool. Please file an issue '
+      'on GitHub with a reproducible sample app and the gen-l10n configuration '
+      'that was used.');
 }
