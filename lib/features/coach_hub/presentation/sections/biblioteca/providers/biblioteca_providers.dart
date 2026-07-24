@@ -54,10 +54,21 @@ final bibliotecaExercisesProvider =
   final muscles = ref.watch(bibliotecaMuscleFilterProvider);
   final equipment = ref.watch(bibliotecaEquipmentFilterProvider);
 
-  // Catalog is the spine — propagate its loading/error states.
-  if (catalogAsync.isLoading) return const AsyncLoading();
-  if (catalogAsync.hasError) {
-    return AsyncError(catalogAsync.error!, catalogAsync.stackTrace!);
+  // Catalog is the spine — hasValue-first (pulido-post-revision, mismo
+  // patrón que pagosBucketsProvider): `exercisesProvider` es un
+  // `FutureProvider` en vivo (re-corre con cada emisión de
+  // `authStateChangesProvider`) — Riverpod 2.5+ preserva el valor previo
+  // dentro de un `AsyncError` subsiguiente (copyWithPrevious/"seamless"),
+  // así que `hasValue == true` Y `hasError == true` pueden darse a la vez
+  // tras un error transitorio. Antes se chequeaba `isLoading`/`hasError`
+  // ANTES que el valor cacheado, así que ese error transitorio tiraba el
+  // catálogo ya cargado en la CAPA PROVIDER (peor que en UI: se pierde el
+  // cache, no solo la pantalla).
+  if (!catalogAsync.hasValue) {
+    if (catalogAsync.hasError) {
+      return AsyncError(catalogAsync.error!, catalogAsync.stackTrace!);
+    }
+    return const AsyncLoading();
   }
 
   final catalog = catalogAsync.requireValue;
@@ -108,9 +119,12 @@ final bibliotecaUnfilteredCountProvider =
   final catalogAsync = ref.watch(exercisesProvider);
   final uid = ref.watch(currentUidProvider) ?? '';
 
-  if (catalogAsync.isLoading) return const AsyncLoading();
-  if (catalogAsync.hasError) {
-    return AsyncError(catalogAsync.error!, catalogAsync.stackTrace!);
+  // hasValue-first — ver comentario en `bibliotecaExercisesProvider`.
+  if (!catalogAsync.hasValue) {
+    if (catalogAsync.hasError) {
+      return AsyncError(catalogAsync.error!, catalogAsync.stackTrace!);
+    }
+    return const AsyncLoading();
   }
 
   final catalog = catalogAsync.requireValue;

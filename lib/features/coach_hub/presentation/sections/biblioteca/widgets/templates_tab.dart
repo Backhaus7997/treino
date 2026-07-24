@@ -51,46 +51,63 @@ class TemplatesTab extends ConsumerWidget {
 
     return TreinoStateSwitcher(
       childKey: ValueKey(_stateKey(templatesAsync)),
-      child: templatesAsync.when(
-        loading: () => const _TemplatesGridSkeleton(),
-        error: (e, _) => const TreinoEmptyState(
-          icon: TreinoIcon.errorState,
-          title: 'Error al cargar plantillas', // i18n
-        ),
-        data: (templates) {
-          if (templates.isEmpty) {
-            return const TreinoEmptyState(
-              icon: TreinoIcon.emptyState,
-              title: 'Todavía no creaste plantillas', // i18n
-            );
-          }
+      child: _buildBody(context, templatesAsync),
+    );
+  }
 
-          return GridView.builder(
-            padding: _gridPadding,
-            gridDelegate: _gridDelegate,
-            itemCount: templates.length,
-            itemBuilder: (context, index) {
-              final routine = templates[index];
-              return TemplateGridCard(
-                routine: routine,
-                onTap: () => showTemplateDetailDialog(context, routine),
-              );
-            },
+  // hasValue-first (pulido-post-revision, mismo defecto que Chat/Alumnos,
+  // commit cdd41949/cf1cc143): `trainerTemplatesStreamProvider` es un
+  // StreamProvider en vivo — Riverpod 2.5+ preserva el valor previo dentro
+  // de un `AsyncError` subsiguiente (copyWithPrevious/"seamless"), así que
+  // `hasValue == true` Y `hasError == true` pueden darse a la vez tras un
+  // error transitorio. `.when()` despacha por SUBTIPO runtime e ignora
+  // `hasValue`, tapando las plantillas ya cargadas con la pantalla de error.
+  // Reemplazado por chequeo explícito hasValue → hasError → loading.
+  Widget _buildBody(
+    BuildContext context,
+    AsyncValue<List<Routine>> templatesAsync,
+  ) {
+    if (templatesAsync.hasValue) {
+      final templates = templatesAsync.requireValue;
+      if (templates.isEmpty) {
+        return const TreinoEmptyState(
+          icon: TreinoIcon.emptyState,
+          title: 'Todavía no creaste plantillas', // i18n
+        );
+      }
+
+      return GridView.builder(
+        padding: _gridPadding,
+        gridDelegate: _gridDelegate,
+        itemCount: templates.length,
+        itemBuilder: (context, index) {
+          final routine = templates[index];
+          return TemplateGridCard(
+            routine: routine,
+            onTap: () => showTemplateDetailDialog(context, routine),
           );
         },
-      ),
-    );
+      );
+    }
+    if (templatesAsync.hasError) {
+      return const TreinoEmptyState(
+        icon: TreinoIcon.errorState,
+        title: 'Error al cargar plantillas', // i18n
+      );
+    }
+    return const _TemplatesGridSkeleton();
   }
 }
 
 /// Discrimina el estado actual para [TreinoStateSwitcher]. Sin filtros en
 /// esta tab, por lo que las keys son fijas: `loading`/`error`/`empty`/`data`.
 String _stateKey(AsyncValue<List<Routine>> templatesAsync) {
+  // hasValue-first — ver comentario en `_buildBody`.
+  if (templatesAsync.hasValue) {
+    return templatesAsync.requireValue.isEmpty ? 'empty' : 'data';
+  }
   if (templatesAsync.hasError) return 'error';
-  if (templatesAsync.isLoading && !templatesAsync.hasValue) return 'loading';
-  final data = templatesAsync.value ?? const [];
-  if (data.isEmpty) return 'empty';
-  return 'data';
+  return 'loading';
 }
 
 /// Skeleton de carga de la grilla de plantillas — mismo [_gridDelegate] que

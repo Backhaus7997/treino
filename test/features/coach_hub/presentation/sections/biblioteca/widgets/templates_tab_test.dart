@@ -234,6 +234,63 @@ void main() {
     });
   });
 
+  group(
+      'TemplatesTab — SCENARIO-STALE — plantillas sostienen ante error '
+      'transitorio (pulido-post-revision)', () {
+    // Regression: `TemplatesTab.build` despachaba con
+    // `templatesAsync.when(...)` — dispatch por SUBTIPO runtime, ignora
+    // `hasValue`. `trainerTemplatesStreamProvider` es un StreamProvider en
+    // vivo — Riverpod 2.5+ preserva el valor previo dentro de un
+    // `AsyncError` subsiguiente (copyWithPrevious/"seamless"), así que un
+    // error transitorio (sin estar en loading) caía en la rama `error:` y
+    // tapaba las plantillas ya cargadas con el mensaje de error. `_stateKey`
+    // tenía el mismo defecto (`hasError` chequeado antes que `hasValue`).
+    testWidgets(
+        'plantillas ya cargadas no desaparecen tras un error transitorio '
+        'del stream (stale-while-refresh)', (tester) async {
+      tester.view.physicalSize = const Size(1280, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final controller = StreamController<List<Routine>>();
+      addTearDown(controller.close);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            currentUidProvider.overrideWithValue(_kTrainerId),
+            trainerTemplatesStreamProvider(_kTrainerId).overrideWith(
+              (ref) => controller.stream,
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.dark(),
+            home: const Scaffold(body: TemplatesTab()),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      controller.add([_templateA]);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Fuerza Total'), findsOneWidget);
+      expect(find.textContaining('Error'), findsNothing);
+
+      controller.addError(Exception('transient stream hiccup'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Fuerza Total'),
+        findsOneWidget,
+        reason: 'un error transitorio con data ya cargada no debe tapar las '
+            'plantillas',
+      );
+      expect(find.textContaining('Error'), findsNothing);
+    });
+  });
+
   group('TemplatesTab — template detail dialog', () {
     testWidgets('tap template card opens TreinoDialog — SCENARIO-BIBW-10a',
         (tester) async {
