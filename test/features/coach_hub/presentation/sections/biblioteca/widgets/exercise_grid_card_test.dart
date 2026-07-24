@@ -3,7 +3,9 @@
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach_hub/presentation/sections/biblioteca/widgets/exercise_grid_card.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/treino_interactive_state.dart';
@@ -69,6 +71,58 @@ void main() {
       await tester.pump();
 
       expect(find.text('CUSTOM'), findsNothing);
+    });
+
+    testWidgets(
+        'thumbnail: card normal muestra el placeholder de marca (wordmark '
+        'TREINO) — sin imágenes de red', (tester) async {
+      await tester.pumpWidget(_wrap(
+        ExerciseGridCard(exercise: _bench, onTap: () {}),
+      ));
+      await tester.pump();
+
+      expect(
+        find.byKey(const Key('exercise_grid_card_brand_placeholder')),
+        findsOneWidget,
+      );
+      expect(find.byType(SvgPicture), findsOneWidget);
+      expect(find.byType(Image), findsNothing);
+
+      const palette = AppPalette.mintMagenta;
+      final svg = tester.widget<SvgPicture>(find.byType(SvgPicture));
+      expect(
+        svg.colorFilter,
+        ColorFilter.mode(
+          palette.accent.withValues(alpha: 0.3),
+          BlendMode.srcIn,
+        ),
+      );
+    });
+
+    testWidgets(
+        'thumbnail: card CUSTOM también muestra el placeholder de marca, '
+        'con accent más presente que la card normal', (tester) async {
+      await tester.pumpWidget(_wrap(
+        ExerciseGridCard(exercise: _customEx, onTap: () {}),
+      ));
+      await tester.pump();
+
+      expect(
+        find.byKey(const Key('exercise_grid_card_brand_placeholder')),
+        findsOneWidget,
+      );
+      expect(find.byType(SvgPicture), findsOneWidget);
+      expect(find.byType(Image), findsNothing);
+
+      const palette = AppPalette.mintMagenta;
+      final svg = tester.widget<SvgPicture>(find.byType(SvgPicture));
+      expect(
+        svg.colorFilter,
+        ColorFilter.mode(
+          palette.accent.withValues(alpha: 0.55),
+          BlendMode.srcIn,
+        ),
+      );
     });
 
     testWidgets('tap invoca onTap', (tester) async {

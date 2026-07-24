@@ -70,13 +70,15 @@ class ChatMessageBubble extends StatelessWidget {
           ),
           decoration: BoxDecoration(
             color: bg,
-            // Los 4 corners comparten AppRadius.sm — la escala cerrada del
-            // design system solo admite 12/16/20/full, así que la "cola"
-            // asimétrica de la burbuja (antes con AppSpacing.hairline, un
-            // token de SPACING reusado indebidamente como radio) queda
-            // pareja con el resto en vez de introducir una excepción fuera
-            // de escala (remediación CRITICAL-2, verify report Fase 8).
-            borderRadius: BorderRadius.circular(AppRadius.sm),
+            // Radios generosos y asimétricos ("cola") — rediseño ronda de
+            // revisión 2026-07-23: 3 esquinas en AppRadius.lg (más
+            // redondeado que el sm uniforme anterior) + 1 esquina en
+            // AppRadius.sm apuntando hacia el emisor, insinuando la cola de
+            // la burbuja sin romper la escala cerrada 12/16/20/full (las 4
+            // esquinas siguen perteneciendo a esa escala — pinned test
+            // `chat_message_bubble_tokens_test.dart` sigue pasando sin
+            // tocarla).
+            borderRadius: _bubbleRadius(isOwn),
             // Burbuja propia es sólida (sin borde); recibida mantiene el
             // borde sutil sobre bgCard.
             border: isOwn ? null : Border.all(color: palette.border),
@@ -192,4 +194,27 @@ class ChatMessageBubble extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Radio de esquina de la burbuja — 3 esquinas generosas (`AppRadius.lg`) +
+/// 1 esquina "cola" (`AppRadius.sm`) apuntando hacia el lado del emisor:
+/// propia (derecha) → cola abajo-derecha; recibida (izquierda) → cola
+/// abajo-izquierda. Ambas esquinas pertenecen a la escala cerrada del
+/// design system (12/16/20/full).
+BorderRadius _bubbleRadius(bool isOwn) {
+  const generous = Radius.circular(AppRadius.lg);
+  const tail = Radius.circular(AppRadius.sm);
+  return isOwn
+      ? const BorderRadius.only(
+          topLeft: generous,
+          topRight: generous,
+          bottomLeft: generous,
+          bottomRight: tail,
+        )
+      : const BorderRadius.only(
+          topLeft: generous,
+          topRight: generous,
+          bottomRight: generous,
+          bottomLeft: tail,
+        );
 }

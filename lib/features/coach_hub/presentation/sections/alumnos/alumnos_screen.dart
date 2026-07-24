@@ -7,16 +7,28 @@ import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
+import 'package:treino/features/coach_hub/presentation/sections/chat/chat_section_screen.dart'
+    show selectedChatIdProvider;
+import 'package:treino/features/coach_hub/presentation/sections/nutricion/nutricion_providers.dart';
+import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/marcar_pagado_actions.dart'
+    show registrarPago;
+import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pagos_buckets_provider.dart';
+import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pagos_estado.dart';
+import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/payment_format.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
 import '../../../../../l10n/app_l10n.dart';
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart';
+import 'package:treino/features/payments/domain/payment.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
+import 'package:treino/features/workout/application/assigned_routine_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
+import 'package:treino/features/workout/domain/routine_status.dart';
 
 /// Estado compuesto de un alumno en el roster (link + billing).
 ///
@@ -32,10 +44,15 @@ extension AlumnoEstadoX on AlumnoEstado {
         AlumnoEstado.inactivo => l10n.coachHubAlumnosStatusInactive,
       };
 
+  // Feedback de revisión ("dot de estado con color semántico"): activo=mint,
+  // pausado=warning (antes highlight — no es un estado de riesgo, pero
+  // tampoco "normal"), conDeuda=danger (antes warning — más severo que un
+  // pago por vencer), inactivo=textMuted. Alinea con la paleta danger/warning
+  // que ya usa Pagos (`pagos_estado.dart`).
   Color color(AppPalette p) => switch (this) {
         AlumnoEstado.activo => p.accent,
-        AlumnoEstado.conDeuda => p.warning,
-        AlumnoEstado.pausado => p.highlight,
+        AlumnoEstado.pausado => p.warning,
+        AlumnoEstado.conDeuda => p.danger,
         AlumnoEstado.inactivo => p.textMuted,
       };
 }
@@ -232,55 +249,66 @@ class _RosterFrame extends ConsumerWidget {
 
     final activos = roster.where((e) => e.estado == AlumnoEstado.activo).length;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.s20,
-        vertical: AppSpacing.s20,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          TreinoFadeSlideIn(
-            delay: AppMotion.stagger(0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TreinoSectionHeader(
-                  title: l10n.coachHubAlumnosTitle,
-                  count: roster.length,
+    // Breakpoint responsive (900px, mismo estándar que el resto del hub —
+    // ver `agenda_web_screen.dart`): el `LayoutBuilder` capta el ancho
+    // ANTES del padding horizontal propio de esta sección, igual que el
+    // patrón de agenda, para que el corte coincida con el ancho real de
+    // pantalla/panel y no con el ancho ya recortado por el padding interno.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= 900;
+        return SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.s20,
+            vertical: AppSpacing.s20,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TreinoFadeSlideIn(
+                delay: AppMotion.stagger(0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TreinoSectionHeader(
+                      title: l10n.coachHubAlumnosTitle,
+                      count: roster.length,
+                    ),
+                    const SizedBox(height: AppSpacing.hairline),
+                    Text(
+                      l10n.coachHubAlumnosSummary(roster.length, activos),
+                      style: TextStyle(color: palette.textMuted, fontSize: 13),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: AppSpacing.hairline),
-                Text(
-                  l10n.coachHubAlumnosSummary(roster.length, activos),
-                  style: TextStyle(color: palette.textMuted, fontSize: 13),
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(height: AppSpacing.s18),
+              TreinoFadeSlideIn(
+                delay: AppMotion.stagger(1),
+                child: _FiltroChips(filtro: filtro, countFor: countFor),
+              ),
+              const SizedBox(height: AppSpacing.s12),
+              TreinoFadeSlideIn(
+                delay: AppMotion.stagger(2),
+                child: const _SearchField(),
+              ),
+              const SizedBox(height: AppSpacing.s14),
+              _RosterTable(
+                visibles: visibles,
+                profiles: profiles,
+                gymNameFor: gymNameFor,
+                loading: tableLoading,
+                errorMessage: errorMessage,
+                onRetry: onRetry,
+                wide: wide,
+                emptyMessage: roster.isEmpty
+                    ? l10n.coachHubAlumnosEmpty
+                    : l10n.coachHubAlumnosEmptyFiltered,
+              ),
+            ],
           ),
-          const SizedBox(height: AppSpacing.s18),
-          TreinoFadeSlideIn(
-            delay: AppMotion.stagger(1),
-            child: _FiltroChips(filtro: filtro, countFor: countFor),
-          ),
-          const SizedBox(height: AppSpacing.s12),
-          TreinoFadeSlideIn(
-            delay: AppMotion.stagger(2),
-            child: const _SearchField(),
-          ),
-          const SizedBox(height: AppSpacing.s14),
-          _RosterTable(
-            visibles: visibles,
-            profiles: profiles,
-            gymNameFor: gymNameFor,
-            loading: tableLoading,
-            errorMessage: errorMessage,
-            onRetry: onRetry,
-            emptyMessage: roster.isEmpty
-                ? l10n.coachHubAlumnosEmpty
-                : l10n.coachHubAlumnosEmptyFiltered,
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -384,6 +412,7 @@ class _RosterTable extends ConsumerWidget {
     required this.loading,
     required this.errorMessage,
     required this.emptyMessage,
+    required this.wide,
     this.onRetry,
   });
 
@@ -395,37 +424,104 @@ class _RosterTable extends ConsumerWidget {
   final String emptyMessage;
   final VoidCallback? onRetry;
 
+  /// `true` con >=900px de ancho disponible (breakpoint del hub). En angosto
+  /// colapsan las columnas agregadas por esta revisión (último entreno,
+  /// rutina, nutrición, vencimiento) y sólo quedan alumno/estado/acciones —
+  /// las 3 que el mockup original ya trataba como núcleo del roster. Las
+  /// celdas colapsadas siguen viajando en `cellWidgets`/`cells` (no se
+  /// filtran los rows): `CoachHubDataTable` sólo renderiza lo que aparece en
+  /// `columns`, así que basta con no declarar la columna acá — no hace falta
+  /// tocar el kit compartido (prohibido para esta pieza).
+  final bool wide;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
 
+    // Ventana de 30 días, día-truncada (UTC) — se computa UNA vez acá (no por
+    // fila) para que la family key de finishedInWindowByUidProvider quede
+    // estable entre rebuilds (mismo criterio que inactivosProvider).
+    final now = DateTime.now().toUtc();
+    final todayStart = DateTime.utc(now.year, now.month, now.day);
+    final windowFrom = todayStart.subtract(const Duration(days: 30));
+    final windowTo = todayStart.add(const Duration(days: 1));
+
     return CoachHubDataTable(
       columns: [
+        // Densidad de fila revisada para esta pieza (responsive-gates): los
+        // flex de TODAS las columnas se recalibraron a un común denominador
+        // más fino (suman 114) — ya no alcanza con enteros chicos (1-4) para
+        // que el header de cada columna respire con las 7 columnas visibles
+        // a la vez en el peor caso (900px, el propio breakpoint: con los
+        // flex 3/1/2/1/1/1/2 originales, el header más largo del roster
+        // («ÚLTIMO ENTRENO») desbordaba por 43px ahí). «Alumno» ya trunca
+        // con ellipsis (`_AlumnoCell`, avatar 36 + gap 12 fijos, el resto es
+        // Flexible) — absorbe el recorte sin riesgo real de overflow (a
+        // diferencia del resto, cuyo header es un `Text` sin ellipsis en el
+        // kit compartido).
         CoachHubColumn(
           key: 'alumno',
           label: l10n.coachHubAlumnosColumnStudent,
-          flex: 4,
+          flex: 14,
         ),
+        // «ESTADO» (l10n, 6 mayúsculas) necesita más aire que un flex:1
+        // sobre 11 columnas totales — mismo criterio que «Rutina».
         CoachHubColumn(
           key: 'estado',
           label: l10n.coachHubAlumnosColumnStatus,
-          flex: 2,
+          flex: 14,
         ),
-        CoachHubColumn(
-          key: 'ultimoEntreno',
-          label: l10n.coachHubAlumnosColumnLastWorkout,
-          flex: 2,
-        ),
+        // Responsive (breakpoint 900px): último entreno/rutina/nutrición/
+        // vencimiento colapsan en angosto — alumno/estado/acciones quedan
+        // como el núcleo siempre visible del roster. En angosto hay bastante
+        // menos flex total compitiendo por el ancho disponible, así que cada
+        // columna que queda se lleva más espacio relativo aunque comparta
+        // los mismos números de flex que en ancho (mismo mecanismo de
+        // `Expanded(flex:)` del kit, sin tocarlo).
+        if (wide) ...[
+          // «ÚLTIMO ENTRENO» (l10n, 14 caracteres con espacio) es el header
+          // más largo del roster — el que más flex necesita.
+          CoachHubColumn(
+            key: 'ultimoEntreno',
+            label: l10n.coachHubAlumnosColumnLastWorkout,
+            flex: 27,
+          ),
+          const CoachHubColumn(
+              key: 'rutina', label: 'Rutina', flex: 14), // i18n
+          // Header corto ("Plan") en vez de "Nutrición": el ancho de columna
+          // disponible (flex compartido con el resto de la fila, sin
+          // ellipsis en `_HeaderCell` del kit) no entra con la palabra
+          // completa — el chip de la celda ("Con plan"/"Sin plan") ya deja
+          // clara la semántica. "Plan" (4 caracteres) es el header más corto
+          // del roster — el que menos flex necesita.
+          const CoachHubColumn(
+              key: 'nutricion', label: 'Plan', flex: 12), // i18n
+          // Header corto ("Vence") por la misma razón que "Plan"/"Rutina".
+          const CoachHubColumn(key: 'vencimiento', label: 'Vence', flex: 13),
+        ],
+        // «ACCIONES» (l10n) + hasta 5 icon-buttons en la fila (pieza
+        // «acciones» previa) — necesita el flex más alto después de
+        // «Último entreno» para que los 5 íconos no se apiñen.
         CoachHubColumn(
           key: 'acciones',
           label: l10n.coachHubAlumnosColumnActions,
-          flex: 2,
+          flex: 20,
         ),
       ],
       rows: [
         for (final entry in visibles)
-          _rowFor(context, ref, palette, l10n, entry, gymNameFor(entry.link)),
+          _rowFor(
+            context,
+            ref,
+            palette,
+            l10n,
+            entry,
+            gymNameFor(entry.link),
+            todayStart: todayStart,
+            windowFrom: windowFrom,
+            windowTo: windowTo,
+          ),
       ],
       loading: loading,
       errorMessage: errorMessage,
@@ -441,24 +537,33 @@ class _RosterTable extends ConsumerWidget {
     AppPalette palette,
     AppL10n l10n,
     _RosterEntry entry,
-    String? gymName,
-  ) {
+    String? gymName, {
+    required DateTime todayStart,
+    required DateTime windowFrom,
+    required DateTime windowTo,
+  }) {
     final link = entry.link;
     final estado = entry.estado;
     final profile = profiles[link.athleteId];
     final name = profile?.displayName ?? l10n.coachHubAlumnosNameFallback;
-    final trainedToday =
-        (ref.watch(finishedTodayByUidProvider(link.athleteId)).valueOrNull ??
-                const [])
-            .isNotEmpty;
+
+    // Camino barato (sin campo denormalizado): bounded query por-alumno vía
+    // finishedInWindowByUidProvider, ordenada finishedAt DESC — el primer
+    // elemento ya es la sesión más reciente dentro de la ventana.
+    final windowKey =
+        (athleteId: link.athleteId, from: windowFrom, to: windowTo);
+    final sessionsInWindow =
+        ref.watch(finishedInWindowByUidProvider(windowKey)).valueOrNull ??
+            const [];
+    final lastFinishedAt =
+        sessionsInWindow.isEmpty ? null : sessionsInWindow.first.finishedAt;
 
     return CoachHubRow(
       id: link.athleteId,
       cells: {
         'alumno': name,
         'estado': estado.label(l10n),
-        'ultimoEntreno':
-            trainedToday ? l10n.coachHubAlumnosLastWorkoutToday : '—',
+        'ultimoEntreno': lastWorkoutLabel(l10n, lastFinishedAt, todayStart),
       },
       cellWidgets: {
         'alumno': _AlumnoCell(
@@ -468,10 +573,38 @@ class _RosterTable extends ConsumerWidget {
           palette: palette,
         ),
         'estado': _EstadoBadge(estado: estado, palette: palette),
+        'rutina': _RutinaCell(athleteId: link.athleteId, palette: palette),
+        'nutricion':
+            _NutricionCell(athleteId: link.athleteId, palette: palette),
+        'vencimiento':
+            _VencimientoCell(athleteId: link.athleteId, palette: palette),
         'acciones': _RowActions(link: link, palette: palette),
       },
     );
   }
+}
+
+/// Etiqueta relativa de la columna «Último entreno», dado el `finishedAt` de
+/// la sesión más reciente dentro de la ventana de 30 días (o `null` si no
+/// hay ninguna) y el "hoy" ya día-truncado (UTC) usado para computar esa
+/// ventana. Pública para testear sin pump (mismo patrón que [estadoForLink]).
+///
+/// "Sin entrenos" es honesto sobre el límite de la ventana: NO implica que el
+/// alumno nunca entrenó, sólo que no hay sesión finalizada en los últimos 30
+/// días. Labels nuevos hardcodeados es-AR (ADR-A3-03: l10n congelado, sólo
+/// columnas existentes usan AppL10n) — excepto "Hoy", que ya tenía key.
+String lastWorkoutLabel(
+  AppL10n l10n,
+  DateTime? lastFinishedAt,
+  DateTime todayStart,
+) {
+  if (lastFinishedAt == null) return 'Sin entrenos'; // i18n
+  final utc = lastFinishedAt.toUtc();
+  final day = DateTime.utc(utc.year, utc.month, utc.day);
+  final daysAgo = todayStart.difference(day).inDays;
+  if (daysAgo <= 0) return l10n.coachHubAlumnosLastWorkoutToday;
+  if (daysAgo == 1) return 'Ayer'; // i18n
+  return 'Hace $daysAgo días'; // i18n
 }
 
 /// Celda «Alumno»: avatar + nombre + gym (si se conoce).
@@ -498,7 +631,10 @@ class _AlumnoCell extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _Avatar(name: name, url: url, palette: palette),
+        // Feedback de revisión: avatar tintado del kit (barrel) en vez del
+        // círculo apagado (fondo neutro + inicial gris) — mismo componente
+        // que Chat/Rutinas, tinte determinístico por nombre.
+        TreinoAvatar(displayName: name, avatarUrl: url, diameter: 36),
         const SizedBox(width: AppSpacing.s12),
         Flexible(
           child: Text.rich(
@@ -528,35 +664,6 @@ class _AlumnoCell extends StatelessWidget {
   }
 }
 
-class _Avatar extends StatelessWidget {
-  const _Avatar({required this.name, required this.url, required this.palette});
-
-  final String name;
-  final String? url;
-  final AppPalette palette;
-
-  @override
-  Widget build(BuildContext context) {
-    final initial = name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
-    return CircleAvatar(
-      radius: 18,
-      backgroundColor: palette.bg,
-      backgroundImage:
-          (url != null && url!.isNotEmpty) ? NetworkImage(url!) : null,
-      child: (url == null || url!.isEmpty)
-          ? Text(
-              initial,
-              style: TextStyle(
-                color: palette.accent,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            )
-          : null,
-    );
-  }
-}
-
 class _EstadoBadge extends StatelessWidget {
   const _EstadoBadge({required this.estado, required this.palette});
 
@@ -566,7 +673,154 @@ class _EstadoBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
-    final color = estado.color(palette);
+    return _DotLabel(color: estado.color(palette), label: estado.label(l10n));
+  }
+}
+
+/// Celda «Rutina»: chip compacto (dot + label) que deriva su estado de
+/// `assignedRoutinesProvider(athleteId)` — "Activa" si el alumno tiene al
+/// menos una rutina con `status == active` asignada, "Sin rutina" en
+/// cualquier otro caso (incluye loading/error, `valueOrNull` — mismo
+/// criterio "barato" que la celda de último entreno). Tap navega al detalle
+/// de rutinas del alumno (`/rutinas/:athleteId`, deep-link) envuelto en
+/// `InkWell` para que absorba el gesto y no dispare el `onRowTap` de la fila
+/// (mismo patrón que `_IconAction`/`_RowActions`, que ya conviven con el
+/// `onRowTap` de `CoachHubDataTable`).
+class _RutinaCell extends ConsumerWidget {
+  const _RutinaCell({required this.athleteId, required this.palette});
+
+  final String athleteId;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final routines =
+        ref.watch(assignedRoutinesProvider(athleteId)).valueOrNull ?? const [];
+    final activa = routines.any((r) => r.status == RoutineStatus.active);
+    return _TappableDotLabel(
+      color: activa ? palette.accent : palette.textMuted,
+      label: activa ? 'Activa' : 'Sin rutina', // i18n
+      onTap: () => context.go('/rutinas/$athleteId'),
+    );
+  }
+}
+
+/// Celda «Nutrición»: chip compacto (dot + label) que deriva su estado del
+/// overview cross-alumno de Fase 6 (`nutricionEntriesProvider`) — REUTILIZA
+/// esa agregación en vez de cruzar `nutritionPlanProvider` por fila (no
+/// duplica el patrón N-streams ya resuelto ahí, ADR-F6-04). "Con plan" si
+/// existe una entry para este alumno con un `NutritionPlan` resuelto (no
+/// loading); "Sin plan" en cualquier otro caso — incluye ausencia de entry
+/// (alumno no `active`, la agregación sólo cubre vínculos activos), loading
+/// o error (mismo criterio "barato" que `_RutinaCell`/último entreno). Tap
+/// navega al detalle del alumno (`/alumnos/:athleteId`, deep-link al editor
+/// real de Fase 3 — NO se edita en el hub, ADR-F6-03), envuelto en `InkWell`
+/// para que absorba el gesto y no dispare el `onRowTap` de la fila.
+class _NutricionCell extends ConsumerWidget {
+  const _NutricionCell({required this.athleteId, required this.palette});
+
+  final String athleteId;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final entries = ref.watch(nutricionEntriesProvider).valueOrNull ?? const [];
+    NutricionEntry? entry;
+    for (final e in entries) {
+      if (e.link.athleteId == athleteId) {
+        entry = e;
+        break;
+      }
+    }
+    final conPlan = entry != null && !entry.planLoading && entry.plan != null;
+    return _TappableDotLabel(
+      color: conPlan ? palette.accent : palette.textMuted,
+      label: conPlan ? 'Con plan' : 'Sin plan', // i18n
+      onTap: () => context.go('/alumnos/$athleteId'),
+    );
+  }
+}
+
+/// Info derivada para la celda «Vencimiento»: agrega los pagos del alumno vía
+/// [pagoEstadoOf] (mismo criterio dueAt-aware que Pagos, ADR-PGW-002/
+/// REQ-VENC-11) y resuelve el peor caso — un pago vencido tiene prioridad
+/// sobre cualquier pago por vencer (más urgente, no tiene sentido mostrar una
+/// fecha futura si ya hay una cuota vencida); sin pago vencido, se toma el
+/// `dueAt` más próximo entre los pagos por vencer (los legacy sin `dueAt` no
+/// aportan fecha); sin ningún pago del alumno, no hay cuota
+/// (`vencido: false, proximaFecha: null` → celda "—").
+///
+/// Pública para testear sin pump (mismo patrón que [estadoForLink] /
+/// [lastWorkoutLabel]).
+({bool vencido, DateTime? proximaFecha}) vencimientoInfoFor(
+  List<Payment> payments,
+  String athleteId,
+  DateTime now,
+) {
+  var vencido = false;
+  DateTime? proxima;
+  for (final p in payments) {
+    if (p.athleteId != athleteId) continue;
+    final estado = pagoEstadoOf(p, now).estado;
+    if (estado == PagoEstado.vencido) {
+      vencido = true;
+    } else if (estado == PagoEstado.porVencer && p.dueAt != null) {
+      final dueAt = p.dueAt!;
+      if (proxima == null || dueAt.isBefore(proxima)) proxima = dueAt;
+    }
+  }
+  return (vencido: vencido, proximaFecha: vencido ? null : proxima);
+}
+
+/// Celda «Vencimiento»: badge "Vencido" (danger, mismo token que
+/// `AlumnoEstado.conDeuda`) si el alumno tiene al menos un pago vencido; si
+/// no, la fecha del próximo vencimiento pendiente (formato "22 mayo", mismo
+/// `fmtDayMonth` que la sección Pagos); "—" si no tiene ninguna cuota
+/// pendiente. Deriva de `pagosBucketsProvider` — a diferencia de
+/// `pagosPorCobrarProvider` (usado en `_LinksLoaded` sólo para derivar el
+/// estado "Con deuda"), éste SÍ trae `dueAt` (ver plan-fase9).
+class _VencimientoCell extends ConsumerWidget {
+  const _VencimientoCell({required this.athleteId, required this.palette});
+
+  final String athleteId;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final payments =
+        ref.watch(pagosBucketsProvider).valueOrNull?.todos ?? const [];
+    final info =
+        vencimientoInfoFor(payments, athleteId, DateTime.now().toUtc());
+
+    if (info.vencido) {
+      return _DotLabel(color: palette.danger, label: 'Vencido'); // i18n
+    }
+    final proxima = info.proximaFecha;
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Text(
+        proxima == null ? '—' : fmtDayMonth(proxima), // i18n
+        style: TextStyle(
+          color: proxima == null ? palette.textMuted : palette.textPrimary,
+          fontSize: 13,
+        ),
+      ),
+    );
+  }
+}
+
+/// Dot + texto — celda compacta compartida por Estado/Rutina/Nutrición/
+/// Vencimiento (mismo idioma visual, columna angosta de la fila fija a
+/// `TreinoTableTokens.rowHeight`). Extraído tras el 2do copy-paste
+/// (Estado→Rutina) — regla del kit (ADR-A3-04).
+class _DotLabel extends StatelessWidget {
+  const _DotLabel({required this.color, required this.label});
+
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
     return Align(
       alignment: Alignment.centerLeft,
       child: Row(
@@ -580,12 +834,71 @@ class _EstadoBadge extends StatelessWidget {
           const SizedBox(width: AppSpacing.hairline + AppSpacing.hairline),
           Flexible(
             child: Text(
-              estado.label(l10n),
+              label,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(color: color, fontSize: 13),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Variante tappable de [_DotLabel] — usada por `_RutinaCell`/
+/// `_NutricionCell` (tap navega a otra pantalla, absorbiendo el gesto para
+/// que no dispare el `onRowTap` de la fila).
+///
+/// A diferencia de envolver `InkWell(child: _DotLabel(...))` (como antes de
+/// la pieza responsive-gates), acá el `Align` queda AFUERA del `InkWell`: el
+/// `InkWell` sólo envuelve el `Row` de contenido (`mainAxisSize: min`), así
+/// que su área tappable es del tamaño del dot+label, no de toda la celda. El
+/// `Align` (fuera) sigue posicionando ese contenido angosto a la izquierda
+/// dentro del ancho completo de la columna. Bug real encontrado al recalibrar
+/// los flex de columna para el breakpoint de 900px: con `InkWell` envolviendo
+/// `_DotLabel` (que internamente ya usaba `Align`), el `InkWell` heredaba el
+/// ancho COMPLETO de la celda (el `Align` interno se expande a llenar el
+/// espacio tight que le da el `Padding`/`Expanded` del kit) — cualquier tap
+/// en el espacio vacío a la derecha del label (no sólo sobre el texto) caía
+/// dentro del `InkWell` y navegaba, en vez de burbujear al tap de la fila.
+/// Eso rompió un test pre-existente (tap en el centro de la fila, que ahora
+/// caía dentro de la columna Rutina/Nutrición al mover los flex).
+class _TappableDotLabel extends StatelessWidget {
+  const _TappableDotLabel({
+    required this.color,
+    required this.label,
+    required this.onTap,
+  });
+
+  final Color color;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        onTap: onTap,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: AppSpacing.hairline + AppSpacing.hairline),
+            Flexible(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: color, fontSize: 13),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -626,11 +939,53 @@ class _RowActions extends ConsumerWidget {
         .terminate(link.id, reason: 'trainer-terminated');
   }
 
+  /// Resuelve (o crea) el chat 1-1 con el alumno vía [chatForOtherUidProvider]
+  /// — mismo provider que la tab «Chat» del detalle — y navega al Chat global
+  /// del Coach Hub dejando la conversación ya seleccionada
+  /// (`selectedChatIdProvider`, mismo mecanismo que usa `ChatListPane` al
+  /// tocar un ítem de la lista).
+  Future<void> _openChat(BuildContext context, WidgetRef ref) async {
+    // El router se captura ANTES del await: las filas del roster se
+    // rebuildean por sus streams y el context de la fila puede morir mientras
+    // getOrCreate resuelve — con `if (!context.mounted) return` la navegación
+    // se perdía silenciosamente (bug reportado en revisión en vivo).
+    final router = GoRouter.of(context);
+    final chat = await ref.read(chatForOtherUidProvider(link.athleteId).future);
+    ref.read(selectedChatIdProvider.notifier).state = chat.chatId;
+    router.go('/chat');
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppL10n.of(context);
     final status = link.status;
-    final buttons = <Widget>[];
+    // Acciones rápidas — SIEMPRE visibles (no dependen del estado del
+    // vínculo, a diferencia de pausar/reanudar/terminar más abajo): el kit
+    // (`CoachHubDataTable`) no propaga hover a `cellWidgets`, así que no hay
+    // forma de revelarlas sólo al pasar el mouse — quedan fijas con tooltip.
+    final buttons = <Widget>[
+      _IconAction(
+        icon: TreinoIcon.chat,
+        tooltip: 'Chat', // i18n
+        color: palette.textMuted,
+        onPressed: () => _openChat(context, ref),
+      ),
+      _IconAction(
+        icon: TreinoIcon.dumbbell,
+        tooltip: 'Rutinas', // i18n
+        color: palette.textMuted,
+        onPressed: () => context.go('/rutinas/${link.athleteId}'),
+      ),
+      _IconAction(
+        icon: TreinoIcon.money,
+        tooltip: 'Registrar pago', // i18n
+        color: palette.textMuted,
+        // Reusa `registrarPago` de la sección Pagos (mismo diálogo +
+        // `paymentRepositoryProvider.add`) — evita duplicar el flujo de alta
+        // de un pago ad-hoc ya resuelto ahí.
+        onPressed: () => registrarPago(context, ref, link.athleteId),
+      ),
+    ];
     if (status == TrainerLinkStatus.active) {
       buttons.add(_IconAction(
         icon: TreinoIcon.pause,
@@ -678,11 +1033,25 @@ class _IconAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Hasta 5 botones conviven en la columna «Acciones» (3 acciones rápidas
+    // siempre visibles + hasta 2 de vínculo pausar/reanudar + terminar). Con
+    // Material 3 (ADR de tema, `useMaterial3: true`), `constraints`/`padding`
+    // por sí solos NO alcanzan: `MaterialTapTargetSize.padded` (default del
+    // tema) fuerza un tap target mínimo de 48x48 vía `_InputPadding` —
+    // invisible pero SÍ cuenta para el layout del `Row` padre, y overflowea
+    // igual aunque el `IconButton` se vea de 32x32. `tapTargetSize:
+    // shrinkWrap` en el `style` es lo que realmente reduce el tamaño de caja
+    // que el botón reporta al `Row`.
     return IconButton(
       tooltip: tooltip,
       icon: Icon(icon, size: 18, color: color),
       onPressed: onPressed,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
       visualDensity: VisualDensity.compact,
+      style: IconButton.styleFrom(
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
     );
   }
 }

@@ -6,7 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../../../app/theme/app_palette.dart';
-import '../../../../../../app/theme/tokens/primitives.dart';
+import '../../../../../../app/theme/tokens/tokens.dart';
 import '../../../../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../../../../core/widgets/treino_icon.dart';
@@ -242,7 +242,6 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _Header(chatId: widget.chatId),
-          const Divider(height: 1),
           Expanded(
             child: TreinoStateSwitcher(
               childKey: ValueKey(_messagesStateKey(messagesAsync)),
@@ -268,7 +267,6 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
               ),
             ),
           ),
-          const Divider(height: 1),
           if (_uploading)
             LinearProgressIndicator(
               value: _uploadProgress > 0 ? _uploadProgress : null,
@@ -435,32 +433,17 @@ class _Header extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: palette.bg,
-            backgroundImage: pubAsync.maybeWhen(
-              data: (p) => (p?.avatarUrl != null && p!.avatarUrl!.isNotEmpty)
-                  ? NetworkImage(p.avatarUrl!)
-                  : null,
+          TreinoAvatar(
+            displayName: pubAsync.maybeWhen(
+              data: (p) => p?.displayName ?? '?',
               orElse: () => null,
             ),
-            child: pubAsync.maybeWhen(
-              data: (p) =>
-                  (p?.avatarUrl == null || (p?.avatarUrl ?? '').isEmpty)
-                      ? Text(
-                          (p?.displayName ?? '?').isNotEmpty
-                              ? (p?.displayName ?? '?')[0].toUpperCase()
-                              : '?',
-                          style: TextStyle(
-                            fontFamily: AppFonts.barlowCondensed,
-                            fontWeight: AppFonts.w700,
-                            fontSize: 14,
-                            color: palette.textMuted,
-                          ),
-                        )
-                      : null,
-              orElse: () => const SizedBox.shrink(),
+            avatarUrl: pubAsync.maybeWhen(
+              data: (p) => p?.avatarUrl,
+              orElse: () => null,
             ),
+            diameter: 36,
+            initialFontSize: 14,
           ),
           const SizedBox(width: AppSpacing.s12),
           Expanded(
@@ -701,26 +684,47 @@ class _Composer extends StatelessWidget {
               label: 'Enviar', // i18n: Fase W2
               child: TreinoInteractiveState(
                 onTap: sending ? null : onSend,
-                builder: (ctx, states) => Container(
-                  key: const Key('chat_send_button'),
-                  constraints:
-                      const BoxConstraints(minWidth: 40, minHeight: 40),
-                  alignment: Alignment.center,
-                  child: sending
-                      ? SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: palette.accent,
+                builder: (ctx, states) {
+                  // Botón circular sólido accent (antes: solo un ícono
+                  // mint sin fondo) — mismo criterio de contraste que
+                  // `ChatMessageBubble.ownFg`: sobre mint sólido, `bg`
+                  // (near-black) da alto contraste en dark; en light
+                  // `palette.bg` es casi blanco, así que ahí usamos
+                  // `textPrimary` (near-black también en light).
+                  final onAccent = Theme.of(ctx).brightness == Brightness.dark
+                      ? palette.bg
+                      : palette.textPrimary;
+                  return AnimatedContainer(
+                    key: const Key('chat_send_button'),
+                    duration: AppMotionTokens.resolve(
+                      ctx,
+                      AppMotionTokens.tapFeedback,
+                    ),
+                    width: 40,
+                    height: 40,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: sending
+                          ? palette.accent.withValues(alpha: 0.4)
+                          : palette.accent,
+                    ),
+                    child: sending
+                        ? SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: onAccent,
+                            ),
+                          )
+                        : Icon(
+                            TreinoIcon.send,
+                            size: 18,
+                            color: onAccent,
                           ),
-                        )
-                      : Icon(
-                          TreinoIcon.send,
-                          size: 20,
-                          color: palette.accent,
-                        ),
-                ),
+                  );
+                },
               ),
             ),
           ),

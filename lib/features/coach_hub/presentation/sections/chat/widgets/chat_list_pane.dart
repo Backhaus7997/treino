@@ -2,10 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
-import '../../../../../../app/theme/app_motion.dart';
 import '../../../../../../app/theme/app_palette.dart';
-import '../../../../../../app/theme/tokens/components/treino_focus_tokens.dart';
-import '../../../../../../app/theme/tokens/primitives.dart';
+import '../../../../../../app/theme/tokens/tokens.dart';
 import '../../../../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../../../../core/widgets/treino_icon.dart';
@@ -105,7 +103,6 @@ class _ChatListPaneState extends ConsumerState<ChatListPane> {
               ),
             ),
           ),
-          const Divider(height: 1),
           Expanded(
             child: TreinoStateSwitcher(
               childKey: ValueKey(_stateKey(chatsAsync)),
@@ -268,7 +265,14 @@ class _ChatRow extends ConsumerWidget {
     final otherUid = _resolveOtherUid(chat, currentUid);
     final pubAsync = ref.watch(userPublicProfileProvider(otherUid));
     final hasUnread = chatHasUnread(chat, currentUid);
-    final transparent = palette.bgCard.withValues(alpha: 0);
+    final resolvedName = pubAsync.maybeWhen(
+      data: (p) => p?.displayName ?? '?',
+      orElse: () => null,
+    );
+    final resolvedAvatarUrl = pubAsync.maybeWhen(
+      data: (p) => p?.avatarUrl,
+      orElse: () => null,
+    );
 
     return TreinoInteractiveState(
       key: Key('chat_row_${chat.chatId}'),
@@ -276,29 +280,40 @@ class _ChatRow extends ConsumerWidget {
         ref.read(selectedChatIdProvider.notifier).state = chat.chatId;
       },
       builder: (ctx, states) {
-        // Selección gana sobre hover/pressed; hover reusa `borderHover`
-        // (token ya pensado para overlays sutiles de interacción).
+        // Pill de selección tipo sidebar (ADR-SH-004): fondo tinte mint
+        // sobre transparente, SIN el bar lateral de 3px del diseño anterior
+        // (feedback de revisión: "esa división con líneas" se sentía cruda).
+        // Selección gana sobre hover/pressed.
         final Color bg;
         if (isSelected) {
-          bg = palette.bg;
+          // 14% de opacidad — un escalón más marcado que el hover (8%) para
+          // distinguirse sin saturar el bgCard del pane.
+          bg = palette.accent.withValues(alpha: 0.14);
         } else if (states.hovered || states.pressed) {
-          bg = palette.borderHover;
+          bg = palette.accent.withValues(alpha: 0.08);
         } else {
-          bg = transparent;
+          bg = Colors.transparent;
         }
 
         return AnimatedContainer(
           key: Key('chat_row_container_${chat.chatId}'),
-          duration: AppMotion.resolve(ctx, AppMotion.fast),
-          curve: AppMotion.standard,
+          duration:
+              AppMotionTokens.resolve(ctx, AppMotionTokens.cardStateChange),
+          curve: AppMotionTokens.enter,
+          margin: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.s8,
+            vertical: AppSpacing.hairline,
+          ),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.s14,
+            vertical: AppSpacing.s12,
+          ),
           decoration: BoxDecoration(
             color: bg,
-            border: Border(
-              left: BorderSide(
-                color: isSelected ? palette.accent : transparent,
-                width: 3,
-              ),
-            ),
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: isSelected
+                ? Border.all(color: palette.accent.withValues(alpha: 0.35))
+                : null,
             // Anillo de foco de teclado — mismo patrón que
             // filter_chips.dart (ADR-SH-002, remediación CRITICAL-2 verify
             // ronda 2): sin esto la row no da feedback visual al navegar
@@ -312,40 +327,12 @@ class _ChatRow extends ConsumerWidget {
                   ]
                 : null,
           ),
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.s18,
-            vertical: AppSpacing.s14,
-          ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              CircleAvatar(
-                radius: 22,
-                backgroundColor: palette.bgCard,
-                backgroundImage: pubAsync.maybeWhen(
-                  data: (p) =>
-                      (p?.avatarUrl != null && p!.avatarUrl!.isNotEmpty)
-                          ? NetworkImage(p.avatarUrl!)
-                          : null,
-                  orElse: () => null,
-                ),
-                child: pubAsync.maybeWhen(
-                  data: (p) =>
-                      (p?.avatarUrl == null || (p?.avatarUrl ?? '').isEmpty)
-                          ? Text(
-                              (p?.displayName ?? '?').isNotEmpty
-                                  ? (p?.displayName ?? '?')[0].toUpperCase()
-                                  : '?',
-                              style: TextStyle(
-                                fontFamily: AppFonts.barlowCondensed,
-                                fontWeight: AppFonts.w700,
-                                fontSize: 16,
-                                color: palette.textMuted,
-                              ),
-                            )
-                          : null,
-                  orElse: () => const SizedBox.shrink(),
-                ),
+              TreinoAvatar(
+                displayName: resolvedName,
+                avatarUrl: resolvedAvatarUrl,
               ),
               const SizedBox(width: AppSpacing.s12),
               Expanded(
@@ -416,9 +403,13 @@ class _ChatRow extends ConsumerWidget {
                             width: AppSpacing.s8,
                             height: AppSpacing.s8,
                             decoration: BoxDecoration(
-                              color: palette.accent,
-                              borderRadius:
-                                  BorderRadius.circular(AppRadius.full),
+                              // Magenta (TreinoBadgeTokens) — antes mint,
+                              // ahora comparte color con el resto de badges
+                              // de no-leídos del Coach Hub (sidebar).
+                              color: TreinoBadgeTokens.of(ctx).background,
+                              borderRadius: BorderRadius.circular(
+                                TreinoBadgeTokens.borderRadius,
+                              ),
                             ),
                           ),
                         ],
