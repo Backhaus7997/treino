@@ -4,6 +4,7 @@
 // resolve the same asset for the same exercise, so the order is pinned here
 // as pure unit tests (no bundle, no fixtures).
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/core/widgets/exercise_asset_image.dart';
@@ -146,6 +147,49 @@ void main() {
           .widgetList<Image>(find.byType(Image))
           .map((i) => (i.image as AssetImage).assetName);
       expect(assetNames, contains('assets/muscles/back.png'));
+    });
+  });
+
+  group('thumbnailUrl (step 0 — real photo from the exercise video)', () {
+    testWidgets('present -> renders CachedNetworkImage for that url',
+        (tester) async {
+      const url = 'https://example.com/exercises%2Fthumbs%2Fplank.jpg';
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ExerciseAssetImage(
+            exerciseId: 'plank',
+            muscleGroup: 'core',
+            thumbnailUrl: url,
+            fallback: Container(key: const Key('fb')),
+          ),
+        ),
+      );
+      // No pumpAndSettle: la carga real de red no ocurre en tests; alcanza
+      // con verificar que el nivel 0 es el widget de red apuntando a la url.
+      final net = tester.widget<CachedNetworkImage>(
+        find.byType(CachedNetworkImage),
+      );
+      expect(net.imageUrl, url);
+      expect(find.byKey(const Key('fb')), findsNothing);
+    });
+
+    testWidgets('null / empty -> asset cascade unchanged (no network widget)',
+        (tester) async {
+      for (final url in [null, '']) {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: ExerciseAssetImage(
+              exerciseId: 'plank',
+              muscleGroup: 'core',
+              thumbnailUrl: url,
+              fallback: Container(key: const Key('fb')),
+            ),
+          ),
+        );
+        await tester.pump();
+        expect(find.byType(CachedNetworkImage), findsNothing);
+        expect(find.byType(Image), findsWidgets);
+      }
     });
   });
 }

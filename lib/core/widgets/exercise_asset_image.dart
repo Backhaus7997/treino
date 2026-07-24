@@ -1,7 +1,13 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 /// Cascading bundled-illustration lookup for an exercise, shared by every
 /// surface that paints one (detail hero, picker thumbnail, …).
+///
+/// When [ExerciseAssetImage.thumbnailUrl] is present it becomes step 0 — the
+/// real photo of the exercise (a frame of its own video, backfilled by
+/// `scripts/extract_exercise_thumbnails.js`) — and the asset cascade below is
+/// its network-error fallback.
 ///
 /// Lives in `core/` — not in a feature — because the picker is Coach code and
 /// the hero is Workout code; same reasoning as
@@ -44,6 +50,7 @@ class ExerciseAssetImage extends StatelessWidget {
     required this.exerciseId,
     required this.muscleGroup,
     required this.fallback,
+    this.thumbnailUrl,
     this.width,
     this.height,
     this.fit = BoxFit.cover,
@@ -51,6 +58,13 @@ class ExerciseAssetImage extends StatelessWidget {
 
   final String exerciseId;
   final String muscleGroup;
+
+  /// Foto real del ejercicio (frame de su video, 256px, escrita por
+  /// `scripts/extract_exercise_thumbnails.js`). Cuando está presente es el
+  /// nivel 0 de la cascada; si la red falla o el campo es null se sigue con
+  /// los assets locales de siempre. La lista y el detalle comparten este
+  /// widget, así que ambos degradan idéntico.
+  final String? thumbnailUrl;
 
   /// Painted when every candidate misses — callers pick what "no illustration"
   /// looks like on their surface (gradient on the hero, icon on a thumbnail).
@@ -73,13 +87,26 @@ class ExerciseAssetImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _tryAt(
-      0,
-      exerciseAssetCandidates(
-        exerciseId: exerciseId,
-        muscleGroup: muscleGroup,
-      ),
+    final paths = exerciseAssetCandidates(
+      exerciseId: exerciseId,
+      muscleGroup: muscleGroup,
     );
+    final url = thumbnailUrl;
+    if (url != null && url.isNotEmpty) {
+      return CachedNetworkImage(
+        imageUrl: url,
+        width: width,
+        height: height,
+        fit: fit,
+        // Los thumbs viven en Storage a 256px nativos — decodificar más
+        // grande solo quema memoria (guideline del PR template).
+        memCacheWidth: 256,
+        fadeInDuration: const Duration(milliseconds: 120),
+        placeholder: (_, __) => SizedBox(width: width, height: height),
+        errorWidget: (_, __, ___) => _tryAt(0, paths),
+      );
+    }
+    return _tryAt(0, paths);
   }
 }
 

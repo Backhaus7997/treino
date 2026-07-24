@@ -23,6 +23,10 @@ class Exercise with _$Exercise {
     List<String>?
         techniqueInstructions, // null means "not yet authored" (ADR-1)
     String? videoUrl,
+    // Foto identificatoria (frame del propio video, 256px en Storage) escrita
+    // por scripts/extract_exercise_thumbnails.js. null en customs y en docs
+    // anteriores al backfill — la UI cae a la cascada de ExerciseAssetImage.
+    String? thumbnailUrl,
     int? defaultRestSeconds,
     @Default(<String>[])
     List<String>

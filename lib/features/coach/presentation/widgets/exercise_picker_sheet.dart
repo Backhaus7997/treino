@@ -423,6 +423,7 @@ class _ExercisePickerSheetContentState
               selected: _selected.contains(e.id),
               palette: palette,
               onTap: () => _toggle(e.id),
+              thumbnailUrl: e.thumbnailUrl,
             ),
         ],
       ],
@@ -449,11 +450,15 @@ class _ExerciseRow extends StatelessWidget {
     required this.selected,
     required this.palette,
     required this.onTap,
+    this.thumbnailUrl,
   });
 
   final String id;
   final String name;
   final String muscleGroup;
+
+  /// Foto real del catálogo (frame del video). null en customs — no tienen.
+  final String? thumbnailUrl;
   final String? subtitle;
   final String? badge;
   final bool isCustom;
@@ -512,6 +517,7 @@ class _ExerciseRow extends StatelessWidget {
             isCustom: isCustom,
             selected: selected,
             palette: palette,
+            thumbnailUrl: thumbnailUrl,
           ),
           title: Text(
             name,
@@ -572,6 +578,7 @@ class _ExerciseThumbnail extends StatelessWidget {
     required this.isCustom,
     required this.selected,
     required this.palette,
+    this.thumbnailUrl,
   });
 
   final String id;
@@ -579,6 +586,7 @@ class _ExerciseThumbnail extends StatelessWidget {
   final bool isCustom;
   final bool selected;
   final AppPalette palette;
+  final String? thumbnailUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -604,6 +612,7 @@ class _ExerciseThumbnail extends StatelessWidget {
                   : ExerciseAssetImage(
                       exerciseId: id,
                       muscleGroup: muscleGroup,
+                      thumbnailUrl: thumbnailUrl,
                       width: 44,
                       height: 44,
                       fallback: fallbackIcon,
