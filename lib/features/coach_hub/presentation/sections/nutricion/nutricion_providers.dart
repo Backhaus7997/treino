@@ -43,9 +43,22 @@ bool matchesNutricionFiltro(NutricionEntry entry, NutricionFiltro filtro) =>
 /// Overview cross-alumno de Nutrición: combina los vínculos `active` del PF
 /// actual ([trainerLinksStreamProvider]) con el plan de cada alumno
 /// ([nutritionPlanProvider]).
+///
+/// hasValue-first (pulido-post-revision, mismo defecto que Chat, commit
+/// cdd41949): [trainerLinksStreamProvider] es un `StreamProvider` en vivo —
+/// Riverpod 2.5+ preserva el valor previo dentro de un `AsyncError`
+/// subsiguiente (`copyWithPrevious`/"seamless"), así que `hasValue == true`
+/// Y `hasError == true` pueden darse a la vez tras un error transitorio del
+/// stream. `.whenData()` es `.map()` por debajo y despacha por el SUBTIPO
+/// RUNTIME del AsyncValue (ignora `hasValue`): en ese estado compuesto caía
+/// en la rama `error:`, que devuelve `hasValue: false` explícito — tiraba
+/// las entries ya calculadas aunque el stream de links siguiera teniendo el
+/// valor cacheado. Se chequea `hasValue` explícitamente ANTES del error.
 final nutricionEntriesProvider =
     Provider.autoDispose<AsyncValue<List<NutricionEntry>>>((ref) {
-  return ref.watch(trainerLinksStreamProvider).whenData((links) {
+  final linksAsync = ref.watch(trainerLinksStreamProvider);
+
+  List<NutricionEntry> computeEntries(List<TrainerLink> links) {
     final trainerId = ref.watch(currentUidProvider) ?? '';
     final active =
         links.where((l) => l.status == TrainerLinkStatus.active).toList();
@@ -64,7 +77,18 @@ final nutricionEntriesProvider =
     }
 
     return [for (final l in active) entryFor(l)];
-  });
+  }
+
+  if (linksAsync.hasValue) {
+    return AsyncValue.data(computeEntries(linksAsync.requireValue));
+  }
+  if (linksAsync.hasError) {
+    return AsyncValue<List<NutricionEntry>>.error(
+      linksAsync.error!,
+      linksAsync.stackTrace ?? StackTrace.current,
+    );
+  }
+  return const AsyncValue.loading();
 });
 
 /// Chip seleccionado del overview. Default: Todos.
