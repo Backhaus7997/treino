@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/app/theme/tokens/components/treino_card_tokens.dart';
 import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
@@ -83,9 +84,12 @@ class DashboardAlertBanner extends ConsumerWidget {
         vertical: AppSpacing.s14,
       ),
       decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: Border.all(color: palette.border),
+        // Card flotante (revisión): mismo token TreinoCardTokens que welcome
+        // card/pendientes/columna derecha — antes AppRadius.sm (12), quedaba
+        // desalineado del resto de las cards del dashboard (md, 16).
+        color: TreinoCardTokens.background(context),
+        borderRadius: BorderRadius.circular(TreinoCardTokens.borderRadius),
+        border: Border.all(color: TreinoCardTokens.border(context)),
       ),
       child: Row(
         children: [
@@ -223,9 +227,9 @@ class DashboardWelcomeCard extends ConsumerWidget {
       key: const Key('welcome_card_root'),
       padding: const EdgeInsets.all(AppSpacing.s20),
       decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: palette.border),
+        color: TreinoCardTokens.background(context),
+        borderRadius: BorderRadius.circular(TreinoCardTokens.borderRadius),
+        border: Border.all(color: TreinoCardTokens.border(context)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -443,7 +447,27 @@ class DashboardAdherenceRing extends ConsumerWidget {
       height: 72,
       child: Stack(
         alignment: Alignment.center,
+        // Clip.none: el halo (96px) bleedea unos px fuera del box 72x72 a
+        // propósito — no afecta layout (Stack no fuerza tamaño por children),
+        // solo pintura. Mismo criterio "sin blur pesado" de AppBackground/
+        // ChatEmptyPane, a escala del número hero del welcome card.
+        clipBehavior: Clip.none,
         children: [
+          Container(
+            key: const Key('adherence_ring_glow'),
+            width: 96,
+            height: 96,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  palette.accent.withValues(alpha: 0.18),
+                  palette.accent.withValues(alpha: 0),
+                ],
+                stops: const [0.0, 0.85],
+              ),
+            ),
+          ),
           CircularProgressIndicator(
             value: ringValue,
             strokeWidth: 6,
@@ -455,6 +479,7 @@ class DashboardAdherenceRing extends ConsumerWidget {
           Text(
             label,
             style: TextStyle(
+              fontFamily: AppFonts.barlowCondensed,
               color:
                   adherence == null ? palette.textMuted : palette.textPrimary,
               fontSize: 14,
