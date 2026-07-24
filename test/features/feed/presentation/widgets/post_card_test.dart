@@ -15,9 +15,22 @@ import 'package:treino/features/feed/domain/routine_tag.dart';
 import 'package:treino/features/feed/domain/workout_stats.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/feed/presentation/widgets/post_card.dart';
+import 'package:treino/features/gyms/application/gym_providers.dart';
+import 'package:treino/features/gyms/domain/gym.dart';
+import 'package:treino/features/gyms/domain/gym_source.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 class MockPostRepository extends Mock implements PostRepository {}
+
+Gym _gym({required String id, required String name}) => Gym(
+      id: id,
+      name: name,
+      lat: -34.56,
+      lng: -58.45,
+      geohash: 'abc123',
+      source: GymSource.googlePlaces,
+      createdAt: DateTime.utc(2026, 1, 1),
+    );
 
 class _MockUser extends Mock implements User {
   _MockUser({required String uid}) : _uid = uid;
@@ -57,12 +70,14 @@ Widget _wrap(
   Widget w, {
   String? viewerUid = 'u1',
   MockPostRepository? mockRepo,
+  List<Override> overrides = const [],
 }) {
   final user = viewerUid == null ? null : _MockUser(uid: viewerUid);
   return ProviderScope(
     overrides: [
       authStateChangesProvider.overrideWith((ref) => Stream.value(user)),
       if (mockRepo != null) postRepositoryProvider.overrideWithValue(mockRepo),
+      ...overrides,
     ],
     child: MaterialApp(
       theme: AppTheme.dark(),
@@ -126,20 +141,102 @@ void main() {
       expect(find.text('Tincho'), findsOneWidget);
     });
 
-    // SCENARIO-167: gym ID rendered when non-null
-    testWidgets('SCENARIO-167: renders gymId when non-null', (tester) async {
+    // SCENARIO-167 (rewritten for #549): the meta row shows the RESOLVED gym
+    // name from the `gyms/` catalog, uppercased — never the raw id.
+    testWidgets(
+        'SCENARIO-167: resolves authorGymId to the gym name via '
+        'gymByIdProvider', (tester) async {
       final post = makePost(authorGymId: 'gym-la-fuerza');
-      await tester.pumpWidget(_wrap(PostCard(post: post)));
+      await tester.pumpWidget(_wrap(
+        PostCard(post: post),
+        overrides: [
+          gymByIdProvider('gym-la-fuerza').overrideWith(
+            (ref) async => _gym(id: 'gym-la-fuerza', name: 'La Fuerza'),
+          ),
+        ],
+      ));
+      // Two pumps: one for the widget, one for the async gym resolution.
+      await tester.pump();
       await tester.pump();
 
-      // gymId uppercased in meta row — case-insensitive search
       final gymFinder = find.byWidgetPredicate(
+        (w) => w is Text && w.data != null && w.data!.contains('LA FUERZA'),
+      );
+      expect(gymFinder, findsAtLeastNWidgets(1));
+      // The raw id must never leak into the UI.
+      expect(
+        find.byWidgetPredicate(
+          (w) =>
+              w is Text &&
+              w.data != null &&
+              w.data!.toLowerCase().contains('gym-la-fuerza'),
+        ),
+        findsNothing,
+      );
+    });
+
+    // Regression #549: a Google Places gym id (`ChIJ…`, opaque) whose doc is
+    // missing from the catalog must NOT be printed raw — the gym segment is
+    // omitted and only the timestamp remains.
+    testWidgets(
+        'regression #549: unresolvable Google Places id is never shown raw',
+        (tester) async {
+      const placeId = 'ChIJucMKes6dmpQR1rebv5azedo';
+      final post = makePost(authorGymId: placeId);
+      await tester.pumpWidget(_wrap(
+        PostCard(post: post),
+        overrides: [
+          gymByIdProvider(placeId).overrideWith((ref) async => null),
+        ],
+      ));
+      await tester.pump();
+      await tester.pump();
+
+      expect(
+        find.byWidgetPredicate(
+          (w) =>
+              w is Text &&
+              w.data != null &&
+              w.data!.toLowerCase().contains(placeId.toLowerCase()),
+        ),
+        findsNothing,
+      );
+      // Meta row still shows the relative timestamp alone.
+      final timestampFinder = find.byWidgetPredicate(
         (w) =>
             w is Text &&
             w.data != null &&
-            w.data!.toLowerCase().contains('gym-la-fuerza'),
+            RegExp(r'^[Hh]ace\s+\d+\s*h$').hasMatch(w.data!),
       );
-      expect(gymFinder, findsAtLeastNWidgets(1));
+      expect(timestampFinder, findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    // Regression #549: while the catalog read is in flight the id must not
+    // flash raw either — loading renders time-only, then upgrades in place.
+    testWidgets('regression #549: no raw id flash while the gym doc loads',
+        (tester) async {
+      final post = makePost(authorGymId: 'gym-la-fuerza');
+      await tester.pumpWidget(_wrap(
+        PostCard(post: post),
+        overrides: [
+          gymByIdProvider('gym-la-fuerza').overrideWith(
+            (ref) async => _gym(id: 'gym-la-fuerza', name: 'La Fuerza'),
+          ),
+        ],
+      ));
+      // First frame only — the future has not completed yet.
+      await tester.pump();
+
+      expect(
+        find.byWidgetPredicate(
+          (w) =>
+              w is Text &&
+              w.data != null &&
+              w.data!.toLowerCase().contains('gym-la-fuerza'),
+        ),
+        findsNothing,
+      );
     });
 
     // SCENARIO-168: timestamp rendered as relative string
@@ -197,6 +294,31 @@ void main() {
       await tester.pump();
 
       expect(find.text('Gran sesión hoy'), findsOneWidget);
+    });
+
+    // Regression #547: the theme's Barlow families carry no emoji glyphs, so
+    // post content (e.g. "¡Terminé mi entreno! 💪") rendered tofu. The body
+    // text style must pin the system emoji fonts — same fix as
+    // post_workout_summary_screen.dart (PR #465), applied to the style so
+    // manual-post emojis render too.
+    testWidgets(
+        'regression #547: body text style pins system emoji font fallbacks',
+        (tester) async {
+      final post = makePost(text: '¡Terminé mi entreno! 💪');
+      await tester.pumpWidget(_wrap(PostCard(post: post)));
+      await tester.pump();
+
+      final body = tester.widget<Text>(find.text('¡Terminé mi entreno! 💪'));
+      final fallback = body.style?.fontFamilyFallback ?? const [];
+      expect(fallback, contains('Apple Color Emoji'));
+      expect(fallback, contains('Noto Color Emoji'));
+      // Appended, not replaced: google_fonts' own base-family fallback
+      // ('Barlow') must survive ahead of the emoji fonts.
+      expect(fallback, contains('Barlow'));
+      expect(
+        fallback.indexOf('Barlow'),
+        lessThan(fallback.indexOf('Apple Color Emoji')),
+      );
     });
 
     // SCENARIO-170: routine tag chip rendered when routineTag present
