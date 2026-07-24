@@ -159,6 +159,11 @@ Future<void> _pump(
   // Repo de pagos — usado por el botón «Registrar pago» del roster (reusa
   // `registrarPago` de la sección Pagos).
   PaymentRepository? paymentRepo,
+  // SCENARIO-STALE (pulido-post-revision): override directo de
+  // `userPublicProfilesBatchProvider` — permite simular un error transitorio
+  // con data previa cacheada (copyWithPrevious de un FutureProvider.family)
+  // sin pasar por [profiles].
+  Override? profilesOverride,
   // `false` para casos donde el stream de links queda colgado en loading a
   // propósito (TreinoShimmer corre en loop infinito — pumpAndSettle no
   // termina nunca ahí; el caller pumpea manualmente en su lugar).
@@ -209,9 +214,10 @@ Future<void> _pump(
         trainerLinksStreamProvider.overrideWith(
           (ref) => linksStream ?? Stream.value(links ?? const []),
         ),
-        userPublicProfilesBatchProvider.overrideWith(
-          (ref, key) => {for (final p in profiles) p.uid: p},
-        ),
+        profilesOverride ??
+            userPublicProfilesBatchProvider.overrideWith(
+              (ref, key) => {for (final p in profiles) p.uid: p},
+            ),
         pagosPorCobrarProvider.overrideWith((ref) => AsyncData(cobros)),
         trainerPaymentsProvider.overrideWith((ref) => Stream.value(payments)),
         finishedInWindowByUidProvider.overrideWith(
@@ -742,6 +748,88 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('DETALLE a1'), findsOneWidget);
+    });
+  });
+
+  group(
+      'SCENARIO-STALE — roster sostiene filas ante error transitorio '
+      '(pulido-post-revision)', () {
+    // Regression: `AlumnosScreen.build` despachaba con `linksAsync.when(...)`
+    // — dispatch por SUBTIPO runtime, ignora `hasValue`. `trainerLinksStreamProvider`
+    // es un StreamProvider en vivo — Riverpod 2.5+ preserva el valor previo
+    // dentro de un `AsyncError` subsiguiente (copyWithPrevious/"seamless"),
+    // así que un error transitorio (sin estar en loading) caía en la rama
+    // `error:` y tapaba el roster ya cargado con el mensaje de error.
+    testWidgets(
+        'roster ya cargado no desaparece tras un error transitorio del '
+        'stream de vínculos (stale-while-refresh)', (tester) async {
+      final controller = StreamController<List<TrainerLink>>();
+      addTearDown(controller.close);
+
+      // settle:false — el shimmer de la tabla anima en loop mientras
+      // trainerLinksStreamProvider no emitió nada todavía.
+      await _pump(
+        tester,
+        linksStream: controller.stream,
+        profiles: [_prof('a1', 'Sofía')],
+        settle: false,
+      );
+
+      controller.add([_link('a1', TrainerLinkStatus.active)]);
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sofía'), findsOneWidget);
+      expect(find.text('No se pudieron cargar los alumnos.'), findsNothing);
+
+      controller.addError(Exception('transient stream hiccup'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Sofía'),
+        findsOneWidget,
+        reason: 'un error transitorio con data ya cargada no debe tapar el '
+            'roster',
+      );
+      expect(find.text('No se pudieron cargar los alumnos.'), findsNothing);
+    });
+
+    // Regression: mismo defecto en `_LinksLoaded.build` — despachaba con
+    // `profilesAsync.when(...)` sobre `userPublicProfilesBatchProvider`
+    // (FutureProvider.family). El fan-out del batch puede lanzar en un
+    // rebuild posterior a un cómputo exitoso, y Riverpod preserva el valor
+    // previo (copyWithPrevious aplica también a FutureProvider, no solo
+    // StreamProvider — confirmado en `_InactivosSection`, dashboard).
+    testWidgets(
+        'roster ya cargado no desaparece tras un error transitorio del '
+        'batch de perfiles (stale-while-refresh)', (tester) async {
+      final attempt = StateProvider<int>((ref) => 0);
+
+      await _pump(
+        tester,
+        links: [_link('a1', TrainerLinkStatus.active)],
+        profilesOverride: userPublicProfilesBatchProvider.overrideWith(
+          (ref, key) {
+            if (ref.watch(attempt) == 0) {
+              return {'a1': _prof('a1', 'Sofía')};
+            }
+            throw Exception('transient batch hiccup');
+          },
+        ),
+      );
+
+      expect(find.text('Sofía'), findsOneWidget);
+
+      final element = tester.element(find.byType(AlumnosScreen));
+      ProviderScope.containerOf(element).read(attempt.notifier).state = 1;
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Sofía'),
+        findsOneWidget,
+        reason: 'un error transitorio con data ya cargada no debe tapar el '
+            'roster',
+      );
     });
   });
 

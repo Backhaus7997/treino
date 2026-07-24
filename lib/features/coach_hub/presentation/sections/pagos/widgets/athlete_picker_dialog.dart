@@ -48,6 +48,26 @@ class _AthletePickerDialog extends ConsumerWidget {
     final palette = AppPalette.of(context);
     final linksAsync = ref.watch(trainerLinksStreamProvider);
 
+    // hasValue-first (pulido-post-revision, mismo defecto que Chat, commit
+    // cdd41949): `trainerLinksStreamProvider` es un StreamProvider en vivo —
+    // Riverpod 2.5+ preserva el valor previo dentro de un `AsyncError`
+    // subsiguiente (copyWithPrevious/"seamless"), así que `hasValue==true`
+    // Y `hasError==true` pueden darse a la vez tras un error transitorio.
+    // `.when()` despacha por SUBTIPO runtime (ignora `hasValue`), así que
+    // antes ese error caía en la rama `error:` y tapaba la lista de
+    // alumnos ya cargada. Se prioriza el valor cacheado.
+    final Widget content;
+    if (linksAsync.hasValue) {
+      content = _AthleteList(links: linksAsync.requireValue);
+    } else if (linksAsync.hasError) {
+      content = Text(
+        'No pudimos cargar tus alumnos.', // i18n
+        style: TextStyle(color: palette.textMuted),
+      );
+    } else {
+      content = const _PickerSkeleton();
+    }
+
     return AlertDialog(
       backgroundColor: palette.bgCard,
       title: Text(
@@ -62,14 +82,7 @@ class _AthletePickerDialog extends ConsumerWidget {
         width: 360,
         child: TreinoStateSwitcher(
           childKey: ValueKey(_stateKeyOf(linksAsync)),
-          child: linksAsync.when(
-            loading: () => const _PickerSkeleton(),
-            error: (e, _) => Text(
-              'No pudimos cargar tus alumnos.', // i18n
-              style: TextStyle(color: palette.textMuted),
-            ),
-            data: (links) => _AthleteList(links: links),
-          ),
+          child: content,
         ),
       ),
       actions: [
@@ -86,9 +99,9 @@ class _AthletePickerDialog extends ConsumerWidget {
 }
 
 String _stateKeyOf(AsyncValue<Object?> value) {
+  if (value.hasValue) return 'data';
   if (value.hasError) return 'error';
-  if (value.isLoading && !value.hasValue) return 'loading';
-  return 'data';
+  return 'loading';
 }
 
 /// Skeleton de 3 filas placeholder mientras resuelve el stream de vínculos.

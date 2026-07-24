@@ -110,32 +110,45 @@ class AlumnosScreen extends ConsumerWidget {
     final l10n = AppL10n.of(context);
     final linksAsync = ref.watch(trainerLinksStreamProvider);
 
+    // hasValue-first (pulido-post-revision, mismo defecto que Chat, commit
+    // cdd41949): `trainerLinksStreamProvider` es un StreamProvider en vivo —
+    // Riverpod 2.5+ preserva el valor previo dentro de un `AsyncError`
+    // subsiguiente (copyWithPrevious/"seamless"), así que `hasValue==true`
+    // Y `hasError==true` pueden darse a la vez tras un error transitorio.
+    // `.when()` despacha por SUBTIPO runtime (ignora `hasValue`), así que
+    // antes ese error caía en la rama `error:` y tapaba el roster ya
+    // cargado. Se prioriza el valor cacheado.
+    final Widget child;
+    if (linksAsync.hasValue) {
+      child = _LinksLoaded(links: linksAsync.requireValue);
+    } else if (linksAsync.hasError) {
+      child = _RosterFrame(
+        roster: const [],
+        profiles: const {},
+        gymNameById: const {},
+        errorMessage: l10n.coachHubAlumnosLoadError,
+        onRetry: () => ref.invalidate(trainerLinksStreamProvider),
+      );
+    } else {
+      child = const _RosterFrame(
+        roster: [],
+        profiles: {},
+        gymNameById: {},
+        tableLoading: true,
+      );
+    }
+
     return TreinoStateSwitcher(
       childKey: ValueKey('alumnos_links_${_stateKeyOf(linksAsync)}'),
-      child: linksAsync.when(
-        loading: () => const _RosterFrame(
-          roster: [],
-          profiles: {},
-          gymNameById: {},
-          tableLoading: true,
-        ),
-        error: (e, _) => _RosterFrame(
-          roster: const [],
-          profiles: const {},
-          gymNameById: const {},
-          errorMessage: l10n.coachHubAlumnosLoadError,
-          onRetry: () => ref.invalidate(trainerLinksStreamProvider),
-        ),
-        data: (links) => _LinksLoaded(links: links),
-      ),
+      child: child,
     );
   }
 }
 
 String _stateKeyOf(AsyncValue<Object?> value) {
+  if (value.hasValue) return 'data';
   if (value.hasError) return 'error';
-  if (value.isLoading && !value.hasValue) return 'loading';
-  return 'data';
+  return 'loading';
 }
 
 /// Resuelve perfiles + gyms + deuda una vez que el stream de links ya emitió,
@@ -175,29 +188,42 @@ class _LinksLoaded extends ConsumerWidget {
       for (final l in roster) (link: l, estado: estadoForLink(l, conDeudaIds)),
     ];
 
+    // hasValue-first (pulido-post-revision, mismo defecto que Chat, commit
+    // cdd41949): `userPublicProfilesBatchProvider` es un FutureProvider.family
+    // con fan-out — Riverpod 2.5+ preserva el valor previo dentro de un
+    // `AsyncError` subsiguiente (copyWithPrevious/"seamless" aplica también a
+    // FutureProvider, no solo StreamProvider — confirmado en
+    // `_InactivosSection`, dashboard). `.when()` despacha por SUBTIPO runtime
+    // (ignora `hasValue`), así que antes ese error caía en la rama `error:`
+    // y tapaba el roster ya cargado.
+    final Widget child;
+    if (profilesAsync.hasValue) {
+      child = _RosterFrame(
+        roster: rosterWithEstado,
+        profiles: profilesAsync.requireValue,
+        gymNameById: gymNameById,
+      );
+    } else if (profilesAsync.hasError) {
+      child = _RosterFrame(
+        roster: rosterWithEstado,
+        profiles: const {},
+        gymNameById: gymNameById,
+        errorMessage: l10n.coachHubAlumnosProfilesLoadError,
+        onRetry: () =>
+            ref.invalidate(userPublicProfilesBatchProvider(ids.join(','))),
+      );
+    } else {
+      child = _RosterFrame(
+        roster: rosterWithEstado,
+        profiles: const {},
+        gymNameById: gymNameById,
+        tableLoading: true,
+      );
+    }
+
     return TreinoStateSwitcher(
       childKey: ValueKey('alumnos_profiles_${_stateKeyOf(profilesAsync)}'),
-      child: profilesAsync.when(
-        loading: () => _RosterFrame(
-          roster: rosterWithEstado,
-          profiles: const {},
-          gymNameById: gymNameById,
-          tableLoading: true,
-        ),
-        error: (e, _) => _RosterFrame(
-          roster: rosterWithEstado,
-          profiles: const {},
-          gymNameById: gymNameById,
-          errorMessage: l10n.coachHubAlumnosProfilesLoadError,
-          onRetry: () =>
-              ref.invalidate(userPublicProfilesBatchProvider(ids.join(','))),
-        ),
-        data: (profiles) => _RosterFrame(
-          roster: rosterWithEstado,
-          profiles: profiles,
-          gymNameById: gymNameById,
-        ),
-      ),
+      child: child,
     );
   }
 }

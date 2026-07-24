@@ -333,18 +333,28 @@ class _ProgresoTab extends ConsumerWidget {
   }
 }
 
-/// `error` si alguna fuente falló; `loading` mientras ninguna de las dos
-/// tenga valor todavía; `data` en cualquier otro caso.
+/// `data` sólo cuando AMBAS fuentes ya tienen valor (`_ProgresoTabData`
+/// necesita `requireValue` de las dos); `error` sólo si alguna falló SIN
+/// tener valor todavía; `loading` en cualquier otro caso.
+///
+/// hasValue-first (pulido-post-revision, mismo defecto que Chat, commit
+/// cdd41949): `measurementsForAthleteProvider`/`performanceTestsForAthleteProvider`
+/// son `StreamProvider.family` en vivo — Riverpod 2.5+ preserva el valor
+/// previo dentro de un `AsyncError` subsiguiente (`copyWithPrevious`/
+/// "seamless"), así que `hasValue == true` Y `hasError == true` pueden darse
+/// a la vez tras un error transitorio del stream. Antes se chequeaba
+/// `hasError` ANTES que el valor cacheado, así que ese error transitorio
+/// tapaba la antropometría/rendimiento ya cargados con el estado de error de
+/// pantalla completa.
 String _progresoStateKeyOf(
   AsyncValue<Object?> meas,
   AsyncValue<Object?> perf,
 ) {
-  if (meas.hasError || perf.hasError) return 'error';
-  if ((meas.isLoading && !meas.hasValue) ||
-      (perf.isLoading && !perf.hasValue)) {
-    return 'loading';
+  if (meas.hasValue && perf.hasValue) return 'data';
+  if ((meas.hasError && !meas.hasValue) || (perf.hasError && !perf.hasValue)) {
+    return 'error';
   }
-  return 'data';
+  return 'loading';
 }
 
 class _ProgresoTabSkeleton extends StatelessWidget {
@@ -488,11 +498,13 @@ class _ResumenTab extends ConsumerWidget {
           AdherenciaHeatmapSkeleton(palette: palette),
         ],
       );
-    } else if (measAsync.hasError || routinesAsync.hasError) {
-      metricsStateKey = 'error';
-      metricsBlock =
-          _muted(palette, 'No se pudo cargar el resumen.'); // i18n: Fase W2
-    } else {
+    } else if (measAsync.hasValue && routinesAsync.hasValue) {
+      // hasValue-first (pulido-post-revision, mismo defecto que Chat, commit
+      // cdd41949): measAsync/routinesAsync pueden tener hasValue==true Y
+      // hasError==true a la vez (copyWithPrevious tras un error transitorio
+      // ya asentado, con isLoading==false) — antes se chequeaba `hasError`
+      // ANTES que el valor cacheado acá abajo, así que ese error tapaba el
+      // resumen ya calculado. Se prioriza el valor cacheado.
       metricsStateKey = 'data';
       final routines = routinesAsync.requireValue;
       final actives = routines.where((r) => r.status == RoutineStatus.active);
@@ -519,6 +531,18 @@ class _ResumenTab extends ConsumerWidget {
           AdherenciaHeatmap(data: m.heatmap, palette: palette),
         ],
       );
+    } else if (measAsync.hasError || routinesAsync.hasError) {
+      metricsStateKey = 'error';
+      metricsBlock =
+          _muted(palette, 'No se pudo cargar el resumen.'); // i18n: Fase W2
+    } else {
+      // Defensivo: no debería alcanzarse — el gate de `isLoading` ya cubre
+      // el primer load sin data ni error, y las dos ramas anteriores cubren
+      // "data ya disponible" y "error sin data". Mismo estado que la rama
+      // de error por completitud.
+      metricsStateKey = 'error';
+      metricsBlock =
+          _muted(palette, 'No se pudo cargar el resumen.'); // i18n: Fase W2
     }
 
     final left = Column(
@@ -645,12 +669,19 @@ class _PagosTab extends ConsumerWidget {
     final paymentsAsync = ref.watch(trainerPaymentsProvider);
     final pendingAsync = ref.watch(pagosPorCobrarProvider);
 
-    if (paymentsAsync.isLoading || pendingAsync.isLoading) {
+    // hasValue-first (pulido-post-revision, mismo defecto que Chat, commit
+    // cdd41949): `trainerPaymentsProvider` es un StreamProvider en vivo —
+    // Riverpod 2.5+ preserva el valor previo dentro de un `AsyncError`
+    // subsiguiente (copyWithPrevious/"seamless"), así que `hasValue==true`
+    // Y `hasError==true` pueden darse a la vez tras un error transitorio.
+    // Antes se chequeaba `hasError` ANTES que el valor cacheado, así que
+    // ese error transitorio tapaba el historial de pagos ya cargado.
+    if (!paymentsAsync.hasValue || !pendingAsync.hasValue) {
+      if (paymentsAsync.hasError || pendingAsync.hasError) {
+        return _muted(
+            palette, 'No se pudieron cargar los pagos.'); // i18n: Fase W2
+      }
       return const Center(child: CircularProgressIndicator());
-    }
-    if (paymentsAsync.hasError || pendingAsync.hasError) {
-      return _muted(
-          palette, 'No se pudieron cargar los pagos.'); // i18n: Fase W2
     }
 
     final history = paymentsAsync.requireValue

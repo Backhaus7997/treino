@@ -30,6 +30,7 @@ import 'package:treino/features/coach_hub/presentation/sections/alumnos/widgets/
 import 'package:treino/features/coach_hub/presentation/sections/alumnos/widgets/alumno_kpi_strip.dart';
 import 'package:treino/features/coach_hub/presentation/sections/alumnos/widgets/alumno_tabs.dart';
 import 'package:treino/features/coach_hub/presentation/sections/alumnos/widgets/progreso_kpi_strip.dart';
+import 'package:treino/features/coach_hub/presentation/sections/alumnos/widgets/resumen_kpi_strip.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/estado_cuenta_card.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/payment_format.dart'
     show fmtDayMonth, nextDueDate;
@@ -290,9 +291,16 @@ Future<void> _pump(
   Stream<UserPublicProfile?>? profileStream,
   TrainerLink? link,
   List<Measurement> measurements = const [],
+  // SCENARIO-STALE (pulido-post-revision): override directo del stream de
+  // mediciones — permite simular un error transitorio con data previa
+  // cacheada (copyWithPrevious real de Riverpod) sin pasar por [measurements].
+  Stream<List<Measurement>>? measurementsStream,
   List<Routine> routines = const [],
   List<Session> sessions = const [],
   List<Payment> payments = const [],
+  // SCENARIO-STALE (pulido-post-revision): idem [measurementsStream] para
+  // `trainerPaymentsProvider` (stream crudo que consume `_PagosTab`).
+  Stream<List<Payment>>? paymentsStream,
   List<CobroPendiente> pendingCobros = const [],
   PaymentRepository? paymentRepo,
   AthleteBilling? billing,
@@ -331,10 +339,11 @@ Future<void> _pump(
         trainerLinksStreamProvider
             .overrideWith((ref) => Stream.value(link == null ? [] : [link])),
         pagosPorCobrarProvider.overrideWith((ref) => AsyncData(pendingCobros)),
-        trainerPaymentsProvider.overrideWith((ref) => Stream.value(payments)),
+        trainerPaymentsProvider
+            .overrideWith((ref) => paymentsStream ?? Stream.value(payments)),
         athleteBillingProvider.overrideWith((ref, id) => Stream.value(billing)),
-        measurementsForAthleteProvider
-            .overrideWith((ref, id) => Stream.value(measurements)),
+        measurementsForAthleteProvider.overrideWith(
+            (ref, id) => measurementsStream ?? Stream.value(measurements)),
         performanceTestsForAthleteProvider.overrideWith((ref, id) =>
             performanceError != null
                 ? Stream.error(performanceError)
@@ -2039,6 +2048,157 @@ void main() {
 
       // Exactly one Recordar button (only the pending row)
       expect(find.text('Recordar'), findsOneWidget);
+    });
+  });
+
+  group(
+      'SCENARIO-STALE — Resumen sostiene métricas ante error transitorio '
+      '(pulido-post-revision)', () {
+    // Regression: measurementsForAthleteProvider es un StreamProvider.family
+    // en vivo — Riverpod 2.5+ preserva el valor previo dentro de un
+    // AsyncError subsiguiente (copyWithPrevious/"seamless"). El gate del
+    // bloque de métricas de `_ResumenTab` chequeaba `hasError` ANTES que el
+    // valor ya cacheado, así que un error transitorio (sin estar en
+    // `isLoading`) tapaba las métricas ya calculadas con "No se pudo cargar
+    // el resumen.".
+    testWidgets(
+        'métricas ya calculadas no desaparecen tras un error transitorio '
+        'del stream de mediciones (stale-while-refresh)', (tester) async {
+      final controller = StreamController<List<Measurement>>();
+      addTearDown(controller.close);
+
+      // settle:false — el skeleton (AdherenciaHeatmapSkeleton/KpiCard
+      // loading) anima en loop mientras measurementsForAthleteProvider no
+      // emitió nada todavía; pumpAndSettle colgaría antes de la 1ra emisión.
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        measurementsStream: controller.stream,
+        sessions: [_session()],
+        settle: false,
+      );
+
+      controller.add([_meas(60.5, fat: 22.4, waist: 71)]);
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      expect(find.text('No se pudo cargar el resumen.'), findsNothing);
+      var strip = tester.widget<ResumenKpiStrip>(find.byType(ResumenKpiStrip));
+      expect(strip.metrics, isNotNull,
+          reason: 'las métricas deben calcularse una vez que las mediciones '
+              'llegaron');
+
+      controller.addError(Exception('transient stream hiccup'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('No se pudo cargar el resumen.'),
+        findsNothing,
+        reason: 'un error transitorio con data ya cargada no debe tapar el '
+            'resumen',
+      );
+      strip = tester.widget<ResumenKpiStrip>(find.byType(ResumenKpiStrip));
+      expect(strip.metrics, isNotNull);
+    });
+  });
+
+  group(
+      'SCENARIO-STALE — Progreso sostiene antropometría ante error '
+      'transitorio (pulido-post-revision)', () {
+    // Regression: mismo defecto que el grupo anterior, pero en
+    // `_progresoStateKeyOf` (`_ProgresoTab`) — chequeaba `hasError` de
+    // measAsync/perfAsync ANTES que el valor cacheado.
+    testWidgets(
+        'antropometría ya cargada no desaparece tras un error transitorio '
+        'del stream de mediciones (stale-while-refresh)', (tester) async {
+      final controller = StreamController<List<Measurement>>();
+      addTearDown(controller.close);
+
+      // settle:false — mismo motivo que el grupo Resumen (skeleton en loop
+      // mientras measurementsForAthleteProvider no emitió nada todavía).
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        measurementsStream: controller.stream,
+        performanceTests: const [],
+        settle: false,
+      );
+
+      await tester.tap(find.text('Progreso'));
+      // Avanza la transición del TabBarView (animación acotada, ~300ms) sin
+      // usar pumpAndSettle — el destino (Progreso) sigue en loading/skeleton
+      // hasta que el controller emita.
+      await tester.pump(const Duration(milliseconds: 300));
+
+      controller.add([_meas(60.5, fat: 22.4, waist: 71)]);
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      expect(find.text('ANTROPOMETRÍA'), findsOneWidget);
+      expect(find.text('No se pudo cargar el progreso.'), findsNothing);
+
+      controller.addError(Exception('transient stream hiccup'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('ANTROPOMETRÍA'),
+        findsOneWidget,
+        reason: 'un error transitorio con data ya cargada no debe tapar el '
+            'progreso',
+      );
+      expect(find.text('No se pudo cargar el progreso.'), findsNothing);
+    });
+  });
+
+  group(
+      'SCENARIO-STALE — Pagos sostiene historial ante error transitorio '
+      '(pulido-post-revision)', () {
+    // Regression: `_PagosTab` mira `trainerPaymentsProvider` (stream crudo,
+    // sin pasar por `pagosBucketsProvider` — ya corregido en b3a14117).
+    // Chequeaba `hasError` ANTES que el valor cacheado.
+    testWidgets(
+        'historial de pagos ya cargado no desaparece tras un error '
+        'transitorio del stream (stale-while-refresh)', (tester) async {
+      final controller = StreamController<List<Payment>>();
+      addTearDown(controller.close);
+
+      // settle:false — `_PagosTab` usa CircularProgressIndicator (animación
+      // en loop) mientras trainerPaymentsProvider no emitió nada todavía.
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        paymentsStream: controller.stream,
+        settle: false,
+      );
+
+      await tester.tap(find.text('Pagos'));
+      // Avanza la transición del TabBarView (animación acotada, ~300ms) sin
+      // pumpAndSettle — el destino (Pagos) sigue en loading hasta que el
+      // controller emita.
+      await tester.pump(const Duration(milliseconds: 300));
+
+      controller.add([
+        _pago(id: 'p1', concept: 'Mensual mayo', status: PaymentStatus.paid),
+      ]);
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Mensual mayo'), findsOneWidget);
+      expect(find.text('No se pudieron cargar los pagos.'), findsNothing);
+
+      controller.addError(Exception('transient stream hiccup'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Mensual mayo'),
+        findsOneWidget,
+        reason: 'un error transitorio con data ya cargada no debe tapar el '
+            'historial de pagos',
+      );
+      expect(find.text('No se pudieron cargar los pagos.'), findsNothing);
     });
   });
 }
