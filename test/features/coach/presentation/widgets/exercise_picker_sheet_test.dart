@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/widgets/exercise_asset_image.dart';
 import 'package:treino/features/coach/presentation/widgets/exercise_picker_sheet.dart';
 import 'package:treino/features/workout/application/custom_exercise_providers.dart';
 import 'package:treino/features/workout/application/exercise_providers.dart';
@@ -228,6 +229,35 @@ void main() {
       // Lunge surfaces via its secondary (shoulders); the curl is filtered out.
       expect(find.text('Estocada a Press'), findsOneWidget);
       expect(find.text('Curl de Bíceps'), findsNothing);
+    });
+  });
+
+  group('ExercisePickerSheet — thumbnail asset cascade (#542)', () {
+    testWidgets(
+        'catalogue rows resolve their illustration via ExerciseAssetImage '
+        'with the exercise muscleGroup', (tester) async {
+      tester.view.physicalSize = const Size(400, 1200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await _openPicker(tester);
+
+      // One shared-cascade thumbnail per catalogue row — same resolution
+      // criteria as the detail hero, which is the whole point of #542.
+      final thumbs = tester
+          .widgetList<ExerciseAssetImage>(find.byType(ExerciseAssetImage))
+          .toList();
+      expect(thumbs, hasLength(_kExercises.length));
+      expect(
+        thumbs.map((t) => t.exerciseId),
+        containsAll(['bench-press', 'incline-dumbbell-press', 'back-squat']),
+      );
+      // The muscle bucket is what carries the Drive catalogue (no bundled
+      // PNG matches its ids), so the muscleGroup MUST flow into the widget.
+      final benchThumb =
+          thumbs.singleWhere((t) => t.exerciseId == 'bench-press');
+      expect(benchThumb.muscleGroup, 'chest');
     });
   });
 }
