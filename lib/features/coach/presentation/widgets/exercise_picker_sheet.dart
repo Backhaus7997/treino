@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/widgets/exercise_asset_image.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../workout/application/custom_exercise_providers.dart';
 import '../../../workout/application/exercise_filter.dart';
@@ -396,6 +397,7 @@ class _ExercisePickerSheetContentState
             _ExerciseRow(
               id: c.id,
               name: c.name,
+              muscleGroup: c.muscleGroup,
               subtitle: c.muscleGroup.isEmpty
                   ? null
                   : muscleGroupLabel(c.muscleGroup),
@@ -413,6 +415,7 @@ class _ExercisePickerSheetContentState
             _ExerciseRow(
               id: e.id,
               name: e.name,
+              muscleGroup: e.muscleGroup,
               subtitle: muscleGroupLabel(e.muscleGroup),
               badge: null,
               isCustom: false,
@@ -438,6 +441,7 @@ class _ExerciseRow extends StatelessWidget {
   const _ExerciseRow({
     required this.id,
     required this.name,
+    required this.muscleGroup,
     required this.subtitle,
     required this.badge,
     required this.isCustom,
@@ -449,6 +453,7 @@ class _ExerciseRow extends StatelessWidget {
 
   final String id;
   final String name;
+  final String muscleGroup;
   final String? subtitle;
   final String? badge;
   final bool isCustom;
@@ -503,6 +508,7 @@ class _ExerciseRow extends StatelessWidget {
               const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           leading: _ExerciseThumbnail(
             id: id,
+            muscleGroup: muscleGroup,
             isCustom: isCustom,
             selected: selected,
             palette: palette,
@@ -552,25 +558,35 @@ class _ExerciseRow extends StatelessWidget {
   }
 }
 
-/// Circular thumbnail for an exercise row. Uses the bundled PNG illustration
-/// from `assets/exercises/{id}.png` when available; falls back to a neutral
-/// icon when the asset is missing (e.g. for custom exercises or unseeded ids).
+/// Circular thumbnail for an exercise row. Resolves the bundled illustration
+/// with the same [ExerciseAssetImage] cascade as the detail hero (#542), so
+/// the list and the detail always agree on what an exercise looks like.
+/// Falls back to a neutral icon when every candidate misses; custom exercises
+/// skip the lookup entirely — mirroring the detail screen, which swaps its
+/// hero for a photo-less compact header on customs.
 /// Adds a small checkmark badge overlay when selected.
 class _ExerciseThumbnail extends StatelessWidget {
   const _ExerciseThumbnail({
     required this.id,
+    required this.muscleGroup,
     required this.isCustom,
     required this.selected,
     required this.palette,
   });
 
   final String id;
+  final String muscleGroup;
   final bool isCustom;
   final bool selected;
   final AppPalette palette;
 
   @override
   Widget build(BuildContext context) {
+    final fallbackIcon = Icon(
+      TreinoIcon.dumbbell,
+      size: 22,
+      color: palette.textMuted,
+    );
     return SizedBox(
       width: 44,
       height: 44,
@@ -584,21 +600,13 @@ class _ExerciseThumbnail extends StatelessWidget {
               color: palette.bgCard,
               alignment: Alignment.center,
               child: isCustom
-                  ? Icon(
-                      TreinoIcon.dumbbell,
-                      size: 22,
-                      color: palette.textMuted,
-                    )
-                  : Image.asset(
-                      'assets/exercises/$id.png',
+                  ? fallbackIcon
+                  : ExerciseAssetImage(
+                      exerciseId: id,
+                      muscleGroup: muscleGroup,
                       width: 44,
                       height: 44,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Icon(
-                        TreinoIcon.dumbbell,
-                        size: 22,
-                        color: palette.textMuted,
-                      ),
+                      fallback: fallbackIcon,
                     ),
             ),
           ),

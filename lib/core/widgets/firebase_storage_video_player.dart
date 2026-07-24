@@ -4,6 +4,7 @@ import 'package:video_player/video_player.dart';
 import '../../app/theme/app_motion.dart';
 import '../../app/theme/app_palette.dart';
 import '../../app/theme/app_theme.dart';
+import 'motion/treino_shimmer.dart';
 import 'treino_icon.dart';
 
 /// Public, reusable native video player for Firebase Storage download URLs.
@@ -113,20 +114,27 @@ class _FirebaseStorageVideoPlayerState
       // not exceed the same envelope as a wide video. Layout may shift
       // once init completes and the real aspect ratio is known; this is
       // limited to first-render (browser caches the manifest afterwards).
+      //
+      // Cold Storage URLs take multi-second inits, and `bgCard` reads as
+      // plain black in a video slot — a muted 22px spinner got missed and the
+      // state was reported as "broken video" (#545). Shimmer sweep + accent
+      // spinner make "loading" unmistakable at a glance.
       return _CappedAspectRatio(
         aspectRatio: 16 / 9,
         maxHeight: widget.maxHeight,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: Container(
-            color: palette.bgCard,
-            alignment: Alignment.center,
-            child: SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.2,
-                color: palette.textMuted,
+          child: TreinoShimmer(
+            child: Container(
+              color: palette.bgCard,
+              alignment: Alignment.center,
+              child: SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.6,
+                  color: palette.accent,
+                ),
               ),
             ),
           ),

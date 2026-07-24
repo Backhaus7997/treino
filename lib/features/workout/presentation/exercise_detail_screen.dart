@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/exercise_asset_image.dart';
 import '../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
@@ -286,15 +287,14 @@ class _HeroStrip extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // Convention: assets/exercises/{exerciseId}.png. Cascade for the 25
-          // hand-curated assets vs the 415-exercise catalogue + the 10
-          // muscle-group fallback assets:
-          //   1. strict exercise id (e.g. `bench-press-barbell`)
-          //   2. strip suffix       (`bench-press-barbell` → `bench-press`)
-          //   3. strip prefix       (`barbell-back-squat`  → `back-squat`)
-          //   4. muscle group       (`assets/muscles/{muscleGroup}.png`)
-          //   5. gradient (last resort, paints when even the muscle is unknown)
-          _ExerciseHeroAsset(
+          // Shared cascade (see ExerciseAssetImage): id variants under
+          // `assets/exercises/` and `assets/muscles/`, then the muscle-group
+          // bucket. In practice the muscle bucket is what paints — the bundled
+          // PNGs predate the Drive catalogue (see
+          // docs/video-catalog-audit/NUEVO-catalogo.json), so id matches are
+          // the exception. Gradient is the last resort when even the muscle
+          // is unknown.
+          ExerciseAssetImage(
             exerciseId: exerciseId,
             muscleGroup: muscleGroup,
             fallback: gradient,
@@ -618,75 +618,5 @@ class _ExerciseLoadingSkeleton extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-/// Cascading hero image lookup. For each id variant (strict, strip-suffix,
-/// strip-prefix), tries BOTH `assets/exercises/` and `assets/muscles/`
-/// before falling back to the muscle-group bucket. This lets the
-/// `assets/muscles/` folder host movement-pattern assets (e.g.
-/// `squat.png` for any squat variant) alongside the strict muscle-group
-/// silhouettes (e.g. `quads.png`).
-///
-/// Order for `exerciseId: 'squat-barbell'`, `muscleGroup: 'quads'`:
-///   1. `assets/exercises/squat-barbell.png`
-///   2. `assets/exercises/squat.png`                 (strip suffix)
-///   3. `assets/exercises/barbell.png`               (strip prefix)
-///   4. `assets/muscles/squat-barbell.png`
-///   5. `assets/muscles/squat.png`                   (strip suffix) ← hit
-///   6. `assets/muscles/barbell.png`                 (strip prefix)
-///   7. `assets/muscles/quads.png`                   (muscle bucket)
-///   8. [fallback]
-///
-/// The chain is built once into a list of candidate paths so the rendered
-/// widget tree is flat (one `Image.asset` with a nested `errorBuilder`
-/// chain), avoiding rebuilds when the lookup walks down the list.
-class _ExerciseHeroAsset extends StatelessWidget {
-  const _ExerciseHeroAsset({
-    required this.exerciseId,
-    required this.muscleGroup,
-    required this.fallback,
-  });
-
-  final String exerciseId;
-  final String muscleGroup;
-  final Widget fallback;
-
-  /// Generates the id-derived slugs to probe in priority order:
-  /// strict, strip-suffix, strip-prefix. Skips duplicates.
-  List<String> _idSlugs() {
-    final out = <String>[exerciseId];
-    final last = exerciseId.lastIndexOf('-');
-    if (last > 0) out.add(exerciseId.substring(0, last));
-    final first = exerciseId.indexOf('-');
-    if (first > 0 && first != last) out.add(exerciseId.substring(first + 1));
-    return out;
-  }
-
-  /// All candidate asset paths in priority order — see class docs.
-  List<String> _candidates() {
-    final slugs = _idSlugs();
-    final out = <String>[
-      for (final s in slugs) 'assets/exercises/$s.png',
-      for (final s in slugs) 'assets/muscles/$s.png',
-    ];
-    if (muscleGroup.isNotEmpty) {
-      out.add('assets/muscles/$muscleGroup.png');
-    }
-    return out;
-  }
-
-  Widget _tryAt(int index, List<String> paths) {
-    if (index >= paths.length) return fallback;
-    return Image.asset(
-      paths[index],
-      fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => _tryAt(index + 1, paths),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return _tryAt(0, _candidates());
   }
 }
