@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../application/exercise_filter.dart' show foldSearch;
 import '../domain/custom_exercise.dart';
 import '../domain/equipment_type.dart';
 import 'custom_exercise_video_upload_service.dart';
@@ -24,6 +25,21 @@ class CustomExerciseRepository {
       .collection('users')
       .doc(trainerId)
       .collection('customExercises');
+
+  // ─── nameLowercase — #553 ──────────────────────────────────────────────────
+  // Callers MUST NOT pass nameLowercase — it is always derived here, mirroring
+  // how UserRepository derives `n`/`displayNameLowercase` (REQ-UPP-002 /
+  // ADR-UPP-11). Normalized with the SAME foldSearch the exercise search uses
+  // (#209), so ordering and searching agree on what "Pantorrilla" and
+  // "pantorrílla" are. Kept out of the CustomExercise model on purpose: it is
+  // a storage-level sort key, not a domain attribute — exactly like `n` on
+  // users/{uid}.
+
+  /// Doc payload for [exercise]: the model JSON without the path-encoded `id`,
+  /// plus the derived `nameLowercase` sort key.
+  Map<String, Object?> _docPayload(CustomExercise exercise) => exercise.toJson()
+    ..remove('id')
+    ..['nameLowercase'] = foldSearch(exercise.name);
 
   // ─── create ────────────────────────────────────────────────────────────────
 
@@ -54,18 +70,18 @@ class CustomExerciseRepository {
       createdAt: now,
       updatedAt: now,
     );
-    await ref.set(exercise.toJson()..remove('id'));
+    await ref.set(_docPayload(exercise));
     return exercise;
   }
 
   // ─── update ────────────────────────────────────────────────────────────────
 
-  /// Persists field changes and bumps `updatedAt`.
+  /// Persists field changes and bumps `updatedAt`. `nameLowercase` rides
+  /// along on every update, so a rename keeps the sort key in lockstep (and
+  /// any pre-#553 doc self-heals on its first edit).
   Future<void> update(CustomExercise exercise) async {
     final next = exercise.copyWith(updatedAt: DateTime.now().toUtc());
-    await _col(exercise.ownerId)
-        .doc(exercise.id)
-        .update(next.toJson()..remove('id'));
+    await _col(exercise.ownerId).doc(exercise.id).update(_docPayload(next));
   }
 
   // ─── delete ────────────────────────────────────────────────────────────────
@@ -98,12 +114,32 @@ class CustomExerciseRepository {
 
   // ─── watchForTrainer ───────────────────────────────────────────────────────
 
-  /// Live stream of the trainer's custom exercises, ordered by name asc so
-  /// the picker shows them alphabetically by default.
+  /// Live stream of the trainer's custom exercises, alphabetized ignoring
+  /// case and Spanish diacritics (#553) — "Pantorrilla en prensa" sorts
+  /// between "dorsiflexion" and "…", not before "abdominales".
+  ///
+  /// The old `orderBy('name')` sorted by UTF-8 byte order, where `A`–`Z`
+  /// (65–90) precede `a`–`z` (97–122), so any capitalized name jumped to the
+  /// top. Sorting happens in Dart over [foldSearch] of the live name rather
+  /// than `orderBy('nameLowercase')` because a server-side orderBy EXCLUDES
+  /// every doc missing the field — pre-#553 docs would vanish from the picker
+  /// until `backfill_custom_exercise_name_lowercase.js` runs. The stream
+  /// already reads the whole (small, per-trainer) collection, so the local
+  /// sort costs nothing, is byte-identical with the search normalization, and
+  /// works the same before and after the backfill.
   Stream<List<CustomExercise>> watchForTrainer(String trainerId) {
-    return _col(trainerId).orderBy('name').snapshots().map((snap) => snap.docs
-        .map((d) => CustomExercise.fromJson({...d.data(), 'id': d.id}))
-        .toList());
+    return _col(trainerId).snapshots().map((snap) {
+      final list = snap.docs
+          .map((d) => CustomExercise.fromJson({...d.data(), 'id': d.id}))
+          .toList();
+      list.sort((a, b) {
+        final byFolded = foldSearch(a.name).compareTo(foldSearch(b.name));
+        if (byFolded != 0) return byFolded;
+        final byName = a.name.compareTo(b.name);
+        return byName != 0 ? byName : a.id.compareTo(b.id);
+      });
+      return list;
+    });
   }
 
   // ─── getById ───────────────────────────────────────────────────────────────
