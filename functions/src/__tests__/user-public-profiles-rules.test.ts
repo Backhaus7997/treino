@@ -199,7 +199,7 @@ describe("userPublicProfiles rules — gymId integrity (getAfter pin)", () => {
 describe("userPublicProfiles rules — field allowlist", () => {
   const uid = "athlete-forge-field";
 
-  it("denies a write containing a field outside the 15-field allowlist", async () => {
+  it("denies a write containing a field outside the field allowlist", async () => {
     await seed(uid, { userGymId: "gym-a", profile: {} });
 
     const alice = testEnv.authenticatedContext(uid);
@@ -268,5 +268,91 @@ describe("userPublicProfiles rules — owner-only", () => {
     const ref = attacker.firestore().collection(COL_PROFILES).doc(victim);
 
     await assertFails(ref.update({ displayName: "pwned" }));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 6. isProfilePublic privacy flag.
+//
+// The privacy feature (Instagram-style public/private profiles) writes this
+// flag from the client via UserPublicProfileRepository.setProfilePublic —
+// a SetOptions(merge: true) partial write. With merge semantics
+// request.resource.data is the full POST-merge document, so the field must
+// be in the hasOnly allowlist twice over: (a) for the flip itself, and (b)
+// so a doc that already stores the flag doesn't fail the allowlist on every
+// LATER unrelated merge (updateCounters after each workout, dual-writes...).
+// ---------------------------------------------------------------------------
+describe("userPublicProfiles rules — isProfilePublic privacy flag", () => {
+  const uid = "athlete-privacy";
+
+  it("allows the owner to flip isProfilePublic (setProfilePublic merge shape)", async () => {
+    await seed(uid, { userGymId: "gym-a", profile: { displayName: "Alice" } });
+
+    const alice = testEnv.authenticatedContext(uid);
+    const ref = alice.firestore().collection(COL_PROFILES).doc(uid);
+
+    // Exact payload + SetOptions(merge: true) shape of
+    // UserPublicProfileRepository.setProfilePublic.
+    await assertSucceeds(ref.set({ isProfilePublic: false }, { merge: true }));
+  });
+
+  it("allows unrelated counter merges on a doc that already stores isProfilePublic", async () => {
+    // Doc already carrying the flag (flipped earlier, or backfilled by the
+    // Admin SDK). The stored field is part of the post-merge doc on EVERY
+    // subsequent merge, so it must not brick unrelated counter writes.
+    await seed(uid, {
+      userGymId: "gym-a",
+      profile: { isProfilePublic: false, followersCount: 3 },
+    });
+
+    const alice = testEnv.authenticatedContext(uid);
+    const ref = alice.firestore().collection(COL_PROFILES).doc(uid);
+
+    // Exact updateCounters shape of FriendshipRepository.accept — a real
+    // prod merge with no other paired field.
+    await assertSucceeds(ref.set({ followersCount: 4 }, { merge: true }));
+  });
+
+  it("allows a first-ever write (create) carrying isProfilePublic", async () => {
+    // UserPublicProfileRepository.set(profile) serializes the full model,
+    // whose freezed default (@Default(true)) always emits the field — so
+    // the CREATE branch must accept it too (payload kept minimal; each
+    // create constraint is AND'd independently).
+    const fresh = "athlete-privacy-create";
+    await seed(fresh, { userGymId: "gym-a" });
+
+    const bob = testEnv.authenticatedContext(fresh);
+    const ref = bob.firestore().collection(COL_PROFILES).doc(fresh);
+
+    await assertSucceeds(
+      ref.set(
+        { uid: fresh, displayName: "Bob", isProfilePublic: true },
+        { merge: true },
+      ),
+    );
+  });
+
+  it("denies a non-bool isProfilePublic (update branch)", async () => {
+    await seed(uid, { userGymId: "gym-a", profile: {} });
+
+    const alice = testEnv.authenticatedContext(uid);
+    const ref = alice.firestore().collection(COL_PROFILES).doc(uid);
+
+    await assertFails(ref.set({ isProfilePublic: "yes" }, { merge: true }));
+  });
+
+  it("denies a non-bool isProfilePublic (create branch — duplicated guard)", async () => {
+    // No profile doc seeded → this merge is a CREATE. The bool guard lives
+    // textually duplicated in both branches (see the COUPLING WARNING in
+    // firestore.rules) — pin each copy independently.
+    const fresh = "athlete-privacy-create-nonbool";
+    await seed(fresh, { userGymId: "gym-a" });
+
+    const bob = testEnv.authenticatedContext(fresh);
+    const ref = bob.firestore().collection(COL_PROFILES).doc(fresh);
+
+    await assertFails(
+      ref.set({ uid: fresh, isProfilePublic: "yes" }, { merge: true }),
+    );
   });
 });
