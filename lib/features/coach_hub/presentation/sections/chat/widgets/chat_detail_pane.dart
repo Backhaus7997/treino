@@ -307,11 +307,17 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
           Expanded(
             child: TreinoStateSwitcher(
               childKey: ValueKey(messagesAsync.when(
+                skipError: true,
                 loading: () => 'loading',
                 error: (_, __) => 'error',
                 data: (_) => 'data',
               )),
+              // `skipError`: stale-while-error. Riverpod preserva el último
+              // valor dentro del AsyncError (copyWithPrevious); si el hilo ya
+              // tenía mensajes, un error transitorio del stream no lo vacía.
+              // El estado de error queda sólo para el primer load fallido.
               child: messagesAsync.when(
+                skipError: true,
                 loading: () => const Padding(
                   padding: EdgeInsets.all(AppSpacing.s14),
                   child: _FilasSkeleton(filas: 4),

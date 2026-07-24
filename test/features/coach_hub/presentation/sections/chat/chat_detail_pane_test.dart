@@ -289,6 +289,78 @@ void main() {
   // adversarial review: `''` must be treated as "absent" EVERYWHERE
   // (`_usableName`), never as a usable name and never left to slip through
   // an `?? ` fallback that only catches `null`.
+  group('ChatDetailPane — messages stale-while-error', () {
+    testWidgets(
+      'thread persists through a transient stream error when messages were '
+      'already loaded',
+      (tester) async {
+        final controller = StreamController<List<Message>>();
+        addTearDown(controller.close);
+
+        final container = _buildContainer(overrides: [
+          chatsForCurrentUserProvider.overrideWith(
+            (ref) => Stream<List<Chat>>.value([_stubChat()]),
+          ),
+          userPublicProfileProvider(_athleteUid).overrideWith(
+            (ref) => Stream<UserPublicProfile?>.value(_stubPub()),
+          ),
+          messagesProvider(_chatId).overrideWith((ref) => controller.stream),
+        ]);
+        addTearDown(container.dispose);
+
+        await _pumpPane(
+          tester,
+          container,
+          const ChatDetailPane(chatId: _chatId),
+        );
+
+        controller.add([
+          Message(
+            id: 'm1',
+            senderId: _athleteUid,
+            text: 'hola A',
+            createdAt: DateTime(2026, 7, 1),
+          ),
+        ]);
+        await tester.pumpAndSettle();
+        expect(find.text('hola A'), findsOneWidget);
+
+        controller.addError('transient');
+        await tester.pumpAndSettle();
+
+        expect(find.text('No pudimos cargar los mensajes.'), findsNothing);
+        expect(find.text('hola A'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'a first load that fails (no messages yet) still shows the error',
+      (tester) async {
+        final container = _buildContainer(overrides: [
+          chatsForCurrentUserProvider.overrideWith(
+            (ref) => Stream<List<Chat>>.value([_stubChat()]),
+          ),
+          userPublicProfileProvider(_athleteUid).overrideWith(
+            (ref) => Stream<UserPublicProfile?>.value(_stubPub()),
+          ),
+          messagesProvider(_chatId).overrideWith(
+            (ref) => Stream<List<Message>>.error('boom'),
+          ),
+        ]);
+        addTearDown(container.dispose);
+
+        await _pumpPane(
+          tester,
+          container,
+          const ChatDetailPane(chatId: _chatId),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('No pudimos cargar los mensajes.'), findsOneWidget);
+      },
+    );
+  });
+
   group('ChatDetailPane header — empty-string (\'\') normalization', () {
     testWidgets(
       'global path (peerUid/peerNameInitial null): a live displayName == "" '
