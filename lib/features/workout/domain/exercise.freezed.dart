@@ -31,7 +31,11 @@ mixin _$Exercise {
       throw _privateConstructorUsedError; // 'compound' | 'isolation' (free-form String, validated in seed)
   List<String>? get techniqueInstructions =>
       throw _privateConstructorUsedError; // null means "not yet authored" (ADR-1)
-  String? get videoUrl => throw _privateConstructorUsedError;
+  String? get videoUrl =>
+      throw _privateConstructorUsedError; // Foto identificatoria (frame del propio video, 256px en Storage) escrita
+// por scripts/extract_exercise_thumbnails.js. null en customs y en docs
+// anteriores al backfill — la UI cae a la cascada de ExerciseAssetImage.
+  String? get thumbnailUrl => throw _privateConstructorUsedError;
   int? get defaultRestSeconds => throw _privateConstructorUsedError;
   List<String> get aliases =>
       throw _privateConstructorUsedError; // Spanish/jargon synonyms for the Excel importer match
@@ -62,6 +66,7 @@ abstract class $ExerciseCopyWith<$Res> {
       String category,
       List<String>? techniqueInstructions,
       String? videoUrl,
+      String? thumbnailUrl,
       int? defaultRestSeconds,
       List<String> aliases,
       @JsonKey(fromJson: _equipmentFromJson, toJson: _equipmentToJson)
@@ -90,6 +95,7 @@ class _$ExerciseCopyWithImpl<$Res, $Val extends Exercise>
     Object? category = null,
     Object? techniqueInstructions = freezed,
     Object? videoUrl = freezed,
+    Object? thumbnailUrl = freezed,
     Object? defaultRestSeconds = freezed,
     Object? aliases = null,
     Object? equipment = freezed,
@@ -123,6 +129,10 @@ class _$ExerciseCopyWithImpl<$Res, $Val extends Exercise>
           ? _value.videoUrl
           : videoUrl // ignore: cast_nullable_to_non_nullable
               as String?,
+      thumbnailUrl: freezed == thumbnailUrl
+          ? _value.thumbnailUrl
+          : thumbnailUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
       defaultRestSeconds: freezed == defaultRestSeconds
           ? _value.defaultRestSeconds
           : defaultRestSeconds // ignore: cast_nullable_to_non_nullable
@@ -155,6 +165,7 @@ abstract class _$$ExerciseImplCopyWith<$Res>
       String category,
       List<String>? techniqueInstructions,
       String? videoUrl,
+      String? thumbnailUrl,
       int? defaultRestSeconds,
       List<String> aliases,
       @JsonKey(fromJson: _equipmentFromJson, toJson: _equipmentToJson)
@@ -181,6 +192,7 @@ class __$$ExerciseImplCopyWithImpl<$Res>
     Object? category = null,
     Object? techniqueInstructions = freezed,
     Object? videoUrl = freezed,
+    Object? thumbnailUrl = freezed,
     Object? defaultRestSeconds = freezed,
     Object? aliases = null,
     Object? equipment = freezed,
@@ -214,6 +226,10 @@ class __$$ExerciseImplCopyWithImpl<$Res>
           ? _value.videoUrl
           : videoUrl // ignore: cast_nullable_to_non_nullable
               as String?,
+      thumbnailUrl: freezed == thumbnailUrl
+          ? _value.thumbnailUrl
+          : thumbnailUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
       defaultRestSeconds: freezed == defaultRestSeconds
           ? _value.defaultRestSeconds
           : defaultRestSeconds // ignore: cast_nullable_to_non_nullable
@@ -241,6 +257,7 @@ class _$ExerciseImpl implements _Exercise {
       required this.category,
       final List<String>? techniqueInstructions,
       this.videoUrl,
+      this.thumbnailUrl,
       this.defaultRestSeconds,
       final List<String> aliases = const <String>[],
       @JsonKey(fromJson: _equipmentFromJson, toJson: _equipmentToJson)
@@ -280,6 +297,11 @@ class _$ExerciseImpl implements _Exercise {
 // null means "not yet authored" (ADR-1)
   @override
   final String? videoUrl;
+// Foto identificatoria (frame del propio video, 256px en Storage) escrita
+// por scripts/extract_exercise_thumbnails.js. null en customs y en docs
+// anteriores al backfill — la UI cae a la cascada de ExerciseAssetImage.
+  @override
+  final String? thumbnailUrl;
   @override
   final int? defaultRestSeconds;
   final List<String> _aliases;
@@ -299,7 +321,7 @@ class _$ExerciseImpl implements _Exercise {
 
   @override
   String toString() {
-    return 'Exercise(id: $id, name: $name, muscleGroup: $muscleGroup, secondaryMuscleGroup: $secondaryMuscleGroup, category: $category, techniqueInstructions: $techniqueInstructions, videoUrl: $videoUrl, defaultRestSeconds: $defaultRestSeconds, aliases: $aliases, equipment: $equipment)';
+    return 'Exercise(id: $id, name: $name, muscleGroup: $muscleGroup, secondaryMuscleGroup: $secondaryMuscleGroup, category: $category, techniqueInstructions: $techniqueInstructions, videoUrl: $videoUrl, thumbnailUrl: $thumbnailUrl, defaultRestSeconds: $defaultRestSeconds, aliases: $aliases, equipment: $equipment)';
   }
 
   @override
@@ -319,6 +341,8 @@ class _$ExerciseImpl implements _Exercise {
                 .equals(other._techniqueInstructions, _techniqueInstructions) &&
             (identical(other.videoUrl, videoUrl) ||
                 other.videoUrl == videoUrl) &&
+            (identical(other.thumbnailUrl, thumbnailUrl) ||
+                other.thumbnailUrl == thumbnailUrl) &&
             (identical(other.defaultRestSeconds, defaultRestSeconds) ||
                 other.defaultRestSeconds == defaultRestSeconds) &&
             const DeepCollectionEquality().equals(other._aliases, _aliases) &&
@@ -337,6 +361,7 @@ class _$ExerciseImpl implements _Exercise {
       category,
       const DeepCollectionEquality().hash(_techniqueInstructions),
       videoUrl,
+      thumbnailUrl,
       defaultRestSeconds,
       const DeepCollectionEquality().hash(_aliases),
       equipment);
@@ -366,6 +391,7 @@ abstract class _Exercise implements Exercise {
       required final String category,
       final List<String>? techniqueInstructions,
       final String? videoUrl,
+      final String? thumbnailUrl,
       final int? defaultRestSeconds,
       final List<String> aliases,
       @JsonKey(fromJson: _equipmentFromJson, toJson: _equipmentToJson)
@@ -392,7 +418,12 @@ abstract class _Exercise implements Exercise {
   List<String>?
       get techniqueInstructions; // null means "not yet authored" (ADR-1)
   @override
-  String? get videoUrl;
+  String?
+      get videoUrl; // Foto identificatoria (frame del propio video, 256px en Storage) escrita
+// por scripts/extract_exercise_thumbnails.js. null en customs y en docs
+// anteriores al backfill — la UI cae a la cascada de ExerciseAssetImage.
+  @override
+  String? get thumbnailUrl;
   @override
   int? get defaultRestSeconds;
   @override
