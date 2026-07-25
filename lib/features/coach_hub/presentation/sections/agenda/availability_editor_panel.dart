@@ -86,25 +86,30 @@ class AvailabilityEditorPanel extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     // ── Reglas ─────────────────────────────────────────────────
-                    rulesAsync.when(
-                      loading: () => Center(
+                    // hasValue-first (pulido-post-revision, mismo defecto
+                    // que Chat, commit cdd41949): `.when()` despacha por
+                    // SUBTIPO runtime (ignora `hasValue`) — se prioriza el
+                    // valor cacheado ante un error transitorio del stream.
+                    if (rulesAsync.hasValue)
+                      _RulesList(
+                        rules: rulesAsync.requireValue,
+                        trainerId: trainerId,
+                        palette: palette,
+                      )
+                    else if (rulesAsync.hasError)
+                      _ErrorState(
+                        palette: palette,
+                        onRetry: () => ref.invalidate(
+                            availabilityRulesStreamProvider(trainerId)),
+                      )
+                    else
+                      Center(
                         child: Padding(
                           padding: const EdgeInsets.all(32),
                           child:
                               CircularProgressIndicator(color: palette.accent),
                         ),
                       ),
-                      error: (e, _) => _ErrorState(
-                        palette: palette,
-                        onRetry: () => ref.invalidate(
-                            availabilityRulesStreamProvider(trainerId)),
-                      ),
-                      data: (rules) => _RulesList(
-                        rules: rules,
-                        trainerId: trainerId,
-                        palette: palette,
-                      ),
-                    ),
 
                     // ── Agregar horario ────────────────────────────────────────
                     Padding(
@@ -149,25 +154,30 @@ class AvailabilityEditorPanel extends ConsumerWidget {
                     ),
 
                     // ── Overrides list ─────────────────────────────────────────
-                    overridesAsync.when(
-                      loading: () => Center(
+                    // hasValue-first (pulido-post-revision, mismo defecto
+                    // que Chat, commit cdd41949): `.when()` despacha por
+                    // SUBTIPO runtime (ignora `hasValue`) — se prioriza el
+                    // valor cacheado ante un error transitorio del stream.
+                    if (overridesAsync.hasValue)
+                      _OverridesList(
+                        overrides: overridesAsync.requireValue,
+                        trainerId: trainerId,
+                        palette: palette,
+                      )
+                    else if (overridesAsync.hasError)
+                      _ErrorState(
+                        palette: palette,
+                        onRetry: () => ref
+                            .invalidate(overridesStreamProvider(overridesKey)),
+                      )
+                    else
+                      Center(
                         child: Padding(
                           padding: const EdgeInsets.all(24),
                           child:
                               CircularProgressIndicator(color: palette.accent),
                         ),
                       ),
-                      error: (e, _) => _ErrorState(
-                        palette: palette,
-                        onRetry: () => ref
-                            .invalidate(overridesStreamProvider(overridesKey)),
-                      ),
-                      data: (overrides) => _OverridesList(
-                        overrides: overrides,
-                        trainerId: trainerId,
-                        palette: palette,
-                      ),
-                    ),
 
                     // ── Botones Bloquear / Extra ───────────────────────────────
                     Padding(

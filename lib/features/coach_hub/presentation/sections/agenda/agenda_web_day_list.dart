@@ -54,14 +54,55 @@ class AgendaWebDayList extends ConsumerWidget {
       ),
     );
 
-    return apptAsync.when(
-      loading: () => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 32),
-        child: Center(
-          child: CircularProgressIndicator(color: palette.accent),
-        ),
-      ),
-      error: (_, __) => Padding(
+    // hasValue-first (pulido-post-revision, mismo defecto que Chat, commit
+    // cdd41949): `trainerAppointmentsStreamProvider` es un StreamProvider en
+    // vivo — Riverpod 2.5+ preserva el valor previo dentro de un
+    // `AsyncError` subsiguiente (`copyWithPrevious`/"seamless"), así que
+    // `hasValue == true` Y `hasError == true` pueden darse a la vez tras un
+    // error transitorio. `.when()` despacha por SUBTIPO runtime (ignora
+    // `hasValue`) — se prioriza el valor cacheado.
+    if (apptAsync.hasValue) {
+      // Filtrar: confirmados del día seleccionado.
+      final dayAppts = apptAsync.requireValue
+          .where(
+            (a) =>
+                a.status == AppointmentStatus.confirmed &&
+                a.startsAt.year == selectedDay.year &&
+                a.startsAt.month == selectedDay.month &&
+                a.startsAt.day == selectedDay.day,
+          )
+          .toList()
+        ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
+
+      if (dayAppts.isEmpty) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 24),
+          child: Center(
+            child: Text(
+              'No hay sesiones este día.', // i18n
+              style: TextStyle(color: palette.textMuted),
+            ),
+          ),
+        );
+      }
+
+      final cards = <Widget>[
+        for (final appt in dayAppts)
+          AppointmentCard(appointment: appt, trainerId: trainerId),
+      ];
+      // Panel desktop: ListView que llena el alto y scrollea.
+      // Layout angosto: Column shrink-wrap dentro del scroll de la página.
+      if (fillHeight) {
+        return ListView(children: cards);
+      }
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: cards,
+      );
+    }
+
+    if (apptAsync.hasError) {
+      return Padding(
         padding: const EdgeInsets.symmetric(vertical: 24),
         child: Center(
           child: Text(
@@ -69,46 +110,14 @@ class AgendaWebDayList extends ConsumerWidget {
             style: TextStyle(color: palette.textMuted),
           ),
         ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 32),
+      child: Center(
+        child: CircularProgressIndicator(color: palette.accent),
       ),
-      data: (allAppts) {
-        // Filtrar: confirmados del día seleccionado.
-        final dayAppts = allAppts
-            .where(
-              (a) =>
-                  a.status == AppointmentStatus.confirmed &&
-                  a.startsAt.year == selectedDay.year &&
-                  a.startsAt.month == selectedDay.month &&
-                  a.startsAt.day == selectedDay.day,
-            )
-            .toList()
-          ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
-
-        if (dayAppts.isEmpty) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 24),
-            child: Center(
-              child: Text(
-                'No hay sesiones este día.', // i18n
-                style: TextStyle(color: palette.textMuted),
-              ),
-            ),
-          );
-        }
-
-        final cards = <Widget>[
-          for (final appt in dayAppts)
-            AppointmentCard(appointment: appt, trainerId: trainerId),
-        ];
-        // Panel desktop: ListView que llena el alto y scrollea.
-        // Layout angosto: Column shrink-wrap dentro del scroll de la página.
-        if (fillHeight) {
-          return ListView(children: cards);
-        }
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: cards,
-        );
-      },
     );
   }
 }
