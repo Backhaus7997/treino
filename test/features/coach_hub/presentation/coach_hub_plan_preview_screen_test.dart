@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
+import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach_hub/application/cf_providers.dart';
 import 'package:treino/features/coach_hub/application/plan_import_providers.dart';
 import 'package:treino/features/coach_hub/domain/parsed_plan.dart';
@@ -281,6 +282,65 @@ void main() {
       expect(find.byType(CoachHubPlanPreviewScreen), findsOneWidget);
       // Local mapping state preserved (unmatched badge gone)
       expect(find.text('sin match'), findsNothing);
+    });
+  });
+
+  group(
+      'SCENARIO-STALE — _AthletePicker sostiene el roster ante error '
+      'transitorio (pulido-post-revision)', () {
+    // Regression: `_AthletePicker.build` despachaba con
+    // `linksAsync.when(loading:, error:, data:)` — dispatch por SUBTIPO
+    // runtime, ignora `hasValue`. `trainerLinksStreamProvider` es un
+    // StreamProvider en vivo — Riverpod 2.5+ preserva el valor previo dentro
+    // de un AsyncError subsiguiente (copyWithPrevious/"seamless"), así que
+    // un error transitorio (con alumnos ya cargados) tapaba el picker con
+    // "No pudimos cargar tus alumnos.".
+    testWidgets(
+        'los alumnos ya cargados no desaparecen tras un error transitorio '
+        'del stream (stale-while-refresh)', (tester) async {
+      final controller = StreamController<List<TrainerLink>>();
+      addTearDown(controller.close);
+
+      final plan = _planWithUnmatched();
+
+      await tester.pumpWidget(
+        _wrap(
+          const CoachHubPlanPreviewScreen(),
+          overrides: [
+            parsedPlanProvider.overrideWith((ref) => plan),
+            userProfileProvider.overrideWith(
+              (ref) => Stream.value(_trainerProfile()),
+            ),
+            exercisesProvider.overrideWith((ref) => Future.value(const [])),
+            trainerLinksStreamProvider.overrideWith((ref) => controller.stream),
+          ],
+        ),
+      );
+      await tester.pump();
+
+      controller.add(const <TrainerLink>[]);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(find.text('No pudimos cargar tus alumnos.'), findsNothing);
+      expect(
+        find.text(
+          'No tenés alumnos activos para asignarles este plan. '
+          'Esperá que un atleta acepte tu vínculo y volvé a importar.',
+        ),
+        findsOneWidget,
+      );
+
+      controller.addError(Exception('transient stream hiccup'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(
+        find.text('No pudimos cargar tus alumnos.'),
+        findsNothing,
+        reason: 'un error transitorio con alumnos ya cargados no debe tapar '
+            'el picker con el mensaje de error',
+      );
     });
   });
 }

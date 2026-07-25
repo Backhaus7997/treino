@@ -86,23 +86,25 @@ class PerfilPublicoScreen extends ConsumerWidget {
           TreinoStateSwitcher(
             childKey:
                 ValueKey('perfil_publico_state_${_stateKeyOf(profileAsync)}'),
-            child: profileAsync.when(
-              loading: () => const _PerfilPublicoLoading(),
-              error: (_, __) => TreinoEmptyState(
-                key: const Key('perfil_publico_error'),
-                icon: TreinoIcon.errorState,
-                title: 'No pudimos cargar tu perfil público.', // i18n: Fase 11
-                ctaLabel: 'Reintentar', // i18n: Fase 11
-                onCtaTap: () => ref.invalidate(userProfileProvider),
-              ),
-              data: (profile) => profile == null
-                  ? const TreinoEmptyState(
-                      key: Key('perfil_publico_empty'),
-                      icon: TreinoIcon.emptyState,
-                      title: 'No encontramos tu perfil.', // i18n: Fase 11
-                    )
-                  : _PerfilPublicoContent(profile: profile),
-            ),
+            // hasValue-first (pulido-post-revision, mismo defecto que Chat,
+            // commit cdd41949): `userProfileProvider` es un StreamProvider en
+            // vivo — Riverpod 2.5+ preserva el valor previo dentro de un
+            // `AsyncError` subsiguiente (`copyWithPrevious`/"seamless"), así
+            // que `hasValue == true` Y `hasError == true` pueden darse a la
+            // vez tras un error transitorio. `.when()` despacha por SUBTIPO
+            // runtime (ignora `hasValue`) — se prioriza el valor cacheado.
+            child: profileAsync.hasValue
+                ? _perfilPublicoContentFor(profileAsync.requireValue)
+                : profileAsync.hasError
+                    ? TreinoEmptyState(
+                        key: const Key('perfil_publico_error'),
+                        icon: TreinoIcon.errorState,
+                        title:
+                            'No pudimos cargar tu perfil público.', // i18n: Fase 11
+                        ctaLabel: 'Reintentar', // i18n: Fase 11
+                        onCtaTap: () => ref.invalidate(userProfileProvider),
+                      )
+                    : const _PerfilPublicoLoading(),
           ),
         ],
       ),
@@ -110,10 +112,18 @@ class PerfilPublicoScreen extends ConsumerWidget {
   }
 }
 
+Widget _perfilPublicoContentFor(UserProfile? profile) => profile == null
+    ? const TreinoEmptyState(
+        key: Key('perfil_publico_empty'),
+        icon: TreinoIcon.emptyState,
+        title: 'No encontramos tu perfil.', // i18n: Fase 11
+      )
+    : _PerfilPublicoContent(profile: profile);
+
 String _stateKeyOf(AsyncValue<Object?> value) {
+  if (value.hasValue) return 'data';
   if (value.hasError) return 'error';
-  if (value.isLoading && !value.hasValue) return 'loading';
-  return 'data';
+  return 'loading';
 }
 
 /// Skeleton de carga (WU-05) — imita la grilla real de dos columnas (dos

@@ -96,14 +96,21 @@ List<TrainerLink> _dedupedAthletes(List<TrainerLink> links) {
 
 /// Key del [TreinoStateSwitcher]: `loading` sólo en la primera carga (sin
 /// data previa), luego `error`/`empty`/`data` según corresponda.
+///
+/// hasValue-first (pulido-post-revision, mismo defecto que Chat, commit
+/// cdd41949): [trainerLinksStreamProvider] es un `StreamProvider` en vivo —
+/// Riverpod 2.5+ preserva el valor previo dentro de un `AsyncError`
+/// subsiguiente (`copyWithPrevious`/"seamless"), así que `hasValue == true`
+/// Y `hasError == true` pueden darse a la vez tras un error transitorio del
+/// stream. Se chequea `hasValue` explícitamente ANTES del error para que un
+/// error transitorio nunca tape el roster ya cargado.
 String _stateKeyOf(
   AsyncValue<List<TrainerLink>> linksAsync,
   List<TrainerLink> athletes,
 ) {
-  if (linksAsync.isLoading && !linksAsync.hasValue) return 'loading';
+  if (linksAsync.hasValue) return athletes.isEmpty ? 'empty' : 'data';
   if (linksAsync.hasError) return 'error';
-  if (athletes.isEmpty) return 'empty';
-  return 'data';
+  return 'loading';
 }
 
 /// Contenido bajo el header — resuelve loading/error/empty/data.
@@ -113,15 +120,32 @@ class _RutinasBody extends ConsumerWidget {
   final AsyncValue<List<TrainerLink>> linksAsync;
   final List<TrainerLink> athletes;
 
+  // hasValue-first (pulido-post-revision, mismo defecto que Chat, commit
+  // cdd41949): [trainerLinksStreamProvider] es un `StreamProvider` en vivo —
+  // Riverpod 2.5+ preserva el valor previo dentro de un `AsyncError`
+  // subsiguiente (`copyWithPrevious`/"seamless"), así que `hasValue == true`
+  // Y `hasError == true` pueden darse a la vez tras un error transitorio del
+  // stream. Se chequea `hasValue` explícitamente ANTES del error para que un
+  // error transitorio nunca tape el roster ya cargado.
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (linksAsync.isLoading && !linksAsync.hasValue) {
+    if (linksAsync.hasValue) {
+      if (athletes.isEmpty) {
+        return const TreinoEmptyState(
+          icon: TreinoIcon.emptyState,
+          title: 'Todavía no tenés alumnos vinculados.', // i18n
+        );
+      }
+
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          for (var i = 0; i < 4; i++) ...[
-            if (i != 0) const SizedBox(height: AppSpacing.s8),
-            const TreinoListRow(title: '', loading: true),
+          for (var i = 0; i < athletes.length; i++) ...[
+            if (i != 0) const SizedBox(height: AppSpacing.s12),
+            TreinoFadeSlideIn(
+              delay: AppMotion.stagger(i),
+              child: _AthleteRow(link: athletes[i]),
+            ),
           ],
         ],
       );
@@ -136,22 +160,12 @@ class _RutinasBody extends ConsumerWidget {
       );
     }
 
-    if (athletes.isEmpty) {
-      return const TreinoEmptyState(
-        icon: TreinoIcon.emptyState,
-        title: 'Todavía no tenés alumnos vinculados.', // i18n
-      );
-    }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (var i = 0; i < athletes.length; i++) ...[
-          if (i != 0) const SizedBox(height: AppSpacing.s12),
-          TreinoFadeSlideIn(
-            delay: AppMotion.stagger(i),
-            child: _AthleteRow(link: athletes[i]),
-          ),
+        for (var i = 0; i < 4; i++) ...[
+          if (i != 0) const SizedBox(height: AppSpacing.s8),
+          const TreinoListRow(title: '', loading: true),
         ],
       ],
     );

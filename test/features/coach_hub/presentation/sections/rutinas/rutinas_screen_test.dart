@@ -249,4 +249,62 @@ void main() {
       expect(find.text('ROUTINES a1'), findsOneWidget);
     });
   });
+
+  group(
+      'SCENARIO-STALE — rutinas sostiene el roster ante error transitorio '
+      '(pulido-post-revision)', () {
+    // Regression: `_stateKeyOf` y `_RutinasBody.build` chequeaban
+    // `linksAsync.hasError` sin mirar `hasValue` antes — `trainerLinksStreamProvider`
+    // es un StreamProvider en vivo, Riverpod 2.5+ preserva el valor previo
+    // dentro de un AsyncError subsiguiente (copyWithPrevious/"seamless"), así
+    // que un error transitorio (con roster ya cargado) tapaba la lista con
+    // el estado de error.
+    testWidgets(
+        'el roster ya cargado no desaparece tras un error transitorio del '
+        'stream (stale-while-refresh)', (tester) async {
+      tester.view.physicalSize = const Size(1400, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final controller = StreamController<List<TrainerLink>>();
+      addTearDown(controller.close);
+      final link =
+          _link(id: '1', status: TrainerLinkStatus.active, athleteId: 'a1');
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            trainerLinksStreamProvider.overrideWith((ref) => controller.stream),
+            userPublicProfileProvider('a1').overrideWith(
+              (ref) => Stream.value(_pub('a1', 'Ana Activa')),
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.dark(),
+            home: const Scaffold(body: RutinasScreen()),
+          ),
+        ),
+      );
+
+      controller.add([link]);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(find.byKey(const ValueKey('data')), findsOneWidget);
+      expect(find.text('Ana Activa'), findsOneWidget);
+
+      controller.addError(Exception('transient stream hiccup'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(
+        find.text('Ana Activa'),
+        findsOneWidget,
+        reason: 'un error transitorio con roster ya cargado no debe tapar '
+            'la lista de rutinas',
+      );
+      expect(find.byKey(const ValueKey('error')), findsNothing);
+    });
+  });
 }

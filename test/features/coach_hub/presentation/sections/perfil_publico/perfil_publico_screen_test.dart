@@ -258,6 +258,48 @@ void main() {
     });
   });
 
+  group(
+      'SCENARIO-STALE — perfil público sostiene el perfil ante error '
+      'transitorio (pulido-post-revision)', () {
+    // Regression: `_stateKeyOf` chequeaba `hasError` antes de `hasValue`, y
+    // el `.when()` del contenido despacha por SUBTIPO runtime (ignora
+    // `hasValue`) — `userProfileProvider` es un StreamProvider en vivo,
+    // Riverpod 2.5+ preserva el valor previo dentro de un AsyncError
+    // subsiguiente (copyWithPrevious/"seamless"), así que un error
+    // transitorio (con perfil ya cargado) tapaba el contenido con el estado
+    // de error.
+    testWidgets(
+        'el perfil ya cargado no desaparece tras un error transitorio del '
+        'stream (stale-while-refresh)', (tester) async {
+      final controller = StreamController<UserProfile?>();
+      addTearDown(controller.close);
+
+      await _pump(tester, profileStream: controller.stream, settle: false);
+
+      controller.add(_trainerProfile());
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      final plano = find.byKey(const Key('perfil_publico_plano'));
+      expect(
+        find.descendant(of: plano, matching: find.text('Joaquín Nadal')),
+        findsOneWidget,
+      );
+
+      controller.addError(Exception('transient stream hiccup'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(
+        find.descendant(of: plano, matching: find.text('Joaquín Nadal')),
+        findsOneWidget,
+        reason: 'un error transitorio con perfil ya cargado no debe tapar '
+            'el contenido de perfil público',
+      );
+      expect(find.byKey(const Key('perfil_publico_error')), findsNothing);
+    });
+  });
+
   group('PerfilPublicoScreen — motion (WU-01)', () {
     testWidgets('dark y light: smoke sin crash en data/loading/error',
         (tester) async {

@@ -943,60 +943,71 @@ class _AthletePicker extends ConsumerWidget {
     // Real-time stream (not the deprecated one-shot FutureProvider) so a link
     // accepted/paused/terminated elsewhere updates the list live. ADR-CHLM-03.
     final linksAsync = ref.watch(trainerLinksStreamProvider);
-    return linksAsync.when(
-      loading: () => Center(
-        child: CircularProgressIndicator(color: palette.accent),
-      ),
-      error: (_, __) => Text(
+
+    // hasValue-first (pulido-post-revision, mismo defecto que Chat, commit
+    // cdd41949): `trainerLinksStreamProvider` es un StreamProvider en vivo —
+    // Riverpod 2.5+ preserva el valor previo dentro de un `AsyncError`
+    // subsiguiente (`copyWithPrevious`/"seamless"), así que `hasValue ==
+    // true` Y `hasError == true` pueden darse a la vez tras un error
+    // transitorio. `.when()` despacha por SUBTIPO runtime (ignora
+    // `hasValue`) — se prioriza el valor cacheado.
+    if (linksAsync.hasValue) {
+      final active = linksAsync.requireValue
+          .where((l) => l.status == TrainerLinkStatus.active)
+          .toList();
+      if (active.isEmpty) {
+        return Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: palette.bgCard,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: palette.border),
+          ),
+          child: Text(
+            'No tenés alumnos activos para asignarles este plan. '
+            'Esperá que un atleta acepte tu vínculo y volvé a importar.',
+            style: TextStyle(color: palette.textMuted, fontSize: 13),
+          ),
+        );
+      }
+      final count = selectedAthleteIds.length;
+      final label = count == 0
+          ? 'ASIGNAR A (ELEGÍ UNO O MÁS)'
+          : 'ASIGNAR A · $count seleccionado(s)';
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.barlowCondensed(
+              color: palette.textMuted,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.4,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...active.map(
+            (link) => _AthleteOption(
+              palette: palette,
+              link: link,
+              selected: selectedAthleteIds.contains(link.athleteId),
+              onTap: () => onToggle(link.athleteId),
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (linksAsync.hasError) {
+      return Text(
         'No pudimos cargar tus alumnos.',
         style: TextStyle(color: palette.textMuted),
-      ),
-      data: (links) {
-        final active =
-            links.where((l) => l.status == TrainerLinkStatus.active).toList();
-        if (active.isEmpty) {
-          return Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: palette.bgCard,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: palette.border),
-            ),
-            child: Text(
-              'No tenés alumnos activos para asignarles este plan. '
-              'Esperá que un atleta acepte tu vínculo y volvé a importar.',
-              style: TextStyle(color: palette.textMuted, fontSize: 13),
-            ),
-          );
-        }
-        final count = selectedAthleteIds.length;
-        final label = count == 0
-            ? 'ASIGNAR A (ELEGÍ UNO O MÁS)'
-            : 'ASIGNAR A · $count seleccionado(s)';
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              label,
-              style: GoogleFonts.barlowCondensed(
-                color: palette.textMuted,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.4,
-              ),
-            ),
-            const SizedBox(height: 8),
-            ...active.map(
-              (link) => _AthleteOption(
-                palette: palette,
-                link: link,
-                selected: selectedAthleteIds.contains(link.athleteId),
-                onTap: () => onToggle(link.athleteId),
-              ),
-            ),
-          ],
-        );
-      },
+      );
+    }
+
+    return Center(
+      child: CircularProgressIndicator(color: palette.accent),
     );
   }
 }

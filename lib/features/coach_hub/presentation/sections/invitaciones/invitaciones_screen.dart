@@ -69,39 +69,47 @@ class InvitacionesScreen extends ConsumerWidget {
           TreinoStateSwitcher(
             childKey:
                 ValueKey('invitaciones_${_stateKeyOf(linksAsync)}_${tab.name}'),
-            child: linksAsync.when(
-              loading: () => const _LoadingList(),
-              error: (e, _) => _ErrorSection(onRetry: () {
-                ref.invalidate(trainerLinksStreamProvider);
-              }),
-              data: (links) {
-                // El stream real ya viene `requestedAt DESC` (Firestore
-                // `.orderBy`, ver `trainer_link_repository.dart`), pero no
-                // dependemos ciegamente de eso: ordenamos explícito acá para
-                // que la garantía sea de la screen, no del stream stub que
-                // reciba (WU-05).
-                final filtered = [
-                  for (final l in links)
-                    if (matchesSolicitudTab(l, tab)) l,
-                ]..sort((a, b) => b.requestedAt.compareTo(a.requestedAt));
-                if (filtered.isEmpty) return _EmptyForTab(tab: tab);
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    for (final link in filtered) ...[
-                      _SolicitudTile(link: link),
-                      if (link != filtered.last)
-                        const SizedBox(height: AppSpacing.s8),
-                    ],
-                  ],
-                );
-              },
-            ),
+            // hasValue-first (pulido-post-revision, mismo defecto que Chat,
+            // commit cdd41949): `trainerLinksStreamProvider` es un
+            // StreamProvider en vivo — Riverpod 2.5+ preserva el valor
+            // previo dentro de un `AsyncError` subsiguiente
+            // (`copyWithPrevious`/"seamless"), así que `hasValue == true` Y
+            // `hasError == true` pueden darse a la vez tras un error
+            // transitorio. `.when()` despacha por SUBTIPO runtime (ignora
+            // `hasValue`) — se prioriza el valor cacheado.
+            child: linksAsync.hasValue
+                ? _invitacionesListFor(linksAsync.requireValue, tab)
+                : linksAsync.hasError
+                    ? _ErrorSection(onRetry: () {
+                        ref.invalidate(trainerLinksStreamProvider);
+                      })
+                    : const _LoadingList(),
           ),
         ],
       ),
     );
   }
+}
+
+/// El stream real ya viene `requestedAt DESC` (Firestore `.orderBy`, ver
+/// `trainer_link_repository.dart`), pero no dependemos ciegamente de eso:
+/// ordenamos explícito acá para que la garantía sea de la screen, no del
+/// stream stub que reciba (WU-05).
+Widget _invitacionesListFor(List<TrainerLink> links, SolicitudTab tab) {
+  final filtered = [
+    for (final l in links)
+      if (matchesSolicitudTab(l, tab)) l,
+  ]..sort((a, b) => b.requestedAt.compareTo(a.requestedAt));
+  if (filtered.isEmpty) return _EmptyForTab(tab: tab);
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      for (final link in filtered) ...[
+        _SolicitudTile(link: link),
+        if (link != filtered.last) const SizedBox(height: AppSpacing.s8),
+      ],
+    ],
+  );
 }
 
 /// Cuenta las solicitudes por tab sobre la lista completa (no filtrada) —
@@ -115,9 +123,9 @@ Map<SolicitudTab, int> _countsByTab(List<TrainerLink>? links) {
 }
 
 String _stateKeyOf(AsyncValue<Object?> value) {
+  if (value.hasValue) return 'data';
   if (value.hasError) return 'error';
-  if (value.isLoading && !value.hasValue) return 'loading';
-  return 'data';
+  return 'loading';
 }
 
 /// Chips de tab (Pendientes/Aceptadas/Rechazadas) con badges de conteo real

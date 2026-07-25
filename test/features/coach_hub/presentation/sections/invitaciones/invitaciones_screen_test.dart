@@ -468,4 +468,42 @@ void main() {
       verifyNever(() => repo.accept(any()));
     });
   });
+
+  group(
+      'SCENARIO-STALE — invitaciones sostiene la bandeja ante error '
+      'transitorio (pulido-post-revision)', () {
+    // Regression: `_stateKeyOf` chequeaba `hasError` antes de `hasValue`, y
+    // el `.when()` del contenido despacha por SUBTIPO runtime (ignora
+    // `hasValue`) — `trainerLinksStreamProvider` es un StreamProvider en
+    // vivo, Riverpod 2.5+ preserva el valor previo dentro de un AsyncError
+    // subsiguiente (copyWithPrevious/"seamless"), así que un error
+    // transitorio (con solicitudes ya cargadas) tapaba la bandeja con el
+    // estado de error.
+    testWidgets(
+        'las solicitudes ya cargadas no desaparecen tras un error '
+        'transitorio del stream (stale-while-refresh)', (tester) async {
+      final controller = StreamController<List<TrainerLink>>();
+      addTearDown(controller.close);
+
+      await _pump(tester, linksStream: controller.stream, settle: false);
+
+      controller.add([_link('a1', TrainerLinkStatus.pending, id: 'l_a1')]);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(find.byKey(const Key('solicitud_card_l_a1')), findsOneWidget);
+
+      controller.addError(Exception('transient stream hiccup'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(
+        find.byKey(const Key('solicitud_card_l_a1')),
+        findsOneWidget,
+        reason: 'un error transitorio con solicitudes ya cargadas no debe '
+            'tapar la bandeja con el estado de error',
+      );
+      expect(find.text('No pudimos cargar esta sección.'), findsNothing);
+    });
+  });
 }
