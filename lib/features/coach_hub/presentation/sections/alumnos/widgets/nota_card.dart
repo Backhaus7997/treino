@@ -72,15 +72,14 @@ class NoteCard extends ConsumerWidget {
     final String stateKey;
     final Widget content;
 
-    if (async.isLoading && !async.hasValue) {
-      stateKey = 'loading';
-      content = _skeleton();
-    } else if (async.hasError) {
-      stateKey = 'error';
-      content = _box(Text('No se pudo cargar la nota.',
-          style: TextStyle(color: palette.textMuted, fontSize: 13)));
-    } else {
-      final note = async.valueOrNull;
+    // hasValue-first: `athleteNoteProvider` es un StreamProvider con
+    // copyWithPrevious — un error transitorio con la nota ya cargada trae
+    // hasValue==true Y hasError==true simultáneos. El orden anterior
+    // (isLoading→hasError→data) chequeaba hasError ANTES que hasValue y
+    // tapaba la nota ya cargada con el error de pantalla completa. Chequeo
+    // explícito hasValue→hasError→loading.
+    if (async.hasValue) {
+      final note = async.value;
       final empty = note == null || note.note.trim().isEmpty;
       stateKey = empty ? 'empty' : 'data';
       content = _box(
@@ -114,6 +113,13 @@ class NoteCard extends ConsumerWidget {
                 ],
               ),
       );
+    } else if (async.hasError) {
+      stateKey = 'error';
+      content = _box(Text('No se pudo cargar la nota.',
+          style: TextStyle(color: palette.textMuted, fontSize: 13)));
+    } else {
+      stateKey = 'loading';
+      content = _skeleton();
     }
 
     return TreinoStateSwitcher(

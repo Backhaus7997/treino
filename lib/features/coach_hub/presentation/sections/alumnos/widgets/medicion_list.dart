@@ -34,49 +34,58 @@ class MedicionList extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final measAsync = ref.watch(measurementsForAthleteProvider(athleteId));
 
-    return TreinoStateSwitcher(
-      childKey: ValueKey('mediciones_list_${_stateKeyOf(measAsync)}'),
-      child: measAsync.when(
-        loading: () => const _MedicionListSkeleton(),
-        error: (_, __) => Center(
-          child: Text(
-            'No pudimos cargar las mediciones.', // i18n: Fase W2
-            style: TextStyle(color: palette.textMuted, fontSize: 14),
-          ),
-        ),
-        data: (all) {
-          // Provider ordena ASC — queremos DESC para "más nuevas arriba".
-          final ms = all.reversed.toList();
-          if (ms.isEmpty) {
-            return const TreinoEmptyState(
+    // hasValue-first: `measurementsForAthleteProvider` es un StreamProvider
+    // con copyWithPrevious — un error transitorio con data ya cargada trae
+    // hasValue==true Y hasError==true simultáneos. `.when()` despacha por
+    // subtipo runtime e ignora hasValue, tapando la lista con el error de
+    // pantalla completa. Chequeo explícito hasValue→hasError→loading.
+    final Widget child;
+    if (measAsync.hasValue) {
+      // Provider ordena ASC — queremos DESC para "más nuevas arriba".
+      final ms = measAsync.value!.reversed.toList();
+      child = ms.isEmpty
+          ? const TreinoEmptyState(
               icon: TreinoIcon.ruler,
               title:
                   'Este alumno todavía no tiene mediciones cargadas.', // i18n: Fase W2
+            )
+          : ListView.separated(
+              itemCount: ms.length,
+              separatorBuilder: (_, __) =>
+                  Divider(height: 1, color: palette.border),
+              itemBuilder: (_, i) => MedicionRow(
+                measurement: ms[i],
+                palette: palette,
+                onDelete: () => onDelete(ms[i]),
+                onEdit: () => onEdit(ms[i]),
+              ),
             );
-          }
-          return ListView.separated(
-            itemCount: ms.length,
-            separatorBuilder: (_, __) =>
-                Divider(height: 1, color: palette.border),
-            itemBuilder: (_, i) => MedicionRow(
-              measurement: ms[i],
-              palette: palette,
-              onDelete: () => onDelete(ms[i]),
-              onEdit: () => onEdit(ms[i]),
-            ),
-          );
-        },
-      ),
+    } else if (measAsync.hasError) {
+      child = Center(
+        child: Text(
+          'No pudimos cargar las mediciones.', // i18n: Fase W2
+          style: TextStyle(color: palette.textMuted, fontSize: 14),
+        ),
+      );
+    } else {
+      child = const _MedicionListSkeleton();
+    }
+
+    return TreinoStateSwitcher(
+      childKey: ValueKey('mediciones_list_${_stateKeyOf(measAsync)}'),
+      child: child,
     );
   }
 }
 
 /// Copia local de `_stateKeyOf` (`alumnos_screen.dart`) — mismo criterio de
-/// key por estado para el `TreinoStateSwitcher`.
+/// key por estado para el `TreinoStateSwitcher`. hasValue-first: la data
+/// cacheada manda incluso si un error transitorio llegó después
+/// (copyWithPrevious).
 String _stateKeyOf(AsyncValue<Object?> value) {
+  if (value.hasValue) return 'data';
   if (value.hasError) return 'error';
-  if (value.isLoading && !value.hasValue) return 'loading';
-  return 'data';
+  return 'loading';
 }
 
 /// Skeleton de carga — mismo patrón que `DatosPersonalesCard._skeleton()`

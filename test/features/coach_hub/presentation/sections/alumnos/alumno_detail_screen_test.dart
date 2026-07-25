@@ -17,10 +17,12 @@ import 'package:treino/app/locale_resolver.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/application/athlete_note_providers.dart';
+import 'package:treino/features/coach/application/profile_share_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/data/trainer_link_repository.dart';
 import 'package:treino/features/coach/domain/appointment.dart';
 import 'package:treino/features/coach/domain/athlete_note.dart';
+import 'package:treino/features/coach/domain/profile_share.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/alumnos/alumno_detail_screen.dart';
@@ -306,6 +308,10 @@ Future<void> _pump(
   AthleteBilling? billing,
   List<PerformanceTest> performanceTests = const [],
   Object? performanceError,
+  // SCENARIO-STALE (pulido-post-revision, alumno-detail-2): idem
+  // [measurementsStream] para `performanceTestsForAthleteProvider` — consumido
+  // por `RendimientoList` (tab Mediciones, vista Rendimiento).
+  Stream<List<PerformanceTest>>? performanceTestsStream,
   List<SetLog> setLogs = const [],
   Object? sessionsError,
   // PR2 — exercise progression overrides
@@ -313,7 +319,20 @@ Future<void> _pump(
   ExerciseProgression? exerciseProgression,
   // PR9 — Resumen tab: nota fijada, próxima sesión, última sesión
   AthleteNote? athleteNote,
+  // SCENARIO-STALE (pulido-post-revision, alumno-detail-2): override directo
+  // del stream de `athleteNoteProvider` — consumido tanto por `NoteCard`
+  // (Resumen) como por `_NotasPrivadasTab` (tab Notas privadas).
+  Stream<AthleteNote?>? noteStream,
   List<Appointment> appointments = const [],
+  // SCENARIO-STALE (pulido-post-revision, alumno-detail-2): idem
+  // [measurementsStream] para `trainerAppointmentsStreamProvider` —
+  // consumido por `ProxSesionCard` (Resumen).
+  Stream<List<Appointment>>? appointmentsStream,
+  // SCENARIO-STALE (pulido-post-revision, alumno-detail-2): `profileShareProvider`
+  // no tenía override en este harness — se agrega junto con [profileShareStream]
+  // para exercitar `DatosPersonalesCard` (Resumen) con data previa cacheada.
+  ProfileShare? profileShare,
+  Stream<ProfileShare?>? profileShareStream,
   Map<String, double> lastWeightByExercise = const {},
   // PR2 (pagos) — trainer's own profile (for paymentAlias)
   UserProfile? trainerProfile,
@@ -345,9 +364,10 @@ Future<void> _pump(
         measurementsForAthleteProvider.overrideWith(
             (ref, id) => measurementsStream ?? Stream.value(measurements)),
         performanceTestsForAthleteProvider.overrideWith((ref, id) =>
-            performanceError != null
+            performanceTestsStream ??
+            (performanceError != null
                 ? Stream.error(performanceError)
-                : Stream.value(performanceTests)),
+                : Stream.value(performanceTests))),
         currentUidProvider.overrideWithValue('t1'),
         assignedRoutinesProvider.overrideWith((ref, id) => routines),
         sessionsByUidProvider.overrideWith((ref, id) {
@@ -371,10 +391,15 @@ Future<void> _pump(
         ),
         // PR9 — nota fijada, próxima sesión, última sesión por ejercicio
         athleteNoteProvider.overrideWith(
-          (ref, key) => Stream.value(athleteNote),
+          (ref, key) => noteStream ?? Stream.value(athleteNote),
         ),
         trainerAppointmentsStreamProvider.overrideWith(
-          (ref, key) => Stream.value(appointments),
+          (ref, key) => appointmentsStream ?? Stream.value(appointments),
+        ),
+        // SCENARIO-STALE (pulido-post-revision, alumno-detail-2): ver doc del
+        // parámetro [profileShareStream] arriba.
+        profileShareProvider.overrideWith(
+          (ref, id) => profileShareStream ?? Stream.value(profileShare),
         ),
         lastWeightByExerciseProvider.overrideWith(
           (ref, uid) async => lastWeightByExercise,
@@ -2199,6 +2224,340 @@ void main() {
             'historial de pagos',
       );
       expect(find.text('No se pudieron cargar los pagos.'), findsNothing);
+    });
+  });
+
+  group(
+      'SCENARIO-STALE — Resumen sostiene la nota fijada ante error '
+      'transitorio (pulido-post-revision, alumno-detail-2)', () {
+    // Regression: `NoteCard` (widgets/nota_card.dart) chequeaba `hasError`
+    // ANTES que el valor cacheado de `athleteNoteProvider` (StreamProvider
+    // en vivo con copyWithPrevious) — un error transitorio con la nota ya
+    // cargada tapaba la nota con "No se pudo cargar la nota.".
+    testWidgets(
+        'nota fijada ya cargada no desaparece tras un error transitorio '
+        'del stream (stale-while-refresh)', (tester) async {
+      final controller = StreamController<AthleteNote?>();
+      addTearDown(controller.close);
+
+      // settle:false — `NoteCard._skeleton()` usa `TreinoShimmer` (animación
+      // en loop) mientras athleteNoteProvider no emitió nada todavía.
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        noteStream: controller.stream,
+        settle: false,
+      );
+
+      controller.add(AthleteNote(
+        trainerId: 't1',
+        athleteId: 'a1',
+        note: 'Buen progreso esta semana',
+        updatedAt: DateTime.utc(2026, 1, 10),
+      ));
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Buen progreso esta semana'), findsOneWidget);
+      expect(find.text('No se pudo cargar la nota.'), findsNothing);
+
+      controller.addError(Exception('transient stream hiccup'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Buen progreso esta semana'),
+        findsOneWidget,
+        reason: 'un error transitorio con la nota ya cargada no debe tapar '
+            'la tarjeta de nota',
+      );
+      expect(find.text('No se pudo cargar la nota.'), findsNothing);
+    });
+  });
+
+  group(
+      'SCENARIO-STALE — Resumen sostiene datos personales ante error '
+      'transitorio (pulido-post-revision, alumno-detail-2)', () {
+    // Regression: `DatosPersonalesCard` (widgets/datos_personales_card.dart)
+    // usaba el orden `isLoading→hasError→data`: con `hasValue==true` Y
+    // `hasError==true` simultáneos (copyWithPrevious tras un error
+    // transitorio ya asentado), la 1ra rama (`isLoading && !hasValue`) da
+    // false pero la 2da (`hasError`) sigue dando true y tapa los datos ya
+    // cargados con el error de pantalla completa.
+    testWidgets(
+        'datos personales ya cargados no desaparecen tras un error '
+        'transitorio del stream (stale-while-refresh)', (tester) async {
+      final controller = StreamController<ProfileShare?>();
+      addTearDown(controller.close);
+
+      // settle:false — `DatosPersonalesCard._skeleton()` usa `TreinoShimmer`
+      // (animación en loop) mientras profileShareProvider no emitió nada
+      // todavía.
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        profileShareStream: controller.stream,
+        settle: false,
+      );
+
+      controller.add(const ProfileShare(
+        trainerId: 't1',
+        phone: '+54 9 11 1234-5678',
+      ));
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      expect(find.text('+54 9 11 1234-5678'), findsOneWidget);
+      expect(
+        find.text('No se pudieron cargar los datos personales.'),
+        findsNothing,
+      );
+
+      controller.addError(Exception('transient stream hiccup'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('+54 9 11 1234-5678'),
+        findsOneWidget,
+        reason: 'un error transitorio con datos ya cargados no debe tapar '
+            'la tarjeta de datos personales',
+      );
+      expect(
+        find.text('No se pudieron cargar los datos personales.'),
+        findsNothing,
+      );
+    });
+  });
+
+  group(
+      'SCENARIO-STALE — Resumen sostiene la próxima sesión ante error '
+      'transitorio (pulido-post-revision, alumno-detail-2)', () {
+    // Regression: `ProxSesionCard` (widgets/prox_sesion_card.dart) mismo
+    // defecto que `DatosPersonalesCard` — orden `isLoading→hasError→data`
+    // sobre `trainerAppointmentsStreamProvider`.
+    testWidgets(
+        'próxima sesión ya cargada no desaparece tras un error transitorio '
+        'del stream (stale-while-refresh)', (tester) async {
+      final controller = StreamController<List<Appointment>>();
+      addTearDown(controller.close);
+
+      // settle:false — `ProxSesionCard._skeleton()` usa `TreinoShimmer`
+      // (animación en loop) mientras trainerAppointmentsStreamProvider no
+      // emitió nada todavía.
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        appointmentsStream: controller.stream,
+        settle: false,
+      );
+
+      controller.add([_appointment()]);
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      expect(find.text('60 min'), findsOneWidget);
+      expect(find.text('No se pudo cargar la agenda.'), findsNothing);
+
+      controller.addError(Exception('transient stream hiccup'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('60 min'),
+        findsOneWidget,
+        reason: 'un error transitorio con la próxima sesión ya cargada no '
+            'debe tapar la tarjeta',
+      );
+      expect(find.text('No se pudo cargar la agenda.'), findsNothing);
+    });
+  });
+
+  group(
+      'SCENARIO-STALE — Mediciones sostiene antropometría ante error '
+      'transitorio (pulido-post-revision, alumno-detail-2)', () {
+    // Regression: `MedicionList` (widgets/medicion_list.dart) usaba
+    // `.when(loading/error/data)` — despacha por SUBTIPO runtime e ignora
+    // `hasValue`, así que un error transitorio con mediciones ya cargadas
+    // caía en la rama `error:` y tapaba la lista.
+    testWidgets(
+        'lista de mediciones ya cargada no desaparece tras un error '
+        'transitorio del stream (stale-while-refresh)', (tester) async {
+      final controller = StreamController<List<Measurement>>();
+      addTearDown(controller.close);
+
+      // settle:false — `_MedicionListSkeleton` usa `TreinoShimmer`
+      // (animación en loop) mientras measurementsForAthleteProvider no
+      // emitió nada todavía.
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        measurementsStream: controller.stream,
+        settle: false,
+      );
+
+      // El TabBar es scrolleable (11 tabs a 1200px): sin ensureVisible el tap
+      // cae fuera del área clickeable (warnIfMissed) y el tab NUNCA cambia —
+      // y la aserción de '60.5 kg' podría pasar por la razón equivocada (el
+      // KPI de peso del tab Resumen). Se scrollea el tab a la vista y se
+      // verifica el cambio real con el toggle de mediciones.
+      final medicionesTab = find.descendant(
+          of: find.byType(TabBar), matching: find.text('Mediciones'));
+      await tester.ensureVisible(medicionesTab);
+      await tester.pump();
+      await tester.tap(medicionesTab);
+      // Pumps ACOTADOS: la vista antropométricas muestra skeleton shimmer
+      // (el stream de mediciones aún no emitió) — pumpAndSettle colgaría.
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byKey(const Key('mediciones_toggle_antropometricas')),
+          findsOneWidget,
+          reason: 'el tab Mediciones debe estar activo (tap real, no missed)');
+
+      controller.add([_meas(60.5)]);
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      expect(find.text('60.5 kg'), findsOneWidget);
+      expect(find.text('No pudimos cargar las mediciones.'), findsNothing);
+
+      controller.addError(Exception('transient stream hiccup'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('60.5 kg'),
+        findsOneWidget,
+        reason: 'un error transitorio con mediciones ya cargadas no debe '
+            'tapar la lista',
+      );
+      expect(find.text('No pudimos cargar las mediciones.'), findsNothing);
+    });
+  });
+
+  group(
+      'SCENARIO-STALE — Mediciones sostiene rendimiento ante error '
+      'transitorio (pulido-post-revision, alumno-detail-2)', () {
+    // Regression: `RendimientoList` (widgets/rendimiento_list.dart) mismo
+    // defecto que `MedicionList` — `.when()` sobre
+    // `performanceTestsForAthleteProvider`.
+    testWidgets(
+        'lista de pruebas de rendimiento ya cargada no desaparece tras un '
+        'error transitorio del stream (stale-while-refresh)', (tester) async {
+      final controller = StreamController<List<PerformanceTest>>();
+      addTearDown(controller.close);
+
+      // settle:false — `_RendimientoListSkeleton` usa `TreinoShimmer`
+      // (animación en loop) mientras performanceTestsForAthleteProvider no
+      // emitió nada todavía.
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        performanceTestsStream: controller.stream,
+        settle: false,
+      );
+
+      // ensureVisible: el TabBar es scrolleable (11 tabs a 1200px) — sin esto
+      // el tap cae fuera del área clickeable (warnIfMissed) y el tab nunca
+      // cambia (fallaba con "Found 0 widgets" en el toggle).
+      final medicionesTab = find.descendant(
+          of: find.byType(TabBar), matching: find.text('Mediciones'));
+      await tester.ensureVisible(medicionesTab);
+      await tester.pump();
+      await tester.tap(medicionesTab);
+      // pumpAndSettle es seguro ACÁ: la vista visible es antropométricas y
+      // measurementsForAthleteProvider (default del harness) ya emitió data
+      // vacía — sin shimmer. Completa la transición del TabBarView.
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('mediciones_toggle_rendimiento')));
+      // Desde acá la vista rendimiento muestra skeleton shimmer (el stream
+      // de performance no emitió) — SOLO pumps acotados, nunca settle.
+      await tester.pump();
+
+      controller.add([_perf(cmjCm: 30)]);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(find.textContaining('CMJ 30'), findsOneWidget);
+      expect(find.text('No pudimos cargar las pruebas.'), findsNothing);
+
+      controller.addError(Exception('transient stream hiccup'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(
+        find.textContaining('CMJ 30'),
+        findsOneWidget,
+        reason: 'un error transitorio con pruebas ya cargadas no debe tapar '
+            'la lista',
+      );
+      expect(find.text('No pudimos cargar las pruebas.'), findsNothing);
+    });
+  });
+
+  group(
+      'SCENARIO-STALE — Notas privadas sostiene el editor ante error '
+      'transitorio (pulido-post-revision, alumno-detail-2)', () {
+    // Regression: `_NotasPrivadasTab` (alumno_detail_screen.dart) usaba
+    // `.when(loading/error/data)` sobre `athleteNoteProvider` — un error
+    // transitorio con la nota ya cargada reemplazaba TODO el editor
+    // (TextField + botón GUARDAR) por el mensaje de error, tirando
+    // cualquier texto sin guardar que el PF tuviera escrito.
+    testWidgets(
+        'nota ya cargada y el editor no desaparecen tras un error '
+        'transitorio del stream (stale-while-refresh)', (tester) async {
+      final controller = StreamController<AthleteNote?>();
+      addTearDown(controller.close);
+
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        noteStream: controller.stream,
+        settle: false,
+      );
+
+      // ensureVisible: 'Notas privadas' está aún más lejos en el TabBar
+      // scrolleable — sin esto el tap se pierde (warnIfMissed) y la aserción
+      // de la nota podría pasar por la razón equivocada (NoteCard del
+      // Resumen consume el mismo athleteNoteProvider).
+      final notasTab = find.descendant(
+          of: find.byType(TabBar), matching: find.text('Notas privadas'));
+      await tester.ensureVisible(notasTab);
+      await tester.pump();
+      await tester.tap(notasTab);
+      // Pumps acotados: noteStream aún no emitió (posible shimmer).
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(const Duration(milliseconds: 300));
+
+      controller.add(AthleteNote(
+        trainerId: 't1',
+        athleteId: 'a1',
+        note: 'Progresando bien, aumentar carga la próxima semana',
+        updatedAt: DateTime.utc(2026, 1, 10),
+      ));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(
+        find.text('Progresando bien, aumentar carga la próxima semana'),
+        findsOneWidget,
+      );
+      expect(find.text('No pudimos cargar la nota.'), findsNothing);
+
+      controller.addError(Exception('transient stream hiccup'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(
+        find.text('Progresando bien, aumentar carga la próxima semana'),
+        findsOneWidget,
+        reason: 'un error transitorio con la nota ya cargada no debe tapar '
+            'el editor',
+      );
+      expect(find.text('No pudimos cargar la nota.'), findsNothing);
     });
   });
 }

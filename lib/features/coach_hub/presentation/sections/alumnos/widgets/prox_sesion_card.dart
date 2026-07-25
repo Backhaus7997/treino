@@ -91,15 +91,15 @@ class ProxSesionCard extends ConsumerWidget {
     final String stateKey;
     final Widget content;
 
-    if (async.isLoading && !async.hasValue) {
-      stateKey = 'loading';
-      content = _skeleton();
-    } else if (async.hasError) {
-      stateKey = 'error';
-      content = _box(Text('No se pudo cargar la agenda.',
-          style: TextStyle(color: palette.textMuted, fontSize: 13)));
-    } else {
-      final appointments = async.valueOrNull ?? const <Appointment>[];
+    // hasValue-first: `trainerAppointmentsStreamProvider` es un
+    // StreamProvider con copyWithPrevious — un error transitorio con
+    // appointments ya cargados trae hasValue==true Y hasError==true
+    // simultáneos. El orden anterior (isLoading→hasError→data) chequeaba
+    // hasError ANTES que hasValue y tapaba la próxima sesión ya cargada con
+    // el error de pantalla completa. Chequeo explícito
+    // hasValue→hasError→loading.
+    if (async.hasValue) {
+      final appointments = async.value ?? const <Appointment>[];
       final upcoming = appointments
           .where((a) =>
               a.athleteId == athleteId &&
@@ -149,6 +149,13 @@ class ProxSesionCard extends ConsumerWidget {
                 ],
               ),
       );
+    } else if (async.hasError) {
+      stateKey = 'error';
+      content = _box(Text('No se pudo cargar la agenda.',
+          style: TextStyle(color: palette.textMuted, fontSize: 13)));
+    } else {
+      stateKey = 'loading';
+      content = _skeleton();
     }
 
     return TreinoStateSwitcher(

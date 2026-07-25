@@ -35,48 +35,58 @@ class RendimientoList extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final testsAsync = ref.watch(performanceTestsForAthleteProvider(athleteId));
 
-    return TreinoStateSwitcher(
-      childKey: ValueKey('rendimiento_list_${_stateKeyOf(testsAsync)}'),
-      child: testsAsync.when(
-        loading: () => const _RendimientoListSkeleton(),
-        error: (_, __) => Center(
-          child: Text(
-            'No pudimos cargar las pruebas.', // i18n: Fase W2
-            style: TextStyle(color: palette.textMuted, fontSize: 14),
-          ),
-        ),
-        data: (all) {
-          final tests = all.reversed.toList();
-          if (tests.isEmpty) {
-            return const TreinoEmptyState(
+    // hasValue-first: `performanceTestsForAthleteProvider` es un
+    // StreamProvider con copyWithPrevious — un error transitorio con data ya
+    // cargada trae hasValue==true Y hasError==true simultáneos. `.when()`
+    // despacha por subtipo runtime e ignora hasValue, tapando la lista con
+    // el error de pantalla completa. Chequeo explícito
+    // hasValue→hasError→loading.
+    final Widget child;
+    if (testsAsync.hasValue) {
+      final tests = testsAsync.value!.reversed.toList();
+      child = tests.isEmpty
+          ? const TreinoEmptyState(
               icon: TreinoIcon.dumbbell,
               title: 'Este alumno todavía no tiene pruebas de rendimiento '
                   'cargadas.', // i18n: Fase W2
+            )
+          : ListView.separated(
+              itemCount: tests.length,
+              separatorBuilder: (_, __) =>
+                  Divider(height: 1, color: palette.border),
+              itemBuilder: (_, i) => RendimientoRow(
+                test: tests[i],
+                palette: palette,
+                onDelete: () => onDelete(tests[i]),
+                onEdit: () => onEdit(tests[i]),
+              ),
             );
-          }
-          return ListView.separated(
-            itemCount: tests.length,
-            separatorBuilder: (_, __) =>
-                Divider(height: 1, color: palette.border),
-            itemBuilder: (_, i) => RendimientoRow(
-              test: tests[i],
-              palette: palette,
-              onDelete: () => onDelete(tests[i]),
-              onEdit: () => onEdit(tests[i]),
-            ),
-          );
-        },
-      ),
+    } else if (testsAsync.hasError) {
+      child = Center(
+        child: Text(
+          'No pudimos cargar las pruebas.', // i18n: Fase W2
+          style: TextStyle(color: palette.textMuted, fontSize: 14),
+        ),
+      );
+    } else {
+      child = const _RendimientoListSkeleton();
+    }
+
+    return TreinoStateSwitcher(
+      childKey: ValueKey('rendimiento_list_${_stateKeyOf(testsAsync)}'),
+      child: child,
     );
   }
 }
 
 /// Copia local de `_stateKeyOf` (`alumnos_screen.dart`) — mismo criterio de
-/// key por estado para el `TreinoStateSwitcher`.
+/// key por estado para el `TreinoStateSwitcher`. hasValue-first: la data
+/// cacheada manda incluso si un error transitorio llegó después
+/// (copyWithPrevious).
 String _stateKeyOf(AsyncValue<Object?> value) {
+  if (value.hasValue) return 'data';
   if (value.hasError) return 'error';
-  if (value.isLoading && !value.hasValue) return 'loading';
-  return 'data';
+  return 'loading';
 }
 
 class _RendimientoListSkeleton extends StatelessWidget {

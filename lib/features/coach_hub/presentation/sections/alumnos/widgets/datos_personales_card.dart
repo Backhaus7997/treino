@@ -94,17 +94,14 @@ class DatosPersonalesCard extends ConsumerWidget {
     final String stateKey;
     final Widget content;
 
-    if (async.isLoading && !async.hasValue) {
-      stateKey = 'loading';
-      content = _skeleton();
-    } else if (async.hasError) {
-      stateKey = 'error';
-      content = _box(Text(
-        'No se pudieron cargar los datos personales.', // i18n
-        style: TextStyle(color: palette.textMuted, fontSize: 13),
-      ));
-    } else {
-      final share = async.valueOrNull;
+    // hasValue-first: `profileShareProvider` es un StreamProvider con
+    // copyWithPrevious — un error transitorio con datos ya cargados trae
+    // hasValue==true Y hasError==true simultáneos. El orden anterior
+    // (isLoading→hasError→data) chequeaba hasError ANTES que hasValue y
+    // tapaba los datos personales ya cargados con el error de pantalla
+    // completa. Chequeo explícito hasValue→hasError→loading.
+    if (async.hasValue) {
+      final share = async.value;
       stateKey = share == null ? 'empty' : 'data';
       content = _box(
         share == null
@@ -171,6 +168,15 @@ class DatosPersonalesCard extends ConsumerWidget {
                 ],
               ),
       );
+    } else if (async.hasError) {
+      stateKey = 'error';
+      content = _box(Text(
+        'No se pudieron cargar los datos personales.', // i18n
+        style: TextStyle(color: palette.textMuted, fontSize: 13),
+      ));
+    } else {
+      stateKey = 'loading';
+      content = _skeleton();
     }
 
     return TreinoStateSwitcher(

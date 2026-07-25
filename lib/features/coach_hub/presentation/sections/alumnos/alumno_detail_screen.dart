@@ -1237,148 +1237,154 @@ class _NotasPrivadasTabState extends ConsumerState<_NotasPrivadasTab> {
       ),
     );
 
-    return noteAsync.when(
-      loading: () => Center(
-        child: CircularProgressIndicator(color: palette.accent),
-      ),
-      error: (_, __) => Center(
+    // hasValue-first: `athleteNoteProvider` es un StreamProvider con
+    // copyWithPrevious — un error transitorio con la nota ya cargada trae
+    // hasValue==true Y hasError==true simultáneos. `.when()` despacha por
+    // subtipo runtime e ignora hasValue, tapando TODO el editor (texto sin
+    // guardar incluido) con el mensaje de error. Chequeo explícito
+    // hasValue→hasError→loading.
+    if (noteAsync.hasValue) {
+      final note = noteAsync.value;
+      // First data emission: seed the text controller. Subsequent emissions
+      // are ignored — the PF's local buffer wins to avoid clobbering typing.
+      _initFromStream(note);
+      final updatedAt = note?.updatedAt;
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // ── Header row: title + last-updated timestamp ─────────────
+            Row(
+              children: [
+                Text(
+                  l10n.coachHubAlumnoDetailNotasTitle,
+                  style: TextStyle(
+                    color: palette.textPrimary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const Spacer(),
+                if (updatedAt != null)
+                  Text(
+                    l10n.coachHubAlumnoDetailNotasUpdatedAt(
+                        _formatUpdatedAt(updatedAt)),
+                    style: TextStyle(
+                      color: palette.textMuted,
+                      fontSize: 12,
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              l10n.coachHubAlumnoDetailNotasSubtitle,
+              style: TextStyle(color: palette.textMuted, fontSize: 13),
+            ),
+            const SizedBox(height: 16),
+            // ── Editable text area ──────────────────────────────────────
+            Expanded(
+              // Rounded box that clips the scrollable content. Instead of
+              // `TextField(expands: true)` which paints outside its parent
+              // in some Flutter Web configs, we let the TextField grow to
+              // its natural content height inside a SingleChildScrollView
+              // — the SCV owns the scrolling and clips reliably against
+              // the ClipRRect ancestor.
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: palette.border),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(11),
+                  child: ColoredBox(
+                    color: palette.bgCard,
+                    child: Scrollbar(
+                      controller: _scrollController,
+                      thumbVisibility: true,
+                      thickness: 6,
+                      child: SingleChildScrollView(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.fromLTRB(16, 16, 20, 16),
+                        child: TextField(
+                          controller: _controller,
+                          maxLines: null,
+                          minLines: 12,
+                          keyboardType: TextInputType.multiline,
+                          style: TextStyle(
+                            color: palette.textPrimary,
+                            fontSize: 14,
+                            height: 1.4,
+                          ),
+                          decoration: InputDecoration.collapsed(
+                            hintText: l10n.coachHubAlumnoDetailNotasHint,
+                            hintStyle: TextStyle(
+                              color: palette.textMuted,
+                              fontSize: 14,
+                            ),
+                          ),
+                          onChanged: (_) {
+                            // Trigger rebuild to toggle save enabled state.
+                            setState(() {});
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            // ── Save button ─────────────────────────────────────────────
+            Align(
+              alignment: Alignment.centerRight,
+              child: ElevatedButton(
+                onPressed:
+                    (_saving || !_hasChanges) ? null : () => _save(trainerUid),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: palette.accent,
+                  foregroundColor: palette.bg,
+                  disabledBackgroundColor:
+                      palette.accent.withValues(alpha: 0.3),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: const StadiumBorder(),
+                ),
+                child: _saving
+                    ? SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: palette.bg,
+                        ),
+                      )
+                    : Text(
+                        l10n.coachHubAlumnoDetailNotasSaveButton,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+              ),
+            ),
+          ],
+        ),
+      );
+    } else if (noteAsync.hasError) {
+      return Center(
         child: Text(
           l10n.coachHubAlumnoDetailNotasLoadError,
           style: TextStyle(color: palette.textMuted, fontSize: 14),
         ),
-      ),
-      data: (note) {
-        // First data emission: seed the text controller. Subsequent emissions
-        // are ignored — the PF's local buffer wins to avoid clobbering typing.
-        _initFromStream(note);
-        final updatedAt = note?.updatedAt;
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // ── Header row: title + last-updated timestamp ─────────────
-              Row(
-                children: [
-                  Text(
-                    l10n.coachHubAlumnoDetailNotasTitle,
-                    style: TextStyle(
-                      color: palette.textPrimary,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const Spacer(),
-                  if (updatedAt != null)
-                    Text(
-                      l10n.coachHubAlumnoDetailNotasUpdatedAt(
-                          _formatUpdatedAt(updatedAt)),
-                      style: TextStyle(
-                        color: palette.textMuted,
-                        fontSize: 12,
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                l10n.coachHubAlumnoDetailNotasSubtitle,
-                style: TextStyle(color: palette.textMuted, fontSize: 13),
-              ),
-              const SizedBox(height: 16),
-              // ── Editable text area ──────────────────────────────────────
-              Expanded(
-                // Rounded box that clips the scrollable content. Instead of
-                // `TextField(expands: true)` which paints outside its parent
-                // in some Flutter Web configs, we let the TextField grow to
-                // its natural content height inside a SingleChildScrollView
-                // — the SCV owns the scrolling and clips reliably against
-                // the ClipRRect ancestor.
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: palette.border),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(11),
-                    child: ColoredBox(
-                      color: palette.bgCard,
-                      child: Scrollbar(
-                        controller: _scrollController,
-                        thumbVisibility: true,
-                        thickness: 6,
-                        child: SingleChildScrollView(
-                          controller: _scrollController,
-                          padding: const EdgeInsets.fromLTRB(16, 16, 20, 16),
-                          child: TextField(
-                            controller: _controller,
-                            maxLines: null,
-                            minLines: 12,
-                            keyboardType: TextInputType.multiline,
-                            style: TextStyle(
-                              color: palette.textPrimary,
-                              fontSize: 14,
-                              height: 1.4,
-                            ),
-                            decoration: InputDecoration.collapsed(
-                              hintText: l10n.coachHubAlumnoDetailNotasHint,
-                              hintStyle: TextStyle(
-                                color: palette.textMuted,
-                                fontSize: 14,
-                              ),
-                            ),
-                            onChanged: (_) {
-                              // Trigger rebuild to toggle save enabled state.
-                              setState(() {});
-                            },
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              // ── Save button ─────────────────────────────────────────────
-              Align(
-                alignment: Alignment.centerRight,
-                child: ElevatedButton(
-                  onPressed: (_saving || !_hasChanges)
-                      ? null
-                      : () => _save(trainerUid),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: palette.accent,
-                    foregroundColor: palette.bg,
-                    disabledBackgroundColor:
-                        palette.accent.withValues(alpha: 0.3),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 24, vertical: 12),
-                    shape: const StadiumBorder(),
-                  ),
-                  child: _saving
-                      ? SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: palette.bg,
-                          ),
-                        )
-                      : Text(
-                          l10n.coachHubAlumnoDetailNotasSaveButton,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.8,
-                          ),
-                        ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
+      );
+    } else {
+      return Center(
+        child: CircularProgressIndicator(color: palette.accent),
+      );
+    }
   }
 }
 
