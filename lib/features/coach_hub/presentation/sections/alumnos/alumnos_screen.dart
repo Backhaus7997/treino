@@ -460,16 +460,19 @@ class _RosterHeaderRow extends StatelessWidget {
           Expanded(
               flex: 2,
               child: Text(l10n.coachHubAlumnosColumnLastWorkout, style: s())),
-          Expanded(
-            flex: 2,
-            child: Text(l10n.coachHubAlumnosColumnActions,
-                style: s(), textAlign: TextAlign.right),
-          ),
+          // Blank trailing slot matching _RowActions's ⋮ button width — no
+          // "ACCIONES" label anymore (the column reads as dead space once
+          // inactive-student rows had nothing to show there).
+          const SizedBox(width: _kRowMenuSlotWidth),
         ],
       ),
     );
   }
 }
+
+/// Width of the trailing ⋮-menu slot, shared by the header (blank) and each
+/// row (button or empty) so both stay pixel-aligned.
+const double _kRowMenuSlotWidth = 40;
 
 class _RosterRow extends ConsumerWidget {
   const _RosterRow({
@@ -572,8 +575,8 @@ class _RosterRow extends ConsumerWidget {
                 ],
               ),
             ),
-            Expanded(
-              flex: 2,
+            SizedBox(
+              width: _kRowMenuSlotWidth,
               child: _RowActions(link: link, palette: palette),
             ),
           ],
@@ -660,6 +663,10 @@ class _EstadoBadge extends StatelessWidget {
   }
 }
 
+/// Trailing ⋮ menu for a roster row — replaces the old always-visible icon
+/// Row. For `terminated`/`pending` links there are no applicable actions, so
+/// no button renders at all (empty slot, same width as the header/other
+/// rows) instead of a disabled ⋮ — "only show what's actionable".
 class _RowActions extends ConsumerWidget {
   const _RowActions({required this.link, required this.palette});
 
@@ -695,62 +702,183 @@ class _RowActions extends ConsumerWidget {
         .terminate(link.id, reason: 'trainer-terminated');
   }
 
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  void _showMenu(BuildContext context, WidgetRef ref) {
     final l10n = AppL10n.of(context);
     final status = link.status;
-    final buttons = <Widget>[];
+    final items = <_MenuItem>[];
+
     if (status == TrainerLinkStatus.active) {
-      buttons.add(_IconAction(
+      items.add(_MenuItem(
         icon: TreinoIcon.pause,
-        tooltip: l10n.coachHubActionPause,
+        label: l10n.coachHubActionPause,
         color: palette.textMuted,
-        onPressed: () => _pause(context, ref),
+        onTap: () => _pause(context, ref),
       ));
     } else if (status == TrainerLinkStatus.paused) {
-      buttons.add(_IconAction(
+      items.add(_MenuItem(
         icon: TreinoIcon.play,
-        tooltip: l10n.coachHubActionResume,
+        label: l10n.coachHubActionResume,
         color: palette.accent,
-        onPressed: () => _resume(ref),
+        onTap: () => _resume(ref),
       ));
     }
     if (status == TrainerLinkStatus.active ||
         status == TrainerLinkStatus.paused) {
-      buttons.add(_IconAction(
+      items.add(_MenuItem(
         icon: TreinoIcon.signOut,
-        tooltip: l10n.coachHubActionTerminate,
+        label: l10n.coachHubActionTerminate,
         color: palette.highlight,
-        onPressed: () => _terminate(context, ref),
+        onTap: () => _terminate(context, ref),
       ));
     }
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: buttons,
+    if (items.isEmpty) return;
+
+    // Same showModalBottomSheet styling as the feed's overflow menu
+    // (post_card.dart `_showPostMenu`) — bgCard sheet, rounded top corners,
+    // SafeArea > Column(min) of ListTiles.
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: palette.bgCard,
+      shape: RoundedRectangleBorder(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        side: BorderSide(color: palette.border),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Drag handle — visual affordance that this is a sheet.
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: palette.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              // Section title so the items aren't loose rows.
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                child: Text(
+                  l10n.coachHubAlumnosRowActionsA11y,
+                  style: GoogleFonts.barlowCondensed(
+                    color: palette.textMuted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ),
+              for (final item in items)
+                _MenuListTile(
+                  item: item,
+                  sheetContext: sheetContext,
+                  palette: palette,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final status = link.status;
+    final hasActions = status == TrainerLinkStatus.active ||
+        status == TrainerLinkStatus.paused;
+    // Inactive/pending students have no applicable action → no ⋮ button at
+    // all (not a disabled one), leaving just the empty fixed-width slot.
+    if (!hasActions) return const SizedBox.shrink();
+
+    final l10n = AppL10n.of(context);
+    return Align(
+      alignment: Alignment.centerRight,
+      child: IconButton(
+        tooltip: l10n.coachHubAlumnosRowActionsA11y,
+        icon: Icon(TreinoIcon.dotsThree, size: 18, color: palette.textMuted),
+        onPressed: () => _showMenu(context, ref),
+        visualDensity: VisualDensity.compact,
+        padding: EdgeInsets.zero,
+        // Pin the tap target to the fixed 40px slot so the default 48px
+        // Material minimum can't paint past the slot into the adjacent column.
+        constraints: const BoxConstraints(maxWidth: 40, maxHeight: 40),
+      ),
     );
   }
 }
 
-class _IconAction extends StatelessWidget {
-  const _IconAction({
+/// Data for one bottom-sheet menu item — decoupled from the `BuildContext`
+/// the sheet builder hands back so `onTap` can close the sheet first (via
+/// its own `sheetContext`) and only then run the real action.
+class _MenuItem {
+  const _MenuItem({
     required this.icon,
-    required this.tooltip,
+    required this.label,
     required this.color,
-    required this.onPressed,
+    required this.onTap,
   });
 
   final IconData icon;
-  final String tooltip;
+  final String label;
   final Color color;
-  final VoidCallback onPressed;
+  final VoidCallback onTap;
+}
+
+class _MenuListTile extends StatelessWidget {
+  const _MenuListTile({
+    required this.item,
+    required this.sheetContext,
+    required this.palette,
+  });
+
+  final _MenuItem item;
+  final BuildContext sheetContext;
+  final AppPalette palette;
 
   @override
   Widget build(BuildContext context) {
-    return IconButton(
-      tooltip: tooltip,
-      icon: Icon(icon, size: 18, color: color),
-      onPressed: onPressed,
-      visualDensity: VisualDensity.compact,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () {
+          Navigator.of(sheetContext).pop();
+          item.onTap();
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+          child: Row(
+            children: [
+              // Icon in a tinted chip, matching the action's color.
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: item.color.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Icon(item.icon, color: item.color, size: 18),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                item.label,
+                style: GoogleFonts.barlow(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                  color: palette.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

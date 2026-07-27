@@ -2132,6 +2132,9 @@ class AppL10nEn extends AppL10n {
   String get postCardMenuA11y => 'Post options';
 
   @override
+  String get coachHubAlumnosRowActionsA11y => '';
+
+  @override
   String get postCardMenuEdit => 'Edit';
 
   @override

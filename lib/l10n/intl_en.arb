@@ -812,6 +812,7 @@
   "routineEditorMissingReps": "Fill in the reps for your sets before saving.",
   "feedPostPublishedSuccess": "Post published.",
   "postCardMenuA11y": "Post options",
+  "coachHubAlumnosRowActionsA11y": "",
   "postCardMenuEdit": "Edit",
   "postCardMenuDelete": "Delete",
   "postCardDeleteConfirmTitle": "Delete this post?",

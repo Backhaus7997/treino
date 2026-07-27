@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/data/trainer_link_repository.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
@@ -211,7 +212,8 @@ void main() {
       expect(find.text('Hoy'), findsOneWidget);
     });
 
-    testWidgets('terminar abre diálogo y al confirmar llama repo.terminate',
+    testWidgets(
+        'terminar (vía menú ⋮) abre diálogo y al confirmar llama repo.terminate',
         (tester) async {
       final repo = _MockRepo();
       when(() => repo.terminate(any(), reason: any(named: 'reason')))
@@ -224,7 +226,11 @@ void main() {
         repo: repo,
       );
 
-      await tester.tap(find.byTooltip('Terminar'));
+      // Las acciones ahora viven detrás del menú ⋮ de la fila, no como
+      // ícono inline — abrirlo primero.
+      await tester.tap(find.byIcon(TreinoIcon.dotsThree));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Terminar')); // item del bottom sheet
       await tester.pumpAndSettle();
       expect(
           find.text('Terminar vínculo'), findsOneWidget); // título del diálogo
@@ -248,12 +254,76 @@ void main() {
         repo: repo,
       );
 
-      await tester.tap(find.byTooltip('Terminar'));
+      await tester.tap(find.byIcon(TreinoIcon.dotsThree));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Terminar')); // item del bottom sheet
       await tester.pumpAndSettle();
       await tester.tap(find.text('Cancelar'));
       await tester.pumpAndSettle();
 
       verifyNever(() => repo.terminate(any(), reason: any(named: 'reason')));
+    });
+
+    group('menú ⋮ por estado', () {
+      testWidgets('activo → ⋮ muestra Pausar + Terminar', (tester) async {
+        await _pump(
+          tester,
+          [_link('a1', TrainerLinkStatus.active)],
+          profiles: [_prof('a1', 'Sofía')],
+        );
+
+        await tester.tap(find.byIcon(TreinoIcon.dotsThree));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Pausar'), findsOneWidget);
+        expect(find.text('Terminar'), findsOneWidget);
+        expect(find.text('Reanudar'), findsNothing);
+      });
+
+      testWidgets('pausado → ⋮ muestra Reanudar + Terminar', (tester) async {
+        await _pump(
+          tester,
+          [_link('a1', TrainerLinkStatus.paused)],
+          profiles: [_prof('a1', 'Sofía')],
+        );
+
+        await tester.tap(find.byIcon(TreinoIcon.dotsThree));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Reanudar'), findsOneWidget);
+        expect(find.text('Terminar'), findsOneWidget);
+        expect(find.text('Pausar'), findsNothing);
+      });
+
+      testWidgets('inactivo → sin botón ⋮ (nada accionable)', (tester) async {
+        await _pump(
+          tester,
+          [_link('a1', TrainerLinkStatus.terminated)],
+          profiles: [_prof('a1', 'Sofía')],
+        );
+
+        expect(find.byIcon(TreinoIcon.dotsThree), findsNothing);
+      });
+
+      testWidgets('reanudar (vía menú ⋮) llama repo.resume sin confirmación',
+          (tester) async {
+        final repo = _MockRepo();
+        when(() => repo.resume(any())).thenAnswer((_) async {});
+
+        await _pump(
+          tester,
+          [_link('a1', TrainerLinkStatus.paused)],
+          profiles: [_prof('a1', 'Sofía')],
+          repo: repo,
+        );
+
+        await tester.tap(find.byIcon(TreinoIcon.dotsThree));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Reanudar'));
+        await tester.pumpAndSettle();
+
+        verify(() => repo.resume('l_a1')).called(1);
+      });
     });
 
     testWidgets('alumno re-vinculado (terminado + activo) → una sola fila',
