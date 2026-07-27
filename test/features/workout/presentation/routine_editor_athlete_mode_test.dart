@@ -339,8 +339,7 @@ void main() {
     expect(submitBtn.onPressed, isNotNull,
         reason: 'submit enabled after name + slot with reps filled');
 
-    await tester.tap(find.widgetWithText(
-        ElevatedButton, 'CREAR RUTINA'));
+    await tester.tap(find.widgetWithText(ElevatedButton, 'CREAR RUTINA'));
     await tester.pumpAndSettle();
 
     verify(() => repo.createUserOwned(
@@ -449,8 +448,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Tap GUARDAR CAMBIOS.
-    await tester.tap(find.widgetWithText(
-        ElevatedButton, 'GUARDAR CAMBIOS'));
+    await tester.tap(find.widgetWithText(ElevatedButton, 'GUARDAR CAMBIOS'));
     await tester.pumpAndSettle();
 
     // Must call updateUserOwned, not createUserOwned.
@@ -477,7 +475,8 @@ void main() {
       overrides: _overrides(repo: repo),
     );
 
-    expect(find.text('Esta rutina ya no existe. Volvé y actualizá la lista.'), findsOneWidget);
+    expect(find.text('Esta rutina ya no existe. Volvé y actualizá la lista.'),
+        findsOneWidget);
     // Editor form must not be shown.
     expect(find.byKey(const Key('editor_name_field')), findsNothing);
   });
@@ -631,8 +630,7 @@ void main() {
     // Submit — the form is already valid (has name + hydrated slots with
     // all required fields). If _isValid is somehow false here, the tap will
     // be a no-op and the verify() below will fail with a clear message.
-    await tester.tap(find.widgetWithText(
-        ElevatedButton, 'GUARDAR CAMBIOS'));
+    await tester.tap(find.widgetWithText(ElevatedButton, 'GUARDAR CAMBIOS'));
     await tester.pumpAndSettle();
 
     // updateUserOwned must have been called exactly once.

@@ -41,12 +41,12 @@ final _customBench = CustomExercise(
 );
 
 List<Override> _overrides({List<Exercise>? exercises}) => [
-  currentUidProvider.overrideWithValue('u1'),
-  exercisesProvider.overrideWith((ref) async => exercises ?? _kExercises),
-  customExercisesForTrainerStreamProvider(
-    'u1',
-  ).overrideWith((ref) => Stream<List<CustomExercise>>.value(const [])),
-];
+      currentUidProvider.overrideWithValue('u1'),
+      exercisesProvider.overrideWith((ref) async => exercises ?? _kExercises),
+      customExercisesForTrainerStreamProvider(
+        'u1',
+      ).overrideWith((ref) => Stream<List<CustomExercise>>.value(const [])),
+    ];
 
 Future<void> _openPicker(
   WidgetTester tester, {
@@ -373,11 +373,11 @@ void main() {
 
   group('ExercisePickerDialog (web) — editar/borrar ejercicio custom', () {
     List<Override> withCustom(CustomExerciseRepository repo) => [
-      customExercisesForTrainerStreamProvider(
-        'u1',
-      ).overrideWith((ref) => Stream.value([_customBench])),
-      customExerciseRepositoryProvider.overrideWithValue(repo),
-    ];
+          customExercisesForTrainerStreamProvider(
+            'u1',
+          ).overrideWith((ref) => Stream.value([_customBench])),
+          customExerciseRepositoryProvider.overrideWithValue(repo),
+        ];
 
     testWidgets('editar abre el form pre-cargado y guarda vía update', (
       tester,
@@ -400,9 +400,8 @@ void main() {
       await tester.pumpAndSettle();
 
       // update conserva el id (mismo doc) y toma el nombre nuevo.
-      final updated =
-          verify(() => repo.update(captureAny())).captured.single
-              as CustomExercise;
+      final updated = verify(() => repo.update(captureAny())).captured.single
+          as CustomExercise;
       expect(updated.id, 'cx-1');
       expect(updated.name, 'Press plano en casa');
     });
@@ -461,8 +460,8 @@ void main() {
     const kVideoUrl = 'https://vids.test/clip1';
 
     List<Override> repoOverride(CustomExerciseRepository repo) => [
-      customExerciseRepositoryProvider.overrideWithValue(repo),
-    ];
+          customExerciseRepositoryProvider.overrideWithValue(repo),
+        ];
 
     void stubCreate(_MockCustomExerciseRepository repo) {
       when(
@@ -489,17 +488,17 @@ void main() {
     }
 
     List<String?> capturedCreate(_MockCustomExerciseRepository repo) => verify(
-      () => repo.create(
-        trainerId: captureAny(named: 'trainerId'),
-        name: captureAny(named: 'name'),
-        muscleGroup: any(named: 'muscleGroup'),
-        secondaryMuscleGroup: any(named: 'secondaryMuscleGroup'),
-        description: any(named: 'description'),
-        videoUrl: captureAny(named: 'videoUrl'),
-        defaultRestSeconds: any(named: 'defaultRestSeconds'),
-        equipment: any(named: 'equipment'),
-      ),
-    ).captured.cast<String?>();
+          () => repo.create(
+            trainerId: captureAny(named: 'trainerId'),
+            name: captureAny(named: 'name'),
+            muscleGroup: any(named: 'muscleGroup'),
+            secondaryMuscleGroup: any(named: 'secondaryMuscleGroup'),
+            description: any(named: 'description'),
+            videoUrl: captureAny(named: 'videoUrl'),
+            defaultRestSeconds: any(named: 'defaultRestSeconds'),
+            equipment: any(named: 'equipment'),
+          ),
+        ).captured.cast<String?>();
 
     testWidgets('un link pegado se guarda en videoUrl al crear', (
       tester,

@@ -838,7 +838,8 @@ void main() {
     // message + scroll, not persist).
     final submit = tester.widget<ElevatedButton>(find.byType(ElevatedButton));
     expect(submit.onPressed, isNotNull,
-        reason: 'button always tappable; invalid week surfaced via attribution');
+        reason:
+            'button always tappable; invalid week surfaced via attribution');
 
     // Attribution: badge on Sem 3's chip + hint naming week and day.
     expect(find.byKey(const Key('week_tab_warning_2')), findsOneWidget);

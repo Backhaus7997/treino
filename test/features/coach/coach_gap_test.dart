@@ -105,7 +105,8 @@ void main() {
       expect(() => repo.cancel(ref.id), throwsA(isA<StateError>()));
 
       // Doc untouched — still active.
-      final after = await firestore.collection('trainer_links').doc(ref.id).get();
+      final after =
+          await firestore.collection('trainer_links').doc(ref.id).get();
       expect(after.data()!['status'], 'active');
     });
 
@@ -367,7 +368,8 @@ void main() {
 
         // Two distinct docs (auto-id, not the deterministic slot id).
         expect(a.id, isNot(equals(b.id)));
-        expect(a.id, isNot(equals('${trainerId}_${startsAt.millisecondsSinceEpoch}')));
+        expect(a.id,
+            isNot(equals('${trainerId}_${startsAt.millisecondsSinceEpoch}')));
 
         final all = await firestore.collection('appointments').get();
         expect(all.docs, hasLength(2));
@@ -463,8 +465,10 @@ void main() {
       'price filter keeps trainers with a null rate and excludes out-of-range',
       () async {
         final cheap = trainer(uid: 'cheap', displayName: 'Cheap', rate: 4000);
-        final pricey = trainer(uid: 'pricey', displayName: 'Pricey', rate: 12000);
-        final noRate = trainer(uid: 'norate', displayName: 'NoRate'); // null rate
+        final pricey =
+            trainer(uid: 'pricey', displayName: 'Pricey', rate: 12000);
+        final noRate =
+            trainer(uid: 'norate', displayName: 'NoRate'); // null rate
 
         final container = ProviderContainer(overrides: [
           athleteLocationProvider.overrideWith(
@@ -533,7 +537,8 @@ void main() {
       },
     );
 
-    test('PriceFilter.matches: null rate always included; range boundaries', () {
+    test('PriceFilter.matches: null rate always included; range boundaries',
+        () {
       // null → always kept regardless of filter.
       for (final f in PriceFilter.values) {
         expect(f.matches(null), isTrue, reason: '$f should keep null rate');
@@ -572,7 +577,8 @@ class _FakeDiscoveryRepo implements TrainerPublicProfileRepositoryInterface {
   final Map<String, TrainerPublicProfile> _byId;
 
   @override
-  Future<List<TrainerPublicProfile>> listAll({TrainerSpecialty? specialty}) async {
+  Future<List<TrainerPublicProfile>> listAll(
+      {TrainerSpecialty? specialty}) async {
     var r = _all;
     if (specialty != null) {
       r = r.where((t) => t.trainerSpecialty == specialty).toList();

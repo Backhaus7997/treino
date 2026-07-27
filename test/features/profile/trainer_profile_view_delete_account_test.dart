@@ -30,7 +30,8 @@ UserProfile _trainerProfile() => UserProfile(
 Widget _wrap() => ProviderScope(
       overrides: [
         currentUidProvider.overrideWithValue('trainer-uid'),
-        userProfileProvider.overrideWith((_) => Stream.value(_trainerProfile())),
+        userProfileProvider
+            .overrideWith((_) => Stream.value(_trainerProfile())),
         trainerLinksStreamProvider.overrideWith((_) => Stream.value(const [])),
         trainerByIdProvider('trainer-uid').overrideWith((_) async => null),
       ],

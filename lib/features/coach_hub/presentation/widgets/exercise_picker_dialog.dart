@@ -85,11 +85,11 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
   }
 
   bool _matches(Exercise e) => exerciseMatchesFilters(
-    e,
-    query: _query,
-    muscles: _muscleFilters,
-    equipment: _equipmentFilters,
-  );
+        e,
+        query: _query,
+        muscles: _muscleFilters,
+        equipment: _equipmentFilters,
+      );
 
   void _toggle(String id) {
     setState(() {
@@ -343,9 +343,9 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
                     onPressed: _selected.isEmpty
                         ? null
                         : () => _confirm(
-                            defaultsAsync.valueOrNull ?? const [],
-                            customsAsync.valueOrNull ?? const [],
-                          ),
+                              defaultsAsync.valueOrNull ?? const [],
+                              customsAsync.valueOrNull ?? const [],
+                            ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: palette.accent,
                       foregroundColor: palette.bg,
@@ -395,9 +395,8 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
     final defaultList = defaults.value ?? const <Exercise>[];
     final customList = customs.value ?? const <CustomExercise>[];
 
-    final filteredCustoms = customList
-        .where((c) => _matches(customToExercise(c)))
-        .toList();
+    final filteredCustoms =
+        customList.where((c) => _matches(customToExercise(c))).toList();
     final filteredDefaults = defaultList.where(_matches).toList();
 
     if (filteredCustoms.isEmpty && filteredDefaults.isEmpty) {

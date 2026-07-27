@@ -35,7 +35,8 @@ void main() {
         )
         .text;
 
-    test('accepts a value within range', () => expect(apply('45', '450'), '450'));
+    test('accepts a value within range',
+        () => expect(apply('45', '450'), '450'));
     test('reverts a keystroke that pushes over the cap (750 > 500)',
         () => expect(apply('75', '750'), '75'));
     test('accepts exactly the cap', () => expect(apply('50', '500'), '500'));

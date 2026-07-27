@@ -280,7 +280,6 @@ void _maybeShowResumePrompt(
 double _sumVolume(List<SetLog> logs) =>
     logs.fold<double>(0, (acc, l) => acc + l.reps * l.weightKg);
 
-
 /// Private placeholder that occupies the same 56 px height as [HomeHeader]
 /// during [AsyncLoading], preventing a layout jump (REQ-HOME-PROVIDER-003).
 class _HomeHeaderSkeleton extends StatelessWidget {

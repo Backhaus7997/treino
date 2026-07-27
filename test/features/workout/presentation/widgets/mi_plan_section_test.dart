@@ -331,8 +331,7 @@ void main() {
 
       // Exactly one "Actual" chip, sitting next to the newest plan.
       expect(find.byKey(const Key('mi_plan_current_chip')), findsOneWidget);
-      expect(
-          find.text('ACTUAL'), findsOneWidget);
+      expect(find.text('ACTUAL'), findsOneWidget);
     });
 
     testWidgets('SCENARIO-451: no badge when link is active', (tester) async {

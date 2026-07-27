@@ -125,8 +125,7 @@ void main() {
       expect(find.text('100'), findsNothing);
     });
 
-    testWidgets(
-        'feed 2 + coach 3 → both badges visible independently',
+    testWidgets('feed 2 + coach 3 → both badges visible independently',
         (tester) async {
       // Regression guard: the two badges must not shadow each other. This
       // reproduces the "message from friend surfaces on both tabs" bug —

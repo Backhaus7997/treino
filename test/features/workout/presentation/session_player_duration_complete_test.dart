@@ -130,7 +130,8 @@ void main() {
       expect(
         button.onPressed,
         isNull,
-        reason: 'sin sets logueados la sesión no está completa → botón inactivo',
+        reason:
+            'sin sets logueados la sesión no está completa → botón inactivo',
       );
     });
 

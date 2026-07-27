@@ -27,7 +27,8 @@ void main() {
     repo = AppointmentRepository(firestore: firestore);
   });
 
-  Appointment confirmedAt(DateTime startsAt, {required String id}) => Appointment(
+  Appointment confirmedAt(DateTime startsAt, {required String id}) =>
+      Appointment(
         id: id,
         trainerId: trainerId,
         athleteId: athleteId,
@@ -56,7 +57,8 @@ void main() {
       'The old real-UTC compare made this 22h in ART and wrongly threw.',
       () async {
         final now = DateTime.utc(2026, 7, 20, 9, 0); // wall-clock today 09:00
-        final startsAt = DateTime.utc(2026, 7, 21, 10, 0); // tomorrow 10:00 (25h)
+        final startsAt =
+            DateTime.utc(2026, 7, 21, 10, 0); // tomorrow 10:00 (25h)
         final appt = confirmedAt(startsAt, id: 'appt-25h');
         await seed(appt);
 
@@ -91,7 +93,8 @@ void main() {
       () async {
         final now = DateTime.utc(2026, 7, 20, 9, 0);
 
-        final at24h = confirmedAt(DateTime.utc(2026, 7, 21, 9, 0), id: 'at-24h');
+        final at24h =
+            confirmedAt(DateTime.utc(2026, 7, 21, 9, 0), id: 'at-24h');
         await seed(at24h);
         await repo.cancel(appointment: at24h, actorUid: trainerId, now: now);
         expect(

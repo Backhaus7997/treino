@@ -44,7 +44,8 @@ void main() {
       expect(
         RegExp(r'android:allowBackup\s*=\s*"true"').hasMatch(manifest),
         isFalse,
-        reason: 'allowBackup no debe estar en "true": reabre la fuga de sesión.',
+        reason:
+            'allowBackup no debe estar en "true": reabre la fuga de sesión.',
       );
     });
   });

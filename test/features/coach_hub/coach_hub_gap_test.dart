@@ -146,7 +146,8 @@ void main() {
 
     final item = result.days.first.items.first;
     expect(item.repsMin, 8);
-    expect(item.repsMax, 8, reason: 'empty Reps Max should fall back to Reps Min');
+    expect(item.repsMax, 8,
+        reason: 'empty Reps Max should fall back to Reps Min');
   });
 
   // -------------------------------------------------------------------------
@@ -214,8 +215,7 @@ void main() {
           muscleGroup: 'Piernas'),
     ];
 
-    final result =
-        matchExercises(_dayWith(['Press banca inclinado']), catalog);
+    final result = matchExercises(_dayWith(['Press banca inclinado']), catalog);
 
     expect(result.unmatched, hasLength(1));
     expect(result.unmatched.first.rowName, 'Press banca inclinado');

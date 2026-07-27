@@ -29,8 +29,8 @@ Widget _wrap(Widget child, {List<Override> overrides = const []}) =>
         // for the card-vs-discovery decision. Bridge it to whatever each test
         // overrides currentAthleteLinkProvider with, so the existing per-test
         // overrides keep driving the view unchanged.
-        currentAthleteLinkAnyStatusProvider
-            .overrideWith((ref) => ref.watch(currentAthleteLinkProvider.future)),
+        currentAthleteLinkAnyStatusProvider.overrideWith(
+            (ref) => ref.watch(currentAthleteLinkProvider.future)),
         ...overrides,
       ],
       child: MaterialApp(

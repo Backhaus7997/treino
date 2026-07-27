@@ -44,9 +44,8 @@ class FriendshipRepository {
       id: docId,
       uidA: uidA,
       uidB: uidB,
-      status: otherIsPublic
-          ? FriendshipStatus.accepted
-          : FriendshipStatus.pending,
+      status:
+          otherIsPublic ? FriendshipStatus.accepted : FriendshipStatus.pending,
       requesterId: myUid,
       members: [uidA, uidB],
       createdAt: DateTime.now().toUtc(),

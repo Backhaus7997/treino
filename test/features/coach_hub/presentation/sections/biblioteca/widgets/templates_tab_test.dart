@@ -86,12 +86,12 @@ Widget _wrap(
 class _MockRoutineRepository extends Mock implements RoutineRepository {}
 
 TrainerLink _activeLink(String athleteId) => TrainerLink(
-  id: 'link-$athleteId',
-  trainerId: _kTrainerId,
-  athleteId: athleteId,
-  status: TrainerLinkStatus.active,
-  requestedAt: DateTime(2024, 1, 1),
-);
+      id: 'link-$athleteId',
+      trainerId: _kTrainerId,
+      athleteId: athleteId,
+      status: TrainerLinkStatus.active,
+      requestedAt: DateTime(2024, 1, 1),
+    );
 
 /// Pumps [TemplatesTab] with everything the "Usar en un alumno" flow touches:
 /// the templates stream, the trainer-links stream (feeds the athlete picker),

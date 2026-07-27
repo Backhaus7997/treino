@@ -73,8 +73,7 @@ void main() {
         elapsedSeconds: 0,
       );
 
-  testWidgets(
-      'cleared weight field logs 0, not the stale planned weight',
+  testWidgets('cleared weight field logs 0, not the stale planned weight',
       (tester) async {
     double? loggedWeight;
     await tester.pumpWidget(

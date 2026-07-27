@@ -39,8 +39,8 @@ final userPublicProfileProvider =
 /// Auth-gated like [userPublicProfileProvider]: emits an empty map when the
 /// viewer is not authenticated. Used by the RESEÑAS section to avoid the
 /// per-tile N+1 listen pattern. ADR-FPS-001.
-final userPublicProfilesBatchProvider = FutureProvider.family
-    .autoDispose<Map<String, UserPublicProfile>, String>(
+final userPublicProfilesBatchProvider =
+    FutureProvider.family.autoDispose<Map<String, UserPublicProfile>, String>(
   (ref, key) async {
     final auth = await ref.watch(authStateChangesProvider.future);
     if (auth == null) return const {};

@@ -41,8 +41,7 @@ void main() {
       'startedAt': Timestamp.fromDate(
         (finishedAt ?? now).subtract(const Duration(hours: 1)),
       ),
-      'finishedAt':
-          finishedAt == null ? null : Timestamp.fromDate(finishedAt),
+      'finishedAt': finishedAt == null ? null : Timestamp.fromDate(finishedAt),
       'totalVolumeKg': 0.0,
       'durationMin': 0,
       'status': status,
@@ -90,8 +89,7 @@ void main() {
       finishedAt: null,
     );
 
-    final results =
-        await repo.listFinishedInWindow(uid, from: from, to: to);
+    final results = await repo.listFinishedInWindow(uid, from: from, to: to);
 
     final ids = results.map((s) => s.id).toSet();
     expect(ids, containsAll(['in-window', 'on-from']));
@@ -108,15 +106,13 @@ void main() {
       finishedAt: DateTime.utc(2026, 5, 1, 10, 0, 0),
     );
 
-    final results =
-        await repo.listFinishedInWindow(uid, from: from, to: to);
+    final results = await repo.listFinishedInWindow(uid, from: from, to: to);
 
     expect(results, isEmpty);
   });
 
   test('returns empty list for empty uid', () async {
-    final results =
-        await repo.listFinishedInWindow('', from: from, to: to);
+    final results = await repo.listFinishedInWindow('', from: from, to: to);
     expect(results, isEmpty);
   });
 }
