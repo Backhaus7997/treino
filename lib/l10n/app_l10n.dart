@@ -4016,6 +4016,12 @@ abstract class AppL10n {
   /// **'Opciones del post'**
   String get postCardMenuA11y;
 
+  /// No description provided for @coachHubAlumnosRowActionsA11y.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Opciones del alumno'**
+  String get coachHubAlumnosRowActionsA11y;
+
   /// Edit action in the post card overflow menu.
   ///
   /// In es_AR, this message translates to:

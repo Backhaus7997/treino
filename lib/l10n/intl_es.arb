@@ -433,6 +433,7 @@
   "routineEditorMissingReps": "Completa las reps de los sets antes de guardar.",
   "feedPostPublishedSuccess": "Post publicado.",
   "postCardMenuA11y": "Opciones del post",
+  "coachHubAlumnosRowActionsA11y": "Opciones del alumno",
   "postCardMenuEdit": "Editar",
   "postCardMenuDelete": "Eliminar",
   "postCardDeleteConfirmTitle": "¿Eliminar este post?",

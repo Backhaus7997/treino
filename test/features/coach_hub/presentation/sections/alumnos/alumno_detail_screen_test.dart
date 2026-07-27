@@ -13,6 +13,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/locale_resolver.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/application/athlete_note_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
@@ -1271,14 +1272,20 @@ void main() {
       expect(find.text('ADHERENCIA · 12 SEMANAS'), findsOneWidget);
     });
 
-    testWidgets('tap en la acción Terminar abre diálogo y NO navega',
+    testWidgets(
+        'tap en la acción Terminar (vía menú ⋮) abre diálogo y NO navega',
         (tester) async {
       final repo = _MockRepo();
       when(() => repo.terminate(any(), reason: any(named: 'reason')))
           .thenAnswer((_) async {});
 
       await pumpRouter(tester, repo: repo);
-      await tester.tap(find.byTooltip('Terminar'));
+      // La acción vive detrás del menú ⋮ de la fila (ya no es un ícono
+      // inline) — abrirlo primero prueba también que el ⋮ no dispara la
+      // navegación de la fila (tap independiente, no propaga).
+      await tester.tap(find.byIcon(TreinoIcon.dotsThree));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Terminar')); // item del bottom sheet
       await tester.pumpAndSettle();
 
       expect(find.text('Terminar vínculo'), findsOneWidget); // diálogo

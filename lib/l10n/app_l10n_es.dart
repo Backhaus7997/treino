@@ -2184,6 +2184,9 @@ class AppL10nEs extends AppL10n {
   String get postCardMenuA11y => 'Opciones del post';
 
   @override
+  String get coachHubAlumnosRowActionsA11y => 'Opciones del alumno';
+
+  @override
   String get postCardMenuEdit => 'Editar';
 
   @override
@@ -5215,6 +5218,9 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get postCardMenuA11y => 'Opciones del post';
+
+  @override
+  String get coachHubAlumnosRowActionsA11y => 'Opciones del alumno';
 
   @override
   String get postCardMenuEdit => 'Editar';

@@ -1518,6 +1518,7 @@
     "description": "Success snackbar after publishing a post (finding 25). Shown via the root ScaffoldMessenger since the compose screen pops on success."
   },
   "postCardMenuA11y": "Opciones del post",
+  "coachHubAlumnosRowActionsA11y": "Opciones del alumno",
   "@postCardMenuA11y": {
     "description": "Semantics label for the post card overflow (3-dot) menu button, shown only on the viewer's own posts."
   },
