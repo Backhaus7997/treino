@@ -2,16 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart' as intl;
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/exercise_asset_image.dart';
 import '../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
+import '../../insights/domain/chart_period.dart';
+import '../application/exercise_progression_aggregator.dart';
+import '../application/exercise_progression_providers.dart';
 import '../application/exercise_providers.dart';
+import '../application/session_providers.dart' show currentUidProvider;
 import '../domain/exercise.dart';
+import '../domain/exercise_progression.dart';
 import '../domain/muscle_group.dart';
+import 'widgets/exercise_progression_chart.dart';
+import 'widgets/exercise_progression_section.dart'
+    show ChartPeriodLabels, ChartPeriodSelector;
 import 'widgets/exercise_video_player.dart';
+import 'widgets/personal_records_list.dart';
 import 'widgets/stat_tile.dart';
 import 'widgets/technique_instruction_item.dart';
 
@@ -42,10 +52,18 @@ class ExerciseDetailScreen extends ConsumerWidget {
     required this.exerciseId,
     this.ownerId,
     this.exerciseName,
+    this.athleteId,
     this.backFallbackRoute = '/workout',
   });
 
   final String exerciseId;
+
+  /// Whose personal stats/history the screen shows (1RM, sesiones, progreso,
+  /// récords, historial). The coach read-only route passes the athlete being
+  /// inspected so a PF NEVER sees their own numbers inside an athlete's
+  /// context; null — every athlete-side entry point — resolves to the
+  /// signed-in user.
+  final String? athleteId;
 
   /// Trainer uid that owns the routine the slot belongs to. When non-null
   /// and the public catalogue lookup misses, the provider tries
@@ -75,6 +93,7 @@ class ExerciseDetailScreen extends ConsumerWidget {
         exerciseName: exerciseName,
       )),
     );
+    final statsUid = athleteId ?? ref.watch(currentUidProvider) ?? '';
 
     // Stack so the hero photo extends edge-to-edge from the top of the safe
     // area while the back button floats over it. Non-data states still render
@@ -85,7 +104,16 @@ class ExerciseDetailScreen extends ConsumerWidget {
           child: exerciseAsync.when(
             data: (exercise) => exercise == null
                 ? const _NotFoundState(label: 'Ejercicio no encontrado')
-                : _ExerciseDetailContent(exercise: exercise),
+                : _ExerciseDetailContent(
+                    exercise: exercise,
+                    statsUid: statsUid,
+                    // The SLOT's id, not the resolved [Exercise.id]: the
+                    // player logs `slot.exerciseId` into setLogs, so when the
+                    // slot id drifted from the catalogue and the provider
+                    // resolved by name-fallback, the athlete's history still
+                    // lives under the slot id.
+                    statsExerciseId: exerciseId,
+                  ),
             loading: () => const _ExerciseLoadingSkeleton(),
             error: (_, __) => _ErrorState(
               message: 'No pudimos cargar el ejercicio.',
@@ -146,9 +174,21 @@ class _BackBar extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _ExerciseDetailContent extends StatelessWidget {
-  const _ExerciseDetailContent({required this.exercise});
+  const _ExerciseDetailContent({
+    required this.exercise,
+    required this.statsUid,
+    required this.statsExerciseId,
+  });
 
   final Exercise exercise;
+
+  /// Athlete whose personal data feeds the stats/records/history blocks —
+  /// see [ExerciseDetailScreen.athleteId].
+  final String statsUid;
+
+  /// The slot's exerciseId — the id the player writes into setLogs (see the
+  /// call site in [ExerciseDetailScreen.build]).
+  final String statsExerciseId;
 
   @override
   Widget build(BuildContext context) {
@@ -185,12 +225,9 @@ class _ExerciseDetailContent extends StatelessWidget {
           sliver: SliverList(
             delegate: SliverChildListDelegate([
               const SizedBox(height: 20),
-              const _StatsCard(
-                tiles: [
-                  StatTile(label: '1RM', value: null),
-                  StatTile(label: 'SESIONES', value: null),
-                  StatTile(label: 'PROGRESO', value: null),
-                ],
+              _PersonalStatsBlock(
+                athleteUid: statsUid,
+                exerciseId: statsExerciseId,
               ),
               const SizedBox(height: 20),
               const _SectionHeader(text: 'VIDEO'),
@@ -211,10 +248,337 @@ class _ExerciseDetailContent extends StatelessWidget {
               const SizedBox(height: 20),
               const _SectionHeader(text: 'HISTORIAL'),
               const SizedBox(height: 12),
-              const _HistoryEmptyState(),
+              _HistorySection(
+                athleteUid: statsUid,
+                exerciseId: statsExerciseId,
+              ),
               const SizedBox(height: 20),
             ]),
           ),
+        ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Period-scoped personal block: header + selector, stats card, chart, records
+// ---------------------------------------------------------------------------
+
+/// Owns the [ChartPeriod] selection and the single
+/// [exerciseProgressionProvider] watch, so switching periods rebuilds ONLY
+/// this subtree — VIDEO/TÉCNICA/HISTORIAL below don't care about the period
+/// (ref.watch del provider más chico posible).
+class _PersonalStatsBlock extends ConsumerStatefulWidget {
+  const _PersonalStatsBlock({
+    required this.athleteUid,
+    required this.exerciseId,
+  });
+
+  final String athleteUid;
+  final String exerciseId;
+
+  @override
+  ConsumerState<_PersonalStatsBlock> createState() =>
+      _PersonalStatsBlockState();
+}
+
+class _PersonalStatsBlockState extends ConsumerState<_PersonalStatsBlock> {
+  /// [AD7] Governs stats card, chart and records — all read the same
+  /// period-scoped aggregation. HISTORIAL deliberately does NOT follow it
+  /// (see [exerciseSessionHistoryProvider]).
+  ChartPeriod _period = ChartPeriod.defaultPeriod;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
+    final progressionAsync = ref.watch(exerciseProgressionProvider((
+      athleteUid: widget.athleteUid,
+      exerciseId: widget.exerciseId,
+      period: _period,
+    )));
+    // Loading/error → null → the tiles keep their "—" placeholder (the card
+    // must never crash nor block the rest of the screen).
+    final progression = progressionAsync.valueOrNull;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const _SectionHeader(text: 'PROGRESIÓN'),
+            const Spacer(),
+            ChartPeriodSelector(
+              selected: _period,
+              labels: ChartPeriodLabels(
+                last30dLabel: l10n.progressionPeriodLast30Days,
+                thisWeekLabel: l10n.progressionPeriodThisWeek,
+                monthLabel: l10n.progressionPeriodMonth,
+              ),
+              onSelect: (p) => setState(() => _period = p),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        _StatsCard(
+          tiles: [
+            StatTile(label: '1RM', value: _oneRepMaxValue(progression)),
+            StatTile(
+              label: 'SESIONES',
+              value: progression == null
+                  ? null
+                  : '${progression.frequencySessionCount}',
+            ),
+            StatTile(label: 'PROGRESO', value: _progressValue(progression)),
+          ],
+        ),
+        const SizedBox(height: 12),
+        _ProgressionChartBlock(progressionAsync: progressionAsync),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Personal stats derivations (display-side)
+// ---------------------------------------------------------------------------
+
+/// Formats a kg / kg·reps value the same way the chart and the records list
+/// do: whole numbers drop the decimals, fractional values keep one.
+String _formatStatValue(double value) =>
+    value % 1 == 0 ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
+
+/// 1RM tile: best Epley estimate within the active period, rounded to 0.5kg
+/// at display only (AD2 — same convention as chart/records).
+String? _oneRepMaxValue(ExerciseProgression? progression) {
+  final series = progression?.oneRepMaxSeries;
+  if (series == null || series.isEmpty) return null;
+  var best = series.first.value;
+  for (final point in series.skip(1)) {
+    if (point.value > best) best = point.value;
+  }
+  return '${_formatStatValue(roundToNearestHalfKg(best))} kg';
+}
+
+/// PROGRESO tile criterion: % delta first→last session over the period's 1RM
+/// series — the estimated-strength metric, deliberately the same series the
+/// 1RM tile reads so the card stays internally coherent (session volume is
+/// confounded by set count; heaviest weight moves in coarse plate jumps).
+/// Needs ≥2 points inside the period; otherwise "—".
+String? _progressValue(ExerciseProgression? progression) {
+  final series = progression?.oneRepMaxSeries;
+  if (series == null || series.length < 2) return null;
+  final first = series.first.value;
+  if (first <= 0) return null;
+  final pct = ((series.last.value - first) / first * 100).round();
+  return pct > 0 ? '+$pct%' : '$pct%';
+}
+
+// ---------------------------------------------------------------------------
+// Progression chart + personal records block
+// ---------------------------------------------------------------------------
+
+/// Chart + records for the active period. Loading keeps a card-sized shimmer
+/// so the sections below don't jump when the data lands; error degrades to a
+/// muted one-liner (the rest of the screen must stay usable).
+class _ProgressionChartBlock extends StatelessWidget {
+  const _ProgressionChartBlock({required this.progressionAsync});
+
+  final AsyncValue<ExerciseProgression> progressionAsync;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+
+    return progressionAsync.when(
+      loading: () => TreinoShimmer(
+        child: Container(
+          height: 220,
+          decoration: BoxDecoration(
+            color: palette.bgCard,
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+      ),
+      error: (_, __) =>
+          const _EmptyState(message: 'No pudimos cargar la progresión.'),
+      data: (progression) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ExerciseProgressionChart(
+            progression: progression,
+            labels: ExerciseProgressionChartLabels(
+              heaviestWeightLabel: l10n.progressionMetricPr,
+              oneRepMaxLabel: l10n.progressionMetricOneRepMax,
+              bestSetVolumeLabel: l10n.progressionMetricBestSetVolume,
+              bestSessionVolumeLabel: l10n.progressionMetricVolume,
+              volumeUnit: 'kg·reps',
+              weightUnit: 'kg',
+              frequencyLabel: (n) => l10n.progressionFrequencyPeriod(n),
+              singlePointHint: l10n.progressionSinglePointHint,
+              emptyHint: l10n.progressionEmptyExercise,
+            ),
+            localeName: l10n.localeName,
+          ),
+          // Empty records would repeat the chart's empty hint right below it —
+          // render the list only when there is something to celebrate.
+          if (progression.personalRecords.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            PersonalRecordsList(
+              records: progression.personalRecords,
+              labels: PersonalRecordsListLabels(
+                sectionTitle: l10n.personalRecordsSectionTitle,
+                heaviestWeightLabel: l10n.progressionMetricPr,
+                oneRepMaxLabel: l10n.progressionMetricOneRepMax,
+                bestSetVolumeLabel: l10n.progressionMetricBestSetVolume,
+                bestSessionVolumeLabel: l10n.progressionMetricVolume,
+                volumeUnit: 'kg·reps',
+                weightUnit: 'kg',
+                emptyText: l10n.progressionEmptyExercise,
+                localeName: l10n.localeName,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// HISTORIAL — real per-session history
+// ---------------------------------------------------------------------------
+
+/// e.g. '10 mar 2026' — same date convention as PersonalRecordsList.
+String _historyDate(DateTime dt, String localeName) =>
+    intl.DateFormat('d MMM yyyy', localeName).format(dt);
+
+class _HistorySection extends ConsumerWidget {
+  const _HistorySection({
+    required this.athleteUid,
+    required this.exerciseId,
+  });
+
+  final String athleteUid;
+  final String exerciseId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    final historyAsync = ref.watch(exerciseSessionHistoryProvider(
+        (athleteUid: athleteUid, exerciseId: exerciseId)));
+
+    return historyAsync.when(
+      loading: () => Text(
+        l10n.coachLoadingLabel,
+        style: GoogleFonts.barlow(
+          fontWeight: FontWeight.w400,
+          fontSize: 14,
+          color: palette.textMuted,
+        ),
+      ),
+      error: (_, __) =>
+          const _EmptyState(message: 'No pudimos cargar el historial.'),
+      data: (entries) => entries.isEmpty
+          ? const _HistoryEmptyState()
+          : _HistoryList(entries: entries, localeName: l10n.localeName),
+    );
+  }
+}
+
+class _HistoryList extends StatelessWidget {
+  const _HistoryList({required this.entries, required this.localeName});
+
+  final List<ExerciseSessionHistoryEntry> entries;
+  final String localeName;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: palette.border),
+      ),
+      child: Column(
+        children: [
+          for (var i = 0; i < entries.length; i++) ...[
+            if (i > 0) Divider(color: palette.border, height: 18),
+            _HistoryRow(entry: entries[i], localeName: localeName),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _HistoryRow extends StatelessWidget {
+  const _HistoryRow({required this.entry, required this.localeName});
+
+  final ExerciseSessionHistoryEntry entry;
+  final String localeName;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    // #368: bodyweight-only session → best set is reps-only, no volume line.
+    final isBodyweight = entry.bestWeightKg <= 0;
+    final bestSet = isBodyweight
+        ? '${entry.bestSetReps} reps'
+        : '${_formatStatValue(entry.bestWeightKg)} kg × ${entry.bestSetReps}';
+
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _historyDate(entry.date, localeName),
+                style: GoogleFonts.barlow(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: palette.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                entry.setCount == 1 ? '1 serie' : '${entry.setCount} series',
+                style: GoogleFonts.barlow(
+                  fontSize: 11,
+                  color: palette.textMuted,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              bestSet,
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 18,
+                color: palette.accent,
+              ),
+            ),
+            if (entry.sessionVolume > 0) ...[
+              const SizedBox(height: 2),
+              Text(
+                '${_formatStatValue(entry.sessionVolume)} kg·reps',
+                style: GoogleFonts.barlow(
+                  fontSize: 11,
+                  color: palette.textMuted,
+                ),
+              ),
+            ],
+          ],
         ),
       ],
     );

@@ -419,6 +419,9 @@ GoRouter buildRouter({
             exerciseId: exerciseId,
             ownerId: ownerId,
             exerciseName: exerciseName,
+            // Personal stats/history belong to the athlete being inspected,
+            // never to the signed-in PF.
+            athleteId: athleteId,
             backFallbackRoute: '/coach/athlete/$athleteId',
           ));
         },

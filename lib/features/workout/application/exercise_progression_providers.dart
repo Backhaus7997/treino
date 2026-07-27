@@ -85,6 +85,47 @@ final exerciseProgressionProvider = FutureProvider.autoDispose
   );
 });
 
+/// Family key for [exerciseSessionHistoryProvider].
+typedef ExerciseHistoryKey = ({String athleteUid, String exerciseId});
+
+/// Derives the exercise detail screen's HISTORIAL rows — the athlete's most
+/// recent sessions containing [ExerciseHistoryKey.exerciseId], via
+/// [deriveExerciseSessionHistory].
+///
+/// Deliberately NOT keyed by period (see the derivation's doc): it fetches
+/// once per screen open and survives period switches. Same bounded scan as
+/// [exerciseProgressionProvider] (last [kProgressionSessionScan] sessions);
+/// running both on one screen mirrors the accepted cost profile of the
+/// insights progression screen (list + progression scans).
+/// autoDispose: cache drops when the screen closes.
+final exerciseSessionHistoryProvider = FutureProvider.autoDispose
+    .family<List<ExerciseSessionHistoryEntry>, ExerciseHistoryKey>(
+        (ref, key) async {
+  if (key.athleteUid.isEmpty || key.exerciseId.isEmpty) return const [];
+
+  final sessions =
+      await ref.watch(sessionsByUidProvider(key.athleteUid).future);
+  final repo = ref.read(sessionRepositoryProvider);
+
+  final scanned = sessions.take(kProgressionSessionScan).toList();
+
+  final logsPerSession = await Future.wait(
+    scanned.map(
+      (s) => repo.listSetLogs(uid: key.athleteUid, sessionId: s.id),
+    ),
+  );
+
+  final logsBySession = <String, List<SetLog>>{
+    for (var i = 0; i < scanned.length; i++) scanned[i].id: logsPerSession[i],
+  };
+
+  return deriveExerciseSessionHistory(
+    exerciseId: key.exerciseId,
+    sessionsDesc: scanned, // already DESC from sessionsByUidProvider
+    logsBySession: logsBySession,
+  );
+});
+
 /// Derives the deduplicated list of exercises found in the bounded scan,
 /// ordered so the most-recently-logged exercise appears first.
 ///
