@@ -4583,7 +4583,7 @@ abstract class AppL10n {
   /// Quick action button label in the Coach Hub web dashboard WelcomeCard to navigate to the alumnos section.
   ///
   /// In es_AR, this message translates to:
-  /// **'+ Nuevo alumno'**
+  /// **'Nuevo alumno'**
   String get dashboardQuickActionNuevoAlumno;
 
   /// Quick action button label in the Coach Hub web dashboard WelcomeCard to navigate to routine creation.

@@ -557,7 +557,7 @@
       "pagos": { "type": "int" }
     }
   },
-  "dashboardQuickActionNuevoAlumno": "+ Nuevo alumno",
+  "dashboardQuickActionNuevoAlumno": "Nuevo alumno",
   "@dashboardQuickActionNuevoAlumno": {
     "description": "Quick action to navigate to alumnos section."
   },

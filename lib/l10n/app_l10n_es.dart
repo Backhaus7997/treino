@@ -2515,7 +2515,7 @@ class AppL10nEs extends AppL10n {
   }
 
   @override
-  String get dashboardQuickActionNuevoAlumno => '+ Nuevo alumno';
+  String get dashboardQuickActionNuevoAlumno => 'Nuevo alumno';
 
   @override
   String get dashboardQuickActionCrearRutina => 'Crear rutina';
@@ -5547,7 +5547,7 @@ class AppL10nEsAr extends AppL10nEs {
   }
 
   @override
-  String get dashboardQuickActionNuevoAlumno => '+ Nuevo alumno';
+  String get dashboardQuickActionNuevoAlumno => 'Nuevo alumno';
 
   @override
   String get dashboardQuickActionCrearRutina => 'Crear rutina';
