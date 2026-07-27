@@ -17,7 +17,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../insights/domain/chart_period.dart';
-import '../../application/exercise_filter.dart' show foldSearch;
+import '../../application/exercise_filter.dart' show matchesAllTokens;
 import '../../application/exercise_progression_providers.dart';
 import '../../domain/exercise_progression.dart' show ExerciseListEntry;
 import 'exercise_progression_chart.dart';
@@ -237,8 +237,7 @@ class _ExerciseProgressionSectionState
       List<ExerciseListEntry> all, String effectiveId) {
     if (widget.labels.searchLabels == null) return all;
 
-    final q = foldSearch(_query.trim());
-    if (q.isEmpty) {
+    if (_query.trim().isEmpty) {
       final capped = all.take(kPickerChipCap).toList();
       if (!capped.any((e) => e.exerciseId == effectiveId)) {
         final effective =
@@ -250,8 +249,10 @@ class _ExerciseProgressionSectionState
       return capped;
     }
 
+    // Mismas semánticas de búsqueda que el picker (fold de acentos + AND de
+    // tokens): "curl biceps" encuentra "Curl de bíceps".
     return all
-        .where((e) => foldSearch(e.exerciseName).contains(q))
+        .where((e) => matchesAllTokens(e.exerciseName, _query))
         .toList(growable: false);
   }
 

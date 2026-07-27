@@ -69,6 +69,37 @@ void main() {
     });
   });
 
+  // ── matchesAllTokens — the shared tokenized predicate ─────────────────────
+
+  group('matchesAllTokens', () {
+    test('every token must appear — order and gap words are irrelevant', () {
+      expect(matchesAllTokens('Press de Banca (Barra)', 'press banca'), isTrue);
+      expect(matchesAllTokens('Press de Banca (Barra)', 'banca press'), isTrue);
+      expect(matchesAllTokens('Press de Banca (Barra)', 'press inclinado'),
+          isFalse);
+    });
+
+    test('folds case and accents on both sides', () {
+      expect(matchesAllTokens('Curl de bíceps', 'CURL BICEPS'), isTrue);
+      expect(matchesAllTokens('curl biceps', 'Bíceps'), isTrue);
+    });
+
+    test('one-word query behaves like folded substring match', () {
+      expect(matchesAllTokens('Curl femoral', 'femo'), isTrue);
+      expect(matchesAllTokens('Curl femoral', 'biceps'), isFalse);
+    });
+
+    test('blank queries match everything — empty, spaces-only, untrimmed', () {
+      expect(matchesAllTokens('Sentadilla', ''), isTrue);
+      expect(matchesAllTokens('Sentadilla', '   '), isTrue);
+      expect(matchesAllTokens('Sentadilla', '  senta  '), isTrue);
+    });
+
+    test('runs of whitespace tokenize like a single separator', () {
+      expect(matchesAllTokens('Curl de bíceps', '  curl   biceps  '), isTrue);
+    });
+  });
+
   // ── exerciseMatchesFilters — empty filters ────────────────────────────────
 
   group('exerciseMatchesFilters — all filters empty', () {
