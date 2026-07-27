@@ -331,12 +331,12 @@ class _WelcomeCard extends ConsumerWidget {
                     _QuickAction(
                       label: l10n.dashboardQuickActionCrearRutina,
                       icon: TreinoIcon.sidebarRutinas,
-                      onTap: () => context.go('/biblioteca'),
+                      onTap: () => context.push('/template-editor'),
                     ),
                     _QuickAction(
                       label: l10n.dashboardQuickActionMensajes(unread),
                       icon: TreinoIcon.sidebarChat,
-                      onTap: () => context.go('/mensajes'),
+                      onTap: () => context.go('/chat'),
                     ),
                     _QuickAction(
                       label: l10n.dashboardQuickActionImportarPlan,
