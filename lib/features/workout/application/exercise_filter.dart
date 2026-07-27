@@ -39,6 +39,21 @@ String foldSearch(String input) {
   return buf.toString();
 }
 
+/// True when every whitespace-separated token of [query] appears somewhere
+/// in [candidate], case/diacritic-insensitively via [foldSearch] — the order
+/// and the words in between don't matter: "press banca" matches
+/// "Press de Banca (Barra)" despite the missing "de".
+///
+/// Blank queries match everything; one-word queries behave exactly like a
+/// folded substring match. Both inputs are folded here, so callers pass raw
+/// strings (folding is idempotent — pre-folded input is also fine).
+bool matchesAllTokens(String candidate, String query) {
+  final q = foldSearch(query).trim();
+  if (q.isEmpty) return true;
+  final folded = foldSearch(candidate);
+  return q.split(_whitespace).every(folded.contains);
+}
+
 /// Returns `true` when [e] satisfies all active filters simultaneously
 /// (AND across filter dimensions, OR within each dimension).
 ///
@@ -63,16 +78,10 @@ bool exerciseMatchesFilters(
 }) {
   final q = foldSearch(query).trim();
   if (q.isNotEmpty) {
-    // Tokenized AND-match: every word of the query must appear in the name
-    // (any order) — "press banca" finds "Press de Banca (Barra)" despite the
-    // missing "de". Aliases match when ALL tokens hit the same alias.
-    final tokens = q.split(_whitespace);
-    final name = foldSearch(e.name);
-    final nameMatch = tokens.every(name.contains);
-    final aliasMatch = e.aliases.any((a) {
-      final alias = foldSearch(a);
-      return tokens.every(alias.contains);
-    });
+    // Tokenized AND-match via [matchesAllTokens] (shared with the progression
+    // search). Aliases match when ALL tokens hit the same alias.
+    final nameMatch = matchesAllTokens(e.name, query);
+    final aliasMatch = e.aliases.any((a) => matchesAllTokens(a, query));
     if (!nameMatch && !aliasMatch) return false;
   }
   // OR within muscle filter, AND across filter types. An exercise matches if

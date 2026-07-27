@@ -118,6 +118,25 @@ void main() {
     expect(find.text('Curl de bíceps'), findsOneWidget);
   });
 
+  testWidgets(
+      'la búsqueda tokeniza (matchesAllTokens) — "curl biceps" encuentra '
+      '"Curl de bíceps"', (tester) async {
+    await tester.pumpWidget(_wrap(overrides: [
+      athleteExerciseListProvider('u1').overrideWith((ref) async => _many),
+    ]));
+    await tester.pumpAndSettle();
+
+    // Un substring exacto fallaría (el nombre lleva "de" entre medio): cada
+    // palabra matchea por separado, con fold de acentos incluido — las mismas
+    // semánticas que el picker del catálogo.
+    await tester.enterText(find.byType(TextField), 'curl biceps');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Curl de bíceps'), findsOneWidget);
+    // El otro curl no tiene "biceps" — el AND de tokens lo excluye.
+    expect(find.text('Curl femoral'), findsNothing);
+  });
+
   testWidgets('sin coincidencias → mensaje que aclara que busca en LO TUYO',
       (tester) async {
     await tester.pumpWidget(_wrap(overrides: [
