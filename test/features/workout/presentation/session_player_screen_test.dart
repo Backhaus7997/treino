@@ -13,6 +13,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/features/workout/application/exercise_providers.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
 import 'package:treino/features/workout/application/session_init.dart';
 import 'package:treino/features/workout/application/session_notifier.dart';
@@ -23,6 +24,7 @@ import 'package:treino/features/workout/domain/set_enums.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/domain/set_spec.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/features/workout/presentation/exercise_detail_screen.dart';
 import 'package:treino/features/workout/presentation/session_player_screen.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
@@ -317,8 +319,8 @@ void main() {
         ),
       );
       await tester.pump();
-      // Nombre con tachado
-      final textWidget = tester.widget<Text>(find.text('Squat'));
+      // Nombre con tachado (el layout ampliado renderiza nombres en UPPERCASE)
+      final textWidget = tester.widget<Text>(find.text('SQUAT'));
       expect(
         textWidget.style?.decoration,
         TextDecoration.lineThrough,
@@ -375,8 +377,11 @@ void main() {
       expect(find.text('+'), findsNothing);
     });
 
-    // SCENARIO-286: fila done NO es tappable
-    testWidgets('SCENARIO-286: fila done no es tappable (onTap null)',
+    // SCENARIO-286 (superseded 2026-07-27): la fila done ahora SÍ es tappable —
+    // el tap en el nombre abre el detalle completo del ejercicio (pedido de
+    // Martín: acceso al detalle desde el player). El assert viejo (no-op)
+    // quedó obsoleto junto con el SetEntrySheet.
+    testWidgets('fila done es tappable y abre el detalle del ejercicio',
         (tester) async {
       final slots = [
         makeSlot(exerciseId: 'e1', exerciseName: 'Squat', targetSets: 1),
@@ -393,15 +398,77 @@ void main() {
       await tester.pumpWidget(
         _wrapProvider(
           const SessionPlayerScreen(init: _kInit),
-          _stateOverride(state),
+          [
+            ..._stateOverride(state),
+            slotExerciseProvider((
+              exerciseId: 'e1',
+              ownerId: null,
+              exerciseName: 'Squat',
+            )).overrideWith((ref) async => null),
+          ],
         ),
       );
       await tester.pump();
-      // Tap en fila done no debe abrir sheet ni lanzar excepción
-      await tester.tap(find.text('Squat'));
+      await tester.tap(find.text('SQUAT'));
       await tester.pumpAndSettle();
-      // El SetEntrySheet NO debe aparecer
-      expect(find.text('SQUAT'), findsNothing);
+      expect(find.byType(ExerciseDetailScreen), findsOneWidget);
+    });
+  });
+
+  // ── Tap en el nombre → detalle del ejercicio (pedido 2026-07-27) ──────────
+
+  group('exercise detail navigation', () {
+    List<Override> detailOverrides(SessionState state) => [
+          ..._stateOverride(state),
+          // Detalle resuelto a null → _NotFoundState; el assert es de
+          // NAVEGACIÓN (push imperativo montó ExerciseDetailScreen), no del
+          // contenido del detalle.
+          slotExerciseProvider((
+            exerciseId: 'e1',
+            ownerId: null,
+            exerciseName: 'Press de banca',
+          )).overrideWith((ref) async => null),
+        ];
+
+    testWidgets(
+        'tap en el nombre del ejercicio ACTIVO pushea ExerciseDetailScreen '
+        'con Scaffold host propio', (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          detailOverrides(_defaultState()),
+        ),
+      );
+      await tester.pump();
+      await tester.tap(find.text('PRESS DE BANCA'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ExerciseDetailScreen), findsOneWidget);
+    });
+
+    testWidgets('back desde el detalle vuelve al player con la sesión intacta',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          detailOverrides(_defaultState()),
+        ),
+      );
+      await tester.pump();
+      await tester.tap(find.text('PRESS DE BANCA'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ExerciseDetailScreen), findsOneWidget);
+
+      // Pop imperativo (mismo Navigator del push) → el player sigue vivo, sin
+      // diálogo de abandono (el PopScope del player no intercepta este pop).
+      final navigator = tester.state<NavigatorState>(find.byType(Navigator));
+      navigator.pop();
+      await tester.pumpAndSettle();
+      expect(find.byType(ExerciseDetailScreen), findsNothing);
+      expect(find.text('TERMINAR SESIÓN'), findsOneWidget);
+      expect(
+        find.textContaining('¿Seguro que querés abandonar?'),
+        findsNothing,
+      );
     });
   });
 
@@ -811,10 +878,10 @@ void main() {
       );
       await tester.pump();
       // Press should be shown with strikethrough (completed summary).
-      final pressText = tester.widget<Text>(find.text('Press'));
+      final pressText = tester.widget<Text>(find.text('PRESS'));
       expect(pressText.style?.decoration, TextDecoration.lineThrough);
       // Curl should be shown as the current block (no strikethrough).
-      final curlText = tester.widget<Text>(find.text('Curl'));
+      final curlText = tester.widget<Text>(find.text('CURL'));
       expect(curlText.style?.decoration, isNot(TextDecoration.lineThrough));
     });
 
@@ -1311,7 +1378,7 @@ void main() {
       );
       await tester.pump();
       // The collapsed "3/3" strikethrough summary must NOT appear.
-      final pressText = tester.widget<Text>(find.text('Press'));
+      final pressText = tester.widget<Text>(find.text('PRESS'));
       expect(pressText.style?.decoration, isNot(TextDecoration.lineThrough));
       // Progress badge must read 3/4, not 3/3.
       expect(find.text('3/4'), findsOneWidget);
@@ -1732,7 +1799,7 @@ void main() {
       );
       await tester.pump();
       expect(find.text('1/2'), findsOneWidget);
-      final pressTextA = tester.widget<Text>(find.text('Press'));
+      final pressTextA = tester.widget<Text>(find.text('PRESS'));
       expect(pressTextA.style?.decoration, isNot(TextDecoration.lineThrough),
           reason: 'block must stay current, not collapse as completed');
     });
