@@ -515,14 +515,15 @@ GoRouter buildRouter({
           // Scaffold. All remaining callers push from within the shell.
           GoRoute(
             path: '/workout',
-            // ?tab=rankings deep-links to the second (Rankings) page of the
-            // athlete Entrenar tab — mirrors the /coach builder below
-            // (design `sdd/rankings-v2/design` AD-2). Trainer role ignores
-            // initialTab (WorkoutScreen's own role branch).
-            pageBuilder: (_, state) {
-              final tab = state.uri.queryParameters['tab'];
-              return _noAnim(WorkoutScreen(initialTab: tab));
-            },
+            // Legacy `?tab=rankings` deep-links (rankings lived here as the
+            // Entrenar second page until relocated to the FEED tab) forward
+            // to /feed?tab=rankings — safety net for old bookmarks and
+            // notifications.
+            redirect: (_, state) =>
+                state.uri.queryParameters['tab'] == 'rankings'
+                    ? '/feed?tab=rankings'
+                    : null,
+            pageBuilder: (_, __) => _noAnim(const WorkoutScreen()),
             routes: [
               GoRoute(
                 path: 'routine/:routineId',
@@ -569,7 +570,13 @@ GoRouter buildRouter({
           ),
           GoRoute(
             path: '/feed',
-            pageBuilder: (_, __) => _noAnim(const FeedScreen()),
+            // ?tab=rankings deep-links to the second (Rankings) page of the
+            // FEED tab — mirrors the /coach builder below. Rankings
+            // relocated here from the Entrenar tab.
+            pageBuilder: (_, state) {
+              final tab = state.uri.queryParameters['tab'];
+              return _noAnim(FeedScreen(initialTab: tab));
+            },
             routes: [
               GoRoute(
                 path: 'create',
@@ -673,14 +680,14 @@ GoRouter buildRouter({
                 builder: (_, __) => _withBg(const ProfileRoutinesScreen()),
               ),
               // rankings — RETIRED as a pushed route (rankings-v2 Phase 3,
-              // task 3.4). Rankings relocated to the second page of the
-              // athlete Entrenar tab (design `sdd/rankings-v2/design`
-              // AD-1/AD-3). Kept REGISTERED with a redirect (not
-              // hard-removed) — a safety net for any lingering
-              // `context.push('/profile/rankings')` call or bookmark.
+              // task 3.4). Rankings now live on the second page of the FEED
+              // tab (previously the athlete Entrenar tab). Kept REGISTERED
+              // with a redirect (not hard-removed) — a safety net for any
+              // lingering `context.push('/profile/rankings')` call or
+              // bookmark.
               GoRoute(
                 path: 'rankings',
-                redirect: (_, __) => '/workout?tab=rankings',
+                redirect: (_, __) => '/feed?tab=rankings',
               ),
               GoRoute(
                 path: 'settings/appearance',

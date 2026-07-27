@@ -1,15 +1,19 @@
 import 'dart:async';
 
+import 'package:firebase_auth/firebase_auth.dart' show User;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_background.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/feed/application/feed_screen_providers.dart';
+import 'package:treino/features/feed/application/friendship_providers.dart';
 import 'package:treino/features/feed/application/post_providers.dart';
 import 'package:treino/features/feed/domain/feed_segment.dart';
 import 'package:treino/features/feed/domain/post.dart';
@@ -19,10 +23,42 @@ import 'package:treino/features/feed/feed_screen.dart';
 import 'package:treino/features/feed/presentation/widgets/feed_empty_state.dart';
 import 'package:treino/features/feed/presentation/widgets/feed_segment_pills.dart';
 import 'package:treino/features/feed/presentation/widgets/post_card.dart';
+import 'package:treino/features/gym_rankings/application/ranking_providers.dart';
 import 'package:treino/l10n/app_l10n.dart';
+import 'package:treino/features/profile/application/ranking_optin_controller_provider.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
+import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
+import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
+import 'package:treino/features/workout/application/session_providers.dart'
+    show currentUidProvider;
+
+class _MockUser extends Mock implements User {}
+
+User _fakeUser(String uid) {
+  final u = _MockUser();
+  when(() => u.uid).thenReturn(uid);
+  return u;
+}
+
+class _FakeRankingOptInController implements RankingOptInControllerBase {
+  final List<String> enabledCalls = [];
+  final List<String> disabledCalls = [];
+
+  @override
+  Future<void> enableRankingOptIn(String uid) async {
+    enabledCalls.add(uid);
+  }
+
+  @override
+  Future<void> disableRankingOptIn(String uid) async {
+    disabledCalls.add(uid);
+  }
+
+  @override
+  Future<void> syncGymIfDesynced(String uid) async {}
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -118,7 +154,9 @@ void main() {
       await tester.pumpWidget(_wrapProvider(const FeedScreen(), baseOverrides));
       await tester.pump();
 
-      expect(find.text('FEED'), findsOneWidget);
+      // Both the segmented tab pill and the page header read "FEED"
+      // (tab label vs. header title) — assert 2, not scoping by text alone.
+      expect(find.text('FEED'), findsNWidgets(2));
     });
 
     // REQ-CHATUNREAD-005: the messages icon shows an unread-chats count badge.
@@ -634,6 +672,134 @@ void main() {
 
       expect(find.byType(PostCard), findsOneWidget);
       expect(find.byType(FeedEmptyState), findsNothing);
+    });
+  });
+
+  // ── Feed | Rankings two-page tab ──────────────────────────────────────────
+  //
+  // Rankings relocated here from the Entrenar tab: FeedScreen hosts a fixed
+  // 2-page DefaultTabController + swipeable TabBarView — "FEED" (page 0, the
+  // social feed) and "RANKINGS" (page 1, the self-contained RankingsBody).
+  // Gating/body internals are covered by rankings_screen_test.dart; these
+  // tests cover the host wiring.
+  group('FeedScreen — two-page Feed tab', () {
+    const uid = 'athlete-1';
+    const gymId = 'gym-a';
+
+    List<Override> tabOverrides({bool rankingOptIn = true}) => [
+          // Page 0 (feed) dependencies.
+          feedSegmentProvider.overrideWith((ref) => FeedSegment.amigos),
+          myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myGymFeedProvider.overrideWith((ref) async => null),
+          feedPublicProvider.overrideWith((ref) async => const <Post>[]),
+          unreadFromFriendsProvider.overrideWith((_) => 0),
+          pendingRequestCountProvider(uid).overrideWith((_) => 0),
+          // Page 1 (rankings) dependencies — mirrors the override set the
+          // Entrenar tab used while it hosted rankings.
+          currentUidProvider.overrideWithValue(uid),
+          authStateChangesProvider
+              .overrideWith((ref) => Stream.value(_fakeUser(uid))),
+          userProfileProvider.overrideWith(
+            (ref) => Stream.value(_makeProfile(gymId: gymId)),
+          ),
+          userPublicProfileProvider(uid).overrideWith(
+            (_) => Stream.value(
+              UserPublicProfile(uid: uid, rankingOptIn: rankingOptIn),
+            ),
+          ),
+          streakLeaderboardProvider(gymId).overrideWith((_) async => []),
+          volumeLeaderboardProvider(gymId).overrideWith((_) async => []),
+          squatLeaderboardProvider(gymId).overrideWith((_) async => []),
+          benchLeaderboardProvider(gymId).overrideWith((_) async => []),
+          deadliftLeaderboardProvider(gymId).overrideWith((_) async => []),
+          rankingOptInControllerProvider
+              .overrideWithValue(_FakeRankingOptInController()),
+        ];
+
+    testWidgets('default (initialTab absent) starts on page 0 (Feed)',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), tabOverrides()),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.byType(FeedSegmentPills), findsOneWidget);
+      expect(find.byKey(const Key('rankings_invitation_state')), findsNothing);
+      expect(find.byKey(const Key('rankings_section_streak')), findsNothing);
+    });
+
+    testWidgets("initialTab: 'rankings' starts on page 1 (Rankings)",
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(initialTab: 'rankings'), tabOverrides()),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(FeedSegmentPills), findsNothing);
+      expect(find.byKey(const Key('rankings_section_streak')), findsOneWidget);
+    });
+
+    testWidgets('swiping the TabBarView switches pages', (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), tabOverrides()),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(FeedSegmentPills), findsOneWidget);
+
+      await tester.fling(find.byType(TabBarView), const Offset(-400, 0), 800);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(FeedSegmentPills), findsNothing);
+      expect(find.byKey(const Key('rankings_section_streak')), findsOneWidget);
+    });
+
+    testWidgets('invitation state renders on page 1 when opted out',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+          const FeedScreen(initialTab: 'rankings'),
+          tabOverrides(rankingOptIn: false),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(
+          find.byKey(const Key('rankings_invitation_state')), findsOneWidget);
+      expect(find.byKey(const Key('rankings_section_streak')), findsNothing);
+    });
+
+    testWidgets(
+        "page 0's feed providers are NOT rebuilt when swiping to page 1 "
+        'and back (keep-alive assertion)', (tester) async {
+      var buildCount = 0;
+
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), [
+          ...tabOverrides(),
+          myFriendsFeedProvider.overrideWith((ref) async {
+            buildCount++;
+            return const <Post>[];
+          }),
+        ]),
+      );
+      await tester.pumpAndSettle();
+
+      expect(buildCount, equals(1));
+
+      // Swipe to page 1 (Rankings) and back to page 0 (Feed).
+      await tester.fling(find.byType(TabBarView), const Offset(-400, 0), 800);
+      await tester.pumpAndSettle();
+      await tester.fling(find.byType(TabBarView), const Offset(400, 0), 800);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(FeedSegmentPills), findsOneWidget);
+      // autoDispose provider would re-fire if page 0 was disposed on swipe
+      // away — keep-alive means the FutureProvider result is cached, so the
+      // fetch only runs once.
+      expect(buildCount, equals(1));
     });
   });
 }
