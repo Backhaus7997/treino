@@ -47,14 +47,6 @@ UserPublicProfile _pub(String uid, String name) => UserPublicProfile(
       displayNameLowercase: name.toLowerCase(),
     );
 
-TrainerLink _pendingLink(String id) => TrainerLink(
-      id: id,
-      trainerId: 'trainer-1',
-      athleteId: 'req-$id',
-      status: TrainerLinkStatus.pending,
-      requestedAt: DateTime.utc(2026, 1, 1),
-    );
-
 // ─── Test helpers ──────────────────────────────────────────────────────────────
 
 /// Wraps [child] in wide (>= 900px) viewport — needs right column rendered.

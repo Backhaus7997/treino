@@ -212,7 +212,10 @@ void main() {
         await tester.pumpAndSettle();
 
         // Confirmation dialog should show
-        expect(find.text('¿Borrar este horario? Las reservas existentes se mantienen.'), findsOneWidget);
+        expect(
+            find.text(
+                '¿Borrar este horario? Las reservas existentes se mantienen.'),
+            findsOneWidget);
 
         // Tap the confirm button
         await tester.tap(find.text('Confirmar'));

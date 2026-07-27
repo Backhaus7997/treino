@@ -184,8 +184,7 @@ class _SessionDetailSheetState extends ConsumerState<SessionDetailSheet> {
     // QA-COA-003: startsAt is wall-clock UTC (ADR-7); compare against wall-clock
     // "now" so the 24h cancel window isn't 3h short in ART.
     final canCancel = !widget.isPast &&
-        appointment.startsAt.difference(nowWall()) >
-            const Duration(hours: 24);
+        appointment.startsAt.difference(nowWall()) > const Duration(hours: 24);
     final isWithin24h = !widget.isPast && !canCancel;
     final isRecurring = appointment.recurringId != null;
 

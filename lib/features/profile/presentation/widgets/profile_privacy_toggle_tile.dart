@@ -104,9 +104,7 @@ class _ProfilePrivacyToggleTileState
         },
         trailing: Switch.adaptive(
           value: isPublic,
-          onChanged: uid.isEmpty || _busy
-              ? null
-              : (v) => _onChanged(uid, v),
+          onChanged: uid.isEmpty || _busy ? null : (v) => _onChanged(uid, v),
           activeThumbColor: palette.accent,
         ),
       ),

@@ -148,7 +148,8 @@ void main() {
         await tester.pump();
         // Old full-screen empty-state copy is no longer rendered.
         expect(
-          find.text('Todavía no configuraste tus horarios de trabajo. Agregá uno para que tus alumnos puedan reservar.'),
+          find.text(
+              'Todavía no configuraste tus horarios de trabajo. Agregá uno para que tus alumnos puedan reservar.'),
           findsNothing,
         );
         // Calendar is always present (no more rules-empty gating).

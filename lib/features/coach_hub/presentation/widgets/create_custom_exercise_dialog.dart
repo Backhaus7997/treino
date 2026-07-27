@@ -148,13 +148,12 @@ class _CustomExerciseFormDialogState
       _uploadProgress = 0;
     });
     try {
-      final url = await ref
-          .read(customExerciseVideoWebUploaderProvider)
-          .pickAndUpload(
-            onProgress: (f) {
-              if (mounted) setState(() => _uploadProgress = f);
-            },
-          );
+      final url =
+          await ref.read(customExerciseVideoWebUploaderProvider).pickAndUpload(
+        onProgress: (f) {
+          if (mounted) setState(() => _uploadProgress = f);
+        },
+      );
       if (!mounted) return;
       if (url != null) setState(() => _videoCtrl.text = url);
     } catch (_) {
@@ -203,9 +202,8 @@ class _CustomExerciseFormDialogState
                   IconButton(
                     tooltip: 'Cerrar', // i18n
                     icon: Icon(TreinoIcon.close, color: palette.textMuted),
-                    onPressed: _saving
-                        ? null
-                        : () => Navigator.of(context).pop(),
+                    onPressed:
+                        _saving ? null : () => Navigator.of(context).pop(),
                   ),
                 ],
               ),
@@ -272,9 +270,8 @@ class _CustomExerciseFormDialogState
               const SizedBox(height: 8),
               OutlinedButton.icon(
                 key: const Key('create_exercise_upload_video_button'),
-                onPressed: (_saving || _uploadingVideo)
-                    ? null
-                    : _onPickAndUpload,
+                onPressed:
+                    (_saving || _uploadingVideo) ? null : _onPickAndUpload,
                 icon: _uploadingVideo
                     ? SizedBox(
                         width: 14,
@@ -323,9 +320,8 @@ class _CustomExerciseFormDialogState
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   TextButton(
-                    onPressed: _saving
-                        ? null
-                        : () => Navigator.of(context).pop(),
+                    onPressed:
+                        _saving ? null : () => Navigator.of(context).pop(),
                     child: Text(
                       'Cancelar', // i18n
                       style: GoogleFonts.barlow(color: palette.textMuted),
@@ -374,9 +370,9 @@ class _CustomExerciseFormDialogState
 
   InputDecoration _inputDecoration(AppPalette palette, String hint) {
     OutlineInputBorder border(Color color) => OutlineInputBorder(
-      borderRadius: BorderRadius.circular(10),
-      borderSide: BorderSide(color: color),
-    );
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: color),
+        );
     return InputDecoration(
       hintText: hint,
       hintStyle: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),

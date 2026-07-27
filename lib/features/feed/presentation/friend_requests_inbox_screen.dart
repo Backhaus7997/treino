@@ -108,11 +108,10 @@ class _InboxHeader extends StatelessWidget {
               onTap: () => context.pop(),
               behavior: HitTestBehavior.opaque,
               child: Container(
-                constraints:
-                    const BoxConstraints(minWidth: 44, minHeight: 44),
+                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
                 alignment: Alignment.centerLeft,
-                child: Icon(TreinoIcon.back,
-                    size: 20, color: palette.textPrimary),
+                child:
+                    Icon(TreinoIcon.back, size: 20, color: palette.textPrimary),
               ),
             ),
           ),

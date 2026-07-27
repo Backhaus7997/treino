@@ -53,7 +53,7 @@ void main() {
 
         await container.read(currentAthleteLinkProvider.future);
         // Let the payments stream surface its error.
-        await container.read(athletePaymentsProvider.stream).first.then(
+        await container.read(athletePaymentsProvider.future).then(
               (_) {},
               onError: (Object _) {},
             );

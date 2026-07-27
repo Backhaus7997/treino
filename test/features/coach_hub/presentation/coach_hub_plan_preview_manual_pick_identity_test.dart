@@ -103,8 +103,7 @@ void main() {
     registerFallbackValue(<String, dynamic>{});
   });
 
-  group(
-      'manual pick resolves only the targeted row, not every same-named row',
+  group('manual pick resolves only the targeted row, not every same-named row',
       () {
     testWidgets(
         'picking for the first of two identical unmatched rows leaves the '

@@ -186,8 +186,7 @@ void main() {
           reason: 'an empty input id must be replaced by a generated doc id');
 
       // The persisted Firestore doc carries the denormalized gym id.
-      final snap =
-          await firestore.collection('posts').doc(persisted.id).get();
+      final snap = await firestore.collection('posts').doc(persisted.id).get();
       expect(snap.data()!['authorGymId'], equals('smart-fit-palermo'));
     });
 
@@ -207,7 +206,8 @@ void main() {
       final persisted = await repo.create(input);
 
       expect(persisted.authorGymId, equals('megatlon-recoleta'),
-          reason: 'explicit authorGymId must not be overwritten by the user doc');
+          reason:
+              'explicit authorGymId must not be overwritten by the user doc');
     });
 
     test('leaves authorGymId null when input is null and user doc has no gymId',
@@ -303,8 +303,7 @@ void main() {
       mockRepo = MockUserPublicProfileRepository();
     });
 
-    test(
-        "'  Tincho ' is normalized to 'tincho' before reaching the repository",
+    test("'  Tincho ' is normalized to 'tincho' before reaching the repository",
         () async {
       when(() => mockRepo.searchByDisplayName('tincho'))
           .thenAnswer((_) async => <UserPublicProfile>[]);

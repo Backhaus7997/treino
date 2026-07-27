@@ -155,15 +155,13 @@ class _DurationTextFieldState extends State<DurationTextField> {
             filled: false,
             border: UnderlineInputBorder(
               borderSide: BorderSide(
-                color:
-                    widget.hasError ? palette.danger : palette.border,
+                color: widget.hasError ? palette.danger : palette.border,
                 width: widget.hasError ? 1.5 : 1.0,
               ),
             ),
             enabledBorder: UnderlineInputBorder(
               borderSide: BorderSide(
-                color:
-                    widget.hasError ? palette.danger : palette.border,
+                color: widget.hasError ? palette.danger : palette.border,
                 width: widget.hasError ? 1.5 : 1.0,
               ),
             ),

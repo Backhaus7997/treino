@@ -654,7 +654,10 @@ void main() {
       await tester.tap(find.text('CREAR RUTINA'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Pronto vas a poder editar el contenido. Por ahora podés archivar y crear de nuevo.'), findsOneWidget);
+      expect(
+          find.text(
+              'Pronto vas a poder editar el contenido. Por ahora podés archivar y crear de nuevo.'),
+          findsOneWidget);
     });
   });
 }

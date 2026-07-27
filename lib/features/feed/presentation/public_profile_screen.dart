@@ -75,16 +75,14 @@ class PublicProfileScreen extends ConsumerWidget {
           // follower, hide detailed content (stats numbers, rutinas, actividad).
           // Header (name / avatar / gym) and the SEGUIR button stay visible so
           // the viewer can still send a follow request.
-          final isAcceptedFollower =
-              view.friendship?.status.name == 'accepted';
+          final isAcceptedFollower = view.friendship?.status.name == 'accepted';
           final gated = !view.isSelf && !view.isPublic && !isAcceptedFollower;
           // Bottom inset so the last post/routine clears the floating
           // TreinoBottomBar (WhatsApp-style: extendBody + translucent pill).
           // Composition: pill height (72) + top margin (8) + bottom safe
           // area + a small breathing gap. Without this the last card sits
           // behind the bar and can't be fully read even on scroll.
-          final bottomInset =
-              MediaQuery.paddingOf(context).bottom + 88;
+          final bottomInset = MediaQuery.paddingOf(context).bottom + 88;
           return SingleChildScrollView(
             padding: EdgeInsets.only(bottom: bottomInset),
             child: Column(
@@ -294,8 +292,7 @@ class _MessageButtonState extends ConsumerState<_MessageButton> {
             onTap: enabled ? _onTap : null,
             behavior: HitTestBehavior.opaque,
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
               decoration: BoxDecoration(
                 color: Colors.transparent,
                 borderRadius: BorderRadius.circular(20),

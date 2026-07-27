@@ -35,26 +35,18 @@ class _ChartMetric {
 
 /// All candidate metrics in preferred display order.
 const _kAllMetrics = <_ChartMetric>[
-  _ChartMetric(
-      label: _labelCmj, unit: 'cm', extractor: _extractCmj),
+  _ChartMetric(label: _labelCmj, unit: 'cm', extractor: _extractCmj),
   _ChartMetric(
       label: _labelSquatJump, unit: 'cm', extractor: _extractSquatJump),
-  _ChartMetric(
-      label: _labelAbalakov, unit: 'cm', extractor: _extractAbalakov),
+  _ChartMetric(label: _labelAbalakov, unit: 'cm', extractor: _extractAbalakov),
   _ChartMetric(
       label: _labelBroadJump, unit: 'cm', extractor: _extractBroadJump),
-  _ChartMetric(
-      label: _labelSprint10, unit: 's', extractor: _extractSprint10),
-  _ChartMetric(
-      label: _labelSprint20, unit: 's', extractor: _extractSprint20),
-  _ChartMetric(
-      label: _labelSprint30, unit: 's', extractor: _extractSprint30),
-  _ChartMetric(
-      label: _labelSprint40, unit: 's', extractor: _extractSprint40),
-  _ChartMetric(
-      label: _labelSquat1rm, unit: 'kg', extractor: _extractSquat1rm),
-  _ChartMetric(
-      label: _labelBench1rm, unit: 'kg', extractor: _extractBench1rm),
+  _ChartMetric(label: _labelSprint10, unit: 's', extractor: _extractSprint10),
+  _ChartMetric(label: _labelSprint20, unit: 's', extractor: _extractSprint20),
+  _ChartMetric(label: _labelSprint30, unit: 's', extractor: _extractSprint30),
+  _ChartMetric(label: _labelSprint40, unit: 's', extractor: _extractSprint40),
+  _ChartMetric(label: _labelSquat1rm, unit: 'kg', extractor: _extractSquat1rm),
+  _ChartMetric(label: _labelBench1rm, unit: 'kg', extractor: _extractBench1rm),
   _ChartMetric(
       label: _labelDeadlift1rm, unit: 'kg', extractor: _extractDeadlift1rm),
   _ChartMetric(
@@ -69,8 +61,7 @@ const _kAllMetrics = <_ChartMetric>[
       label: _labelCourseNavette,
       unit: 'nivel',
       extractor: _extractCourseNavette),
-  _ChartMetric(
-      label: _labelCooper, unit: 'm', extractor: _extractCooper),
+  _ChartMetric(label: _labelCooper, unit: 'm', extractor: _extractCooper),
   _ChartMetric(
       label: _labelSitAndReach, unit: 'cm', extractor: _extractSitAndReach),
 ];

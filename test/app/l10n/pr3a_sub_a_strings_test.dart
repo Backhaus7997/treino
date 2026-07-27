@@ -58,19 +58,23 @@ void main() {
       expect(l10n.profileEditPersonalNameMaxLength, 'Máximo 50 caracteres');
     });
 
-    testWidgets('profileEditPersonalWeightInvalidNumber verbatim', (tester) async {
+    testWidgets('profileEditPersonalWeightInvalidNumber verbatim',
+        (tester) async {
       final l10n = await _pumpAndGetL10n(tester);
-      expect(l10n.profileEditPersonalWeightInvalidNumber, 'Ingresá un número válido');
+      expect(l10n.profileEditPersonalWeightInvalidNumber,
+          'Ingresá un número válido');
     });
 
     testWidgets('profileEditPersonalWeightOutOfRange verbatim', (tester) async {
       final l10n = await _pumpAndGetL10n(tester);
-      expect(l10n.profileEditPersonalWeightOutOfRange, 'Ingresá un peso entre 30 y 300 kg');
+      expect(l10n.profileEditPersonalWeightOutOfRange,
+          'Ingresá un peso entre 30 y 300 kg');
     });
 
     testWidgets('profileEditPersonalHeightOutOfRange verbatim', (tester) async {
       final l10n = await _pumpAndGetL10n(tester);
-      expect(l10n.profileEditPersonalHeightOutOfRange, 'Ingresá una altura entre 120 y 230 cm');
+      expect(l10n.profileEditPersonalHeightOutOfRange,
+          'Ingresá una altura entre 120 y 230 cm');
     });
 
     // eliminar_cuenta_sheet.dart — 9 keys
@@ -115,7 +119,8 @@ void main() {
 
     testWidgets('eliminarCuentaSheetLoadingSubtitle verbatim', (tester) async {
       final l10n = await _pumpAndGetL10n(tester);
-      expect(l10n.eliminarCuentaSheetLoadingSubtitle, 'Esto puede tardar unos segundos.');
+      expect(l10n.eliminarCuentaSheetLoadingSubtitle,
+          'Esto puede tardar unos segundos.');
     });
 
     testWidgets('eliminarCuentaSheetErrorFallback verbatim', (tester) async {
@@ -152,7 +157,8 @@ void main() {
       expect(l10n.dashboardStatCanceladas, 'CANCELADAS');
     });
 
-    testWidgets('dashboardProximasSesionesSectionLabel verbatim', (tester) async {
+    testWidgets('dashboardProximasSesionesSectionLabel verbatim',
+        (tester) async {
       final l10n = await _pumpAndGetL10n(tester);
       expect(l10n.dashboardProximasSesionesSectionLabel, 'PRÓXIMAS SESIONES');
     });
@@ -172,7 +178,8 @@ void main() {
       expect(l10n.dashboardDejarFeedbackLabel, 'Dejar feedback');
     });
 
-    testWidgets('dashboardActividadRecienteSectionLabel verbatim', (tester) async {
+    testWidgets('dashboardActividadRecienteSectionLabel verbatim',
+        (tester) async {
       final l10n = await _pumpAndGetL10n(tester);
       expect(l10n.dashboardActividadRecienteSectionLabel, 'ACTIVIDAD RECIENTE');
     });

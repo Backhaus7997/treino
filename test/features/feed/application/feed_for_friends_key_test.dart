@@ -65,10 +65,10 @@ void main() {
       final keyFromFirstEmission = friendUidsKey(['u2', 'u3']);
       final keyFromSecondEmission = friendUidsKey(['u3', 'u2']);
 
-      final first =
-          await container.read(feedForFriendsProvider(keyFromFirstEmission).future);
-      final second =
-          await container.read(feedForFriendsProvider(keyFromSecondEmission).future);
+      final first = await container
+          .read(feedForFriendsProvider(keyFromFirstEmission).future);
+      final second = await container
+          .read(feedForFriendsProvider(keyFromSecondEmission).future);
 
       expect(first, equals(posts));
       expect(second, equals(posts));

@@ -23,7 +23,8 @@ final myFriendsFeedProvider = FutureProvider<List<Post>>((ref) async {
   // propios posts privacy=friends. La regla de posts ya permite leer los
   // propios (request.auth.uid == authorUid), así que la query no falla.
   final authorUids = <String>{...friendUids, auth.uid}.toList();
-  return await ref.watch(feedForFriendsProvider(friendUidsKey(authorUids)).future);
+  return await ref
+      .watch(feedForFriendsProvider(friendUidsKey(authorUids)).future);
 });
 
 /// Returns the gym-privacy feed for the current user's gym.

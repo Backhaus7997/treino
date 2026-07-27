@@ -69,7 +69,8 @@ void main() {
       final activeOnly =
           await container.read(currentAthleteLinkProvider.future);
       expect(activeOnly, isNull,
-          reason: 'currentAthleteLinkProvider conserva su semántica active-only');
+          reason:
+              'currentAthleteLinkProvider conserva su semántica active-only');
     });
 
     test('expone un link PAUSED (y el active-only devuelve null)', () async {

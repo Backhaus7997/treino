@@ -125,9 +125,19 @@ void main() {
       addTearDown(container.dispose);
 
       // Espera a que el merge tenga AMBOS orígenes (Q1 puede emitir antes que Q2).
-      final result = await container
-          .read(measurementsForAthleteProvider('athleteX').stream)
-          .firstWhere((list) => list.length == 2);
+      final bothSources = Completer<List<Measurement>>();
+      final sub = container.listen(
+        measurementsForAthleteProvider('athleteX'),
+        (_, next) {
+          final list = next.valueOrNull;
+          if (list != null && list.length == 2 && !bothSources.isCompleted) {
+            bothSources.complete(list);
+          }
+        },
+        fireImmediately: true,
+      );
+      addTearDown(sub.close);
+      final result = await bothSources.future;
 
       expect(
           result.map((m) => m.recordedBy), ['coach', 'athleteX']); // asc fecha

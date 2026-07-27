@@ -4108,8 +4108,9 @@ class _NuevaMedicionField extends StatelessWidget {
           if (s.isEmpty) return null; // opcional
           final parsed = double.tryParse(s);
           if (parsed == null) return 'Número inválido'; // i18n: Fase W2
-          if (parsed < 0 || parsed > 500)
+          if (parsed < 0 || parsed > 500) {
             return 'Fuera de rango'; // i18n: Fase W2
+          }
           return null;
         },
       ),

@@ -54,7 +54,8 @@ void main() {
 
     testWidgets('profileEditTrainerTitleOnboarding verbatim', (tester) async {
       final l10n = await _pumpAndGetL10n(tester);
-      expect(l10n.profileEditTrainerTitleOnboarding, 'Completá tu perfil profesional');
+      expect(l10n.profileEditTrainerTitleOnboarding,
+          'Completá tu perfil profesional');
     });
 
     testWidgets('profileEditTrainerSaveSuccess verbatim', (tester) async {
@@ -64,17 +65,22 @@ void main() {
 
     testWidgets('profileEditTrainerSaveError verbatim', (tester) async {
       final l10n = await _pumpAndGetL10n(tester);
-      expect(l10n.profileEditTrainerSaveError, 'No pudimos guardar. Probá de nuevo.');
+      expect(l10n.profileEditTrainerSaveError,
+          'No pudimos guardar. Probá de nuevo.');
     });
 
-    testWidgets('profileEditTrainerValidationSpecialty verbatim', (tester) async {
+    testWidgets('profileEditTrainerValidationSpecialty verbatim',
+        (tester) async {
       final l10n = await _pumpAndGetL10n(tester);
-      expect(l10n.profileEditTrainerValidationSpecialty, 'Elegí una especialidad.');
+      expect(l10n.profileEditTrainerValidationSpecialty,
+          'Elegí una especialidad.');
     });
 
-    testWidgets('profileEditTrainerValidationLocation verbatim', (tester) async {
+    testWidgets('profileEditTrainerValidationLocation verbatim',
+        (tester) async {
       final l10n = await _pumpAndGetL10n(tester);
-      expect(l10n.profileEditTrainerValidationLocation, 'Agregá al menos una ubicación o activá clases virtuales.');
+      expect(l10n.profileEditTrainerValidationLocation,
+          'Agregá al menos una ubicación o activá clases virtuales.');
     });
 
     // athlete_detail_screen.dart (~7 keys)
@@ -85,7 +91,8 @@ void main() {
 
     testWidgets('athleteDetailProfileLoadError verbatim', (tester) async {
       final l10n = await _pumpAndGetL10n(tester);
-      expect(l10n.athleteDetailProfileLoadError, 'No pudimos cargar este perfil.');
+      expect(
+          l10n.athleteDetailProfileLoadError, 'No pudimos cargar este perfil.');
     });
 
     testWidgets('athleteDetailPlanDeleteTitle verbatim', (tester) async {
@@ -156,7 +163,8 @@ void main() {
 
     testWidgets('newSessionSheetDurationError verbatim', (tester) async {
       final l10n = await _pumpAndGetL10n(tester);
-      expect(l10n.newSessionSheetDurationError, 'Ingresá una duración válida (5–480 min).');
+      expect(l10n.newSessionSheetDurationError,
+          'Ingresá una duración válida (5–480 min).');
     });
 
     testWidgets('newSessionSheetNoActiveAthletes verbatim', (tester) async {

@@ -104,8 +104,8 @@ final visiblePostsByAuthorProvider =
       ).future,
     );
     if (friendship?.status == FriendshipStatus.accepted) {
-      visible
-          .addAll(await repo.byAuthorAndPrivacy(targetUid, PostPrivacy.friends));
+      visible.addAll(
+          await repo.byAuthorAndPrivacy(targetUid, PostPrivacy.friends));
     }
 
     // Gym tier — queried constrained to the viewer's own gym, so every returned

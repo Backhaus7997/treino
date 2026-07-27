@@ -35,11 +35,9 @@ void main() {
     repo = AvailabilityRepository(firestore: firestore);
   });
 
-  Future<bool> docExists() async => (await firestore
-          .collection('coach_availability_rules')
-          .doc('r1')
-          .get())
-      .exists;
+  Future<bool> docExists() async =>
+      (await firestore.collection('coach_availability_rules').doc('r1').get())
+          .exists;
 
   group('addRule rejects non-bookable windows', () {
     test('end before start throws and persists nothing', () async {

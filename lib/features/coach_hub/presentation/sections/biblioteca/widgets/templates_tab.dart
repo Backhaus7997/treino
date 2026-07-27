@@ -197,7 +197,8 @@ Future<void> _deleteTemplate(
     );
   } catch (_) {
     messenger.showSnackBar(
-      const SnackBar(content: Text('No pudimos eliminar la plantilla.')), // i18n
+      const SnackBar(
+          content: Text('No pudimos eliminar la plantilla.')), // i18n
     );
   }
 }

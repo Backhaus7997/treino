@@ -125,8 +125,7 @@ void main() {
 
     // SCENARIO-322: accept() flips status to accepted (counter maintenance moved
     // to the maintainFollowCounters Cloud Function).
-    test(
-        'SCENARIO-322: accept() flips friendship status to accepted',
+    test('SCENARIO-322: accept() flips friendship status to accepted',
         () async {
       await seedFriendshipForAccept(
         id: 'aaa_bbb',
@@ -564,9 +563,7 @@ void main() {
   // Privacy — auto-accept path when target is public
   // ---------------------------------------------------------------------------
   group('FriendshipRepository.request — auto-accept path', () {
-    test(
-        'otherIsPublic: true → doc is created directly as accepted',
-        () async {
+    test('otherIsPublic: true → doc is created directly as accepted', () async {
       final autoRepo = FriendshipRepository(firestore: firestore);
       final friendship =
           await autoRepo.request('bbb', 'aaa', otherIsPublic: true);
@@ -578,8 +575,7 @@ void main() {
       expect(friendship.status, equals(FriendshipStatus.accepted));
     });
 
-    test(
-        'otherIsPublic: false (default) → doc is created as pending',
+    test('otherIsPublic: false (default) → doc is created as pending',
         () async {
       final autoRepo = FriendshipRepository(firestore: firestore);
 
@@ -595,10 +591,8 @@ void main() {
         'recreated', () async {
       final autoRepo = FriendshipRepository(firestore: firestore);
 
-      final first =
-          await autoRepo.request('bbb', 'aaa', otherIsPublic: true);
-      final second =
-          await autoRepo.request('bbb', 'aaa', otherIsPublic: true);
+      final first = await autoRepo.request('bbb', 'aaa', otherIsPublic: true);
+      final second = await autoRepo.request('bbb', 'aaa', otherIsPublic: true);
 
       // Idempotent: same doc id, still accepted, no duplicate created.
       expect(second.id, equals(first.id));
