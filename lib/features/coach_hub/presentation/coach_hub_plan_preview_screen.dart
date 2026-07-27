@@ -16,6 +16,7 @@ import '../../coach/domain/trainer_link_status.dart';
 import '../../profile/application/user_providers.dart';
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../profile/domain/experience_level.dart';
+import '../../workout/application/exercise_filter.dart';
 import '../../workout/application/exercise_providers.dart';
 import '../../workout/domain/exercise.dart';
 import '../../workout/domain/muscle_group.dart';
@@ -775,17 +776,20 @@ class _ExercisePickerSheetState extends State<_ExercisePickerSheet> {
     super.dispose();
   }
 
+  /// Same predicate as the catalog picker and the Coach Hub web dialog
+  /// (tokenized, diacritic-tolerant, name + aliases). The old raw
+  /// `muscleGroup` substring match is gone on purpose: it compared against
+  /// the internal English key ('chest', …) that the Spanish UI never shows.
   List<Exercise> get _filtered {
-    final q = _query.toLowerCase().trim();
-    if (q.isEmpty) return widget.exercises;
-    return widget.exercises.where((e) {
-      if (e.name.toLowerCase().contains(q)) return true;
-      if (e.muscleGroup.toLowerCase().contains(q)) return true;
-      for (final alias in e.aliases) {
-        if (alias.toLowerCase().contains(q)) return true;
-      }
-      return false;
-    }).toList();
+    if (_query.trim().isEmpty) return widget.exercises;
+    return widget.exercises
+        .where((e) => exerciseMatchesFilters(
+              e,
+              query: _query,
+              muscles: const {},
+              equipment: const {},
+            ))
+        .toList();
   }
 
   @override
