@@ -1912,7 +1912,7 @@
       "pagos": { "type": "int" }
     }
   },
-  "dashboardQuickActionNuevoAlumno": "+ Nuevo alumno",
+  "dashboardQuickActionNuevoAlumno": "Nuevo alumno",
   "@dashboardQuickActionNuevoAlumno": {
     "description": "Quick action button label in the Coach Hub web dashboard WelcomeCard to navigate to the alumnos section."
   },
