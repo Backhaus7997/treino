@@ -130,7 +130,8 @@ void main() {
       expect(
         button.onPressed,
         isNull,
-        reason: 'sin sets logueados la sesión no está completa → botón inactivo',
+        reason:
+            'sin sets logueados la sesión no está completa → botón inactivo',
       );
     });
 
@@ -171,9 +172,10 @@ void main() {
       expect(notifier.loggedSets.single.setNumber, 1);
 
       // 2) El bloque se marca completo: colapsa al resumen "1/1" con el nombre
-      //    tachado (_CompletedBlockSummary).
+      //    tachado (_CompletedBlockSummary). El layout ampliado del player
+      //    renderiza los nombres en UPPERCASE (heading condensed).
       expect(find.text('1/1'), findsOneWidget);
-      final nameText = tester.widget<Text>(find.text('Plancha'));
+      final nameText = tester.widget<Text>(find.text('PLANCHA'));
       expect(nameText.style?.decoration, TextDecoration.lineThrough);
 
       // 3) TERMINAR SESIÓN habilitado (isFullyCompleted == true).
