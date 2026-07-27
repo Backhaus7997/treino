@@ -14,6 +14,7 @@ import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
+import 'package:treino/features/workout/application/user_routines_providers.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/presentation/routine_detail_screen.dart';
 import 'package:treino/features/workout/presentation/widgets/historial_section.dart';
