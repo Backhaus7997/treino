@@ -15,6 +15,8 @@ import '../../../core/utils/kg_format.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../coach/presentation/widgets/exercise_picker_sheet.dart';
+import '../../profile/application/user_providers.dart'
+    show userProfileProvider, userRepositoryProvider;
 import '../../profile/domain/experience_level.dart';
 import '../application/routine_providers.dart' show routineRepositoryProvider;
 import '../application/session_providers.dart' show currentUidProvider;
@@ -1470,7 +1472,31 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                 : RoutineVisibility.private,
             numWeeks: _numWeeks,
           );
-          await repo.createUserOwned(uid: uid, draft: draft);
+          final created = await repo.createUserOwned(uid: uid, draft: draft);
+          // The mounted-guard must run BEFORE touching `ref` again: a back
+          // gesture during the create (canPop is true — _isDirty was cleared
+          // at the top of _submit) disposes this element and ref.read would
+          // throw. Returning early skips activation; the lazy adoption in
+          // unifiedRoutinesProvider heals it on next listing.
+          if (!mounted) return;
+          // Auto-activa (workout redesign slice 1): the freshly created
+          // routine becomes the active one ONLY when the athlete has no
+          // active routine yet — an existing marker is never stolen. When
+          // the profile isn't loaded yet the write is skipped; lazy
+          // adoption covers that case too.
+          final profileAsync = ref.read(userProfileProvider);
+          final profile = profileAsync.valueOrNull;
+          final hasActive = profile?.activeRoutineId?.isNotEmpty ?? false;
+          if (profileAsync.hasValue && profile != null && !hasActive) {
+            try {
+              await ref.read(userRepositoryProvider).update(uid, {
+                'activeRoutineId': created.id,
+              });
+            } catch (_) {
+              // Best-effort: activation must not fail an already-successful
+              // create; lazy adoption retries while the marker stays null.
+            }
+          }
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(l10n.workoutSelfEditorSuccess)),

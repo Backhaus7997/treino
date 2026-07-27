@@ -6,9 +6,8 @@ import '../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../profile/application/user_providers.dart';
 import '../profile/domain/user_role.dart';
 import 'presentation/widgets/historial_section.dart';
-import 'presentation/widgets/mi_plan_section.dart';
-import 'presentation/widgets/mis_rutinas_section.dart';
 import 'presentation/widgets/plantillas_section.dart';
+import 'presentation/widgets/rutinas_section.dart';
 import 'presentation/widgets/trainer_templates_section.dart';
 import 'trainer_workout_view.dart';
 
@@ -38,8 +37,8 @@ class WorkoutScreen extends ConsumerWidget {
   }
 }
 
-/// Athlete workout body — assigned plan, trainer templates, own routines,
-/// public catalog, and session history.
+/// Athlete workout body — unified routines list (coach plans pinned + own),
+/// trainer templates, public catalog, and session history.
 class _AthleteWorkout extends StatelessWidget {
   const _AthleteWorkout();
 
@@ -58,37 +57,31 @@ class _AthleteWorkout extends StatelessWidget {
         ),
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
+          // Unified RUTINAS list (workout-area redesign slice 1): merges the
+          // former "Mi plan" (trainer-assigned) + "Mis rutinas" (self-made)
+          // sections — coach plans pinned on top with their own chip.
           TreinoFadeSlideIn(
             delay: AppMotion.stagger(0),
-            child: const MiPlanSection(),
+            child: const RutinasSection(),
           ),
           const SizedBox(height: 12),
           // Trainer-shared templates surface — invisible if the athlete has
-          // no active link or the trainer hasn't opted in. Sits between
-          // "Mi plan" (their assigned routine) and "Plantillas" (catalog)
-          // because conceptually it's still "stuff your trainer made for
-          // you", just non-assigned.
+          // no active link or the trainer hasn't opted in. Sits between the
+          // unified routines list and "Plantillas" (catalog) because
+          // conceptually it's still "stuff your trainer made for you", just
+          // non-assigned.
           TreinoFadeSlideIn(
             delay: AppMotion.stagger(1),
             child: const TrainerTemplatesSection(),
           ),
           const SizedBox(height: 12),
-          // Athlete-authored routines (athlete-self-routines SDD).
-          // Belongs after TrainerTemplates because both are "my plans"
-          // (trainer-sourced first, then self-made), then the public
-          // catalog Plantillas, then Historial.
           TreinoFadeSlideIn(
             delay: AppMotion.stagger(2),
-            child: const MisRutinasSection(),
-          ),
-          const SizedBox(height: 12),
-          TreinoFadeSlideIn(
-            delay: AppMotion.stagger(3),
             child: const PlantillasSection(),
           ),
           const SizedBox(height: 12),
           TreinoFadeSlideIn(
-            delay: AppMotion.stagger(4),
+            delay: AppMotion.stagger(3),
             child: const HistorialSection(),
           ),
         ],

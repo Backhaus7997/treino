@@ -710,5 +710,6 @@
   "insightsTileVolumeByGroupTitle": "Volumen por grupo",
   "insightsTileVolumeByGroupSubtitle": "Sets vs. objetivo por grupo muscular",
   "volumeByGroupScreenTitle": "VOLUMEN POR GRUPO",
-  "volumeByGroupEmptyTarget": "Necesitás una rutina asignada para ver tu volumen objetivo."
+  "volumeByGroupEmptyTarget": "Necesitás una rutina asignada para ver tu volumen objetivo.",
+  "workoutRutinasCoachChip": "DE TU COACH"
 }

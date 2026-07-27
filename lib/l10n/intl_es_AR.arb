@@ -310,6 +310,10 @@
   "workoutMisRutinasConfirmConfirm": "ELIMINAR",
   "workoutMisRutinasArchiveSuccess": "Rutina eliminada",
   "workoutMisRutinasArchiveError": "No pudimos eliminar la rutina. Reintentá.",
+  "workoutRutinasCoachChip": "DE TU COACH",
+  "@workoutRutinasCoachChip": {
+    "description": "Chip pinned on trainer-assigned routine cards in the unified RUTINAS list (workout tab + /profile/routines mirror). Same pill anatomy as workoutMisRutinasActiveChip, highlight color. Workout-area redesign slice 1."
+  },
   "workoutSplitFallback": "Sin split",
   "workoutPickerMuscleFilter": "Músculos",
   "workoutPickerEquipmentFilter": "Equipamiento",
