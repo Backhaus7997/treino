@@ -1398,7 +1398,7 @@ void main() {
     testWidgets(
         'con setLogs → picker + chart renderizan (SCENARIO-PROG-11A / REQ-PROG-11)',
         (tester) async {
-      final entry = const ExerciseListEntry(
+      const entry = ExerciseListEntry(
         exerciseId: 'squat',
         exerciseName: 'Sentadilla',
       );

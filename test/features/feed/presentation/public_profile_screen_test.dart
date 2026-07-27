@@ -1,9 +1,9 @@
 import 'dart:async';
+import 'dart:ui' show Tristate;
 
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' show User;
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart' show SemanticsFlag;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -109,7 +109,8 @@ void main() {
       // That is the screen's Scaffold plus the outer test wrapper's = 2.
       expect(find.byType(Scaffold), findsNWidgets(2));
       expect(find.byType(AppBar), findsOneWidget);
-      expect(find.byType(BackButton), findsNothing); // custom leading, not default
+      expect(
+          find.byType(BackButton), findsNothing); // custom leading, not default
       expect(find.widgetWithIcon(IconButton, TreinoIcon.back), findsOneWidget);
       // Still does NOT introduce its own AppBackground — it composites over the
       // shell's AppBackground via the transparent Scaffold/AppBar. (The AppBar
@@ -237,8 +238,7 @@ void main() {
       expect(find.byType(PublicProfileFollowButton), findsOneWidget);
     });
 
-    testWidgets(
-        'private + accepted follower → shows tabs (gate lifted)',
+    testWidgets('private + accepted follower → shows tabs (gate lifted)',
         (tester) async {
       await tester.pumpWidget(_wrap(
         child: const PublicProfileScreen(targetUid: 'target'),
@@ -253,8 +253,7 @@ void main() {
       expect(find.text('ACTIVIDAD'), findsOneWidget);
     });
 
-    testWidgets(
-        'private + isSelf → shows tabs (owner always sees own profile)',
+    testWidgets('private + isSelf → shows tabs (owner always sees own profile)',
         (tester) async {
       await tester.pumpWidget(_wrap(
         child: const PublicProfileScreen(targetUid: 'target'),
@@ -266,9 +265,7 @@ void main() {
       expect(find.text('RUTINAS PÚBLICAS'), findsOneWidget);
     });
 
-    testWidgets(
-        'public + non-follower → shows tabs (no gate)',
-        (tester) async {
+    testWidgets('public + non-follower → shows tabs (no gate)', (tester) async {
       await tester.pumpWidget(_wrap(
         child: const PublicProfileScreen(targetUid: 'target'),
         view: AsyncData(_view(isPublic: true, friendship: null)),
@@ -311,7 +308,7 @@ void main() {
       final finder = find.bySemanticsLabel('Mensaje');
       if (finder.evaluate().isEmpty) return false;
       final node = tester.getSemantics(finder);
-      return node.hasFlag(SemanticsFlag.isEnabled);
+      return node.flagsCollection.isEnabled == Tristate.isTrue;
     }
 
     testWidgets(
@@ -343,9 +340,7 @@ void main() {
       expect(messageButtonSemanticEnabled(tester), isFalse);
     });
 
-    testWidgets(
-        'accepted friendship → MENSAJE is enabled',
-        (tester) async {
+    testWidgets('accepted friendship → MENSAJE is enabled', (tester) async {
       await tester.pumpWidget(_wrap(
         child: const PublicProfileScreen(targetUid: 'target'),
         view: AsyncData(_view(friendship: acceptedFriendship())),
@@ -356,8 +351,7 @@ void main() {
       expect(messageButtonSemanticEnabled(tester), isTrue);
     });
 
-    testWidgets(
-        'isSelf → MENSAJE row is not rendered at all (own profile)',
+    testWidgets('isSelf → MENSAJE row is not rendered at all (own profile)',
         (tester) async {
       await tester.pumpWidget(_wrap(
         child: const PublicProfileScreen(targetUid: 'target'),
