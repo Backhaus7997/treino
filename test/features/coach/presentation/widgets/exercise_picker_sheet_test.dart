@@ -187,6 +187,21 @@ void main() {
       // Sentadilla visible
       expect(find.text('Sentadilla con Barra'), findsOneWidget);
     });
+
+    testWidgets(
+        'tokenized search: "press banca" finds the exercise without the '
+        'connector "de"', (tester) async {
+      await _openPicker(tester);
+
+      await tester.enterText(find.byType(TextField).first, 'press banca');
+      await tester.pumpAndSettle();
+
+      // Every word matches "Press de Banca" (any order, "de" omitted)…
+      expect(find.text('Press de Banca'), findsOneWidget);
+      // …while exercises matching only ONE of the words stay hidden.
+      expect(find.text('Press Inclinado con Mancuerna'), findsNothing);
+      expect(find.text('Sentadilla con Barra'), findsNothing);
+    });
   });
 
   group('ExercisePickerSheet — muscle filter (granular + secondary)', () {

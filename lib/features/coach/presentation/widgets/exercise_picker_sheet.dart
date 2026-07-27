@@ -32,8 +32,9 @@ import 'muscle_filter_sheet.dart';
 ///
 /// ADR-RER-01, REQ-RER-001..004, REQ-RER-017.
 ///
-/// Search uses [foldSearch] from `exercise_filter.dart` — lowercases and
-/// strips Spanish diacritics (ADR-BIBW-01 extraction).
+/// Search uses [exerciseMatchesFilters] from `exercise_filter.dart` — folds
+/// case/diacritics and tokenizes multi-word queries: every word must appear
+/// in the name, in any order ("press banca" → "Press de Banca (Barra)").
 
 Future<List<Exercise>?> showExercisePicker(
   BuildContext context, {

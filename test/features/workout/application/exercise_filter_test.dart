@@ -161,6 +161,97 @@ void main() {
         isTrue,
       );
     });
+
+    test('multi-word query skips connectors — "press banca"', () {
+      // The catalogue name is "Press de Banca"; the query omits the "de".
+      expect(
+        exerciseMatchesFilters(
+          _bench,
+          query: 'press banca',
+          muscles: const {},
+          equipment: const {},
+        ),
+        isTrue,
+      );
+    });
+
+    test('multi-word query is order-independent — "banca press"', () {
+      expect(
+        exerciseMatchesFilters(
+          _bench,
+          query: 'banca press',
+          muscles: const {},
+          equipment: const {},
+        ),
+        isTrue,
+      );
+    });
+
+    test('multi-word query folds case and accents per token', () {
+      // "BICEPS curl" (no accent, reversed order) → "Curl de Bíceps"
+      expect(
+        exerciseMatchesFilters(
+          _curl,
+          query: 'BICEPS curl',
+          muscles: const {},
+          equipment: const {},
+        ),
+        isTrue,
+      );
+    });
+
+    test('multi-word query fails when ANY word is missing', () {
+      expect(
+        exerciseMatchesFilters(
+          _bench,
+          query: 'press sentadilla',
+          muscles: const {},
+          equipment: const {},
+        ),
+        isFalse,
+      );
+    });
+
+    test('tokens must all hit the SAME field — no name+alias cross-match', () {
+      // "mancuerna" only appears in the name ("Remo con Mancuerna") and
+      // "unilateral" only in the alias ("remo unilateral"): neither field
+      // contains ALL tokens, so the exercise must NOT match. Pins the
+      // single-field rule documented on [exerciseMatchesFilters].
+      expect(
+        exerciseMatchesFilters(
+          _remo,
+          query: 'mancuerna unilateral',
+          muscles: const {},
+          equipment: const {},
+        ),
+        isFalse,
+      );
+    });
+
+    test('all tokens within a single alias match — "unilateral remo"', () {
+      // Alias is "remo unilateral"; both tokens hit it, reversed order.
+      expect(
+        exerciseMatchesFilters(
+          _remo,
+          query: 'unilateral remo',
+          muscles: const {},
+          equipment: const {},
+        ),
+        isTrue,
+      );
+    });
+
+    test('extra whitespace between tokens is tolerated', () {
+      expect(
+        exerciseMatchesFilters(
+          _bench,
+          query: '  press   banca  ',
+          muscles: const {},
+          equipment: const {},
+        ),
+        isTrue,
+      );
+    });
   });
 
   // ── exerciseMatchesFilters — muscle filter ────────────────────────────────
