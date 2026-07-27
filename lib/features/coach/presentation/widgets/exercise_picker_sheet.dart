@@ -604,6 +604,22 @@ class _ExerciseThumbnail extends StatelessWidget {
     );
     // 68px (antes 44): con foto real (#565) el círculo chico no dejaba
     // apreciar el ejercicio (pedido de producto 2026-07-24).
+    // ListTile constriñe el leading a 56px de alto (maxHeight fija del SDK,
+    // list_tile.dart) y aplastaba el círculo en elipse 68x56: el OverflowBox
+    // reporta el alto constreñido al tile pero pinta el 68x68 real, centrado.
+    return SizedBox(
+      width: 68,
+      child: OverflowBox(
+        minWidth: 68,
+        maxWidth: 68,
+        minHeight: 68,
+        maxHeight: 68,
+        child: _buildCircle(fallbackIcon),
+      ),
+    );
+  }
+
+  Widget _buildCircle(Icon fallbackIcon) {
     return SizedBox(
       width: 68,
       height: 68,
