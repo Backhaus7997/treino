@@ -1472,6 +1472,12 @@ abstract class AppL10n {
   /// **'No pudimos eliminar la rutina. Reintentá.'**
   String get workoutMisRutinasArchiveError;
 
+  /// Chip pinned on trainer-assigned routine cards in the unified RUTINAS list (workout tab + /profile/routines mirror). Same pill anatomy as workoutMisRutinasActiveChip, highlight color. Workout-area redesign slice 1.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DE TU COACH'**
+  String get workoutRutinasCoachChip;
+
   /// No description provided for @workoutSplitFallback.
   ///
   /// In es_AR, this message translates to:

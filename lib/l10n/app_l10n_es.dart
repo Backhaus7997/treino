@@ -757,6 +757,9 @@ class AppL10nEs extends AppL10n {
       'No pudimos eliminar la rutina. Reintentá.';
 
   @override
+  String get workoutRutinasCoachChip => 'DE TU COACH';
+
+  @override
   String get workoutSplitFallback => 'Sin split';
 
   @override
@@ -3792,6 +3795,9 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get workoutMisRutinasArchiveError =>
       'No pudimos eliminar la rutina. Reintentá.';
+
+  @override
+  String get workoutRutinasCoachChip => 'DE TU COACH';
 
   @override
   String get workoutSplitFallback => 'Sin split';

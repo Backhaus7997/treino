@@ -17,7 +17,7 @@ import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/presentation/routine_detail_screen.dart';
 import 'package:treino/features/workout/presentation/widgets/historial_section.dart';
-import 'package:treino/features/workout/presentation/widgets/mi_plan_section.dart';
+import 'package:treino/features/workout/presentation/widgets/rutinas_section.dart';
 import 'package:treino/features/workout/presentation/widgets/plantillas_section.dart';
 import 'package:treino/features/workout/trainer_workout_view.dart';
 import 'package:treino/features/workout/workout_screen.dart';
@@ -53,11 +53,13 @@ Widget _wrapWorkout(Widget w, {List<Override> overrides = const []}) =>
       overrides: [
         currentUidProvider.overrideWithValue('test-uid'),
         sessionsByUidProvider.overrideWith((ref, uid) async => []),
-        // MiPlanSection: return null user → section renders SizedBox.shrink.
-        // Tests that only care about PLANTILLAS / HISTORIAL order don't need
-        // the full MiPlanSection provider stack.
+        // RutinasSection: resolve the unified list to empty so tests that
+        // only care about PLANTILLAS / HISTORIAL don't need a full stack.
         authStateChangesProvider.overrideWith((ref) => const Stream.empty()),
         currentAthleteLinkProvider.overrideWith((ref) async => null),
+        assignedRoutinesProvider('test-uid').overrideWith((ref) async => []),
+        userCreatedRoutinesProvider('test-uid')
+            .overrideWith((ref) => Stream.value(const <Routine>[])),
         ...overrides,
       ],
       child: MaterialApp(
@@ -186,48 +188,41 @@ void main() {
 
   group('WorkoutScreen', () {
     testWidgets(
-        'three sections rendered in order: MI PLAN → PLANTILLAS → HISTORIAL',
+        'three sections rendered in order: RUTINAS → PLANTILLAS → HISTORIAL',
         (tester) async {
       await tester.pumpWidget(
         _wrapWorkout(
           const WorkoutScreen(),
           overrides: [
             routinesProvider.overrideWith((ref) async => []),
-            // Provide a user so MiPlanSection is visible (shows empty state).
-            authStateChangesProvider.overrideWith(
-              (ref) => Stream.value(null),
-            ),
-            assignedRoutinesProvider('').overrideWith((ref) async => []),
           ],
         ),
       );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
 
-      // MiPlanSection renders SizedBox.shrink when uid is null (null User).
-      // Test presence of MiPlanSection widget and remaining sections.
-      expect(find.byType(MiPlanSection), findsOneWidget);
+      // The unified RutinasSection replaces the old MiPlan + MisRutinas pair
+      // (workout redesign slice 1).
+      expect(find.byType(RutinasSection), findsOneWidget);
       expect(find.text('PLANTILLAS'), findsOneWidget);
       expect(find.text('HISTORIAL'), findsOneWidget);
 
-      final miPlanPos = tester.getTopLeft(find.byType(MiPlanSection)).dy;
+      final rutinasPos = tester.getTopLeft(find.byType(RutinasSection)).dy;
       final plantillasPos = tester.getTopLeft(find.text('PLANTILLAS')).dy;
       final historialPos = tester.getTopLeft(find.text('HISTORIAL')).dy;
 
-      expect(miPlanPos, lessThanOrEqualTo(plantillasPos));
+      expect(rutinasPos, lessThanOrEqualTo(plantillasPos));
       expect(plantillasPos, lessThan(historialPos));
     });
 
-    testWidgets('MiPlanSection empty state appears when plans list is empty',
+    testWidgets(
+        'RutinasSection empty state appears when the unified list is empty',
         (tester) async {
       await tester.pumpWidget(
         _wrapWorkout(
           const WorkoutScreen(),
           overrides: [
             routinesProvider.overrideWith((ref) async => []),
-            currentUidProvider.overrideWithValue('athlete-1'),
-            assignedRoutinesProvider('athlete-1')
-                .overrideWith((ref) async => []),
           ],
         ),
       );
@@ -235,7 +230,10 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
 
       expect(
-        find.text('No tenés rutina asignada todavía.'),
+        find.text(
+          'Todavía no creaste ninguna rutina. '
+          'Tocá CREAR RUTINA para armar la primera.',
+        ),
         findsOneWidget,
       );
     });
@@ -344,7 +342,7 @@ void main() {
       expect(find.byType(TabBar), findsNothing);
       expect(find.byType(TabBarView), findsNothing);
       expect(find.text('RANKINGS'), findsNothing);
-      expect(find.byType(MiPlanSection), findsOneWidget);
+      expect(find.byType(RutinasSection), findsOneWidget);
     });
 
     testWidgets('a trainer-role user renders ONLY TrainerWorkoutView',

@@ -1078,5 +1078,6 @@
   "reviewTileDeletedUser": "Deleted user",
   "reviewTileDateToday": "today",
   "reviewTileDateDaysAgo": "{count, plural, =1{1 day} other{{count} days}} ago",
-  "reviewTileDateMonthsAgo": "{count, plural, =1{1 month} other{{count} months}} ago"
+  "reviewTileDateMonthsAgo": "{count, plural, =1{1 month} other{{count} months}} ago",
+  "workoutRutinasCoachChip": "FROM YOUR COACH"
 }

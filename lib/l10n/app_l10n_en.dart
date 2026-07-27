@@ -730,6 +730,9 @@ class AppL10nEn extends AppL10n {
   String get workoutMisRutinasArchiveError => '';
 
   @override
+  String get workoutRutinasCoachChip => 'FROM YOUR COACH';
+
+  @override
   String get workoutSplitFallback => '';
 
   @override
