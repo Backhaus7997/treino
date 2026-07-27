@@ -18,12 +18,12 @@ import '../domain/ranking_dimension.dart';
 /// sub-split squat/bench/deadlift) for the current athlete's gym.
 ///
 /// Placement: `/profile/rankings` is RETIRED as a pushed route and now
-/// redirects to `/workout?tab=rankings` (design `sdd/rankings-v2/design`
-/// AD-3, Phase 3 cleanup). The PRIMARY placement is the second page of the
-/// athlete Entrenar tab (`WorkoutScreen`'s `_RankingsPage`, AD-1/AD-2). This
-/// class is no longer mounted by the router — it is kept as a widget-test
-/// harness (`rankings_screen_test.dart`) that exercises the same
-/// [RankingsBody] both hosts render, so gating/body logic is verified once.
+/// redirects to `/feed?tab=rankings`. The PRIMARY placement is the second
+/// page of the FEED tab (`FeedScreen`'s `_RankingsPage` — relocated there
+/// from the athlete Entrenar tab). This class is no longer mounted by the
+/// router — it is kept as a widget-test harness
+/// (`rankings_screen_test.dart`) that exercises the same [RankingsBody] both
+/// hosts render, so gating/body logic is verified once.
 class RankingsScreen extends StatelessWidget {
   const RankingsScreen({super.key});
 
@@ -33,7 +33,7 @@ class RankingsScreen extends StatelessWidget {
 
 /// The rankings surface body — gym resolution, opt-in gate, leaderboards,
 /// and the slim page header (design AD-7). Composed directly by
-/// [RankingsScreen] (pushed-route placement) and by `WorkoutScreen`'s
+/// [RankingsScreen] (pushed-route placement) and by `FeedScreen`'s
 /// `_RankingsPage` (tab placement, the primary one as of this slice).
 ///
 /// The screen resolves the athlete's `gymId` from [userProfileProvider] —

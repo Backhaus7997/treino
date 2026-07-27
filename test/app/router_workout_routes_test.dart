@@ -4,6 +4,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/treino_bottom_bar.dart';
+import 'package:treino/features/auth/application/auth_providers.dart';
+import 'package:treino/features/feed/feed_screen.dart';
+import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/workout/application/exercise_providers.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
@@ -280,11 +283,13 @@ void main() {
     });
   });
 
-  // ─── /workout?tab= deep-link (rankings-v2 Phase 2, task 2.5) ───────────────
+  // ─── /workout?tab=rankings legacy redirect ────────────────────────────────
   //
-  // Design AD-2: the `/workout` route builder reads `?tab=` and forwards it
-  // as `WorkoutScreen.initialTab`, mirroring the `/coach` builder
-  // (router.dart:467-472) exactly.
+  // Rankings relocated from the Entrenar tab to the FEED tab: the production
+  // `/workout` route keeps a redirect so legacy `?tab=rankings` deep-links
+  // (old bookmarks / notifications) land on `/feed?tab=rankings`, whose
+  // builder forwards the query param as `FeedScreen.initialTab`. The mini
+  // routers below mirror the production wiring in router.dart.
   group('/workout?tab= deep-link', () {
     GoRouter buildRouter() => GoRouter(
           initialLocation: '/start',
@@ -292,81 +297,85 @@ void main() {
             GoRoute(path: '/start', builder: (_, __) => const Text('START')),
             GoRoute(
               path: '/workout',
+              redirect: (_, state) =>
+                  state.uri.queryParameters['tab'] == 'rankings'
+                      ? '/feed?tab=rankings'
+                      : null,
+              pageBuilder: (_, __) =>
+                  const NoTransitionPage(child: WorkoutScreen()),
+            ),
+            GoRoute(
+              path: '/feed',
               pageBuilder: (context, state) {
                 final tab = state.uri.queryParameters['tab'];
-                return NoTransitionPage(
-                  child: WorkoutScreen(initialTab: tab),
-                );
+                return NoTransitionPage(child: FeedScreen(initialTab: tab));
               },
             ),
           ],
         );
 
-    testWidgets(
-        '/workout?tab=rankings builds WorkoutScreen with initialTab: '
-        "'rankings'", (tester) async {
-      final router = buildRouter();
-      await tester.pumpWidget(
-        ProviderScope(
+    Widget wrapRouter(GoRouter router) => ProviderScope(
+          overrides: [
+            currentUidProvider.overrideWithValue(null),
+            authStateChangesProvider.overrideWith((_) => Stream.value(null)),
+            userProfileProvider.overrideWith((_) => Stream.value(null)),
+          ],
           child: MaterialApp.router(
             theme: AppTheme.dark(),
             localizationsDelegates: AppL10n.localizationsDelegates,
             supportedLocales: AppL10n.supportedLocales,
             routerConfig: router,
           ),
-        ),
-      );
+        );
+
+    testWidgets(
+        '/workout?tab=rankings redirects to /feed?tab=rankings and builds '
+        "FeedScreen with initialTab: 'rankings'", (tester) async {
+      final router = buildRouter();
+      await tester.pumpWidget(wrapRouter(router));
 
       router.go('/workout?tab=rankings');
       await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
 
-      final screen = tester.widget<WorkoutScreen>(find.byType(WorkoutScreen));
+      expect(
+        router.routerDelegate.currentConfiguration.uri.toString(),
+        equals('/feed?tab=rankings'),
+      );
+      final screen = tester.widget<FeedScreen>(find.byType(FeedScreen));
       expect(screen.initialTab, equals('rankings'));
     });
 
-    testWidgets(
-        '/workout (no query param) builds WorkoutScreen with initialTab: '
-        'null', (tester) async {
+    testWidgets('/workout (no query param) stays on /workout', (tester) async {
       final router = buildRouter();
-      await tester.pumpWidget(
-        ProviderScope(
-          child: MaterialApp.router(
-            theme: AppTheme.dark(),
-            localizationsDelegates: AppL10n.localizationsDelegates,
-            supportedLocales: AppL10n.supportedLocales,
-            routerConfig: router,
-          ),
-        ),
-      );
+      await tester.pumpWidget(wrapRouter(router));
 
       router.go('/workout');
       await tester.pump();
 
-      final screen = tester.widget<WorkoutScreen>(find.byType(WorkoutScreen));
-      expect(screen.initialTab, isNull);
+      expect(
+        router.routerDelegate.currentConfiguration.uri.toString(),
+        equals('/workout'),
+      );
+      expect(find.byType(WorkoutScreen), findsOneWidget);
     });
   });
 
-  // ─── /profile/rankings redirect (rankings-v2 Phase 3, task 3.3) ───────────
+  // ─── /profile/rankings redirect ───────────────────────────────────────────
   //
-  // Design AD-3: `/profile/rankings` is retired as a pushed route but stays
-  // REGISTERED as a redirect to `/workout?tab=rankings` — a safety net for
-  // any lingering `context.push('/profile/rankings')` call or bookmark, per
-  // spec `gym-rankings` — REMOVED Requirement: Rankings Reachable via
-  // Profile Tile and /profile/rankings (route disposition: redirect, not
-  // hard-remove).
+  // `/profile/rankings` stays REGISTERED as a redirect (safety net for any
+  // lingering `context.push('/profile/rankings')` call or bookmark) — now
+  // pointing at `/feed?tab=rankings`, the rankings' current home.
   group('/profile/rankings redirect', () {
     GoRouter buildRouter() => GoRouter(
           initialLocation: '/start',
           routes: [
             GoRoute(path: '/start', builder: (_, __) => const Text('START')),
             GoRoute(
-              path: '/workout',
+              path: '/feed',
               pageBuilder: (context, state) {
                 final tab = state.uri.queryParameters['tab'];
-                return NoTransitionPage(
-                  child: WorkoutScreen(initialTab: tab),
-                );
+                return NoTransitionPage(child: FeedScreen(initialTab: tab));
               },
             ),
             GoRoute(
@@ -375,7 +384,7 @@ void main() {
               routes: [
                 GoRoute(
                   path: 'rankings',
-                  redirect: (_, __) => '/workout?tab=rankings',
+                  redirect: (_, __) => '/feed?tab=rankings',
                 ),
               ],
             ),
@@ -383,11 +392,16 @@ void main() {
         );
 
     testWidgets(
-        '/profile/rankings redirects to /workout?tab=rankings and builds '
-        'WorkoutScreen with initialTab: \'rankings\'', (tester) async {
+        '/profile/rankings redirects to /feed?tab=rankings and builds '
+        "FeedScreen with initialTab: 'rankings'", (tester) async {
       final router = buildRouter();
       await tester.pumpWidget(
         ProviderScope(
+          overrides: [
+            currentUidProvider.overrideWithValue(null),
+            authStateChangesProvider.overrideWith((_) => Stream.value(null)),
+            userProfileProvider.overrideWith((_) => Stream.value(null)),
+          ],
           child: MaterialApp.router(
             theme: AppTheme.dark(),
             localizationsDelegates: AppL10n.localizationsDelegates,
@@ -399,12 +413,13 @@ void main() {
 
       router.go('/profile/rankings');
       await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
 
       expect(
         router.routerDelegate.currentConfiguration.uri.toString(),
-        equals('/workout?tab=rankings'),
+        equals('/feed?tab=rankings'),
       );
-      final screen = tester.widget<WorkoutScreen>(find.byType(WorkoutScreen));
+      final screen = tester.widget<FeedScreen>(find.byType(FeedScreen));
       expect(screen.initialTab, equals('rankings'));
     });
   });

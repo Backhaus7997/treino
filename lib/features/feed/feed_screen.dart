@@ -8,6 +8,7 @@ import '../../core/widgets/motion/treino_state_switcher.dart';
 import '../../core/widgets/treino_icon.dart';
 import '../../l10n/app_l10n.dart';
 import '../chat/application/chat_providers.dart';
+import '../gym_rankings/presentation/rankings_screen.dart' show RankingsBody;
 import '../workout/application/session_providers.dart' show currentUidProvider;
 import 'application/feed_screen_providers.dart';
 import 'application/friendship_providers.dart';
@@ -18,16 +19,92 @@ import 'presentation/widgets/feed_empty_state.dart';
 import 'presentation/widgets/feed_segment_pills.dart';
 import 'presentation/widgets/post_card.dart';
 
-class FeedScreen extends ConsumerStatefulWidget {
-  const FeedScreen({super.key});
+/// Feed tab — 2-page swipeable surface: "Feed" (page 0, the social feed) +
+/// "Rankings" (page 1, relocated from the Entrenar tab). Same segmented-pill
+/// + [TabBarView] pattern the Entrenar tab used while it hosted rankings:
+/// page 0 keeps its provider subscriptions alive via
+/// [AutomaticKeepAliveClientMixin] while swiped away; page 1's Firestore
+/// leaderboard listeners are `autoDispose` and release on swipe-away.
+class FeedScreen extends StatelessWidget {
+  const FeedScreen({super.key, this.initialTab});
 
-  @override
-  ConsumerState<FeedScreen> createState() => _FeedScreenState();
-}
+  /// Optional initial sub-tab — accepts `'rankings'`. Read from the `?tab=`
+  /// query param by the `/feed` route builder (mirrors `CoachScreen.initialTab`).
+  final String? initialTab;
 
-class _FeedScreenState extends ConsumerState<FeedScreen> {
+  static const _labels = <String>['FEED', 'RANKINGS'];
+
+  static int _resolveInitialIndex(String? tab) => tab == 'rankings' ? 1 : 0;
+
   @override
   Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final theme = Theme.of(context);
+
+    return DefaultTabController(
+      length: _labels.length,
+      initialIndex: _resolveInitialIndex(initialTab),
+      child: Column(
+        children: [
+          // Segmented pill control — same sub-tab language as the Entrenar
+          // tab's former pill and TrainerCoachView's week tabs.
+          Container(
+            margin: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: palette.bgCard,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: palette.textMuted.withValues(alpha: 0.12),
+              ),
+            ),
+            child: TabBar(
+              dividerColor: Colors.transparent,
+              indicatorSize: TabBarIndicatorSize.tab,
+              indicator: BoxDecoration(
+                color: palette.accent,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              splashBorderRadius: BorderRadius.circular(20),
+              labelColor: palette.bg,
+              unselectedLabelColor: palette.textMuted,
+              labelStyle: theme.textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
+              ),
+              tabs: [for (final l in _labels) Tab(text: l, height: 40)],
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Expanded(
+            child: TabBarView(
+              children: [_FeedPage(), _RankingsPage()],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Page 0 — the original feed body (header + segment pills + posts), wrapped
+/// with [AutomaticKeepAliveClientMixin] so its feed providers are NOT rebuilt
+/// when swiping to Rankings and back.
+class _FeedPage extends ConsumerStatefulWidget {
+  const _FeedPage();
+
+  @override
+  ConsumerState<_FeedPage> createState() => _FeedPageState();
+}
+
+class _FeedPageState extends ConsumerState<_FeedPage>
+    with AutomaticKeepAliveClientMixin<_FeedPage> {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
     final segment = ref.watch(feedSegmentProvider);
 
     return Column(
@@ -46,6 +123,19 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
         ),
       ],
     );
+  }
+}
+
+/// Page 1 — thin host for the self-contained rankings surface. Owns its own
+/// slim `RANKINGS` header and all state-branching (no-gym / opted-out /
+/// leaderboards). NOT kept alive — its leaderboard listeners are
+/// `autoDispose` and release on swipe-away.
+class _RankingsPage extends StatelessWidget {
+  const _RankingsPage();
+
+  @override
+  Widget build(BuildContext context) {
+    return const RankingsBody();
   }
 }
 
