@@ -59,6 +59,8 @@
   "@homeEstaSemanaEmptyBody": {"description": "Home 'Esta Semana' card empty-state body copy encouraging the first workout."},
   "homeEstaSemanaEmptyCta": "EXPLORAR RUTINAS  →",
   "@homeEstaSemanaEmptyCta": {"description": "Home 'Esta Semana' card empty-state CTA button navigating to routines."},
+  "homeEstaSemanaInsightsCta": "VER INSIGHTS  →",
+  "@homeEstaSemanaInsightsCta": {"description": "Home 'Esta Semana' card CTA button navigating to the insights hub (/home/insights). The whole card was already tappable but carried no visible affordance, so the destination was undiscoverable."},
   "homeEstaSemanaHeaderPillResume": "A RETOMAR",
   "@homeEstaSemanaHeaderPillResume": {"description": "Home 'Esta Semana' card header pill label when the athlete has history but zero sessions this week (#551)."},
   "homeEstaSemanaResumeTitle": "TU RACHA\nTE ESPERA",
@@ -928,6 +930,10 @@
   "a11yAvatarLabelGeneric": "Foto de perfil",
   "@a11yAvatarLabelGeneric": {
     "description": "Non-parametric avatar Semantics label used when the display name is unavailable/null (findings 4,6,7,16,18,19)."
+  },
+  "a11yHomeAvatarButton": "Ver tu perfil",
+  "@a11yHomeAvatarButton": {
+    "description": "Semantics label for the tappable avatar in the athlete HomeHeader. The avatar is a button that opens the user's own public profile, so the label states the ACTION rather than describing the image (a11yAvatarLabel covers the non-interactive case)."
   },
   "homePendingRequestsA11y": "{count} solicitudes pendientes",
   "@homePendingRequestsA11y": {

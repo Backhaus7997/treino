@@ -95,6 +95,9 @@ class AppL10nEs extends AppL10n {
   String get homeEstaSemanaEmptyCta => 'EXPLORAR RUTINAS  →';
 
   @override
+  String get homeEstaSemanaInsightsCta => 'VER INSIGHTS  →';
+
+  @override
   String get homeEstaSemanaHeaderPillResume => 'A RETOMAR';
 
   @override
@@ -1735,6 +1738,9 @@ class AppL10nEs extends AppL10n {
   String get a11yAvatarLabelGeneric => 'Foto de perfil';
 
   @override
+  String get a11yHomeAvatarButton => 'Ver tu perfil';
+
+  @override
   String homePendingRequestsA11y(int count) {
     return '$count solicitudes pendientes';
   }
@@ -3130,6 +3136,9 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get homeEstaSemanaEmptyCta => 'EXPLORAR RUTINAS  →';
+
+  @override
+  String get homeEstaSemanaInsightsCta => 'VER INSIGHTS  →';
 
   @override
   String get homeEstaSemanaHeaderPillResume => 'A RETOMAR';
@@ -4772,6 +4781,9 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get a11yAvatarLabelGeneric => 'Foto de perfil';
+
+  @override
+  String get a11yHomeAvatarButton => 'Ver tu perfil';
 
   @override
   String homePendingRequestsA11y(int count) {

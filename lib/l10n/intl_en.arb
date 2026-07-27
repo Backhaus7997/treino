@@ -44,6 +44,7 @@
   "homeEstaSemanaEmptyTitle": "YOUR STREAK\nSTARTS HERE",
   "homeEstaSemanaEmptyBody": "Every workout feeds your streak. Do your first one and start building your progress.",
   "homeEstaSemanaEmptyCta": "EXPLORE ROUTINES  →",
+  "homeEstaSemanaInsightsCta": "VIEW INSIGHTS  →",
   "homeEstaSemanaHeaderPillResume": "BACK AT IT",
   "homeEstaSemanaResumeTitle": "YOUR STREAK\nAWAITS",
   "homeEstaSemanaResumeBody": "Your history is already built. This week is still at zero — get back in today and keep adding progress.",
@@ -654,6 +655,7 @@
     }
   },
   "a11yAvatarLabelGeneric": "Profile photo",
+  "a11yHomeAvatarButton": "View your profile",
   "homePendingRequestsA11y": "{count} pending requests",
   "@homePendingRequestsA11y": {
     "placeholders": {

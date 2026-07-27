@@ -81,8 +81,17 @@ class _AthleteHome extends ConsumerWidget {
       },
     );
 
+    // The avatar opens the athlete's OWN public profile. Pushed (not `go`)
+    // so PublicProfileScreen's back affordance — `canPop() ? pop() : go('/feed')`
+    // — pops back to Home instead of falling through to the feed. The
+    // `/home/profile/:uid` twin keeps INICIO highlighted (see router.dart).
     final Widget headerOrSkeleton = profileAsync.when(
-      data: (profile) => HomeHeader(profile: profile),
+      data: (profile) => HomeHeader(
+        profile: profile,
+        onAvatarTap: profile == null
+            ? null
+            : () => context.push('/home/profile/${profile.uid}'),
+      ),
       loading: () => const _HomeHeaderSkeleton(),
       error: (_, __) => const HomeHeader(profile: null),
     );

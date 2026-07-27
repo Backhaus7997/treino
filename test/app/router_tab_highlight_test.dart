@@ -36,6 +36,8 @@ import 'package:treino/features/feed/domain/feed_segment.dart';
 import 'package:treino/features/feed/domain/post.dart';
 import 'package:treino/features/feed/feed_screen.dart';
 import 'package:treino/features/feed/presentation/friend_requests_inbox_screen.dart';
+import 'package:treino/features/feed/presentation/public_profile_screen.dart';
+import 'package:treino/features/home/home_screen.dart';
 import 'package:treino/features/profile/application/profile_stats_providers.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
@@ -147,6 +149,36 @@ void main() {
       expect(find.byType(FeedScreen), findsOneWidget);
       expect(_tabIndex(tester), 1,
           reason: 'back must land on the FEED tab root');
+    });
+
+    testWidgets(
+        'INICIO → avatar profile keeps INICIO highlighted and pops back to /home',
+        (tester) async {
+      final router = await _pumpRouter(tester, '/home');
+      expect(_tabIndex(tester), 2, reason: 'sanity: /home highlights INICIO');
+
+      // Same push the HomeHeader avatar performs.
+      //
+      // Bounded pumps instead of pumpAndSettle: PublicProfileScreen's own
+      // providers are not overridden here, so it parks on a spinner that
+      // never settles. This test is about the ROUTE (which tab stays lit),
+      // not the screen's data — that lives in public_profile_screen_test.
+      router.push('/home/profile/uid-test');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.byType(PublicProfileScreen), findsOneWidget);
+      expect(_tabIndex(tester), 2,
+          reason: 'the public profile opened from INICIO must keep INICIO '
+              'highlighted, not jump to FEED');
+
+      router.pop();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.byType(HomeScreen), findsOneWidget);
+      expect(_tabIndex(tester), 2,
+          reason: 'back must land on the INICIO tab root');
     });
 
     testWidgets(
