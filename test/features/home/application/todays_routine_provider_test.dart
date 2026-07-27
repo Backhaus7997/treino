@@ -79,6 +79,15 @@ UserProfile _profile({String? activeRoutineId}) => UserProfile(
       activeRoutineId: activeRoutineId,
     );
 
+/// Keeps the profile stream subscribed and resolved BEFORE reading the
+/// provider — Tier 0 reads `activeRoutineId` via a synchronous select, so
+/// tests that rely on the marker must warm it up deterministically (mirrors
+/// app runtime, where the profile loads long before the home card).
+Future<void> _warmProfile(ProviderContainer c) async {
+  c.listen<AsyncValue<UserProfile?>>(userProfileProvider, (_, __) {});
+  await c.read(userProfileProvider.future);
+}
+
 ProviderContainer _container({
   List<Routine> assigned = const [],
   List<Routine> selfCreated = const [],
@@ -181,9 +190,14 @@ void main() {
       expect(today, isNull);
     });
 
+    // ── Tier 0 (workout redesign slice 1): explicit active marker wins ────
+    // The unified list lets the athlete mark ANY routine active — coach
+    // plans included — and the home card follows that choice.
+
     test(
-        'trainer-assigned PRESENT + multi self-created + activeRoutineId → '
-        'trainer-assigned still wins (priority not bypassed)', () async {
+        'Tier 0: trainer-assigned PRESENT + activeRoutineId on a self-created '
+        'routine → the ACTIVE routine wins (marker beats the coach plan)',
+        () async {
       final assigned = _routine(id: 'assigned-1');
       final self1 = _routine(id: 'self-1');
       final self2 = _routine(id: 'self-2');
@@ -192,10 +206,50 @@ void main() {
         selfCreated: [self1, self2],
         activeRoutineId: 'self-2',
       );
+      await _warmProfile(c);
+
+      final today = await c.read(todaysRoutineProvider.future);
+      expect(today!.routine.id, equals('self-2'),
+          reason: 'slice 1: the explicit active marker drives the home card '
+              'across the UNIFIED list — the coach plan no longer overrides '
+              'the athlete\'s choice');
+    });
+
+    test(
+        'Tier 0: activeRoutineId pointing at the trainer-assigned plan '
+        'resolves it (coach plans are activatable)', () async {
+      final assigned1 = _routine(id: 'assigned-1');
+      final assigned2 = _routine(id: 'assigned-2');
+      final self = _routine(id: 'self-1');
+      final c = _container(
+        assigned: [assigned1, assigned2],
+        selfCreated: [self],
+        activeRoutineId: 'assigned-2',
+      );
+      await _warmProfile(c);
+
+      final today = await c.read(todaysRoutineProvider.future);
+      expect(today!.routine.id, equals('assigned-2'),
+          reason: 'the marker can select an OLDER coach plan over the '
+              'newest one — user choice beats recency');
+    });
+
+    test(
+        'Tier 0 stale: activeRoutineId not in any list + assigned present → '
+        'falls back to the legacy chain (assigned.first)', () async {
+      final assigned = _routine(id: 'assigned-1');
+      final self = _routine(id: 'self-1');
+      final c = _container(
+        assigned: [assigned],
+        selfCreated: [self],
+        activeRoutineId: 'archived-id',
+      );
+      await _warmProfile(c);
 
       final today = await c.read(todaysRoutineProvider.future);
       expect(today!.routine.id, equals('assigned-1'),
-          reason: 'trainer-assigned tier wins over self-created active marker');
+          reason: 'a stale marker must not blank the card when the legacy '
+              'chain can still resolve a routine');
     });
 
     test(
@@ -207,6 +261,7 @@ void main() {
         selfCreated: [self],
         activeRoutineId: 'something-else',
       );
+      await _warmProfile(c);
 
       final today = await c.read(todaysRoutineProvider.future);
       expect(today!.routine.id, equals('self-only'),
