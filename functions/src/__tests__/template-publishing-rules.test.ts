@@ -36,6 +36,11 @@ const RATER = "rater-1";
 
 let testEnv: RulesTestEnvironment;
 
+// Explicit 120s hook timeout, above the 30s global testTimeout: jest runs
+// the LARGEST suite first under --runInBand, which is this one, so its
+// beforeAll pays the emulator's cold start (~30-50s on a loaded CI box).
+// Without this the hook times out and every test in the file fails with a
+// misleading `clearFirestore of undefined`.
 beforeAll(async () => {
   setLogLevel("error");
   testEnv = await initializeTestEnvironment({
@@ -46,7 +51,7 @@ beforeAll(async () => {
       port: 8080,
     },
   });
-});
+}, 120_000);
 
 afterAll(async () => {
   await testEnv.cleanup();
