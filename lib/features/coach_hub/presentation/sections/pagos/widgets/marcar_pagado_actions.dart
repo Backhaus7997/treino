@@ -182,8 +182,13 @@ String reminderText({
   required String? paymentAlias,
 }) {
   final monto = fmtArs(amount);
-  final buf =
-      StringBuffer('Hola! Te recuerdo el pago de $concept por $monto.'); // i18n
+  // Fallback: a too-short or empty concept (e.g. a test value like "jaj")
+  // reads as broken in the reminder. Below 4 chars we use a generic label
+  // instead of interpolating it. The trainer can still edit the message.
+  final trimmed = concept.trim();
+  final conceptLabel = trimmed.length < 4 ? 'tu cuota' : trimmed; // i18n
+  final buf = StringBuffer(
+      'Hola! Te recuerdo el pago de $conceptLabel por $monto.'); // i18n
   if (paymentAlias != null && paymentAlias.isNotEmpty) {
     buf.write(' Podés transferir a: $paymentAlias'); // i18n
   }
