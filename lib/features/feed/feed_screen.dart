@@ -476,8 +476,20 @@ class _AmigosBody extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return _FeedAsyncBody<List<Post>>(
       async: ref.watch(myFriendsFeedProvider),
-      onRetry: () => ref.invalidate(myFriendsFeedProvider),
-      onRefresh: () => ref.refresh(myFriendsFeedProvider.future),
+      // El wrapper compone feedForFriendsProvider, una family NO autoDispose
+      // que cachea el query por key. invalidate/refresh del wrapper no
+      // cascada a sus dependencias: con la misma key (mismos amigos) el
+      // wrapper re-usa la instancia cacheada y el query a Firestore nunca se
+      // re-emite — ni el retry tras error ni el pull-to-refresh traerían
+      // posts nuevos. Tumbar la family primero fuerza el re-fetch real.
+      onRetry: () {
+        ref.invalidate(feedForFriendsProvider);
+        ref.invalidate(myFriendsFeedProvider);
+      },
+      onRefresh: () {
+        ref.invalidate(feedForFriendsProvider);
+        return ref.refresh(myFriendsFeedProvider.future);
+      },
       dataBuilder: (context, posts) {
         if (posts.isEmpty) {
           return _scrollableEmptyState(
@@ -498,8 +510,16 @@ class _MiGymBody extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return _FeedAsyncBody<List<Post>?>(
       async: ref.watch(myGymFeedProvider),
-      onRetry: () => ref.invalidate(myGymFeedProvider),
-      onRefresh: () => ref.refresh(myGymFeedProvider.future),
+      // Mismo patrón que _AmigosBody: tumbar la family cacheada
+      // (feedForGymProvider) antes del wrapper para re-emitir el query.
+      onRetry: () {
+        ref.invalidate(feedForGymProvider);
+        ref.invalidate(myGymFeedProvider);
+      },
+      onRefresh: () {
+        ref.invalidate(feedForGymProvider);
+        return ref.refresh(myGymFeedProvider.future);
+      },
       dataBuilder: (context, posts) {
         if (posts == null) {
           return _scrollableEmptyState(
