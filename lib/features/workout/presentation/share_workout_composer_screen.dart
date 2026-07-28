@@ -8,6 +8,9 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/motion/treino_fade_slide_in.dart';
+import '../../../core/widgets/motion/treino_state_switcher.dart';
+import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../feed/application/create_post_notifier.dart' show kMaxPostChars;
@@ -48,29 +51,36 @@ class ShareWorkoutComposerScreen extends ConsumerWidget {
     return Scaffold(
       body: AppBackground(
         child: SafeArea(
-          child: summaryAsync.when(
-            loading: () =>
-                Center(child: CircularProgressIndicator(color: palette.accent)),
-            error: (_, __) => _ComposerError(
-              onRetry: () => ref.invalidate(sessionSummaryProvider(key)),
-            ),
-            data: (data) {
-              final session = data.session;
-              if (session == null) {
-                return _ComposerError(
-                  onRetry: () => ref.invalidate(sessionSummaryProvider(key)),
-                );
-              }
-              return _ComposerBody(
-                session: session,
-                setLogs: data.setLogs,
-                snapshot: buildWorkoutSnapshot(
+          child: TreinoStateSwitcher(
+            childKey: ValueKey(summaryAsync.when(
+              loading: () => 'loading',
+              error: (_, __) => 'error',
+              data: (data) => data.session == null ? 'error' : 'data',
+            )),
+            child: summaryAsync.when(
+              loading: () => Center(
+                  child: CircularProgressIndicator(color: palette.accent)),
+              error: (_, __) => _ComposerError(
+                onRetry: () => ref.invalidate(sessionSummaryProvider(key)),
+              ),
+              data: (data) {
+                final session = data.session;
+                if (session == null) {
+                  return _ComposerError(
+                    onRetry: () => ref.invalidate(sessionSummaryProvider(key)),
+                  );
+                }
+                return _ComposerBody(
+                  session: session,
                   setLogs: data.setLogs,
-                  setsByAxis: distribution?.setsByAxis ?? const {},
-                  volumeKgByAxis: distribution?.volumeKgByAxis ?? const {},
-                ),
-              );
-            },
+                  snapshot: buildWorkoutSnapshot(
+                    setLogs: data.setLogs,
+                    setsByAxis: distribution?.setsByAxis ?? const {},
+                    volumeKgByAxis: distribution?.volumeKgByAxis ?? const {},
+                  ),
+                );
+              },
+            ),
           ),
         ),
       ),
@@ -176,69 +186,71 @@ class _ComposerBodyState extends ConsumerState<_ComposerBody> {
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                TextField(
-                  controller: controller,
-                  maxLines: null,
-                  maxLength: kMaxPostChars,
-                  keyboardType: TextInputType.multiline,
-                  style: GoogleFonts.barlow(
-                    fontWeight: FontWeight.w400,
-                    fontSize: 16,
-                    color: palette.textPrimary,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: l10n.shareWorkoutComposerHint,
-                    hintStyle: GoogleFonts.barlow(
+            child: TreinoFadeSlideIn(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: controller,
+                    maxLines: null,
+                    maxLength: kMaxPostChars,
+                    keyboardType: TextInputType.multiline,
+                    style: GoogleFonts.barlow(
                       fontWeight: FontWeight.w400,
                       fontSize: 16,
-                      color: palette.textMuted,
+                      color: palette.textPrimary,
                     ),
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    counterStyle: GoogleFonts.barlow(
-                      fontWeight: FontWeight.w400,
-                      fontSize: 12,
-                      color: palette.textMuted,
+                    decoration: InputDecoration(
+                      hintText: l10n.shareWorkoutComposerHint,
+                      hintStyle: GoogleFonts.barlow(
+                        fontWeight: FontWeight.w400,
+                        fontSize: 16,
+                        color: palette.textMuted,
+                      ),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      counterStyle: GoogleFonts.barlow(
+                        fontWeight: FontWeight.w400,
+                        fontSize: 12,
+                        color: palette.textMuted,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                _PhotoField(
-                  photoPath: _photoPath,
-                  hasError: _photoError,
-                  onPick: _pickPhoto,
-                  onRemove: () => setState(() {
-                    _photoPath = null;
-                    _photoError = false;
-                  }),
-                  onLoadError: () {
-                    // El archivo elegido no se puede decodificar — se descarta
-                    // acá en vez de fallar recién al subir.
-                    if (!mounted) return;
-                    setState(() {
+                  const SizedBox(height: 12),
+                  _PhotoField(
+                    photoPath: _photoPath,
+                    hasError: _photoError,
+                    onPick: _pickPhoto,
+                    onRemove: () => setState(() {
                       _photoPath = null;
-                      _photoError = true;
-                    });
-                  },
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  l10n.shareWorkoutComposerPreviewTitle,
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12,
-                    letterSpacing: 1.0,
-                    color: palette.textMuted,
+                      _photoError = false;
+                    }),
+                    onLoadError: () {
+                      // El archivo elegido no se puede decodificar — se descarta
+                      // acá en vez de fallar recién al subir.
+                      if (!mounted) return;
+                      setState(() {
+                        _photoPath = null;
+                        _photoError = true;
+                      });
+                    },
                   ),
-                ),
-                const SizedBox(height: 12),
-                WorkoutSnapshotDetail(snapshot: widget.snapshot),
-                const SizedBox(height: 20),
-              ],
+                  const SizedBox(height: 20),
+                  Text(
+                    l10n.shareWorkoutComposerPreviewTitle,
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                      letterSpacing: 1.0,
+                      color: palette.textMuted,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  WorkoutSnapshotDetail(snapshot: widget.snapshot),
+                  const SizedBox(height: 20),
+                ],
+              ),
             ),
           ),
         ),
@@ -274,9 +286,8 @@ class _ComposerHeader extends StatelessWidget {
           Semantics(
             button: true,
             label: l10n.commonCancel,
-            child: GestureDetector(
+            child: TreinoTappable(
               onTap: isSharing ? null : () => context.pop(),
-              behavior: HitTestBehavior.opaque,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
                 child: Align(
@@ -315,9 +326,8 @@ class _ComposerHeader extends StatelessWidget {
                   enabled: enabled,
                   label: l10n.shareWorkoutComposerPublish,
                   liveRegion: isSharing,
-                  child: GestureDetector(
+                  child: TreinoTappable(
                     onTap: enabled ? onPublish : null,
-                    behavior: HitTestBehavior.opaque,
                     child: ConstrainedBox(
                       constraints:
                           const BoxConstraints(minWidth: 44, minHeight: 44),
@@ -384,9 +394,8 @@ class _PhotoField extends StatelessWidget {
           Semantics(
             button: true,
             label: l10n.shareWorkoutComposerAddPhoto,
-            child: GestureDetector(
+            child: TreinoTappable(
               onTap: onPick,
-              behavior: HitTestBehavior.opaque,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(minHeight: 44),
                 child: Align(
@@ -474,9 +483,8 @@ class _PhotoField extends StatelessWidget {
           child: Semantics(
             button: true,
             label: l10n.shareWorkoutComposerRemovePhoto,
-            child: GestureDetector(
+            child: TreinoTappable(
               onTap: onRemove,
-              behavior: HitTestBehavior.opaque,
               child: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
@@ -541,9 +549,8 @@ class _ComposerError extends StatelessWidget {
             Semantics(
               button: true,
               label: l10n.coachRetryLabel,
-              child: GestureDetector(
+              child: TreinoTappable(
                 onTap: onRetry,
-                behavior: HitTestBehavior.opaque,
                 child: ConstrainedBox(
                   constraints:
                       const BoxConstraints(minWidth: 44, minHeight: 44),
