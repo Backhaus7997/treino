@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../app/theme/app_motion.dart';
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/widgets/motion/treino_fade_slide_in.dart';
+import '../../../../core/widgets/motion/treino_tappable.dart';
 import '../../domain/appointment.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../agenda_formatters.dart';
@@ -46,105 +49,108 @@ class DaySlotsSheet extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Sheet handle
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(
-                color: palette.border,
-                borderRadius: BorderRadius.circular(2),
+      child: TreinoFadeSlideIn(
+        distance: AppMotion.slideSm,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Sheet handle
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: palette.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
-          ),
 
-          if (!hasContent) ...[
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 24),
-                child: Text(
-                  AppL10n.of(context).agendaEmptyAvailability,
-                  style: GoogleFonts.barlow(
-                    fontSize: 14,
+            if (!hasContent) ...[
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Text(
+                    AppL10n.of(context).agendaEmptyAvailability,
+                    style: GoogleFonts.barlow(
+                      fontSize: 14,
+                      color: palette.textMuted,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ] else ...[
+              // Existing bookings section
+              if (existingBookings.isNotEmpty) ...[
+                Text(
+                  'RESERVADO',
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 11,
+                    letterSpacing: 1.2,
+                    color: palette.accent,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: existingBookings
+                      .map((appt) => _BookedChip(
+                            appointment: appt,
+                            onCancel: () => _onCancelTap(context, appt),
+                            now: now,
+                          ))
+                      .toList(),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // Free slots section (filtered to future only)
+              if (futureSlots.isNotEmpty) ...[
+                Text(
+                  'HORARIOS DISPONIBLES',
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 11,
+                    letterSpacing: 1.2,
                     color: palette.textMuted,
                   ),
-                  textAlign: TextAlign.center,
                 ),
-              ),
-            ),
-          ] else ...[
-            // Existing bookings section
-            if (existingBookings.isNotEmpty) ...[
-              Text(
-                'RESERVADO',
-                style: GoogleFonts.barlowCondensed(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 11,
-                  letterSpacing: 1.2,
-                  color: palette.accent,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: existingBookings
-                    .map((appt) => _BookedChip(
-                          appointment: appt,
-                          onCancel: () => _onCancelTap(context, appt),
-                          now: now,
-                        ))
-                    .toList(),
-              ),
-              const SizedBox(height: 16),
-            ],
-
-            // Free slots section (filtered to future only)
-            if (futureSlots.isNotEmpty) ...[
-              Text(
-                'HORARIOS DISPONIBLES',
-                style: GoogleFonts.barlowCondensed(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 11,
-                  letterSpacing: 1.2,
-                  color: palette.textMuted,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: futureSlots
-                    .map(
-                      (slot) => ActionChip(
-                        label: Text(
-                          AgendaFormatters.formatTime(slot),
-                          style: GoogleFonts.barlowCondensed(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                            color: palette.textPrimary,
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: futureSlots
+                      .map(
+                        (slot) => ActionChip(
+                          label: Text(
+                            AgendaFormatters.formatTime(slot),
+                            style: GoogleFonts.barlowCondensed(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                              color: palette.textPrimary,
+                            ),
                           ),
+                          backgroundColor: palette.bgCard,
+                          side: BorderSide(color: palette.border),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          onPressed: () => _onSlotTap(context, slot),
                         ),
-                        backgroundColor: palette.bgCard,
-                        side: BorderSide(color: palette.border),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        onPressed: () => _onSlotTap(context, slot),
-                      ),
-                    )
-                    .toList(),
-              ),
+                      )
+                      .toList(),
+                ),
+              ],
             ],
-          ],
 
-          const SizedBox(height: 8),
-        ],
+            const SizedBox(height: 8),
+          ],
+        ),
       ),
     );
   }
@@ -218,7 +224,7 @@ class _BookedChip extends StatelessWidget {
           ),
           if (_canCancel) ...[
             const SizedBox(width: 8),
-            GestureDetector(
+            TreinoTappable(
               onTap: onCancel,
               child:
                   Icon(Icons.cancel_outlined, size: 16, color: palette.accent),
