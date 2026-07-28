@@ -769,6 +769,67 @@ class AppL10nEn extends AppL10n {
   String get workoutRutinasCoachChip => 'FROM YOUR COACH';
 
   @override
+  String get workoutPlantillasTrainerChip => 'TRAINER';
+
+  @override
+  String get templateRatingsTitle => 'RATINGS';
+
+  @override
+  String get templateRatingsNoneYet =>
+      'Nobody has rated this template yet. Be the first!';
+
+  @override
+  String templateRatingsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count ratings',
+      one: '1 rating',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get templateRatingsMineEmpty => 'What did you think?';
+
+  @override
+  String get templateRatingsMineLabel => 'Your rating';
+
+  @override
+  String get templateRatingsRateCta => 'RATE';
+
+  @override
+  String get templateRatingsEditCta => 'EDIT';
+
+  @override
+  String get templateRatingsEmpty => 'No comments yet.';
+
+  @override
+  String get templateRatingsError => 'We couldn\'t load the comments.';
+
+  @override
+  String get templateRatingSheetTitle => 'Rate this template';
+
+  @override
+  String get templateRatingSheetTitleEdit => 'Edit your rating';
+
+  @override
+  String get templateRatingSheetCommentHint =>
+      'Tell others how this template went (optional)';
+
+  @override
+  String get templateRatingSheetCancel => 'CANCEL';
+
+  @override
+  String get templateRatingSheetSubmit => 'SUBMIT';
+
+  @override
+  String get templateRatingSheetSuccess => 'Thanks for rating!';
+
+  @override
+  String get templateRatingSheetError => 'We couldn\'t save your rating.';
+
+  @override
   String get workoutSplitFallback => '';
 
   @override

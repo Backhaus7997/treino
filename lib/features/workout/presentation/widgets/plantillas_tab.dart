@@ -103,12 +103,11 @@ class _PlantillasTabState extends ConsumerState<PlantillasTab>
   }
 }
 
-/// Catalog error state. The coach templates are independent of the catalog
-/// fetch (their own stream — see coachSharedTemplatesProvider), so when the
-/// coach part already resolved, its grid stays on screen ABOVE the error
-/// message instead of being swallowed by it — the independence the old
-/// side-by-side sections had. Only the catalog is in error, and retry
-/// re-fetches exactly that.
+/// Catalog error state. Coach and community templates are independent of the
+/// catalog fetch (their own providers), so whatever already resolved stays on
+/// screen ABOVE the error message instead of being swallowed by it — the
+/// independence the old side-by-side sections had. Only the catalog is in
+/// error, and retry re-fetches exactly that.
 class _CatalogErrorState extends ConsumerWidget {
   const _CatalogErrorState({required this.filter});
 
@@ -121,9 +120,15 @@ class _CatalogErrorState extends ConsumerWidget {
     final coach = ref.watch(coachSharedTemplatesProvider);
     // The level pills keep filtering the whole grid — the surviving coach
     // part included.
+    final community = ref.watch(communityTemplatesProvider);
+    final coachIds = {for (final r in coach) r.id};
     final entries = <TemplateEntry>[
       for (final r in coach)
-        if (filter == null || r.level == filter) (routine: r, fromCoach: true),
+        if (filter == null || r.level == filter)
+          (routine: r, origin: TemplateOrigin.coach),
+      for (final r in community)
+        if (!coachIds.contains(r.id) && (filter == null || r.level == filter))
+          (routine: r, origin: TemplateOrigin.community),
     ];
 
     return Column(
@@ -181,13 +186,19 @@ class _TemplatesGrid extends StatelessWidget {
           routine: entry.routine,
           // Coach templates always glow magenta to match their chip (coach
           // ownership speaks highlight — same language as RutinasSection);
-          // catalog cards keep the existing hash-based alternation.
+          // catalog and community cards keep the hash-based alternation.
           variant: entry.fromCoach || entry.routine.id.hashCode % 3 == 0
               ? RoutineCardVariant.highlight
               : RoutineCardVariant.accent,
           reserveTitleLines: true,
-          badge:
-              entry.fromCoach ? CoachChip(routineId: entry.routine.id) : null,
+          badge: switch (entry.origin) {
+            TemplateOrigin.coach => CoachChip(routineId: entry.routine.id),
+            TemplateOrigin.community => CoachChip(
+                routineId: entry.routine.id,
+                variant: CoachChipVariant.communityTrainer,
+              ),
+            TemplateOrigin.system => null,
+          },
         ),
     ];
 

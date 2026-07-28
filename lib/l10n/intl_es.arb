@@ -724,5 +724,22 @@
   "shareWorkoutComposerPreviewTitle": "TU ENTRENO",
   "postCardWorkoutDetailShow": "VER DETALLE",
   "postCardWorkoutDetailHide": "OCULTAR DETALLE",
-  "postCardWorkoutDetailTruncated": "Se muestran los primeros {count} ejercicios."
+  "postCardWorkoutDetailTruncated": "Se muestran los primeros {count} ejercicios.",
+  "workoutPlantillasTrainerChip": "ENTRENADOR",
+  "templateRatingsTitle": "CALIFICACIONES",
+  "templateRatingsNoneYet": "Todavía nadie calificó esta plantilla. ¡Sé el primero!",
+  "templateRatingsCount": "{count, plural, =1{1 calificación} other{{count} calificaciones}}",
+  "templateRatingsMineEmpty": "¿Qué te pareció?",
+  "templateRatingsMineLabel": "Tu calificación",
+  "templateRatingsRateCta": "CALIFICAR",
+  "templateRatingsEditCta": "EDITAR",
+  "templateRatingsEmpty": "Todavía no hay comentarios.",
+  "templateRatingsError": "No pudimos cargar los comentarios.",
+  "templateRatingSheetTitle": "Califica esta plantilla",
+  "templateRatingSheetTitleEdit": "Edita tu calificación",
+  "templateRatingSheetCommentHint": "Cuenta cómo te fue con esta plantilla (opcional)",
+  "templateRatingSheetCancel": "CANCELAR",
+  "templateRatingSheetSubmit": "ENVIAR",
+  "templateRatingSheetSuccess": "¡Gracias por calificar!",
+  "templateRatingSheetError": "No pudimos guardar tu calificación."
 }

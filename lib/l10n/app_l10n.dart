@@ -1544,6 +1544,108 @@ abstract class AppL10n {
   /// **'DE TU COACH'**
   String get workoutRutinasCoachChip;
 
+  /// Badge on PLANTILLAS grid cards for templates published to the community catalogue by ANY trainer (not the athlete's own coach, which uses workoutRutinasCoachChip). Accent color. Workout-area redesign slice 3.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ENTRENADOR'**
+  String get workoutPlantillasTrainerChip;
+
+  /// Section header of the community ratings block in the detail of a published trainer template. Workout-area redesign slice 3.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CALIFICACIONES'**
+  String get templateRatingsTitle;
+
+  /// Shown instead of the average when a published template has zero ratings.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía nadie calificó esta plantilla. ¡Sé el primero!'**
+  String get templateRatingsNoneYet;
+
+  /// How many people rated the template, next to the average score.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =1{1 calificación} other{{count} calificaciones}}'**
+  String templateRatingsCount(int count);
+
+  /// Label above the rate CTA when the user has not rated this template yet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Qué te pareció?'**
+  String get templateRatingsMineEmpty;
+
+  /// Label above the user's own rating when they already rated this template.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu calificación'**
+  String get templateRatingsMineLabel;
+
+  /// Button that opens the rating sheet for the first time.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CALIFICAR'**
+  String get templateRatingsRateCta;
+
+  /// Button that opens the rating sheet to edit the user's existing rating.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'EDITAR'**
+  String get templateRatingsEditCta;
+
+  /// Empty state of the comment list when nobody left a written comment (ratings without text do not appear here).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no hay comentarios.'**
+  String get templateRatingsEmpty;
+
+  /// Error state of the comment list in the published-template detail.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar los comentarios.'**
+  String get templateRatingsError;
+
+  /// Title of the rating bottom sheet when creating a new rating.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Calificá esta plantilla'**
+  String get templateRatingSheetTitle;
+
+  /// Title of the rating bottom sheet when editing an existing rating.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Editá tu calificación'**
+  String get templateRatingSheetTitleEdit;
+
+  /// Hint of the optional comment field in the template rating sheet, max 500 chars.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Contá cómo te fue con esta plantilla (opcional)'**
+  String get templateRatingSheetCommentHint;
+
+  /// Cancel button of the template rating sheet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CANCELAR'**
+  String get templateRatingSheetCancel;
+
+  /// Submit button of the template rating sheet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ENVIAR'**
+  String get templateRatingSheetSubmit;
+
+  /// SnackBar shown after a rating is saved.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¡Gracias por calificar!'**
+  String get templateRatingSheetSuccess;
+
+  /// SnackBar shown when saving a rating fails.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos guardar tu calificación.'**
+  String get templateRatingSheetError;
+
   /// No description provided for @workoutSplitFallback.
   ///
   /// In es_AR, this message translates to:

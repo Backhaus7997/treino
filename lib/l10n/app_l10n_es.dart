@@ -796,6 +796,67 @@ class AppL10nEs extends AppL10n {
   String get workoutRutinasCoachChip => 'DE TU COACH';
 
   @override
+  String get workoutPlantillasTrainerChip => 'ENTRENADOR';
+
+  @override
+  String get templateRatingsTitle => 'CALIFICACIONES';
+
+  @override
+  String get templateRatingsNoneYet =>
+      'Todavía nadie calificó esta plantilla. ¡Sé el primero!';
+
+  @override
+  String templateRatingsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count calificaciones',
+      one: '1 calificación',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get templateRatingsMineEmpty => '¿Qué te pareció?';
+
+  @override
+  String get templateRatingsMineLabel => 'Tu calificación';
+
+  @override
+  String get templateRatingsRateCta => 'CALIFICAR';
+
+  @override
+  String get templateRatingsEditCta => 'EDITAR';
+
+  @override
+  String get templateRatingsEmpty => 'Todavía no hay comentarios.';
+
+  @override
+  String get templateRatingsError => 'No pudimos cargar los comentarios.';
+
+  @override
+  String get templateRatingSheetTitle => 'Califica esta plantilla';
+
+  @override
+  String get templateRatingSheetTitleEdit => 'Edita tu calificación';
+
+  @override
+  String get templateRatingSheetCommentHint =>
+      'Cuenta cómo te fue con esta plantilla (opcional)';
+
+  @override
+  String get templateRatingSheetCancel => 'CANCELAR';
+
+  @override
+  String get templateRatingSheetSubmit => 'ENVIAR';
+
+  @override
+  String get templateRatingSheetSuccess => '¡Gracias por calificar!';
+
+  @override
+  String get templateRatingSheetError => 'No pudimos guardar tu calificación.';
+
+  @override
   String get workoutSplitFallback => 'Sin split';
 
   @override
@@ -3906,6 +3967,67 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get workoutRutinasCoachChip => 'DE TU COACH';
+
+  @override
+  String get workoutPlantillasTrainerChip => 'ENTRENADOR';
+
+  @override
+  String get templateRatingsTitle => 'CALIFICACIONES';
+
+  @override
+  String get templateRatingsNoneYet =>
+      'Todavía nadie calificó esta plantilla. ¡Sé el primero!';
+
+  @override
+  String templateRatingsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count calificaciones',
+      one: '1 calificación',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get templateRatingsMineEmpty => '¿Qué te pareció?';
+
+  @override
+  String get templateRatingsMineLabel => 'Tu calificación';
+
+  @override
+  String get templateRatingsRateCta => 'CALIFICAR';
+
+  @override
+  String get templateRatingsEditCta => 'EDITAR';
+
+  @override
+  String get templateRatingsEmpty => 'Todavía no hay comentarios.';
+
+  @override
+  String get templateRatingsError => 'No pudimos cargar los comentarios.';
+
+  @override
+  String get templateRatingSheetTitle => 'Calificá esta plantilla';
+
+  @override
+  String get templateRatingSheetTitleEdit => 'Editá tu calificación';
+
+  @override
+  String get templateRatingSheetCommentHint =>
+      'Contá cómo te fue con esta plantilla (opcional)';
+
+  @override
+  String get templateRatingSheetCancel => 'CANCELAR';
+
+  @override
+  String get templateRatingSheetSubmit => 'ENVIAR';
+
+  @override
+  String get templateRatingSheetSuccess => '¡Gracias por calificar!';
+
+  @override
+  String get templateRatingSheetError => 'No pudimos guardar tu calificación.';
 
   @override
   String get workoutSplitFallback => 'Sin split';

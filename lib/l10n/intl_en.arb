@@ -1100,5 +1100,22 @@
   "shareWorkoutComposerPreviewTitle": "YOUR WORKOUT",
   "postCardWorkoutDetailShow": "SHOW DETAIL",
   "postCardWorkoutDetailHide": "HIDE DETAIL",
-  "postCardWorkoutDetailTruncated": "Showing the first {count} exercises."
+  "postCardWorkoutDetailTruncated": "Showing the first {count} exercises.",
+  "workoutPlantillasTrainerChip": "TRAINER",
+  "templateRatingsTitle": "RATINGS",
+  "templateRatingsNoneYet": "Nobody has rated this template yet. Be the first!",
+  "templateRatingsCount": "{count, plural, =1{1 rating} other{{count} ratings}}",
+  "templateRatingsMineEmpty": "What did you think?",
+  "templateRatingsMineLabel": "Your rating",
+  "templateRatingsRateCta": "RATE",
+  "templateRatingsEditCta": "EDIT",
+  "templateRatingsEmpty": "No comments yet.",
+  "templateRatingsError": "We couldn't load the comments.",
+  "templateRatingSheetTitle": "Rate this template",
+  "templateRatingSheetTitleEdit": "Edit your rating",
+  "templateRatingSheetCommentHint": "Tell others how this template went (optional)",
+  "templateRatingSheetCancel": "CANCEL",
+  "templateRatingSheetSubmit": "SUBMIT",
+  "templateRatingSheetSuccess": "Thanks for rating!",
+  "templateRatingSheetError": "We couldn't save your rating."
 }
