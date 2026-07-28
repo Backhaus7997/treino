@@ -377,6 +377,12 @@ Widget _feedPostList(BuildContext context, List<Post> posts) {
     itemCount: posts.length,
     separatorBuilder: (_, __) => const SizedBox(height: 14),
     itemBuilder: (_, i) => PostCard(
+      // La card tiene estado local (el detalle del entreno expandido), así
+      // que la reconciliación POR POSICIÓN del ListView la corrompe: si
+      // entra un post nuevo arriba (refresh, o el propio usuario
+      // compartiendo), el Element de esa posición se reusa para OTRO post y
+      // muestra su detalle expandido. La key ata el estado al post.
+      key: ValueKey(posts[i].id),
       post: posts[i],
       onAuthorTap: () => context.go('/feed/profile/${posts[i].authorUid}'),
     ),

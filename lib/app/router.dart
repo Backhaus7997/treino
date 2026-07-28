@@ -30,6 +30,7 @@ import '../features/workout/presentation/routine_editor_screen.dart';
 import '../features/workout/application/session_init.dart';
 import '../features/workout/presentation/exercise_detail_screen.dart';
 import '../features/workout/presentation/post_workout_summary_screen.dart';
+import '../features/workout/presentation/share_workout_composer_screen.dart';
 import '../features/workout/presentation/session_detail_screen.dart';
 import '../features/workout/presentation/session_history_screen.dart';
 import '../features/workout/presentation/routine_detail_screen.dart';
@@ -294,6 +295,19 @@ GoRouter buildRouter({
           final sessionId = state.pathParameters['sessionId']!;
           return PostWorkoutSummaryScreen(sessionId: sessionId);
         },
+        routes: [
+          // Composer del post de entreno — el botón COMPARTIR del resumen
+          // navega acá en vez de publicar de una. Sub-ruta del summary para
+          // que `pop()` vuelva al resumen con la sesión ya cargada (el
+          // provider está cacheado por la misma key).
+          GoRoute(
+            path: 'share',
+            builder: (context, state) {
+              final sessionId = state.pathParameters['sessionId']!;
+              return ShareWorkoutComposerScreen(sessionId: sessionId);
+            },
+          ),
+        ],
       ),
 
       // ─── Historial full list — TOP-LEVEL ROUTE (outside ShellRoute) ───────

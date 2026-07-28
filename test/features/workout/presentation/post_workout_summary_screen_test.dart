@@ -119,6 +119,14 @@ Widget _buildWithRouter({
           body: Center(child: Text('workout-home')),
         ),
       ),
+      // Stub del composer: acá sólo importa que COMPARTIR navegue; el
+      // composer real se testea en share_workout_composer_screen_test.dart.
+      GoRoute(
+        path: '/workout/session-summary/:sessionId/share',
+        builder: (_, __) => const Scaffold(
+          body: Center(child: Text('composer-screen')),
+        ),
+      ),
     ],
   );
 
@@ -691,8 +699,15 @@ void main() {
     expect(shareCalled, isFalse);
   });
 
-  testWidgets(
-      'SCENARIO-350: COMPARTIR button triggers shareWorkout on notifier',
+  // ── SCENARIO-350 (actualizado, share-composer PR2) ───────────────────────
+  //
+  // COMPARTIR ya NO publica de una: abre el composer, donde el texto es
+  // editable y se puede adjuntar una foto. Publicar (y sus snackbars de éxito
+  // y error, ex SCENARIO-351/352) vive ahora en
+  // share_workout_composer_screen_test.dart, junto con el assert del conteo
+  // de ejercicios DISTINTOS (ex QA-FEED-364/389).
+
+  testWidgets('SCENARIO-350: COMPARTIR abre el composer sin publicar todavía',
       (tester) async {
     bool shareCalled = false;
 
@@ -709,73 +724,10 @@ void main() {
     await tester.tap(find.text('COMPARTIR'));
     await tester.pumpAndSettle();
 
-    expect(shareCalled, isTrue);
-  });
-
-  testWidgets(
-      'QA-FEED-364/389: COMPARTIR passes the DISTINCT-exercise count to shareWorkout',
-      (tester) async {
-    final notifier = _TrackingNotifier(onShare: () {});
-
-    // 3 set logs across 2 DISTINCT exercises → the feed card stat is "2 ej.",
-    // not 3 (that would be the sets count).
-    await tester.pumpWidget(_buildWithRouter(
-      summaryOverride: () => (
-        session: _makeSession(),
-        setLogs: [
-          _makeSetLog(exerciseId: 'e1'),
-          _makeSetLog(exerciseId: 'e1'),
-          _makeSetLog(exerciseId: 'e2'),
-        ],
-      ),
-      notifierOverride: () => notifier,
-    ));
-    await tester.pumpAndSettle();
-
-    await tester.ensureVisible(find.text('COMPARTIR'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('COMPARTIR'));
-    await tester.pumpAndSettle();
-
-    expect(notifier.capturedExerciseCount, equals(2));
-  });
-
-  // ── SCENARIO-351/352: SnackBars ──────────────────────────────────────────
-
-  testWidgets(
-      'SCENARIO-351: success SnackBar "¡Post compartido!" + nav to /workout',
-      (tester) async {
-    await tester.pumpWidget(_buildWithRouter(
-      summaryOverride: () => (session: _makeSession(), setLogs: []),
-      notifierOverride: () => _SuccessNotifier(),
-    ));
-    await tester.pumpAndSettle();
-
-    await tester.ensureVisible(find.text('COMPARTIR'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('COMPARTIR'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('¡Post compartido!'), findsOneWidget);
-    expect(find.text('workout-home'), findsOneWidget);
-  });
-
-  testWidgets(
-      'SCENARIO-352: error SnackBar shown without nav on shareWorkout failure',
-      (tester) async {
-    await tester.pumpWidget(_buildWithRouter(
-      summaryOverride: () => (session: _makeSession(), setLogs: []),
-      notifierOverride: () => _ErrorNotifier(),
-    ));
-    await tester.pumpAndSettle();
-
-    await tester.ensureVisible(find.text('COMPARTIR'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('COMPARTIR'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('No pudimos compartir tu post. Intentá de nuevo.'),
-        findsOneWidget);
+    expect(find.text('composer-screen'), findsOneWidget);
+    // Nada se publicó con el tap: eso ocurre recién al confirmar en el
+    // composer.
+    expect(shareCalled, isFalse);
     expect(find.text('workout-home'), findsNothing);
   });
 
@@ -906,32 +858,6 @@ class _TrackingNotifier extends PostWorkoutNotifier {
   }
 }
 
-class _SuccessNotifier extends PostWorkoutNotifier {
-  @override
-  Future<void> shareWorkout(
-    Session session, {
-    required String text,
-    required int exerciseCount,
-    String? localPhotoPath,
-  }) async {
-    state = const AsyncLoading();
-    await Future<void>.delayed(Duration.zero);
-    state = const AsyncData(null);
-  }
-}
-
-class _ErrorNotifier extends PostWorkoutNotifier {
-  @override
-  Future<void> shareWorkout(
-    Session session, {
-    required String text,
-    required int exerciseCount,
-    String? localPhotoPath,
-  }) async {
-    state = const AsyncLoading();
-    await Future<void>.delayed(Duration.zero);
-    final err = Exception('fail');
-    state = AsyncError(err, StackTrace.empty);
-    throw err;
-  }
-}
+// Los stubs de éxito/error del share vivían acá para SCENARIO-351/352; esos
+// escenarios se mudaron a share_workout_composer_screen_test.dart cuando
+// COMPARTIR pasó a abrir el composer en vez de publicar.

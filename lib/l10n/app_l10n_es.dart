@@ -596,6 +596,39 @@ class AppL10nEs extends AppL10n {
   String get workoutPostAutoCompleteText => '¡Terminé mi entreno! 💪';
 
   @override
+  String get shareWorkoutComposerTitle => 'COMPARTIR ENTRENO';
+
+  @override
+  String get shareWorkoutComposerHint => '¿Cómo estuvo tu entreno?';
+
+  @override
+  String get shareWorkoutComposerPublish => 'PUBLICAR';
+
+  @override
+  String get shareWorkoutComposerAddPhoto => 'AGREGAR FOTO';
+
+  @override
+  String get shareWorkoutComposerRemovePhoto => 'Quitar foto';
+
+  @override
+  String get shareWorkoutComposerPhotoError =>
+      'No pudimos usar esa foto. Probá con otra.';
+
+  @override
+  String get shareWorkoutComposerPreviewTitle => 'TU ENTRENO';
+
+  @override
+  String get postCardWorkoutDetailShow => 'VER DETALLE';
+
+  @override
+  String get postCardWorkoutDetailHide => 'OCULTAR DETALLE';
+
+  @override
+  String postCardWorkoutDetailTruncated(int count) {
+    return 'Se muestran los primeros $count ejercicios.';
+  }
+
+  @override
   String get workoutHistorialHeading => 'HISTORIAL';
 
   @override
@@ -3673,6 +3706,39 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get workoutPostAutoCompleteText => '¡Terminé mi entreno! 💪';
+
+  @override
+  String get shareWorkoutComposerTitle => 'COMPARTIR ENTRENO';
+
+  @override
+  String get shareWorkoutComposerHint => '¿Cómo estuvo tu entreno?';
+
+  @override
+  String get shareWorkoutComposerPublish => 'PUBLICAR';
+
+  @override
+  String get shareWorkoutComposerAddPhoto => 'AGREGAR FOTO';
+
+  @override
+  String get shareWorkoutComposerRemovePhoto => 'Quitar foto';
+
+  @override
+  String get shareWorkoutComposerPhotoError =>
+      'No pudimos usar esa foto. Probá con otra.';
+
+  @override
+  String get shareWorkoutComposerPreviewTitle => 'TU ENTRENO';
+
+  @override
+  String get postCardWorkoutDetailShow => 'VER DETALLE';
+
+  @override
+  String get postCardWorkoutDetailHide => 'OCULTAR DETALLE';
+
+  @override
+  String postCardWorkoutDetailTruncated(int count) {
+    return 'Se muestran los primeros $count ejercicios.';
+  }
 
   @override
   String get workoutHistorialHeading => 'HISTORIAL';

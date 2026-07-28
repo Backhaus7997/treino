@@ -15,6 +15,12 @@ import 'session_muscle_distribution.dart';
 import 'session_providers.dart';
 
 class PostWorkoutNotifier extends AutoDisposeAsyncNotifier<void> {
+  /// True mientras hay un [shareWorkout] en vuelo. NO se deriva de
+  /// `state.isLoading`: el estado de un AsyncNotifier ya arranca en
+  /// `AsyncLoading` mientras `build()` está pendiente, así que ese chequeo
+  /// bloquearía el primer share legítimo.
+  bool _publishing = false;
+
   @override
   Future<void> build() async {}
 
@@ -24,6 +30,12 @@ class PostWorkoutNotifier extends AutoDisposeAsyncNotifier<void> {
     required int exerciseCount,
     String? localPhotoPath,
   }) async {
+    // Guard de reentrancia: el gate del botón depende de que la UI vea el
+    // AsyncLoading de abajo, y eso recién ocurre en el próximo frame — dos
+    // taps dentro de esa ventana entraban acá dos veces y publicaban DOS
+    // posts, cada uno con su propia foto subida.
+    if (_publishing) return;
+    _publishing = true;
     state = const AsyncLoading();
     try {
       final authUser = await ref.read(authStateChangesProvider.future);
@@ -91,6 +103,10 @@ class PostWorkoutNotifier extends AutoDisposeAsyncNotifier<void> {
     } catch (e, st) {
       state = AsyncError(e, st);
       rethrow;
+    } finally {
+      // Se libera SIEMPRE, también al fallar: si no, un error dejaba el
+      // composer sin poder reintentar hasta recrear el notifier.
+      _publishing = false;
     }
   }
 

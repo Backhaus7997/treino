@@ -713,5 +713,16 @@
   "insightsTileVolumeByGroupSubtitle": "Sets vs. objetivo por grupo muscular",
   "volumeByGroupScreenTitle": "VOLUMEN POR GRUPO",
   "volumeByGroupEmptyTarget": "Necesitás una rutina asignada para ver tu volumen objetivo.",
-  "workoutRutinasCoachChip": "DE TU COACH"
+  "workoutRutinasCoachChip": "DE TU COACH",
+  "workoutPostAutoCompleteText": "¡Terminé mi entreno! 💪",
+  "shareWorkoutComposerTitle": "COMPARTIR ENTRENO",
+  "shareWorkoutComposerHint": "¿Cómo estuvo tu entreno?",
+  "shareWorkoutComposerPublish": "PUBLICAR",
+  "shareWorkoutComposerAddPhoto": "AGREGAR FOTO",
+  "shareWorkoutComposerRemovePhoto": "Quitar foto",
+  "shareWorkoutComposerPhotoError": "No pudimos usar esa foto. Probá con otra.",
+  "shareWorkoutComposerPreviewTitle": "TU ENTRENO",
+  "postCardWorkoutDetailShow": "VER DETALLE",
+  "postCardWorkoutDetailHide": "OCULTAR DETALLE",
+  "postCardWorkoutDetailTruncated": "Se muestran los primeros {count} ejercicios."
 }

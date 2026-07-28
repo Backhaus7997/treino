@@ -68,34 +68,13 @@ class PostWorkoutSummaryScreen extends ConsumerWidget {
                 muscleDistribution: muscleDistribution,
                 highlights: highlights,
                 isSharing: isSharing,
-                onShare: () async {
-                  final messenger = ScaffoldMessenger.of(context);
-                  final l10n = AppL10n.of(context);
-                  try {
-                    await ref
-                        .read(postWorkoutNotifierProvider.notifier)
-                        .shareWorkout(
-                          session,
-                          text: l10n.workoutPostAutoCompleteText,
-                          // QA-FEED-364/389: distinct exercises in this session
-                          // → the feed card's "N ej." stat.
-                          exerciseCount: data.setLogs
-                              .map((s) => s.exerciseId)
-                              .toSet()
-                              .length,
-                        );
-                    if (!context.mounted) return;
-                    messenger.showSnackBar(SnackBar(
-                      content: Text(l10n.workoutSnackShareSuccess),
-                    ));
-                    context.go('/workout');
-                  } catch (_) {
-                    if (!context.mounted) return;
-                    messenger.showSnackBar(SnackBar(
-                      content: Text(l10n.workoutSnackShareError),
-                    ));
-                  }
-                },
+                // COMPARTIR abre el composer en vez de publicar de una: el
+                // texto es editable, la foto es opcional y el detalle que
+                // verá el resto se previsualiza antes de publicar. Publicar
+                // (y sus snackbars) vive ahora en
+                // ShareWorkoutComposerScreen.
+                onShare: () =>
+                    context.push('/workout/session-summary/$sessionId/share'),
               );
             },
           ),

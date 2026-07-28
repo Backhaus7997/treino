@@ -197,6 +197,36 @@ void main() {
     });
   });
 
+  group('reentrancia', () {
+    test('dos shareWorkout concurrentes publican UN solo post', () async {
+      final container = makeContainer();
+
+      // El gate del botón depende de que la UI vea el AsyncLoading, y eso
+      // recién ocurre en el próximo frame: dos taps dentro de esa ventana
+      // llegan acá antes de cualquier rebuild. Sin guard, esto subía dos
+      // fotos y creaba dos posts.
+      final first = share(container, localPhotoPath: '/tmp/foto.jpg');
+      final second = share(container, localPhotoPath: '/tmp/foto.jpg');
+      await Future.wait([first, second]);
+
+      expect(repo.newPostIdCalls, 1);
+      expect(repo.capturedPost, isNotNull);
+    });
+
+    test('un share posterior, ya resuelto el primero, sí procede', () async {
+      final container = makeContainer();
+
+      await share(container);
+      expect(repo.capturedPost, isNotNull);
+
+      repo.capturedPost = null;
+      await share(container, localPhotoPath: '/tmp/foto.jpg');
+
+      expect(repo.capturedPost, isNotNull);
+      expect(repo.capturedPost!.photoUrl, 'https://fake.storage/photo.jpg');
+    });
+  });
+
   group('shareWorkout sin foto', () {
     test('no aloca id ni toca el servicio de fotos — flujo idéntico al viejo',
         () async {
