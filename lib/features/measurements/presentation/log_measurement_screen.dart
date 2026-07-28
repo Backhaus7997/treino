@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/utils/date_labels.dart';
 import '../../../core/utils/kg_format.dart';
+import '../../../core/widgets/motion/treino_success_check.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../workout/application/session_providers.dart'
@@ -423,10 +424,22 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            initial != null
-                ? l10n.measurementLogUpdateSuccess
-                : l10n.measurementLogSaveSuccess,
+          content: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // El pop ya pasó (línea de arriba) — el check no compite con
+              // ninguna navegación, solo acompaña el mensaje mientras el
+              // SnackBar hace su propia entrada.
+              const TreinoSuccessCheck(size: 18, strokeWidth: 2),
+              const SizedBox(width: 10),
+              Flexible(
+                child: Text(
+                  initial != null
+                      ? l10n.measurementLogUpdateSuccess
+                      : l10n.measurementLogSaveSuccess,
+                ),
+              ),
+            ],
           ),
         ),
       );
