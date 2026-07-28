@@ -11,6 +11,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../../app/theme/app_palette.dart';
+import '../../../../../core/widgets/motion/treino_state_switcher.dart';
+import '../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../../core/widgets/treino_icon.dart';
 import '../../../../coach/application/agenda_providers.dart';
 import '../../../../coach/domain/appointment.dart';
@@ -157,119 +159,126 @@ class _AgendaWebDayListState extends ConsumerState<AgendaWebDayList> {
       ),
     );
 
-    return apptAsync.when(
-      loading: () => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 32),
-        child: Center(
-          child: CircularProgressIndicator(color: palette.accent),
-        ),
-      ),
-      error: (_, __) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 24),
-        child: Center(
-          child: Text(
-            'Error al cargar los turnos.', // i18n
-            style: TextStyle(color: palette.textMuted),
+    return TreinoStateSwitcher(
+      childKey: ValueKey(apptAsync.when(
+        loading: () => 'loading',
+        error: (_, __) => 'error',
+        data: (_) => 'data',
+      )),
+      child: apptAsync.when(
+        loading: () => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 32),
+          child: Center(
+            child: CircularProgressIndicator(color: palette.accent),
           ),
         ),
-      ),
-      data: (allAppts) {
-        // Filtrar: confirmados del día seleccionado.
-        final dayAppts = allAppts
-            .where(
-              (a) =>
-                  a.status == AppointmentStatus.confirmed &&
-                  a.startsAt.year == widget.selectedDay.year &&
-                  a.startsAt.month == widget.selectedDay.month &&
-                  a.startsAt.day == widget.selectedDay.day,
-            )
-            .toList()
-          ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
-
-        if (dayAppts.isEmpty) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 24),
-            child: Center(
-              child: Text(
-                'No hay sesiones este día.', // i18n
-                style: TextStyle(color: palette.textMuted),
-              ),
+        error: (_, __) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 24),
+          child: Center(
+            child: Text(
+              'Error al cargar los turnos.', // i18n
+              style: TextStyle(color: palette.textMuted),
             ),
-          );
-        }
-
-        // Selección EFECTIVA: intersección de lo tildado con lo que sigue
-        // siendo válido en el stream vigente (por si algo se cobró/canceló
-        // por otra vía mientras el trainer elegía). El lock al alumno se
-        // DERIVA de acá — nunca de un campo de estado aparte — así se
-        // libera solo si esa selección deja de existir.
-        final effectiveSelected = dayAppts
-            .where((a) => _selectedIds.contains(a.id) && _isBillable(a))
-            .toList();
-        final lockedAthleteId = effectiveSelected.isEmpty
-            ? null
-            : effectiveSelected.first.athleteId;
-
-        // Pre-calienta la tarifa de referencia del alumno lockeado ANTES de
-        // que el trainer llegue a BatchCobrarDialog — mismo gotcha que Slice
-        // 2a (obs. #468): un StreamProvider recién suscripto sigue en
-        // AsyncLoading el primer microtask, y BatchCobrarDialog prellena el
-        // monto con un ref.read() síncrono al abrir.
-        if (lockedAthleteId != null) {
-          ref.watch(athleteBillingProvider(lockedAthleteId));
-        }
-
-        final cards = <Widget>[
-          for (final appt in dayAppts)
-            AppointmentCard(
-              key: ValueKey(appt.id),
-              appointment: appt,
-              trainerId: widget.trainerId,
-              selectionMode: _selectionMode,
-              selected: _selectedIds.contains(appt.id) && _isBillable(appt),
-              selectable: _isBillable(appt) &&
-                  (lockedAthleteId == null ||
-                      lockedAthleteId == appt.athleteId),
-              onToggleSelected: () => _toggleSelected(appt),
-              onLongPress: () => _handleLongPress(appt),
-            ),
-        ];
-
-        final header = _SelectionHeaderRow(
-          selectionMode: _selectionMode,
-          selectedCount: effectiveSelected.length,
-          onEnterSelection: _enterSelectionMode,
-          onCancelSelection: _exitSelectionMode,
-        );
-
-        final bottomBar = effectiveSelected.isNotEmpty
-            ? _CobrarLoteBar(
-                count: effectiveSelected.length,
-                onTap: () => _openBatchCobrar(effectiveSelected),
+          ),
+        ),
+        data: (allAppts) {
+          // Filtrar: confirmados del día seleccionado.
+          final dayAppts = allAppts
+              .where(
+                (a) =>
+                    a.status == AppointmentStatus.confirmed &&
+                    a.startsAt.year == widget.selectedDay.year &&
+                    a.startsAt.month == widget.selectedDay.month &&
+                    a.startsAt.day == widget.selectedDay.day,
               )
-            : const SizedBox.shrink();
+              .toList()
+            ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
 
-        if (widget.fillHeight) {
+          if (dayAppts.isEmpty) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: Text(
+                  'No hay sesiones este día.', // i18n
+                  style: TextStyle(color: palette.textMuted),
+                ),
+              ),
+            );
+          }
+
+          // Selección EFECTIVA: intersección de lo tildado con lo que sigue
+          // siendo válido en el stream vigente (por si algo se cobró/canceló
+          // por otra vía mientras el trainer elegía). El lock al alumno se
+          // DERIVA de acá — nunca de un campo de estado aparte — así se
+          // libera solo si esa selección deja de existir.
+          final effectiveSelected = dayAppts
+              .where((a) => _selectedIds.contains(a.id) && _isBillable(a))
+              .toList();
+          final lockedAthleteId = effectiveSelected.isEmpty
+              ? null
+              : effectiveSelected.first.athleteId;
+
+          // Pre-calienta la tarifa de referencia del alumno lockeado ANTES de
+          // que el trainer llegue a BatchCobrarDialog — mismo gotcha que Slice
+          // 2a (obs. #468): un StreamProvider recién suscripto sigue en
+          // AsyncLoading el primer microtask, y BatchCobrarDialog prellena el
+          // monto con un ref.read() síncrono al abrir.
+          if (lockedAthleteId != null) {
+            ref.watch(athleteBillingProvider(lockedAthleteId));
+          }
+
+          final cards = <Widget>[
+            for (final appt in dayAppts)
+              AppointmentCard(
+                key: ValueKey(appt.id),
+                appointment: appt,
+                trainerId: widget.trainerId,
+                selectionMode: _selectionMode,
+                selected: _selectedIds.contains(appt.id) && _isBillable(appt),
+                selectable: _isBillable(appt) &&
+                    (lockedAthleteId == null ||
+                        lockedAthleteId == appt.athleteId),
+                onToggleSelected: () => _toggleSelected(appt),
+                onLongPress: () => _handleLongPress(appt),
+              ),
+          ];
+
+          final header = _SelectionHeaderRow(
+            selectionMode: _selectionMode,
+            selectedCount: effectiveSelected.length,
+            onEnterSelection: _enterSelectionMode,
+            onCancelSelection: _exitSelectionMode,
+          );
+
+          final bottomBar = effectiveSelected.isNotEmpty
+              ? _CobrarLoteBar(
+                  count: effectiveSelected.length,
+                  onTap: () => _openBatchCobrar(effectiveSelected),
+                )
+              : const SizedBox.shrink();
+
+          if (widget.fillHeight) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                header,
+                const SizedBox(height: 8),
+                Expanded(child: ListView(children: cards)),
+                bottomBar,
+              ],
+            );
+          }
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               header,
               const SizedBox(height: 8),
-              Expanded(child: ListView(children: cards)),
+              ...cards,
               bottomBar,
             ],
           );
-        }
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            header,
-            const SizedBox(height: 8),
-            ...cards,
-            bottomBar,
-          ],
-        );
-      },
+        },
+      ),
     );
   }
 }
@@ -443,7 +452,7 @@ class AppointmentCard extends ConsumerWidget {
     final showCheckbox = selectionMode && !billed;
     final dimmed = selectionMode && !billed && !selectable;
 
-    return GestureDetector(
+    return TreinoTappable(
       onTap: selectionMode
           ? (selectable ? onToggleSelected : null)
           : () => _openDetail(context, ref),
