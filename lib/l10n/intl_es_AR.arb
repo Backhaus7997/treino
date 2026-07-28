@@ -465,6 +465,10 @@
   "dashboardSinCobros": "Sin cobros pendientes.",
   "dashboardErrorCobros": "No pudimos cargar los cobros.",
   "dashboardHolaSinNombre": "HOLA",
+  "dashboardSolicitudesPendientesEmpty": "No tenés solicitudes pendientes.",
+  "@dashboardSolicitudesPendientesEmpty": {
+    "description": "Empty state of the pending-requests sheet, shown when the trainer opens the header bell with no incoming link requests."
+  },
   "dashboardSolicitudesPendientesTitle": "SOLICITUDES PENDIENTES ({count})",
   "@dashboardSolicitudesPendientesTitle": {
     "placeholders": {

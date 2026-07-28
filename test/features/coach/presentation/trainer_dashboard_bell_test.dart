@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -14,10 +16,13 @@ import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 // #393: the trainer home bell used to be a bare, inert Icon (no tap handler).
-// It now OPENS A MODAL listing the pending link requests (accept/decline) — but
-// only when there are pending requests (badgeCount > 0); with a zero badge it
-// stays inert. (The first cut scrolled to the inline card, which was useless
-// since that card is already on screen when the bell is reachable.)
+// It OPENS A MODAL listing the pending link requests (accept/decline). (The
+// first cut scrolled to the inline card, which was useless since that card is
+// already on screen when the bell is reachable.)
+//
+// It was then gated on badgeCount > 0 and sat inert at zero, which read as
+// broken — tapping did nothing and there was no way to tell that from a bug.
+// It always opens now, and the sheet owns the empty state.
 
 Widget _wrap(Widget child) => MaterialApp(
       theme: AppTheme.dark(),
@@ -56,8 +61,11 @@ void main() {
       expect(taps, 1);
     });
 
-    testWidgets(
-        'with zero pending requests → the bell is inert (tap is a no-op)',
+    // Superseded: the bell used to be INERT at badgeCount == 0, which read as
+    // broken — a trainer with no requests tapped it and nothing happened, with
+    // no way to tell that from a bug. It always opens now; the sheet owns the
+    // empty state.
+    testWidgets('with zero pending requests → the bell still opens',
         (tester) async {
       var taps = 0;
       await tester.pumpWidget(_wrap(
@@ -65,11 +73,10 @@ void main() {
       ));
 
       expect(find.byIcon(TreinoIcon.bell), findsOneWidget);
-      expect(find.text('0'), findsNothing); // no badge at zero
+      expect(find.text('0'), findsNothing); // still no badge at zero
 
-      // Nothing to show → the bell has no tap handler wired.
       await tester.tap(find.byIcon(TreinoIcon.bell), warnIfMissed: false);
-      expect(taps, 0);
+      expect(taps, 1);
     });
   });
 
@@ -97,6 +104,76 @@ void main() {
       // (OutlinedButton) actions.
       expect(find.byType(ElevatedButton), findsNWidgets(2));
       expect(find.byType(OutlinedButton), findsNWidgets(2));
+    });
+
+    // The sheet reaches "empty" two ways that need OPPOSITE behaviour, so both
+    // are pinned here.
+
+    testWidgets('opened with none → empty state, and it STAYS open',
+        (tester) async {
+      await tester.pumpWidget(ProviderScope(
+        overrides: [
+          trainerLinksStreamProvider.overrideWith(
+            (ref) => Stream.value(const <TrainerLink>[]),
+          ),
+          userPublicProfileProvider.overrideWith(
+            (ref, uid) => Stream<UserPublicProfile?>.value(null),
+          ),
+        ],
+        child: _wrap(const PendingRequestsSheetTestHarness()),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No tenés solicitudes pendientes.'), findsOneWidget);
+      expect(find.byType(ElevatedButton), findsNothing);
+      // Still mounted — it must not auto-close on this path.
+      expect(find.byType(PendingRequestsSheetTestHarness), findsOneWidget);
+    });
+
+    testWidgets(
+        'the LAST request disappearing still auto-closes (not an empty state)',
+        (tester) async {
+      final controller = StreamController<List<TrainerLink>>();
+      addTearDown(controller.close);
+
+      await tester.pumpWidget(ProviderScope(
+        overrides: [
+          trainerLinksStreamProvider.overrideWith((ref) => controller.stream),
+          userPublicProfileProvider.overrideWith(
+            (ref, uid) => Stream<UserPublicProfile?>.value(null),
+          ),
+        ],
+        child: _wrap(const Text('BASE')),
+      ));
+
+      // Pushed as a real route: `maybePop` is a no-op on the only route in the
+      // stack, so the sheet needs something underneath for the auto-close to
+      // be observable at all.
+      Navigator.of(tester.element(find.text('BASE'))).push(
+        MaterialPageRoute<void>(
+          builder: (_) =>
+              const Scaffold(body: PendingRequestsSheetTestHarness()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Opens WITH a request…
+      controller.add([_pending('l1', 'a1')]);
+      await tester.pumpAndSettle();
+      expect(find.byType(ElevatedButton), findsOneWidget);
+
+      // …and the trainer resolves the last one.
+      controller.add(const <TrainerLink>[]);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byType(PendingRequestsSheetTestHarness),
+        findsNothing,
+        reason: 'must auto-close, not sit on an empty state — the trainer '
+            'just acted, they did not come to browse',
+      );
+      expect(find.text('BASE'), findsOneWidget);
+      expect(find.text('No tenés solicitudes pendientes.'), findsNothing);
     });
   });
 }

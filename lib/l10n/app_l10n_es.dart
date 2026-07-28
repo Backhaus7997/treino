@@ -1124,6 +1124,10 @@ class AppL10nEs extends AppL10n {
   String get dashboardHolaSinNombre => 'HOLA';
 
   @override
+  String get dashboardSolicitudesPendientesEmpty =>
+      'No tenés solicitudes pendientes.';
+
+  @override
   String dashboardSolicitudesPendientesTitle(int count) {
     return 'SOLICITUDES PENDIENTES ($count)';
   }
@@ -4197,6 +4201,10 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get dashboardHolaSinNombre => 'HOLA';
+
+  @override
+  String get dashboardSolicitudesPendientesEmpty =>
+      'No tenés solicitudes pendientes.';
 
   @override
   String dashboardSolicitudesPendientesTitle(int count) {
