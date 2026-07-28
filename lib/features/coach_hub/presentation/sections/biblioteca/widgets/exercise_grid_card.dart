@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../../../app/theme/app_palette.dart';
 import '../../../../../../core/widgets/exercise_asset_image.dart';
+import '../../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../../../core/widgets/treino_icon.dart';
 import '../../../../../workout/domain/exercise.dart';
 import '../../../../../workout/domain/muscle_group.dart';
@@ -39,7 +40,7 @@ class ExerciseGridCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    return GestureDetector(
+    return TreinoTappable(
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
