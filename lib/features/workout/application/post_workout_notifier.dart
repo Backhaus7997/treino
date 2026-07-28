@@ -46,8 +46,7 @@ class PostWorkoutNotifier extends AutoDisposeAsyncNotifier<void> {
 
       await ref.read(postRepositoryProvider).create(post);
 
-      ref.invalidate(myFriendsFeedProvider);
-      ref.invalidate(feedPublicProvider);
+      invalidateAllFeedProviders(ref);
 
       state = const AsyncData(null);
     } catch (e, st) {

@@ -227,10 +227,8 @@ class CreatePostNotifier
 
       await ref.read(postRepositoryProvider).create(post);
 
-      // Invalidate all 3 feed providers unconditionally (ADR-CP-006)
-      ref.invalidate(myFriendsFeedProvider);
-      ref.invalidate(feedPublicProvider);
-      ref.invalidate(myGymFeedProvider);
+      // Invalidate every feed read model unconditionally (ADR-CP-006).
+      invalidateAllFeedProviders(ref);
 
       // Reset state
       state = const AsyncData(CreatePostState());

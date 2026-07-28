@@ -19,7 +19,7 @@ class PostActionsNotifier {
   /// disappears from any screen currently rendering it.
   Future<void> deletePost(String postId) async {
     await _ref.read(postRepositoryProvider).delete(postId);
-    _invalidateFeeds(authorUid: null);
+    invalidateAllFeedProviders(_ref);
   }
 
   /// Updates [post] (text/privacy/routineTag only — see
@@ -27,19 +27,8 @@ class PostActionsNotifier {
   /// change shows up wherever the post is rendered.
   Future<Post> updatePost(Post post) async {
     final updated = await _ref.read(postRepositoryProvider).update(post);
-    _invalidateFeeds(authorUid: post.authorUid);
+    invalidateAllFeedProviders(_ref);
     return updated;
-  }
-
-  void _invalidateFeeds({required String? authorUid}) {
-    // Unconditional invalidation mirrors ADR-CP-006 (see create_post_notifier).
-    _ref.invalidate(myFriendsFeedProvider);
-    _ref.invalidate(feedPublicProvider);
-    _ref.invalidate(myGymFeedProvider);
-    // Families: invalidating without args tears down every instance, which
-    // is simplest and safe here (low cardinality, re-fetched lazily).
-    _ref.invalidate(postsByAuthorProvider);
-    _ref.invalidate(visiblePostsByAuthorProvider);
   }
 }
 
