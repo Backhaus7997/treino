@@ -154,9 +154,47 @@ class _DashboardHeader extends ConsumerWidget {
               onTap: () => _showPendingRequestsSheet(context),
             ),
             const SizedBox(width: 12),
-            _AvatarInitials(
-              initials: initials.isEmpty ? '·' : initials,
-              palette: palette,
+            // Shortcut to the trainer's own profile (/profile renders
+            // TrainerProfileView for this role). The avatar was a bare
+            // decoration until now.
+            //
+            // `go`, not `push`: PERFIL is one of the shell tabs, so this is a
+            // tab switch, not a pushed page — pushing would stack a second
+            // profile on top of the INICIO tab and leave the bottom bar
+            // highlighting the wrong entry.
+            //
+            // Wrapped HERE and not inside _AvatarInitials: that widget is also
+            // used for athlete rows in ENTRENARON HOY and in the feedback
+            // picker, where it must stay inert.
+            Semantics(
+              button: true,
+              // `container: true` is what makes this its OWN semantics node.
+              // Without it the annotation merges into the enclosing node and
+              // the whole header — date, greeting, bell label and this one —
+              // is announced as a single blob.
+              container: true,
+              // excludeSemantics: the initials render as a Text that would
+              // otherwise merge into the label and be read out as
+              // "Ver tu perfil MP". They are decorative — derived from the
+              // display name the trainer already knows is theirs.
+              excludeSemantics: true,
+              label: AppL10n.of(context).a11yHomeAvatarButton,
+              child: GestureDetector(
+                onTap: () => context.go('/profile'),
+                behavior: HitTestBehavior.opaque,
+                // The avatar itself is 36px — under the 44pt minimum touch
+                // target. `opaque` makes the whole padded box tappable.
+                child: ConstrainedBox(
+                  constraints:
+                      const BoxConstraints(minWidth: 44, minHeight: 44),
+                  child: Center(
+                    child: _AvatarInitials(
+                      initials: initials.isEmpty ? '·' : initials,
+                      palette: palette,
+                    ),
+                  ),
+                ),
+              ),
             ),
           ],
         ),
@@ -181,15 +219,23 @@ class _BellWithBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
-    // #393: the bell was a bare Icon with no tap handler. It now opens a modal
-    // sheet listing the pending link requests (accept/decline) — but only when
-    // there IS at least one (badgeCount > 0); with a zero badge it stays inert.
-    final actionable = badgeCount > 0;
+    // #393: the bell was a bare Icon with no tap handler. It opens a modal
+    // sheet listing the pending link requests (accept/decline).
+    //
+    // It used to be gated on `badgeCount > 0` and sat INERT at zero, which
+    // read as broken — a trainer with no requests tapped it and nothing
+    // happened, with no way to tell that from a bug. It is always tappable
+    // now; the sheet owns the empty state.
     return Semantics(
       label: l10n.homePendingRequestsA11y(badgeCount),
-      button: actionable,
+      button: true,
+      // Without `container: true` this annotation merged into the enclosing
+      // header node, so the pending count was announced glued to the date and
+      // the greeting ("MARTES 28 JULIO HOLA, MATEO 0 solicitudes pendientes")
+      // instead of as its own control.
+      container: true,
       child: GestureDetector(
-        onTap: actionable ? onTap : null,
+        onTap: onTap,
         behavior: HitTestBehavior.opaque,
         child: ExcludeSemantics(
           child: Stack(
@@ -761,11 +807,31 @@ void _showPendingRequestsSheet(BuildContext context) {
   );
 }
 
-class _PendingRequestsSheet extends ConsumerWidget {
+class _PendingRequestsSheet extends ConsumerStatefulWidget {
   const _PendingRequestsSheet();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_PendingRequestsSheet> createState() =>
+      _PendingRequestsSheetState();
+}
+
+class _PendingRequestsSheetState extends ConsumerState<_PendingRequestsSheet> {
+  /// Latches once the sheet has shown at least one request.
+  ///
+  /// It distinguishes the two ways of ending up with an empty list, which need
+  /// OPPOSITE behaviour:
+  /// - opened with none → show the empty state and STAY (the bell is now
+  ///   always tappable, so this is a legitimate way to open the sheet);
+  /// - opened with some and the last one was just accepted/declined →
+  ///   auto-close, so the sheet does not sit there with nothing in it.
+  ///
+  /// Written during build without setState on purpose: it never needs to
+  /// trigger a rebuild of its own — the stream already rebuilds us, and this
+  /// only records what that rebuild showed.
+  bool _hadAny = false;
+
+  @override
+  Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     final linksAsync = ref.watch(trainerLinksStreamProvider);
@@ -773,10 +839,9 @@ class _PendingRequestsSheet extends ConsumerWidget {
         .where((l) => l.status == TrainerLinkStatus.pending)
         .toList();
 
-    // The bell only opens this when there ARE pending requests. If the trainer
-    // accepts/declines the last one while the sheet is open, the stream empties
-    // → auto-close, so the sheet never sits there with nothing in it.
-    if (pending.isEmpty) {
+    if (pending.isNotEmpty) _hadAny = true;
+
+    if (pending.isEmpty && _hadAny) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (context.mounted) Navigator.of(context).maybePop();
       });
@@ -804,6 +869,14 @@ class _PendingRequestsSheet extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 16),
+            if (pending.isEmpty)
+              Text(
+                l10n.dashboardSolicitudesPendientesEmpty,
+                style: GoogleFonts.barlow(
+                  fontSize: 13,
+                  color: palette.textMuted,
+                ),
+              ),
             for (final link in pending) ...[
               _PendingRequestCard(link: link),
               const SizedBox(height: 8),

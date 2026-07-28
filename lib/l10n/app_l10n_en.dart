@@ -1090,6 +1090,10 @@ class AppL10nEn extends AppL10n {
   String get dashboardHolaSinNombre => 'HOLA';
 
   @override
+  String get dashboardSolicitudesPendientesEmpty =>
+      'You have no pending requests.';
+
+  @override
   String dashboardSolicitudesPendientesTitle(int count) {
     return 'SOLICITUDES PENDIENTES ($count)';
   }

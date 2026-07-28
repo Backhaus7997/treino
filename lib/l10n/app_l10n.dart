@@ -2144,6 +2144,12 @@ abstract class AppL10n {
   /// **'HOLA'**
   String get dashboardHolaSinNombre;
 
+  /// Empty state of the pending-requests sheet, shown when the trainer opens the header bell with no incoming link requests.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No tenés solicitudes pendientes.'**
+  String get dashboardSolicitudesPendientesEmpty;
+
   /// No description provided for @dashboardSolicitudesPendientesTitle.
   ///
   /// In es_AR, this message translates to:
