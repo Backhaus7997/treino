@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:table_calendar/table_calendar.dart';
 
+import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/motion/treino_fade_slide_in.dart';
+import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../profile/application/user_public_profile_providers.dart';
 import '../application/agenda_providers.dart';
@@ -70,12 +73,19 @@ class _AthleteAgendaScreenState extends ConsumerState<AthleteAgendaScreen> {
         ),
       ),
       backgroundColor: palette.bg,
-      body: appointmentsAsync.when(
-        loading: () => Center(
-          child: CircularProgressIndicator(color: palette.accent),
+      body: TreinoStateSwitcher(
+        childKey: ValueKey(appointmentsAsync.when(
+          loading: () => 'loading',
+          error: (_, __) => 'error',
+          data: (_) => 'data',
+        )),
+        child: appointmentsAsync.when(
+          loading: () => Center(
+            child: CircularProgressIndicator(color: palette.accent),
+          ),
+          error: (_, __) => _errorState(context, palette),
+          data: (appointments) => _body(context, palette, appointments),
         ),
-        error: (_, __) => _errorState(context, palette),
-        data: (appointments) => _body(context, palette, appointments),
       ),
     );
   }
@@ -104,42 +114,52 @@ class _AthleteAgendaScreenState extends ConsumerState<AthleteAgendaScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       children: [
         // ── Calendar ──────────────────────────────────────────────────────────
-        _AgendaCalendar(
-          focusedDay: _focusedDay,
-          selectedDay: _selectedDay,
-          appointments: confirmed,
-          onDaySelected: (selected, focused) {
-            setState(() {
-              _selectedDay = selected;
-              _focusedDay = focused;
-            });
-            _openDaySheet(context, selected, confirmed);
-          },
-          onPageChanged: (focused) {
-            setState(() => _focusedDay = focused);
-          },
+        TreinoFadeSlideIn(
+          child: _AgendaCalendar(
+            focusedDay: _focusedDay,
+            selectedDay: _selectedDay,
+            appointments: confirmed,
+            onDaySelected: (selected, focused) {
+              setState(() {
+                _selectedDay = selected;
+                _focusedDay = focused;
+              });
+              _openDaySheet(context, selected, confirmed);
+            },
+            onPageChanged: (focused) {
+              setState(() => _focusedDay = focused);
+            },
+          ),
         ),
 
         const SizedBox(height: 24),
 
         // ── Upcoming sessions list ────────────────────────────────────────────
         if (upcoming.isNotEmpty) ...[
-          Text(
-            AppL10n.of(context).agendaUpcomingAppointmentsHeading,
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-              letterSpacing: 1.2,
-              color: palette.textMuted,
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(1),
+            child: Text(
+              AppL10n.of(context).agendaUpcomingAppointmentsHeading,
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                letterSpacing: 1.2,
+                color: palette.textMuted,
+              ),
             ),
           ),
           const SizedBox(height: 10),
-          ...upcoming.map(
-            (appt) => AppointmentTile(
-              appointment: appt,
-              now: now,
-            ),
-          ),
+          // Lista eager (spread en ListView(children:), no builder) → stagger
+          // seguro.
+          ...upcoming.asMap().entries.map(
+                (e) => TreinoFadeSlideIn(
+                  delay: AppMotion.stagger(e.key + 2),
+                  child: AppointmentTile(
+                    appointment: e.value,
+                    now: now,
+                  ),
+                ),
+              ),
         ] else ...[
           _emptyState(context, palette),
         ],
@@ -368,9 +388,13 @@ class _DaySessionsSheet extends ConsumerWidget {
               ),
             ),
           ] else ...[
-            ...sessions.map(
-              (appt) => _SessionRow(appointment: appt),
-            ),
+            ...sessions.asMap().entries.map(
+                  (e) => TreinoFadeSlideIn(
+                    delay: AppMotion.stagger(e.key),
+                    distance: AppMotion.slideSm,
+                    child: _SessionRow(appointment: e.value),
+                  ),
+                ),
           ],
 
           const SizedBox(height: 8),
