@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/widgets/motion/treino_state_switcher.dart';
+import '../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../profile/application/user_providers.dart'
     show firestoreProvider;
 import '../../application/agenda_providers.dart';
@@ -192,7 +194,10 @@ class TrainerDayDetailSheet extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 16),
-            child,
+            TreinoStateSwitcher(
+              childKey: ValueKey(child.runtimeType),
+              child: child,
+            ),
             const SizedBox(height: 8),
           ],
         ),
@@ -412,7 +417,7 @@ class _BookedSlotChipState extends ConsumerState<_BookedSlotChip> {
   Widget build(BuildContext context) {
     final accent = widget.accentColor;
 
-    return GestureDetector(
+    return TreinoTappable(
       onTap: () => showModalBottomSheet<void>(
         context: context,
         useRootNavigator: true,
