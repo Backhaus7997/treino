@@ -348,6 +348,37 @@ class _SharedToggleRow extends StatelessWidget {
   }
 }
 
+/// Secondary actions of a template card, collapsed into the overflow menu.
+enum _TemplateAction { publish, edit, delete }
+
+/// One row of the template overflow menu — icon + label, colored by intent.
+class _MenuRow extends StatelessWidget {
+  const _MenuRow({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: 12),
+        Text(
+          label,
+          style: GoogleFonts.barlow(fontSize: 14, color: color),
+        ),
+      ],
+    );
+  }
+}
+
 class _TemplateCard extends ConsumerStatefulWidget {
   const _TemplateCard({required this.template, required this.palette});
 
@@ -557,71 +588,55 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
                   ),
                 ),
                 const SizedBox(height: 2),
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        '${t.split ?? AppL10n.of(context).workoutSplitFallback} · $daysCount día${daysCount == 1 ? '' : 's'}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.barlow(
-                          color: palette.textMuted,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                    if (isPublished) ...[
-                      const SizedBox(width: 8),
+                Text(
+                  '${t.split ?? AppL10n.of(context).workoutSplitFallback} · $daysCount día${daysCount == 1 ? '' : 's'}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.barlow(
+                    color: palette.textMuted,
+                    fontSize: 12,
+                  ),
+                ),
+                // Own line, not beside the split: on a narrow phone the
+                // badge and the subtitle fought for the same row and the
+                // subtitle got squeezed to nothing.
+                if (isPublished) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
                       Icon(TreinoIcon.globe, size: 12, color: palette.accent),
                       const SizedBox(width: 4),
-                      Text(
-                        'PUBLICADA',
-                        key: Key('template_published_badge_${t.id}'),
-                        style: GoogleFonts.barlowCondensed(
-                          color: palette.accent,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 11,
-                          letterSpacing: 1,
+                      // Flexible: the word is wider than the name column on a
+                      // narrow phone, and a decorative badge must degrade
+                      // rather than overflow the card.
+                      Flexible(
+                        child: Text(
+                          'PUBLICADA',
+                          key: Key('template_published_badge_${t.id}'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.barlowCondensed(
+                            color: palette.accent,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 11,
+                            letterSpacing: 1,
+                          ),
                         ),
                       ),
                     ],
-                  ],
-                ),
+                  ),
+                ],
               ],
             ),
           ),
           const SizedBox(width: 8),
-          IconButton(
-            key: Key('template_publish_toggle_${t.id}'),
-            onPressed: busy ? null : () => _onTogglePublished(context),
-            icon: _publishing
-                ? SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: palette.accent),
-                  )
-                : Icon(
-                    isPublished ? TreinoIcon.eyeOff : TreinoIcon.globe,
-                    size: 18,
-                    color: isPublished ? palette.accent : palette.textMuted,
-                  ),
-            tooltip: isPublished ? 'Despublicar' : 'Publicar',
-            constraints: const BoxConstraints(),
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-          ),
-          IconButton(
-            onPressed: busy
-                ? null
-                : () => context.push(
-                      '/workout/template-editor',
-                      extra: widget.template.id,
-                    ),
-            icon: Icon(TreinoIcon.edit, size: 18, color: palette.textMuted),
-            tooltip: 'Editar',
-            constraints: const BoxConstraints(),
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-          ),
+          // ASIGNAR stays inline (the primary action); publicar / editar /
+          // eliminar moved into an overflow menu when publishing added a
+          // fourth control. Four fixed-width buttons plus the name did not
+          // fit a 360dp phone — the name column collapsed to zero width and
+          // the row overflowed. One menu button also gives each action a
+          // full-width tap target instead of shrinking them all.
           TextButton(
             onPressed: busy ? null : () => _onAssign(context),
             style: TextButton.styleFrom(
@@ -644,19 +659,65 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
                     ),
                   ),
           ),
-          IconButton(
-            onPressed: busy ? null : () => _onDelete(context),
-            icon: _deleting
+          PopupMenuButton<_TemplateAction>(
+            key: Key('template_actions_menu_${t.id}'),
+            enabled: !busy,
+            color: palette.bgCard,
+            tooltip: 'Más acciones',
+            icon: (_publishing || _deleting)
                 ? SizedBox(
                     width: 16,
                     height: 16,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2, color: palette.danger),
+                      strokeWidth: 2,
+                      color: _deleting ? palette.danger : palette.accent,
+                    ),
                   )
-                : Icon(TreinoIcon.trash, size: 18, color: palette.textMuted),
-            tooltip: 'Eliminar',
-            constraints: const BoxConstraints(),
-            padding: const EdgeInsets.symmetric(horizontal: 8),
+                : Icon(
+                    TreinoIcon.dotsThree,
+                    size: 18,
+                    color: palette.textMuted,
+                  ),
+            onSelected: (action) {
+              switch (action) {
+                case _TemplateAction.publish:
+                  _onTogglePublished(context);
+                case _TemplateAction.edit:
+                  context.push(
+                    '/workout/template-editor',
+                    extra: widget.template.id,
+                  );
+                case _TemplateAction.delete:
+                  _onDelete(context);
+              }
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                key: Key('template_publish_toggle_${t.id}'),
+                value: _TemplateAction.publish,
+                child: _MenuRow(
+                  icon: isPublished ? TreinoIcon.eyeOff : TreinoIcon.globe,
+                  label: isPublished ? 'Despublicar' : 'Publicar',
+                  color: palette.accent,
+                ),
+              ),
+              PopupMenuItem(
+                value: _TemplateAction.edit,
+                child: _MenuRow(
+                  icon: TreinoIcon.edit,
+                  label: 'Editar',
+                  color: palette.textPrimary,
+                ),
+              ),
+              PopupMenuItem(
+                value: _TemplateAction.delete,
+                child: _MenuRow(
+                  icon: TreinoIcon.trash,
+                  label: 'Eliminar',
+                  color: palette.danger,
+                ),
+              ),
+            ],
           ),
         ],
       ),

@@ -98,6 +98,9 @@ void main() {
       findsNothing,
     );
 
+    await tester
+        .tap(find.byKey(const Key('template_actions_menu_$_templateId')));
+    await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(const Key('template_publish_toggle_$_templateId')),
     );
@@ -126,6 +129,9 @@ void main() {
     await tester.pumpWidget(_wrap(firestore, makeTemplate()));
     await tester.pumpAndSettle();
 
+    await tester
+        .tap(find.byKey(const Key('template_actions_menu_$_templateId')));
+    await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(const Key('template_publish_toggle_$_templateId')),
     );
@@ -149,6 +155,9 @@ void main() {
       findsOneWidget,
     );
 
+    await tester
+        .tap(find.byKey(const Key('template_actions_menu_$_templateId')));
+    await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(const Key('template_publish_toggle_$_templateId')),
     );
@@ -169,5 +178,26 @@ void main() {
       find.text('Tu plantilla salió del catálogo público.'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('the card fits a 360dp phone without collapsing the name',
+      (tester) async {
+    // Regression lock: publishing added a fourth control to the action row.
+    // With four fixed-width buttons the row overflowed at 360dp and the
+    // Expanded name column measured 0px wide — the trainer could not tell
+    // which template they were about to publish or delete.
+    tester.view.physicalSize = const Size(360, 1200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final firestore = await seed(RoutineVisibility.public);
+    await tester.pumpWidget(
+      _wrap(firestore, makeTemplate(visibility: RoutineVisibility.public)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    final nameWidth = tester.getSize(find.text('Plantilla PPL')).width;
+    expect(nameWidth, greaterThan(40));
   });
 }

@@ -62,6 +62,7 @@ Widget _wrap(
   TemplateRating? myRating,
   Map<String, UserPublicProfile> profiles = const {},
   bool ratingsError = false,
+  bool myRatingLoading = false,
 }) =>
     ProviderScope(
       overrides: [
@@ -74,8 +75,11 @@ Widget _wrap(
               ? Stream<List<TemplateRating>>.error(Exception('boom'))
               : Stream.value(ratings),
         ),
-        myTemplateRatingProvider(_routineId)
-            .overrideWith((ref) => Stream.value(myRating)),
+        myTemplateRatingProvider(_routineId).overrideWith(
+          (ref) => myRatingLoading
+              ? const Stream<TemplateRating?>.empty()
+              : Stream.value(myRating),
+        ),
         userPublicProfilesBatchProvider(
           (ratings.map((r) => r.userId).toSet().toList()..sort()).join(','),
         ).overrideWith((ref) async => profiles),
@@ -128,6 +132,53 @@ void main() {
       expect(find.byKey(const Key('template_rating_average')), findsNothing);
       expect(find.text('0.0'), findsNothing);
     });
+
+    testWidgets(
+        'ratings exist but the aggregate has not landed → falls back to them, '
+        'never claims nobody rated it', (tester) async {
+      // The Cloud Function writes ratingAvg/ratingsCount asynchronously (and
+      // not at all until it is deployed). Without the fallback the section
+      // contradicted itself: "nobody rated this yet" right above a comment.
+      await tester.pumpWidget(
+        _wrap(
+          makeTemplate(),
+          ratings: [
+            makeRating(userId: 'u1', rating: 5, comment: 'Muy completa'),
+            makeRating(userId: 'u2', rating: 3),
+          ],
+          profiles: const {
+            'u1': UserPublicProfile(
+              uid: 'u1',
+              displayName: 'Ana',
+              displayNameLowercase: 'ana',
+            ),
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Todavía nadie calificó esta plantilla. ¡Sé el primero!'),
+        findsNothing,
+      );
+      expect(find.text('4.0'), findsOneWidget);
+      expect(find.text('2 calificaciones'), findsOneWidget);
+      expect(find.text('Muy completa'), findsOneWidget);
+    });
+
+    testWidgets('the CF aggregate wins over the fallback once it lands',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          makeTemplate(ratingAvg: 4.5, ratingsCount: 120),
+          ratings: [makeRating(userId: 'u1', rating: 1)],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('4.5'), findsOneWidget);
+      expect(find.text('120 calificaciones'), findsOneWidget);
+    });
   });
 
   group('TemplateRatingsSection — mi calificación', () {
@@ -173,6 +224,22 @@ void main() {
       expect(find.byKey(const Key('template_rating_cta')), findsNothing);
       // The average is still visible to them.
       expect(find.byKey(const Key('template_rating_average')), findsOneWidget);
+    });
+
+    testWidgets('no CTA while my rating is still loading', (tester) async {
+      // Otherwise the "you haven't rated" variant flashes, and tapping it
+      // opens the sheet empty — whose submit would wipe the comment I
+      // already left (set without merge).
+      await tester.pumpWidget(
+        _wrap(
+          makeTemplate(ratingAvg: 4, ratingsCount: 2),
+          myRatingLoading: true,
+        ),
+      );
+      await tester.pump();
+
+      expect(find.byKey(const Key('template_rating_cta')), findsNothing);
+      expect(find.text('¿Qué te pareció?'), findsNothing);
     });
 
     testWidgets('a signed-out viewer sees no input either', (tester) async {

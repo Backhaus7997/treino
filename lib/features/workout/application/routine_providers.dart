@@ -25,7 +25,15 @@ final routinesProvider = FutureProvider<List<Routine>>((ref) async {
 /// `visibility == 'public'`). Auth-gated like [routinesProvider]; a failure
 /// here is enrichment-only for the PLANTILLAS grid (see
 /// `communityTemplatesProvider`).
-final publishedTemplatesProvider = FutureProvider<List<Routine>>((ref) async {
+///
+/// `autoDispose` on purpose (unlike [routinesProvider], whose system
+/// catalogue is effectively immutable): the community catalogue changes
+/// whenever ANY trainer publishes or unpublishes. Kept alive while
+/// `/workout` is mounted by PlantillasTab, it re-queries when the athlete
+/// comes back to the Entrenar tab instead of freezing for the whole
+/// session.
+final publishedTemplatesProvider =
+    FutureProvider.autoDispose<List<Routine>>((ref) async {
   final user = await ref.watch(authStateChangesProvider.future);
   if (user == null) return const [];
   return ref.watch(routineRepositoryProvider).listPublishedTemplates();

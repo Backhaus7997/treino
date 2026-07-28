@@ -34,13 +34,18 @@ class TemplateRatingsSection extends ConsumerWidget {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     final ratingsAsync = ref.watch(templateRatingsProvider(routine.id));
-    final myRating =
-        ref.watch(myTemplateRatingProvider(routine.id)).valueOrNull;
+    final myRatingAsync = ref.watch(myTemplateRatingProvider(routine.id));
     final uid = ref.watch(authStateChangesProvider).valueOrNull?.uid;
     // The template's author never rates their own work (Firestore rules
     // enforce it too) — showing them the input would only produce a denied
     // write.
-    final canRate = uid != null && uid != routine.assignedBy;
+    //
+    // `hasValue` (not `valueOrNull`) gates the row: while my rating is still
+    // loading, rendering the "you haven't rated" variant would invite a tap
+    // that opens the sheet EMPTY and overwrites the comment I already left.
+    final canRate =
+        uid != null && uid != routine.assignedBy && myRatingAsync.hasValue;
+    final myRating = myRatingAsync.valueOrNull;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -55,7 +60,10 @@ class TemplateRatingsSection extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 12),
-        _AverageRow(routine: routine),
+        _AverageRow(
+          routine: routine,
+          knownRatings: ratingsAsync.valueOrNull ?? const [],
+        ),
         if (canRate) ...[
           const SizedBox(height: 18),
           _MyRatingRow(routine: routine, myRating: myRating),
@@ -98,17 +106,31 @@ class TemplateRatingsSection extends ConsumerWidget {
 
 /// Average score + how many people rated. With zero ratings it says so
 /// plainly instead of rendering a hollow 0.0.
+///
+/// The aggregate normally comes from the routine doc (server-authoritative,
+/// written by the Cloud Function). [knownRatings] is the fallback for the
+/// window where ratings already exist but the CF has not written the
+/// aggregate yet — without it the section contradicts itself, showing
+/// "nobody rated this yet" right above someone's comment. The fallback is
+/// exact while the streamed list is not capped, and the aggregate takes
+/// over as soon as it lands.
 class _AverageRow extends StatelessWidget {
-  const _AverageRow({required this.routine});
+  const _AverageRow({required this.routine, required this.knownRatings});
 
   final Routine routine;
+  final List<TemplateRating> knownRatings;
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    final avg = routine.ratingAvg;
-    final count = routine.ratingsCount ?? 0;
+    var avg = routine.ratingAvg;
+    var count = routine.ratingsCount ?? 0;
+
+    if ((avg == null || count == 0) && knownRatings.isNotEmpty) {
+      count = knownRatings.length;
+      avg = knownRatings.fold<int>(0, (sum, r) => sum + r.rating) / count;
+    }
 
     if (avg == null || count == 0) {
       return Row(

@@ -168,6 +168,9 @@ void main() {
       scrollable: find.byType(Scrollable).first,
     );
 
+    // Genuinely zero ratings: both empty states are the honest answer here
+    // (unlike "aggregate missing but ratings exist", covered in
+    // template_ratings_section_test.dart).
     expect(
       find.text('Todavía nadie calificó esta plantilla. ¡Sé el primero!'),
       findsOneWidget,
