@@ -12,6 +12,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/features/payments/domain/payment.dart';
 import 'package:treino/features/profile/application/user_providers.dart'
     show userProfileProvider;
@@ -231,22 +232,30 @@ class _PagosScreenState extends ConsumerState<PagosScreen>
     required String? paymentAlias,
     required bool showActions,
   }) {
-    return bucketsAsync.when(
-      data: (b) => PagosWebTable(
-        payments: getPayments(b),
-        profiles: profiles,
-        emptyLabel: emptyLabel,
-        onMarcarPagado:
-            showActions ? (p) => marcarPagadoDoc(context, ref, p) : null,
-        onRecordar:
-            showActions ? (p) => recordar(context, ref, p, paymentAlias) : null,
-        showActions: showActions,
-      ),
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(
-        child: Text(
-          'Error al cargar pagos.', // i18n
-          style: TextStyle(color: palette.danger),
+    return TreinoStateSwitcher(
+      childKey: ValueKey(bucketsAsync.when(
+        loading: () => 'loading',
+        error: (_, __) => 'error',
+        data: (_) => 'data',
+      )),
+      child: bucketsAsync.when(
+        data: (b) => PagosWebTable(
+          payments: getPayments(b),
+          profiles: profiles,
+          emptyLabel: emptyLabel,
+          onMarcarPagado:
+              showActions ? (p) => marcarPagadoDoc(context, ref, p) : null,
+          onRecordar: showActions
+              ? (p) => recordar(context, ref, p, paymentAlias)
+              : null,
+          showActions: showActions,
+        ),
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(
+          child: Text(
+            'Error al cargar pagos.', // i18n
+            style: TextStyle(color: palette.danger),
+          ),
         ),
       ),
     );
