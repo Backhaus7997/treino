@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/motion/treino_state_switcher.dart';
+import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../application/search_users_provider.dart';
@@ -117,9 +119,8 @@ class _SearchUsersHeader extends StatelessWidget {
           Semantics(
             button: true,
             label: l10n.commonBack,
-            child: GestureDetector(
+            child: TreinoTappable(
               onTap: () => context.pop(),
-              behavior: HitTestBehavior.opaque,
               child: SizedBox(
                 width: 44,
                 height: 44,
@@ -208,9 +209,8 @@ class _SearchTextField extends StatelessWidget {
             return Semantics(
               button: true,
               label: l10n.searchUsersClearA11y,
-              child: GestureDetector(
+              child: TreinoTappable(
                 onTap: onClear,
-                behavior: HitTestBehavior.opaque,
                 child: SizedBox(
                   width: 44,
                   height: 44,
@@ -260,54 +260,60 @@ class _SearchBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (activeQuery.isEmpty) {
-      return const FeedEmptyState(message: 'Buscá usuarios por nombre');
-    }
-
-    if (activeQuery.length < kSearchMinChars) {
-      return const FeedEmptyState(message: 'Buscá usuarios por nombre');
+    if (activeQuery.isEmpty || activeQuery.length < kSearchMinChars) {
+      return const TreinoStateSwitcher(
+        childKey: ValueKey('initial'),
+        child: FeedEmptyState(message: 'Buscá usuarios por nombre'),
+      );
     }
 
     final asyncUsers = ref.watch(searchUsersProvider(activeQuery));
 
-    return asyncUsers.when(
-      loading: () => Center(
-        child: CircularProgressIndicator(color: palette.accent),
-      ),
-      error: (_, __) => Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Text(
-            'No pudimos buscar usuarios. Intentá de nuevo.',
-            style: GoogleFonts.barlow(
-              fontSize: 14,
-              color: palette.textMuted,
+    return TreinoStateSwitcher(
+      childKey: ValueKey(asyncUsers.when(
+        loading: () => 'loading',
+        error: (_, __) => 'error',
+        data: (users) => users.isEmpty ? 'empty:$activeQuery' : 'data',
+      )),
+      child: asyncUsers.when(
+        loading: () => Center(
+          child: CircularProgressIndicator(color: palette.accent),
+        ),
+        error: (_, __) => Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Text(
+              'No pudimos buscar usuarios. Intentá de nuevo.',
+              style: GoogleFonts.barlow(
+                fontSize: 14,
+                color: palette.textMuted,
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
           ),
         ),
-      ),
-      data: (users) {
-        if (users.isEmpty) {
-          return FeedEmptyState(
-            message: 'Sin resultados para "$activeQuery"',
-          );
-        }
-        return ListView.separated(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: EdgeInsets.fromLTRB(
-              20, 0, 20, MediaQuery.paddingOf(context).bottom),
-          itemCount: users.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 8),
-          itemBuilder: (_, i) {
-            final user = users[i];
-            return UserSearchResultTile(
-              profile: user,
-              onTap: () => context.push('/feed/profile/${user.uid}'),
+        data: (users) {
+          if (users.isEmpty) {
+            return FeedEmptyState(
+              message: 'Sin resultados para "$activeQuery"',
             );
-          },
-        );
-      },
+          }
+          return ListView.separated(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(
+                20, 0, 20, MediaQuery.paddingOf(context).bottom),
+            itemCount: users.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 8),
+            itemBuilder: (_, i) {
+              final user = users[i];
+              return UserSearchResultTile(
+                profile: user,
+                onTap: () => context.push('/feed/profile/${user.uid}'),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }
