@@ -4,14 +4,19 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_background.dart';
+import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/utils/kg_format.dart';
+import '../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../application/post_workout_notifier.dart';
+import '../application/session_highlights.dart';
 import '../application/session_muscle_distribution.dart';
 import '../application/session_providers.dart';
+import '../application/session_recognition.dart';
 import '../domain/session.dart';
 import '../domain/set_log.dart';
+import 'widgets/session_highlights_section.dart';
 import 'widgets/session_muscle_distribution_section.dart';
 import 'widgets/stat_tile.dart';
 import '../../../l10n/app_l10n.dart';
@@ -35,6 +40,12 @@ class PostWorkoutSummaryScreen extends ConsumerWidget {
           (uid: uid, sessionId: sessionId),
         ))
         .valueOrNull;
+    // Mismo contrato best-effort para récords/reconocimiento: mientras el
+    // scan de historial corre (o si falla), el tile PRS HOY muestra "—" y las
+    // secciones de PRs/ejercicios no aparecen — nada bloquea el resumen.
+    final highlights = ref
+        .watch(sessionHighlightsProvider((uid: uid, sessionId: sessionId)))
+        .valueOrNull;
 
     return Scaffold(
       body: AppBackground(
@@ -55,6 +66,7 @@ class PostWorkoutSummaryScreen extends ConsumerWidget {
                 session: session,
                 setLogs: data.setLogs,
                 muscleDistribution: muscleDistribution,
+                highlights: highlights,
                 isSharing: isSharing,
                 onShare: () async {
                   final messenger = ScaffoldMessenger.of(context);
@@ -100,6 +112,7 @@ class _LoadedBody extends StatelessWidget {
     required this.session,
     required this.setLogs,
     required this.muscleDistribution,
+    required this.highlights,
     required this.isSharing,
     required this.onShare,
   });
@@ -107,6 +120,7 @@ class _LoadedBody extends StatelessWidget {
   final Session session;
   final List<SetLog> setLogs;
   final SessionMuscleDistribution? muscleDistribution;
+  final SessionHighlights? highlights;
   final bool isSharing;
   final VoidCallback onShare;
 
@@ -115,6 +129,7 @@ class _LoadedBody extends StatelessWidget {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     final distribution = muscleDistribution;
+    final highlights = this.highlights;
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -131,99 +146,103 @@ class _LoadedBody extends StatelessWidget {
           ),
           const SizedBox(height: 8),
 
-          // Header
-          Text(
-            session.wasFullyCompleted
-                ? l10n.workoutSummaryHeaderCompleted
-                : l10n.workoutSummaryHeaderAbandoned,
-            textAlign: TextAlign.center,
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w800,
-              fontSize: 32,
-              color: palette.accent,
-              letterSpacing: 1.5,
+          // Header — entrada fade+slide sobria (TreinoFadeSlideIn respeta
+          // reduce-motion: visible al primer frame, sin delay).
+          TreinoFadeSlideIn(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  session.wasFullyCompleted
+                      ? l10n.workoutSummaryHeaderCompleted
+                      : l10n.workoutSummaryHeaderAbandoned,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 32,
+                    color: palette.accent,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  session.routineName,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 18,
+                    color: palette.textMuted,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            session.routineName,
-            textAlign: TextAlign.center,
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w600,
-              fontSize: 18,
-              color: palette.textMuted,
-            ),
-          ),
+          _RecognitionSlot(highlights: highlights),
           const SizedBox(height: 32),
 
           // 2×2 stat grid
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 16,
-            crossAxisSpacing: 16,
-            childAspectRatio: 2,
-            children: [
-              StatTile(
-                label: l10n.workoutStatDurationMin,
-                value: session.durationMin.toString(),
-              ),
-              StatTile(
-                label: l10n.workoutStatVolumeKg,
-                value: formatVolumeKg(session.totalVolumeKg),
-              ),
-              StatTile(
-                label: l10n.workoutStatSets,
-                value: setLogs.length.toString(),
-              ),
-              StatTile(
-                label: l10n.workoutStatPrsToday,
-                value: l10n.workoutStatPrsTodayStub,
-              ),
-            ],
-          ),
-          const SizedBox(height: 32),
-
-          // Muscle distribution of THIS session (radar, or bars when the
-          // session folds into <3 radar axes). Absent while loading, on
-          // resolver error, or when no set maps to a radar axis.
-          if (distribution != null && distribution.setsByAxis.isNotEmpty) ...[
-            SessionMuscleDistributionSection(distribution: distribution),
-            const SizedBox(height: 32),
-          ],
-
-          // PRs section (stub)
-          Text(
-            l10n.workoutPrsSectionTitle,
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 16,
-              color: palette.textPrimary,
-              letterSpacing: 1.2,
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(1),
+            child: GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 16,
+              crossAxisSpacing: 16,
+              childAspectRatio: 2,
+              children: [
+                StatTile(
+                  label: l10n.workoutStatDurationMin,
+                  value: session.durationMin.toString(),
+                ),
+                StatTile(
+                  label: l10n.workoutStatVolumeKg,
+                  value: formatVolumeKg(session.totalVolumeKg),
+                ),
+                StatTile(
+                  label: l10n.workoutStatSets,
+                  value: setLogs.length.toString(),
+                ),
+                StatTile(
+                  label: l10n.workoutStatPrsToday,
+                  // null → "—": mientras el scan de récords corre (o falló),
+                  // y para sesiones que no cuentan como entreno (#372 — un
+                  // "0" en una sesión abandonada afirmaría una medición que
+                  // no se hizo).
+                  value: highlights == null || !session.countsAsWorkout
+                      ? null
+                      : highlights.recordCount.toString(),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            l10n.workoutPrsPlaceholder,
-            style: TextStyle(color: palette.textMuted),
-          ),
           const SizedBox(height: 32),
+
+          // Slots SIEMPRE presentes (shrink cuando no aplican): la cantidad
+          // de hijos del Column no cambia cuando la data async llega, así los
+          // hermanos de abajo conservan su State y sus entradas one-shot
+          // (TreinoFadeSlideIn) no se re-disparan.
+          _DistributionSlot(distribution: distribution),
+          _PrsSlot(session: session, highlights: highlights),
+          _ExercisesSlot(highlights: highlights),
 
           // Mood row — 5 emojis, visual only (decorative, non-interactive).
           // Flexible + FittedBox per emoji: when a glyph measures wider than
           // expected (tofu .notdef, large font scale) the row scales down
           // instead of overflowing (#456).
-          const ExcludeSemantics(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                Flexible(child: _MoodEmoji('😞')),
-                Flexible(child: _MoodEmoji('😕')),
-                Flexible(child: _MoodEmoji('😐')),
-                Flexible(child: _MoodEmoji('🙂')),
-                Flexible(child: _MoodEmoji('😄')),
-              ],
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(2),
+            child: const ExcludeSemantics(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  Flexible(child: _MoodEmoji('😞')),
+                  Flexible(child: _MoodEmoji('😕')),
+                  Flexible(child: _MoodEmoji('😐')),
+                  Flexible(child: _MoodEmoji('🙂')),
+                  Flexible(child: _MoodEmoji('😄')),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 40),
@@ -257,6 +276,98 @@ class _LoadedBody extends StatelessWidget {
                 : Text(l10n.workoutButtonShare),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Async slots ───────────────────────────────────────────────────────────────
+// Cada slot es un hijo fijo del Column que renderiza SizedBox.shrink hasta que
+// su data llega; el contenido monta con su propia entrada TreinoFadeSlideIn y
+// lleva su spacing adentro (así "ausente" no deja huecos).
+
+class _RecognitionSlot extends StatelessWidget {
+  const _RecognitionSlot({required this.highlights});
+
+  final SessionHighlights? highlights;
+
+  @override
+  Widget build(BuildContext context) {
+    final highlights = this.highlights;
+    if (highlights == null ||
+        highlights.recognition.kind == SessionRecognitionKind.none) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: TreinoFadeSlideIn(
+        distance: AppMotion.slideSm,
+        child: SessionRecognitionBanner(recognition: highlights.recognition),
+      ),
+    );
+  }
+}
+
+class _DistributionSlot extends StatelessWidget {
+  const _DistributionSlot({required this.distribution});
+
+  final SessionMuscleDistribution? distribution;
+
+  @override
+  Widget build(BuildContext context) {
+    final distribution = this.distribution;
+    if (distribution == null || distribution.setsByAxis.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 32),
+      child: TreinoFadeSlideIn(
+        child: SessionMuscleDistributionSection(distribution: distribution),
+      ),
+    );
+  }
+}
+
+class _PrsSlot extends StatelessWidget {
+  const _PrsSlot({required this.session, required this.highlights});
+
+  final Session session;
+  final SessionHighlights? highlights;
+
+  @override
+  Widget build(BuildContext context) {
+    final highlights = this.highlights;
+    // Sin sets no hay nada que contar, y una sesión que no cuenta como
+    // entreno (#372) no reclama PRs — misma regla que Insights.
+    if (highlights == null ||
+        highlights.exercises.isEmpty ||
+        !session.countsAsWorkout) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 32),
+      child: TreinoFadeSlideIn(
+        child: SessionPrsSection(highlights: highlights),
+      ),
+    );
+  }
+}
+
+class _ExercisesSlot extends StatelessWidget {
+  const _ExercisesSlot({required this.highlights});
+
+  final SessionHighlights? highlights;
+
+  @override
+  Widget build(BuildContext context) {
+    final highlights = this.highlights;
+    if (highlights == null || highlights.exercises.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 32),
+      child: TreinoFadeSlideIn(
+        child: SessionExercisesSection(exercises: highlights.exercises),
       ),
     );
   }
