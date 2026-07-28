@@ -496,6 +496,7 @@ class _TrackingNotifier extends PostWorkoutNotifier {
     Session session, {
     required String text,
     required int exerciseCount,
+    String? localPhotoPath,
   }) async {
     capturedExerciseCount = exerciseCount;
     onShare();
@@ -509,6 +510,7 @@ class _SuccessNotifier extends PostWorkoutNotifier {
     Session session, {
     required String text,
     required int exerciseCount,
+    String? localPhotoPath,
   }) async {
     state = const AsyncLoading();
     await Future<void>.delayed(Duration.zero);
@@ -522,6 +524,7 @@ class _ErrorNotifier extends PostWorkoutNotifier {
     Session session, {
     required String text,
     required int exerciseCount,
+    String? localPhotoPath,
   }) async {
     state = const AsyncLoading();
     await Future<void>.delayed(Duration.zero);

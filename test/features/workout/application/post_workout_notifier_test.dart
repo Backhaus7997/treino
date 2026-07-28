@@ -211,6 +211,7 @@ class _FakeNotifier extends PostWorkoutNotifier {
     Session session, {
     required String text,
     required int exerciseCount,
+    String? localPhotoPath,
   }) async {
     state = const AsyncLoading();
     try {
