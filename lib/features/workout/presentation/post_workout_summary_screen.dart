@@ -8,6 +8,7 @@ import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/utils/kg_format.dart';
 import '../../../core/widgets/motion/treino_fade_slide_in.dart';
+import '../../../core/widgets/motion/treino_success_check.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../application/post_workout_notifier.dart';
 import '../application/session_highlights.dart';
@@ -131,6 +132,12 @@ class _LoadedBody extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // Check que se dibuja one-shot — solo para el cierre exitoso;
+                // una sesión abandonada no festeja lo que no se cumplió.
+                if (session.wasFullyCompleted) ...[
+                  const Center(child: TreinoSuccessCheck()),
+                  const SizedBox(height: 12),
+                ],
                 Text(
                   session.wasFullyCompleted
                       ? l10n.workoutSummaryHeaderCompleted
@@ -173,14 +180,18 @@ class _LoadedBody extends StatelessWidget {
                 StatTile(
                   label: l10n.workoutStatDurationMin,
                   value: session.durationMin.toString(),
+                  countUpValue: session.durationMin,
                 ),
                 StatTile(
                   label: l10n.workoutStatVolumeKg,
                   value: formatVolumeKg(session.totalVolumeKg),
+                  countUpValue: session.totalVolumeKg,
+                  countUpFormatter: (v) => formatVolumeKg(v.toDouble()),
                 ),
                 StatTile(
                   label: l10n.workoutStatSets,
                   value: setLogs.length.toString(),
+                  countUpValue: setLogs.length,
                 ),
                 StatTile(
                   label: l10n.workoutStatPrsToday,
@@ -191,6 +202,9 @@ class _LoadedBody extends StatelessWidget {
                   value: highlights == null || !session.countsAsWorkout
                       ? null
                       : highlights.recordCount.toString(),
+                  countUpValue: highlights == null || !session.countsAsWorkout
+                      ? null
+                      : highlights.recordCount,
                 ),
               ],
             ),
