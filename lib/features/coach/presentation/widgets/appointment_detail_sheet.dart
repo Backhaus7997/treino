@@ -7,6 +7,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/utils/argentina_time.dart'
     show argentinaNow, argentinaUtcOffset;
+import '../../../../core/widgets/motion/treino_state_switcher.dart';
+import '../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../../coach_hub/presentation/sections/pagos/widgets/payment_format.dart'
@@ -239,57 +241,61 @@ class _AppointmentDetailSheetState
               const SizedBox(height: 12),
               // ── Cobrar (Slice 2a — Agenda→cobro bridge) ────────────────────
               if (appointment.status == AppointmentStatus.confirmed) ...[
-                if (appointment.paymentId != null)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      color: palette.accent.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(9999),
-                      border: Border.all(color: palette.accent),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(TreinoIcon.checkCircleFill,
-                            size: 18, color: palette.accent),
-                        const SizedBox(width: 8),
-                        Text(
-                          AppL10n.of(context).agendaCobradoLabel,
-                          style: GoogleFonts.barlowCondensed(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                            color: palette.accent,
+                TreinoStateSwitcher(
+                  childKey: ValueKey(appointment.paymentId != null
+                      ? 'cobrado'
+                      : (_showCobrarForm ? 'form' : 'button')),
+                  child: appointment.paymentId != null
+                      ? Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: palette.accent.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(9999),
+                            border: Border.all(color: palette.accent),
                           ),
-                        ),
-                      ],
-                    ),
-                  )
-                else if (!_showCobrarForm)
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: OutlinedButton(
-                      onPressed: () => _openCobrarForm(ref),
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: palette.accent),
-                        foregroundColor: palette.accent,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(9999),
-                        ),
-                      ),
-                      child: Text(
-                        AppL10n.of(context).agendaCobrarCta,
-                        style: GoogleFonts.barlowCondensed(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                    ),
-                  )
-                else
-                  _buildCobrarForm(context, ref, palette),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(TreinoIcon.checkCircleFill,
+                                  size: 18, color: palette.accent),
+                              const SizedBox(width: 8),
+                              Text(
+                                AppL10n.of(context).agendaCobradoLabel,
+                                style: GoogleFonts.barlowCondensed(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                  color: palette.accent,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : (!_showCobrarForm
+                          ? SizedBox(
+                              width: double.infinity,
+                              height: 48,
+                              child: OutlinedButton(
+                                onPressed: () => _openCobrarForm(ref),
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(color: palette.accent),
+                                  foregroundColor: palette.accent,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(9999),
+                                  ),
+                                ),
+                                child: Text(
+                                  AppL10n.of(context).agendaCobrarCta,
+                                  style: GoogleFonts.barlowCondensed(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 13,
+                                    letterSpacing: 0.8,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : _buildCobrarForm(context, ref, palette)),
+                ),
                 const SizedBox(height: 12),
               ],
               SizedBox(
@@ -552,9 +558,8 @@ class _AppointmentDetailSheetState
           ),
           const SizedBox(height: 14),
           label(l10n.agendaCobrarVenceElLabel),
-          InkWell(
+          TreinoTappable(
             onTap: _pickDueDate,
-            borderRadius: BorderRadius.circular(12),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               decoration: BoxDecoration(
@@ -583,9 +588,8 @@ class _AppointmentDetailSheetState
                     Semantics(
                       button: true,
                       label: l10n.agendaCobrarVenceElQuitar,
-                      child: GestureDetector(
+                      child: TreinoTappable(
                         onTap: () => setState(() => _dueDate = null),
-                        behavior: HitTestBehavior.opaque,
                         child: Padding(
                           padding: const EdgeInsets.all(2),
                           child: Icon(TreinoIcon.close,
