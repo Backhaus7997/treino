@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/motion/treino_state_switcher.dart';
+import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../auth/application/auth_providers.dart';
@@ -33,51 +35,58 @@ class FriendRequestsInboxScreen extends ConsumerWidget {
       children: [
         _InboxHeader(palette: palette),
         Expanded(
-          child: requestsAsync.when(
-            loading: () => Center(
-              child: CircularProgressIndicator(color: palette.accent),
-            ),
-            error: (_, __) => Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Text(
-                  'No pudimos cargar las solicitudes. Intentá de nuevo.',
-                  style: GoogleFonts.barlow(
-                    fontSize: 14,
-                    color: palette.textMuted,
+          child: TreinoStateSwitcher(
+            childKey: ValueKey(requestsAsync.when(
+              loading: () => 'loading',
+              error: (_, __) => 'error',
+              data: (list) => list.isEmpty ? 'empty' : 'data',
+            )),
+            child: requestsAsync.when(
+              loading: () => Center(
+                child: CircularProgressIndicator(color: palette.accent),
+              ),
+              error: (_, __) => Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Text(
+                    'No pudimos cargar las solicitudes. Intentá de nuevo.',
+                    style: GoogleFonts.barlow(
+                      fontSize: 14,
+                      color: palette.textMuted,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
-                  textAlign: TextAlign.center,
                 ),
               ),
-            ),
-            data: (list) {
-              if (list.isEmpty) {
-                return Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Text(
-                      'No hay solicitudes pendientes',
-                      style: GoogleFonts.barlow(
-                        fontSize: 14,
-                        color: palette.textMuted,
+              data: (list) {
+                if (list.isEmpty) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Text(
+                        'No hay solicitudes pendientes',
+                        style: GoogleFonts.barlow(
+                          fontSize: 14,
+                          color: palette.textMuted,
+                        ),
+                        textAlign: TextAlign.center,
                       ),
-                      textAlign: TextAlign.center,
                     ),
+                  );
+                }
+                return ListView.separated(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.fromLTRB(
+                      20, 0, 20, MediaQuery.paddingOf(context).bottom),
+                  itemCount: list.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (_, i) => FriendRequestInboxTile(
+                    friendship: list[i],
+                    viewerUid: myUid ?? '',
                   ),
                 );
-              }
-              return ListView.separated(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: EdgeInsets.fromLTRB(
-                    20, 0, 20, MediaQuery.paddingOf(context).bottom),
-                itemCount: list.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
-                itemBuilder: (_, i) => FriendRequestInboxTile(
-                  friendship: list[i],
-                  viewerUid: myUid ?? '',
-                ),
-              );
-            },
+              },
+            ),
           ),
         ),
       ],
@@ -104,9 +113,8 @@ class _InboxHeader extends StatelessWidget {
           Semantics(
             button: true,
             label: l10n.commonBack,
-            child: GestureDetector(
+            child: TreinoTappable(
               onTap: () => context.pop(),
-              behavior: HitTestBehavior.opaque,
               child: Container(
                 constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
                 alignment: Alignment.centerLeft,
