@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../../../app/theme/app_palette.dart';
+import '../../../../../../core/widgets/exercise_asset_image.dart';
 import '../../../../../../core/widgets/treino_icon.dart';
 import '../../../../../workout/domain/exercise.dart';
 import '../../../../../workout/domain/muscle_group.dart';
@@ -68,10 +69,15 @@ class ExerciseGridCard extends StatelessWidget {
                               color: palette.accent,
                             ),
                           )
-                        : Image.asset(
-                            'assets/exercises/${exercise.id}.png',
+                        // Real exercise photo via thumbnailUrl (same shared
+                        // widget mobile uses). Falls back through local assets
+                        // to the dumbbell icon when the URL is null/fails.
+                        : ExerciseAssetImage(
+                            exerciseId: exercise.id,
+                            muscleGroup: exercise.muscleGroup,
+                            thumbnailUrl: exercise.thumbnailUrl,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
+                            fallback: Container(
                               color: palette.bgCard,
                               alignment: Alignment.center,
                               child: Icon(
