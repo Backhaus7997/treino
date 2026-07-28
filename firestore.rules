@@ -468,8 +468,21 @@ service cloud.firestore {
       // `request.resource.data` es el doc FINAL mergeado, así que las mismas
       // condiciones valen: docs legacy traen un subset de las keys permitidas
       // y pasan hasOnly igual.
+      //
+      // Campos inmutables pineados equal-to-existing (idioma get(...,null),
+      // como `payments`): PostRepository.update solo edita text/privacy/
+      // routineTag y su doc declara authorUid/authorGymId/author*/createdAt/id
+      // inmutables — sin el pin, el dueño podía REASIGNAR authorUid y plantar
+      // un post falso atribuido a otra persona en el feed de los amigos de la
+      // víctima (o inyectar en el feed de otro gym vía authorGymId).
       allow update: if request.auth != null
                     && request.auth.uid == resource.data.authorUid
+                    && request.resource.data.authorUid == resource.data.authorUid
+                    && request.resource.data.get('authorGymId', null) == resource.data.get('authorGymId', null)
+                    && request.resource.data.get('authorDisplayName', null) == resource.data.get('authorDisplayName', null)
+                    && request.resource.data.get('authorAvatarUrl', null) == resource.data.get('authorAvatarUrl', null)
+                    && request.resource.data.get('id', null) == resource.data.get('id', null)
+                    && request.resource.data.get('createdAt', null) == resource.data.get('createdAt', null)
                     && request.resource.data.keys().hasOnly([
                          'id', 'authorUid', 'authorDisplayName',
                          'authorAvatarUrl', 'authorGymId', 'text',

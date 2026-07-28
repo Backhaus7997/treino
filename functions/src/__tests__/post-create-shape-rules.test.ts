@@ -281,4 +281,25 @@ describe("posts/{postId} update — same shape bounds as create", () => {
       updatePost(AUTHOR, { workoutSnapshot: snapshotWith(31) })
     );
   });
+
+  // Immutable-field pins: without them, the post's own author could REASSIGN
+  // authorUid and plant a fake post attributed to someone else (visible in the
+  // victim's friends' feeds), or inject into another gym via authorGymId.
+  it("DENIES the author reassigning authorUid (identity spoofing)", async () => {
+    await assertFails(
+      updatePost(AUTHOR, { authorUid: OTHER, text: "contenido falso" })
+    );
+  });
+
+  it("DENIES the author reassigning authorGymId (cross-gym injection)", async () => {
+    await assertFails(updatePost(AUTHOR, { authorGymId: "gym-ajeno" }));
+  });
+
+  it("DENIES rewriting authorDisplayName on edit", async () => {
+    await assertFails(updatePost(AUTHOR, { authorDisplayName: "Impostor" }));
+  });
+
+  it("DENIES rewriting createdAt on edit", async () => {
+    await assertFails(updatePost(AUTHOR, { createdAt: new Date() }));
+  });
 });
