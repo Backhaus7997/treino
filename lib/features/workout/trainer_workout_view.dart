@@ -11,6 +11,7 @@ import '../profile/application/user_public_profile_providers.dart';
 import 'application/routine_providers.dart';
 import 'application/session_providers.dart' show currentUidProvider;
 import 'domain/routine.dart';
+import 'domain/routine_visibility.dart';
 
 /// Trainer-specific workout tab — replaces the athlete WORKOUT body (rutina /
 /// plantillas / historial) with a "Crear planes" surface. The trainer should
@@ -360,6 +361,7 @@ class _TemplateCard extends ConsumerStatefulWidget {
 class _TemplateCardState extends ConsumerState<_TemplateCard> {
   bool _assigning = false;
   bool _deleting = false;
+  bool _publishing = false;
 
   Future<void> _onDelete(BuildContext context) async {
     final confirmed = await showDialog<bool>(
@@ -423,6 +425,84 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
     }
   }
 
+  Future<void> _onTogglePublished(BuildContext context) async {
+    final isPublished = widget.template.visibility == RoutineVisibility.public;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: widget.palette.bgCard,
+        title: Text(
+          isPublished ? 'Despublicar plantilla' : 'Publicar plantilla',
+          style: GoogleFonts.barlowCondensed(
+            fontWeight: FontWeight.w700,
+            color: widget.palette.textPrimary,
+          ),
+        ),
+        content: Text(
+          isPublished
+              ? '"${widget.template.name}" va a salir del catálogo público. '
+                  'Las calificaciones que ya recibió se conservan.'
+              : '"${widget.template.name}" va a quedar visible para toda la '
+                  'comunidad de TREINO, que va a poder usarla y calificarla.',
+          style: GoogleFonts.barlow(
+            fontSize: 13,
+            color: widget.palette.textPrimary,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(
+              'Cancelar',
+              style:
+                  GoogleFonts.barlowCondensed(color: widget.palette.textMuted),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(
+              isPublished ? 'Despublicar' : 'Publicar',
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                color: widget.palette.accent,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _publishing = true);
+    try {
+      final repo = ref.read(routineRepositoryProvider);
+      if (isPublished) {
+        await repo.unpublishTemplate(widget.template.id);
+      } else {
+        await repo.publishTemplate(widget.template.id);
+      }
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isPublished
+                ? 'Tu plantilla salió del catálogo público.'
+                : '¡Tu plantilla ya está en el catálogo público!',
+          ),
+        ),
+      );
+      // The templates stream auto-refreshes from the Firestore snapshot.
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No pudimos actualizar la publicación.'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _publishing = false);
+    }
+  }
+
   Future<void> _onAssign(BuildContext context) async {
     final athleteId = await showAthletePickerSheet(context);
     if (athleteId == null || !mounted) return;
@@ -451,6 +531,8 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
     final palette = widget.palette;
     final t = widget.template;
     final daysCount = t.days.length;
+    final isPublished = t.visibility == RoutineVisibility.public;
+    final busy = _assigning || _deleting || _publishing;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
@@ -475,19 +557,61 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
                   ),
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  '${t.split ?? AppL10n.of(context).workoutSplitFallback} · $daysCount día${daysCount == 1 ? '' : 's'}',
-                  style: GoogleFonts.barlow(
-                    color: palette.textMuted,
-                    fontSize: 12,
-                  ),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        '${t.split ?? AppL10n.of(context).workoutSplitFallback} · $daysCount día${daysCount == 1 ? '' : 's'}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.barlow(
+                          color: palette.textMuted,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    if (isPublished) ...[
+                      const SizedBox(width: 8),
+                      Icon(TreinoIcon.globe, size: 12, color: palette.accent),
+                      const SizedBox(width: 4),
+                      Text(
+                        'PUBLICADA',
+                        key: Key('template_published_badge_${t.id}'),
+                        style: GoogleFonts.barlowCondensed(
+                          color: palette.accent,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 11,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),
           ),
           const SizedBox(width: 8),
           IconButton(
-            onPressed: (_assigning || _deleting)
+            key: Key('template_publish_toggle_${t.id}'),
+            onPressed: busy ? null : () => _onTogglePublished(context),
+            icon: _publishing
+                ? SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: palette.accent),
+                  )
+                : Icon(
+                    isPublished ? TreinoIcon.eyeOff : TreinoIcon.globe,
+                    size: 18,
+                    color: isPublished ? palette.accent : palette.textMuted,
+                  ),
+            tooltip: isPublished ? 'Despublicar' : 'Publicar',
+            constraints: const BoxConstraints(),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+          ),
+          IconButton(
+            onPressed: busy
                 ? null
                 : () => context.push(
                       '/workout/template-editor',
@@ -499,7 +623,7 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
             padding: const EdgeInsets.symmetric(horizontal: 8),
           ),
           TextButton(
-            onPressed: _assigning ? null : () => _onAssign(context),
+            onPressed: busy ? null : () => _onAssign(context),
             style: TextButton.styleFrom(
               foregroundColor: palette.accent,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -521,8 +645,7 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
                   ),
           ),
           IconButton(
-            onPressed:
-                (_assigning || _deleting) ? null : () => _onDelete(context),
+            onPressed: busy ? null : () => _onDelete(context),
             icon: _deleting
                 ? SizedBox(
                     width: 16,
