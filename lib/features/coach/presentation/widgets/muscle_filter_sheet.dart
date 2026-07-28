@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../app/theme/app_motion.dart';
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/widgets/motion/treino_fade_slide_in.dart';
+import '../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../workout/domain/muscle_group.dart';
 import '../../../../l10n/app_l10n.dart';
@@ -73,99 +76,102 @@ class _MuscleFilterSheetContentState extends State<_MuscleFilterSheetContent> {
             color: palette.bg,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Drag handle
-              Padding(
-                padding: const EdgeInsets.only(top: 12, bottom: 8),
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: palette.border,
-                    borderRadius: BorderRadius.circular(2),
+          child: TreinoFadeSlideIn(
+            distance: AppMotion.slideSm,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Drag handle
+                Padding(
+                  padding: const EdgeInsets.only(top: 12, bottom: 8),
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: palette.border,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
-              ),
-              // Title row + Limpiar button
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 4, 12, 8),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        l10n.workoutPickerMuscleSheetTitle,
-                        style: GoogleFonts.barlowCondensed(
-                          color: palette.textPrimary,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.4,
-                        ),
-                      ),
-                    ),
-                    if (_selected.isNotEmpty)
-                      TextButton(
-                        onPressed: () => setState(_selected.clear),
+                // Title row + Limpiar button
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 12, 8),
+                  child: Row(
+                    children: [
+                      Expanded(
                         child: Text(
-                          l10n.workoutPickerSheetClear,
-                          style: GoogleFonts.barlow(
-                            color: palette.textMuted,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
+                          l10n.workoutPickerMuscleSheetTitle,
+                          style: GoogleFonts.barlowCondensed(
+                            color: palette.textPrimary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.4,
                           ),
                         ),
                       ),
-                  ],
+                      if (_selected.isNotEmpty)
+                        TextButton(
+                          onPressed: () => setState(_selected.clear),
+                          child: Text(
+                            l10n.workoutPickerSheetClear,
+                            style: GoogleFonts.barlow(
+                              color: palette.textMuted,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
-              Divider(height: 1, color: palette.border),
-              // Scrollable list of muscle groups (multi-select)
-              Flexible(
-                child: ListView(
-                  controller: scrollController,
-                  shrinkWrap: true,
-                  padding: const EdgeInsets.only(bottom: 12),
-                  children: [
-                    for (final group in MuscleGroup.displayOrder)
-                      _MuscleRow(
-                        group: group,
-                        selected: _selected.contains(group),
-                        onTap: () => _toggle(group),
-                        palette: palette,
-                      ),
-                  ],
+                Divider(height: 1, color: palette.border),
+                // Scrollable list of muscle groups (multi-select)
+                Flexible(
+                  child: ListView(
+                    controller: scrollController,
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.only(bottom: 12),
+                    children: [
+                      for (final group in MuscleGroup.displayOrder)
+                        _MuscleRow(
+                          group: group,
+                          selected: _selected.contains(group),
+                          onTap: () => _toggle(group),
+                          palette: palette,
+                        ),
+                    ],
+                  ),
                 ),
-              ),
-              // Sticky Aplicar button
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: palette.accent,
-                      foregroundColor: palette.bg,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                // Sticky Aplicar button
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: palette.accent,
+                        foregroundColor: palette.bg,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
-                    ),
-                    onPressed: () => Navigator.of(context).pop(_selected),
-                    child: Text(
-                      _selected.isEmpty
-                          ? l10n.workoutPickerSheetApplyAll
-                          : l10n.workoutPickerSheetApply(_selected.length),
-                      style: GoogleFonts.barlowCondensed(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1.2,
+                      onPressed: () => Navigator.of(context).pop(_selected),
+                      child: Text(
+                        _selected.isEmpty
+                            ? l10n.workoutPickerSheetApplyAll
+                            : l10n.workoutPickerSheetApply(_selected.length),
+                        style: GoogleFonts.barlowCondensed(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.2,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
@@ -188,7 +194,7 @@ class _MuscleRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return TreinoTappable(
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
