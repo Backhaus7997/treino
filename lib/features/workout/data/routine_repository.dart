@@ -510,6 +510,12 @@ class RoutineRepository {
       source: RoutineSource.trainerAssigned,
       assignedTo: athleteId,
       visibility: RoutineVisibility.private,
+      // Community aggregates belong to the published template, not the
+      // athlete's private copy. toJson() already excludes them from the
+      // write (includeToJson: false); clearing them here keeps the RETURNED
+      // object faithful to the persisted doc as well.
+      ratingAvg: null,
+      ratingsCount: null,
     );
     return createAssigned(assigned);
   }
@@ -528,6 +534,10 @@ class RoutineRepository {
   /// ≤500). The rules additionally require the parent to be a published
   /// `trainer-template` NOT owned by the rater — the author cannot rate
   /// their own work.
+  ///
+  /// On EDITS the rules pin `createdAt` to its stored value, so this method
+  /// reads the existing doc first and preserves its `createdAt` — callers
+  /// may stamp both timestamps with "now" and edits still pass the rule.
   Future<void> upsertTemplateRating({
     required String routineId,
     required TemplateRating rating,
@@ -557,18 +567,32 @@ class RoutineRepository {
         'must be at most 500 characters',
       );
     }
-    await _ratingsOf(routineId).doc(rating.userId).set(rating.toJson());
+    final docRef = _ratingsOf(routineId).doc(rating.userId);
+    final json = rating.toJson();
+    // Preserve the original createdAt on edits (see doc comment above) —
+    // one extra read per submit, and rating submissions are rare.
+    final existingCreatedAt = (await docRef.get()).data()?['createdAt'];
+    if (existingCreatedAt != null) {
+      json['createdAt'] = existingCreatedAt;
+    }
+    await docRef.set(json);
   }
 
-  /// Live stream of every rating left on a template, newest first.
+  /// Live stream of the ratings left on a template, newest first, capped at
+  /// [limit] (bounded like `ReviewRepository.watchForTrainer` — an unbounded
+  /// community subcollection must not stream in full).
   ///
   /// Single orderBy on a subcollection field — covered by Firestore's
   /// automatic single-field index, no composite needed. The doc id is
   /// injected as `userId` so the id stays authoritative even for docs whose
   /// body drifted (mirrors [_fromDoc]).
-  Stream<List<TemplateRating>> watchTemplateRatings(String routineId) {
+  Stream<List<TemplateRating>> watchTemplateRatings(
+    String routineId, {
+    int limit = 50,
+  }) {
     return _ratingsOf(routineId)
         .orderBy('createdAt', descending: true)
+        .limit(limit)
         .snapshots()
         .map(
           (s) => [

@@ -228,11 +228,16 @@ service cloud.firestore {
                     && !('assignedBy' in request.resource.data)
                     && !('assignedTo' in request.resource.data)
                     // Only content fields may appear in the written document.
+                    // ratingAvg/ratingsCount: defensively listed (same as the
+                    // trainer-template path) so a doc that ever gained CF
+                    // aggregates cannot brick its owner's edits; the
+                    // affectedKeys allowlist below still excludes them.
                     && request.resource.data.keys().hasOnly(
                          // + numWeeks (periodization, Model B) — mirror RoutineRepository.
                          ['name', 'level', 'days',
                           'source', 'createdBy', 'visibility', 'createdAt', 'status',
-                          'split', 'estimatedMinutesPerDay', 'imageUrl', 'numWeeks'])
+                          'split', 'estimatedMinutesPerDay', 'imageUrl', 'numWeeks',
+                          'ratingAvg', 'ratingsCount'])
                     // The diff must touch ONLY content fields (name/level/days/
                     // numWeeks/visibility).
                     && request.resource.data.diff(resource.data).affectedKeys()
@@ -270,12 +275,17 @@ service cloud.firestore {
                     && (!('createdAt' in resource.data)
                         || request.resource.data.createdAt == resource.data.createdAt)
                     // Only content fields may appear in the written document.
+                    // ratingAvg/ratingsCount: defensively listed (same as the
+                    // trainer-template path) so a doc that ever gained CF
+                    // aggregates cannot brick the trainer's edits; the
+                    // affectedKeys allowlist below still excludes them.
                     && request.resource.data.keys().hasOnly(
                          // + numWeeks (periodization, Model B) — mirror RoutineRepository.
                          ['name', 'split', 'level', 'days',
                           'source', 'assignedBy', 'assignedTo', 'visibility',
                           'status', 'createdBy', 'createdAt',
-                          'estimatedMinutesPerDay', 'imageUrl', 'numWeeks'])
+                          'estimatedMinutesPerDay', 'imageUrl', 'numWeeks',
+                          'ratingAvg', 'ratingsCount'])
                     // The diff must touch ONLY content fields.
                     && request.resource.data.diff(resource.data).affectedKeys()
                          // + numWeeks (periodization) — repo always sends it.
@@ -339,8 +349,14 @@ service cloud.firestore {
       // or ownership changes can never ride along on this path. Any
       // authenticated user can then read the published doc via the existing
       // `visibility == 'public'` branch of the read rule above.
+      // The role gate mirrors the "any athlete-role user forges X" guards
+      // used across the file: CREATE branch 1 predates role checks, so an
+      // athlete CAN hold a private forged `trainer-template` doc — without
+      // this gate, path 5 would let them publish it into the community
+      // catalogue (and collect ratings on it).
       allow update: if request.auth != null
                     && request.auth.uid == resource.data.assignedBy
+                    && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
                     && resource.data.source == 'trainer-template'
                     && request.resource.data.diff(resource.data).affectedKeys()
                          == ['visibility'].toSet()
@@ -385,9 +401,12 @@ service cloud.firestore {
                && request.resource.data.rating is int
                && request.resource.data.rating >= 1
                && request.resource.data.rating <= 5
-               && (!('comment' in request.resource.data)
-                   || request.resource.data.comment == null
-                   || request.resource.data.comment.size() <= 500)
+               // optStrMaxLen (shared guard, QA #508) — the `is string`
+               // check matters: `.size()` is also defined for lists/maps,
+               // so a bare size check would accept a List/Map comment that
+               // later explodes the `as String?` cast in every client
+               // reading this template's ratings.
+               && optStrMaxLen(request.resource.data.get('comment', null), 500)
                && request.resource.data.createdAt is timestamp
                && request.resource.data.updatedAt is timestamp;
       }

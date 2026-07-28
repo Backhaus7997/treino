@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/workout/data/routine_repository.dart';
 import 'package:treino/features/workout/domain/routine.dart';
+import 'package:treino/features/workout/domain/routine_source.dart';
+import 'package:treino/features/workout/domain/routine_visibility.dart';
 import 'package:treino/features/workout/domain/template_rating.dart';
 
 void main() {
@@ -208,6 +210,37 @@ void main() {
       expect(data['comment'], isNull);
     });
 
+    test('an edit preserves the ORIGINAL createdAt', () async {
+      // The rules pin createdAt to its stored value on update, so a caller
+      // that stamps both timestamps with "now" must still pass. Without
+      // this preservation the edit would be permission-denied in prod.
+      await repo.upsertTemplateRating(
+        routineId: 'tpl-1',
+        rating: makeRating('user-1', rating: 5, createdMs: 1000),
+      );
+      await repo.upsertTemplateRating(
+        routineId: 'tpl-1',
+        rating: makeRating('user-1', rating: 2, createdMs: 9000),
+      );
+
+      final data = (await firestore
+              .collection('routines')
+              .doc('tpl-1')
+              .collection('ratings')
+              .doc('user-1')
+              .get())
+          .data()!;
+      expect(data['rating'], 2);
+      expect(
+        (data['createdAt']! as Timestamp).millisecondsSinceEpoch,
+        1000,
+      );
+      expect(
+        (data['updatedAt']! as Timestamp).millisecondsSinceEpoch,
+        9000,
+      );
+    });
+
     test('rejects out-of-range ratings and oversized comments', () {
       expect(
         () => repo.upsertTemplateRating(
@@ -291,6 +324,52 @@ void main() {
         ratings.map((r) => r.userId).toList(),
         ['user-legacy', 'user-new', 'user-old'],
       );
+    });
+
+    test('caps the stream at the requested limit', () async {
+      for (var i = 0; i < 5; i++) {
+        await repo.upsertTemplateRating(
+          routineId: 'tpl-1',
+          rating: makeRating('user-$i', createdMs: 1000 + i),
+        );
+      }
+
+      final ratings = await repo.watchTemplateRatings('tpl-1', limit: 2).first;
+
+      expect(ratings.map((r) => r.userId).toList(), ['user-4', 'user-3']);
+    });
+  });
+
+  group('assignTemplateToAthlete', () {
+    test('drops the community aggregates from the assigned copy', () async {
+      const template = Routine(
+        id: 'tpl-1',
+        name: 'Plantilla publicada',
+        level: ExperienceLevel.beginner,
+        days: [],
+        source: RoutineSource.trainerTemplate,
+        assignedBy: 'trainer-a',
+        visibility: RoutineVisibility.public,
+        ratingAvg: 4.5,
+        ratingsCount: 3,
+      );
+
+      final assigned = await repo.assignTemplateToAthlete(
+        template: template,
+        athleteId: 'athlete-1',
+      );
+
+      // The returned object must match the persisted doc — a published
+      // template's reputation does not follow its private copies.
+      expect(assigned.ratingAvg, isNull);
+      expect(assigned.ratingsCount, isNull);
+      expect(assigned.visibility, RoutineVisibility.private);
+
+      final data =
+          (await firestore.collection('routines').doc(assigned.id).get())
+              .data()!;
+      expect(data.containsKey('ratingAvg'), isFalse);
+      expect(data.containsKey('ratingsCount'), isFalse);
     });
   });
 

@@ -83,6 +83,23 @@ function ratingPayload(uid: string, overrides: Record<string, unknown> = {}) {
 beforeEach(async () => {
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();
+    // Role docs — UPDATE path 5 gates publishing on users/{uid}.role.
+    await db.collection("users").doc(TRAINER_A).set({
+      uid: TRAINER_A,
+      role: "trainer",
+    });
+    await db.collection("users").doc(TRAINER_B).set({
+      uid: TRAINER_B,
+      role: "trainer",
+    });
+    await db.collection("users").doc(ATHLETE).set({
+      uid: ATHLETE,
+      role: "athlete",
+    });
+    await db.collection("users").doc(RATER).set({
+      uid: RATER,
+      role: "athlete",
+    });
     // Private template owned by TRAINER_A.
     await db.collection("routines").doc("tpl-private").set(templateDoc());
     // Published template owned by TRAINER_A.
@@ -176,14 +193,43 @@ describe("publish/unpublish a trainer template (UPDATE path 5)", () => {
     );
   });
 
-  it("DENIES publishing a user-created routine via this path", async () => {
-    // The narrow path is trainer-template only; user-created visibility
-    // flips ride UPDATE path 2 (owner content edits), not path 5.
-    await assertFails(
-      asUser(TRAINER_B)
+  it("DENIES an athlete publishing a forged trainer-template they own", async () => {
+    // CREATE branch 1 predates role checks, so an athlete CAN hold a
+    // private trainer-template doc with themselves as assignedBy. The
+    // role gate on path 5 must keep it out of the community catalogue.
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx
+        .firestore()
         .collection("routines")
-        .doc("user-pub")
-        .update({ visibility: "private" }),
+        .doc("tpl-forged-by-athlete")
+        .set(templateDoc({ assignedBy: ATHLETE }));
+    });
+
+    await assertFails(
+      asUser(ATHLETE)
+        .collection("routines")
+        .doc("tpl-forged-by-athlete")
+        .update({ visibility: "public" }),
+    );
+  });
+
+  it("DENIES the owning trainer publishing a trainer-assigned plan", async () => {
+    // Path 5 is trainer-template only, and path 3 (assigned-plan content
+    // edits) excludes visibility from its affectedKeys allowlist.
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection("routines").doc("assigned-plan").set(
+        templateDoc({
+          source: "trainer-assigned",
+          assignedTo: ATHLETE,
+        }),
+      );
+    });
+
+    await assertFails(
+      asUser(TRAINER_A)
+        .collection("routines")
+        .doc("assigned-plan")
+        .update({ visibility: "public" }),
     );
   });
 });
@@ -355,6 +401,18 @@ describe("ratings create", () => {
         "tpl-public",
         ratingPayload(RATER, { comment: "x".repeat(501) }),
       ),
+    );
+  });
+
+  it("DENIES non-string comments (List / Map poison docs)", async () => {
+    // `.size()` is also defined for lists and maps, so without the
+    // `is string` guard these would pass the ≤500 check and then explode
+    // the `as String?` cast in every client reading the ratings stream.
+    await assertFails(
+      rate(RATER, "tpl-public", ratingPayload(RATER, { comment: ["x", "y"] })),
+    );
+    await assertFails(
+      rate(RATER, "tpl-public", ratingPayload(RATER, { comment: { a: 1 } })),
     );
   });
 
