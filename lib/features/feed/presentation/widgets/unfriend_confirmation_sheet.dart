@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../app/theme/app_motion.dart';
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/widgets/motion/treino_fade_slide_in.dart';
+import '../../../../core/widgets/motion/treino_tappable.dart';
 
 /// Bottom sheet that asks the user to confirm removing a friendship.
 ///
@@ -28,60 +31,63 @@ class UnfriendConfirmationSheet extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Drag handle
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: palette.border,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 18),
-          // Title
-          Text(
-            '¿Eliminar amistad con $friendDisplayName?',
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 18,
-              color: palette.textPrimary,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 20),
-          // Buttons row
-          Row(
-            children: [
-              Expanded(
-                child: _SheetButton(
-                  label: 'CANCELAR',
-                  bg: Colors.transparent,
-                  borderColor: palette.border,
-                  textColor: palette.textPrimary,
-                  onPressed: () => Navigator.of(context).pop(),
+      child: TreinoFadeSlideIn(
+        distance: AppMotion.slideSm,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Drag handle
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: palette.border,
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _SheetButton(
-                  label: 'ELIMINAR',
-                  bg: palette.danger,
-                  borderColor: palette.danger,
-                  textColor: palette.onDanger,
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    onConfirm();
-                  },
-                ),
+            ),
+            const SizedBox(height: 18),
+            // Title
+            Text(
+              '¿Eliminar amistad con $friendDisplayName?',
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 18,
+                color: palette.textPrimary,
               ),
-            ],
-          ),
-        ],
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            // Buttons row
+            Row(
+              children: [
+                Expanded(
+                  child: _SheetButton(
+                    label: 'CANCELAR',
+                    bg: Colors.transparent,
+                    borderColor: palette.border,
+                    textColor: palette.textPrimary,
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _SheetButton(
+                    label: 'ELIMINAR',
+                    bg: palette.danger,
+                    borderColor: palette.danger,
+                    textColor: palette.onDanger,
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      onConfirm();
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -108,9 +114,8 @@ class _SheetButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return TreinoTappable(
       onTap: onPressed,
-      behavior: HitTestBehavior.opaque,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
         decoration: BoxDecoration(
