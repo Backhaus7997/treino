@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/utils/geohash.dart';
 import '../../../l10n/app_l10n.dart';
+import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../coach/domain/trainer_location.dart';
@@ -232,8 +233,11 @@ class _ProfileEditTrainerScreenState
     final profile = profileAsync.valueOrNull;
 
     if (profile == null) {
-      return Scaffold(
-        body: Center(child: CircularProgressIndicator(color: palette.accent)),
+      return TreinoStateSwitcher(
+        childKey: const ValueKey('loading'),
+        child: Scaffold(
+          body: Center(child: CircularProgressIndicator(color: palette.accent)),
+        ),
       );
     }
     _initFromProfile(profile);
@@ -415,31 +419,34 @@ class _ProfileEditTrainerScreenState
           )
         : body;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(title),
-        // ADR-TPO-006: in onboarding mode, hide the back arrow entirely.
-        automaticallyImplyLeading:
-            widget.mode != ProfileEditTrainerMode.onboarding,
-        // QA-PRO-008 (#429): the onboarding gate intentionally blocks every
-        // navigation path (router redirect + PopScope + no back arrow), which
-        // turned the screen into a dead end — a trainer unwilling/unable to
-        // complete the form couldn't even leave the account. Sign-out is the
-        // minimum escape hatch: authStateChanges emits null and the router
-        // redirect lands the user back on /welcome. Edit mode keeps the
-        // normal back arrow and needs no extra exit.
-        actions: [
-          if (widget.mode == ProfileEditTrainerMode.onboarding)
-            IconButton(
-              key: const Key('trainer_onboarding_sign_out'),
-              tooltip: AppL10n.of(context).authProfileSignOut,
-              icon: const Icon(TreinoIcon.signOut),
-              onPressed: () =>
-                  ref.read(authNotifierProvider.notifier).signOut(),
-            ),
-        ],
+    return TreinoStateSwitcher(
+      childKey: const ValueKey('form'),
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(title),
+          // ADR-TPO-006: in onboarding mode, hide the back arrow entirely.
+          automaticallyImplyLeading:
+              widget.mode != ProfileEditTrainerMode.onboarding,
+          // QA-PRO-008 (#429): the onboarding gate intentionally blocks every
+          // navigation path (router redirect + PopScope + no back arrow), which
+          // turned the screen into a dead end — a trainer unwilling/unable to
+          // complete the form couldn't even leave the account. Sign-out is the
+          // minimum escape hatch: authStateChanges emits null and the router
+          // redirect lands the user back on /welcome. Edit mode keeps the
+          // normal back arrow and needs no extra exit.
+          actions: [
+            if (widget.mode == ProfileEditTrainerMode.onboarding)
+              IconButton(
+                key: const Key('trainer_onboarding_sign_out'),
+                tooltip: AppL10n.of(context).authProfileSignOut,
+                icon: const Icon(TreinoIcon.signOut),
+                onPressed: () =>
+                    ref.read(authNotifierProvider.notifier).signOut(),
+              ),
+          ],
+        ),
+        body: wrappedBody,
       ),
-      body: wrappedBody,
     );
   }
 
