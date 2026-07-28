@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
@@ -91,43 +92,51 @@ class AlumnosScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppL10n.of(context);
     final linksAsync = ref.watch(trainerLinksStreamProvider);
-    return linksAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => _CenteredMuted(l10n.coachHubAlumnosLoadError),
-      data: (links) {
-        // Un alumno = una fila: colapsamos a su link más reciente (el stream
-        // viene requestedAt DESC) y excluimos `pending` (esos son solicitudes,
-        // sección aparte). Sin esto, un alumno re-vinculado (terminado + nuevo
-        // activo) aparecería dos veces e infla los contadores.
-        final seen = <String>{};
-        final roster = [
-          for (final l in links)
-            if (l.status != TrainerLinkStatus.pending && seen.add(l.athleteId))
-              l,
-        ];
-        final ids = (roster.map((l) => l.athleteId).toSet().toList()..sort());
-        final profilesAsync =
-            ref.watch(userPublicProfilesBatchProvider(ids.join(',')));
-        final cobros =
-            ref.watch(pagosPorCobrarProvider).valueOrNull ?? const [];
-        final conDeudaIds = <String>{
-          for (final c in cobros) c.athleteId,
-        };
-        final deudaByAthlete = <String, int>{
-          for (final c in cobros) c.athleteId: c.amountArs,
-        };
-        return profilesAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) =>
-              _CenteredMuted(l10n.coachHubAlumnosProfilesLoadError),
-          data: (profiles) => _RosterView(
-            roster: roster,
-            profiles: profiles,
-            conDeudaIds: conDeudaIds,
-            deudaByAthlete: deudaByAthlete,
-          ),
-        );
-      },
+    return TreinoStateSwitcher(
+      childKey: ValueKey(linksAsync.when(
+        loading: () => 'loading',
+        error: (_, __) => 'error',
+        data: (_) => 'data',
+      )),
+      child: linksAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => _CenteredMuted(l10n.coachHubAlumnosLoadError),
+        data: (links) {
+          // Un alumno = una fila: colapsamos a su link más reciente (el stream
+          // viene requestedAt DESC) y excluimos `pending` (esos son solicitudes,
+          // sección aparte). Sin esto, un alumno re-vinculado (terminado + nuevo
+          // activo) aparecería dos veces e infla los contadores.
+          final seen = <String>{};
+          final roster = [
+            for (final l in links)
+              if (l.status != TrainerLinkStatus.pending &&
+                  seen.add(l.athleteId))
+                l,
+          ];
+          final ids = (roster.map((l) => l.athleteId).toSet().toList()..sort());
+          final profilesAsync =
+              ref.watch(userPublicProfilesBatchProvider(ids.join(',')));
+          final cobros =
+              ref.watch(pagosPorCobrarProvider).valueOrNull ?? const [];
+          final conDeudaIds = <String>{
+            for (final c in cobros) c.athleteId,
+          };
+          final deudaByAthlete = <String, int>{
+            for (final c in cobros) c.athleteId: c.amountArs,
+          };
+          return profilesAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) =>
+                _CenteredMuted(l10n.coachHubAlumnosProfilesLoadError),
+            data: (profiles) => _RosterView(
+              roster: roster,
+              profiles: profiles,
+              conDeudaIds: conDeudaIds,
+              deudaByAthlete: deudaByAthlete,
+            ),
+          );
+        },
+      ),
     );
   }
 }
