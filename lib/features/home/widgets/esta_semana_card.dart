@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/utils/argentina_time.dart';
 import '../../../core/utils/date_labels.dart';
@@ -61,19 +62,20 @@ class EstaSemanaCard extends ConsumerWidget {
     final palette = AppPalette.of(context);
     final async = ref.watch(weeklyInsightsProvider);
 
-    return TreinoTappable(
-      onTap: () => context.push('/home/insights'),
-      child: Container(
-        decoration: BoxDecoration(
-          color: palette.bgCard,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: palette.border, width: 1),
-        ),
-        child: async.when(
-          loading: () => const _Skeleton(),
-          error: (_, __) => const _ErrorFallback(),
-          data: (insights) => _Loaded(insights: insights),
-        ),
+    // The card itself is NOT tappable. It used to navigate to /home/insights
+    // as a whole, which was undiscoverable (no affordance) and made the
+    // silhouettes/period cards feel accidentally clickable. The explicit
+    // `VER INSIGHTS` CTA inside [_Loaded] now owns that navigation.
+    return Container(
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: palette.border, width: 1),
+      ),
+      child: async.when(
+        loading: () => const _Skeleton(),
+        error: (_, __) => const _ErrorFallback(),
+        data: (insights) => _Loaded(insights: insights),
       ),
     );
   }
@@ -181,7 +183,12 @@ class _Loaded extends StatelessWidget {
           const _CardHeader(),
           const SizedBox(height: 18),
 
-          // ── Streak number (big) + DÍAS ────────────────────────────────
+          // ── Streak number (big) + DÍAS + insights CTA ─────────────────
+          //
+          // The CTA sits in the dead space to the RIGHT of the streak
+          // number — the largest void in the card. Bottom-aligned with the
+          // whole row so it shares a baseline with the "DÍA(S)" unit label
+          // instead of floating against the 96 px digits.
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -205,6 +212,15 @@ class _Loaded extends StatelessWidget {
                     letterSpacing: 1.2,
                     color: palette.accent,
                   ),
+                ),
+              ),
+              const Spacer(),
+              // Flexible, not a bare child: a 3-digit streak plus a long
+              // translated label would otherwise overflow the row.
+              const Flexible(
+                child: Padding(
+                  padding: EdgeInsets.only(bottom: 14),
+                  child: _InsightsCta(),
                 ),
               ),
             ],
@@ -248,6 +264,101 @@ class _Loaded extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Insights CTA ──────────────────────────────────────────────────────────────
+//
+// The whole card is already a tap target for /home/insights
+// ([EstaSemanaCard]'s TreinoTappable), but that carried NO visible affordance —
+// the destination was effectively undiscoverable. This makes it explicit, and
+// gives the action real button semantics, which the card-level GestureDetector
+// (a bare GestureDetector) never had.
+//
+// Compact — NOT full-width like _ZeroWeekState's CTA — because it lives inline
+// beside the streak number rather than as a block at the foot of the card.
+
+class _InsightsCta extends StatefulWidget {
+  const _InsightsCta();
+
+  @override
+  State<_InsightsCta> createState() => _InsightsCtaState();
+}
+
+class _InsightsCtaState extends State<_InsightsCta> {
+  bool _hovered = false;
+
+  void _setHovered(bool value) {
+    if (_hovered == value) return;
+    setState(() => _hovered = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+
+    // Same construction as [HomeCTAButton] (Motion PR3), compact instead of
+    // full-width: Semantics + TreinoTappable + Container. NOT an
+    // OutlinedButton/ElevatedButton — TreinoTappable must REPLACE the tap
+    // handler, never wrap one, or the two recognizers fight in the gesture
+    // arena and the press animation breaks.
+    //
+    // Filled accent, not an outline: the outlined version was visually
+    // indistinguishable from the "RACHA ACTUAL" chip right above it.
+    //
+    // Two distinct feedbacks:
+    // - PRESS  → scale 0.97, owned by [TreinoTappable] (works everywhere).
+    // - HOVER  → lighter fill + accent glow, below. Pointer-only by nature:
+    //   a touch screen never emits enter/exit, so on phones this branch is
+    //   simply never entered. It exists for iPad-with-pointer / desktop /
+    //   web, mirroring the MouseRegion pattern in CoachHubSidebar.
+    return MouseRegion(
+      onEnter: (_) => _setHovered(true),
+      onExit: (_) => _setHovered(false),
+      cursor: SystemMouseCursors.click,
+      child: Semantics(
+        button: true,
+        child: TreinoTappable(
+          onTap: () => context.push('/home/insights'),
+          child: AnimatedContainer(
+            // resolve() collapses to Duration.zero under reduce-motion: the
+            // hover STATE still applies, it just stops being animated.
+            duration: AppMotion.resolve(context, AppMotion.micro),
+            curve: AppMotion.standard,
+            height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: ShapeDecoration(
+              color: _hovered
+                  ? Color.lerp(palette.accent, Colors.white, 0.18)!
+                  : palette.accent,
+              shape: const StadiumBorder(),
+              shadows: _hovered
+                  ? [
+                      BoxShadow(
+                        color: palette.accent.withValues(alpha: 0.45),
+                        blurRadius: 16,
+                        spreadRadius: 1,
+                      ),
+                    ]
+                  : const [],
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              l10n.homeEstaSemanaInsightsCta,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                letterSpacing: 0.8,
+                color: palette.bg,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
