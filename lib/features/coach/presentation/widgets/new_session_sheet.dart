@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_motion.dart';
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/widgets/motion/treino_state_switcher.dart';
+import '../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../../profile/application/user_public_profile_providers.dart';
@@ -166,46 +168,60 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
                     const SizedBox(height: 14),
 
                     // ── Per-mode fields ───────────────────────────────────────────
-                    if (!_recurring) ...[
-                      // SINGLE: date picker
-                      _FieldLabel(
-                          label: AppL10n.of(context).newSessionSheetFechaLabel,
-                          palette: palette),
-                      const SizedBox(height: 8),
-                      _TappableField(
-                        palette: palette,
-                        text: _formatDate(_date),
-                        icon: TreinoIcon.calendar,
-                        onTap: _pickDate,
-                      ),
-                      const SizedBox(height: 14),
-                    ] else ...[
-                      // RECURRING: weekday chips
-                      _FieldLabel(label: 'DÍAS', palette: palette),
-                      const SizedBox(height: 8),
-                      _WeekdayChips(
-                        selected: _weekdays,
-                        palette: palette,
-                        onToggle: (wd) => setState(() {
-                          if (_weekdays.contains(wd)) {
-                            _weekdays = {..._weekdays}..remove(wd);
-                          } else {
-                            _weekdays = {..._weekdays, wd};
-                          }
-                        }),
-                      ),
-                      const SizedBox(height: 14),
+                    TreinoStateSwitcher(
+                      childKey: ValueKey(_recurring ? 'recurring' : 'single'),
+                      child: !_recurring
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // SINGLE: date picker
+                                _FieldLabel(
+                                  label: AppL10n.of(context)
+                                      .newSessionSheetFechaLabel,
+                                  palette: palette,
+                                ),
+                                const SizedBox(height: 8),
+                                _TappableField(
+                                  palette: palette,
+                                  text: _formatDate(_date),
+                                  icon: TreinoIcon.calendar,
+                                  onTap: _pickDate,
+                                ),
+                                const SizedBox(height: 14),
+                              ],
+                            )
+                          : Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // RECURRING: weekday chips
+                                _FieldLabel(label: 'DÍAS', palette: palette),
+                                const SizedBox(height: 8),
+                                _WeekdayChips(
+                                  selected: _weekdays,
+                                  palette: palette,
+                                  onToggle: (wd) => setState(() {
+                                    if (_weekdays.contains(wd)) {
+                                      _weekdays = {..._weekdays}..remove(wd);
+                                    } else {
+                                      _weekdays = {..._weekdays, wd};
+                                    }
+                                  }),
+                                ),
+                                const SizedBox(height: 14),
 
-                      // RECURRING: repeat-for chips
-                      _FieldLabel(label: 'REPETIR POR', palette: palette),
-                      const SizedBox(height: 8),
-                      _WeeksChips(
-                        selected: _weeks,
-                        palette: palette,
-                        onChanged: (w) => setState(() => _weeks = w),
-                      ),
-                      const SizedBox(height: 14),
-                    ],
+                                // RECURRING: repeat-for chips
+                                _FieldLabel(
+                                    label: 'REPETIR POR', palette: palette),
+                                const SizedBox(height: 8),
+                                _WeeksChips(
+                                  selected: _weeks,
+                                  palette: palette,
+                                  onChanged: (w) => setState(() => _weeks = w),
+                                ),
+                                const SizedBox(height: 14),
+                              ],
+                            ),
+                    ),
 
                     // ── Time ──────────────────────────────────────────────────────
                     _FieldLabel(
@@ -578,7 +594,7 @@ class _Pill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: GestureDetector(
+      child: TreinoTappable(
         onTap: onTap,
         child: AnimatedContainer(
           duration: AppMotion.fast,
@@ -634,7 +650,7 @@ class _WeekdayChips extends StatelessWidget {
       runSpacing: 8,
       children: _kWeekdays.map((entry) {
         final isSelected = selected.contains(entry.wd);
-        return GestureDetector(
+        return TreinoTappable(
           onTap: () => onToggle(entry.wd),
           child: AnimatedContainer(
             duration: AppMotion.fast,
@@ -830,9 +846,8 @@ class _TappableField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return TreinoTappable(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         decoration: BoxDecoration(
