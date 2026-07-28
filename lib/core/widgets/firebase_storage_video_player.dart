@@ -177,7 +177,7 @@ class _FirebaseStorageVideoPlayerState
               AnimatedOpacity(
                 opacity: isPlaying ? 0 : 1,
                 duration: AppMotion.fast,
-                child: const _PlayOverlay(),
+                child: const VideoPlayOverlay(),
               ),
               Positioned(
                 left: 0,
@@ -203,10 +203,13 @@ class _FirebaseStorageVideoPlayerState
   }
 }
 
-// ─── Private helpers ──────────────────────────────────────────────────────────
-
-class _PlayOverlay extends StatelessWidget {
-  const _PlayOverlay();
+/// Subtle, brand-neutral play affordance shared by every video surface —
+/// 44px white circle with a soft drop shadow, no big black puck. Public so
+/// the feature-side video cards (exercise_video_player.dart) and the
+/// exercise-detail video hero reuse the exact same overlay instead of
+/// keeping per-file copies.
+class VideoPlayOverlay extends StatelessWidget {
+  const VideoPlayOverlay({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -240,6 +243,8 @@ class _PlayOverlay extends StatelessWidget {
     );
   }
 }
+
+// ─── Private helpers ──────────────────────────────────────────────────────────
 
 class _VideoErrorPlaceholder extends StatelessWidget {
   const _VideoErrorPlaceholder({required this.palette});

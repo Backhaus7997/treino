@@ -3,9 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart' as intl;
+import 'package:video_player/video_player.dart';
 
+import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/exercise_asset_image.dart';
+import '../../../core/widgets/firebase_storage_video_player.dart'
+    show VideoPlayOverlay;
 import '../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
@@ -202,6 +206,19 @@ class _ExerciseDetailContent extends StatelessWidget {
     // plan. Swap to a compact header that skips the photo slot entirely.
     final isCustom = exercise.category.toLowerCase() == 'custom';
 
+    // Video-first (pedido 2026-07-28): a playable URL puts the video in the
+    // hero itself — photo as poster, tap to play. Absent/unplayable URLs keep
+    // the photo hero, never an empty slot. Custom exercises keep the compact
+    // header (no photo to posterize) and get the video as the first body
+    // section instead, so trainers keep seeing their upload slot in every
+    // state (including the "coming soon" placeholder).
+    final videoUrl = exercise.videoUrl?.trim() ?? '';
+    final heroVideoUrl = !isCustom &&
+            (isFirebaseStorageVideo(videoUrl) ||
+                parseYoutubeVideoId(videoUrl) != null)
+        ? videoUrl
+        : null;
+
     return CustomScrollView(
       slivers: [
         SliverToBoxAdapter(
@@ -210,13 +227,22 @@ class _ExerciseDetailContent extends StatelessWidget {
                   badgeText: badgeText,
                   titleText: exercise.name.toUpperCase(),
                 )
-              : _HeroStrip(
-                  exerciseId: exercise.id,
-                  muscleGroup: exercise.muscleGroup,
-                  thumbnailUrl: exercise.thumbnailUrl,
-                  badgeText: badgeText,
-                  titleText: exercise.name.toUpperCase(),
-                ),
+              : heroVideoUrl != null
+                  ? _VideoHeroStrip(
+                      exerciseId: exercise.id,
+                      muscleGroup: exercise.muscleGroup,
+                      thumbnailUrl: exercise.thumbnailUrl,
+                      badgeText: badgeText,
+                      titleText: exercise.name.toUpperCase(),
+                      videoUrl: heroVideoUrl,
+                    )
+                  : _HeroStrip(
+                      exerciseId: exercise.id,
+                      muscleGroup: exercise.muscleGroup,
+                      thumbnailUrl: exercise.thumbnailUrl,
+                      badgeText: badgeText,
+                      titleText: exercise.name.toUpperCase(),
+                    ),
         ),
         SliverPadding(
           // Bottom inset clears the shell's floating nav bar (extendBody:true).
@@ -225,18 +251,15 @@ class _ExerciseDetailContent extends StatelessWidget {
           sliver: SliverList(
             delegate: SliverChildListDelegate([
               const SizedBox(height: 20),
-              _PersonalStatsBlock(
-                athleteUid: statsUid,
-                exerciseId: statsExerciseId,
-              ),
-              const SizedBox(height: 20),
-              const _SectionHeader(text: 'VIDEO'),
-              const SizedBox(height: 12),
-              // ExerciseVideoPlayer handles all states (null/invalid/valid)
-              // internally — we always render the slot so trainers can see
-              // there's a video surface even before URLs are populated.
-              ExerciseVideoPlayer(videoUrl: exercise.videoUrl),
-              const SizedBox(height: 20),
+              if (isCustom) ...[
+                const _SectionHeader(text: 'VIDEO'),
+                const SizedBox(height: 12),
+                // ExerciseVideoPlayer handles all states (null/invalid/valid)
+                // internally — the slot always renders so trainers can see
+                // there's a video surface even before URLs are populated.
+                ExerciseVideoPlayer(videoUrl: exercise.videoUrl),
+                const SizedBox(height: 20),
+              ],
               const _SectionHeader(text: 'TÉCNICA'),
               const SizedBox(height: 12),
               if (instructions == null || instructions.isEmpty)
@@ -245,6 +268,11 @@ class _ExerciseDetailContent extends StatelessWidget {
                 )
               else
                 _TecnicaCard(instructions: instructions),
+              const SizedBox(height: 20),
+              _PersonalStatsBlock(
+                athleteUid: statsUid,
+                exerciseId: statsExerciseId,
+              ),
               const SizedBox(height: 20),
               const _SectionHeader(text: 'HISTORIAL'),
               const SizedBox(height: 12),
@@ -267,8 +295,8 @@ class _ExerciseDetailContent extends StatelessWidget {
 
 /// Owns the [ChartPeriod] selection and the single
 /// [exerciseProgressionProvider] watch, so switching periods rebuilds ONLY
-/// this subtree — VIDEO/TÉCNICA/HISTORIAL below don't care about the period
-/// (ref.watch del provider más chico posible).
+/// this subtree — the hero/TÉCNICA above and HISTORIAL below don't care
+/// about the period (ref.watch del provider más chico posible).
 class _PersonalStatsBlock extends ConsumerStatefulWidget {
   const _PersonalStatsBlock({
     required this.athleteUid,
@@ -638,22 +666,8 @@ class _HeroStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    final gradient = Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            palette.accent.withValues(alpha: 0.85),
-            palette.bg,
-          ],
-        ),
-      ),
-    );
-
     return SizedBox(
-      height: 320,
+      height: _kHeroHeight,
       width: double.infinity,
       child: Stack(
         fit: StackFit.expand,
@@ -669,62 +683,392 @@ class _HeroStrip extends StatelessWidget {
             exerciseId: exerciseId,
             muscleGroup: muscleGroup,
             thumbnailUrl: thumbnailUrl,
-            fallback: gradient,
+            fallback: const _HeroGradientFallback(),
           ),
-          // Top scrim — keeps the floating back button legible on bright photos.
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 96,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    palette.scrimDark.withValues(alpha: 0.45),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
-          // Bottom scrim — makes the badge + title overlay readable and
-          // softens the seam between the photo and the body content.
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: 200,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    palette.bg.withValues(alpha: 0.95),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          // Badge + exercise title overlaid at the bottom-left of the hero.
-          Positioned(
-            left: 20,
-            right: 20,
-            bottom: 16,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _Breadcrumb(text: badgeText),
-                const SizedBox(height: 8),
-                _ExerciseTitle(text: titleText),
-              ],
-            ),
-          ),
+          const _HeroTopScrim(),
+          const _HeroBottomScrim(),
+          _HeroTitleOverlay(badgeText: badgeText, titleText: titleText),
         ],
+      ),
+    );
+  }
+}
+
+/// Fixed hero envelope shared by [_HeroStrip] and [_VideoHeroStrip] — every
+/// video state (poster / loading / playing) keeps this exact height so the
+/// layout never jumps.
+const double _kHeroHeight = 320;
+
+/// Last-resort hero paint when even the muscle group has no bundled asset.
+class _HeroGradientFallback extends StatelessWidget {
+  const _HeroGradientFallback();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            palette.accent.withValues(alpha: 0.85),
+            palette.bg,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Top scrim — keeps the floating back button legible on bright photos.
+class _HeroTopScrim extends StatelessWidget {
+  const _HeroTopScrim();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      height: 96,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              palette.scrimDark.withValues(alpha: 0.45),
+              Colors.transparent,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Bottom scrim — makes the badge + title overlay readable and softens the
+/// seam between the photo/video and the body content.
+class _HeroBottomScrim extends StatelessWidget {
+  const _HeroBottomScrim();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Positioned(
+      bottom: 0,
+      left: 0,
+      right: 0,
+      height: 200,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.transparent,
+              palette.bg.withValues(alpha: 0.95),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Badge + exercise title overlaid at the bottom-left of the hero.
+class _HeroTitleOverlay extends StatelessWidget {
+  const _HeroTitleOverlay({required this.badgeText, required this.titleText});
+
+  final String badgeText;
+  final String titleText;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      left: 20,
+      right: 20,
+      bottom: 16,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _Breadcrumb(text: badgeText),
+          const SizedBox(height: 8),
+          _ExerciseTitle(text: titleText),
+        ],
+      ),
+    );
+  }
+}
+
+/// Hero for catalogue exercises WITH a playable video (pedido 2026-07-28:
+/// "el video arriba del todo, donde hoy está la foto"). Same [_kHeroHeight]
+/// envelope as [_HeroStrip] in every state, with the photo (a frame of this
+/// very video, #565) as poster. Playback NEVER starts on its own — only from
+/// the user's tap.
+///
+///   * Firebase Storage URL → tap mounts the native inline player filling
+///     the strip (cover, matching the poster's crop) and starts playback
+///     once ready. While initialising the poster stays under the #545
+///     loading treatment (shimmer sweep + accent spinner) so "loading" is
+///     unmistakable. Tap toggles play/pause; scrims + title fade out during
+///     playback and return on pause (same chrome-on-pause pattern as
+///     [FirebaseStorageVideoPlayer]). Progress bar allows scrubbing.
+///   * YouTube URL → tap opens the watch page in the in-app browser sheet —
+///     inline embeds are rejected by YouTube on iOS WKWebView (see
+///     exercise_video_player.dart).
+///   * Init failure → poster returns with a muted caption; tapping retries.
+class _VideoHeroStrip extends StatefulWidget {
+  const _VideoHeroStrip({
+    required this.exerciseId,
+    required this.muscleGroup,
+    required this.badgeText,
+    required this.titleText,
+    required this.videoUrl,
+    this.thumbnailUrl,
+  });
+
+  final String exerciseId;
+  final String muscleGroup;
+
+  /// Poster del video — la foto real del ejercicio (frame de su video, #565).
+  /// Ausente/falla → cascada de assets, igual que [_HeroStrip].
+  final String? thumbnailUrl;
+  final String badgeText;
+  final String titleText;
+
+  /// Already verified playable by the caller (Firebase Storage or YouTube) —
+  /// anything else renders [_HeroStrip] instead.
+  final String videoUrl;
+
+  @override
+  State<_VideoHeroStrip> createState() => _VideoHeroStripState();
+}
+
+class _VideoHeroStripState extends State<_VideoHeroStrip> {
+  VideoPlayerController? _controller;
+  bool _initializing = false;
+  bool _initFailed = false;
+
+  /// Last observed isPlaying. The controller notifies on every position tick,
+  /// so [_onPlayerTick] only setStates when this flips (cero rebuilds
+  /// innecesarios) — e.g. when the clip reaches its end and the chrome must
+  /// come back without a tap.
+  bool _wasPlaying = false;
+
+  bool get _isPlaying => _controller?.value.isPlaying ?? false;
+
+  @override
+  void didUpdateWidget(covariant _VideoHeroStrip oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.videoUrl != widget.videoUrl) {
+      _disposeController();
+      _initializing = false;
+      _initFailed = false;
+      _wasPlaying = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    _disposeController();
+    super.dispose();
+  }
+
+  /// removeListener BEFORE dispose: the controller's own dispose only clears
+  /// listeners at the very end, after async platform round-trips — an
+  /// in-flight position tick can still notify in that gap and would reach a
+  /// setState on an unmounted State (e.g. play → back immediately).
+  void _disposeController() {
+    _controller?.removeListener(_onPlayerTick);
+    _controller?.dispose();
+    _controller = null;
+  }
+
+  void _onPlayerTick() {
+    if (!mounted) return;
+    final playing = _controller?.value.isPlaying ?? false;
+    if (playing == _wasPlaying) return;
+    setState(() => _wasPlaying = playing);
+  }
+
+  /// Lazy init on the user's tap — the poster costs zero bandwidth until the
+  /// athlete actually wants the video.
+  Future<void> _startPlayback() async {
+    setState(() {
+      _initializing = true;
+      _initFailed = false;
+    });
+    final c = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl));
+    try {
+      await c.initialize();
+    } catch (_) {
+      await c.dispose();
+      if (!mounted) return;
+      setState(() {
+        _initializing = false;
+        _initFailed = true;
+      });
+      return;
+    }
+    if (!mounted) {
+      await c.dispose();
+      return;
+    }
+    c.addListener(_onPlayerTick);
+    setState(() {
+      _controller = c;
+      _initializing = false;
+    });
+    // The tap that got us here IS the play intent (tap-to-play, not
+    // autoplay). Outside the try: a play() failure must never dispose a
+    // controller the build is already rendering.
+    await c.play();
+  }
+
+  void _onTap() {
+    final youtubeId = parseYoutubeVideoId(widget.videoUrl);
+    if (youtubeId != null) {
+      openYoutubeWatchPage(context, youtubeId);
+      return;
+    }
+    final c = _controller;
+    if (c != null) {
+      setState(() => c.value.isPlaying ? c.pause() : c.play());
+      return;
+    }
+    if (!_initializing) _startPlayback();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final c = _controller;
+    final showChrome = !_isPlaying;
+
+    return SizedBox(
+      height: _kHeroHeight,
+      width: double.infinity,
+      child: Semantics(
+        // hint (no label): badge + title descendants already fuse as the
+        // node's label — an explicit label would duplicate them in VoiceOver.
+        button: true,
+        hint: _isPlaying ? 'Pausar video' : 'Reproducir video',
+        child: GestureDetector(
+          onTap: _onTap,
+          behavior: HitTestBehavior.opaque,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // Media layer: the poster until the player is ready (also the
+              // backdrop while it initialises — loading never reads as a
+              // black hole), then the video filling the strip with the same
+              // cover crop as the poster frame.
+              if (c == null)
+                ExerciseAssetImage(
+                  exerciseId: widget.exerciseId,
+                  muscleGroup: widget.muscleGroup,
+                  thumbnailUrl: widget.thumbnailUrl,
+                  fallback: const _HeroGradientFallback(),
+                )
+              else
+                FittedBox(
+                  fit: BoxFit.cover,
+                  clipBehavior: Clip.hardEdge,
+                  child: SizedBox(
+                    width: c.value.size.width,
+                    height: c.value.size.height,
+                    child: VideoPlayer(c),
+                  ),
+                ),
+              // Chrome (scrims + badge + title): visible on poster/pause,
+              // fades out while playing so nothing covers the technique.
+              AnimatedOpacity(
+                opacity: showChrome ? 1 : 0,
+                duration: AppMotion.fast,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    const _HeroTopScrim(),
+                    const _HeroBottomScrim(),
+                    _HeroTitleOverlay(
+                      badgeText: widget.badgeText,
+                      titleText: widget.titleText,
+                    ),
+                  ],
+                ),
+              ),
+              // #545 loading treatment over the poster: shimmer sweep +
+              // accent spinner — unmistakably "loading", never a dead frame.
+              if (_initializing)
+                TreinoShimmer(
+                  child: ColoredBox(
+                    color: palette.scrimDark.withValues(alpha: 0.55),
+                    child: Center(
+                      child: SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.6,
+                          color: palette.accent,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              AnimatedOpacity(
+                opacity: showChrome && !_initializing ? 1 : 0,
+                duration: AppMotion.fast,
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const VideoPlayOverlay(),
+                      if (_initFailed) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: palette.scrimDark.withValues(alpha: 0.55),
+                            borderRadius: BorderRadius.circular(9999),
+                          ),
+                          child: Text(
+                            'No pudimos reproducir el video.',
+                            style: GoogleFonts.barlow(
+                              fontWeight: FontWeight.w500,
+                              fontSize: 12,
+                              color: palette.textPrimary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              if (c != null)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: VideoProgressIndicator(
+                    c,
+                    allowScrubbing: true,
+                    colors: VideoProgressColors(
+                      playedColor: palette.accent,
+                      bufferedColor: Colors.white
+                          .withValues(alpha: 0.35), // intentional: media
+                      backgroundColor: Colors.white
+                          .withValues(alpha: 0.15), // intentional: media
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
