@@ -19,10 +19,12 @@ import '../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../application/agenda_providers.dart';
 import '../application/dashboard_day_counts.dart';
+import '../application/follow_up_entry_providers.dart';
 import '../application/recent_activity_provider.dart';
 import '../application/trained_today_provider.dart';
 import '../application/trainer_link_providers.dart';
 import '../domain/appointment.dart';
+import '../domain/follow_up_entry.dart' show FollowUpTag;
 import '../domain/wall_clock.dart';
 
 // Re-export so the mobile test (trainer_dashboard_day_counts_test.dart) that
@@ -79,6 +81,7 @@ class TrainerDashboardTab extends ConsumerWidget {
         _SectionHeader(
           label: AppL10n.of(context).dashboardEntrenaronHoySectionLabel,
           trailingLabel: AppL10n.of(context).dashboardDejarFeedbackLabel,
+          trailingOnTap: () => _showDejarFeedbackSheet(context),
         ),
         const SizedBox(height: 8),
         const _EntrenaronHoyList(),
@@ -414,6 +417,336 @@ class _PendingRequestCardState extends ConsumerState<_PendingRequestCard> {
 /// in-app notification centre (only push FCM), so this modal is the single
 /// place the trainer reviews them. (The requests used to also render inline in
 /// the dashboard, but that duplicated the modal and cluttered the home.)
+/// Opens the "Dejar feedback" sheet from the ENTRENARON HOY section header.
+///
+/// The link had NO handler until now: `_SectionHeader` renders a trailing
+/// label with `trailingOnTap == null` in `textMuted`, so it sat there looking
+/// deliberately inert. The mockup (docs/app-trainer/screens/dashboard) shows
+/// it in accent — an active link — but never designed a destination screen,
+/// so the surface below is new. It writes a [FollowUpEntry] tagged
+/// `entrenamiento`, the same private trainer→athlete note the Coach Hub (web)
+/// already creates; only the mobile UI was missing.
+void _showDejarFeedbackSheet(BuildContext context) {
+  final palette = AppPalette.of(context);
+  showModalBottomSheet<void>(
+    context: context,
+    useRootNavigator: true,
+    backgroundColor: palette.bgCard,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (_) => const _DejarFeedbackSheet(),
+  );
+}
+
+/// Two-step sheet: pick an athlete who trained today, then write the note.
+///
+/// Athletes come from [trainedTodayProvider] — the SAME source the section
+/// lists — so the sheet can never offer someone the trainer isn't looking at.
+class _DejarFeedbackSheet extends ConsumerStatefulWidget {
+  const _DejarFeedbackSheet();
+
+  @override
+  ConsumerState<_DejarFeedbackSheet> createState() =>
+      _DejarFeedbackSheetState();
+}
+
+class _DejarFeedbackSheetState extends ConsumerState<_DejarFeedbackSheet> {
+  final _controller = TextEditingController();
+  String? _athleteId;
+  String? _athleteName;
+  bool _saving = false;
+  bool _failed = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final trainerId = ref.read(currentUidProvider) ?? '';
+    final text = _controller.text.trim();
+    if (trainerId.isEmpty || _athleteId == null || text.isEmpty) return;
+
+    setState(() {
+      _saving = true;
+      _failed = false;
+    });
+
+    try {
+      await ref.read(followUpEntryRepositoryProvider).add(
+            trainerId: trainerId,
+            athleteId: _athleteId!,
+            text: text,
+            tag: FollowUpTag.entrenamiento,
+          );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _failed = true;
+      });
+      return;
+    }
+
+    if (!mounted) return;
+    final l10n = AppL10n.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    Navigator.of(context).pop();
+    messenger.showSnackBar(
+      SnackBar(content: Text(l10n.dashboardFeedbackSaved)),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+
+    return SafeArea(
+      child: Padding(
+        // viewInsets so the composer stays above the keyboard.
+        padding: EdgeInsets.fromLTRB(
+          20,
+          16,
+          20,
+          16 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                if (_athleteId != null)
+                  GestureDetector(
+                    onTap: () => setState(() {
+                      _athleteId = null;
+                      _athleteName = null;
+                      _failed = false;
+                    }),
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 10),
+                      child: Icon(TreinoIcon.back,
+                          size: 20, color: palette.textPrimary),
+                    ),
+                  ),
+                Expanded(
+                  child: Text(
+                    _athleteName ?? l10n.dashboardFeedbackSheetTitle,
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 20,
+                      letterSpacing: 1.0,
+                      color: palette.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (_athleteId == null)
+              _FeedbackAthletePicker(
+                onPick: (id, name) => setState(() {
+                  _athleteId = id;
+                  _athleteName = name;
+                }),
+              )
+            else ...[
+              TextField(
+                controller: _controller,
+                autofocus: true,
+                minLines: 3,
+                maxLines: 6,
+                enabled: !_saving,
+                onChanged: (_) => setState(() {}),
+                style: GoogleFonts.barlow(
+                    fontSize: 14, color: palette.textPrimary),
+                decoration: InputDecoration(
+                  hintText: l10n.dashboardFeedbackComposerHint,
+                  hintStyle: GoogleFonts.barlow(
+                      fontSize: 14, color: palette.textMuted),
+                  filled: true,
+                  fillColor: palette.bg,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(color: palette.border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(color: palette.border),
+                  ),
+                ),
+              ),
+              if (_failed) ...[
+                const SizedBox(height: 10),
+                Text(
+                  l10n.dashboardFeedbackSaveError,
+                  style:
+                      GoogleFonts.barlow(fontSize: 13, color: palette.danger),
+                ),
+              ],
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  // Disabled on empty text — an empty FollowUpEntry is noise
+                  // in the athlete's history, not a saved note.
+                  onPressed:
+                      _saving || _controller.text.trim().isEmpty ? null : _save,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: palette.accent,
+                    foregroundColor: palette.bg,
+                    minimumSize: const Size.fromHeight(48),
+                    shape: const StadiumBorder(),
+                  ),
+                  child: _saving
+                      ? SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: palette.bg,
+                          ),
+                        )
+                      : Text(
+                          l10n.dashboardFeedbackSave,
+                          style: GoogleFonts.barlowCondensed(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Step 1 — the athletes who trained today, reusing [trainedTodayProvider].
+class _FeedbackAthletePicker extends ConsumerWidget {
+  const _FeedbackAthletePicker({required this.onPick});
+
+  final void Function(String athleteId, String displayName) onPick;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    final todayAsync = ref.watch(trainedTodayProvider);
+
+    if (todayAsync.isLoading && !todayAsync.hasValue) {
+      return _PlaceholderCard(
+          palette: palette, message: l10n.dashboardCargando);
+    }
+    if (todayAsync.hasError && !todayAsync.hasValue) {
+      return _PlaceholderCard(
+          palette: palette, message: l10n.dashboardErrorActividad);
+    }
+
+    final entries = todayAsync.valueOrNull ?? const <TrainedTodayEntry>[];
+    if (entries.isEmpty) {
+      return _PlaceholderCard(
+          palette: palette, message: l10n.dashboardNadieEntreno);
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          l10n.dashboardFeedbackPickAthlete,
+          style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+        ),
+        const SizedBox(height: 10),
+        // Bounded so a trainer with many athletes still gets a sheet that
+        // fits — the list scrolls instead of pushing the header off-screen.
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 320),
+          child: ListView.separated(
+            shrinkWrap: true,
+            itemCount: entries.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 8),
+            itemBuilder: (_, i) => _FeedbackAthleteTile(
+              entry: entries[i],
+              onPick: onPick,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FeedbackAthleteTile extends ConsumerWidget {
+  const _FeedbackAthleteTile({required this.entry, required this.onPick});
+
+  final TrainedTodayEntry entry;
+  final void Function(String athleteId, String displayName) onPick;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    // Same name-resolution contract as _EntrenaronHoyRow: a raw uid is not a
+    // name, so it falls back to the generic label.
+    final profileAsync = ref.watch(userPublicProfileProvider(entry.athleteId));
+    final rawName = profileAsync.valueOrNull?.displayName ?? '';
+    final showName = rawName.isEmpty || _looksLikeUid(rawName)
+        ? AppL10n.of(context).dashboardAlumnoFallback
+        : rawName;
+
+    return InkWell(
+      onTap: () => onPick(entry.athleteId, showName),
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: palette.bg,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: palette.border),
+        ),
+        child: Row(
+          children: [
+            _AvatarInitials(initials: _initials(showName), palette: palette),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                showName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.barlow(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: palette.textPrimary,
+                ),
+              ),
+            ),
+            Icon(TreinoIcon.forward, size: 14, color: palette.textMuted),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Test-only harness that renders the "Dejar feedback" sheet content directly,
+/// so the picker → composer → save flow is testable without driving the
+/// bottom-sheet plumbing (mirrors [PendingRequestsSheetTestHarness]).
+///
+/// @visibleForTesting
+class DejarFeedbackSheetTestHarness extends StatelessWidget {
+  const DejarFeedbackSheetTestHarness({super.key});
+
+  @override
+  Widget build(BuildContext context) => const _DejarFeedbackSheet();
+}
+
 void _showPendingRequestsSheet(BuildContext context) {
   final palette = AppPalette.of(context);
   showModalBottomSheet<void>(

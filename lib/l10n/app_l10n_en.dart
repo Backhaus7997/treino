@@ -1044,6 +1044,35 @@ class AppL10nEn extends AppL10n {
   String get dashboardNadieEntreno => 'Nadie entrenó hoy todavía.';
 
   @override
+  String get athleteDetailSeguimientoEmpty =>
+      'You haven\'t logged any follow-up for this athlete yet.';
+
+  @override
+  String get athleteDetailSeguimientoLoadError =>
+      'We couldn\'t load the follow-up log.';
+
+  @override
+  String get dashboardFeedbackSheetTitle => 'Leave feedback';
+
+  @override
+  String get dashboardFeedbackPickAthlete =>
+      'Who do you want to leave feedback for?';
+
+  @override
+  String get dashboardFeedbackComposerHint =>
+      'Write your notes on the workout…';
+
+  @override
+  String get dashboardFeedbackSave => 'Save';
+
+  @override
+  String get dashboardFeedbackSaved => 'Feedback saved';
+
+  @override
+  String get dashboardFeedbackSaveError =>
+      'We couldn\'t save the feedback. Please try again.';
+
+  @override
   String get dashboardErrorActividad =>
       'No pudimos cargar la actividad de hoy.';
 

@@ -1078,6 +1078,35 @@ class AppL10nEs extends AppL10n {
   String get dashboardNadieEntreno => 'Nadie entrenó hoy todavía.';
 
   @override
+  String get athleteDetailSeguimientoEmpty =>
+      'Todavía no dejaste seguimiento de este alumno.';
+
+  @override
+  String get athleteDetailSeguimientoLoadError =>
+      'No pudimos cargar el seguimiento.';
+
+  @override
+  String get dashboardFeedbackSheetTitle => 'Dejar feedback';
+
+  @override
+  String get dashboardFeedbackPickAthlete =>
+      '¿A quién le querés dejar feedback?';
+
+  @override
+  String get dashboardFeedbackComposerHint =>
+      'Escribí tu devolución del entrenamiento…';
+
+  @override
+  String get dashboardFeedbackSave => 'Guardar';
+
+  @override
+  String get dashboardFeedbackSaved => 'Feedback guardado';
+
+  @override
+  String get dashboardFeedbackSaveError =>
+      'No pudimos guardar el feedback. Probá de nuevo.';
+
+  @override
   String get dashboardErrorActividad =>
       'No pudimos cargar la actividad de hoy.';
 
@@ -4122,6 +4151,35 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get dashboardNadieEntreno => 'Nadie entrenó hoy todavía.';
+
+  @override
+  String get athleteDetailSeguimientoEmpty =>
+      'Todavía no dejaste seguimiento de este alumno.';
+
+  @override
+  String get athleteDetailSeguimientoLoadError =>
+      'No pudimos cargar el seguimiento.';
+
+  @override
+  String get dashboardFeedbackSheetTitle => 'Dejar feedback';
+
+  @override
+  String get dashboardFeedbackPickAthlete =>
+      '¿A quién le querés dejar feedback?';
+
+  @override
+  String get dashboardFeedbackComposerHint =>
+      'Escribí tu devolución del entrenamiento…';
+
+  @override
+  String get dashboardFeedbackSave => 'Guardar';
+
+  @override
+  String get dashboardFeedbackSaved => 'Feedback guardado';
+
+  @override
+  String get dashboardFeedbackSaveError =>
+      'No pudimos guardar el feedback. Probá de nuevo.';
 
   @override
   String get dashboardErrorActividad =>

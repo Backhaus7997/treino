@@ -2066,6 +2066,54 @@ abstract class AppL10n {
   /// **'Nadie entrenó hoy todavía.'**
   String get dashboardNadieEntreno;
 
+  /// Empty state of the SEGUIMIENTO section in the mobile athlete detail, when the trainer has no FollowUpEntry for this athlete yet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no dejaste seguimiento de este alumno.'**
+  String get athleteDetailSeguimientoEmpty;
+
+  /// Error state of the SEGUIMIENTO section when the FollowUpEntry query fails.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar el seguimiento.'**
+  String get athleteDetailSeguimientoLoadError;
+
+  /// Title of the bottom sheet opened from the 'Dejar feedback' link in the trainer dashboard's ENTRENARON HOY section.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Dejar feedback'**
+  String get dashboardFeedbackSheetTitle;
+
+  /// Prompt above the list of athletes who trained today, in the leave-feedback sheet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿A quién le querés dejar feedback?'**
+  String get dashboardFeedbackPickAthlete;
+
+  /// Placeholder of the multiline text field where the trainer writes the feedback note.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Escribí tu devolución del entrenamiento…'**
+  String get dashboardFeedbackComposerHint;
+
+  /// Primary action of the leave-feedback sheet: persists the note as a FollowUpEntry.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Guardar'**
+  String get dashboardFeedbackSave;
+
+  /// SnackBar confirmation shown after the feedback note is saved.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Feedback guardado'**
+  String get dashboardFeedbackSaved;
+
+  /// Inline error shown in the leave-feedback sheet when the Firestore write fails.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos guardar el feedback. Probá de nuevo.'**
+  String get dashboardFeedbackSaveError;
+
   /// No description provided for @dashboardErrorActividad.
   ///
   /// In es_AR, this message translates to:
