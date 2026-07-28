@@ -21,6 +21,16 @@ final routinesProvider = FutureProvider<List<Routine>>((ref) async {
   return ref.watch(routineRepositoryProvider).listSystemTemplates();
 });
 
+/// Community-published trainer templates (`trainer-template` +
+/// `visibility == 'public'`). Auth-gated like [routinesProvider]; a failure
+/// here is enrichment-only for the PLANTILLAS grid (see
+/// `communityTemplatesProvider`).
+final publishedTemplatesProvider = FutureProvider<List<Routine>>((ref) async {
+  final user = await ref.watch(authStateChangesProvider.future);
+  if (user == null) return const [];
+  return ref.watch(routineRepositoryProvider).listPublishedTemplates();
+});
+
 /// Live stream of the trainer's own templates (assignedBy == trainerId,
 /// source == trainer-template). Powers the template library section of
 /// `TrainerWorkoutView`.

@@ -5,11 +5,27 @@ import '../../profile/application/user_public_profile_providers.dart';
 import '../domain/routine.dart';
 import 'routine_providers.dart';
 
-/// One entry of the unified PLANTILLAS grid. [fromCoach] marks templates
-/// shared by the athlete's linked trainer — they render a "DE TU COACH"
-/// badge and are pinned before the public catalog, mirroring how
-/// `unifiedRoutinesProvider` pins coach plans in the RUTINAS list.
-typedef TemplateEntry = ({Routine routine, bool fromCoach});
+/// Where a PLANTILLAS grid entry comes from — drives its badge and its
+/// position in the grid.
+enum TemplateOrigin {
+  /// Shared by the athlete's own linked trainer → "DE TU COACH", pinned first.
+  coach,
+
+  /// Published to the community catalogue by any trainer → "ENTRENADOR".
+  community,
+
+  /// The TREINO system catalogue → no badge.
+  system,
+}
+
+/// One entry of the unified PLANTILLAS grid.
+typedef TemplateEntry = ({Routine routine, TemplateOrigin origin});
+
+extension TemplateEntryX on TemplateEntry {
+  /// Kept so existing call sites (and tests) keep reading naturally now that
+  /// the grid has three origins instead of a coach/not-coach boolean.
+  bool get fromCoach => origin == TemplateOrigin.coach;
+}
 
 /// Coach-shared templates as OPTIONAL enrichment of the PLANTILLAS grid.
 ///
@@ -38,25 +54,41 @@ final coachSharedTemplatesProvider = Provider.autoDispose<List<Routine>>(
   },
 );
 
-/// The unified PLANTILLAS grid source: coach-shared templates first, then the
-/// public system catalog. Sources are disjoint by construction (`source ==
-/// 'trainer-template'` vs `source == 'system'`), so plain concatenation
-/// cannot duplicate.
+/// Community-published templates as OPTIONAL enrichment of the grid, same
+/// contract as [coachSharedTemplatesProvider]: while the query is loading or
+/// failed, the community contributes nothing and the rest of the grid renders
+/// alone.
+final communityTemplatesProvider = Provider.autoDispose<List<Routine>>((ref) {
+  return ref.watch(publishedTemplatesProvider).valueOrNull ?? const [];
+});
+
+/// The unified PLANTILLAS grid source: the linked coach's templates first,
+/// then community-published templates from any trainer, then the public
+/// system catalog.
 ///
-/// Loading/error track the CATALOG only ([routinesProvider]) — the coach part
-/// is enrichment (see [coachSharedTemplatesProvider]). Existing providers are
-/// composed untouched: coach_hub consumes them and their signatures must not
-/// change.
+/// Loading/error track the CATALOG only ([routinesProvider]) — coach and
+/// community are enrichment. Existing providers are composed untouched:
+/// coach_hub consumes them and their signatures must not change.
+///
+/// Coach and community DO overlap (the linked coach's own published
+/// templates match both queries), so entries are deduped by routine id with
+/// the coach origin winning — an athlete seeing their own coach's template
+/// should read "DE TU COACH", not the generic community badge. System is
+/// disjoint from both by `source`.
 final unifiedTemplatesProvider =
     Provider.autoDispose<AsyncValue<List<TemplateEntry>>>((ref) {
   final catalog = ref.watch(routinesProvider);
   final coach = ref.watch(coachSharedTemplatesProvider);
-  return catalog.whenData(
-    (system) => [
-      for (final r in coach) (routine: r, fromCoach: true),
-      for (final r in system) (routine: r, fromCoach: false),
-    ],
-  );
+  final community = ref.watch(communityTemplatesProvider);
+  return catalog.whenData((system) {
+    final seen = <String>{for (final r in coach) r.id};
+    return [
+      for (final r in coach) (routine: r, origin: TemplateOrigin.coach),
+      for (final r in community)
+        if (seen.add(r.id)) (routine: r, origin: TemplateOrigin.community),
+      for (final r in system) (routine: r, origin: TemplateOrigin.system),
+    ];
+  });
 });
 
 /// [unifiedTemplatesProvider] filtered by [routinesLevelFilterProvider] —
