@@ -429,12 +429,78 @@ service cloud.firestore {
 
       // Create: only the owner of the post — authorUid must equal caller uid.
       // SCENARIO-130: non-owner create is blocked.
+      //
+      // Shape hardening (share-composer PR1): allowlist de keys + bounds de
+      // los campos abusables. OJO: `string.size()` en rules NO cuenta
+      // caracteres user-visible — '💪'.repeat(280) mide > 280 (verificado
+      // contra el emulador, ver post-create-shape-rules.test.ts), así que un
+      // bound de 280 rompería posts legítimos con tildes/emoji. El cap de UX
+      // (280 caracteres, kMaxPostChars) vive en el cliente; acá va 280 × 4 =
+      // 1120 como techo anti-abuso (4 es el peso máximo de un code point en
+      // UTF-8 — cubre tildes, CJK y emoji simples), mismo split cliente-corto
+      // / rules-holgadas que el `text.size() < 5000` de chats.
+      // `photoUrl` ≤ 600 vía optStrMaxLen (json_serializable emite la key
+      // presente-con-null en posts sin foto — el helper la acepta);
+      // `workoutSnapshot` solo se valida en su capa externa (map con
+      // exercises list ≤ 30, espejo de kMaxSnapshotExercises) — la forma
+      // anidada de cada set NO se valida (sin precedente en este archivo;
+      // el límite de 1 MiB por doc es el backstop).
       allow create: if request.auth != null
-                    && request.auth.uid == request.resource.data.authorUid;
+                    && request.auth.uid == request.resource.data.authorUid
+                    && request.resource.data.keys().hasOnly([
+                         'id', 'authorUid', 'authorDisplayName',
+                         'authorAvatarUrl', 'authorGymId', 'text',
+                         'routineTag', 'privacy', 'createdAt', 'workoutStats',
+                         'photoUrl', 'workoutSnapshot'
+                       ])
+                    && request.resource.data.text is string
+                    && request.resource.data.text.size() <= 1120
+                    && request.resource.data.privacy in ['friends', 'gym', 'public']
+                    && optStrMaxLen(request.resource.data.get('photoUrl', null), 600)
+                    && (request.resource.data.get('workoutSnapshot', null) == null
+                        || (request.resource.data.workoutSnapshot is map
+                            && request.resource.data.workoutSnapshot.get('exercises', null) is list
+                            && request.resource.data.workoutSnapshot.exercises.size() <= 30));
 
-      // Update and delete: only the original author.
-      allow update, delete: if request.auth != null
-                            && request.auth.uid == resource.data.authorUid;
+      // Update: only the original author, mismos bounds de shape que create —
+      // sin esto el hardening del create es cosmético (el dueño podría inflar
+      // `text` o meter keys nuevas vía update). En updates,
+      // `request.resource.data` es el doc FINAL mergeado, así que las mismas
+      // condiciones valen: docs legacy traen un subset de las keys permitidas
+      // y pasan hasOnly igual.
+      //
+      // Campos inmutables pineados equal-to-existing (idioma get(...,null),
+      // como `payments`): PostRepository.update solo edita text/privacy/
+      // routineTag y su doc declara authorUid/authorGymId/author*/createdAt/id
+      // inmutables — sin el pin, el dueño podía REASIGNAR authorUid y plantar
+      // un post falso atribuido a otra persona en el feed de los amigos de la
+      // víctima (o inyectar en el feed de otro gym vía authorGymId).
+      allow update: if request.auth != null
+                    && request.auth.uid == resource.data.authorUid
+                    && request.resource.data.authorUid == resource.data.authorUid
+                    && request.resource.data.get('authorGymId', null) == resource.data.get('authorGymId', null)
+                    && request.resource.data.get('authorDisplayName', null) == resource.data.get('authorDisplayName', null)
+                    && request.resource.data.get('authorAvatarUrl', null) == resource.data.get('authorAvatarUrl', null)
+                    && request.resource.data.get('id', null) == resource.data.get('id', null)
+                    && request.resource.data.get('createdAt', null) == resource.data.get('createdAt', null)
+                    && request.resource.data.keys().hasOnly([
+                         'id', 'authorUid', 'authorDisplayName',
+                         'authorAvatarUrl', 'authorGymId', 'text',
+                         'routineTag', 'privacy', 'createdAt', 'workoutStats',
+                         'photoUrl', 'workoutSnapshot'
+                       ])
+                    && request.resource.data.text is string
+                    && request.resource.data.text.size() <= 1120
+                    && request.resource.data.privacy in ['friends', 'gym', 'public']
+                    && optStrMaxLen(request.resource.data.get('photoUrl', null), 600)
+                    && (request.resource.data.get('workoutSnapshot', null) == null
+                        || (request.resource.data.workoutSnapshot is map
+                            && request.resource.data.workoutSnapshot.get('exercises', null) is list
+                            && request.resource.data.workoutSnapshot.exercises.size() <= 30));
+
+      // Delete: only the original author.
+      allow delete: if request.auth != null
+                    && request.auth.uid == resource.data.authorUid;
     }
 
     // Public identity documents — one per user, public-readable by any

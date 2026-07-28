@@ -13,6 +13,12 @@ class PostRepository {
   CollectionReference<Map<String, Object?>> get _posts =>
       _firestore.collection('posts');
 
+  /// Allocates a post doc id client-side WITHOUT writing anything. For flows
+  /// that need the id before the doc exists — the post photo uploads to
+  /// `postPhotos/{uid}/{postId}.{ext}` first, then `create()` persists the
+  /// doc under this same id.
+  String newPostId() => _posts.doc().id;
+
   /// Creates a post doc. Reads `users/{uid}.gymId` once to denormalize
   /// `authorGymId`. Returns the persisted post with its assigned id.
   Future<Post> create(Post input) async {
@@ -144,6 +150,13 @@ class PostRepository {
     // and store it only as the doc ID) deserialize correctly. App-created
     // posts already carry `id` in the body via `create()` — this is a no-op
     // override for those.
-    return Post.fromJson({...data, 'id': snap.id});
+    try {
+      return Post.fromJson({...data, 'id': snap.id});
+    } catch (_) {
+      // A malformed doc (hand-crafted via SDK — rules only validate the
+      // outer shape) must degrade to a skipped row, never kill the whole
+      // feed query: every caller pipes through `.whereType<Post>()`.
+      return null;
+    }
   }
 }

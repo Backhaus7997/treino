@@ -5,6 +5,8 @@ import 'package:treino/features/feed/data/post_repository.dart';
 import 'package:treino/features/feed/domain/post.dart';
 import 'package:treino/features/feed/domain/post_privacy.dart';
 import 'package:treino/features/feed/domain/routine_tag.dart';
+import 'package:treino/features/feed/domain/workout_snapshot.dart';
+import 'package:treino/features/workout/domain/set_log.dart';
 
 Post _makePost({
   String id = 'p1',
@@ -321,6 +323,106 @@ void main() {
       final result = await repo.feedForGym('gym1');
 
       expect(result.map((p) => p.id).toList(), equals(['new', 'mid', 'old']));
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Share-composer PR1: id client-side, snapshot/foto roundtrip, parse defensivo
+  // ---------------------------------------------------------------------------
+  group('PostRepository.newPostId', () {
+    test('aloca ids no vacíos y distintos sin escribir ningún doc', () async {
+      final a = repo.newPostId();
+      final b = repo.newPostId();
+
+      expect(a, isNotEmpty);
+      expect(b, isNotEmpty);
+      expect(a, isNot(equals(b)));
+      final snap = await firestore.collection('posts').doc(a).get();
+      expect(snap.exists, isFalse);
+    });
+
+    test('create respeta el id pre-alocado', () async {
+      final id = repo.newPostId();
+      await repo.create(_makePost(id: id, authorUid: 'u1'));
+
+      final snap = await firestore.collection('posts').doc(id).get();
+      expect(snap.exists, isTrue);
+    });
+  });
+
+  group('PostRepository photoUrl + workoutSnapshot roundtrip', () {
+    test('create persiste photoUrl y workoutSnapshot y byAuthor los rehidrata',
+        () async {
+      final snapshot = buildWorkoutSnapshot(
+        setLogs: [
+          SetLog(
+            id: 's1',
+            exerciseId: 'e1',
+            exerciseName: 'Press banca',
+            setNumber: 1,
+            reps: 8,
+            weightKg: 60,
+            completedAt: DateTime.utc(2026, 7, 28, 10),
+          ),
+        ],
+      );
+      await repo.create(_makePost(id: 'p1', authorUid: 'u1').copyWith(
+        photoUrl: 'https://example.com/photo.jpg',
+        workoutSnapshot: snapshot,
+      ));
+
+      final result = await repo.byAuthor('u1');
+
+      expect(result.single.photoUrl, equals('https://example.com/photo.jpg'));
+      expect(result.single.workoutSnapshot, equals(snapshot));
+      expect(
+        result.single.workoutSnapshot!.exercises.single.sets.single.reps,
+        equals(8),
+      );
+    });
+
+    test('un post legacy sin photoUrl/workoutSnapshot deserializa con nulls',
+        () async {
+      // Doc viejo sembrado a mano — sin las keys nuevas.
+      await firestore.collection('posts').doc('legacy').set({
+        'authorUid': 'u1',
+        'authorDisplayName': 'Ana',
+        'authorAvatarUrl': null,
+        'authorGymId': null,
+        'text': 'viejo',
+        'routineTag': null,
+        'privacy': 'public',
+        'createdAt': Timestamp.fromDate(DateTime.utc(2026, 1, 1)),
+      });
+
+      final result = await repo.byAuthor('u1');
+
+      expect(result.single.photoUrl, isNull);
+      expect(result.single.workoutSnapshot, isNull);
+    });
+  });
+
+  group('PostRepository parse defensivo', () {
+    test('un doc malformado se saltea en vez de matar la query entera',
+        () async {
+      // Las rules solo validan la capa externa del doc — un snapshot con sets
+      // rotos crafteado vía SDK pasa el create pero no puede deserializar.
+      await firestore.collection('posts').doc('bad').set({
+        'authorUid': 'u1',
+        'text': 'roto',
+        'privacy': 'public',
+        'createdAt': Timestamp.fromDate(DateTime.utc(2026, 1, 2)),
+        'workoutSnapshot': {
+          'exercises': [
+            {'exerciseName': 'X', 'sets': 'no-es-una-lista'},
+          ],
+        },
+      });
+      await repo.create(_makePost(id: 'good', authorUid: 'u1'));
+
+      final result = await repo.byAuthor('u1');
+
+      expect(result.map((p) => p.id).toList(), equals(['good']));
     });
   });
 }
