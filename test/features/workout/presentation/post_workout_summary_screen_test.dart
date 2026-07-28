@@ -8,7 +8,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/features/insights/domain/radar_axis.dart';
+import 'package:treino/features/insights/presentation/widgets/muscle_distribution_radar.dart';
 import 'package:treino/features/workout/application/post_workout_notifier.dart';
+import 'package:treino/features/workout/application/session_muscle_distribution.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
@@ -56,6 +59,8 @@ Widget _buildWithRouter({
   PostWorkoutNotifier Function()? notifierOverride,
   bool summaryLoading = false,
   bool summaryError = false,
+  SessionMuscleDistribution muscleDistribution = emptySessionMuscleDistribution,
+  bool muscleError = false,
 }) {
   final router = GoRouter(
     initialLocation: '/workout/session-summary/s1',
@@ -80,6 +85,12 @@ Widget _buildWithRouter({
       if (summaryLoading) return Completer<_SummaryRecord>().future;
       if (summaryError) return Future.error(Exception('load error'));
       return Future.value(summaryOverride());
+    }),
+    // Always overridden: the real provider would hit the real exercise
+    // catalog (Firestore) from inside a widget test.
+    sessionMuscleDistributionProvider.overrideWith((ref, key) {
+      if (muscleError) return Future.error(Exception('catalog error'));
+      return Future.value(muscleDistribution);
     }),
     currentUidProvider.overrideWithValue('u1'),
     if (notifierOverride != null)
@@ -395,6 +406,81 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('workout-home'), findsOneWidget);
+  });
+
+  // ── Muscle distribution section ──────────────────────────────────────────
+
+  testWidgets(
+      'muscle distribution: ≥3 axes → radar without legend or stat cards',
+      (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+      muscleDistribution: (
+        setsByAxis: {
+          RadarAxis.chest: 6,
+          RadarAxis.arms: 4,
+          RadarAxis.shoulders: 3,
+        },
+        volumeKgByAxis: {
+          RadarAxis.chest: 1200.0,
+          RadarAxis.arms: 400.0,
+          RadarAxis.shoulders: 300.0,
+        },
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('DISTRIBUCIÓN MUSCULAR'), findsOneWidget);
+    expect(find.byType(MuscleDistributionRadar), findsOneWidget);
+    // Single-session mode: no Actual/Anterior legend, no stat cards (the
+    // 2×2 grid above already shows those metrics).
+    expect(find.text('Actual'), findsNothing);
+    expect(find.text('Anterior'), findsNothing);
+    expect(find.text('Entrenos'), findsNothing);
+  });
+
+  testWidgets(
+      'muscle distribution: <3 axes → group bars with sets and volume, '
+      'no radar', (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+      muscleDistribution: (
+        setsByAxis: {RadarAxis.legs: 4, RadarAxis.core: 2},
+        volumeKgByAxis: {RadarAxis.legs: 400.0, RadarAxis.core: 0.0},
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('DISTRIBUCIÓN MUSCULAR'), findsOneWidget);
+    expect(find.byType(MuscleDistributionRadar), findsNothing);
+    expect(find.text('PIERNAS'), findsOneWidget);
+    expect(find.text('CORE'), findsOneWidget);
+    expect(find.text('4 sets · 400 kg'), findsOneWidget);
+    expect(find.text('2 sets · 0 kg'), findsOneWidget);
+  });
+
+  testWidgets('muscle distribution: empty distribution → whole section absent',
+      (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('DISTRIBUCIÓN MUSCULAR'), findsNothing);
+    expect(find.byType(MuscleDistributionRadar), findsNothing);
+  });
+
+  testWidgets(
+      'muscle distribution: resolver error → section absent, summary intact',
+      (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+      muscleError: true,
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('DISTRIBUCIÓN MUSCULAR'), findsNothing);
+    expect(find.text('BUEN ENTRENO'), findsOneWidget);
   });
 }
 

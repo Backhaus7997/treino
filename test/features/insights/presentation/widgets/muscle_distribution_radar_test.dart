@@ -355,6 +355,43 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   });
+
+  // ── showLegend / showStatCards (single-session mode) ─────────────────────
+
+  group('MuscleDistributionRadar visibility flags', () {
+    testWidgets('defaults keep legend and stat cards (backwards compatible)',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        MuscleDistributionRadar(insights: _sample, labels: _labels()),
+      ));
+
+      expect(find.text('Actual'), findsOneWidget);
+      expect(find.text('Anterior'), findsOneWidget);
+      expect(find.text('Entrenos'), findsOneWidget);
+      expect(find.byType(RadarChart), findsOneWidget);
+    });
+
+    testWidgets(
+        'showLegend/showStatCards false → chart only, no legend, no cards',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        MuscleDistributionRadar(
+          insights: _sample,
+          labels: _labels(),
+          showLegend: false,
+          showStatCards: false,
+        ),
+      ));
+
+      expect(find.byType(RadarChart), findsOneWidget);
+      expect(find.text('Actual'), findsNothing);
+      expect(find.text('Anterior'), findsNothing);
+      expect(find.text('Entrenos'), findsNothing);
+      expect(find.text('Duración'), findsNothing);
+      expect(find.text('Volumen'), findsNothing);
+      expect(find.text('Sets'), findsNothing);
+    });
+  });
 }
 
 /// Sample con las 6 axes pobladas — para los tests que sólo miran el chart.

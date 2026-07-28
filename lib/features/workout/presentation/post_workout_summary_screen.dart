@@ -8,9 +8,11 @@ import '../../../app/theme/app_palette.dart';
 import '../../../core/utils/kg_format.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../application/post_workout_notifier.dart';
+import '../application/session_muscle_distribution.dart';
 import '../application/session_providers.dart';
 import '../domain/session.dart';
 import '../domain/set_log.dart';
+import 'widgets/session_muscle_distribution_section.dart';
 import 'widgets/stat_tile.dart';
 import '../../../l10n/app_l10n.dart';
 
@@ -26,6 +28,13 @@ class PostWorkoutSummaryScreen extends ConsumerWidget {
       sessionSummaryProvider((uid: uid, sessionId: sessionId)),
     );
     final isSharing = ref.watch(postWorkoutNotifierProvider).isLoading;
+    // Best-effort: mientras carga (o si el catálogo/rutina falla) la sección
+    // simplemente no aparece — el gráfico jamás bloquea ni rompe el resumen.
+    final muscleDistribution = ref
+        .watch(sessionMuscleDistributionProvider(
+          (uid: uid, sessionId: sessionId),
+        ))
+        .valueOrNull;
 
     return Scaffold(
       body: AppBackground(
@@ -45,6 +54,7 @@ class PostWorkoutSummaryScreen extends ConsumerWidget {
               return _LoadedBody(
                 session: session,
                 setLogs: data.setLogs,
+                muscleDistribution: muscleDistribution,
                 isSharing: isSharing,
                 onShare: () async {
                   final messenger = ScaffoldMessenger.of(context);
@@ -89,12 +99,14 @@ class _LoadedBody extends StatelessWidget {
   const _LoadedBody({
     required this.session,
     required this.setLogs,
+    required this.muscleDistribution,
     required this.isSharing,
     required this.onShare,
   });
 
   final Session session;
   final List<SetLog> setLogs;
+  final SessionMuscleDistribution? muscleDistribution;
   final bool isSharing;
   final VoidCallback onShare;
 
@@ -102,6 +114,7 @@ class _LoadedBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
+    final distribution = muscleDistribution;
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -171,6 +184,14 @@ class _LoadedBody extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 32),
+
+          // Muscle distribution of THIS session (radar, or bars when the
+          // session folds into <3 radar axes). Absent while loading, on
+          // resolver error, or when no set maps to a radar axis.
+          if (distribution != null && distribution.setsByAxis.isNotEmpty) ...[
+            SessionMuscleDistributionSection(distribution: distribution),
+            const SizedBox(height: 32),
+          ],
 
           // PRs section (stub)
           Text(

@@ -73,10 +73,24 @@ class MuscleDistributionRadar extends StatelessWidget {
     super.key,
     required this.insights,
     required this.labels,
+    this.showLegend = true,
+    this.showStatCards = true,
   });
 
   final MuscleDistributionInsights insights;
   final MuscleDistributionLabels labels;
+
+  /// Ocultá la leyenda Actual/Anterior cuando el caller renderiza un único
+  /// dataset sin comparación (p. ej. el resumen post-entreno, que pasa
+  /// `previousSetsByAxis` vacío): una leyenda de dos períodos sobre un solo
+  /// polígono es ruido. Default `true` — las pantallas de Insights no cambian.
+  final bool showLegend;
+
+  /// Ocultá las 4 stat cards (Workouts/Duration/Volume/Sets) cuando la
+  /// pantalla contenedora ya muestra esas métricas por su cuenta (p. ej. el
+  /// grid 2×2 del resumen post-entreno). Default `true` — las pantallas de
+  /// Insights no cambian.
+  final bool showStatCards;
 
   @override
   Widget build(BuildContext context) {
@@ -103,11 +117,15 @@ class MuscleDistributionRadar extends StatelessWidget {
               ),
             )
           else ...[
-            _RadarLegend(labels: labels, palette: palette),
-            const SizedBox(height: 12),
+            if (showLegend) ...[
+              _RadarLegend(labels: labels, palette: palette),
+              const SizedBox(height: 12),
+            ],
             _Radar(insights: insights, palette: palette),
-            const SizedBox(height: 12),
-            _StatCardGrid(insights: insights, labels: labels),
+            if (showStatCards) ...[
+              const SizedBox(height: 12),
+              _StatCardGrid(insights: insights, labels: labels),
+            ],
           ],
         ],
       ),
