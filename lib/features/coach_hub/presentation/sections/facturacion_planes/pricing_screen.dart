@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../../app/theme/app_palette.dart';
+import '../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../coach/domain/subscription_tier.dart';
 import '../../../../profile/application/user_providers.dart';
 
@@ -145,9 +146,8 @@ class _CycleOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return TreinoTappable(
       onTap: onTap,
-      behavior: HitTestBehavior.opaque,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -288,7 +288,7 @@ class _EnterpriseBanner extends StatelessWidget {
               ),
             ],
           ),
-          GestureDetector(
+          TreinoTappable(
             onTap: () {
               // MOCK: el canal de contacto (o el plan usage-based de Fase 2) se
               // define más adelante. Por ahora, aviso honesto.
@@ -300,7 +300,6 @@ class _EnterpriseBanner extends StatelessWidget {
                 ),
               );
             },
-            behavior: HitTestBehavior.opaque,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
               decoration: BoxDecoration(
@@ -547,9 +546,8 @@ class _PlanCtaButton extends StatelessWidget {
 
     return Opacity(
       opacity: enabled ? 1 : 0.5,
-      child: GestureDetector(
+      child: TreinoTappable(
         onTap: enabled ? () => _showComingSoon(context) : null,
-        behavior: HitTestBehavior.opaque,
         child: Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(vertical: 12),

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../../app/theme/app_palette.dart';
+import '../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../coach/domain/subscription_tier.dart';
 import 'keep_students_screen.dart';
 import 'plan_limit_paywall.dart';
@@ -91,9 +92,8 @@ class _PreviewButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: GestureDetector(
+      child: TreinoTappable(
         onTap: onTap,
-        behavior: HitTestBehavior.opaque,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
           decoration: BoxDecoration(
