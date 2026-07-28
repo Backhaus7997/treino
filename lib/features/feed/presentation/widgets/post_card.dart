@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -14,7 +15,9 @@ import '../../../gyms/domain/gym_display_name.dart';
 import '../../application/post_actions_notifier.dart';
 import '../../domain/post.dart';
 import '../../domain/routine_tag.dart';
+import '../../domain/workout_snapshot.dart';
 import 'post_avatar.dart';
+import 'workout_snapshot_detail.dart';
 
 /// #547: the theme's Barlow families carry no emoji glyphs, so an emoji inside
 /// user-authored (or auto-generated) post content renders as tofu "▯". Pinning
@@ -173,6 +176,15 @@ class PostCard extends ConsumerWidget {
             ),
           ),
 
+          // Foto adjuntada desde el composer de entreno. memCacheWidth acota
+          // el bitmap decodificado al ancho real de la card (mismo criterio
+          // que PostAvatar) — sin eso, una foto de cámara de 4000px se
+          // decodifica entera por cada card del ListView.
+          if (post.photoUrl != null && post.photoUrl!.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _PostPhoto(url: post.photoUrl!),
+          ],
+
           if (post.routineTag != null) ...[
             const SizedBox(height: 12),
             _RoutineTagChip(tag: post.routineTag!),
@@ -213,6 +225,14 @@ class PostCard extends ConsumerWidget {
                 ),
               ],
             ),
+          ],
+
+          // Detalle del entreno (ejercicios con sets + distribución muscular).
+          // Sólo en posts compartidos desde el composer — los manuales y los
+          // legacy no traen snapshot y la card queda idéntica a hoy.
+          if (post.workoutSnapshot != null) ...[
+            const SizedBox(height: 12),
+            _WorkoutDetailSection(snapshot: post.workoutSnapshot!),
           ],
         ],
       ),
@@ -337,6 +357,120 @@ String _formatMeta(String gymName, DateTime createdAt) {
 }
 
 // ── Private widgets ────────────────────────────────────────────────────────
+
+/// Foto del post. `memCacheWidth` acota el bitmap decodificado — la card
+/// ocupa el ancho de la pantalla, así que 2× el ancho lógico típico alcanza
+/// para pantallas de densidad alta sin decodificar el original de cámara.
+class _PostPhoto extends StatelessWidget {
+  const _PostPhoto({required this.url});
+
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 320),
+        child: SizedBox(
+          width: double.infinity,
+          child: CachedNetworkImage(
+            imageUrl: url,
+            fit: BoxFit.cover,
+            memCacheWidth: 1080,
+            placeholder: (_, __) => Container(
+              height: 200,
+              color: palette.bg,
+            ),
+            // Una foto rota (objeto borrado, URL vencida) NO deja un hueco
+            // ni rompe la card: se colapsa y el resto del post se lee igual.
+            errorWidget: (_, __, ___) => const SizedBox.shrink(),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Sección expandible con el detalle del entreno compartido.
+///
+/// [StatefulWidget] propio (no estado en [PostCard], que es un
+/// `ConsumerWidget` instanciado N veces en el `ListView` del feed) y el
+/// contenido se construye SÓLO cuando está expandida — colapsada, la card
+/// paga apenas el botón, no los N bloques de ejercicios ni el mini-gráfico.
+class _WorkoutDetailSection extends StatefulWidget {
+  const _WorkoutDetailSection({required this.snapshot});
+
+  final WorkoutSnapshot snapshot;
+
+  @override
+  State<_WorkoutDetailSection> createState() => _WorkoutDetailSectionState();
+}
+
+class _WorkoutDetailSectionState extends State<_WorkoutDetailSection> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    final label = _expanded
+        ? l10n.postCardWorkoutDetailHide
+        : l10n.postCardWorkoutDetailShow;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Semantics(
+          button: true,
+          expanded: _expanded,
+          label: label,
+          child: GestureDetector(
+            onTap: () => setState(() => _expanded = !_expanded),
+            behavior: HitTestBehavior.opaque,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 44),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                widthFactor: 1,
+                child: ExcludeSemantics(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        label,
+                        style: GoogleFonts.barlowCondensed(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                          letterSpacing: 1.0,
+                          color: palette.accent,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(
+                        _expanded
+                            ? TreinoIcon.chevronUp
+                            : TreinoIcon.chevronDown,
+                        size: 14,
+                        color: palette.accent,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        if (_expanded) ...[
+          const SizedBox(height: 12),
+          WorkoutSnapshotDetail(snapshot: widget.snapshot),
+        ],
+      ],
+    );
+  }
+}
 
 class _RoutineTagChip extends StatelessWidget {
   const _RoutineTagChip({required this.tag});

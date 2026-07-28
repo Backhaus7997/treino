@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,9 +13,12 @@ import 'package:treino/features/feed/data/post_repository.dart';
 import 'package:treino/features/feed/domain/post.dart';
 import 'package:treino/features/feed/domain/post_privacy.dart';
 import 'package:treino/features/feed/domain/routine_tag.dart';
+import 'package:treino/features/feed/domain/workout_snapshot.dart';
 import 'package:treino/features/feed/domain/workout_stats.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/feed/presentation/widgets/post_card.dart';
+import 'package:treino/features/feed/presentation/widgets/workout_snapshot_detail.dart';
+import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
 import 'package:treino/features/gyms/domain/gym.dart';
 import 'package:treino/features/gyms/domain/gym_source.dart';
@@ -589,6 +593,170 @@ void main() {
 
         verifyNever(() => repo.delete(any()));
         expect(find.byType(AlertDialog), findsNothing);
+      });
+    });
+
+    // ── Share-composer PR2: detalle del entreno y foto ────────────────────
+    group('workout snapshot detail', () {
+      WorkoutSnapshot snapshot(
+              {int exerciseCount = 2, bool truncated = false}) =>
+          WorkoutSnapshot(
+            exercises: [
+              for (var i = 0; i < exerciseCount; i++)
+                WorkoutSnapshotExercise(
+                  exerciseName: 'Ejercicio $i',
+                  sets: [
+                    SetLog(
+                      id: 's$i',
+                      exerciseId: 'e$i',
+                      exerciseName: 'Ejercicio $i',
+                      setNumber: 1,
+                      reps: 10,
+                      weightKg: 50,
+                      completedAt: DateTime.utc(2026, 7, 28, 10),
+                    ),
+                  ],
+                ),
+            ],
+            setsByAxis: const {'chest': 2, 'legs': 1},
+            volumeKgByAxis: const {'chest': 1000, 'legs': 500},
+            truncated: truncated,
+          );
+
+      testWidgets('un post SIN snapshot no muestra el control de detalle',
+          (tester) async {
+        await tester.pumpWidget(_wrap(PostCard(post: makePost())));
+        await tester.pump();
+
+        expect(find.text('VER DETALLE'), findsNothing);
+        expect(find.byType(WorkoutSnapshotDetail), findsNothing);
+      });
+
+      testWidgets(
+          'con snapshot muestra el control pero NO construye el detalle hasta expandir',
+          (tester) async {
+        await tester.pumpWidget(_wrap(
+          PostCard(post: makePost().copyWith(workoutSnapshot: snapshot())),
+        ));
+        await tester.pump();
+
+        expect(find.text('VER DETALLE'), findsOneWidget);
+        // Lazy: colapsada, la card no paga los bloques de ejercicios ni el
+        // mini-gráfico (hay N cards en el ListView del feed).
+        expect(find.byType(WorkoutSnapshotDetail), findsNothing);
+        expect(find.text('Ejercicio 0'), findsNothing);
+      });
+
+      testWidgets('al expandir renderiza ejercicios, sets y el mini-gráfico',
+          (tester) async {
+        await tester.pumpWidget(_wrap(
+          PostCard(post: makePost().copyWith(workoutSnapshot: snapshot())),
+        ));
+        await tester.pump();
+
+        await tester.tap(find.text('VER DETALLE'));
+        await tester.pump();
+
+        expect(find.byType(WorkoutSnapshotDetail), findsOneWidget);
+        expect(find.byType(MuscleDistributionBars), findsOneWidget);
+        expect(find.text('Ejercicio 0'), findsOneWidget);
+        expect(find.text('Ejercicio 1'), findsOneWidget);
+        expect(find.text('10 reps'), findsNWidgets(2));
+        // Ejes del mini-gráfico, en el orden canónico del radar.
+        expect(find.text('PECHO'), findsOneWidget);
+        expect(find.text('PIERNAS'), findsOneWidget);
+        // El control invierte su label para poder colapsar.
+        expect(find.text('OCULTAR DETALLE'), findsOneWidget);
+      });
+
+      testWidgets('vuelve a colapsar y descarta el detalle', (tester) async {
+        await tester.pumpWidget(_wrap(
+          PostCard(post: makePost().copyWith(workoutSnapshot: snapshot())),
+        ));
+        await tester.pump();
+
+        await tester.tap(find.text('VER DETALLE'));
+        await tester.pump();
+        await tester.tap(find.text('OCULTAR DETALLE'));
+        await tester.pump();
+
+        expect(find.byType(WorkoutSnapshotDetail), findsNothing);
+        expect(find.text('VER DETALLE'), findsOneWidget);
+      });
+
+      testWidgets('un snapshot truncado avisa cuántos ejercicios muestra',
+          (tester) async {
+        await tester.pumpWidget(_wrap(
+          PostCard(
+            post: makePost().copyWith(
+              workoutSnapshot: snapshot(truncated: true),
+            ),
+          ),
+        ));
+        await tester.pump();
+        await tester.tap(find.text('VER DETALLE'));
+        await tester.pump();
+
+        expect(
+          find.text('Se muestran los primeros $kMaxSnapshotExercises '
+              'ejercicios.'),
+          findsOneWidget,
+        );
+      });
+
+      testWidgets('un snapshot sin ejes no renderiza el mini-gráfico',
+          (tester) async {
+        await tester.pumpWidget(_wrap(
+          PostCard(
+            post: makePost().copyWith(
+              workoutSnapshot: snapshot().copyWith(
+                setsByAxis: const {},
+                volumeKgByAxis: const {},
+              ),
+            ),
+          ),
+        ));
+        await tester.pump();
+        await tester.tap(find.text('VER DETALLE'));
+        await tester.pump();
+
+        expect(find.byType(MuscleDistributionBars), findsNothing);
+        expect(find.text('Ejercicio 0'), findsOneWidget);
+      });
+    });
+
+    group('post photo', () {
+      testWidgets('un post sin photoUrl no renderiza imagen de red',
+          (tester) async {
+        await tester.pumpWidget(_wrap(PostCard(post: makePost())));
+        await tester.pump();
+
+        expect(find.byType(CachedNetworkImage), findsNothing);
+      });
+
+      testWidgets('con photoUrl renderiza la foto con memCacheWidth acotado',
+          (tester) async {
+        await tester.pumpWidget(_wrap(
+          PostCard(
+            post: makePost().copyWith(photoUrl: 'https://example.com/f.jpg'),
+          ),
+        ));
+        await tester.pump();
+
+        final image = tester.widget<CachedNetworkImage>(
+          find.byType(CachedNetworkImage),
+        );
+        expect(image.imageUrl, 'https://example.com/f.jpg');
+        expect(image.memCacheWidth, isNotNull);
+      });
+
+      testWidgets('photoUrl vacía se trata como sin foto', (tester) async {
+        await tester.pumpWidget(_wrap(
+          PostCard(post: makePost().copyWith(photoUrl: '')),
+        ));
+        await tester.pump();
+
+        expect(find.byType(CachedNetworkImage), findsNothing);
       });
     });
   });
