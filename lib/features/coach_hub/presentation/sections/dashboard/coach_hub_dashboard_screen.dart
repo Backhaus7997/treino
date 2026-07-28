@@ -429,14 +429,16 @@ class _AdherenceRing extends ConsumerWidget {
       label = l10n.dashboardAdherenceRingPlaceholder; // "--"
       ringValue = 0;
     } else {
-      label = l10n.dashboardAdherenceValue(adherence.round());
-      // Clamp ring value to [0, 1] for CircularProgressIndicator.
+      // Clamp the displayed % to 100: an athlete can log more sessions than
+      // planned (raw value can exceed 100), but "105% de adherencia" reads
+      // as a bug. Same clamp is applied to the KPI card so both agree.
+      label = l10n.dashboardAdherenceValue(adherence.round().clamp(0, 100));
       ringValue = (adherence / 100).clamp(0.0, 1.0);
     }
 
     return SizedBox(
-      width: 72,
-      height: 72,
+      width: 84,
+      height: 84,
       child: Stack(
         alignment: Alignment.center,
         children: [
@@ -453,7 +455,7 @@ class _AdherenceRing extends ConsumerWidget {
             style: TextStyle(
               color:
                   adherence == null ? palette.textMuted : palette.textPrimary,
-              fontSize: 14,
+              fontSize: 11,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -504,7 +506,9 @@ class _KpiStrip extends ConsumerWidget {
     final adherenceValue = adherenceAsync.valueOrNull;
     final adherenceLabel = adherenceValue == null
         ? l10n.dashboardAdherenceRingPlaceholder // "--"
-        : l10n.dashboardAdherenceValue(adherenceValue.round());
+        // Clamp to 100% — matches the adherence ring (raw value can exceed
+        // 100 when an athlete logs more sessions than planned).
+        : l10n.dashboardAdherenceValue(adherenceValue.round().clamp(0, 100));
 
     final isLoading = linksAsync.isLoading || bucketsAsync.isLoading;
 
