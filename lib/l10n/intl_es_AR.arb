@@ -255,6 +255,51 @@
   "workoutSnackShareSuccess": "¡Post compartido!",
   "workoutSnackShareError": "No pudimos compartir tu post. Intentá de nuevo.",
   "workoutPostAutoCompleteText": "¡Terminé mi entreno! 💪",
+  "shareWorkoutComposerTitle": "COMPARTIR ENTRENO",
+  "@shareWorkoutComposerTitle": {
+    "description": "Header title of the share-a-workout composer screen, opened from the COMPARTIR button of the post-workout summary."
+  },
+  "shareWorkoutComposerHint": "¿Cómo estuvo tu entreno?",
+  "@shareWorkoutComposerHint": {
+    "description": "Placeholder of the composer's text field. The field is pre-filled with workoutPostAutoCompleteText, so this only shows if the athlete clears it."
+  },
+  "shareWorkoutComposerPublish": "PUBLICAR",
+  "@shareWorkoutComposerPublish": {
+    "description": "Composer's confirm action — publishes the workout post to the feed."
+  },
+  "shareWorkoutComposerAddPhoto": "AGREGAR FOTO",
+  "@shareWorkoutComposerAddPhoto": {
+    "description": "Composer action that opens the image picker to attach one optional photo to the workout post."
+  },
+  "shareWorkoutComposerRemovePhoto": "Quitar foto",
+  "@shareWorkoutComposerRemovePhoto": {
+    "description": "Accessibility label of the control that detaches the photo already attached in the composer."
+  },
+  "shareWorkoutComposerPhotoError": "No pudimos usar esa foto. Probá con otra.",
+  "@shareWorkoutComposerPhotoError": {
+    "description": "Inline error shown in the composer when the picked photo cannot be read or exceeds the size limit."
+  },
+  "shareWorkoutComposerPreviewTitle": "TU ENTRENO",
+  "@shareWorkoutComposerPreviewTitle": {
+    "description": "Section header above the workout detail preview inside the composer — what the rest of the users will see attached to the post."
+  },
+  "postCardWorkoutDetailShow": "VER DETALLE",
+  "@postCardWorkoutDetailShow": {
+    "description": "Feed card control that expands the shared workout detail (exercises with sets/reps/weight plus the muscle distribution mini-chart)."
+  },
+  "postCardWorkoutDetailHide": "OCULTAR DETALLE",
+  "@postCardWorkoutDetailHide": {
+    "description": "Feed card control that collapses the shared workout detail back."
+  },
+  "postCardWorkoutDetailTruncated": "Se muestran los primeros {count} ejercicios.",
+  "@postCardWorkoutDetailTruncated": {
+    "description": "Note at the end of an expanded workout detail whose exercise list was capped when the post was shared.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "workoutHistorialHeading": "HISTORIAL",
   "workoutHistorialEmptyMessage": "Todavía no entrenaste.",
   "workoutHistorialEmptyCta": "Empezar entrenamiento",

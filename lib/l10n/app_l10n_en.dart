@@ -581,6 +581,39 @@ class AppL10nEn extends AppL10n {
   String get workoutPostAutoCompleteText => '';
 
   @override
+  String get shareWorkoutComposerTitle => 'SHARE WORKOUT';
+
+  @override
+  String get shareWorkoutComposerHint => 'How was your workout?';
+
+  @override
+  String get shareWorkoutComposerPublish => 'PUBLISH';
+
+  @override
+  String get shareWorkoutComposerAddPhoto => 'ADD PHOTO';
+
+  @override
+  String get shareWorkoutComposerRemovePhoto => 'Remove photo';
+
+  @override
+  String get shareWorkoutComposerPhotoError =>
+      'We couldn\'t use that photo. Try another one.';
+
+  @override
+  String get shareWorkoutComposerPreviewTitle => 'YOUR WORKOUT';
+
+  @override
+  String get postCardWorkoutDetailShow => 'SHOW DETAIL';
+
+  @override
+  String get postCardWorkoutDetailHide => 'HIDE DETAIL';
+
+  @override
+  String postCardWorkoutDetailTruncated(int count) {
+    return 'Showing the first $count exercises.';
+  }
+
+  @override
   String get workoutHistorialHeading => '';
 
   @override

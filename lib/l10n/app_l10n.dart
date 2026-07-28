@@ -1178,6 +1178,66 @@ abstract class AppL10n {
   /// **'¡Terminé mi entreno! 💪'**
   String get workoutPostAutoCompleteText;
 
+  /// Header title of the share-a-workout composer screen, opened from the COMPARTIR button of the post-workout summary.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'COMPARTIR ENTRENO'**
+  String get shareWorkoutComposerTitle;
+
+  /// Placeholder of the composer's text field. The field is pre-filled with workoutPostAutoCompleteText, so this only shows if the athlete clears it.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Cómo estuvo tu entreno?'**
+  String get shareWorkoutComposerHint;
+
+  /// Composer's confirm action — publishes the workout post to the feed.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PUBLICAR'**
+  String get shareWorkoutComposerPublish;
+
+  /// Composer action that opens the image picker to attach one optional photo to the workout post.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'AGREGAR FOTO'**
+  String get shareWorkoutComposerAddPhoto;
+
+  /// Accessibility label of the control that detaches the photo already attached in the composer.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Quitar foto'**
+  String get shareWorkoutComposerRemovePhoto;
+
+  /// Inline error shown in the composer when the picked photo cannot be read or exceeds the size limit.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos usar esa foto. Probá con otra.'**
+  String get shareWorkoutComposerPhotoError;
+
+  /// Section header above the workout detail preview inside the composer — what the rest of the users will see attached to the post.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TU ENTRENO'**
+  String get shareWorkoutComposerPreviewTitle;
+
+  /// Feed card control that expands the shared workout detail (exercises with sets/reps/weight plus the muscle distribution mini-chart).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VER DETALLE'**
+  String get postCardWorkoutDetailShow;
+
+  /// Feed card control that collapses the shared workout detail back.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'OCULTAR DETALLE'**
+  String get postCardWorkoutDetailHide;
+
+  /// Note at the end of an expanded workout detail whose exercise list was capped when the post was shared.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Se muestran los primeros {count} ejercicios.'**
+  String postCardWorkoutDetailTruncated(int count);
+
   /// No description provided for @workoutHistorialHeading.
   ///
   /// In es_AR, this message translates to:

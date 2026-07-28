@@ -1089,5 +1089,15 @@
   "reviewTileDateToday": "today",
   "reviewTileDateDaysAgo": "{count, plural, =1{1 day} other{{count} days}} ago",
   "reviewTileDateMonthsAgo": "{count, plural, =1{1 month} other{{count} months}} ago",
-  "workoutRutinasCoachChip": "FROM YOUR COACH"
+  "workoutRutinasCoachChip": "FROM YOUR COACH",
+  "shareWorkoutComposerTitle": "SHARE WORKOUT",
+  "shareWorkoutComposerHint": "How was your workout?",
+  "shareWorkoutComposerPublish": "PUBLISH",
+  "shareWorkoutComposerAddPhoto": "ADD PHOTO",
+  "shareWorkoutComposerRemovePhoto": "Remove photo",
+  "shareWorkoutComposerPhotoError": "We couldn't use that photo. Try another one.",
+  "shareWorkoutComposerPreviewTitle": "YOUR WORKOUT",
+  "postCardWorkoutDetailShow": "SHOW DETAIL",
+  "postCardWorkoutDetailHide": "HIDE DETAIL",
+  "postCardWorkoutDetailTruncated": "Showing the first {count} exercises."
 }
