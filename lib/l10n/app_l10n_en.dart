@@ -94,6 +94,9 @@ class AppL10nEn extends AppL10n {
   String get homeEstaSemanaEmptyCta => 'EXPLORE ROUTINES  →';
 
   @override
+  String get homeEstaSemanaInsightsCta => 'VIEW INSIGHTS  →';
+
+  @override
   String get homeEstaSemanaHeaderPillResume => 'BACK AT IT';
 
   @override
@@ -1685,6 +1688,9 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get a11yAvatarLabelGeneric => 'Profile photo';
+
+  @override
+  String get a11yHomeAvatarButton => 'View your profile';
 
   @override
   String homePendingRequestsA11y(int count) {

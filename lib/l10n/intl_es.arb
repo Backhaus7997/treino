@@ -43,6 +43,7 @@
   "homeEstaSemanaEmptyTitle": "TU RACHA\nEMPIEZA AQUÍ",
   "homeEstaSemanaEmptyBody": "Cada entrenamiento alimenta tu racha. Haz el primero y empieza a construir tu progreso.",
   "homeEstaSemanaEmptyCta": "EXPLORAR RUTINAS  →",
+  "homeEstaSemanaInsightsCta": "VER INSIGHTS  →",
   "homeEstaSemanaHeaderPillResume": "A RETOMAR",
   "homeEstaSemanaResumeTitle": "TU RACHA\nTE ESPERA",
   "homeEstaSemanaResumeBody": "Ya tienes historial construido. Esta semana aún está en cero — retoma hoy y sigue sumando progreso.",
@@ -241,6 +242,7 @@
     }
   },
   "a11yAvatarLabelGeneric": "Foto de perfil",
+  "a11yHomeAvatarButton": "Ver tu perfil",
   "homePendingRequestsA11y": "{count} solicitudes pendientes",
   "@homePendingRequestsA11y": {
     "placeholders": {

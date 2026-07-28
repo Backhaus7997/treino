@@ -617,6 +617,22 @@ GoRouter buildRouter({
           GoRoute(
             path: '/home',
             pageBuilder: (_, __) => _noAnim(const HomeScreen()),
+            routes: [
+              GoRoute(
+                // Public profile reached from the HomeHeader avatar. Mirror
+                // of /feed/profile/:uid: _ShellScaffold derives the
+                // highlighted tab from the location's path prefix, so the
+                // same screen registered under the ORIGIN branch keeps
+                // INICIO highlighted — and pop lands back on /home —
+                // instead of jumping to FEED (issue #387 pattern, same as
+                // the friend-requests and coach plan/exercise twins).
+                path: 'profile/:uid',
+                builder: (context, state) {
+                  final uid = state.pathParameters['uid']!;
+                  return _withBg(PublicProfileScreen(targetUid: uid));
+                },
+              ),
+            ],
           ),
           GoRoute(
             path: '/coach',

@@ -224,6 +224,12 @@ abstract class AppL10n {
   /// **'EXPLORAR RUTINAS  →'**
   String get homeEstaSemanaEmptyCta;
 
+  /// Home 'Esta Semana' card CTA button navigating to the insights hub (/home/insights). The whole card was already tappable but carried no visible affordance, so the destination was undiscoverable.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VER INSIGHTS  →'**
+  String get homeEstaSemanaInsightsCta;
+
   /// Home 'Esta Semana' card header pill label when the athlete has history but zero sessions this week (#551).
   ///
   /// In es_AR, this message translates to:
@@ -3235,6 +3241,12 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Foto de perfil'**
   String get a11yAvatarLabelGeneric;
+
+  /// Semantics label for the tappable avatar in the athlete HomeHeader. The avatar is a button that opens the user's own public profile, so the label states the ACTION rather than describing the image (a11yAvatarLabel covers the non-interactive case).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver tu perfil'**
+  String get a11yHomeAvatarButton;
 
   /// Semantics label for the bell-with-badge in the trainer home header that currently conveys the pending count purely visually (finding 18). Fix agents add the @homePendingRequestsA11y placeholder metadata (count: int).
   ///
