@@ -509,7 +509,7 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
     );
   }
 
-  /// Abre el detalle completo del ejercicio (foto hero + video + técnica).
+  /// Abre el detalle completo del ejercicio (video hero + técnica + stats).
   ///
   /// Push IMPERATIVO con Scaffold host propio: el player es una ruta immersive
   /// fuera del ShellRoute, y pushear la ruta de shell `/workout/exercise/:id`
@@ -1090,16 +1090,35 @@ class _CompletedBlockSummary extends StatelessWidget {
               Icon(TreinoIcon.checkBare, color: palette.accent, size: 20),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  exerciseName.toUpperCase(),
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 16,
-                    letterSpacing: 0.5,
-                    color: palette.textMuted,
-                    decoration: TextDecoration.lineThrough,
-                    decorationColor: palette.textMuted,
-                  ),
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        exerciseName.toUpperCase(),
+                        style: GoogleFonts.barlowCondensed(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
+                          letterSpacing: 0.5,
+                          color: palette.textMuted,
+                          decoration: TextDecoration.lineThrough,
+                          decorationColor: palette.textMuted,
+                        ),
+                      ),
+                    ),
+                    // Señal de navegación pegada al nombre — misma regla que
+                    // el header de _ExerciseSection: solo cuando la fila abre
+                    // el detalle. Decorativa para VoiceOver (hint de arriba).
+                    if (onOpenDetail != null) ...[
+                      const SizedBox(width: 8),
+                      ExcludeSemantics(
+                        child: Icon(
+                          TreinoIcon.chevronRight,
+                          size: 14,
+                          color: palette.textMuted,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
               Text(
@@ -1681,19 +1700,42 @@ class _ExerciseSectionState extends State<_ExerciseSection> {
                   child: Container(
                     constraints: const BoxConstraints(minHeight: 44),
                     alignment: Alignment.centerLeft,
-                    child: Text(
-                      widget.slot.exerciseName.toUpperCase(),
-                      style: GoogleFonts.barlowCondensed(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 22,
-                        letterSpacing: 0.5,
-                        height: 1.05,
-                        color: isDone ? palette.textMuted : palette.textPrimary,
-                        decoration: isDone
-                            ? TextDecoration.lineThrough
-                            : TextDecoration.none,
-                        decorationColor: palette.textMuted,
-                      ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            widget.slot.exerciseName.toUpperCase(),
+                            style: GoogleFonts.barlowCondensed(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 22,
+                              letterSpacing: 0.5,
+                              height: 1.05,
+                              color: isDone
+                                  ? palette.textMuted
+                                  : palette.textPrimary,
+                              decoration: isDone
+                                  ? TextDecoration.lineThrough
+                                  : TextDecoration.none,
+                              decorationColor: palette.textMuted,
+                            ),
+                          ),
+                        ),
+                        // Señal de navegación pegada al nombre (#578 hizo el
+                        // tap invisible): solo cuando el tap realmente abre
+                        // el detalle. Decorativa para VoiceOver — el hint del
+                        // Semantics de arriba ya anuncia la acción.
+                        if (widget.onOpenDetail != null) ...[
+                          const SizedBox(width: 8),
+                          ExcludeSemantics(
+                            child: Icon(
+                              TreinoIcon.chevronRight,
+                              size: 16,
+                              color: palette.textMuted,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                 ),

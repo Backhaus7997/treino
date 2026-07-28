@@ -472,6 +472,108 @@ void main() {
     });
   });
 
+  // ── Indicador de tap → detalle (chevron, pedido 2026-07-28) ───────────────
+  //
+  // Regla: el chevron va SOLO donde el tap abre el detalle del ejercicio —
+  // header de _ExerciseSection (activo / future destrabado / miembro de
+  // superserie) y fila de _CompletedBlockSummary. Los previews `future` NO lo
+  // llevan (su tap significa "adelantar el bloque" y ya tienen hint + play
+  // propio) ni el resumen de superserie completa (no es tocable).
+
+  group('tap indicator (chevron junto al nombre)', () {
+    testWidgets(
+        'ejercicio activo lleva chevron junto al nombre; el preview future '
+        '(tap = adelantar) no lo lleva', (tester) async {
+      await tester.pumpWidget(_wrapProvider(
+        const SessionPlayerScreen(init: _kInit),
+        _stateOverride(_defaultState()),
+      ));
+      await tester.pump();
+      // e1 activo → chevron; e2 future preview → sin chevron.
+      expect(find.byIcon(TreinoIcon.chevronRight), findsOneWidget);
+    });
+
+    testWidgets(
+        'fila completada y ejercicio activo llevan chevron; el future no '
+        '(2 de 3 bloques)', (tester) async {
+      await tester.pumpWidget(_wrapProvider(
+        const SessionPlayerScreen(init: _kInit),
+        _stateOverride(_stateWith1Of3Done()),
+      ));
+      await tester.pump();
+      // e1 completado (resumen tocable) + e2 activo → 2; e3 future → sin.
+      expect(find.byIcon(TreinoIcon.chevronRight), findsNWidgets(2));
+    });
+
+    testWidgets('cada miembro de una superserie interactiva lleva chevron',
+        (tester) async {
+      final state = SessionState(
+        session: makeSession(),
+        day: makeDay(
+          dayNumber: 1,
+          slots: [
+            makeSlot(
+                exerciseId: 'e1',
+                exerciseName: 'A',
+                targetSets: 2,
+                supersetGroup: 1),
+            makeSlot(
+                exerciseId: 'e2',
+                exerciseName: 'B',
+                targetSets: 2,
+                supersetGroup: 1),
+          ],
+        ),
+        setLogs: const [],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      );
+      await tester.pumpWidget(_wrapProvider(
+        const SessionPlayerScreen(init: _kInit),
+        _stateOverride(state),
+      ));
+      await tester.pump();
+      expect(find.byIcon(TreinoIcon.chevronRight), findsNWidgets(2));
+    });
+
+    testWidgets(
+        'superserie COMPLETA colapsa a resumen no tocable — sin chevron',
+        (tester) async {
+      final state = SessionState(
+        session: makeSession(),
+        day: makeDay(
+          dayNumber: 1,
+          slots: [
+            makeSlot(
+                exerciseId: 'e1',
+                exerciseName: 'A',
+                targetSets: 2,
+                supersetGroup: 1),
+            makeSlot(
+                exerciseId: 'e2',
+                exerciseName: 'B',
+                targetSets: 2,
+                supersetGroup: 1),
+          ],
+        ),
+        setLogs: [
+          for (var s = 1; s <= 2; s++) ...[
+            makeSetLog(exerciseId: 'e1', setNumber: s),
+            makeSetLog(exerciseId: 'e2', setNumber: s),
+          ],
+        ],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      );
+      await tester.pumpWidget(_wrapProvider(
+        const SessionPlayerScreen(init: _kInit),
+        _stateOverride(state),
+      ));
+      await tester.pump();
+      expect(find.byIcon(TreinoIcon.chevronRight), findsNothing);
+    });
+  });
+
   // ── Superserie round-robin (_SupersetSection) ─────────────────────────────
 
   group('_SupersetSection (round-robin)', () {
