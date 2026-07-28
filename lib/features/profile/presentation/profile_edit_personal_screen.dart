@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/image/avatar_cropper.dart';
+import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../auth/application/auth_providers.dart';
@@ -493,9 +494,8 @@ class _ProfileEditPersonalScreenState
         // ── Header ──────────────────────────────────────────────────────────
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-          child: GestureDetector(
+          child: TreinoTappable(
             onTap: _onBackTap,
-            behavior: HitTestBehavior.opaque,
             child: Row(
               children: [
                 Icon(TreinoIcon.back, size: 20, color: palette.textPrimary),
