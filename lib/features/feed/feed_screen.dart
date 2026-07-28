@@ -9,6 +9,8 @@ import '../../core/widgets/treino_icon.dart';
 import '../../l10n/app_l10n.dart';
 import '../chat/application/chat_providers.dart';
 import '../gym_rankings/presentation/rankings_screen.dart' show RankingsBody;
+import '../profile/application/user_providers.dart';
+import '../profile/domain/user_role.dart';
 import '../workout/application/session_providers.dart' show currentUidProvider;
 import 'application/feed_screen_providers.dart';
 import 'application/friendship_providers.dart';
@@ -19,17 +21,49 @@ import 'presentation/widgets/feed_empty_state.dart';
 import 'presentation/widgets/feed_segment_pills.dart';
 import 'presentation/widgets/post_card.dart';
 
-/// Feed tab — 2-page swipeable surface: "Feed" (page 0, the social feed) +
-/// "Rankings" (page 1, relocated from the Entrenar tab). Same segmented-pill
-/// + [TabBarView] pattern the Entrenar tab used while it hosted rankings:
-/// page 0 keeps its provider subscriptions alive via
-/// [AutomaticKeepAliveClientMixin] while swiped away; page 1's Firestore
-/// leaderboard listeners are `autoDispose` and release on swipe-away.
-class FeedScreen extends StatelessWidget {
+/// Role-aware Feed tab.
+///
+/// - Athlete → 2-page swipeable surface: "Feed" (page 0, the social feed) +
+///   "Rankings" (page 1). Page 0 keeps its provider subscriptions alive via
+///   [AutomaticKeepAliveClientMixin] while swiped away; page 1's Firestore
+///   leaderboard listeners are `autoDispose` and release on swipe-away.
+/// - Trainer → the feed body ALONE, no pill and no rankings page. Rankings
+///   are per-gym ATHLETE leaderboards (streaks, volume, main lifts) and a
+///   trainer is not a competitor in them. Trainers never saw this surface
+///   while it lived on the Entrenar tab (TrainerWorkoutView bypassed it);
+///   moving it to the role-shared Feed tab exposed it by accident, and this
+///   gate restores the original scope.
+/// - Loading → athlete layout, same rationale as [HomeScreen] /
+///   [WorkoutScreen]: athletes dominate, and rendering early avoids a
+///   skeleton stall. A trainer may see the pill for one frame before their
+///   role resolves — acceptable, and [RankingsBody] self-gates anyway.
+class FeedScreen extends ConsumerWidget {
   const FeedScreen({super.key, this.initialTab});
 
   /// Optional initial sub-tab — accepts `'rankings'`. Read from the `?tab=`
   /// query param by the `/feed` route builder (mirrors `CoachScreen.initialTab`).
+  /// Ignored for the trainer view, which has no second page to land on.
+  final String? initialTab;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final UserRole? role = ref.watch(
+      userProfileProvider.select((async) => async.valueOrNull?.role),
+    );
+
+    // Two SEPARATE subtrees, not one DefaultTabController with a varying
+    // `length`: flipping 2 → 1 on an existing controller throws on the
+    // length/index mismatch. Swapping the whole subtree sidesteps it.
+    return role == UserRole.trainer
+        ? const _FeedPage()
+        : _AthleteFeed(initialTab: initialTab);
+  }
+}
+
+/// Athlete Feed — segmented pill + swipeable [TabBarView].
+class _AthleteFeed extends StatelessWidget {
+  const _AthleteFeed({this.initialTab});
+
   final String? initialTab;
 
   static const _labels = <String>['FEED', 'RANKINGS'];
@@ -78,7 +112,8 @@ class FeedScreen extends StatelessWidget {
           const SizedBox(height: 8),
           const Expanded(
             child: TabBarView(
-              children: [_FeedPage(), _RankingsPage()],
+              // showTitle: false — the pill above already reads "FEED".
+              children: [_FeedPage(showTitle: false), _RankingsPage()],
             ),
           ),
         ],
@@ -91,7 +126,15 @@ class FeedScreen extends StatelessWidget {
 /// with [AutomaticKeepAliveClientMixin] so its feed providers are NOT rebuilt
 /// when swiping to Rankings and back.
 class _FeedPage extends ConsumerStatefulWidget {
-  const _FeedPage();
+  const _FeedPage({this.showTitle = true});
+
+  /// Whether the header renders its "FEED" title.
+  ///
+  /// `false` under [_AthleteFeed], where the segmented pill ALREADY reads
+  /// "FEED" one row above — printing it twice was pure redundancy. `true`
+  /// (default) for the trainer view, which has no pill and would otherwise
+  /// lose every label identifying the screen.
+  final bool showTitle;
 
   @override
   ConsumerState<_FeedPage> createState() => _FeedPageState();
@@ -110,7 +153,7 @@ class _FeedPageState extends ConsumerState<_FeedPage>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const _FeedHeader(),
+        _FeedHeader(showTitle: widget.showTitle),
         const SizedBox(height: 14),
         const FeedSegmentPills(),
         const SizedBox(height: 18),
@@ -140,7 +183,11 @@ class _RankingsPage extends StatelessWidget {
 }
 
 class _FeedHeader extends ConsumerWidget {
-  const _FeedHeader();
+  const _FeedHeader({required this.showTitle});
+
+  /// See [_FeedPage.showTitle]. When `false` only the action icons render,
+  /// still right-aligned — the Spacer takes over the room the title had.
+  final bool showTitle;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -160,15 +207,16 @@ class _FeedHeader extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       child: Row(
         children: [
-          Text(
-            'FEED',
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 28,
-              letterSpacing: 1.2,
-              color: palette.textPrimary,
+          if (showTitle)
+            Text(
+              'FEED',
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 28,
+                letterSpacing: 1.2,
+                color: palette.textPrimary,
+              ),
             ),
-          ),
           const Spacer(),
           Semantics(
             button: true,

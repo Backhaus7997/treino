@@ -87,11 +87,12 @@ Post _makePost({
       createdAt: createdAt ?? DateTime.now().subtract(const Duration(hours: 1)),
     );
 
-UserProfile _makeProfile({String? gymId}) => UserProfile(
+UserProfile _makeProfile({String? gymId, UserRole role = UserRole.athlete}) =>
+    UserProfile(
       uid: 'u1',
       email: 'tincho@test.com',
       displayName: 'Tincho',
-      role: UserRole.athlete,
+      role: role,
       createdAt: DateTime.utc(2026, 1, 1),
       updatedAt: DateTime.utc(2026, 1, 1),
       gymId: gymId,
@@ -149,14 +150,18 @@ void main() {
       feedPublicProvider.overrideWith((ref) async => const <Post>[]),
     ];
 
-    // SCENARIO-144: FeedScreen renders header title "FEED"
-    testWidgets('SCENARIO-144: renders header title FEED', (tester) async {
+    // SCENARIO-144: "FEED" is labelled EXACTLY ONCE.
+    //
+    // For an athlete that label is the segmented pill; the header title is
+    // suppressed because printing "FEED" twice, one row apart, was pure
+    // redundancy. The trainer case (no pill → the title is the only label)
+    // is asserted in the role-gate group.
+    testWidgets('SCENARIO-144: labels FEED once — the pill, not a duplicate',
+        (tester) async {
       await tester.pumpWidget(_wrapProvider(const FeedScreen(), baseOverrides));
       await tester.pump();
 
-      // Both the segmented tab pill and the page header read "FEED"
-      // (tab label vs. header title) — assert 2, not scoping by text alone.
-      expect(find.text('FEED'), findsNWidgets(2));
+      expect(find.text('FEED'), findsOneWidget);
     });
 
     // REQ-CHATUNREAD-005: the messages icon shows an unread-chats count badge.
@@ -769,6 +774,70 @@ void main() {
       expect(
           find.byKey(const Key('rankings_invitation_state')), findsOneWidget);
       expect(find.byKey(const Key('rankings_section_streak')), findsNothing);
+    });
+
+    // ── Role gate ───────────────────────────────────────────────────────────
+    //
+    // Rankings are per-gym ATHLETE leaderboards. Trainers never saw them while
+    // the surface lived on the Entrenar tab (TrainerWorkoutView bypassed it);
+    // moving it to the role-shared Feed tab exposed it by accident.
+    testWidgets('a trainer sees the feed alone — no pill, no rankings page',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), [
+          ...tabOverrides(),
+          userProfileProvider.overrideWith(
+            (ref) => Stream.value(_makeProfile(role: UserRole.trainer)),
+          ),
+        ]),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.byType(TabBar), findsNothing);
+      expect(find.byType(TabBarView), findsNothing);
+      expect(find.text('RANKINGS'), findsNothing);
+      // The feed itself still renders.
+      expect(find.byType(FeedSegmentPills), findsOneWidget);
+      // And it KEEPS its header title: with no pill, that is the only thing
+      // naming the screen, so suppressing it here would leave the trainer
+      // with an unlabelled surface.
+      expect(find.text('FEED'), findsOneWidget);
+    });
+
+    testWidgets(
+        "a trainer deep-linking ?tab=rankings still lands on the feed — the "
+        'gate wins over initialTab', (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(initialTab: 'rankings'), [
+          ...tabOverrides(),
+          userProfileProvider.overrideWith(
+            (ref) => Stream.value(_makeProfile(role: UserRole.trainer)),
+          ),
+        ]),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.byKey(const Key('rankings_section_streak')), findsNothing);
+      expect(find.byKey(const Key('rankings_invitation_state')), findsNothing);
+      expect(find.byType(FeedSegmentPills), findsOneWidget);
+    });
+
+    testWidgets('an athlete still gets the pill', (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), [
+          ...tabOverrides(),
+          userProfileProvider.overrideWith(
+            (ref) => Stream.value(_makeProfile(role: UserRole.athlete)),
+          ),
+        ]),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.byType(TabBar), findsOneWidget);
+      expect(find.text('RANKINGS'), findsOneWidget);
     });
 
     testWidgets(
