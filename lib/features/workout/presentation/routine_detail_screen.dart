@@ -21,8 +21,10 @@ import '../domain/routine_day.dart';
 import '../domain/routine_day_duration.dart';
 import '../domain/routine_slot.dart';
 import '../domain/routine_source.dart';
+import '../domain/routine_visibility.dart';
 import 'widgets/exercise_slot_row.dart';
 import 'widgets/stat_tile.dart';
+import 'widgets/template_ratings_section.dart';
 
 /// RoutineDetailScreen — ConsumerStatefulWidget that observes routineByIdStreamProvider.
 /// selectedDayIndex is local state (ADR-RD-3).
@@ -495,6 +497,15 @@ class _RoutineDetailContent extends ConsumerWidget {
                 )
               else
                 _StartSessionCTABar(routine: routine, day: day),
+              // Community reputation — published trainer templates only. It
+              // sits below the CTA on purpose: whoever opened the template
+              // came to train, and the ratings are what they check before
+              // (or after) deciding.
+              if (routine.source == RoutineSource.trainerTemplate &&
+                  routine.visibility == RoutineVisibility.public) ...[
+                const SizedBox(height: 20),
+                TemplateRatingsSection(routine: routine),
+              ],
               const SizedBox(height: 18),
             ]),
           ),

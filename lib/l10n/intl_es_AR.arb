@@ -361,6 +361,77 @@
   "@workoutRutinasCoachChip": {
     "description": "Chip pinned on trainer-assigned routine cards in the unified RUTINAS list (workout tab + /profile/routines mirror). Same pill anatomy as workoutMisRutinasActiveChip, highlight color. Workout-area redesign slice 1."
   },
+  "workoutPlantillasTrainerChip": "ENTRENADOR",
+  "@workoutPlantillasTrainerChip": {
+    "description": "Badge on PLANTILLAS grid cards for templates published to the community catalogue by ANY trainer (not the athlete's own coach, which uses workoutRutinasCoachChip). Accent color. Workout-area redesign slice 3."
+  },
+  "templateRatingsTitle": "CALIFICACIONES",
+  "@templateRatingsTitle": {
+    "description": "Section header of the community ratings block in the detail of a published trainer template. Workout-area redesign slice 3."
+  },
+  "templateRatingsNoneYet": "Todavía nadie calificó esta plantilla. ¡Sé el primero!",
+  "@templateRatingsNoneYet": {
+    "description": "Shown instead of the average when a published template has zero ratings."
+  },
+  "templateRatingsCount": "{count, plural, =1{1 calificación} other{{count} calificaciones}}",
+  "@templateRatingsCount": {
+    "description": "How many people rated the template, next to the average score.",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "templateRatingsMineEmpty": "¿Qué te pareció?",
+  "@templateRatingsMineEmpty": {
+    "description": "Label above the rate CTA when the user has not rated this template yet."
+  },
+  "templateRatingsMineLabel": "Tu calificación",
+  "@templateRatingsMineLabel": {
+    "description": "Label above the user's own rating when they already rated this template."
+  },
+  "templateRatingsRateCta": "CALIFICAR",
+  "@templateRatingsRateCta": {
+    "description": "Button that opens the rating sheet for the first time."
+  },
+  "templateRatingsEditCta": "EDITAR",
+  "@templateRatingsEditCta": {
+    "description": "Button that opens the rating sheet to edit the user's existing rating."
+  },
+  "templateRatingsEmpty": "Todavía no hay comentarios.",
+  "@templateRatingsEmpty": {
+    "description": "Empty state of the comment list when nobody left a written comment (ratings without text do not appear here)."
+  },
+  "templateRatingsError": "No pudimos cargar los comentarios.",
+  "@templateRatingsError": {
+    "description": "Error state of the comment list in the published-template detail."
+  },
+  "templateRatingSheetTitle": "Calificá esta plantilla",
+  "@templateRatingSheetTitle": {
+    "description": "Title of the rating bottom sheet when creating a new rating."
+  },
+  "templateRatingSheetTitleEdit": "Editá tu calificación",
+  "@templateRatingSheetTitleEdit": {
+    "description": "Title of the rating bottom sheet when editing an existing rating."
+  },
+  "templateRatingSheetCommentHint": "Contá cómo te fue con esta plantilla (opcional)",
+  "@templateRatingSheetCommentHint": {
+    "description": "Hint of the optional comment field in the template rating sheet, max 500 chars."
+  },
+  "templateRatingSheetCancel": "CANCELAR",
+  "@templateRatingSheetCancel": {
+    "description": "Cancel button of the template rating sheet."
+  },
+  "templateRatingSheetSubmit": "ENVIAR",
+  "@templateRatingSheetSubmit": {
+    "description": "Submit button of the template rating sheet."
+  },
+  "templateRatingSheetSuccess": "¡Gracias por calificar!",
+  "@templateRatingSheetSuccess": {
+    "description": "SnackBar shown after a rating is saved."
+  },
+  "templateRatingSheetError": "No pudimos guardar tu calificación.",
+  "@templateRatingSheetError": {
+    "description": "SnackBar shown when saving a rating fails."
+  },
   "workoutSplitFallback": "Sin split",
   "workoutPickerMuscleFilter": "Músculos",
   "workoutPickerEquipmentFilter": "Equipamiento",
