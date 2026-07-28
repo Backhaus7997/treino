@@ -71,6 +71,87 @@ List<PersonalRecord> derivePersonalRecords(
   ];
 }
 
+/// One HISTORIAL row of the exercise detail screen — a single session's
+/// snapshot of the exercise, at per-session granularity (the 4 series above
+/// collapse these same metrics into chart points).
+///
+/// [bestWeightKg] is 0 for bodyweight-only sessions (#368 convention: the
+/// player logs bodyweight sets with `weightKg = 0`) — callers render the
+/// best set as reps-only in that case. [sessionVolume] sums ONLY weighted
+/// sets (same #368 rule as [aggregateExerciseProgression]'s volume series),
+/// so it is 0 for bodyweight-only sessions.
+typedef ExerciseSessionHistoryEntry = ({
+  DateTime date,
+  int setCount,
+  double bestWeightKg,
+  int bestSetReps,
+  double sessionVolume,
+});
+
+/// Upper bound on the rows [deriveExerciseSessionHistory] returns. The scan
+/// already caps at `kProgressionSessionScan` sessions; this caps the RENDERED
+/// list so the detail screen's HISTORIAL stays a bounded card, not an
+/// unbounded feed (pagination is a follow-up if ever needed).
+const int kExerciseHistoryMaxEntries = 20;
+
+/// Derives the per-session HISTORIAL rows for [exerciseId] — most recent
+/// first, mirroring [sessionsDesc]'s order. Pure top-level function, no
+/// Riverpod, fully testable (same convention as
+/// [aggregateExerciseProgression]).
+///
+/// Deliberately NOT period-bounded: HISTORIAL answers "when did I last train
+/// this and how did it go", which must survive period switches — and lets the
+/// screen distinguish "never trained" (empty here) from "no data in the
+/// selected period" (empty series in the aggregation).
+///
+/// Same session/set filters as the aggregator:
+/// - only `countsAsWorkout` sessions (#372 — abandoned/in-progress excluded);
+/// - the best set is max `weightKg`, ties broken by max reps; a
+///   bodyweight-only session (#368, all `weightKg = 0`) yields its top-reps
+///   set with `bestWeightKg = 0`;
+/// - `setCount` is weight-agnostic (a bodyweight set still counts as a set,
+///   matching the frecuencia stat's weight-agnostic spirit);
+/// - dates are `startedAt.toLocal()` for display (#380).
+List<ExerciseSessionHistoryEntry> deriveExerciseSessionHistory({
+  required String exerciseId,
+  required List<Session> sessionsDesc,
+  required Map<String, List<SetLog>> logsBySession,
+  int maxEntries = kExerciseHistoryMaxEntries,
+}) {
+  if (exerciseId.isEmpty) return const [];
+
+  final entries = <ExerciseSessionHistoryEntry>[];
+  for (final session in sessionsDesc) {
+    if (!session.countsAsWorkout) continue;
+    final logs = logsBySession[session.id] ?? const [];
+    final exerciseLogs = logs.where((l) => l.exerciseId == exerciseId);
+    if (exerciseLogs.isEmpty) continue;
+
+    SetLog? best;
+    var volume = 0.0;
+    var setCount = 0;
+    for (final log in exerciseLogs) {
+      setCount++;
+      if (log.weightKg > 0) volume += log.reps * log.weightKg;
+      if (best == null ||
+          log.weightKg > best.weightKg ||
+          (log.weightKg == best.weightKg && log.reps > best.reps)) {
+        best = log;
+      }
+    }
+
+    entries.add((
+      date: session.startedAt.toLocal(),
+      setCount: setCount,
+      bestWeightKg: best!.weightKg,
+      bestSetReps: best.reps,
+      sessionVolume: volume,
+    ));
+    if (entries.length >= maxEntries) break;
+  }
+  return entries;
+}
+
 /// Pure top-level aggregator — no Riverpod, fully testable.
 ///
 /// [exerciseId]   the target exercise to aggregate.

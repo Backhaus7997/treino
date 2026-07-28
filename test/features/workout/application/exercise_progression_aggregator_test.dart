@@ -911,4 +911,216 @@ void main() {
       expect(withoutWindow.frequencySessionCount, 2);
     });
   });
+
+  group('deriveExerciseSessionHistory [HISTORIAL — pure fn]', () {
+    test(
+        'derives one row per session containing the exercise, most-recent '
+        'first, with best set (max weight, ties → max reps), set count and '
+        'session volume', () {
+      final s1 = _session('s1', DateTime.utc(2026, 7, 20, 12));
+      final s2 = _session('s2', DateTime.utc(2026, 7, 22, 12));
+      final logs = <String, List<SetLog>>{
+        's1': [
+          _log(
+              sessionId: 's1',
+              exerciseId: 'squat',
+              exerciseName: 'Sentadilla',
+              reps: 8,
+              weightKg: 80,
+              setNumber: 1),
+          _log(
+              sessionId: 's1',
+              exerciseId: 'squat',
+              exerciseName: 'Sentadilla',
+              reps: 5,
+              weightKg: 90,
+              setNumber: 2),
+          // Same weight as set 2, more reps → this one is the best set.
+          _log(
+              sessionId: 's1',
+              exerciseId: 'squat',
+              exerciseName: 'Sentadilla',
+              reps: 6,
+              weightKg: 90,
+              setNumber: 3),
+          _log(
+              sessionId: 's1',
+              exerciseId: 'bench',
+              exerciseName: 'Press banca',
+              reps: 5,
+              weightKg: 60),
+        ],
+        's2': [
+          _log(
+              sessionId: 's2',
+              exerciseId: 'squat',
+              exerciseName: 'Sentadilla',
+              reps: 5,
+              weightKg: 95),
+        ],
+      };
+
+      final history = deriveExerciseSessionHistory(
+        exerciseId: 'squat',
+        sessionsDesc: [s2, s1],
+        logsBySession: logs,
+      );
+
+      expect(history, hasLength(2));
+      // Most-recent first (mirrors sessionsDesc).
+      expect(history[0].date, DateTime.utc(2026, 7, 22, 12).toLocal());
+      expect(history[0].setCount, 1);
+      expect(history[0].bestWeightKg, 95);
+      expect(history[0].bestSetReps, 5);
+      expect(history[0].sessionVolume, 5 * 95.0);
+
+      expect(history[1].date, DateTime.utc(2026, 7, 20, 12).toLocal());
+      // The bench log does not leak into squat's row.
+      expect(history[1].setCount, 3);
+      expect(history[1].bestWeightKg, 90);
+      expect(history[1].bestSetReps, 6);
+      expect(history[1].sessionVolume, 8 * 80.0 + 5 * 90.0 + 6 * 90.0);
+    });
+
+    test(
+        '#372: abandoned sessions and sessions without the exercise are '
+        'skipped', () {
+      final done = _session('done', DateTime.utc(2026, 7, 20, 12));
+      final dropped = _abandoned('dropped', DateTime.utc(2026, 7, 21, 12));
+      final other = _session('other', DateTime.utc(2026, 7, 22, 12));
+      final logs = <String, List<SetLog>>{
+        'done': [
+          _log(
+              sessionId: 'done',
+              exerciseId: 'squat',
+              exerciseName: 'S',
+              reps: 5,
+              weightKg: 80),
+        ],
+        'dropped': [
+          _log(
+              sessionId: 'dropped',
+              exerciseId: 'squat',
+              exerciseName: 'S',
+              reps: 5,
+              weightKg: 100),
+        ],
+        'other': [
+          _log(
+              sessionId: 'other',
+              exerciseId: 'bench',
+              exerciseName: 'B',
+              reps: 5,
+              weightKg: 60),
+        ],
+      };
+
+      final history = deriveExerciseSessionHistory(
+        exerciseId: 'squat',
+        sessionsDesc: [other, dropped, done],
+        logsBySession: logs,
+      );
+
+      expect(history, hasLength(1));
+      expect(history.single.bestWeightKg, 80);
+    });
+
+    test(
+        '#368: bodyweight-only session keeps its top-reps set with '
+        'bestWeightKg 0 and zero volume; mixed sessions sum only weighted '
+        'sets but count every set', () {
+      final bodyweight = _session('bw', DateTime.utc(2026, 7, 20, 12));
+      final mixed = _session('mixed', DateTime.utc(2026, 7, 22, 12));
+      final logs = <String, List<SetLog>>{
+        'bw': [
+          _log(
+              sessionId: 'bw',
+              exerciseId: 'pullup',
+              exerciseName: 'Dominadas',
+              reps: 8,
+              weightKg: 0,
+              setNumber: 1),
+          _log(
+              sessionId: 'bw',
+              exerciseId: 'pullup',
+              exerciseName: 'Dominadas',
+              reps: 12,
+              weightKg: 0,
+              setNumber: 2),
+        ],
+        'mixed': [
+          _log(
+              sessionId: 'mixed',
+              exerciseId: 'pullup',
+              exerciseName: 'Dominadas',
+              reps: 10,
+              weightKg: 0,
+              setNumber: 1),
+          _log(
+              sessionId: 'mixed',
+              exerciseId: 'pullup',
+              exerciseName: 'Dominadas',
+              reps: 6,
+              weightKg: 10,
+              setNumber: 2),
+        ],
+      };
+
+      final history = deriveExerciseSessionHistory(
+        exerciseId: 'pullup',
+        sessionsDesc: [mixed, bodyweight],
+        logsBySession: logs,
+      );
+
+      expect(history, hasLength(2));
+      // Mixed: weighted set wins best-set even with fewer reps; volume sums
+      // only the weighted set; both sets count.
+      expect(history[0].bestWeightKg, 10);
+      expect(history[0].bestSetReps, 6);
+      expect(history[0].sessionVolume, 6 * 10.0);
+      expect(history[0].setCount, 2);
+      // Bodyweight-only: top-reps set, zero weight/volume.
+      expect(history[1].bestWeightKg, 0);
+      expect(history[1].bestSetReps, 12);
+      expect(history[1].sessionVolume, 0);
+      expect(history[1].setCount, 2);
+    });
+
+    test('maxEntries caps the rows; empty exerciseId short-circuits', () {
+      final sessions = [
+        for (var i = 0; i < 5; i++)
+          _session('s$i', DateTime.utc(2026, 7, 25 - i, 12)),
+      ];
+      final logs = <String, List<SetLog>>{
+        for (final s in sessions)
+          s.id: [
+            _log(
+                sessionId: s.id,
+                exerciseId: 'squat',
+                exerciseName: 'S',
+                reps: 5,
+                weightKg: 80),
+          ],
+      };
+
+      final capped = deriveExerciseSessionHistory(
+        exerciseId: 'squat',
+        sessionsDesc: sessions,
+        logsBySession: logs,
+        maxEntries: 3,
+      );
+      expect(capped, hasLength(3));
+      // The cap keeps the MOST RECENT rows (walk order is sessionsDesc).
+      expect(capped.first.date, DateTime.utc(2026, 7, 25, 12).toLocal());
+
+      expect(
+        deriveExerciseSessionHistory(
+          exerciseId: '',
+          sessionsDesc: sessions,
+          logsBySession: logs,
+        ),
+        isEmpty,
+      );
+    });
+  });
 }
