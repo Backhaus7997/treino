@@ -6,7 +6,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
+import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
+import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
@@ -51,34 +55,49 @@ class RutinasScreen extends ConsumerWidget {
             style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
           ),
           const SizedBox(height: 20),
-          linksAsync.when(
-            loading: () => const Padding(
-              padding: EdgeInsets.symmetric(vertical: 40),
-              child: Center(child: CircularProgressIndicator()),
+          TreinoStateSwitcher(
+            childKey: ValueKey(linksAsync.when(
+              loading: () => 'loading',
+              error: (_, __) => 'error',
+              data: (links) => links
+                      .where((l) => l.status != TrainerLinkStatus.pending)
+                      .isEmpty
+                  ? 'empty'
+                  : 'data',
+            )),
+            child: linksAsync.when(
+              loading: () => const Padding(
+                padding: EdgeInsets.symmetric(vertical: 40),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+              error: (_, __) =>
+                  _muted(palette, 'No pudimos cargar los alumnos.'), // i18n
+              data: (links) {
+                // Una fila por alumno: colapsamos al link más reciente (el stream
+                // viene requestedAt DESC) y excluimos `pending` (esas son
+                // solicitudes, todavía no son alumnos).
+                final seen = <String>{};
+                final athletes = <TrainerLink>[];
+                for (final l in links) {
+                  if (l.status == TrainerLinkStatus.pending) continue;
+                  if (seen.add(l.athleteId)) athletes.add(l);
+                }
+                if (athletes.isEmpty) {
+                  return _muted(
+                      palette, 'Todavía no tenés alumnos vinculados.'); // i18n
+                }
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final (i, link) in athletes.indexed)
+                      TreinoFadeSlideIn(
+                        delay: AppMotion.stagger(i),
+                        child: _AthleteRow(link: link),
+                      ),
+                  ],
+                );
+              },
             ),
-            error: (_, __) =>
-                _muted(palette, 'No pudimos cargar los alumnos.'), // i18n
-            data: (links) {
-              // Una fila por alumno: colapsamos al link más reciente (el stream
-              // viene requestedAt DESC) y excluimos `pending` (esas son
-              // solicitudes, todavía no son alumnos).
-              final seen = <String>{};
-              final athletes = <TrainerLink>[];
-              for (final l in links) {
-                if (l.status == TrainerLinkStatus.pending) continue;
-                if (seen.add(l.athleteId)) athletes.add(l);
-              }
-              if (athletes.isEmpty) {
-                return _muted(
-                    palette, 'Todavía no tenés alumnos vinculados.'); // i18n
-              }
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (final link in athletes) _AthleteRow(link: link),
-                ],
-              );
-            },
           ),
         ],
       ),
@@ -156,8 +175,7 @@ class _AthleteRowState extends ConsumerState<_AthleteRow> {
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
+      child: TreinoTappable(
         onTap: () => context.push('/rutinas/$athleteId'),
         child: Container(
           margin: const EdgeInsets.only(bottom: 8),
