@@ -19,6 +19,7 @@ import '../../application/session_providers.dart' show currentUidProvider;
 import '../../application/unified_routines_providers.dart';
 import '../../application/user_routines_providers.dart';
 import '../../domain/routine.dart';
+import 'coach_chip.dart';
 
 const int _kRoutineCap = 10;
 
@@ -412,7 +413,7 @@ class _RoutineCard extends ConsumerWidget {
                           spacing: 6,
                           runSpacing: 4,
                           children: [
-                            if (fromCoach) _CoachChip(routineId: routine.id),
+                            if (fromCoach) CoachChip(routineId: routine.id),
                             if (isActive) _ActivaChip(routineId: routine.id),
                           ],
                         ),
@@ -523,37 +524,6 @@ class _ActivaChip extends StatelessWidget {
           fontSize: 11,
           letterSpacing: 1.2,
           color: palette.accent,
-        ),
-      ),
-    );
-  }
-}
-
-// ── DE TU COACH chip ──────────────────────────────────────────────────────────
-
-class _CoachChip extends StatelessWidget {
-  const _CoachChip({required this.routineId});
-
-  final String routineId;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    return Container(
-      key: Key('routine_coach_chip_$routineId'),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-      decoration: BoxDecoration(
-        color: palette.highlight.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(9999),
-        border: Border.all(color: palette.highlight.withValues(alpha: 0.5)),
-      ),
-      child: Text(
-        AppL10n.of(context).workoutRutinasCoachChip,
-        style: GoogleFonts.barlowCondensed(
-          fontWeight: FontWeight.w700,
-          fontSize: 11,
-          letterSpacing: 1.2,
-          color: palette.highlight,
         ),
       ),
     );

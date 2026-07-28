@@ -6,7 +6,7 @@
 //   - profile/presentation/widgets/eliminar_cuenta_sheet.dart (9 keys)
 //   - coach/presentation/trainer_dashboard_tab.dart (9 keys)
 //   - reviews/presentation/widgets/review_bottom_sheet.dart (1 key)
-//   - workout/presentation/widgets/plantillas_section.dart (1 key)
+//   - workout/presentation/widgets/plantillas_tab.dart (1 key)
 //   - profile_setup/presentation/profile_setup_flow.dart (4 keys)
 //
 // These tests will FAIL until ARB keys are added and codegen is re-run.
@@ -190,7 +190,7 @@ void main() {
       expect(l10n.reviewSnackBarSuccess, '¡Gracias por tu reseña!');
     });
 
-    // plantillas_section.dart — 1 key
+    // plantillas_tab.dart — 1 key
     testWidgets('plantillasRetryLabel verbatim', (tester) async {
       final l10n = await _pumpAndGetL10n(tester);
       expect(l10n.plantillasRetryLabel, 'Reintentar');

@@ -2,26 +2,35 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/theme/app_motion.dart';
+import '../../app/theme/app_palette.dart';
 import '../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../profile/application/user_providers.dart';
 import '../profile/domain/user_role.dart';
 import 'presentation/widgets/historial_section.dart';
-import 'presentation/widgets/plantillas_section.dart';
+import 'presentation/widgets/plantillas_tab.dart';
 import 'presentation/widgets/rutinas_section.dart';
-import 'presentation/widgets/trainer_templates_section.dart';
 import 'trainer_workout_view.dart';
 
 /// Role-aware workout screen.
 ///
-/// - Athlete → single "Tu entreno" body. Rankings, formerly the second page
-///   of this tab (rankings-v2), relocated to the FEED tab
-///   (`/feed?tab=rankings`) — see [FeedScreen].
+/// - Athlete → 2-page swipeable Entrenar tab (workout redesign slice 2):
+///   "Tu entreno" (page 0 — unified routines + history) + "Plantillas"
+///   (page 1 — the full template grid, coach-shared + catalog). Same
+///   segmented-pill pattern the tab had in the rankings era; rankings itself
+///   now lives in the FEED tab (`/feed?tab=rankings`) — see [FeedScreen].
 /// - Trainer → [TrainerWorkoutView] dedicated to plan creation. Trainers
-///   should not see athlete-mode controls (no EMPEZAR, no historial propio);
-///   their WORKOUT surface is exclusively for assigning routines.
+///   should not see athlete-mode controls (no EMPEZAR, no historial propio,
+///   no template grid); their WORKOUT surface is exclusively for assigning
+///   routines.
 /// - Loading → empty surface (matches [HomeScreen] / [CoachScreen] pattern).
 class WorkoutScreen extends ConsumerWidget {
-  const WorkoutScreen({super.key});
+  const WorkoutScreen({super.key, this.initialTab});
+
+  /// Optional initial sub-tab — accepts `'plantillas'`. Read from the
+  /// `?tab=` query param by the `/workout` route builder (mirrors
+  /// `CoachScreen.initialTab` / `FeedScreen.initialTab`). Unknown values
+  /// fall back to page 0. Ignored for the trainer view.
+  final String? initialTab;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -33,17 +42,98 @@ class WorkoutScreen extends ConsumerWidget {
     // [HomeScreen]: athletes dominate; rendering early avoids skeleton stalls.
     return role == UserRole.trainer
         ? const TrainerWorkoutView()
-        : const _AthleteWorkout();
+        : _AthleteWorkout(initialTab: initialTab);
   }
 }
 
-/// Athlete workout body — unified routines list (coach plans pinned + own),
-/// trainer templates, public catalog, and session history.
+/// Athlete workout — fixed 2-page [DefaultTabController] + swipeable
+/// [TabBarView] (same structure the rankings-era tab used). BOTH pages keep
+/// their provider subscriptions alive via [AutomaticKeepAliveClientMixin]
+/// while swiped away — swapping tabs must not tear down streams (the coach
+/// cards would pop in late on every visit). Everything (autoDispose chains
+/// included) is released together when the athlete leaves the `/workout`
+/// route, matching the lifetime the old single-page sections had.
 class _AthleteWorkout extends StatelessWidget {
-  const _AthleteWorkout();
+  const _AthleteWorkout({this.initialTab});
+
+  final String? initialTab;
+
+  static const _labels = <String>['TU ENTRENO', 'PLANTILLAS'];
+
+  static int _resolveInitialIndex(String? tab) => tab == 'plantillas' ? 1 : 0;
 
   @override
   Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final theme = Theme.of(context);
+
+    return DefaultTabController(
+      length: _labels.length,
+      initialIndex: _resolveInitialIndex(initialTab),
+      child: Column(
+        children: [
+          // Segmented pill control — mirrors TrainerCoachView's sub-tab
+          // language (week tabs, bottom-bar pill).
+          Container(
+            margin: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: palette.bgCard,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: palette.textMuted.withValues(alpha: 0.12),
+              ),
+            ),
+            child: TabBar(
+              dividerColor: Colors.transparent,
+              indicatorSize: TabBarIndicatorSize.tab,
+              indicator: BoxDecoration(
+                color: palette.accent,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              splashBorderRadius: BorderRadius.circular(20),
+              labelColor: palette.bg,
+              unselectedLabelColor: palette.textMuted,
+              labelStyle: theme.textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
+              ),
+              tabs: [for (final l in _labels) Tab(text: l, height: 40)],
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Expanded(
+            child: TabBarView(
+              // Swipeable on purpose — same gesture language the tab had in
+              // the rankings era.
+              children: [_TuEntrenoPage(), PlantillasTab()],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Page 0 — unified RUTINAS list (workout redesign slice 1: former "Mi plan"
+/// + "Mis rutinas" merged, coach plans pinned with their own chip) + session
+/// history. Wrapped with [AutomaticKeepAliveClientMixin] so its section
+/// providers are NOT rebuilt when swiping to PLANTILLAS and back.
+class _TuEntrenoPage extends StatefulWidget {
+  const _TuEntrenoPage();
+
+  @override
+  State<_TuEntrenoPage> createState() => _TuEntrenoPageState();
+}
+
+class _TuEntrenoPageState extends State<_TuEntrenoPage>
+    with AutomaticKeepAliveClientMixin<_TuEntrenoPage> {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: ListView(
@@ -57,31 +147,13 @@ class _AthleteWorkout extends StatelessWidget {
         ),
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
-          // Unified RUTINAS list (workout-area redesign slice 1): merges the
-          // former "Mi plan" (trainer-assigned) + "Mis rutinas" (self-made)
-          // sections — coach plans pinned on top with their own chip.
           TreinoFadeSlideIn(
             delay: AppMotion.stagger(0),
             child: const RutinasSection(),
           ),
           const SizedBox(height: 12),
-          // Trainer-shared templates surface — invisible if the athlete has
-          // no active link or the trainer hasn't opted in. Sits between the
-          // unified routines list and "Plantillas" (catalog) because
-          // conceptually it's still "stuff your trainer made for you", just
-          // non-assigned.
           TreinoFadeSlideIn(
             delay: AppMotion.stagger(1),
-            child: const TrainerTemplatesSection(),
-          ),
-          const SizedBox(height: 12),
-          TreinoFadeSlideIn(
-            delay: AppMotion.stagger(2),
-            child: const PlantillasSection(),
-          ),
-          const SizedBox(height: 12),
-          TreinoFadeSlideIn(
-            delay: AppMotion.stagger(3),
             child: const HistorialSection(),
           ),
         ],

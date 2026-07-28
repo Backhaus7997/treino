@@ -283,13 +283,16 @@ void main() {
     });
   });
 
-  // ─── /workout?tab=rankings legacy redirect ────────────────────────────────
+  // ─── /workout?tab= deep-links ─────────────────────────────────────────────
   //
-  // Rankings relocated from the Entrenar tab to the FEED tab: the production
-  // `/workout` route keeps a redirect so legacy `?tab=rankings` deep-links
-  // (old bookmarks / notifications) land on `/feed?tab=rankings`, whose
-  // builder forwards the query param as `FeedScreen.initialTab`. The mini
-  // routers below mirror the production wiring in router.dart.
+  // Two behaviors live on the production `/workout` route (mirrored by the
+  // mini routers below):
+  //   * legacy `?tab=rankings` (rankings lived here until relocated to the
+  //     FEED tab) redirects to `/feed?tab=rankings` — safety net for old
+  //     bookmarks / notifications;
+  //   * every other `?tab=` value is forwarded as `WorkoutScreen.initialTab`
+  //     (`'plantillas'` opens the PLANTILLAS page; unknown values fall back
+  //     to page 0 inside the screen).
   group('/workout?tab= deep-link', () {
     GoRouter buildRouter() => GoRouter(
           initialLocation: '/start',
@@ -301,8 +304,11 @@ void main() {
                   state.uri.queryParameters['tab'] == 'rankings'
                       ? '/feed?tab=rankings'
                       : null,
-              pageBuilder: (_, __) =>
-                  const NoTransitionPage(child: WorkoutScreen()),
+              pageBuilder: (_, state) => NoTransitionPage(
+                child: WorkoutScreen(
+                  initialTab: state.uri.queryParameters['tab'],
+                ),
+              ),
             ),
             GoRoute(
               path: '/feed',
@@ -358,6 +364,42 @@ void main() {
         equals('/workout'),
       );
       expect(find.byType(WorkoutScreen), findsOneWidget);
+    });
+
+    testWidgets(
+        "/workout?tab=plantillas stays on /workout and builds WorkoutScreen "
+        "with initialTab: 'plantillas'", (tester) async {
+      final router = buildRouter();
+      await tester.pumpWidget(wrapRouter(router));
+
+      router.go('/workout?tab=plantillas');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(
+        router.routerDelegate.currentConfiguration.uri.toString(),
+        equals('/workout?tab=plantillas'),
+      );
+      final screen = tester.widget<WorkoutScreen>(find.byType(WorkoutScreen));
+      expect(screen.initialTab, equals('plantillas'));
+    });
+
+    testWidgets(
+        '/workout?tab=desconocido stays on /workout without crashing '
+        '(screen falls back to page 0)', (tester) async {
+      final router = buildRouter();
+      await tester.pumpWidget(wrapRouter(router));
+
+      router.go('/workout?tab=desconocido');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(
+        router.routerDelegate.currentConfiguration.uri.toString(),
+        equals('/workout?tab=desconocido'),
+      );
+      expect(find.byType(WorkoutScreen), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
   });
 

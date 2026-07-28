@@ -526,7 +526,12 @@ GoRouter buildRouter({
                 state.uri.queryParameters['tab'] == 'rankings'
                     ? '/feed?tab=rankings'
                     : null,
-            pageBuilder: (_, __) => _noAnim(const WorkoutScreen()),
+            // `?tab=plantillas` deep-links to the PLANTILLAS page; unknown
+            // values fall back to page 0 inside the screen (mirrors /feed
+            // and /coach `?tab=` forwarding).
+            pageBuilder: (_, state) => _noAnim(
+              WorkoutScreen(initialTab: state.uri.queryParameters['tab']),
+            ),
             routes: [
               GoRoute(
                 path: 'routine/:routineId',
