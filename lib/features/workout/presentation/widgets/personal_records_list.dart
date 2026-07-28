@@ -176,54 +176,87 @@ class _PersonalRecordRow extends StatelessWidget {
     final valStr = _formatValue(record.value, isOneRepMax: isOneRepMax);
     final unit = labels.unitFor(record.recordType);
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                labels.labelFor(record.recordType),
-                style: GoogleFonts.barlow(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: palette.textPrimary,
+    // El bloque valor+unidad tiene ancho INTRÍNSECO, y un hijo no flexible de un
+    // Row recibe ancho ILIMITADO: sin acotarlo no puede achicarse y la fila
+    // desborda en pantallas angostas o con font scale de accesibilidad grande
+    // (iOS "Texto más grande"). Mismo blindaje que `_SessionRecordRow` en
+    // session_highlights_section.dart (PR #593), pero con un TOPE por fracción
+    // del ancho disponible en vez de un reparto fijo de flex.
+    //
+    // El motivo del cambio de construcción: acá el texto de la izquierda es un
+    // label corto y FIJO ('Peso máximo', '1RM', …), no un nombre de ejercicio
+    // arbitrario. Un reparto fijo (Expanded 3:2) le asigna al valor sólo 2/5 del
+    // ancho y termina escalando récords de volumen normales a 65-88% en
+    // cualquier teléfono común — la fila de al lado se ve más grande que esta.
+    // Un TOPE, en cambio, no asigna nada: mientras el valor entre en el 70% no
+    // se toca (el Expanded del label absorbe el resto y lo deja pegado a la
+    // derecha, igual que antes de este fix) y sólo escala cuando de verdad
+    // desbordaría. El 30% restante es el piso que le queda garantizado al label.
+    return LayoutBuilder(
+      builder: (context, constraints) => Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Sin maxLines/ellipsis a propósito: los labels de tipo de
+                // récord son cortos y fijos, así que con font scale grande
+                // conviene que envuelvan (siguen legibles) antes que elidirse.
+                // El ancho acotado del Expanded evita el desborde horizontal.
+                Text(
+                  labels.labelFor(record.recordType),
+                  style: GoogleFonts.barlow(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: palette.textPrimary,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                _dateWithYear(record.achievedAt, labels.localeName),
-                style:
-                    GoogleFonts.barlow(fontSize: 11, color: palette.textMuted),
-              ),
-            ],
+                const SizedBox(height: 2),
+                Text(
+                  _dateWithYear(record.achievedAt, labels.localeName),
+                  style: GoogleFonts.barlow(
+                    fontSize: 11,
+                    color: palette.textMuted,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            Text(
-              valStr,
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 18,
-                color: palette.accent,
+          const SizedBox(width: 8),
+          ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: constraints.maxWidth * 0.7),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerRight,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    valStr,
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 18,
+                      color: palette.accent,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    unit,
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                      color: palette.accent,
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(width: 4),
-            Text(
-              unit,
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
-                color: palette.accent,
-              ),
-            ),
-          ],
-        ),
-      ],
+          ),
+        ],
+      ),
     );
   }
 }
