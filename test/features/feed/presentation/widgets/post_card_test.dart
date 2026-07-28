@@ -26,6 +26,27 @@ import 'package:treino/l10n/app_l10n.dart';
 
 class MockPostRepository extends Mock implements PostRepository {}
 
+/// Snapshot mínimo con UN ejercicio identificable por nombre — sirve para
+/// distinguir qué post está expandido en una lista.
+WorkoutSnapshot _snapshotFor(String exerciseName) => WorkoutSnapshot(
+      exercises: [
+        WorkoutSnapshotExercise(
+          exerciseName: exerciseName,
+          sets: [
+            SetLog(
+              id: 's1',
+              exerciseId: 'e1',
+              exerciseName: exerciseName,
+              setNumber: 1,
+              reps: 10,
+              weightKg: 50,
+              completedAt: DateTime.utc(2026, 7, 28, 10),
+            ),
+          ],
+        ),
+      ],
+    );
+
 Gym _gym({required String id, required String name}) => Gym(
       id: id,
       name: name,
@@ -723,6 +744,46 @@ void main() {
         expect(find.byType(MuscleDistributionBars), findsNothing);
         expect(find.text('Ejercicio 0'), findsOneWidget);
       });
+    });
+
+    // Regresión: PostCard ganó estado local (el detalle expandido) al sumarse
+    // el snapshot, así que los call sites del feed y del perfil DEBEN pasarle
+    // una key estable por post. Sin eso, un post nuevo arriba (refresh, o el
+    // propio usuario compartiendo) corre las posiciones y el estado expandido
+    // queda pegado al índice, mostrando el detalle de OTRO post.
+    testWidgets(
+        'el estado expandido sigue al post, no a su posición en la lista',
+        (tester) async {
+      final viejo = makePost(id: 'viejo', text: 'post viejo')
+          .copyWith(workoutSnapshot: _snapshotFor('Sentadilla'));
+      final nuevo = makePost(id: 'nuevo', text: 'post nuevo')
+          .copyWith(workoutSnapshot: _snapshotFor('Press banca'));
+
+      Widget listOf(List<Post> posts) => _wrap(
+            ListView(
+              children: [
+                for (final p in posts) PostCard(key: ValueKey(p.id), post: p),
+              ],
+            ),
+          );
+
+      // Un solo post, con su detalle expandido.
+      await tester.pumpWidget(listOf([viejo]));
+      await tester.pump();
+      await tester.tap(find.text('VER DETALLE'));
+      await tester.pump();
+      expect(find.text('Sentadilla'), findsOneWidget);
+
+      // Entra un post nuevo ARRIBA: el viejo pasa del índice 0 al 1.
+      await tester.pumpWidget(listOf([nuevo, viejo]));
+      await tester.pump();
+
+      // El detalle sigue siendo el del post viejo, que es el que se expandió.
+      expect(find.text('Sentadilla'), findsOneWidget);
+      // Y el post nuevo NO heredó el estado expandido de la posición 0.
+      expect(find.text('Press banca'), findsNothing);
+      expect(find.text('VER DETALLE'), findsOneWidget);
+      expect(find.text('OCULTAR DETALLE'), findsOneWidget);
     });
 
     group('post photo', () {

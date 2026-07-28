@@ -321,6 +321,30 @@ void main() {
       expect(find.text('Post tres'), findsOneWidget);
     });
 
+    // Regresión: PostCard tiene estado local (el detalle del entreno
+    // expandible), así que la lista DEBE darle una key estable por post. Sin
+    // eso, la reconciliación por posición del ListView pega el estado al
+    // índice: entra un post nuevo arriba y el detalle expandido salta a otro
+    // post. El assert es sobre el call site real, no sobre PostCard aislado.
+    testWidgets('cada PostCard lleva una key estable derivada del post.id', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), makeOverrides([post1, post2, post3])),
+      );
+      await tester.pumpAndSettle();
+
+      final keys = tester
+          .widgetList<PostCard>(find.byType(PostCard))
+          .map((card) => card.key)
+          .toList();
+      expect(keys, [
+        const ValueKey('a1'),
+        const ValueKey('a2'),
+        const ValueKey('a3'),
+      ]);
+    });
+
     // SCENARIO-151: no FeedEmptyState when posts present
     testWidgets('SCENARIO-151: no FeedEmptyState when posts present', (
       tester,

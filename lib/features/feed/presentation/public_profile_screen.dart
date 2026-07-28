@@ -477,7 +477,9 @@ class _ActividadTabBody extends ConsumerWidget {
               for (final post in posts)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
-                  child: PostCard(post: post),
+                  // Ver nota en feed_screen: PostCard tiene estado local
+                  // (detalle expandido) y necesita key estable por post.
+                  child: PostCard(key: ValueKey(post.id), post: post),
                 ),
             ],
           ),
