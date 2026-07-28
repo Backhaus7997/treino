@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../app/theme/app_motion.dart';
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/widgets/motion/treino_state_switcher.dart';
 
 /// Header común a los 4 steps:
 /// - 4 segmentos arriba que se llenan en accent al avanzar.
@@ -34,7 +36,9 @@ class ProfileSetupHeader extends StatelessWidget {
           children: List.generate(_totalSteps, (i) {
             final filled = i <= currentStep;
             return Expanded(
-              child: Container(
+              child: AnimatedContainer(
+                duration: AppMotion.resolve(context, AppMotion.fast),
+                curve: AppMotion.standard,
                 margin: EdgeInsets.only(right: i == _totalSteps - 1 ? 0 : 8),
                 height: 4,
                 decoration: BoxDecoration(
@@ -56,20 +60,26 @@ class ProfileSetupHeader extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        Text(
-          title,
-          // Clamp to 2 lines + ellipsis so a long title (or large OS text
-          // scaling) wraps gracefully instead of pushing the PageView body off
-          // screen (audit F4). The engine handles wrapping — no hardcoded `\n`.
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          softWrap: true,
-          style: GoogleFonts.barlowCondensed(
-            color: palette.textPrimary,
-            fontSize: 32,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.5,
-            height: 1.0,
+        // Cross-fade sincronizado con el slide del PageView (profile_setup_flow
+        // ya anima animateToPage con AppMotion.slow/standard) — sin esto el
+        // título "saltaba" mientras el contenido deslizaba.
+        TreinoStateSwitcher(
+          childKey: ValueKey(currentStep),
+          child: Text(
+            title,
+            // Clamp to 2 lines + ellipsis so a long title (or large OS text
+            // scaling) wraps gracefully instead of pushing the PageView body off
+            // screen (audit F4). The engine handles wrapping — no hardcoded `\n`.
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            softWrap: true,
+            style: GoogleFonts.barlowCondensed(
+              color: palette.textPrimary,
+              fontSize: 32,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.5,
+              height: 1.0,
+            ),
           ),
         ),
       ],
