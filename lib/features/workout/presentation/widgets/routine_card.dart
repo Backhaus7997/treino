@@ -16,11 +16,21 @@ class RoutineCard extends StatelessWidget {
     required this.routine,
     this.variant = RoutineCardVariant.accent,
     this.reserveTitleLines = false,
+    this.badge,
     super.key,
   });
 
   final Routine routine;
   final RoutineCardVariant variant;
+
+  /// Optional chip rendered to the right of the icon square (e.g. the
+  /// "DE TU COACH" [CoachChip] on the PLANTILLAS grid). Lives INSIDE the
+  /// icon row — never overlaid — so it can't collide with the icon on narrow
+  /// screens. The row is hard-capped to the icon square's 40px (SizedBox),
+  /// so card heights stay deterministic whether the badge is present or not
+  /// (see #402) — [FittedBox] scales the chip down when the cell is too
+  /// narrow OR when large accessibility text would outgrow the 40px row.
+  final Widget? badge;
 
   /// When true, the title block always reserves its full two lines even if
   /// the name fits in one — the card's height stops depending on how long the
@@ -76,6 +86,21 @@ class RoutineCard extends StatelessWidget {
       );
     }
 
+    // Icon square — tinted background matching the variant.
+    final iconSquare = Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: tint.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: tint.withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      child: Icon(TreinoIcon.tabWorkout, color: tint, size: 20),
+    );
+
     return TreinoTappable(
       onTap: () => context.push('/workout/routine/${routine.id}'),
       child: Container(
@@ -96,20 +121,33 @@ class RoutineCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Icon square — tinted background matching the variant.
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: tint.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: tint.withValues(alpha: 0.3),
-                  width: 1,
+            if (badge == null)
+              iconSquare
+            else
+              // Hard 40px cap: without it the row height tracks the chip
+              // (Align shrink-wraps under an unbounded cross axis), and at
+              // large accessibility text scales the chip outgrows the icon —
+              // de-aligning the grid rows. Bounded, FittedBox scales the
+              // chip down instead.
+              SizedBox(
+                height: 40,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    iconSquare,
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.topRight,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: badge,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              child: Icon(TreinoIcon.tabWorkout, color: tint, size: 20),
-            ),
             const SizedBox(height: 12),
             title,
             const SizedBox(height: 8),
