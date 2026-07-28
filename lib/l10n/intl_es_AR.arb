@@ -428,6 +428,38 @@
   "dashboardErrorTurnos": "No pudimos cargar tus próximos turnos.",
   "dashboardSinTurnosProximos": "No tenés turnos próximos confirmados.",
   "dashboardNadieEntreno": "Nadie entrenó hoy todavía.",
+  "athleteDetailSeguimientoEmpty": "Todavía no dejaste seguimiento de este alumno.",
+  "@athleteDetailSeguimientoEmpty": {
+    "description": "Empty state of the SEGUIMIENTO section in the mobile athlete detail, when the trainer has no FollowUpEntry for this athlete yet."
+  },
+  "athleteDetailSeguimientoLoadError": "No pudimos cargar el seguimiento.",
+  "@athleteDetailSeguimientoLoadError": {
+    "description": "Error state of the SEGUIMIENTO section when the FollowUpEntry query fails."
+  },
+  "dashboardFeedbackSheetTitle": "Dejar feedback",
+  "@dashboardFeedbackSheetTitle": {
+    "description": "Title of the bottom sheet opened from the 'Dejar feedback' link in the trainer dashboard's ENTRENARON HOY section."
+  },
+  "dashboardFeedbackPickAthlete": "¿A quién le querés dejar feedback?",
+  "@dashboardFeedbackPickAthlete": {
+    "description": "Prompt above the list of athletes who trained today, in the leave-feedback sheet."
+  },
+  "dashboardFeedbackComposerHint": "Escribí tu devolución del entrenamiento…",
+  "@dashboardFeedbackComposerHint": {
+    "description": "Placeholder of the multiline text field where the trainer writes the feedback note."
+  },
+  "dashboardFeedbackSave": "Guardar",
+  "@dashboardFeedbackSave": {
+    "description": "Primary action of the leave-feedback sheet: persists the note as a FollowUpEntry."
+  },
+  "dashboardFeedbackSaved": "Feedback guardado",
+  "@dashboardFeedbackSaved": {
+    "description": "SnackBar confirmation shown after the feedback note is saved."
+  },
+  "dashboardFeedbackSaveError": "No pudimos guardar el feedback. Probá de nuevo.",
+  "@dashboardFeedbackSaveError": {
+    "description": "Inline error shown in the leave-feedback sheet when the Firestore write fails."
+  },
   "dashboardErrorActividad": "No pudimos cargar la actividad de hoy.",
   "dashboardSinActividadReciente": "Sin actividad en los últimos días.",
   "dashboardSinCobros": "Sin cobros pendientes.",

@@ -14,7 +14,9 @@ import '../../measurements/presentation/log_measurement_screen.dart';
 import '../../measurements/presentation/widgets/measurement_history_list.dart';
 import '../../measurements/presentation/widgets/measurement_progress_chart.dart';
 import '../application/athlete_note_providers.dart';
+import '../application/follow_up_entry_providers.dart';
 import '../domain/athlete_note.dart';
+import '../domain/follow_up_entry.dart';
 import '../../coach_hub/presentation/sections/pagos/widgets/payment_format.dart'
     show groupThousands;
 import '../../coach_hub/presentation/sections/pagos/widgets/thousands_input_formatter.dart';
@@ -182,6 +184,10 @@ class _AthleteDetailBody extends ConsumerWidget {
               // ── Cobro section ─────────────────────────────────────────
               const SizedBox(height: 20),
               _CobroSection(athleteId: athleteId),
+
+              // ── Seguimiento section ───────────────────────────────────
+              const SizedBox(height: 20),
+              _SeguimientoSection(athleteId: athleteId, trainerUid: trainerUid),
 
               // ── Nota del alumno section ───────────────────────────────
               const SizedBox(height: 20),
@@ -1366,6 +1372,180 @@ class _CobroConfigSheetState extends ConsumerState<_CobroConfigSheet> {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ── Seguimiento section ───────────────────────────────────────────────────────
+
+/// Read-only history of [FollowUpEntry] — the private trainer→athlete log.
+///
+/// Distinct from [_NotaSection] right below: that is ONE editable memo per
+/// athlete, this is an append-only, tagged, timestamped log. Until now the log
+/// could be WRITTEN from mobile (the dashboard's "Dejar feedback" sheet) but
+/// only READ in the Coach Hub (web) — the trainer left a note on their phone
+/// and it vanished from their view. This closes that asymmetry.
+///
+/// Read-only on purpose: creating entries stays in the dashboard sheet (tagged
+/// `entrenamiento`, anchored to "who trained today"), and editing/deleting
+/// stays in the web hub, which already owns that surface.
+class _SeguimientoSection extends ConsumerWidget {
+  const _SeguimientoSection(
+      {required this.athleteId, required this.trainerUid});
+
+  final String athleteId;
+  final String trainerUid;
+
+  /// Same tag → (label, colour) mapping the web hub uses, so an entry does not
+  /// change identity depending on which surface the trainer reads it from.
+  (String, Color) _tagStyle(FollowUpTag tag, AppPalette palette) {
+    switch (tag) {
+      case FollowUpTag.general:
+        return ('GENERAL', palette.textMuted);
+      case FollowUpTag.entrenamiento:
+        return ('ENTRENAMIENTO', palette.accent);
+      case FollowUpTag.nutricion:
+        return ('NUTRICIÓN', palette.warning);
+      case FollowUpTag.molestia:
+        return ('MOLESTIA', palette.danger);
+      case FollowUpTag.motivacion:
+        return ('MOTIVACIÓN', palette.highlight);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    final entriesAsync = ref.watch(
+      followUpEntriesProvider(
+        (trainerId: trainerUid, athleteId: athleteId),
+      ),
+    );
+
+    Widget card(Widget child) => Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: palette.bgCard,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: palette.border),
+          ),
+          child: child,
+        );
+
+    Widget muted(String text) => Text(
+          text,
+          style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'SEGUIMIENTO',
+          style: GoogleFonts.barlowCondensed(
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
+            letterSpacing: 1.2,
+            color: palette.textMuted,
+          ),
+        ),
+        const SizedBox(height: 12),
+        entriesAsync.when(
+          loading: () => card(muted(l10n.dashboardCargando)),
+          error: (_, __) => card(muted(l10n.athleteDetailSeguimientoLoadError)),
+          data: (entries) {
+            if (entries.isEmpty) {
+              return card(muted(l10n.athleteDetailSeguimientoEmpty));
+            }
+            // Server-side DESC already; cap the mobile view — the full log
+            // lives in the web hub.
+            final shown = entries.take(10).toList();
+            return card(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (var i = 0; i < shown.length; i++) ...[
+                    if (i > 0) ...[
+                      const SizedBox(height: 12),
+                      Divider(color: palette.border, height: 1),
+                      const SizedBox(height: 12),
+                    ],
+                    _SeguimientoRow(
+                      entry: shown[i],
+                      tagStyle: _tagStyle(shown[i].tag, palette),
+                      palette: palette,
+                    ),
+                  ],
+                ],
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _SeguimientoRow extends StatelessWidget {
+  const _SeguimientoRow({
+    required this.entry,
+    required this.tagStyle,
+    required this.palette,
+  });
+
+  final FollowUpEntry entry;
+  final (String, Color) tagStyle;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, color) = tagStyle;
+    final d = entry.recordedAt.toLocal();
+    final date = '${d.day.toString().padLeft(2, '0')}/'
+        '${d.month.toString().padLeft(2, '0')}';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                border: Border.all(color: color),
+                borderRadius: BorderRadius.circular(9999),
+              ),
+              child: Text(
+                label,
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 10,
+                  letterSpacing: 1.0,
+                  color: color,
+                ),
+              ),
+            ),
+            const Spacer(),
+            Text(
+              date,
+              style: GoogleFonts.barlow(
+                fontSize: 12,
+                color: palette.textMuted,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          entry.text,
+          style: GoogleFonts.barlow(
+            fontSize: 14,
+            color: palette.textPrimary,
+          ),
+        ),
+      ],
     );
   }
 }
