@@ -22,6 +22,11 @@ _$PostImpl _$$PostImplFromJson(Map<String, dynamic> json) => _$PostImpl(
       workoutStats: json['workoutStats'] == null
           ? null
           : WorkoutStats.fromJson(json['workoutStats'] as Map<String, dynamic>),
+      photoUrl: json['photoUrl'] as String?,
+      workoutSnapshot: json['workoutSnapshot'] == null
+          ? null
+          : WorkoutSnapshot.fromJson(
+              json['workoutSnapshot'] as Map<String, dynamic>),
     );
 
 Map<String, dynamic> _$$PostImplToJson(_$PostImpl instance) =>
@@ -36,6 +41,8 @@ Map<String, dynamic> _$$PostImplToJson(_$PostImpl instance) =>
       'privacy': _$PostPrivacyEnumMap[instance.privacy]!,
       'createdAt': const TimestampConverter().toJson(instance.createdAt),
       'workoutStats': instance.workoutStats?.toJson(),
+      'photoUrl': instance.photoUrl,
+      'workoutSnapshot': instance.workoutSnapshot?.toJson(),
     };
 
 const _$PostPrivacyEnumMap = {

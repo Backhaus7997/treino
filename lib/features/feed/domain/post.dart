@@ -5,6 +5,7 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 import '../../profile/data/timestamp_converter.dart';
 import 'post_privacy.dart';
 import 'routine_tag.dart';
+import 'workout_snapshot.dart';
 import 'workout_stats.dart';
 
 part 'post.freezed.dart';
@@ -31,6 +32,14 @@ class Post with _$Post {
     // it and the card hides the row. Keeping it non-required also means the
     // other Post(...) call sites (e.g. manual create-post) need no change.
     WorkoutStats? workoutStats,
+    // Foto opcional adjuntada desde el composer de share-a-workout. Optional
+    // (NOT `required`) igual que workoutStats — posts manuales y legacy la
+    // omiten y la card no renderiza imagen; ningún call site existente cambia.
+    String? photoUrl,
+    // Detalle del entreno para el feed (ejercicios + sets + distribución
+    // muscular). Mismo contrato opcional que workoutStats: null en posts
+    // manuales/legacy → la card esconde la sección expandible.
+    WorkoutSnapshot? workoutSnapshot,
   }) = _Post;
 
   factory Post.fromJson(Map<String, Object?> json) => _$PostFromJson(json);

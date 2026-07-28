@@ -38,7 +38,15 @@ mixin _$Post {
 // (NOT `required`) on purpose — a manual post or a legacy doc simply omits
 // it and the card hides the row. Keeping it non-required also means the
 // other Post(...) call sites (e.g. manual create-post) need no change.
-  WorkoutStats? get workoutStats => throw _privateConstructorUsedError;
+  WorkoutStats? get workoutStats =>
+      throw _privateConstructorUsedError; // Foto opcional adjuntada desde el composer de share-a-workout. Optional
+// (NOT `required`) igual que workoutStats — posts manuales y legacy la
+// omiten y la card no renderiza imagen; ningún call site existente cambia.
+  String? get photoUrl =>
+      throw _privateConstructorUsedError; // Detalle del entreno para el feed (ejercicios + sets + distribución
+// muscular). Mismo contrato opcional que workoutStats: null en posts
+// manuales/legacy → la card esconde la sección expandible.
+  WorkoutSnapshot? get workoutSnapshot => throw _privateConstructorUsedError;
 
   /// Serializes this Post to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -64,10 +72,13 @@ abstract class $PostCopyWith<$Res> {
       RoutineTag? routineTag,
       PostPrivacy privacy,
       @TimestampConverter() DateTime createdAt,
-      WorkoutStats? workoutStats});
+      WorkoutStats? workoutStats,
+      String? photoUrl,
+      WorkoutSnapshot? workoutSnapshot});
 
   $RoutineTagCopyWith<$Res>? get routineTag;
   $WorkoutStatsCopyWith<$Res>? get workoutStats;
+  $WorkoutSnapshotCopyWith<$Res>? get workoutSnapshot;
 }
 
 /// @nodoc
@@ -95,6 +106,8 @@ class _$PostCopyWithImpl<$Res, $Val extends Post>
     Object? privacy = null,
     Object? createdAt = null,
     Object? workoutStats = freezed,
+    Object? photoUrl = freezed,
+    Object? workoutSnapshot = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -137,6 +150,14 @@ class _$PostCopyWithImpl<$Res, $Val extends Post>
           ? _value.workoutStats
           : workoutStats // ignore: cast_nullable_to_non_nullable
               as WorkoutStats?,
+      photoUrl: freezed == photoUrl
+          ? _value.photoUrl
+          : photoUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
+      workoutSnapshot: freezed == workoutSnapshot
+          ? _value.workoutSnapshot
+          : workoutSnapshot // ignore: cast_nullable_to_non_nullable
+              as WorkoutSnapshot?,
     ) as $Val);
   }
 
@@ -167,6 +188,20 @@ class _$PostCopyWithImpl<$Res, $Val extends Post>
       return _then(_value.copyWith(workoutStats: value) as $Val);
     });
   }
+
+  /// Create a copy of Post
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $WorkoutSnapshotCopyWith<$Res>? get workoutSnapshot {
+    if (_value.workoutSnapshot == null) {
+      return null;
+    }
+
+    return $WorkoutSnapshotCopyWith<$Res>(_value.workoutSnapshot!, (value) {
+      return _then(_value.copyWith(workoutSnapshot: value) as $Val);
+    });
+  }
 }
 
 /// @nodoc
@@ -186,12 +221,16 @@ abstract class _$$PostImplCopyWith<$Res> implements $PostCopyWith<$Res> {
       RoutineTag? routineTag,
       PostPrivacy privacy,
       @TimestampConverter() DateTime createdAt,
-      WorkoutStats? workoutStats});
+      WorkoutStats? workoutStats,
+      String? photoUrl,
+      WorkoutSnapshot? workoutSnapshot});
 
   @override
   $RoutineTagCopyWith<$Res>? get routineTag;
   @override
   $WorkoutStatsCopyWith<$Res>? get workoutStats;
+  @override
+  $WorkoutSnapshotCopyWith<$Res>? get workoutSnapshot;
 }
 
 /// @nodoc
@@ -216,6 +255,8 @@ class __$$PostImplCopyWithImpl<$Res>
     Object? privacy = null,
     Object? createdAt = null,
     Object? workoutStats = freezed,
+    Object? photoUrl = freezed,
+    Object? workoutSnapshot = freezed,
   }) {
     return _then(_$PostImpl(
       id: null == id
@@ -258,6 +299,14 @@ class __$$PostImplCopyWithImpl<$Res>
           ? _value.workoutStats
           : workoutStats // ignore: cast_nullable_to_non_nullable
               as WorkoutStats?,
+      photoUrl: freezed == photoUrl
+          ? _value.photoUrl
+          : photoUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
+      workoutSnapshot: freezed == workoutSnapshot
+          ? _value.workoutSnapshot
+          : workoutSnapshot // ignore: cast_nullable_to_non_nullable
+              as WorkoutSnapshot?,
     ));
   }
 }
@@ -275,7 +324,9 @@ class _$PostImpl implements _Post {
       required this.routineTag,
       required this.privacy,
       @TimestampConverter() required this.createdAt,
-      this.workoutStats});
+      this.workoutStats,
+      this.photoUrl,
+      this.workoutSnapshot});
 
   factory _$PostImpl.fromJson(Map<String, dynamic> json) =>
       _$$PostImplFromJson(json);
@@ -310,10 +361,20 @@ class _$PostImpl implements _Post {
 // other Post(...) call sites (e.g. manual create-post) need no change.
   @override
   final WorkoutStats? workoutStats;
+// Foto opcional adjuntada desde el composer de share-a-workout. Optional
+// (NOT `required`) igual que workoutStats — posts manuales y legacy la
+// omiten y la card no renderiza imagen; ningún call site existente cambia.
+  @override
+  final String? photoUrl;
+// Detalle del entreno para el feed (ejercicios + sets + distribución
+// muscular). Mismo contrato opcional que workoutStats: null en posts
+// manuales/legacy → la card esconde la sección expandible.
+  @override
+  final WorkoutSnapshot? workoutSnapshot;
 
   @override
   String toString() {
-    return 'Post(id: $id, authorUid: $authorUid, authorDisplayName: $authorDisplayName, authorAvatarUrl: $authorAvatarUrl, authorGymId: $authorGymId, text: $text, routineTag: $routineTag, privacy: $privacy, createdAt: $createdAt, workoutStats: $workoutStats)';
+    return 'Post(id: $id, authorUid: $authorUid, authorDisplayName: $authorDisplayName, authorAvatarUrl: $authorAvatarUrl, authorGymId: $authorGymId, text: $text, routineTag: $routineTag, privacy: $privacy, createdAt: $createdAt, workoutStats: $workoutStats, photoUrl: $photoUrl, workoutSnapshot: $workoutSnapshot)';
   }
 
   @override
@@ -337,7 +398,11 @@ class _$PostImpl implements _Post {
             (identical(other.createdAt, createdAt) ||
                 other.createdAt == createdAt) &&
             (identical(other.workoutStats, workoutStats) ||
-                other.workoutStats == workoutStats));
+                other.workoutStats == workoutStats) &&
+            (identical(other.photoUrl, photoUrl) ||
+                other.photoUrl == photoUrl) &&
+            (identical(other.workoutSnapshot, workoutSnapshot) ||
+                other.workoutSnapshot == workoutSnapshot));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -353,7 +418,9 @@ class _$PostImpl implements _Post {
       routineTag,
       privacy,
       createdAt,
-      workoutStats);
+      workoutStats,
+      photoUrl,
+      workoutSnapshot);
 
   /// Create a copy of Post
   /// with the given fields replaced by the non-null parameter values.
@@ -382,7 +449,9 @@ abstract class _Post implements Post {
       required final RoutineTag? routineTag,
       required final PostPrivacy privacy,
       @TimestampConverter() required final DateTime createdAt,
-      final WorkoutStats? workoutStats}) = _$PostImpl;
+      final WorkoutStats? workoutStats,
+      final String? photoUrl,
+      final WorkoutSnapshot? workoutSnapshot}) = _$PostImpl;
 
   factory _Post.fromJson(Map<String, dynamic> json) = _$PostImpl.fromJson;
 
@@ -414,7 +483,17 @@ abstract class _Post implements Post {
 // it and the card hides the row. Keeping it non-required also means the
 // other Post(...) call sites (e.g. manual create-post) need no change.
   @override
-  WorkoutStats? get workoutStats;
+  WorkoutStats?
+      get workoutStats; // Foto opcional adjuntada desde el composer de share-a-workout. Optional
+// (NOT `required`) igual que workoutStats — posts manuales y legacy la
+// omiten y la card no renderiza imagen; ningún call site existente cambia.
+  @override
+  String?
+      get photoUrl; // Detalle del entreno para el feed (ejercicios + sets + distribución
+// muscular). Mismo contrato opcional que workoutStats: null en posts
+// manuales/legacy → la card esconde la sección expandible.
+  @override
+  WorkoutSnapshot? get workoutSnapshot;
 
   /// Create a copy of Post
   /// with the given fields replaced by the non-null parameter values.
