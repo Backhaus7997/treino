@@ -3,9 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/utils/date_labels.dart';
 import '../../../l10n/app_l10n.dart';
+import '../../../core/widgets/motion/treino_fade_slide_in.dart';
+import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../chat/application/chat_providers.dart';
 import '../../measurements/application/measurement_providers.dart';
@@ -344,60 +347,72 @@ class _PlanesSection extends ConsumerWidget {
         const SizedBox(height: 12),
 
         // ── Async content ──────────────────────────────────────────────────
-        plansAsync.when(
-          loading: () => _card(
-            palette: palette,
-            child: Text(
-              'Cargando…',
-              style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+        TreinoStateSwitcher(
+          childKey: ValueKey(plansAsync.when(
+            loading: () => 'loading',
+            error: (_, __) => 'error',
+            data: (_) => 'data',
+          )),
+          child: plansAsync.when(
+            loading: () => _card(
+              palette: palette,
+              child: Text(
+                'Cargando…',
+                style:
+                    GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+              ),
             ),
-          ),
-          error: (e, __) => _card(
-            palette: palette,
-            child: Text(
-              (e is FirebaseException && e.code == 'permission-denied')
-                  ? 'No pudimos cargar los planes. Puede que el vínculo con '
-                      'este alumno se haya actualizado recién.'
-                  : 'No pudimos cargar los planes.',
-              style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+            error: (e, __) => _card(
+              palette: palette,
+              child: Text(
+                (e is FirebaseException && e.code == 'permission-denied')
+                    ? 'No pudimos cargar los planes. Puede que el vínculo con '
+                        'este alumno se haya actualizado recién.'
+                    : 'No pudimos cargar los planes.',
+                style:
+                    GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+              ),
             ),
-          ),
-          data: (allPlans) {
-            // Client-side filter: only show plans assigned by current trainer
-            final myPlans =
-                allPlans.where((r) => r.assignedBy == trainerUid).toList();
+            data: (allPlans) {
+              // Client-side filter: only show plans assigned by current trainer
+              final myPlans =
+                  allPlans.where((r) => r.assignedBy == trainerUid).toList();
 
-            if (myPlans.isEmpty) {
-              return Text(
-                AppL10n.of(context).coachAthleteDetailNoPlans,
-                style: GoogleFonts.barlow(
-                  fontWeight: FontWeight.w400,
-                  fontSize: 14,
-                  color: palette.textMuted,
-                ),
-              );
-            }
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (final plan in myPlans) ...[
-                  _PlanCard(
-                    plan: plan,
-                    onTap: () => context.push(
-                      '/coach/athlete/$athleteId/plan/${plan.id}',
-                    ),
-                    onEdit: () => context.push(
-                      '/workout/routine-editor/$athleteId',
-                      extra: plan.id,
-                    ),
-                    onDelete: () => _onDeletePlan(context, ref, plan),
+              if (myPlans.isEmpty) {
+                return Text(
+                  AppL10n.of(context).coachAthleteDetailNoPlans,
+                  style: GoogleFonts.barlow(
+                    fontWeight: FontWeight.w400,
+                    fontSize: 14,
+                    color: palette.textMuted,
                   ),
-                  const SizedBox(height: 12),
+                );
+              }
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final (i, plan) in myPlans.indexed) ...[
+                    TreinoFadeSlideIn(
+                      delay: AppMotion.stagger(i),
+                      child: _PlanCard(
+                        plan: plan,
+                        onTap: () => context.push(
+                          '/coach/athlete/$athleteId/plan/${plan.id}',
+                        ),
+                        onEdit: () => context.push(
+                          '/workout/routine-editor/$athleteId',
+                          extra: plan.id,
+                        ),
+                        onDelete: () => _onDeletePlan(context, ref, plan),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                 ],
-              ],
-            );
-          },
+              );
+            },
+          ),
         ),
       ],
     );
