@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../app/theme/app_palette.dart';
+import '../../../../../core/widgets/motion/treino_state_switcher.dart';
 import 'widgets/chat_detail_pane.dart';
 import 'widgets/chat_empty_pane.dart';
 import 'widgets/chat_list_pane.dart';
@@ -47,9 +48,12 @@ class ChatSectionScreen extends ConsumerWidget {
         ),
         VerticalDivider(width: 1, color: palette.border),
         Expanded(
-          child: selectedChatId == null
-              ? const ChatEmptyPane()
-              : ChatDetailPane(chatId: selectedChatId),
+          child: TreinoStateSwitcher(
+            childKey: ValueKey(selectedChatId),
+            child: selectedChatId == null
+                ? const ChatEmptyPane()
+                : ChatDetailPane(chatId: selectedChatId),
+          ),
         ),
       ],
     );

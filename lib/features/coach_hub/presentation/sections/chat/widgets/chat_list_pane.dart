@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../../../app/theme/app_palette.dart';
+import '../../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../../chat/application/chat_providers.dart';
 import '../../../../../chat/domain/chat.dart';
 import '../../../../../profile/application/user_public_profile_providers.dart';
@@ -166,7 +167,7 @@ class _ChatRow extends ConsumerWidget {
     final pubAsync = ref.watch(userPublicProfileProvider(otherUid));
     final hasUnread = chatHasUnread(chat, currentUid);
 
-    return InkWell(
+    return TreinoTappable(
       key: Key('chat_row_${chat.chatId}'),
       onTap: () {
         ref.read(selectedChatIdProvider.notifier).state = chat.chatId;
