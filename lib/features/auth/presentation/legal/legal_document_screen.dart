@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_background.dart';
+import '../../../../app/theme/app_motion.dart';
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import 'legal_content.dart';
 
@@ -45,17 +47,20 @@ class LegalDocumentScreen extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                     Expanded(
-                      child: Semantics(
-                        header: true,
-                        child: Text(
-                          title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.barlowCondensed(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.3,
-                            color: palette.textPrimary,
+                      child: TreinoFadeSlideIn(
+                        distance: AppMotion.slideSm,
+                        child: Semantics(
+                          header: true,
+                          child: Text(
+                            title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.barlowCondensed(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.3,
+                              color: palette.textPrimary,
+                            ),
                           ),
                         ),
                       ),
