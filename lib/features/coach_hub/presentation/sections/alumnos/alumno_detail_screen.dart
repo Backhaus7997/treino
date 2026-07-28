@@ -10,6 +10,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/core/utils/date_labels.dart';
+import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/coach/application/athlete_file_providers.dart';
@@ -486,18 +487,25 @@ class _ChatTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final chatAsync = ref.watch(chatForOtherUidProvider(athleteId));
-    return chatAsync.when(
-      loading: () => Center(
-        child: CircularProgressIndicator(color: palette.accent),
-      ),
-      error: (_, __) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-        child: Text(
-          'No pudimos abrir el chat. Reintentá.', // i18n: Fase W2
-          style: TextStyle(color: palette.textMuted, fontSize: 15),
+    return TreinoStateSwitcher(
+      childKey: ValueKey(chatAsync.when(
+        loading: () => 'loading',
+        error: (_, __) => 'error',
+        data: (_) => 'data',
+      )),
+      child: chatAsync.when(
+        loading: () => Center(
+          child: CircularProgressIndicator(color: palette.accent),
         ),
+        error: (_, __) => Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          child: Text(
+            'No pudimos abrir el chat. Reintentá.', // i18n: Fase W2
+            style: TextStyle(color: palette.textMuted, fontSize: 15),
+          ),
+        ),
+        data: (chat) => ChatDetailPane(chatId: chat.chatId),
       ),
-      data: (chat) => ChatDetailPane(chatId: chat.chatId),
     );
   }
 }
@@ -1512,14 +1520,33 @@ class _PagosTab extends ConsumerWidget {
     final paymentsAsync = ref.watch(trainerPaymentsProvider);
     final pendingAsync = ref.watch(pagosPorCobrarProvider);
 
+    Widget body;
+    String stateKey;
     if (paymentsAsync.isLoading || pendingAsync.isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      stateKey = 'loading';
+      body = const Center(child: CircularProgressIndicator());
+    } else if (paymentsAsync.hasError || pendingAsync.hasError) {
+      stateKey = 'error';
+      body =
+          _muted(palette, 'No se pudieron cargar los pagos.'); // i18n: Fase W2
+    } else {
+      stateKey = 'data';
+      body =
+          _buildPagosBody(context, ref, palette, paymentsAsync, pendingAsync);
     }
-    if (paymentsAsync.hasError || pendingAsync.hasError) {
-      return _muted(
-          palette, 'No se pudieron cargar los pagos.'); // i18n: Fase W2
-    }
+    return TreinoStateSwitcher(
+      childKey: ValueKey(stateKey),
+      child: body,
+    );
+  }
 
+  Widget _buildPagosBody(
+    BuildContext context,
+    WidgetRef ref,
+    AppPalette palette,
+    AsyncValue<List<Payment>> paymentsAsync,
+    AsyncValue<List<CobroPendiente>> pendingAsync,
+  ) {
     final history = paymentsAsync.requireValue
         .where((p) => p.athleteId == athleteId)
         .toList()
@@ -1645,48 +1672,62 @@ class _EntrenamientoTab extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 10),
-          routinesAsync.when(
-            loading: () => _muted(palette, 'Cargando…'), // i18n: Fase W2
-            error: (e, _) => _muted(
-                palette, 'No se pudo cargar la rutina.'), // i18n: Fase W2
-            data: (routines) {
-              final actives =
-                  routines.where((r) => r.status == RoutineStatus.active);
-              final active = actives
-                      .where((r) => r.assignedBy == trainerUid)
-                      .firstOrNull ??
-                  actives.firstOrNull;
-              if (active == null) {
-                return _muted(
-                    palette, 'Sin rutina activa asignada.'); // i18n: Fase W2
-              }
-              return _RutinaCard(
-                  routine: active, palette: palette, athleteId: athleteId);
-            },
+          TreinoStateSwitcher(
+            childKey: ValueKey(routinesAsync.when(
+              loading: () => 'loading',
+              error: (_, __) => 'error',
+              data: (_) => 'data',
+            )),
+            child: routinesAsync.when(
+              loading: () => _muted(palette, 'Cargando…'), // i18n: Fase W2
+              error: (e, _) => _muted(
+                  palette, 'No se pudo cargar la rutina.'), // i18n: Fase W2
+              data: (routines) {
+                final actives =
+                    routines.where((r) => r.status == RoutineStatus.active);
+                final active = actives
+                        .where((r) => r.assignedBy == trainerUid)
+                        .firstOrNull ??
+                    actives.firstOrNull;
+                if (active == null) {
+                  return _muted(
+                      palette, 'Sin rutina activa asignada.'); // i18n: Fase W2
+                }
+                return _RutinaCard(
+                    routine: active, palette: palette, athleteId: athleteId);
+              },
+            ),
           ),
           const SizedBox(height: 20),
           _sectionLabel(palette, 'HISTORIAL DE SESIONES'), // i18n: Fase W2
           const SizedBox(height: 10),
-          sessionsAsync.when(
-            loading: () => _muted(palette, 'Cargando…'), // i18n: Fase W2
-            error: (e, _) => _muted(
-                palette,
-                e is FirebaseException && e.code == 'permission-denied'
-                    ? 'El alumno no compartió su historial.' // i18n: Fase W2
-                    : 'No se pudo cargar el historial.'), // i18n: Fase W2
-            data: (sessions) {
-              // isCompletedSession excluye sesiones abandonadas (status=finished
-              // pero wasFullyCompleted=false) para no divergir del historial del
-              // propio alumno ni de los contadores públicos. // i18n: Fase W2
-              final finished =
-                  sessions.where(isCompletedSession).take(20).toList();
-              if (finished.isEmpty) {
-                return _muted(palette,
-                    'Sin sesiones registradas todavía.'); // i18n: Fase W2
-              }
-              return _HistorialTable(
-                  sessions: finished, palette: palette, athleteId: athleteId);
-            },
+          TreinoStateSwitcher(
+            childKey: ValueKey(sessionsAsync.when(
+              loading: () => 'loading',
+              error: (_, __) => 'error',
+              data: (_) => 'data',
+            )),
+            child: sessionsAsync.when(
+              loading: () => _muted(palette, 'Cargando…'), // i18n: Fase W2
+              error: (e, _) => _muted(
+                  palette,
+                  e is FirebaseException && e.code == 'permission-denied'
+                      ? 'El alumno no compartió su historial.' // i18n: Fase W2
+                      : 'No se pudo cargar el historial.'), // i18n: Fase W2
+              data: (sessions) {
+                // isCompletedSession excluye sesiones abandonadas (status=finished
+                // pero wasFullyCompleted=false) para no divergir del historial del
+                // propio alumno ni de los contadores públicos. // i18n: Fase W2
+                final finished =
+                    sessions.where(isCompletedSession).take(20).toList();
+                if (finished.isEmpty) {
+                  return _muted(palette,
+                      'Sin sesiones registradas todavía.'); // i18n: Fase W2
+                }
+                return _HistorialTable(
+                    sessions: finished, palette: palette, athleteId: athleteId);
+              },
+            ),
           ),
           const SizedBox(height: 24),
           _DailyHeatmapTabSection(athleteId: athleteId),
