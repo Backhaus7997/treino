@@ -16,6 +16,9 @@ export {
   rankingAggregateOnSession,
   rankingAggregateOnOptIn,
 } from "./ranking-aggregate";
+// Fase W3 (template publishing): community-rating aggregate on the parent
+// routine doc (ratingAvg/ratingsCount, CF-write-only fields).
+export { templateRatingAggregate } from "./template-rating-aggregate";
 export { notifyOnChatMessage } from "./notifications/notify-chat-message";
 export { notifyOnAppointment } from "./notifications/notify-appointment";
 export { notifyOnLinkChange } from "./notifications/notify-link-change";

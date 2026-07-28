@@ -11,6 +11,7 @@ import '../domain/routine.dart';
 import '../domain/routine_source.dart';
 import '../domain/routine_status.dart';
 import '../domain/routine_visibility.dart';
+import '../domain/template_rating.dart';
 
 class RoutineRepository {
   RoutineRepository({required FirebaseFirestore firestore})
@@ -32,6 +33,22 @@ class RoutineRepository {
   Future<List<Routine>> listSystemTemplates() async {
     final snap = await _collection
         .where('source', isEqualTo: 'system')
+        .where('visibility', isEqualTo: 'public')
+        .get();
+    return snap.docs.map(_fromDoc).whereType<Routine>().toList();
+  }
+
+  /// Returns every community-published trainer template — `trainer-template`
+  /// docs whose owning trainer flipped `visibility` to `public` via
+  /// [publishTemplate].
+  ///
+  /// Equality-only query, so it rides Firestore's automatic single-field
+  /// indexes (no composite index needed); callers decide presentation order.
+  /// Used by the athlete Plantillas tab to surface community templates
+  /// alongside the system catalogue.
+  Future<List<Routine>> listPublishedTemplates() async {
+    final snap = await _collection
+        .where('source', isEqualTo: 'trainer-template')
         .where('visibility', isEqualTo: 'public')
         .get();
     return snap.docs.map(_fromDoc).whereType<Routine>().toList();
@@ -413,6 +430,35 @@ class RoutineRepository {
     return templateRoutine.copyWith(id: ref.id);
   }
 
+  /// Publishes a trainer template to the community catalogue by flipping its
+  /// `visibility` to `public`.
+  ///
+  /// Single-field update on purpose — it matches the narrow owner-only
+  /// Firestore rule (`affectedKeys() == {'visibility'}`), same idiom as
+  /// [archive]. Rules enforce that only the owning trainer may flip it and
+  /// only on `trainer-template` docs.
+  Future<void> publishTemplate(String templateId) =>
+      _setTemplateVisibility(templateId, RoutineVisibility.public);
+
+  /// Takes a published template back to `private`.
+  ///
+  /// Ratings already left by the community are kept in the subcollection, so
+  /// re-publishing restores them (and the routine's aggregates) intact.
+  Future<void> unpublishTemplate(String templateId) =>
+      _setTemplateVisibility(templateId, RoutineVisibility.private);
+
+  Future<void> _setTemplateVisibility(
+    String templateId,
+    RoutineVisibility visibility,
+  ) async {
+    if (templateId.isEmpty) {
+      throw ArgumentError.value(templateId, 'templateId', 'must be non-empty');
+    }
+    await _collection.doc(templateId).update({
+      'visibility': visibility.toJson(),
+    });
+  }
+
   /// Deletes a routine document by [id]. Used by the trainer to remove a
   /// template from their library. The UI only exposes this on the trainer's
   /// own templates; Firestore rules enforce that only the owner
@@ -464,8 +510,110 @@ class RoutineRepository {
       source: RoutineSource.trainerAssigned,
       assignedTo: athleteId,
       visibility: RoutineVisibility.private,
+      // Community aggregates belong to the published template, not the
+      // athlete's private copy. toJson() already excludes them from the
+      // write (includeToJson: false); clearing them here keeps the RETURNED
+      // object faithful to the persisted doc as well.
+      ratingAvg: null,
+      ratingsCount: null,
     );
     return createAssigned(assigned);
+  }
+
+  // ── Community ratings on published templates (Fase W3) ────────────────────
+
+  CollectionReference<Map<String, Object?>> _ratingsOf(String routineId) =>
+      _collection.doc(routineId).collection('ratings');
+
+  /// Writes (or overwrites) [rating] at its deterministic doc id — the
+  /// rater's uid — so each user holds exactly ONE rating per template. Set
+  /// without merge so stale fields from a previous version never survive,
+  /// mirroring `ReviewRepository.upsert` semantics.
+  ///
+  /// Client-side guards mirror the Firestore rules (rating 1..5, comment
+  /// ≤500). The rules additionally require the parent to be a published
+  /// `trainer-template` NOT owned by the rater — the author cannot rate
+  /// their own work.
+  ///
+  /// On EDITS the rules pin `createdAt` to its stored value, so this method
+  /// reads the existing doc first and preserves its `createdAt` — callers
+  /// may stamp both timestamps with "now" and edits still pass the rule.
+  Future<void> upsertTemplateRating({
+    required String routineId,
+    required TemplateRating rating,
+  }) async {
+    if (routineId.isEmpty) {
+      throw ArgumentError.value(routineId, 'routineId', 'must be non-empty');
+    }
+    if (rating.userId.isEmpty) {
+      throw ArgumentError.value(
+        rating.userId,
+        'rating.userId',
+        'must be non-empty',
+      );
+    }
+    if (rating.rating < 1 || rating.rating > 5) {
+      throw ArgumentError.value(
+        rating.rating,
+        'rating.rating',
+        'must be within 1..5',
+      );
+    }
+    final comment = rating.comment;
+    if (comment != null && comment.length > 500) {
+      throw ArgumentError.value(
+        comment,
+        'rating.comment',
+        'must be at most 500 characters',
+      );
+    }
+    final docRef = _ratingsOf(routineId).doc(rating.userId);
+    final json = rating.toJson();
+    // Preserve the original createdAt on edits (see doc comment above) —
+    // one extra read per submit, and rating submissions are rare.
+    final existingCreatedAt = (await docRef.get()).data()?['createdAt'];
+    if (existingCreatedAt != null) {
+      json['createdAt'] = existingCreatedAt;
+    }
+    await docRef.set(json);
+  }
+
+  /// Live stream of the ratings left on a template, newest first, capped at
+  /// [limit] (bounded like `ReviewRepository.watchForTrainer` — an unbounded
+  /// community subcollection must not stream in full).
+  ///
+  /// Single orderBy on a subcollection field — covered by Firestore's
+  /// automatic single-field index, no composite needed. The doc id is
+  /// injected as `userId` so the id stays authoritative even for docs whose
+  /// body drifted (mirrors [_fromDoc]).
+  Stream<List<TemplateRating>> watchTemplateRatings(
+    String routineId, {
+    int limit = 50,
+  }) {
+    return _ratingsOf(routineId)
+        .orderBy('createdAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map(
+          (s) => [
+            for (final d in s.docs)
+              TemplateRating.fromJson({...d.data(), 'userId': d.id}),
+          ],
+        );
+  }
+
+  /// Live stream of the caller's own rating on a template — `null` while the
+  /// user hasn't rated it yet. Drives the editable "my rating" input in the
+  /// published-template detail.
+  Stream<TemplateRating?> watchMyTemplateRating({
+    required String routineId,
+    required String userId,
+  }) {
+    return _ratingsOf(routineId).doc(userId).snapshots().map((snap) {
+      final data = snap.data();
+      if (!snap.exists || data == null) return null;
+      return TemplateRating.fromJson({...data, 'userId': snap.id});
+    });
   }
 
   /// Deserializes a Firestore doc into a [Routine], injecting the doc id.

@@ -43,7 +43,16 @@ mixin _$Routine {
 // ── Periodization (Model B) ──────────────────────────────────────────────
 // Number of authored weeks. @Default(1) keeps single-week routines intact
 // and retro-compatible with docs that lack this field.
-  int get numWeeks => throw _privateConstructorUsedError;
+  int get numWeeks =>
+      throw _privateConstructorUsedError; // ── Community rating aggregates (Fase W3 — template publishing) ──────────
+// Written EXCLUSIVELY by the `templateRatingAggregate` Cloud Function.
+// `includeToJson: false` keeps them out of every client write payload;
+// firestore.rules additionally rejects them on create and never lists
+// them in any update affectedKeys allowlist.
+  @JsonKey(includeToJson: false)
+  double? get ratingAvg => throw _privateConstructorUsedError;
+  @JsonKey(includeToJson: false)
+  int? get ratingsCount => throw _privateConstructorUsedError;
 
   /// Serializes this Routine to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -73,7 +82,9 @@ abstract class $RoutineCopyWith<$Res> {
       RoutineVisibility visibility,
       String? createdBy,
       RoutineStatus status,
-      int numWeeks});
+      int numWeeks,
+      @JsonKey(includeToJson: false) double? ratingAvg,
+      @JsonKey(includeToJson: false) int? ratingsCount});
 }
 
 /// @nodoc
@@ -105,6 +116,8 @@ class _$RoutineCopyWithImpl<$Res, $Val extends Routine>
     Object? createdBy = freezed,
     Object? status = null,
     Object? numWeeks = null,
+    Object? ratingAvg = freezed,
+    Object? ratingsCount = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -163,6 +176,14 @@ class _$RoutineCopyWithImpl<$Res, $Val extends Routine>
           ? _value.numWeeks
           : numWeeks // ignore: cast_nullable_to_non_nullable
               as int,
+      ratingAvg: freezed == ratingAvg
+          ? _value.ratingAvg
+          : ratingAvg // ignore: cast_nullable_to_non_nullable
+              as double?,
+      ratingsCount: freezed == ratingsCount
+          ? _value.ratingsCount
+          : ratingsCount // ignore: cast_nullable_to_non_nullable
+              as int?,
     ) as $Val);
   }
 }
@@ -188,7 +209,9 @@ abstract class _$$RoutineImplCopyWith<$Res> implements $RoutineCopyWith<$Res> {
       RoutineVisibility visibility,
       String? createdBy,
       RoutineStatus status,
-      int numWeeks});
+      int numWeeks,
+      @JsonKey(includeToJson: false) double? ratingAvg,
+      @JsonKey(includeToJson: false) int? ratingsCount});
 }
 
 /// @nodoc
@@ -218,6 +241,8 @@ class __$$RoutineImplCopyWithImpl<$Res>
     Object? createdBy = freezed,
     Object? status = null,
     Object? numWeeks = null,
+    Object? ratingAvg = freezed,
+    Object? ratingsCount = freezed,
   }) {
     return _then(_$RoutineImpl(
       id: null == id
@@ -276,6 +301,14 @@ class __$$RoutineImplCopyWithImpl<$Res>
           ? _value.numWeeks
           : numWeeks // ignore: cast_nullable_to_non_nullable
               as int,
+      ratingAvg: freezed == ratingAvg
+          ? _value.ratingAvg
+          : ratingAvg // ignore: cast_nullable_to_non_nullable
+              as double?,
+      ratingsCount: freezed == ratingsCount
+          ? _value.ratingsCount
+          : ratingsCount // ignore: cast_nullable_to_non_nullable
+              as int?,
     ));
   }
 }
@@ -297,7 +330,9 @@ class _$RoutineImpl implements _Routine {
       this.visibility = RoutineVisibility.public,
       this.createdBy,
       this.status = RoutineStatus.active,
-      this.numWeeks = 1})
+      this.numWeeks = 1,
+      @JsonKey(includeToJson: false) this.ratingAvg,
+      @JsonKey(includeToJson: false) this.ratingsCount})
       : _days = days;
 
   factory _$RoutineImpl.fromJson(Map<String, dynamic> json) =>
@@ -351,10 +386,21 @@ class _$RoutineImpl implements _Routine {
   @override
   @JsonKey()
   final int numWeeks;
+// ── Community rating aggregates (Fase W3 — template publishing) ──────────
+// Written EXCLUSIVELY by the `templateRatingAggregate` Cloud Function.
+// `includeToJson: false` keeps them out of every client write payload;
+// firestore.rules additionally rejects them on create and never lists
+// them in any update affectedKeys allowlist.
+  @override
+  @JsonKey(includeToJson: false)
+  final double? ratingAvg;
+  @override
+  @JsonKey(includeToJson: false)
+  final int? ratingsCount;
 
   @override
   String toString() {
-    return 'Routine(id: $id, name: $name, split: $split, level: $level, days: $days, estimatedMinutesPerDay: $estimatedMinutesPerDay, imageUrl: $imageUrl, source: $source, assignedBy: $assignedBy, assignedTo: $assignedTo, visibility: $visibility, createdBy: $createdBy, status: $status, numWeeks: $numWeeks)';
+    return 'Routine(id: $id, name: $name, split: $split, level: $level, days: $days, estimatedMinutesPerDay: $estimatedMinutesPerDay, imageUrl: $imageUrl, source: $source, assignedBy: $assignedBy, assignedTo: $assignedTo, visibility: $visibility, createdBy: $createdBy, status: $status, numWeeks: $numWeeks, ratingAvg: $ratingAvg, ratingsCount: $ratingsCount)';
   }
 
   @override
@@ -382,7 +428,11 @@ class _$RoutineImpl implements _Routine {
                 other.createdBy == createdBy) &&
             (identical(other.status, status) || other.status == status) &&
             (identical(other.numWeeks, numWeeks) ||
-                other.numWeeks == numWeeks));
+                other.numWeeks == numWeeks) &&
+            (identical(other.ratingAvg, ratingAvg) ||
+                other.ratingAvg == ratingAvg) &&
+            (identical(other.ratingsCount, ratingsCount) ||
+                other.ratingsCount == ratingsCount));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -402,7 +452,9 @@ class _$RoutineImpl implements _Routine {
       visibility,
       createdBy,
       status,
-      numWeeks);
+      numWeeks,
+      ratingAvg,
+      ratingsCount);
 
   /// Create a copy of Routine
   /// with the given fields replaced by the non-null parameter values.
@@ -435,7 +487,9 @@ abstract class _Routine implements Routine {
       final RoutineVisibility visibility,
       final String? createdBy,
       final RoutineStatus status,
-      final int numWeeks}) = _$RoutineImpl;
+      final int numWeeks,
+      @JsonKey(includeToJson: false) final double? ratingAvg,
+      @JsonKey(includeToJson: false) final int? ratingsCount}) = _$RoutineImpl;
 
   factory _Routine.fromJson(Map<String, dynamic> json) = _$RoutineImpl.fromJson;
 
@@ -471,7 +525,17 @@ abstract class _Routine implements Routine {
 // Number of authored weeks. @Default(1) keeps single-week routines intact
 // and retro-compatible with docs that lack this field.
   @override
-  int get numWeeks;
+  int get numWeeks; // ── Community rating aggregates (Fase W3 — template publishing) ──────────
+// Written EXCLUSIVELY by the `templateRatingAggregate` Cloud Function.
+// `includeToJson: false` keeps them out of every client write payload;
+// firestore.rules additionally rejects them on create and never lists
+// them in any update affectedKeys allowlist.
+  @override
+  @JsonKey(includeToJson: false)
+  double? get ratingAvg;
+  @override
+  @JsonKey(includeToJson: false)
+  int? get ratingsCount;
 
   /// Create a copy of Routine
   /// with the given fields replaced by the non-null parameter values.

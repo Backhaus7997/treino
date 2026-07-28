@@ -136,6 +136,13 @@ service cloud.firestore {
       // REQ-COACH-PLANS-005..010, SCENARIO-438..443.
       allow create: if request.auth != null
                     && request.resource.data.assignedBy == request.auth.uid
+                    // Community rating aggregates are CF-write-only (Fase W3):
+                    // a create must not seed forged starting values — a trainer
+                    // could otherwise mint a template pre-loaded with a 5.0
+                    // average before publishing it. The client never emits
+                    // these keys (Routine uses @JsonKey(includeToJson: false)).
+                    && !('ratingAvg' in request.resource.data)
+                    && !('ratingsCount' in request.resource.data)
                     && (
                       // Trainer-assigned plan for a specific athlete.
                       (request.resource.data.source == 'trainer-assigned'
@@ -168,6 +175,10 @@ service cloud.firestore {
                     && request.resource.data.visibility in ['private', 'public']
                     && !('assignedBy' in request.resource.data)              // must be absent (REQ-USR-004)
                     && !('assignedTo' in request.resource.data)              // must be absent (REQ-USR-004)
+                    // Rating aggregates are CF-write-only (Fase W3) — same
+                    // absence guard as branch 1.
+                    && !('ratingAvg' in request.resource.data)
+                    && !('ratingsCount' in request.resource.data)
                     && request.resource.data.createdAt is timestamp;
 
       // UPDATE path 1 (narrow): owner flips only `status` — archive / restore.
@@ -217,11 +228,16 @@ service cloud.firestore {
                     && !('assignedBy' in request.resource.data)
                     && !('assignedTo' in request.resource.data)
                     // Only content fields may appear in the written document.
+                    // ratingAvg/ratingsCount: defensively listed (same as the
+                    // trainer-template path) so a doc that ever gained CF
+                    // aggregates cannot brick its owner's edits; the
+                    // affectedKeys allowlist below still excludes them.
                     && request.resource.data.keys().hasOnly(
                          // + numWeeks (periodization, Model B) — mirror RoutineRepository.
                          ['name', 'level', 'days',
                           'source', 'createdBy', 'visibility', 'createdAt', 'status',
-                          'split', 'estimatedMinutesPerDay', 'imageUrl', 'numWeeks'])
+                          'split', 'estimatedMinutesPerDay', 'imageUrl', 'numWeeks',
+                          'ratingAvg', 'ratingsCount'])
                     // The diff must touch ONLY content fields (name/level/days/
                     // numWeeks/visibility).
                     && request.resource.data.diff(resource.data).affectedKeys()
@@ -259,12 +275,17 @@ service cloud.firestore {
                     && (!('createdAt' in resource.data)
                         || request.resource.data.createdAt == resource.data.createdAt)
                     // Only content fields may appear in the written document.
+                    // ratingAvg/ratingsCount: defensively listed (same as the
+                    // trainer-template path) so a doc that ever gained CF
+                    // aggregates cannot brick the trainer's edits; the
+                    // affectedKeys allowlist below still excludes them.
                     && request.resource.data.keys().hasOnly(
                          // + numWeeks (periodization, Model B) — mirror RoutineRepository.
                          ['name', 'split', 'level', 'days',
                           'source', 'assignedBy', 'assignedTo', 'visibility',
                           'status', 'createdBy', 'createdAt',
-                          'estimatedMinutesPerDay', 'imageUrl', 'numWeeks'])
+                          'estimatedMinutesPerDay', 'imageUrl', 'numWeeks',
+                          'ratingAvg', 'ratingsCount'])
                     // The diff must touch ONLY content fields.
                     && request.resource.data.diff(resource.data).affectedKeys()
                          // + numWeeks (periodization) — repo always sends it.
@@ -302,16 +323,44 @@ service cloud.firestore {
                     && (!('createdAt' in resource.data)
                         || request.resource.data.createdAt == resource.data.createdAt)
                     // Only content fields may appear in the written document.
+                    // ratingAvg/ratingsCount ARE listed: request.resource.data
+                    // is the POST-state of the doc, so once the
+                    // templateRatingAggregate CF wrote aggregates onto a
+                    // published template, every content edit would fail this
+                    // hasOnly without them. They stay un-editable because the
+                    // affectedKeys() allowlist below does NOT include them.
                     && request.resource.data.keys().hasOnly(
                          // + numWeeks (periodization, Model B) — mirror RoutineRepository.
                          ['name', 'split', 'level', 'days',
                           'source', 'assignedBy', 'assignedTo', 'visibility',
                           'status', 'createdBy', 'createdAt',
-                          'estimatedMinutesPerDay', 'imageUrl', 'numWeeks'])
+                          'estimatedMinutesPerDay', 'imageUrl', 'numWeeks',
+                          'ratingAvg', 'ratingsCount'])
                     // The diff must touch ONLY content fields.
                     && request.resource.data.diff(resource.data).affectedKeys()
                          // + numWeeks (periodization) — repo always sends it.
                          .hasOnly(['name', 'split', 'level', 'days', 'numWeeks']);
+
+      // UPDATE path 5 (narrow, Fase W3): the owning trainer publishes /
+      // unpublishes their template — flips ONLY `visibility` between
+      // 'private' and 'public'. Mirrors the "status flip" idiom of UPDATE
+      // path 1. 'shared' is NOT accepted here (trainer-assigned concept),
+      // and the visibility-only diff means content edits, aggregate forgery,
+      // or ownership changes can never ride along on this path. Any
+      // authenticated user can then read the published doc via the existing
+      // `visibility == 'public'` branch of the read rule above.
+      // The role gate mirrors the "any athlete-role user forges X" guards
+      // used across the file: CREATE branch 1 predates role checks, so an
+      // athlete CAN hold a private forged `trainer-template` doc — without
+      // this gate, path 5 would let them publish it into the community
+      // catalogue (and collect ratings on it).
+      allow update: if request.auth != null
+                    && request.auth.uid == resource.data.assignedBy
+                    && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
+                    && resource.data.source == 'trainer-template'
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                         == ['visibility'].toSet()
+                    && request.resource.data.visibility in ['private', 'public'];
 
       // DELETE (narrow): the owning trainer may delete their OWN
       // `trainer-template` docs (library cleanup) and `trainer-assigned`
@@ -320,6 +369,69 @@ service cloud.firestore {
       allow delete: if request.auth != null
                     && resource.data.source in ['trainer-template', 'trainer-assigned']
                     && request.auth.uid == resource.data.assignedBy;
+    }
+
+    // Community ratings on published trainer templates (Fase W3).
+    // One doc per rater — the doc id IS the rater's uid (upsert semantics,
+    // mirroring /reviews' deterministic-id idiom). Aggregated into the parent
+    // routine's `ratingAvg`/`ratingsCount` by the `templateRatingAggregate`
+    // CF (Admin SDK — bypasses these rules); the client NEVER writes those
+    // aggregate fields.
+    match /routines/{routineId}/ratings/{userId} {
+      function ratedRoutine() {
+        return get(/databases/$(database)/documents/routines/$(routineId)).data;
+      }
+
+      // The parent must be a community-published trainer template, and the
+      // template's own author cannot rate their work (anti self-boosting).
+      // A missing parent doc makes get() fail the evaluation → deny, so
+      // ratings can never be attached to nonexistent routines.
+      function parentIsRateable() {
+        return ratedRoutine().source == 'trainer-template'
+               && ratedRoutine().visibility == 'public'
+               && ratedRoutine().assignedBy != request.auth.uid;
+      }
+
+      // Payload shape shared by create/update. Mirrors /reviews: rating is a
+      // 1..5 int, comment absent/null or ≤500 chars.
+      function ratingPayloadOk() {
+        return request.resource.data.keys().hasOnly(
+                 ['userId', 'rating', 'comment', 'createdAt', 'updatedAt'])
+               && request.resource.data.userId == userId
+               && request.resource.data.rating is int
+               && request.resource.data.rating >= 1
+               && request.resource.data.rating <= 5
+               // optStrMaxLen (shared guard, QA #508) — the `is string`
+               // check matters: `.size()` is also defined for lists/maps,
+               // so a bare size check would accept a List/Map comment that
+               // later explodes the `as String?` cast in every client
+               // reading this template's ratings.
+               && optStrMaxLen(request.resource.data.get('comment', null), 500)
+               && request.resource.data.createdAt is timestamp
+               && request.resource.data.updatedAt is timestamp;
+      }
+
+      // Read: any authenticated user — same openness as /reviews. Ratings on
+      // a template someone unpublished stay technically readable by id, but
+      // routine auto-ids are 20 random chars (no enumeration), matching the
+      // privacy stance documented on the routines read rule.
+      allow read: if request.auth != null;
+
+      allow create: if request.auth != null
+                    && request.auth.uid == userId
+                    && parentIsRateable()
+                    && ratingPayloadOk();
+
+      // Editing my own rating keeps identity + createdAt pinned; requires
+      // the template to still be published (an unpublished template freezes
+      // its ratings until the trainer republishes).
+      allow update: if request.auth != null
+                    && request.auth.uid == userId
+                    && parentIsRateable()
+                    && ratingPayloadOk()
+                    && request.resource.data.createdAt == resource.data.createdAt;
+
+      allow delete: if false;
     }
 
     // Vínculo PF ↔ atleta (Fase 5 Etapa 1, REQ-COACH-FOUNDATIONS-004).
