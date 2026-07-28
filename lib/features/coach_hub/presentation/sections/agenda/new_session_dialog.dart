@@ -14,7 +14,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../../app/theme/app_motion.dart';
 import '../../../../../app/theme/app_palette.dart';
+import '../../../../../core/widgets/motion/treino_fade_slide_in.dart';
+import '../../../../../core/widgets/motion/treino_success_check.dart';
+import '../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../coach/application/agenda_providers.dart';
 import '../../../../coach/application/trainer_link_providers.dart';
 import '../../../../coach/domain/trainer_link.dart';
@@ -190,7 +194,17 @@ class _NewSessionDialogState extends ConsumerState<NewSessionDialog> {
       if (!mounted) return;
       Navigator.of(context).pop(true);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sesión registrada.')), // i18n
+        const SnackBar(
+          // El pop ya pasó — el check no compite con la navegación.
+          content: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TreinoSuccessCheck(size: 18, strokeWidth: 2),
+              SizedBox(width: 10),
+              Flexible(child: Text('Sesión registrada.')), // i18n
+            ],
+          ),
+        ),
       );
     } catch (_) {
       if (!mounted) return;
@@ -232,113 +246,116 @@ class _NewSessionDialogState extends ConsumerState<NewSessionDialog> {
       ),
       content: SizedBox(
         width: 420,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // ── Athlete picker ────────────────────────────────────────
-              _FieldLabel(label: 'ALUMNO', palette: palette), // i18n
-              const SizedBox(height: 8),
-              if (!hasActiveLinks)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Text(
-                    'No tenés alumnos activos todavía.', // i18n
-                    style: GoogleFonts.barlow(
-                      fontSize: 13,
-                      color: palette.textMuted,
+        child: TreinoFadeSlideIn(
+          distance: AppMotion.slideSm,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // ── Athlete picker ────────────────────────────────────────
+                _FieldLabel(label: 'ALUMNO', palette: palette), // i18n
+                const SizedBox(height: 8),
+                if (!hasActiveLinks)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      'No tenés alumnos activos todavía.', // i18n
+                      style: GoogleFonts.barlow(
+                        fontSize: 13,
+                        color: palette.textMuted,
+                      ),
                     ),
+                  )
+                else
+                  _AthleteDropdown(
+                    links: activeLinks,
+                    selectedId: _selectedAthleteId,
+                    palette: palette,
+                    onChanged: (id) => setState(() {
+                      _selectedAthleteId = id;
+                      _errorMessage = null;
+                    }),
                   ),
-                )
-              else
-                _AthleteDropdown(
-                  links: activeLinks,
-                  selectedId: _selectedAthleteId,
+                const SizedBox(height: 14),
+
+                // ── Fecha ─────────────────────────────────────────────────
+                _FieldLabel(label: 'FECHA', palette: palette), // i18n
+                const SizedBox(height: 8),
+                _TappableField(
                   palette: palette,
-                  onChanged: (id) => setState(() {
-                    _selectedAthleteId = id;
+                  text: _formatDate(_date),
+                  onTap: _pickDate,
+                ),
+                const SizedBox(height: 14),
+
+                // ── Hora ──────────────────────────────────────────────────
+                _FieldLabel(label: 'HORA', palette: palette), // i18n
+                const SizedBox(height: 8),
+                _TappableField(
+                  palette: palette,
+                  text: _time.format(context),
+                  onTap: _pickTime,
+                ),
+                const SizedBox(height: 14),
+
+                // ── Duración ──────────────────────────────────────────────
+                _FieldLabel(label: 'DURACIÓN (min)', palette: palette), // i18n
+                const SizedBox(height: 8),
+                _DurationSection(
+                  controller: _durationController,
+                  palette: palette,
+                  onChipTap: (val) => setState(() {
+                    _durationController.text = val.toString();
                     _errorMessage = null;
                   }),
                 ),
-              const SizedBox(height: 14),
+                const SizedBox(height: 14),
 
-              // ── Fecha ─────────────────────────────────────────────────
-              _FieldLabel(label: 'FECHA', palette: palette), // i18n
-              const SizedBox(height: 8),
-              _TappableField(
-                palette: palette,
-                text: _formatDate(_date),
-                onTap: _pickDate,
-              ),
-              const SizedBox(height: 14),
-
-              // ── Hora ──────────────────────────────────────────────────
-              _FieldLabel(label: 'HORA', palette: palette), // i18n
-              const SizedBox(height: 8),
-              _TappableField(
-                palette: palette,
-                text: _time.format(context),
-                onTap: _pickTime,
-              ),
-              const SizedBox(height: 14),
-
-              // ── Duración ──────────────────────────────────────────────
-              _FieldLabel(label: 'DURACIÓN (min)', palette: palette), // i18n
-              const SizedBox(height: 8),
-              _DurationSection(
-                controller: _durationController,
-                palette: palette,
-                onChipTap: (val) => setState(() {
-                  _durationController.text = val.toString();
-                  _errorMessage = null;
-                }),
-              ),
-              const SizedBox(height: 14),
-
-              // ── Nota ──────────────────────────────────────────────────
-              _FieldLabel(label: 'NOTA (opcional)', palette: palette), // i18n
-              const SizedBox(height: 8),
-              TextField(
-                controller: _noteController,
-                maxLines: 2,
-                style: GoogleFonts.barlow(
-                  fontSize: 14,
-                  color: palette.textPrimary,
-                ),
-                decoration: InputDecoration(
-                  hintText: 'Ej: traer banda, primera sesión…', // i18n
-                  hintStyle: GoogleFonts.barlow(
-                    fontSize: 14,
-                    color: palette.textMuted,
-                  ),
-                  filled: true,
-                  fillColor: palette.bg,
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: palette.border),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: palette.accent, width: 1.5),
-                  ),
-                ),
-              ),
-
-              // ── Error message ─────────────────────────────────────────
-              if (_errorMessage != null) ...[
-                const SizedBox(height: 12),
-                Text(
-                  _errorMessage!,
+                // ── Nota ──────────────────────────────────────────────────
+                _FieldLabel(label: 'NOTA (opcional)', palette: palette), // i18n
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _noteController,
+                  maxLines: 2,
                   style: GoogleFonts.barlow(
-                    fontSize: 13,
-                    color: palette.danger,
+                    fontSize: 14,
+                    color: palette.textPrimary,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Ej: traer banda, primera sesión…', // i18n
+                    hintStyle: GoogleFonts.barlow(
+                      fontSize: 14,
+                      color: palette.textMuted,
+                    ),
+                    filled: true,
+                    fillColor: palette.bg,
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: palette.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: palette.accent, width: 1.5),
+                    ),
                   ),
                 ),
-              ],
 
-              const SizedBox(height: 8),
-            ],
+                // ── Error message ─────────────────────────────────────────
+                if (_errorMessage != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    _errorMessage!,
+                    style: GoogleFonts.barlow(
+                      fontSize: 13,
+                      color: palette.danger,
+                    ),
+                  ),
+                ],
+
+                const SizedBox(height: 8),
+              ],
+            ),
           ),
         ),
       ),
@@ -566,9 +583,8 @@ class _TappableField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return TreinoTappable(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         decoration: BoxDecoration(
