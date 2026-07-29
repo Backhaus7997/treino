@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/utils/date_labels.dart';
 import '../../../l10n/app_l10n.dart';
@@ -1552,265 +1553,303 @@ class _SeguimientoRow extends StatelessWidget {
 
 // ── Nota del alumno section ───────────────────────────────────────────────────
 
-class _NotaSection extends ConsumerWidget {
+/// NOTA DEL ALUMNO — one free-text memo per (trainer, athlete), edited IN
+/// PLACE.
+///
+/// It used to be a read-only card plus an "Agregar"/"Editar" link that opened
+/// a bottom sheet. Tapping the card itself now turns it into the field, which
+/// is the gesture the card already looked like it supported — the sheet was a
+/// detour to type one line of text.
+///
+/// The link is gone on purpose: with the card tappable it was a second door to
+/// the same room, and the empty state now says what to do instead of just
+/// "Sin nota.".
+///
+/// NOT to be confused with [_SeguimientoSection] right above: that one is an
+/// append-only tagged log; this is a single memo that gets overwritten.
+class _NotaSection extends ConsumerStatefulWidget {
   const _NotaSection({required this.athleteId, required this.trainerUid});
 
   final String athleteId;
   final String trainerUid;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final palette = AppPalette.of(context);
-    final noteAsync = ref.watch(
-      athleteNoteProvider((trainerId: trainerUid, athleteId: athleteId)),
-    );
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // ── Section header row ──────────────────────────────────────────
-        Row(
-          children: [
-            Text(
-              'NOTA DEL ALUMNO',
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
-                letterSpacing: 1.2,
-                color: palette.textMuted,
-              ),
-            ),
-            const Spacer(),
-            GestureDetector(
-              onTap: () => _openEditSheet(context, ref, noteAsync.valueOrNull),
-              child: Text(
-                noteAsync.valueOrNull == null ? 'Agregar' : 'Editar',
-                style: GoogleFonts.barlow(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                  color: palette.accent,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-
-        // ── Content ─────────────────────────────────────────────────────
-        noteAsync.when(
-          loading: () => _card(
-            palette: palette,
-            child: Text(
-              'Cargando…',
-              style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
-            ),
-          ),
-          error: (_, __) => _card(
-            palette: palette,
-            child: Text(
-              'No pudimos cargar la nota.',
-              style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
-            ),
-          ),
-          data: (note) => _card(
-            palette: palette,
-            child: note == null || note.note.trim().isEmpty
-                ? Text(
-                    'Sin nota.',
-                    style: GoogleFonts.barlow(
-                        fontSize: 13, color: palette.textMuted),
-                  )
-                : Text(
-                    note.note,
-                    style: GoogleFonts.barlow(
-                      fontSize: 14,
-                      color: palette.textPrimary,
-                    ),
-                  ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _openEditSheet(
-    BuildContext context,
-    WidgetRef ref,
-    AthleteNote? existing,
-  ) {
-    showModalBottomSheet<void>(
-      context: context,
-      useRootNavigator: true,
-      isScrollControlled: true,
-      backgroundColor: AppPalette.of(context).bgCard,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => _NotaEditSheet(
-        athleteId: athleteId,
-        trainerUid: trainerUid,
-        existing: existing,
-      ),
-    );
-  }
-
-  Widget _card({required AppPalette palette, required Widget child}) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: palette.border),
-      ),
-      child: child,
-    );
-  }
+  ConsumerState<_NotaSection> createState() => _NotaSectionState();
 }
 
-class _NotaEditSheet extends ConsumerStatefulWidget {
-  const _NotaEditSheet({
-    required this.athleteId,
-    required this.trainerUid,
-    required this.existing,
-  });
+class _NotaSectionState extends ConsumerState<_NotaSection> {
+  final _controller = TextEditingController();
 
-  final String athleteId;
-  final String trainerUid;
-  final AthleteNote? existing;
+  /// Anchors the editor block (field + Cancelar/Guardar) so it can be scrolled
+  /// into view — see [_startEditing].
+  final _editorKey = GlobalKey();
 
-  @override
-  ConsumerState<_NotaEditSheet> createState() => _NotaEditSheetState();
-}
-
-class _NotaEditSheetState extends ConsumerState<_NotaEditSheet> {
-  late final TextEditingController _noteController;
+  bool _editing = false;
   bool _saving = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _noteController = TextEditingController(text: widget.existing?.note ?? '');
-  }
+  bool _failed = false;
 
   @override
   void dispose() {
-    _noteController.dispose();
+    _controller.dispose();
     super.dispose();
+  }
+
+  /// Seeds the field from the note as it stands RIGHT NOW, then scrolls the
+  /// editor into view.
+  ///
+  /// The controller is filled here rather than kept in sync with the stream on
+  /// every build: while the trainer is typing, an incoming snapshot must not
+  /// overwrite what they wrote.
+  ///
+  /// The scroll is not cosmetic. This section sits at the BOTTOM of a long
+  /// ListView, so entering edit mode grows the card and pushes Cancelar /
+  /// Guardar past the fold — the trainer tapped to write and the way to
+  /// confirm was off-screen. Flutter auto-scrolls a focused TextField into
+  /// view but stops at the field itself; the buttons below it are what need
+  /// the extra room, hence aligning the whole block's BOTTOM (alignment: 1).
+  ///
+  /// Post-frame because the editor does not exist in the tree until this
+  /// setState has been laid out.
+  void _startEditing(String current) {
+    _controller.text = current;
+    _controller.selection = TextSelection.collapsed(offset: current.length);
+    setState(() {
+      _editing = true;
+      _failed = false;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = _editorKey.currentContext;
+      if (ctx == null || !mounted) return;
+      Scrollable.ensureVisible(
+        ctx,
+        alignment: 1,
+        duration: AppMotion.resolve(context, AppMotion.fast),
+        curve: AppMotion.standard,
+      );
+    });
+  }
+
+  void _cancel() {
+    setState(() {
+      _editing = false;
+      _saving = false;
+      _failed = false;
+    });
   }
 
   Future<void> _save() async {
     if (_saving) return;
-    setState(() => _saving = true);
+    setState(() {
+      _saving = true;
+      _failed = false;
+    });
     try {
       await ref.read(athleteNoteRepositoryProvider).setNote(
             AthleteNote(
               trainerId: widget.trainerUid,
               athleteId: widget.athleteId,
-              note: _noteController.text.trim(),
+              note: _controller.text.trim(),
               updatedAt: DateTime.now().toUtc(),
             ),
           );
       if (!mounted) return;
-      Navigator.of(context).pop();
+      setState(() {
+        _saving = false;
+        _editing = false;
+      });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No pudimos guardar. Probá de nuevo.')),
-      );
+      // Stay in edit mode with the text intact — a failed write must not cost
+      // the trainer what they just wrote.
+      setState(() {
+        _saving = false;
+        _failed = true;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+    final noteAsync = ref.watch(
+      athleteNoteProvider(
+        (trainerId: widget.trainerUid, athleteId: widget.athleteId),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // ── Handle ──────────────────────────────────────────────────
-          Center(
-            child: Container(
-              width: 36,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 14),
-              decoration: BoxDecoration(
-                color: palette.border,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          Text(
-            'NOTA DEL ALUMNO',
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 18,
-              color: palette.textPrimary,
-              letterSpacing: 1.2,
-            ),
-          ),
-          const SizedBox(height: 18),
+    );
 
-          // ── Nota field ───────────────────────────────────────────────
-          TextField(
-            controller: _noteController,
-            maxLines: 5,
-            style: TextStyle(color: palette.textPrimary),
-            decoration: InputDecoration(
-              hintText: 'Ej: viene de lesión de rodilla, no cargar piernas…',
-              hintStyle: TextStyle(color: palette.textMuted),
-              filled: true,
-              fillColor: palette.bg,
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide(color: palette.border),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide(color: palette.accent, width: 1.5),
-              ),
+    Widget card({required Widget child}) => Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: palette.bgCard,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: _editing ? palette.accent : palette.border,
             ),
           ),
-          const SizedBox(height: 20),
+          child: child,
+        );
 
-          // ── Save button ──────────────────────────────────────────────
-          ElevatedButton(
-            onPressed: _saving ? null : _save,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: palette.accent,
-              foregroundColor: palette.bg,
-              minimumSize: const Size.fromHeight(48),
-              shape: const StadiumBorder(),
-              disabledBackgroundColor: palette.accent.withValues(alpha: 0.3),
-            ),
-            child: _saving
-                ? SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: palette.bg,
-                    ),
-                  )
-                : Text(
-                    'GUARDAR',
-                    style: GoogleFonts.barlowCondensed(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                      letterSpacing: 1.4,
-                    ),
+    Widget muted(String text) => Text(
+          text,
+          style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'NOTA DEL ALUMNO',
+          style: GoogleFonts.barlowCondensed(
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
+            letterSpacing: 1.2,
+            color: palette.textMuted,
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (_editing)
+          _NotaEditor(
+            key: _editorKey,
+            controller: _controller,
+            palette: palette,
+            saving: _saving,
+            failed: _failed,
+            onCancel: _cancel,
+            onSave: _save,
+            card: card,
+          )
+        else
+          noteAsync.when(
+            loading: () => card(child: muted('Cargando…')),
+            error: (_, __) => card(child: muted('No pudimos cargar la nota.')),
+            data: (note) {
+              final text = note?.note.trim() ?? '';
+              return Semantics(
+                button: true,
+                container: true,
+                label: text.isEmpty
+                    ? 'Escribir una nota sobre el alumno'
+                    : 'Editar la nota del alumno',
+                child: GestureDetector(
+                  onTap: () => _startEditing(text),
+                  behavior: HitTestBehavior.opaque,
+                  child: card(
+                    child: text.isEmpty
+                        // The hint doubles as the affordance now that the
+                        // "Agregar" link is gone.
+                        ? muted('Tocá para escribir una nota.')
+                        : Text(
+                            text,
+                            style: GoogleFonts.barlow(
+                              fontSize: 14,
+                              color: palette.textPrimary,
+                            ),
+                          ),
                   ),
+                ),
+              );
+            },
+          ),
+      ],
+    );
+  }
+}
+
+/// The in-place editor: the same card, now holding the field plus its
+/// Cancelar / Guardar pair.
+class _NotaEditor extends StatelessWidget {
+  const _NotaEditor({
+    super.key,
+    required this.controller,
+    required this.palette,
+    required this.saving,
+    required this.failed,
+    required this.onCancel,
+    required this.onSave,
+    required this.card,
+  });
+
+  final TextEditingController controller;
+  final AppPalette palette;
+  final bool saving;
+  final bool failed;
+  final VoidCallback onCancel;
+  final Future<void> Function() onSave;
+  final Widget Function({required Widget child}) card;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        card(
+          child: TextField(
+            controller: controller,
+            autofocus: true,
+            enabled: !saving,
+            minLines: 2,
+            maxLines: 6,
+            style: GoogleFonts.barlow(fontSize: 14, color: palette.textPrimary),
+            decoration: InputDecoration(
+              // The card already draws the border and padding.
+              isDense: true,
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              contentPadding: EdgeInsets.zero,
+              hintText: 'Escribí una nota sobre el alumno…',
+              hintStyle:
+                  GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
+            ),
+          ),
+        ),
+        if (failed) ...[
+          const SizedBox(height: 8),
+          Text(
+            'No pudimos guardar. Probá de nuevo.',
+            style: GoogleFonts.barlow(fontSize: 13, color: palette.danger),
           ),
         ],
-      ),
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            TextButton(
+              onPressed: saving ? null : onCancel,
+              style: TextButton.styleFrom(foregroundColor: palette.textMuted),
+              child: Text(
+                'Cancelar',
+                style: GoogleFonts.barlow(
+                    fontWeight: FontWeight.w600, fontSize: 13),
+              ),
+            ),
+            const SizedBox(width: 4),
+            FilledButton(
+              onPressed: saving ? null : onSave,
+              style: FilledButton.styleFrom(
+                backgroundColor: palette.accent,
+                foregroundColor: palette.bg,
+                minimumSize: const Size(0, 40),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                shape: const StadiumBorder(),
+              ),
+              child: saving
+                  ? SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: palette.bg),
+                    )
+                  : Text(
+                      'Guardar',
+                      style: GoogleFonts.barlow(
+                          fontWeight: FontWeight.w700, fontSize: 13),
+                    ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
