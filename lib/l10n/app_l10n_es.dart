@@ -1218,6 +1218,9 @@ class AppL10nEs extends AppL10n {
   String get dashboardHolaSinNombre => 'HOLA';
 
   @override
+  String get a11yDashboardAvatarButton => 'Editar tu perfil profesional';
+
+  @override
   String get dashboardSolicitudesPendientesEmpty =>
       'No tenés solicitudes pendientes.';
 
@@ -4389,6 +4392,9 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get dashboardHolaSinNombre => 'HOLA';
+
+  @override
+  String get a11yDashboardAvatarButton => 'Editar tu perfil profesional';
 
   @override
   String get dashboardSolicitudesPendientesEmpty =>

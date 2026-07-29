@@ -581,6 +581,10 @@
   "dashboardSinCobros": "Sin cobros pendientes.",
   "dashboardErrorCobros": "No pudimos cargar los cobros.",
   "dashboardHolaSinNombre": "HOLA",
+  "a11yDashboardAvatarButton": "Editar tu perfil profesional",
+  "@a11yDashboardAvatarButton": {
+    "description": "Semantics label for the trainer dashboard header avatar, which opens the professional-profile editor. Distinct from a11yHomeAvatarButton (athlete home), which opens a read-only public profile."
+  },
   "dashboardSolicitudesPendientesEmpty": "No tenés solicitudes pendientes.",
   "@dashboardSolicitudesPendientesEmpty": {
     "description": "Empty state of the pending-requests sheet, shown when the trainer opens the header bell with no incoming link requests."
