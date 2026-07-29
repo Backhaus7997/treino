@@ -169,9 +169,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Default tab is Vencidos (index 0) — it should show empty state.
+      // Default tab is Por vencer (index 0) — it should show empty state.
       expect(
-        find.text('No hay pagos vencidos'), // i18n
+        find.text('No hay pagos pendientes'), // i18n
         findsOneWidget,
       );
     });

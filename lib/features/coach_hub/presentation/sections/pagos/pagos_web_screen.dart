@@ -50,7 +50,7 @@ class _PagosScreenState extends ConsumerState<PagosScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
 
-  static const _kTabs = ['Vencidos', 'Por vencer', 'Pagados', 'Todos']; // i18n
+  static const _kTabs = ['Por vencer', 'Vencidos', 'Pagados', 'Todos']; // i18n
 
   @override
   void initState() {
@@ -122,8 +122,8 @@ class _PagosScreenState extends ConsumerState<PagosScreen>
     });
 
     final tabLabels = [
-      'Vencidos · $vencidosN', // i18n
       'Por vencer · $porVencerN', // i18n
+      'Vencidos · $vencidosN', // i18n
       'Pagados · $pagadosN', // i18n
       'Todos · $todosN', // i18n
     ];
@@ -201,21 +201,21 @@ class _PagosScreenState extends ConsumerState<PagosScreen>
           child: TabBarView(
             controller: _tabController,
             children: [
-              // Vencidos tab
-              _tabBody(
-                bucketsAsync: bucketsAsync,
-                getPayments: (b) => b.vencidos,
-                emptyLabel: 'No hay pagos vencidos', // i18n
-                palette: palette,
-                profiles: profiles,
-                paymentAlias: paymentAlias,
-                showActions: true,
-              ),
               // Por vencer tab
               _tabBody(
                 bucketsAsync: bucketsAsync,
                 getPayments: (b) => b.porVencer,
                 emptyLabel: 'No hay pagos pendientes', // i18n
+                palette: palette,
+                profiles: profiles,
+                paymentAlias: paymentAlias,
+                showActions: true,
+              ),
+              // Vencidos tab
+              _tabBody(
+                bucketsAsync: bucketsAsync,
+                getPayments: (b) => b.vencidos,
+                emptyLabel: 'No hay pagos vencidos', // i18n
                 palette: palette,
                 profiles: profiles,
                 paymentAlias: paymentAlias,
