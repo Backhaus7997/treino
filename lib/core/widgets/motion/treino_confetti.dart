@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../../app/theme/app_motion.dart';
-import '../../../app/theme/app_palette.dart';
 
 /// Ráfaga de confetti one-shot para el momento más celebratorio del flujo:
 /// terminar un entreno completo — TREINO Motion (cobertura total, extensión
@@ -16,9 +15,12 @@ import '../../../app/theme/app_palette.dart';
 /// producto antes de implementarse (Retos/Missions/Bets/Levels/XP siguen
 /// fuera; esto no agrega ninguno de esos sistemas).
 ///
-/// **Colores de marca**: las partículas alternan `AppPalette.accent` /
-/// `AppPalette.highlight` — nunca HEX literal, nunca un arcoíris genérico
-/// fuera de paleta.
+/// **Colores — excepción deliberada a "nunca HEX literal"**: a diferencia
+/// del resto del kit, las partículas usan [_confettiColors], una paleta
+/// fija y variada (no `AppPalette.accent`/`highlight`). Decisión de producto
+/// explícita: un festejo con dos tonos de la marca se sentía chico — un
+/// confetti de verdad necesita variedad de color que la paleta de dos
+/// acentos de TREINO no tiene. Ver [_confettiColors] para el detalle.
 ///
 /// **One-shot**: mismo contrato que [TreinoSuccessCheck] — genera las
 /// partículas y arranca la caída SOLO en el primer mount del [State]; un
@@ -53,7 +55,7 @@ import '../../../app/theme/app_palette.dart';
 /// )
 /// ```
 class TreinoConfetti extends StatefulWidget {
-  const TreinoConfetti({super.key, this.particleCount = 28, this.random});
+  const TreinoConfetti({super.key, this.particleCount = 60, this.random});
 
   /// Cantidad de partículas de la ráfaga.
   final int particleCount;
@@ -88,20 +90,18 @@ class _TreinoConfettiState extends State<TreinoConfetti>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Se resuelve acá (no en initState) porque tanto reduce-motion como los
-    // colores de partícula necesitan InheritedWidgets (MediaQuery/
-    // AppPalette) — mismo patrón que TreinoSuccessCheck/TreinoShimmer.
+    // Se resuelve acá (no en initState) porque reduce-motion necesita
+    // MediaQuery — mismo patrón que TreinoSuccessCheck/TreinoShimmer.
     if (!_initialized) {
       _initialized = true;
       if (AppMotion.reduceMotion(context)) {
         _reduceMotion = true;
         return;
       }
-      final palette = AppPalette.of(context);
       final rnd = widget.random ?? math.Random();
       _particles = List.generate(
         widget.particleCount,
-        (_) => _ConfettiParticle.random(rnd, palette),
+        (_) => _ConfettiParticle.random(rnd),
       );
       _controller.forward();
     } else if (AppMotion.reduceMotion(context) && !_reduceMotion) {
@@ -139,6 +139,20 @@ class _TreinoConfettiState extends State<TreinoConfetti>
   }
 }
 
+// intentional: excepción documentada a "nunca HEX literal" — ver el
+// dartdoc de TreinoConfetti. Set fijo y variado, no ligado a AppPalette;
+// deliberadamente NO usa Mint Magenta para que el festejo no se sienta como
+// "dos tonos de la marca otra vez".
+const _confettiColors = <Color>[
+  Color(0xFFFF6B6B), // rojo coral
+  Color(0xFFFFD93D), // amarillo
+  Color(0xFF6BCB77), // verde
+  Color(0xFF4D96FF), // azul
+  Color(0xFFB983FF), // violeta
+  Color(0xFFFF9F45), // naranja
+  Color(0xFFFF6FB5), // rosa
+];
+
 /// Parámetros congelados de una partícula al momento de generarse — la
 /// física en sí (posición/rotación/opacidad por frame) se resuelve en
 /// [_ConfettiPainter.paint] a partir de estos valores + el progreso 0→1.
@@ -155,21 +169,27 @@ class _ConfettiParticle {
     required this.color,
   });
 
-  factory _ConfettiParticle.random(math.Random rnd, AppPalette palette) {
+  factory _ConfettiParticle.random(math.Random rnd) {
+    // Arranca la ráfaga escalonada dentro del primer cuarto del total — se
+    // siente como una explosión, no como una fila prolija.
+    final fallDelay = rnd.nextDouble() * 0.25;
+    // fallDuration es una fracción de lo que QUEDA después de fallDelay
+    // (nunca del total): así fallDelay + fallDuration <= 1.0 siempre, y
+    // cada partícula termina su caída (incluido el fade) dentro de la
+    // ventana del controller — ninguna queda a mitad de vuelo "clavada" en
+    // pantalla cuando el controller se detiene en 1.0.
+    final remaining = 1.0 - fallDelay;
+    final fallDuration = remaining * (0.7 + rnd.nextDouble() * 0.3);
     return _ConfettiParticle(
       startX: rnd.nextDouble(),
       driftAmplitude: 12 + rnd.nextDouble() * 18,
       driftPhase: rnd.nextDouble() * 2 * math.pi,
-      // Arranca la ráfaga escalonada dentro del primer cuarto del total —
-      // se siente como una explosión, no como una fila prolija.
-      fallDelay: rnd.nextDouble() * 0.25,
-      // Cada partícula tarda una fracción distinta del total en caer —
-      // evita que todas toquen "el piso" al mismo tiempo.
-      fallDuration: 0.55 + rnd.nextDouble() * 0.35,
+      fallDelay: fallDelay,
+      fallDuration: fallDuration,
       rotationSpeed:
           (rnd.nextBool() ? 1 : -1) * (2 + rnd.nextDouble() * 3) * math.pi,
       size: 6 + rnd.nextDouble() * 5,
-      color: rnd.nextBool() ? palette.accent : palette.highlight,
+      color: _confettiColors[rnd.nextInt(_confettiColors.length)],
     );
   }
 
