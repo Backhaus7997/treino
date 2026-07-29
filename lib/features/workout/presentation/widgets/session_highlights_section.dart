@@ -208,89 +208,111 @@ class _SessionRecordRow extends StatelessWidget {
     final previous =
         _formatRecordValue(record.previousBest, isOneRepMax: isOneRepMax);
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Expanded(
-          flex: 3,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                exerciseName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.barlow(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: palette.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                typeLabel,
-                style:
-                    GoogleFonts.barlow(fontSize: 11, color: palette.textMuted),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 8),
-        // Flexible + FittedBox scaleDown: el bloque de valores tiene ancho
-        // intrínseco, y un hijo NO flexible de un Row recibe ancho ilimitado
-        // — sin flex el FittedBox nunca escala y la fila desborda en pantallas
-        // angostas o con font scale de accesibilidad grande. El reparto 3:2
-        // deja al nombre la mayor parte (se elide) y a los valores lo justo
-        // para renderizar a tamaño natural en anchos normales. Mismo blindaje
-        // #370/#456 que el resto de la pantalla.
-        Flexible(
-          flex: 2,
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerRight,
+    // El bloque de valores tiene ancho INTRÍNSECO, y un hijo no flexible de un
+    // Row recibe ancho ILIMITADO: sin acotarlo el FittedBox nunca escala y la
+    // fila desborda con font scale de accesibilidad grande (#370/#456). Por eso
+    // el bloque necesita SÍ o SÍ un constraint acotado.
+    //
+    // Ahora, ese constraint tiene que ser un TOPE, no un reparto fijo de flex
+    // (`Expanded 3:2`, que es lo que tenía este widget). Medido con las TTF
+    // reales de Barlow, dPR 1.0:
+    //
+    //   · El reparto ASIGNA: el bloque se dimensiona a su ancho intrínseco pero
+    //     el sobrante de su 2/5 queda a su DERECHA, así que nunca llegaba al
+    //     borde de la card — y como cada fila tiene un valor de largo distinto,
+    //     dos filas de la misma card quedaban desalineadas entre sí por ~50px.
+    //     Borde derecho ragged. Con `Expanded` en el nombre + tope acá, el
+    //     bloque queda pegado a la derecha y todas las filas alinean.
+    //   · A font scale 1x el reparto no achicaba nada (el bloque mide 87px en
+    //     el peor caso y 2/5 alcanzan de sobra hasta 320px de pantalla), pero a
+    //     font scale de accesibilidad se queda sin aire y el FittedBox lo
+    //     aplasta: a 390px de ancho el valor salía 37% más chico a 2x y 80% más
+    //     chico a 3x de lo que corresponde. Con el tope escala recién a 3x.
+    //
+    // Mismo criterio que `_PersonalRecordRow` (PR #598). Diferencia con esa
+    // fila: acá la izquierda es un nombre de ejercicio de largo arbitrario con
+    // `maxLines: 1` + ellipsis, no un label corto y fijo. Elidir es su
+    // comportamiento previsto, así que cederle ancho al bloque cuando el valor
+    // es largo es el intercambio correcto.
+    return LayoutBuilder(
+      builder: (context, constraints) => Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: [
-                    Text(
-                      newValue,
-                      style: GoogleFonts.barlowCondensed(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 18,
-                        color: palette.accent,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      unit,
-                      style: GoogleFonts.barlowCondensed(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
-                        color: palette.accent,
-                      ),
-                    ),
-                  ],
-                ),
-                // "→ marca anterior" — mismo idioma visual que las stat cards
-                // del radar de Insights (valor actual grande, "→ prev" chico
-                // abajo).
                 Text(
-                  '→ $previous $unit',
+                  exerciseName,
                   maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.barlow(
-                    fontSize: 10,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: palette.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  typeLabel,
+                  style: GoogleFonts.barlow(
+                    fontSize: 11,
                     color: palette.textMuted,
                   ),
                 ),
               ],
             ),
           ),
-        ),
-      ],
+          const SizedBox(width: 8),
+          ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: constraints.maxWidth * 0.7),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerRight,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text(
+                        newValue,
+                        style: GoogleFonts.barlowCondensed(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 18,
+                          color: palette.accent,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        unit,
+                        style: GoogleFonts.barlowCondensed(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                          color: palette.accent,
+                        ),
+                      ),
+                    ],
+                  ),
+                  // "→ marca anterior" — mismo idioma visual que las stat cards
+                  // del radar de Insights (valor actual grande, "→ prev" chico
+                  // abajo).
+                  Text(
+                    '→ $previous $unit',
+                    maxLines: 1,
+                    style: GoogleFonts.barlow(
+                      fontSize: 10,
+                      color: palette.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -376,52 +398,55 @@ class _SessionExerciseRow extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            if (isHighlighted) ...[
-              Icon(TreinoIcon.starFill, size: 14, color: palette.accent),
-              const SizedBox(width: 6),
-            ],
-            Expanded(
-              flex: 3,
-              child: Text(
-                exercise.exerciseName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.barlow(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: palette.textPrimary,
-                ),
-              ),
-            ),
-            // Mismo razonamiento que _SessionRecordRow: los badges son de
-            // ancho intrínseco y juntos superan el ancho útil en una pantalla
-            // angosta aunque el nombre se elida a cero, así que necesitan un
-            // constraint acotado (flex) para poder achicarse.
-            if (exercise.records.isNotEmpty || exercise.isFirstTime)
-              Flexible(
-                flex: 2,
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerRight,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (exercise.records.isNotEmpty) ...[
-                        const SizedBox(width: 8),
-                        _Badge(label: 'PR', color: palette.accent),
-                      ],
-                      if (exercise.isFirstTime) ...[
-                        const SizedBox(width: 8),
-                        // TODO(l10n): literal es-AR — ARB owned por otra rama.
-                        _Badge(label: '1ª VEZ', color: palette.highlight),
-                      ],
-                    ],
+        // Mismo razonamiento y mismo tope que _SessionRecordRow: los badges son
+        // de ancho intrínseco y juntos superan el ancho útil en una pantalla
+        // angosta aunque el nombre se elida a cero, así que necesitan un
+        // constraint acotado para poder achicarse — pero un TOPE, no un reparto
+        // fijo, para que a anchos normales se dibujen a tamaño natural.
+        LayoutBuilder(
+          builder: (context, constraints) => Row(
+            children: [
+              if (isHighlighted) ...[
+                Icon(TreinoIcon.starFill, size: 14, color: palette.accent),
+                const SizedBox(width: 6),
+              ],
+              Expanded(
+                child: Text(
+                  exercise.exerciseName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.barlow(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: palette.textPrimary,
                   ),
                 ),
               ),
-          ],
+              if (exercise.records.isNotEmpty || exercise.isFirstTime)
+                ConstrainedBox(
+                  constraints:
+                      BoxConstraints(maxWidth: constraints.maxWidth * 0.7),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (exercise.records.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          _Badge(label: 'PR', color: palette.accent),
+                        ],
+                        if (exercise.isFirstTime) ...[
+                          const SizedBox(width: 8),
+                          // TODO(l10n): literal es-AR — ARB owned por otra rama.
+                          _Badge(label: '1ª VEZ', color: palette.highlight),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
         const SizedBox(height: 2),
         Text(
