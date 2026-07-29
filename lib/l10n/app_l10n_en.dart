@@ -1184,6 +1184,9 @@ class AppL10nEn extends AppL10n {
   String get dashboardHolaSinNombre => 'HOLA';
 
   @override
+  String get a11yDashboardAvatarButton => 'Edit your professional profile';
+
+  @override
   String get dashboardSolicitudesPendientesEmpty =>
       'You have no pending requests.';
 

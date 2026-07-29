@@ -154,14 +154,18 @@ class _DashboardHeader extends ConsumerWidget {
               onTap: () => _showPendingRequestsSheet(context),
             ),
             const SizedBox(width: 12),
-            // Shortcut to the trainer's own profile (/profile renders
-            // TrainerProfileView for this role). The avatar was a bare
-            // decoration until now.
+            // Shortcut straight to the professional-profile EDITOR, not to the
+            // PERFIL tab: from the dashboard the useful destination is the
+            // form, not the tab root the trainer would then have to tap
+            // through.
             //
-            // `go`, not `push`: PERFIL is one of the shell tabs, so this is a
-            // tab switch, not a pushed page — pushing would stack a second
-            // profile on top of the INICIO tab and leave the bottom bar
-            // highlighting the wrong entry.
+            // `push`, not `go`: ProfileEditTrainerScreen ends its edit-mode
+            // save with `context.pop()` (ADR-TPO-006). Navigating with `go`
+            // would leave nothing to pop and strand the trainer on the form
+            // after saving.
+            //
+            // No `?mode=onboarding` — that param is for the first-run gate;
+            // any other value defaults to edit mode, which is what we want.
             //
             // Wrapped HERE and not inside _AvatarInitials: that widget is also
             // used for athlete rows in ENTRENARON HOY and in the feedback
@@ -178,9 +182,9 @@ class _DashboardHeader extends ConsumerWidget {
               // "Ver tu perfil MP". They are decorative — derived from the
               // display name the trainer already knows is theirs.
               excludeSemantics: true,
-              label: AppL10n.of(context).a11yHomeAvatarButton,
+              label: AppL10n.of(context).a11yDashboardAvatarButton,
               child: GestureDetector(
-                onTap: () => context.go('/profile'),
+                onTap: () => context.push('/profile/edit-trainer'),
                 behavior: HitTestBehavior.opaque,
                 // The avatar itself is 36px — under the 44pt minimum touch
                 // target. `opaque` makes the whole padded box tappable.
