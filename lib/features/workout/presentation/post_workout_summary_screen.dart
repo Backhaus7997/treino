@@ -7,6 +7,7 @@ import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/utils/kg_format.dart';
+import '../../../core/widgets/motion/treino_confetti.dart';
 import '../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../core/widgets/motion/treino_success_check.dart';
 import '../../../core/widgets/treino_icon.dart';
@@ -63,7 +64,7 @@ class PostWorkoutSummaryScreen extends ConsumerWidget {
               if (session == null) {
                 return const _NotFoundState();
               }
-              return _LoadedBody(
+              final loadedBody = _LoadedBody(
                 session: session,
                 setLogs: data.setLogs,
                 muscleDistribution: muscleDistribution,
@@ -76,6 +77,16 @@ class PostWorkoutSummaryScreen extends ConsumerWidget {
                 // ShareWorkoutComposerScreen.
                 onShare: () =>
                     context.push('/workout/session-summary/$sessionId/share'),
+              );
+              // Confetti solo para el cierre exitoso — mismo gate que
+              // TreinoSuccessCheck arriba en _LoadedBody. Overlay encima del
+              // contenido, nunca bloquea taps (IgnorePointer interno).
+              if (!session.wasFullyCompleted) return loadedBody;
+              return Stack(
+                children: [
+                  loadedBody,
+                  const Positioned.fill(child: TreinoConfetti()),
+                ],
               );
             },
           ),

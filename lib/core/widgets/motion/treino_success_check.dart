@@ -8,8 +8,10 @@ import '../../../app/theme/app_palette.dart';
 /// Check dentro de un círculo que se DIBUJA one-shot al montarse — TREINO
 /// Motion (cobertura total, B1). Feedback de un momento de éxito claro
 /// (guardar medida, enviar review, completar un flujo) sin caer en badge de
-/// achievement ni confetti (fuera de scope del producto): un trazo, no un
-/// relleno — sobrio, estilo Hevy.
+/// achievement: un trazo, no un relleno — sobrio, estilo Hevy. Para el único
+/// momento del producto que sí justifica algo más festivo (terminar un
+/// entreno completo), ver [TreinoConfetti] — se usa junto a este widget, no
+/// en su reemplazo.
 ///
 /// **Trazo, no relleno**: el círculo y el check se pintan como stroke del
 /// [color] (default `AppPalette.accent`) — nunca un ícono relleno tipo
