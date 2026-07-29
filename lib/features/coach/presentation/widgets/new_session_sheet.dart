@@ -168,59 +168,71 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
                     const SizedBox(height: 14),
 
                     // ── Per-mode fields ───────────────────────────────────────────
-                    TreinoStateSwitcher(
-                      childKey: ValueKey(_recurring ? 'recurring' : 'single'),
-                      child: !_recurring
-                          ? Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // SINGLE: date picker
-                                _FieldLabel(
-                                  label: AppL10n.of(context)
-                                      .newSessionSheetFechaLabel,
-                                  palette: palette,
-                                ),
-                                const SizedBox(height: 8),
-                                _TappableField(
-                                  palette: palette,
-                                  text: _formatDate(_date),
-                                  icon: TreinoIcon.calendar,
-                                  onTap: _pickDate,
-                                ),
-                                const SizedBox(height: 14),
-                              ],
-                            )
-                          : Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // RECURRING: weekday chips
-                                _FieldLabel(label: 'DÍAS', palette: palette),
-                                const SizedBox(height: 8),
-                                _WeekdayChips(
-                                  selected: _weekdays,
-                                  palette: palette,
-                                  onToggle: (wd) => setState(() {
-                                    if (_weekdays.contains(wd)) {
-                                      _weekdays = {..._weekdays}..remove(wd);
-                                    } else {
-                                      _weekdays = {..._weekdays, wd};
-                                    }
-                                  }),
-                                ),
-                                const SizedBox(height: 14),
+                    // AnimatedSize: el cross-fade interpola opacity entre dos
+                    // Columns de alturas muy distintas. Sin envolverlo, el
+                    // Stack del layoutBuilder mantiene la altura del hijo más
+                    // alto durante los 240ms y la libera de golpe al remover
+                    // el saliente — los campos de abajo quedan quietos
+                    // durante el fade y saltan sin animación al terminar.
+                    AnimatedSize(
+                      duration: AppMotion.resolve(context, AppMotion.base),
+                      curve: AppMotion.standard,
+                      alignment: Alignment.topCenter,
+                      child: TreinoStateSwitcher(
+                        childKey: ValueKey(_recurring ? 'recurring' : 'single'),
+                        child: !_recurring
+                            ? Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // SINGLE: date picker
+                                  _FieldLabel(
+                                    label: AppL10n.of(context)
+                                        .newSessionSheetFechaLabel,
+                                    palette: palette,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  _TappableField(
+                                    palette: palette,
+                                    text: _formatDate(_date),
+                                    icon: TreinoIcon.calendar,
+                                    onTap: _pickDate,
+                                  ),
+                                  const SizedBox(height: 14),
+                                ],
+                              )
+                            : Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // RECURRING: weekday chips
+                                  _FieldLabel(label: 'DÍAS', palette: palette),
+                                  const SizedBox(height: 8),
+                                  _WeekdayChips(
+                                    selected: _weekdays,
+                                    palette: palette,
+                                    onToggle: (wd) => setState(() {
+                                      if (_weekdays.contains(wd)) {
+                                        _weekdays = {..._weekdays}..remove(wd);
+                                      } else {
+                                        _weekdays = {..._weekdays, wd};
+                                      }
+                                    }),
+                                  ),
+                                  const SizedBox(height: 14),
 
-                                // RECURRING: repeat-for chips
-                                _FieldLabel(
-                                    label: 'REPETIR POR', palette: palette),
-                                const SizedBox(height: 8),
-                                _WeeksChips(
-                                  selected: _weeks,
-                                  palette: palette,
-                                  onChanged: (w) => setState(() => _weeks = w),
-                                ),
-                                const SizedBox(height: 14),
-                              ],
-                            ),
+                                  // RECURRING: repeat-for chips
+                                  _FieldLabel(
+                                      label: 'REPETIR POR', palette: palette),
+                                  const SizedBox(height: 8),
+                                  _WeeksChips(
+                                    selected: _weeks,
+                                    palette: palette,
+                                    onChanged: (w) =>
+                                        setState(() => _weeks = w),
+                                  ),
+                                  const SizedBox(height: 14),
+                                ],
+                              ),
+                      ),
                     ),
 
                     // ── Time ──────────────────────────────────────────────────────

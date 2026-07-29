@@ -86,6 +86,55 @@ void main() {
     });
 
     testWidgets(
+        'child saliente NO recibe taps durante el cross-fade (sin tap '
+        'fantasma) — el entrante sí', (tester) async {
+      var outgoingTaps = 0;
+      var incomingTaps = 0;
+
+      Widget box(Key key, VoidCallback onTap) => GestureDetector(
+            key: key,
+            behavior: HitTestBehavior.opaque,
+            onTap: onTap,
+            child: const SizedBox(width: 200, height: 200),
+          );
+
+      const outgoingKey = Key('outgoing-box');
+      const incomingKey = Key('incoming-box');
+
+      await tester.pumpWidget(_wrap(
+        child: TreinoStateSwitcher(
+          childKey: const ValueKey('loading'),
+          child: box(outgoingKey, () => outgoingTaps++),
+        ),
+      ));
+
+      await tester.pumpWidget(_wrap(
+        child: TreinoStateSwitcher(
+          childKey: const ValueKey('data'),
+          child: box(incomingKey, () => incomingTaps++),
+        ),
+      ));
+      // A mitad del cross-fade ambos children coexisten en el Stack, con la
+      // misma geometría (topCenter, mismo tamaño) — se superponen exacto.
+      await tester.pump(AppMotion.base * 0.5);
+      expect(find.byKey(outgoingKey), findsOneWidget);
+      expect(find.byKey(incomingKey), findsOneWidget);
+      expect(
+        tester.getRect(find.byKey(outgoingKey)),
+        tester.getRect(find.byKey(incomingKey)),
+      );
+
+      // Tap en el centro de la zona compartida: sin IgnorePointer en el
+      // saliente, Flutter también le entregaría el evento (o el arena lo
+      // dejaría ambiguo); con el fix, únicamente el entrante lo recibe.
+      await tester.tapAt(tester.getCenter(find.byKey(incomingKey)));
+      expect(outgoingTaps, 0);
+      expect(incomingTaps, 1);
+
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets(
         'reduce-motion (disableAnimations: true) → el cambio es instantáneo',
         (tester) async {
       await tester.pumpWidget(_wrap(

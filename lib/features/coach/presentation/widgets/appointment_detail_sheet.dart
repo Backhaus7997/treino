@@ -558,47 +558,59 @@ class _AppointmentDetailSheetState
           ),
           const SizedBox(height: 14),
           label(l10n.agendaCobrarVenceElLabel),
-          TreinoTappable(
-            onTap: _pickDueDate,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-              decoration: BoxDecoration(
-                color: palette.bg,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: palette.border),
-              ),
-              child: Row(
-                children: [
-                  Icon(TreinoIcon.calendar, size: 16, color: palette.textMuted),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      _dueDate == null
-                          ? l10n.agendaCobrarVenceElHint
-                          : AgendaFormatters.formatDate(_dueDate!),
-                      style: GoogleFonts.barlow(
-                        fontSize: 14,
-                        color: _dueDate == null
-                            ? palette.textMuted
-                            : palette.textPrimary,
+          // El TreinoTappable de "quitar fecha" NO puede quedar dentro del
+          // subtree del TreinoTappable del campo completo: dos
+          // GestureDetector anidados compiten en el gesture arena (el
+          // externo hunde el campo por deadline y cancela cuando el interno
+          // gana). Se separan en TreinoTappable hermanos dentro del Row.
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            decoration: BoxDecoration(
+              color: palette.bg,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: palette.border),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TreinoTappable(
+                    onTap: _pickDueDate,
+                    child: Row(
+                      children: [
+                        Icon(TreinoIcon.calendar,
+                            size: 16, color: palette.textMuted),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            _dueDate == null
+                                ? l10n.agendaCobrarVenceElHint
+                                : AgendaFormatters.formatDate(_dueDate!),
+                            style: GoogleFonts.barlow(
+                              fontSize: 14,
+                              color: _dueDate == null
+                                  ? palette.textMuted
+                                  : palette.textPrimary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (_dueDate != null)
+                  Semantics(
+                    button: true,
+                    label: l10n.agendaCobrarVenceElQuitar,
+                    child: TreinoTappable(
+                      onTap: () => setState(() => _dueDate = null),
+                      child: Padding(
+                        padding: const EdgeInsets.all(2),
+                        child: Icon(TreinoIcon.close,
+                            size: 16, color: palette.textMuted),
                       ),
                     ),
                   ),
-                  if (_dueDate != null)
-                    Semantics(
-                      button: true,
-                      label: l10n.agendaCobrarVenceElQuitar,
-                      child: TreinoTappable(
-                        onTap: () => setState(() => _dueDate = null),
-                        child: Padding(
-                          padding: const EdgeInsets.all(2),
-                          child: Icon(TreinoIcon.close,
-                              size: 16, color: palette.textMuted),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+              ],
             ),
           ),
           if (_billingError != null) ...[

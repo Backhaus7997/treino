@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../../app/theme/app_motion.dart';
 import '../../../../app/theme/app_palette.dart';
-import '../../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../workout/domain/equipment_type.dart';
@@ -76,102 +74,102 @@ class _EquipmentFilterSheetContentState
             color: palette.bg,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
-          child: TreinoFadeSlideIn(
-            distance: AppMotion.slideSm,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Drag handle
-                Padding(
-                  padding: const EdgeInsets.only(top: 12, bottom: 8),
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: palette.border,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
+          // Sin TreinoFadeSlideIn de bloque: la ruta modal (DraggableScrollableSheet)
+          // ya anima la entrada — un fade+slide interno quedaba enmascarado y
+          // era inconsistente con los sheets hermanos sin entrada propia.
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Drag handle
+              Padding(
+                padding: const EdgeInsets.only(top: 12, bottom: 8),
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: palette.border,
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                // Title row + Limpiar button
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 4, 12, 8),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          l10n.workoutPickerEquipmentSheetTitle,
-                          style: GoogleFonts.barlowCondensed(
-                            color: palette.textPrimary,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 1.4,
-                          ),
-                        ),
-                      ),
-                      if (_selected.isNotEmpty)
-                        TextButton(
-                          onPressed: () => setState(_selected.clear),
-                          child: Text(
-                            l10n.workoutPickerSheetClear,
-                            style: GoogleFonts.barlow(
-                              color: palette.textMuted,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                Divider(height: 1, color: palette.border),
-                // Scrollable list of equipment types (multi-select)
-                Flexible(
-                  child: ListView(
-                    controller: scrollController,
-                    shrinkWrap: true,
-                    padding: const EdgeInsets.only(bottom: 12),
-                    children: [
-                      for (final type in EquipmentType.values)
-                        _EquipmentRow(
-                          type: type,
-                          selected: _selected.contains(type),
-                          onTap: () => _toggle(type),
-                          palette: palette,
-                        ),
-                    ],
-                  ),
-                ),
-                // Sticky Aplicar button
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: palette.accent,
-                        foregroundColor: palette.bg,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onPressed: () => Navigator.of(context).pop(_selected),
+              ),
+              // Title row + Limpiar button
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 12, 8),
+                child: Row(
+                  children: [
+                    Expanded(
                       child: Text(
-                        _selected.isEmpty
-                            ? l10n.workoutPickerSheetApplyAll
-                            : l10n.workoutPickerSheetApply(_selected.length),
+                        l10n.workoutPickerEquipmentSheetTitle,
                         style: GoogleFonts.barlowCondensed(
+                          color: palette.textPrimary,
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
-                          letterSpacing: 1.2,
+                          letterSpacing: 1.4,
                         ),
+                      ),
+                    ),
+                    if (_selected.isNotEmpty)
+                      TextButton(
+                        onPressed: () => setState(_selected.clear),
+                        child: Text(
+                          l10n.workoutPickerSheetClear,
+                          style: GoogleFonts.barlow(
+                            color: palette.textMuted,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Divider(height: 1, color: palette.border),
+              // Scrollable list of equipment types (multi-select)
+              Flexible(
+                child: ListView(
+                  controller: scrollController,
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.only(bottom: 12),
+                  children: [
+                    for (final type in EquipmentType.values)
+                      _EquipmentRow(
+                        type: type,
+                        selected: _selected.contains(type),
+                        onTap: () => _toggle(type),
+                        palette: palette,
+                      ),
+                  ],
+                ),
+              ),
+              // Sticky Aplicar button
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: palette.accent,
+                      foregroundColor: palette.bg,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: () => Navigator.of(context).pop(_selected),
+                    child: Text(
+                      _selected.isEmpty
+                          ? l10n.workoutPickerSheetApplyAll
+                          : l10n.workoutPickerSheetApply(_selected.length),
+                      style: GoogleFonts.barlowCondensed(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.2,
                       ),
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       },
