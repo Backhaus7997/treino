@@ -639,6 +639,29 @@ class _LeaderboardList extends StatelessWidget {
   final String myUid;
   final AppPalette palette;
 
+  Widget _row(int i, List<int> ranks) {
+    final row = _LeaderboardRow(
+      rank: ranks[i],
+      profile: entries[i].profile,
+      value: entries[i].value,
+      isMe: entries[i].profile.uid == myUid,
+      palette: palette,
+    );
+    // Cap explícito en 8 (mismo patrón que feed_screen.dart
+    // _feedPostList): hasta 20 filas x 3 secciones visibles sin cap
+    // arrancarían hasta ~60 AnimationControllers one-shot al entrar a la
+    // pantalla, la mayoría por debajo del fold — y por el cap de
+    // AppMotion.stagger (maxItems 8) las filas 8+ ya comparten el mismo
+    // delay y aparecen igual como bloque, así que el stagger no comunicaba
+    // nada extra ahí.
+    if (i >= 8) return row;
+    return TreinoFadeSlideIn(
+      delay: AppMotion.stagger(i),
+      distance: AppMotion.slideSm,
+      child: row,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // QA-GYM-101: puestos con empates compartidos (1, 1, 3) en vez de índice+1.
@@ -655,17 +678,7 @@ class _LeaderboardList extends StatelessWidget {
             if (i > 0)
               Divider(
                   height: 1, color: palette.border, indent: 14, endIndent: 14),
-            TreinoFadeSlideIn(
-              delay: AppMotion.stagger(i),
-              distance: AppMotion.slideSm,
-              child: _LeaderboardRow(
-                rank: ranks[i],
-                profile: entries[i].profile,
-                value: entries[i].value,
-                isMe: entries[i].profile.uid == myUid,
-                palette: palette,
-              ),
-            ),
+            _row(i, ranks),
           ],
         ],
       ),

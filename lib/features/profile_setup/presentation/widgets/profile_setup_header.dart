@@ -65,20 +65,29 @@ class ProfileSetupHeader extends StatelessWidget {
         // título "saltaba" mientras el contenido deslizaba.
         TreinoStateSwitcher(
           childKey: ValueKey(currentStep),
-          child: Text(
-            title,
-            // Clamp to 2 lines + ellipsis so a long title (or large OS text
-            // scaling) wraps gracefully instead of pushing the PageView body off
-            // screen (audit F4). The engine handles wrapping — no hardcoded `\n`.
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            softWrap: true,
-            style: GoogleFonts.barlowCondensed(
-              color: palette.textPrimary,
-              fontSize: 32,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.5,
-              height: 1.0,
+          // SizedBox full-width: el título es un Text de ancho intrínseco
+          // alineado a la izquierda, pero el layoutBuilder de
+          // TreinoStateSwitcher es un Stack(alignment: topCenter) pensado
+          // para children full-width — sin esto, durante el cross-fade el
+          // Stack centra ambos títulos según el más ancho y el entrante
+          // "saltaba" ~50px al completarse la transición.
+          child: SizedBox(
+            width: double.infinity,
+            child: Text(
+              title,
+              // Clamp to 2 lines + ellipsis so a long title (or large OS text
+              // scaling) wraps gracefully instead of pushing the PageView body off
+              // screen (audit F4). The engine handles wrapping — no hardcoded `\n`.
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              softWrap: true,
+              style: GoogleFonts.barlowCondensed(
+                color: palette.textPrimary,
+                fontSize: 32,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
+                height: 1.0,
+              ),
             ),
           ),
         ),

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../../app/theme/app_motion.dart';
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../../core/widgets/motion/treino_tappable.dart';
@@ -31,8 +30,11 @@ class UnfriendConfirmationSheet extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+      // Sin override de distance: usa el default del sistema (slideMd),
+      // igual que ReviewBottomSheet (review_bottom_sheet.dart:144) — ambos
+      // son sheets de confirmación/formulario de tamaño comparable, la
+      // divergencia de 8px vs 12px era arbitraria.
       child: TreinoFadeSlideIn(
-        distance: AppMotion.slideSm,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [

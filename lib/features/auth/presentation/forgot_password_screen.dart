@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_background.dart';
+import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
@@ -143,78 +144,87 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                   // de éxito claro sin competir con ninguna navegación (esta
                   // pantalla no redirige sola, el usuario vuelve a /login él
                   // mismo desde el link de abajo).
-                  TreinoStateSwitcher(
-                    childKey: ValueKey(_sent),
-                    child: _sent
-                        ? Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Success state
-                              Text(
-                                l10n.authForgotSuccess,
-                                style: GoogleFonts.barlow(
-                                  fontSize: 15,
-                                  color: palette.accent,
-                                  height: 1.5,
-                                ),
-                              ),
-                              const SizedBox(height: 20),
-                              // Field shown as read-only after success
-                              AuthInput(
-                                controller: _emailCtrl,
-                                label: l10n.authForgotEmailLabel,
-                                hint: l10n.authForgotEmailHint,
-                                leadingIcon: TreinoIcon.mail,
-                                keyboardType: TextInputType.emailAddress,
-                                enabled: false,
-                              ),
-                              const SizedBox(height: 20),
-                              TextButton(
-                                onPressed: () => context.go('/login'),
-                                child: Text(
-                                  l10n.authForgotBackToLogin,
+                  // Completa el patrón de login/register/welcome: el bloque
+                  // de contenido entra con stagger(1) después del headline.
+                  // TreinoStateSwitcher es un AnimatedSwitcher — NO anima su
+                  // child inicial, así que sin este wrapper el form aparecía
+                  // estático mientras el headline sí animaba.
+                  TreinoFadeSlideIn(
+                    delay: AppMotion.stagger(1),
+                    child: TreinoStateSwitcher(
+                      childKey: ValueKey(_sent),
+                      child: _sent
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Success state
+                                Text(
+                                  l10n.authForgotSuccess,
                                   style: GoogleFonts.barlow(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
+                                    fontSize: 15,
                                     color: palette.accent,
+                                    height: 1.5,
                                   ),
                                 ),
-                              ),
-                            ],
-                          )
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Form state
-                              AuthInput(
-                                controller: _emailCtrl,
-                                label: l10n.authForgotEmailLabel,
-                                hint: l10n.authForgotEmailHint,
-                                leadingIcon: TreinoIcon.mail,
-                                keyboardType: TextInputType.emailAddress,
-                                textInputAction: TextInputAction.done,
-                                autofillHints: const [AutofillHints.email],
-                                validator: EmailPasswordValidator.validateEmail,
-                                onFieldSubmitted: (_) =>
-                                    _emailCtrl.text.trim().isEmpty
-                                        ? null
-                                        : _submit(),
-                              ),
-                              const SizedBox(height: 20),
-                              if (_failure != null) ...[
-                                AuthFailureBanner(failure: _failure!),
-                                const SizedBox(height: 12),
+                                const SizedBox(height: 20),
+                                // Field shown as read-only after success
+                                AuthInput(
+                                  controller: _emailCtrl,
+                                  label: l10n.authForgotEmailLabel,
+                                  hint: l10n.authForgotEmailHint,
+                                  leadingIcon: TreinoIcon.mail,
+                                  keyboardType: TextInputType.emailAddress,
+                                  enabled: false,
+                                ),
+                                const SizedBox(height: 20),
+                                TextButton(
+                                  onPressed: () => context.go('/login'),
+                                  child: Text(
+                                    l10n.authForgotBackToLogin,
+                                    style: GoogleFonts.barlow(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: palette.accent,
+                                    ),
+                                  ),
+                                ),
                               ],
-                              AuthPillButton(
-                                label: l10n.authForgotCta,
-                                onPressed: _emailCtrl.text.trim().isEmpty
-                                    ? null
-                                    : _submit,
-                                isLoading: _isLoading,
-                                showArrow: false,
-                              ),
-                            ],
-                          ),
+                            )
+                          : Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Form state
+                                AuthInput(
+                                  controller: _emailCtrl,
+                                  label: l10n.authForgotEmailLabel,
+                                  hint: l10n.authForgotEmailHint,
+                                  leadingIcon: TreinoIcon.mail,
+                                  keyboardType: TextInputType.emailAddress,
+                                  textInputAction: TextInputAction.done,
+                                  autofillHints: const [AutofillHints.email],
+                                  validator:
+                                      EmailPasswordValidator.validateEmail,
+                                  onFieldSubmitted: (_) =>
+                                      _emailCtrl.text.trim().isEmpty
+                                          ? null
+                                          : _submit(),
+                                ),
+                                const SizedBox(height: 20),
+                                if (_failure != null) ...[
+                                  AuthFailureBanner(failure: _failure!),
+                                  const SizedBox(height: 12),
+                                ],
+                                AuthPillButton(
+                                  label: l10n.authForgotCta,
+                                  onPressed: _emailCtrl.text.trim().isEmpty
+                                      ? null
+                                      : _submit,
+                                  isLoading: _isLoading,
+                                  showArrow: false,
+                                ),
+                              ],
+                            ),
+                    ),
                   ),
                 ],
               ),

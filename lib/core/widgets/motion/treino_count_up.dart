@@ -63,7 +63,13 @@ class TreinoCountUp extends StatelessWidget {
         final text = formatter != null
             ? formatter!(animated)
             : animated.round().toString();
-        return Text(text, style: style, textAlign: textAlign);
+        // Dígitos de ancho fijo: sin esto cada tick relayoutea el párrafo
+        // (los dígitos proporcionales tienen ancho distinto) y el número
+        // jitea corriendo a los hermanos en Rows/Centers durante los ~320ms
+        // del conteo.
+        final effectiveStyle = (style ?? DefaultTextStyle.of(context).style)
+            .copyWith(fontFeatures: const [FontFeature.tabularFigures()]);
+        return Text(text, style: effectiveStyle, textAlign: textAlign);
       },
     );
   }

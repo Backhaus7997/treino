@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../../app/theme/app_motion.dart';
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/utils/kg_format.dart';
-import '../../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../domain/routine_slot.dart';
@@ -89,167 +87,168 @@ class _SetEntrySheetState extends State<SetEntrySheet> {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottomPad),
-      child: TreinoFadeSlideIn(
-        distance: AppMotion.slideSm,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Drag handle
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: palette.border,
-                  borderRadius: BorderRadius.circular(2),
-                ),
+      // Sin TreinoFadeSlideIn de bloque: showModalBottomSheet ya anima la
+      // sheet deslizándola desde abajo; el fade+slide-8px interno corría en
+      // simultáneo comunicando lo mismo — motion redundante en el flujo de
+      // logueo de sets, el de mayor frecuencia si vuelve a montarse desde el
+      // player.
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Drag handle
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: palette.border,
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
-            const SizedBox(height: 18),
-            // Título + botón de info (técnica) cuando hay instrucciones cargadas.
-            Row(
-              children: [
-                const SizedBox(
-                    width: 32), // balance del lado izquierdo del ícono
-                Expanded(
-                  child: Text(
-                    widget.slot.exerciseName.toUpperCase(),
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.barlowCondensed(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 18,
-                      letterSpacing: 1.2,
-                      color: palette.textPrimary,
-                    ),
+          ),
+          const SizedBox(height: 18),
+          // Título + botón de info (técnica) cuando hay instrucciones cargadas.
+          Row(
+            children: [
+              const SizedBox(width: 32), // balance del lado izquierdo del ícono
+              Expanded(
+                child: Text(
+                  widget.slot.exerciseName.toUpperCase(),
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 18,
+                    letterSpacing: 1.2,
+                    color: palette.textPrimary,
                   ),
                 ),
-                SizedBox(
-                  width: 32,
-                  child: (widget.techniqueInstructions?.isNotEmpty ?? false)
-                      ? TreinoTappable(
-                          onTap: _showTechniqueModal,
-                          child: Icon(
-                            TreinoIcon.infoCircle,
-                            size: 20,
-                            color: palette.textMuted,
-                          ),
-                        )
-                      : const SizedBox.shrink(),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            // Subtítulo set progress
-            Text(
-              'SET ${widget.setNumber} DE ${widget.slot.targetSets}',
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
-                letterSpacing: 1.0,
-                color: palette.accent,
               ),
+              SizedBox(
+                width: 32,
+                child: (widget.techniqueInstructions?.isNotEmpty ?? false)
+                    ? TreinoTappable(
+                        onTap: _showTechniqueModal,
+                        child: Icon(
+                          TreinoIcon.infoCircle,
+                          size: 20,
+                          color: palette.textMuted,
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Subtítulo set progress
+          Text(
+            'SET ${widget.setNumber} DE ${widget.slot.targetSets}',
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+              letterSpacing: 1.0,
+              color: palette.accent,
             ),
-            const SizedBox(height: 8),
-            // Hint objetivo
-            Text(
-              'Objetivo: ${widget.slot.targetRepsMin}–${widget.slot.targetRepsMax} reps '
-              '· ${widget.slot.targetWeightKg != null ? '${formatWeightKg(widget.slot.targetWeightKg)} kg' : '– kg'}',
-              style: GoogleFonts.barlow(
-                fontWeight: FontWeight.w400,
+          ),
+          const SizedBox(height: 8),
+          // Hint objetivo
+          Text(
+            'Objetivo: ${widget.slot.targetRepsMin}–${widget.slot.targetRepsMax} reps '
+            '· ${widget.slot.targetWeightKg != null ? '${formatWeightKg(widget.slot.targetWeightKg)} kg' : '– kg'}',
+            style: GoogleFonts.barlow(
+              fontWeight: FontWeight.w400,
+              fontSize: 12,
+              color: palette.textMuted,
+            ),
+          ),
+          const SizedBox(height: 20),
+          // Stepper reps
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _StepperButton(icon: '–', onTap: _decReps),
+              const SizedBox(width: 20),
+              Text(
+                '$_reps',
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 40,
+                  color: palette.textPrimary,
+                ),
+              ),
+              const SizedBox(width: 20),
+              _StepperButton(icon: '+', onTap: _incReps),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Center(
+            child: Text(
+              'REPS',
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
                 fontSize: 12,
+                letterSpacing: 1.2,
                 color: palette.textMuted,
               ),
             ),
-            const SizedBox(height: 20),
-            // Stepper reps
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _StepperButton(icon: '–', onTap: _decReps),
-                const SizedBox(width: 20),
-                Text(
-                  '$_reps',
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 40,
-                    color: palette.textPrimary,
-                  ),
-                ),
-                const SizedBox(width: 20),
-                _StepperButton(icon: '+', onTap: _incReps),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Center(
-              child: Text(
-                'REPS',
+          ),
+          const SizedBox(height: 20),
+          // Stepper peso
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _StepperButton(icon: '–', onTap: _decWeight),
+              const SizedBox(width: 20),
+              Text(
+                formatWeightKg(_weight),
                 style: GoogleFonts.barlowCondensed(
                   fontWeight: FontWeight.w700,
-                  fontSize: 12,
-                  letterSpacing: 1.2,
-                  color: palette.textMuted,
+                  fontSize: 40,
+                  color: palette.textPrimary,
                 ),
               ),
+              const SizedBox(width: 20),
+              _StepperButton(icon: '+', onTap: _incWeight),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Center(
+            child: Text(
+              'KG',
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+                letterSpacing: 1.2,
+                color: palette.textMuted,
+              ),
             ),
-            const SizedBox(height: 20),
-            // Stepper peso
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _StepperButton(icon: '–', onTap: _decWeight),
-                const SizedBox(width: 20),
-                Text(
-                  formatWeightKg(_weight),
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 40,
-                    color: palette.textPrimary,
-                  ),
+          ),
+          const SizedBox(height: 20),
+          // Botón CHECK
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _onCheckTap,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: palette.accent,
+                minimumSize: const Size.fromHeight(56),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(9999),
                 ),
-                const SizedBox(width: 20),
-                _StepperButton(icon: '+', onTap: _incWeight),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Center(
+              ),
               child: Text(
-                'KG',
+                'CHECK',
                 style: GoogleFonts.barlowCondensed(
                   fontWeight: FontWeight.w700,
-                  fontSize: 12,
-                  letterSpacing: 1.2,
-                  color: palette.textMuted,
+                  fontSize: 16,
+                  letterSpacing: 1.0,
+                  color: palette.bg,
                 ),
               ),
             ),
-            const SizedBox(height: 20),
-            // Botón CHECK
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _onCheckTap,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: palette.accent,
-                  minimumSize: const Size.fromHeight(56),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(9999),
-                  ),
-                ),
-                child: Text(
-                  'CHECK',
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 16,
-                    letterSpacing: 1.0,
-                    color: palette.bg,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
+          ),
+          const SizedBox(height: 8),
+        ],
       ),
     );
   }
@@ -322,115 +321,114 @@ class TechniqueSheet extends StatelessWidget {
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.75,
       ),
-      child: TreinoFadeSlideIn(
-        distance: AppMotion.slideSm,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Drag handle
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: palette.border,
-                  borderRadius: BorderRadius.circular(2),
-                ),
+      // Sin TreinoFadeSlideIn de bloque: showModalBottomSheet ya anima la
+      // sheet — mismo motivo que SetEntrySheet arriba.
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Drag handle
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: palette.border,
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
-            const SizedBox(height: 18),
-            // Título
-            Text(
-              exerciseName.toUpperCase(),
-              textAlign: TextAlign.center,
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 18,
-                letterSpacing: 1.2,
-                color: palette.textPrimary,
-              ),
+          ),
+          const SizedBox(height: 18),
+          // Título
+          Text(
+            exerciseName.toUpperCase(),
+            textAlign: TextAlign.center,
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: 18,
+              letterSpacing: 1.2,
+              color: palette.textPrimary,
             ),
-            const SizedBox(height: 8),
-            Text(
-              'TÉCNICA',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
-                letterSpacing: 1.0,
-                color: palette.accent,
-              ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'TÉCNICA',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+              letterSpacing: 1.0,
+              color: palette.accent,
             ),
-            const SizedBox(height: 18),
-            // Video placeholder — se reemplaza cuando carguemos videos reales.
-            if (videoUrl == null)
-              Container(
-                height: 120,
-                decoration: BoxDecoration(
-                  color: palette.bg,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: palette.border),
-                ),
-                child: Center(
-                  child: Text(
-                    'Video próximamente',
-                    style: GoogleFonts.barlow(
-                      fontWeight: FontWeight.w400,
-                      fontSize: 12,
-                      color: palette.textMuted,
-                    ),
+          ),
+          const SizedBox(height: 18),
+          // Video placeholder — se reemplaza cuando carguemos videos reales.
+          if (videoUrl == null)
+            Container(
+              height: 120,
+              decoration: BoxDecoration(
+                color: palette.bg,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: palette.border),
+              ),
+              child: Center(
+                child: Text(
+                  'Video próximamente',
+                  style: GoogleFonts.barlow(
+                    fontWeight: FontWeight.w400,
+                    fontSize: 12,
+                    color: palette.textMuted,
                   ),
                 ),
               ),
-            const SizedBox(height: 18),
-            // Lista de pasos numerados — scrollable si son muchos.
-            Flexible(
-              child: ListView.separated(
-                shrinkWrap: true,
-                physics: const ClampingScrollPhysics(),
-                itemCount: instructions.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
-                itemBuilder: (_, i) => Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: palette.accent.withValues(alpha: 0.15),
-                        border: Border.all(color: palette.accent, width: 1),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        '${i + 1}',
-                        style: GoogleFonts.barlowCondensed(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 12,
-                          color: palette.accent,
-                        ),
+            ),
+          const SizedBox(height: 18),
+          // Lista de pasos numerados — scrollable si son muchos.
+          Flexible(
+            child: ListView.separated(
+              shrinkWrap: true,
+              physics: const ClampingScrollPhysics(),
+              itemCount: instructions.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (_, i) => Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: palette.accent.withValues(alpha: 0.15),
+                      border: Border.all(color: palette.accent, width: 1),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      '${i + 1}',
+                      style: GoogleFonts.barlowCondensed(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                        color: palette.accent,
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        instructions[i],
-                        style: GoogleFonts.barlow(
-                          fontWeight: FontWeight.w400,
-                          fontSize: 14,
-                          color: palette.textPrimary,
-                          height: 1.4,
-                        ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      instructions[i],
+                      style: GoogleFonts.barlow(
+                        fontWeight: FontWeight.w400,
+                        fontSize: 14,
+                        color: palette.textPrimary,
+                        height: 1.4,
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-          ],
-        ),
+          ),
+          const SizedBox(height: 8),
+        ],
       ),
     );
   }

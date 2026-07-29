@@ -449,21 +449,24 @@ class _Composer extends StatelessWidget {
           const SizedBox(width: 8),
           IconButton(
             onPressed: sending ? null : onSend,
-            icon: TreinoStateSwitcher(
-              childKey: ValueKey(sending),
-              child: sending
-                  ? Semantics(
-                      label: l10n.chatSendingA11y,
-                      enabled: false,
-                      child: SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: palette.accent),
-                      ),
-                    )
-                  : Icon(TreinoIcon.send, color: palette.accent),
-            ),
+            // Swap instantáneo (sin TreinoStateSwitcher): enviar es la acción
+            // más frecuente del chat — 240ms de cross-fade para una
+            // micro-acción rutinaria es más lento que el escalón que le
+            // corresponde. Mismo patrón que AuthPillButton.isLoading
+            // (auth_pill_button.dart), el hermano del sistema para este
+            // mismo gesto de "swap icono ↔ spinner".
+            icon: sending
+                ? Semantics(
+                    label: l10n.chatSendingA11y,
+                    enabled: false,
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: palette.accent),
+                    ),
+                  )
+                : Icon(TreinoIcon.send, color: palette.accent),
             tooltip: sending ? l10n.chatSendingA11y : l10n.chatScreenSendLabel,
           ),
         ],
