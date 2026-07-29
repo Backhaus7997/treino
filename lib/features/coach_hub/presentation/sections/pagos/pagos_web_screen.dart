@@ -12,12 +12,16 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/features/payments/application/payment_providers.dart'
+    show paymentRepositoryProvider;
 import 'package:treino/features/payments/domain/payment.dart';
 import 'package:treino/features/profile/application/user_providers.dart'
     show userProfileProvider;
 import 'package:treino/features/profile/application/user_public_profile_providers.dart'
     show userPublicProfilesBatchProvider;
 import 'package:treino/features/profile/domain/user_public_profile.dart';
+import 'package:treino/features/workout/application/session_providers.dart'
+    show currentUidProvider;
 
 import 'widgets/marcar_pagado_actions.dart';
 import 'widgets/pagos_buckets_provider.dart';
@@ -46,7 +50,7 @@ class _PagosScreenState extends ConsumerState<PagosScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
 
-  static const _kTabs = ['Vencidos', 'Por vencer', 'Pagados', 'Todos']; // i18n
+  static const _kTabs = ['Por vencer', 'Vencidos', 'Pagados', 'Todos']; // i18n
 
   @override
   void initState() {
@@ -62,15 +66,38 @@ class _PagosScreenState extends ConsumerState<PagosScreen>
   }
 
   Future<void> _onRegistrarPago() async {
-    await showDialog<({int amount, String concept})>(
+    final result = await showDialog<RegistrarPagoResult>(
       context: context,
       builder: (_) => const RegistrarPagoDialog(),
     );
-    // NOTE: RegistrarPagoDialog is a trainer-wide dialog without athlete picker.
-    // The dialog itself handles cancellation/submission. Persistence happens
-    // inside the dialog if an athleteId can be provided.
-    // Full athlete-picker wiring for the trainer-wide context is tracked V2
-    // (requires showing an athlete selection before the dialog).
+    if (result == null || !context.mounted) return;
+
+    final trainerId = ref.read(currentUidProvider);
+    if (trainerId == null) return;
+
+    final now = DateTime.now().toUtc();
+    final payment = Payment(
+      id: '',
+      trainerId: trainerId,
+      athleteId: result.athleteId,
+      amountArs: result.amount,
+      concept: result.concept,
+      status: result.status,
+      createdAt: now,
+      paidAt: result.status == PaymentStatus.paid ? now : null,
+      dueAt: result.status == PaymentStatus.pending ? result.dueAt : null,
+    );
+
+    try {
+      await ref.read(paymentRepositoryProvider).add(payment);
+      if (mounted) {
+        pagoSnack(context, 'Pago registrado.'); // i18n
+      }
+    } catch (_) {
+      if (mounted) {
+        pagoSnack(context, 'No pudimos guardar. Intentá de nuevo.'); // i18n
+      }
+    }
   }
 
   @override
@@ -95,8 +122,8 @@ class _PagosScreenState extends ConsumerState<PagosScreen>
     });
 
     final tabLabels = [
-      'Vencidos · $vencidosN', // i18n
       'Por vencer · $porVencerN', // i18n
+      'Vencidos · $vencidosN', // i18n
       'Pagados · $pagadosN', // i18n
       'Todos · $todosN', // i18n
     ];
@@ -174,21 +201,21 @@ class _PagosScreenState extends ConsumerState<PagosScreen>
           child: TabBarView(
             controller: _tabController,
             children: [
-              // Vencidos tab
-              _tabBody(
-                bucketsAsync: bucketsAsync,
-                getPayments: (b) => b.vencidos,
-                emptyLabel: 'No hay pagos vencidos', // i18n
-                palette: palette,
-                profiles: profiles,
-                paymentAlias: paymentAlias,
-                showActions: true,
-              ),
               // Por vencer tab
               _tabBody(
                 bucketsAsync: bucketsAsync,
                 getPayments: (b) => b.porVencer,
                 emptyLabel: 'No hay pagos pendientes', // i18n
+                palette: palette,
+                profiles: profiles,
+                paymentAlias: paymentAlias,
+                showActions: true,
+              ),
+              // Vencidos tab
+              _tabBody(
+                bucketsAsync: bucketsAsync,
+                getPayments: (b) => b.vencidos,
+                emptyLabel: 'No hay pagos vencidos', // i18n
                 palette: palette,
                 profiles: profiles,
                 paymentAlias: paymentAlias,
