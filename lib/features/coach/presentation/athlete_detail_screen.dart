@@ -148,55 +148,67 @@ class _AthleteDetailBody extends ConsumerWidget {
     return Column(
       children: [
         Expanded(
-          child: ListView(
+          // SingleChildScrollView + Column (no ListView(children:)): un
+          // ListView, aunque construya sus widgets eager, sigue siendo un
+          // viewport — los Elements/State de los TreinoFadeSlideIn que
+          // salen del cacheExtent se desmontan y re-animan al volver a
+          // scrollear. Column dentro de SingleChildScrollView scrollea
+          // como una sola unidad, sin reciclar Elements por ítem (ver doc
+          // de TreinoFadeSlideIn) — esta pantalla es larga, así que el
+          // riesgo era real (ver _PlanesSection más abajo).
+          child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-            children: [
-              // ── Athlete header ──────────────────────────────────────
-              _AthleteHeader(profileAsync: profileAsync),
-              if (profileAsync.hasError) ...[
-                const SizedBox(height: 8),
-                Text(
-                  AppL10n.of(context).athleteDetailProfileLoadError,
-                  style: GoogleFonts.barlow(
-                    fontSize: 13,
-                    color: palette.textMuted,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // ── Athlete header ──────────────────────────────────────
+                _AthleteHeader(profileAsync: profileAsync),
+                if (profileAsync.hasError) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    AppL10n.of(context).athleteDetailProfileLoadError,
+                    style: GoogleFonts.barlow(
+                      fontSize: 13,
+                      color: palette.textMuted,
+                    ),
                   ),
+                ],
+                const SizedBox(height: 20),
+
+                // ── Planes section ──────────────────────────────────────
+                _PlanesSection(
+                  athleteId: athleteId,
+                  trainerUid: trainerUid,
+                  plansAsync: plansAsync,
                 ),
+
+                // ── Antropometría section ────────────────────────────────
+                const SizedBox(height: 8),
+                _AntropometriaSection(
+                    athleteId: athleteId, trainerUid: trainerUid),
+
+                // ── Rendimiento section ──────────────────────────────────
+                const SizedBox(height: 20),
+                _RendimientoSection(athleteId: athleteId),
+
+                // ── Historial de sesiones section ─────────────────────────
+                const SizedBox(height: 20),
+                _EntrenamientosSection(athleteId: athleteId),
+
+                // ── Cobro section ─────────────────────────────────────────
+                const SizedBox(height: 20),
+                _CobroSection(athleteId: athleteId),
+
+                // ── Seguimiento section ───────────────────────────────────
+                const SizedBox(height: 20),
+                _SeguimientoSection(
+                    athleteId: athleteId, trainerUid: trainerUid),
+
+                // ── Nota del alumno section ───────────────────────────────
+                const SizedBox(height: 20),
+                _NotaSection(athleteId: athleteId, trainerUid: trainerUid),
               ],
-              const SizedBox(height: 20),
-
-              // ── Planes section ──────────────────────────────────────
-              _PlanesSection(
-                athleteId: athleteId,
-                trainerUid: trainerUid,
-                plansAsync: plansAsync,
-              ),
-
-              // ── Antropometría section ────────────────────────────────
-              const SizedBox(height: 8),
-              _AntropometriaSection(
-                  athleteId: athleteId, trainerUid: trainerUid),
-
-              // ── Rendimiento section ──────────────────────────────────
-              const SizedBox(height: 20),
-              _RendimientoSection(athleteId: athleteId),
-
-              // ── Historial de sesiones section ─────────────────────────
-              const SizedBox(height: 20),
-              _EntrenamientosSection(athleteId: athleteId),
-
-              // ── Cobro section ─────────────────────────────────────────
-              const SizedBox(height: 20),
-              _CobroSection(athleteId: athleteId),
-
-              // ── Seguimiento section ───────────────────────────────────
-              const SizedBox(height: 20),
-              _SeguimientoSection(athleteId: athleteId, trainerUid: trainerUid),
-
-              // ── Nota del alumno section ───────────────────────────────
-              const SizedBox(height: 20),
-              _NotaSection(athleteId: athleteId, trainerUid: trainerUid),
-            ],
+            ),
           ),
         ),
 

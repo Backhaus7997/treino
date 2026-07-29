@@ -386,10 +386,17 @@ void main() {
         );
       }
 
-      // Scroll de ida y vuelta — sin overflow ni errores.
-      await tester.drag(find.byType(ListView), const Offset(0, -600));
+      // Scroll de ida y vuelta — sin overflow ni errores. `.first` porque el
+      // grid interno también scrollea: el de afuera es el de PlantillasTab.
+      final scroller = find
+          .descendant(
+            of: find.byType(PlantillasTab),
+            matching: find.byType(SingleChildScrollView),
+          )
+          .first;
+      await tester.drag(scroller, const Offset(0, -600));
       await tester.pump();
-      await tester.drag(find.byType(ListView), const Offset(0, 600));
+      await tester.drag(scroller, const Offset(0, 600));
       await tester.pump();
       expect(tester.takeException(), isNull);
     });

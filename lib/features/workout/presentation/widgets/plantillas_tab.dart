@@ -52,7 +52,14 @@ class _PlantillasTabState extends ConsumerState<PlantillasTab>
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: ListView(
+      // SingleChildScrollView + Column (no ListView(children:)): un
+      // ListView, aunque construya sus widgets eager, sigue siendo un
+      // viewport — los Elements/State de los TreinoFadeSlideIn que salen
+      // del cacheExtent se desmontan y re-animan al volver a scrollear.
+      // Column dentro de SingleChildScrollView scrollea como una sola
+      // unidad, sin reciclar Elements por ítem (ver doc de
+      // TreinoFadeSlideIn).
+      child: SingleChildScrollView(
         // + bottom inset: the floating bar overlays the body (extendBody),
         // so the last item needs room to scroll out from behind it.
         padding: EdgeInsets.fromLTRB(
@@ -62,42 +69,45 @@ class _PlantillasTabState extends ConsumerState<PlantillasTab>
           20 + MediaQuery.paddingOf(context).bottom,
         ),
         physics: const AlwaysScrollableScrollPhysics(),
-        children: [
-          TreinoFadeSlideIn(
-            delay: AppMotion.stagger(0),
-            child: const LevelFilterPills(),
-          ),
-          const SizedBox(height: 10),
-          TreinoFadeSlideIn(
-            delay: AppMotion.stagger(1),
-            child: entriesAsync.when(
-              data: (entries) {
-                if (entries.isEmpty) {
-                  final msg = filter == null
-                      ? 'No hay plantillas todavía.'
-                      : 'No hay plantillas para este nivel.';
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 20),
-                    child: Text(
-                      msg,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: palette.textMuted,
-                      ),
-                    ),
-                  );
-                }
-                return _TemplatesGrid(entries: entries);
-              },
-              loading: () => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 20),
-                child: Center(
-                  child: CircularProgressIndicator(color: palette.accent),
-                ),
-              ),
-              error: (_, __) => _CatalogErrorState(filter: filter),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TreinoFadeSlideIn(
+              delay: AppMotion.stagger(0),
+              child: const LevelFilterPills(),
             ),
-          ),
-        ],
+            const SizedBox(height: 10),
+            TreinoFadeSlideIn(
+              delay: AppMotion.stagger(1),
+              child: entriesAsync.when(
+                data: (entries) {
+                  if (entries.isEmpty) {
+                    final msg = filter == null
+                        ? 'No hay plantillas todavía.'
+                        : 'No hay plantillas para este nivel.';
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      child: Text(
+                        msg,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: palette.textMuted,
+                        ),
+                      ),
+                    );
+                  }
+                  return _TemplatesGrid(entries: entries);
+                },
+                loading: () => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  child: Center(
+                    child: CircularProgressIndicator(color: palette.accent),
+                  ),
+                ),
+                error: (_, __) => _CatalogErrorState(filter: filter),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

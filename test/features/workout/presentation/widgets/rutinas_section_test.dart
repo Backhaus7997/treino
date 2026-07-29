@@ -552,6 +552,26 @@ void main() {
     });
 
     testWidgets(
+        'tap on the SECOND self-created card (both non-active) navigates too '
+        '— QA #REGR: reported dead on real device/simulator, unreproduced '
+        'here', (tester) async {
+      await _pumpSection(
+        tester,
+        own: [
+          _makeUserRoutine(id: 'r1', name: 'Rutina A'),
+          _makeUserRoutine(id: 'r2', name: 'Rutina B'),
+        ],
+        activeRoutineId: 'r1',
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('routine_card_r2')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Detalles'), findsOneWidget);
+    });
+
+    testWidgets(
         'terminated trainer link → coach card shows "Plan finalizado" chip',
         (tester) async {
       await _pumpSection(

@@ -110,60 +110,70 @@ class _AthleteAgendaScreenState extends ConsumerState<AthleteAgendaScreen> {
         .toList()
       ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
 
-    return ListView(
+    return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      children: [
-        // ── Calendar ──────────────────────────────────────────────────────────
-        TreinoFadeSlideIn(
-          child: _AgendaCalendar(
-            focusedDay: _focusedDay,
-            selectedDay: _selectedDay,
-            appointments: confirmed,
-            onDaySelected: (selected, focused) {
-              setState(() {
-                _selectedDay = selected;
-                _focusedDay = focused;
-              });
-              _openDaySheet(context, selected, confirmed);
-            },
-            onPageChanged: (focused) {
-              setState(() => _focusedDay = focused);
-            },
-          ),
-        ),
-
-        const SizedBox(height: 24),
-
-        // ── Upcoming sessions list ────────────────────────────────────────────
-        if (upcoming.isNotEmpty) ...[
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ── Calendar ──────────────────────────────────────────────────────────
           TreinoFadeSlideIn(
-            delay: AppMotion.stagger(1),
-            child: Text(
-              AppL10n.of(context).agendaUpcomingAppointmentsHeading,
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-                letterSpacing: 1.2,
-                color: palette.textMuted,
-              ),
+            child: _AgendaCalendar(
+              focusedDay: _focusedDay,
+              selectedDay: _selectedDay,
+              appointments: confirmed,
+              onDaySelected: (selected, focused) {
+                setState(() {
+                  _selectedDay = selected;
+                  _focusedDay = focused;
+                });
+                _openDaySheet(context, selected, confirmed);
+              },
+              onPageChanged: (focused) {
+                setState(() => _focusedDay = focused);
+              },
             ),
           ),
-          const SizedBox(height: 10),
-          // Lista eager (spread en ListView(children:), no builder) → stagger
-          // seguro.
-          ...upcoming.asMap().entries.map(
-                (e) => TreinoFadeSlideIn(
-                  delay: AppMotion.stagger(e.key + 2),
-                  child: AppointmentTile(
-                    appointment: e.value,
-                    now: now,
-                  ),
+
+          const SizedBox(height: 24),
+
+          // ── Upcoming sessions list ────────────────────────────────────────────
+          if (upcoming.isNotEmpty) ...[
+            TreinoFadeSlideIn(
+              delay: AppMotion.stagger(1),
+              child: Text(
+                AppL10n.of(context).agendaUpcomingAppointmentsHeading,
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  letterSpacing: 1.2,
+                  color: palette.textMuted,
                 ),
               ),
-        ] else ...[
-          _emptyState(context, palette),
+            ),
+            const SizedBox(height: 10),
+            // SingleChildScrollView + Column (no ListView(children:)): un
+            // ListView, aunque construya sus widgets eager, sigue siendo un
+            // viewport — los Elements/State de los TreinoFadeSlideIn que
+            // salen del cacheExtent se desmontan y re-animan al volver a
+            // scrollear. Column dentro de SingleChildScrollView scrollea
+            // como una sola unidad, sin reciclar Elements por ítem (ver doc
+            // de TreinoFadeSlideIn) — esta lista crece con los turnos del
+            // trainer, así que el riesgo de re-animación al scrollear era
+            // real.
+            ...upcoming.asMap().entries.map(
+                  (e) => TreinoFadeSlideIn(
+                    delay: AppMotion.stagger(e.key + 2),
+                    child: AppointmentTile(
+                      appointment: e.value,
+                      now: now,
+                    ),
+                  ),
+                ),
+          ] else ...[
+            _emptyState(context, palette),
+          ],
         ],
-      ],
+      ),
     );
   }
 
