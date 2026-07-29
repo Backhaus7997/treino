@@ -124,15 +124,28 @@ class AlumnosScreen extends ConsumerWidget {
           final deudaByAthlete = <String, int>{
             for (final c in cobros) c.athleteId: c.amountArs,
           };
-          return profilesAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) =>
-                _CenteredMuted(l10n.coachHubAlumnosProfilesLoadError),
-            data: (profiles) => _RosterView(
-              roster: roster,
-              profiles: profiles,
-              conDeudaIds: conDeudaIds,
-              deudaByAthlete: deudaByAthlete,
+          // TreinoStateSwitcher propio con key propia: el branch 'data' del
+          // switcher externo renderiza un when() ANIDADO de profilesAsync que
+          // tiene su propio spinner/error bajo la misma key 'data' — sin este
+          // switcher interno, un reemplazo dentro de esa key no anima (misma
+          // key = mismo widget para AnimatedSwitcher). Mismo patrón que
+          // _EntrenamientoTab / _UltimaSessionCard en esta misma rebanada.
+          return TreinoStateSwitcher(
+            childKey: ValueKey(profilesAsync.when(
+              loading: () => 'profiles-loading',
+              error: (_, __) => 'profiles-error',
+              data: (_) => 'profiles-data',
+            )),
+            child: profilesAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) =>
+                  _CenteredMuted(l10n.coachHubAlumnosProfilesLoadError),
+              data: (profiles) => _RosterView(
+                roster: roster,
+                profiles: profiles,
+                conDeudaIds: conDeudaIds,
+                deudaByAthlete: deudaByAthlete,
+              ),
             ),
           );
         },

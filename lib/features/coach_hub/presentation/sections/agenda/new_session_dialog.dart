@@ -583,29 +583,36 @@ class _TappableField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TreinoTappable(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        decoration: BoxDecoration(
-          color: palette.bg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: palette.border),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                text,
-                style: GoogleFonts.barlow(
-                  fontSize: 14,
-                  color: palette.textPrimary,
+    // MouseRegion(cursor): en web este call-site era InkWell (cursor de
+    // mano al hover); TreinoTappable es un GestureDetector pelado sin
+    // MouseRegion. Fix local seguro — el fix de fondo (cursor/foco dentro de
+    // TreinoTappable) pertenece al widget core, fuera de este slice.
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: TreinoTappable(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          decoration: BoxDecoration(
+            color: palette.bg,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: palette.border),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  text,
+                  style: GoogleFonts.barlow(
+                    fontSize: 14,
+                    color: palette.textPrimary,
+                  ),
                 ),
               ),
-            ),
-            Icon(Icons.edit_calendar_outlined,
-                size: 16, color: palette.textMuted),
-          ],
+              Icon(Icons.edit_calendar_outlined,
+                  size: 16, color: palette.textMuted),
+            ],
+          ),
         ),
       ),
     );

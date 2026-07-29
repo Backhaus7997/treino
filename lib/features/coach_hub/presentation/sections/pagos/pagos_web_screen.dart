@@ -233,10 +233,18 @@ class _PagosScreenState extends ConsumerState<PagosScreen>
     required bool showActions,
   }) {
     return TreinoStateSwitcher(
+      // Incluye la vacuidad en la key (mismo patrón que rutinas_screen /
+      // athlete_routines_screen en esta misma rebanada): sin esto, marcar
+      // pagado el último vencido reemplaza la tabla por el empty state BAJO
+      // LA MISMA key 'data' — AnimatedSwitcher lo trata como el mismo widget
+      // y el swap queda seco, sin el cross-fade que sí tienen las pantallas
+      // hermanas. Seguro habilitarlo ahora: el child saliente (la tabla, que
+      // sí tiene botones) queda protegido por el IgnorePointer que
+      // TreinoStateSwitcher aplica a todo child en fade-out.
       childKey: ValueKey(bucketsAsync.when(
         loading: () => 'loading',
         error: (_, __) => 'error',
-        data: (_) => 'data',
+        data: (b) => getPayments(b).isEmpty ? 'empty' : 'data',
       )),
       child: bucketsAsync.when(
         data: (b) => PagosWebTable(

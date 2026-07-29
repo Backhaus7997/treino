@@ -11,6 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/core/utils/date_labels.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
+import 'package:treino/core/widgets/motion/treino_success_check.dart';
 import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
@@ -2165,63 +2166,69 @@ class _ExpandableSessionRowState extends ConsumerState<_ExpandableSessionRow> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        TreinoTappable(
-          onTap: () => setState(() => _expanded = !_expanded),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Row(
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: Text(
-                    // Historial tab shows active sessions too; fall back to
-                    // startedAt when finishedAt is null so the user still
-                    // sees WHEN the athlete started it.
-                    // Real UTC instants; fmtDate localizes them (#380).
-                    s.finishedAt != null
-                        ? fmtDate(s.finishedAt!)
-                        : widget.showStatusBadge
-                            ? fmtDate(s.startedAt)
-                            : '—',
-                    style: c,
-                  ),
-                ),
-                Expanded(
-                  flex: 4,
-                  child: widget.showStatusBadge
-                      ? Row(
-                          children: [
-                            _SessionStatusPill(session: s, palette: palette),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(s.routineName,
-                                  overflow: TextOverflow.ellipsis, style: c),
-                            ),
-                          ],
-                        )
-                      : Text(s.routineName,
-                          overflow: TextOverflow.ellipsis, style: c),
-                ),
-                Expanded(
-                  flex: 2,
-                  child:
-                      Text('${s.durationMin} min', style: c), // i18n: Fase W2
-                ),
-                Expanded(
-                  flex: 2,
-                  child: Text('${s.totalVolumeKg.round()} kg', // i18n: Fase W2
+        // MouseRegion(cursor): call-site web — InkWell daba cursor de mano
+        // al hover, TreinoTappable no trae MouseRegion. Fix local seguro.
+        MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: TreinoTappable(
+            onTap: () => setState(() => _expanded = !_expanded),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: Text(
+                      // Historial tab shows active sessions too; fall back to
+                      // startedAt when finishedAt is null so the user still
+                      // sees WHEN the athlete started it.
+                      // Real UTC instants; fmtDate localizes them (#380).
+                      s.finishedAt != null
+                          ? fmtDate(s.finishedAt!)
+                          : widget.showStatusBadge
+                              ? fmtDate(s.startedAt)
+                              : '—',
                       style: c,
-                      textAlign: TextAlign.right),
-                ),
-                SizedBox(
-                  width: 24,
-                  child: Icon(
-                    _expanded ? TreinoIcon.chevronUp : TreinoIcon.chevronDown,
-                    size: 16,
-                    color: palette.textMuted,
+                    ),
                   ),
-                ),
-              ],
+                  Expanded(
+                    flex: 4,
+                    child: widget.showStatusBadge
+                        ? Row(
+                            children: [
+                              _SessionStatusPill(session: s, palette: palette),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(s.routineName,
+                                    overflow: TextOverflow.ellipsis, style: c),
+                              ),
+                            ],
+                          )
+                        : Text(s.routineName,
+                            overflow: TextOverflow.ellipsis, style: c),
+                  ),
+                  Expanded(
+                    flex: 2,
+                    child:
+                        Text('${s.durationMin} min', style: c), // i18n: Fase W2
+                  ),
+                  Expanded(
+                    flex: 2,
+                    child:
+                        Text('${s.totalVolumeKg.round()} kg', // i18n: Fase W2
+                            style: c,
+                            textAlign: TextAlign.right),
+                  ),
+                  SizedBox(
+                    width: 24,
+                    child: Icon(
+                      _expanded ? TreinoIcon.chevronUp : TreinoIcon.chevronDown,
+                      size: 16,
+                      color: palette.textMuted,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -2395,9 +2402,20 @@ class _NotasPrivadasTabState extends ConsumerState<_NotasPrivadasTab> {
         _lastSavedContent = content;
       });
       final l10n = AppL10n.of(context);
+      // Mismo patrón que las 4 snackbars de éxito de Agenda
+      // (appointment_detail_dialog.dart): mismo momento de éxito (guardado),
+      // mismo feedback — antes solo el guardado de notas del TURNO tenía el
+      // check y el de notas privadas del alumno quedaba en texto plano.
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(l10n.coachHubAlumnoDetailNotasSaveSuccess),
+          content: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const TreinoSuccessCheck(size: 18, strokeWidth: 2),
+              const SizedBox(width: 10),
+              Flexible(child: Text(l10n.coachHubAlumnoDetailNotasSaveSuccess)),
+            ],
+          ),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -3031,33 +3049,49 @@ class _ArchivoRow extends StatelessWidget {
     };
     final subtitle =
         '${_formatSize(file.sizeBytes)} · ${fmtDate(file.uploadedAt)}';
-    return TreinoTappable(
-      onTap: _open,
+    // MouseRegion(cursor): call-site web — InkWell daba cursor de mano al
+    // hover, TreinoTappable no trae MouseRegion. Fix local seguro.
+    // TreinoTappable envuelve solo el icono+texto (Expanded): los IconButton
+    // quedan como siblings del Row exterior, fuera de su subtree, para que
+    // los dos recognizers no compitan en el gesture arena (ver
+    // _ExerciseRow en exercise_picker_sheet.dart).
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
         child: Row(
           children: [
-            Icon(icon, size: 24, color: palette.textMuted),
-            const SizedBox(width: 14),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    file.fileName,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: palette.textPrimary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
+              child: TreinoTappable(
+                onTap: _open,
+                child: Row(
+                  children: [
+                    Icon(icon, size: 24, color: palette.textMuted),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            file.fileName,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: palette.textPrimary,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            subtitle,
+                            style: TextStyle(
+                                color: palette.textMuted, fontSize: 12),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: TextStyle(color: palette.textMuted, fontSize: 12),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
             IconButton(
@@ -3309,27 +3343,32 @@ class _MedicionesToggle extends StatelessWidget {
   Widget build(BuildContext context) {
     Widget seg(_MedicionView v, String label) {
       final active = view == v;
+      // MouseRegion(cursor): call-site web — InkWell daba cursor de mano al
+      // hover, TreinoTappable no trae MouseRegion. Fix local seguro.
       return Expanded(
-        child: TreinoTappable(
-          onTap: () => onChanged(v),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            decoration: BoxDecoration(
-              color: active ? palette.accent.withValues(alpha: 0.15) : null,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: active ? palette.accent : palette.border,
-                width: active ? 1.5 : 1,
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: TreinoTappable(
+            onTap: () => onChanged(v),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              decoration: BoxDecoration(
+                color: active ? palette.accent.withValues(alpha: 0.15) : null,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: active ? palette.accent : palette.border,
+                  width: active ? 1.5 : 1,
+                ),
               ),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              label,
-              style: TextStyle(
-                color: active ? palette.accent : palette.textMuted,
-                fontSize: 13,
-                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                letterSpacing: 0.4,
+              alignment: Alignment.center,
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: active ? palette.accent : palette.textMuted,
+                  fontSize: 13,
+                  fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                  letterSpacing: 0.4,
+                ),
               ),
             ),
           ),
@@ -3516,8 +3555,15 @@ class _MedicionRowState extends State<_MedicionRow> {
   Widget build(BuildContext context) {
     final m = widget.measurement;
     final palette = widget.palette;
-    return TreinoTappable(
-      onTap: () => setState(() => _expanded = !_expanded),
+    // MouseRegion(cursor): call-site web — InkWell daba cursor de mano al
+    // hover, TreinoTappable no trae MouseRegion. Fix local seguro.
+    // TreinoTappable envuelve solo el ícono de expandir + texto (Expanded):
+    // los IconButton de Editar/Eliminar quedan como siblings del Row
+    // exterior, fuera de su subtree, para que los dos recognizers no
+    // compitan en el gesture arena (ver _ExerciseRow en
+    // exercise_picker_sheet.dart).
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
         child: Column(
@@ -3525,35 +3571,44 @@ class _MedicionRowState extends State<_MedicionRow> {
           children: [
             Row(
               children: [
-                Icon(
-                  _expanded
-                      ? Icons.keyboard_arrow_down
-                      : Icons.keyboard_arrow_right,
-                  size: 22,
-                  color: palette.textMuted,
-                ),
-                const SizedBox(width: 8),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        fmtDate(m.recordedAt),
-                        style: TextStyle(
-                          color: palette.textPrimary,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _summary(),
-                        style: TextStyle(
+                  child: TreinoTappable(
+                    onTap: () => setState(() => _expanded = !_expanded),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _expanded
+                              ? Icons.keyboard_arrow_down
+                              : Icons.keyboard_arrow_right,
+                          size: 22,
                           color: palette.textMuted,
-                          fontSize: 12,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                fmtDate(m.recordedAt),
+                                style: TextStyle(
+                                  color: palette.textPrimary,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                _summary(),
+                                style: TextStyle(
+                                  color: palette.textMuted,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 IconButton(
@@ -4194,7 +4249,12 @@ class _NuevaMedicionSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (onToggle != null)
-          TreinoTappable(onTap: onToggle, child: header)
+          // MouseRegion(cursor): call-site web — InkWell daba cursor de
+          // mano al hover, TreinoTappable no trae MouseRegion.
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: TreinoTappable(onTap: onToggle, child: header),
+          )
         else
           header,
         if (expanded)
@@ -4318,8 +4378,15 @@ class _RendimientoRowState extends State<_RendimientoRow> {
   Widget build(BuildContext context) {
     final t = widget.test;
     final palette = widget.palette;
-    return TreinoTappable(
-      onTap: () => setState(() => _expanded = !_expanded),
+    // MouseRegion(cursor): call-site web — InkWell daba cursor de mano al
+    // hover, TreinoTappable no trae MouseRegion. Fix local seguro.
+    // TreinoTappable envuelve solo el ícono de expandir + texto (Expanded):
+    // los IconButton de Editar/Eliminar quedan como siblings del Row
+    // exterior, fuera de su subtree, para que los dos recognizers no
+    // compitan en el gesture arena (ver _ExerciseRow en
+    // exercise_picker_sheet.dart).
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
         child: Column(
@@ -4327,35 +4394,44 @@ class _RendimientoRowState extends State<_RendimientoRow> {
           children: [
             Row(
               children: [
-                Icon(
-                  _expanded
-                      ? Icons.keyboard_arrow_down
-                      : Icons.keyboard_arrow_right,
-                  size: 22,
-                  color: palette.textMuted,
-                ),
-                const SizedBox(width: 8),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        fmtDate(t.recordedAt),
-                        style: TextStyle(
-                          color: palette.textPrimary,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _summary(),
-                        style: TextStyle(
+                  child: TreinoTappable(
+                    onTap: () => setState(() => _expanded = !_expanded),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _expanded
+                              ? Icons.keyboard_arrow_down
+                              : Icons.keyboard_arrow_right,
+                          size: 22,
                           color: palette.textMuted,
-                          fontSize: 12,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                fmtDate(t.recordedAt),
+                                style: TextStyle(
+                                  color: palette.textPrimary,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                _summary(),
+                                style: TextStyle(
+                                  color: palette.textMuted,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 IconButton(

@@ -317,28 +317,34 @@ class _TimePicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TreinoTappable(
-      onTap: () => _pick(context),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          border: Border.all(color: palette.border),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.access_time_outlined,
-                size: 18, color: palette.textMuted),
-            const SizedBox(width: 8),
-            Text(
-              '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}',
-              style: GoogleFonts.barlow(
-                fontSize: 14,
-                color: palette.textPrimary,
+    // MouseRegion(cursor): call-site web — InkWell daba cursor de mano al
+    // hover, TreinoTappable no trae MouseRegion. Fix local seguro (el fix
+    // de fondo pertenece al widget core).
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: TreinoTappable(
+        onTap: () => _pick(context),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            border: Border.all(color: palette.border),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.access_time_outlined,
+                  size: 18, color: palette.textMuted),
+              const SizedBox(width: 8),
+              Text(
+                '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}',
+                style: GoogleFonts.barlow(
+                  fontSize: 14,
+                  color: palette.textPrimary,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

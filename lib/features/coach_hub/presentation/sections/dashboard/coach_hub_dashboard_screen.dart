@@ -7,7 +7,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
 import 'package:treino/core/utils/argentina_time.dart';
-import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/application/dashboard_day_counts.dart';
@@ -64,11 +63,13 @@ class CoachHubDashboardScreen extends ConsumerWidget {
             final wide =
                 constraints.maxWidth >= 900 && constraints.maxHeight.isFinite;
 
-            // Sobriedad de superficie desktop: un solo fade-slide de entrada
-            // para todo el dashboard al montarse, sin stagger por sección
-            // (cada sub-sección ya resuelve su propio async por separado).
-            final content =
-                TreinoFadeSlideIn(child: _DashboardContent(wide: wide));
+            // Sin entrada one-shot: el resto de las secciones del hub
+            // (Agenda, Pagos, Biblioteca, Chat, Ajustes, Alumnos) aparecen
+            // instantáneas al click del sidebar, y cada sección monta vía
+            // NoTransitionPage — un TreinoFadeSlideIn acá se re-dispararía
+            // en CADA visita a la superficie más frecuentada del hub, no
+            // solo la primera vez. Mismo motion que sus hermanas.
+            final content = _DashboardContent(wide: wide);
 
             if (wide) {
               return SingleChildScrollView(

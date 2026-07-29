@@ -12,6 +12,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../../app/theme/app_palette.dart';
 import '../../../../../core/widgets/motion/treino_state_switcher.dart';
+import '../../../../../core/widgets/motion/treino_success_check.dart';
 import '../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../../core/widgets/treino_icon.dart';
 import '../../../../coach/application/agenda_providers.dart';
@@ -134,12 +135,25 @@ class _AgendaWebDayListState extends ConsumerState<AgendaWebDayList> {
     );
     if (billed == true && mounted) {
       _exitSelectionMode();
+      // Mismo patrón que las 4 snackbars de éxito de Agenda
+      // (appointment_detail_dialog.dart): el cobro de 1 turno mostraba el
+      // check, el cobro en lote (mismo string "Turno cobrado.") no —
+      // misma acción, feedback distinto sin razón.
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            selected.length == 1
-                ? 'Turno cobrado.' // i18n
-                : '${selected.length} turnos cobrados.', // i18n
+          content: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const TreinoSuccessCheck(size: 18, strokeWidth: 2),
+              const SizedBox(width: 10),
+              Flexible(
+                child: Text(
+                  selected.length == 1
+                      ? 'Turno cobrado.' // i18n
+                      : '${selected.length} turnos cobrados.', // i18n
+                ),
+              ),
+            ],
           ),
         ),
       );

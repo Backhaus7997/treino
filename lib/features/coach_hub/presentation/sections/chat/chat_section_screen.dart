@@ -49,7 +49,16 @@ class ChatSectionScreen extends ConsumerWidget {
         VerticalDivider(width: 1, color: palette.border),
         Expanded(
           child: TreinoStateSwitcher(
-            childKey: ValueKey(selectedChatId),
+            // ValueKey(selectedChatId == null), NO ValueKey(selectedChatId):
+            // la key solo debe diferenciar empty↔detail (el momento
+            // significativo que amerita cross-fade). Si la key varía en
+            // CADA cambio de chat, AnimatedSwitcher desmonta el
+            // ChatDetailPane viejo y monta uno nuevo — pierde el draft del
+            // composer y rompe la invariante del issue #435 (el adjunto en
+            // vuelo debe aterrizar en el chat donde el PF lo eligió; con
+            // remount, el guard `!mounted` lo descarta en silencio). Cambiar
+            // de chat→chat debe quedar in-place, sin remount, como en main.
+            childKey: ValueKey(selectedChatId == null),
             child: selectedChatId == null
                 ? const ChatEmptyPane()
                 : ChatDetailPane(chatId: selectedChatId),
