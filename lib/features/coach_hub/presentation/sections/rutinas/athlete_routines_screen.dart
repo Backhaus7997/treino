@@ -113,7 +113,12 @@ class AthleteRoutinesScreen extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     for (final (i, routine) in active.indexed)
+                      // key por routine.id: mismo fix que rutinas_screen —
+                      // sin ella, un stream que re-emite con un ítem más
+                      // (crear rutina y volver) hace parpadear la última
+                      // fila visible por matching posicional.
                       TreinoFadeSlideIn(
+                        key: ValueKey(routine.id),
                         delay: AppMotion.stagger(i),
                         child:
                             _RoutineRow(routine: routine, athleteId: athleteId),

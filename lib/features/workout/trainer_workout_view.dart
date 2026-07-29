@@ -47,51 +47,60 @@ class TrainerWorkoutView extends ConsumerWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: ListView(
+      // SingleChildScrollView + Column (no ListView(children:)): un
+      // ListView, aunque construya sus widgets eager, sigue siendo un
+      // viewport — los Elements/State de los TreinoFadeSlideIn que salen del
+      // cacheExtent se desmontan y re-animan al volver a scrollear. Column
+      // dentro de SingleChildScrollView scrollea como una sola unidad, sin
+      // reciclar Elements por ítem (ver doc de TreinoFadeSlideIn).
+      child: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(vertical: 20),
         physics: const ClampingScrollPhysics(),
-        children: [
-          TreinoFadeSlideIn(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'CREAR PLANES',
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 28,
-                    letterSpacing: 0.5,
-                    color: palette.textPrimary,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TreinoFadeSlideIn(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'CREAR PLANES',
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 28,
+                      letterSpacing: 0.5,
+                      color: palette.textPrimary,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Tu espacio para armar plantillas de rutina y asignarlas a tus alumnos.',
-                  style: GoogleFonts.barlow(
-                    fontWeight: FontWeight.w400,
-                    fontSize: 14,
-                    color: palette.textMuted,
+                  const SizedBox(height: 8),
+                  Text(
+                    'Tu espacio para armar plantillas de rutina y asignarlas a tus alumnos.',
+                    style: GoogleFonts.barlow(
+                      fontWeight: FontWeight.w400,
+                      fontSize: 14,
+                      color: palette.textMuted,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 20),
-          TreinoFadeSlideIn(
-            delay: AppMotion.stagger(1),
-            child: _AssignFromAlumnoCard(palette: palette),
-          ),
-          const SizedBox(height: 12),
-          TreinoFadeSlideIn(
-            delay: AppMotion.stagger(2),
-            child: _TemplateLibrarySection(
-              palette: palette,
-              templatesAsync: templatesAsync,
-              uid: uid,
-              sharedWithAthletes: sharedFlag,
+            const SizedBox(height: 20),
+            TreinoFadeSlideIn(
+              delay: AppMotion.stagger(1),
+              child: _AssignFromAlumnoCard(palette: palette),
             ),
-          ),
-        ],
+            const SizedBox(height: 12),
+            TreinoFadeSlideIn(
+              delay: AppMotion.stagger(2),
+              child: _TemplateLibrarySection(
+                palette: palette,
+                templatesAsync: templatesAsync,
+                uid: uid,
+                sharedWithAthletes: sharedFlag,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

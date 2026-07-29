@@ -363,43 +363,71 @@ class _FeedHeader extends ConsumerWidget {
 }
 
 /// A scrollable list of [PostCard]s sharing the common feed layout.
-Widget _feedPostList(BuildContext context, List<Post> posts) {
-  // TODO(pagination): cursor-based pagination deferred (see explore §9)
-  return ListView.separated(
-    physics: const AlwaysScrollableScrollPhysics(),
-    padding: EdgeInsets.fromLTRB(
-      20,
-      0,
-      20,
-      MediaQuery.paddingOf(context).bottom,
-    ),
-    itemCount: posts.length,
-    separatorBuilder: (_, __) => const SizedBox(height: 14),
-    itemBuilder: (_, i) {
-      final post = posts[i];
-      void onAuthorTap() => context.go('/feed/profile/${post.authorUid}');
+///
+/// StatefulWidget (no función suelta): [TreinoFadeSlideIn] está PROHIBIDO en
+/// builders lazy porque los ítems reciclados re-montan su State al re-entrar
+/// al viewport y la entrada re-animaría en cada scroll — el cap `i >= 8` NO
+/// alcanza porque el problema es el re-mount, no el índice. `_animatedIds`
+/// vive en el State de este widget (sobrevive al scroll, que solo
+/// monta/desmonta los Elements hijos del `ListView.separated`, no este
+/// State) y recuerda qué posts YA corrieron su entrada, así un post
+/// reciclado que vuelve a construirse nunca vuelve a animar.
+class _FeedPostList extends StatefulWidget {
+  const _FeedPostList({required this.posts});
 
-      // La card tiene estado local (el detalle del entreno expandido), así
-      // que la reconciliación POR POSICIÓN del ListView la corrompe: si
-      // entra un post nuevo arriba (refresh, o el propio usuario
-      // compartiendo), el Element de esa posición se reusa para OTRO post y
-      // muestra su detalle expandido. La key ata el estado al post — vive en
-      // PostCard (invariante que un test cubre explícitamente) Y en
-      // cualquier wrapper que se interponga como raíz del builder, para que
-      // la reconciliación del ListView tampoco se confunda en esa capa.
-      final card = PostCard(
-          key: ValueKey(post.id), post: post, onAuthorTap: onAuthorTap);
-      if (i >= 8) return card;
-      // Stagger sutil SOLO para los primeros 8 posts (lo que se ve en cada
-      // carga/refresh) — cap explícito para no costear memoria/perf en
-      // listas largas ni generar una cascada interminable de delays.
-      return TreinoFadeSlideIn(
-        key: ValueKey(post.id),
-        delay: AppMotion.stagger(i),
-        child: card,
-      );
-    },
-  );
+  final List<Post> posts;
+
+  @override
+  State<_FeedPostList> createState() => _FeedPostListState();
+}
+
+class _FeedPostListState extends State<_FeedPostList> {
+  final Set<String> _animatedIds = {};
+
+  @override
+  Widget build(BuildContext context) {
+    // TODO(pagination): cursor-based pagination deferred (see explore §9)
+    return ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        0,
+        20,
+        MediaQuery.paddingOf(context).bottom,
+      ),
+      itemCount: widget.posts.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 14),
+      itemBuilder: (_, i) {
+        final post = widget.posts[i];
+        void onAuthorTap() => context.go('/feed/profile/${post.authorUid}');
+
+        // La card tiene estado local (el detalle del entreno expandido), así
+        // que la reconciliación POR POSICIÓN del ListView la corrompe: si
+        // entra un post nuevo arriba (refresh, o el propio usuario
+        // compartiendo), el Element de esa posición se reusa para OTRO post y
+        // muestra su detalle expandido. La key ata el estado al post — vive en
+        // PostCard (invariante que un test cubre explícitamente) Y en
+        // cualquier wrapper que se interponga como raíz del builder, para que
+        // la reconciliación del ListView tampoco se confunda en esa capa.
+        final card = PostCard(
+            key: ValueKey(post.id), post: post, onAuthorTap: onAuthorTap);
+
+        // `add` devuelve false si el id ya estaba — ya animó una vez, no
+        // importa si el Element se recicló y se está reconstruyendo ahora.
+        final alreadyAnimated = !_animatedIds.add(post.id);
+        // Stagger sutil SOLO para los primeros 8 posts que entran sin haber
+        // animado antes (lo que se ve en cada carga/refresh) — cap explícito
+        // para no costear memoria/perf en listas largas ni generar una
+        // cascada interminable de delays.
+        if (i >= 8 || alreadyAnimated) return card;
+        return TreinoFadeSlideIn(
+          key: ValueKey(post.id),
+          delay: AppMotion.stagger(i),
+          child: card,
+        );
+      },
+    );
+  }
 }
 
 /// Wraps an empty/placeholder state in a scrollable so it can still be
@@ -516,7 +544,7 @@ class _AmigosBody extends ConsumerWidget {
             const FeedEmptyState(message: 'Aún no hay posts de tus amigos'),
           );
         }
-        return _feedPostList(context, posts);
+        return _FeedPostList(posts: posts);
       },
     );
   }
@@ -552,7 +580,7 @@ class _MiGymBody extends ConsumerWidget {
             const FeedEmptyState(message: 'Tu gym todavía no tiene posts'),
           );
         }
-        return _feedPostList(context, posts);
+        return _FeedPostList(posts: posts);
       },
     );
   }
@@ -574,7 +602,7 @@ class _PublicoBody extends ConsumerWidget {
             const FeedEmptyState(message: 'Aún no hay posts públicos'),
           );
         }
-        return _feedPostList(context, posts);
+        return _FeedPostList(posts: posts);
       },
     );
   }

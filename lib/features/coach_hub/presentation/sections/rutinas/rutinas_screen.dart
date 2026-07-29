@@ -90,7 +90,14 @@ class RutinasScreen extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     for (final (i, link) in athletes.indexed)
+                      // key por athleteId: sin ella el matching de Elements
+                      // es posicional y una inserción del stream (un alumno
+                      // nuevo se PREPENDEA, requestedAt DESC) hace que las
+                      // filas existentes reusen el State one-shot corrido de
+                      // posición y la última fila infle una animación nueva
+                      // — exactamente al revés de la intención.
                       TreinoFadeSlideIn(
+                        key: ValueKey(link.athleteId),
                         delay: AppMotion.stagger(i),
                         child: _AthleteRow(link: link),
                       ),
