@@ -84,7 +84,9 @@ void main() {
         ),
       );
 
-      await tester.pump();
+      // TreinoStateSwitcher cross-fadea loading→data (AppMotion.base):
+      // pumpAndSettle en vez de un pump suelto para dejar que termine.
+      await tester.pumpAndSettle();
 
       expect(find.text('No hay solicitudes pendientes'), findsOneWidget);
       expect(find.byType(CircularProgressIndicator), findsNothing);
@@ -111,7 +113,9 @@ void main() {
         ),
       );
 
-      await tester.pump();
+      // TreinoStateSwitcher cross-fadea loading→data (AppMotion.base):
+      // pumpAndSettle en vez de un pump suelto para dejar que termine.
+      await tester.pumpAndSettle();
 
       expect(find.byType(FriendRequestInboxTile), findsNWidgets(2));
       expect(find.byType(CircularProgressIndicator), findsNothing);
@@ -135,7 +139,9 @@ void main() {
         ),
       );
 
-      await tester.pump();
+      // TreinoStateSwitcher cross-fadea loading→error (AppMotion.base):
+      // pumpAndSettle en vez de un pump suelto para dejar que termine.
+      await tester.pumpAndSettle();
 
       expect(
         find.text('No pudimos cargar las solicitudes. Intentá de nuevo.'),

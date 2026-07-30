@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/motion/treino_state_switcher.dart';
+import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../auth/application/auth_providers.dart';
@@ -33,12 +35,19 @@ class CreatePostScreen extends ConsumerWidget {
     final stateAsync = ref.watch(provider);
     final notifier = ref.read(provider.notifier);
 
-    return stateAsync.when(
-      loading: () => const _CreatePostLoading(),
-      error: (_, __) => _CreatePostError(
-        onRetry: () => ref.invalidate(provider),
+    return TreinoStateSwitcher(
+      childKey: ValueKey(stateAsync.when(
+        loading: () => 'loading',
+        error: (_, __) => 'error',
+        data: (_) => 'data',
+      )),
+      child: stateAsync.when(
+        loading: () => const _CreatePostLoading(),
+        error: (_, __) => _CreatePostError(
+          onRetry: () => ref.invalidate(provider),
+        ),
+        data: (state) => _CreatePostBody(state: state, notifier: notifier),
       ),
-      data: (state) => _CreatePostBody(state: state, notifier: notifier),
     );
   }
 }
@@ -282,9 +291,8 @@ class _CreatePostHeader extends ConsumerWidget {
           Semantics(
             button: true,
             label: l10n.commonCancel,
-            child: GestureDetector(
+            child: TreinoTappable(
               onTap: () => context.pop(),
-              behavior: HitTestBehavior.opaque,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
                 child: Align(
@@ -332,7 +340,7 @@ class _CreatePostHeader extends ConsumerWidget {
                       ? l10n.createPostSaveChangesA11y
                       : l10n.feedCreatePostA11y),
               liveRegion: state.isSubmitting,
-              child: GestureDetector(
+              child: TreinoTappable(
                 onTap: state.canSubmit
                     ? () async {
                         // Capture the root messenger + copy BEFORE the await: the
@@ -353,7 +361,6 @@ class _CreatePostHeader extends ConsumerWidget {
                         }
                       }
                     : null,
-                behavior: HitTestBehavior.opaque,
                 child: ConstrainedBox(
                   constraints:
                       const BoxConstraints(minWidth: 44, minHeight: 44),

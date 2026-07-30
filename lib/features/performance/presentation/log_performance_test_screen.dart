@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart' as intl;
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/motion/treino_success_check.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
@@ -251,7 +252,18 @@ class _LogPerformanceTestScreenState
       if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.performanceLogSaveSuccess)),
+        SnackBar(
+          content: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // El pop ya pasó (línea de arriba) — no compite con ninguna
+              // navegación.
+              const TreinoSuccessCheck(size: 18, strokeWidth: 2),
+              const SizedBox(width: 10),
+              Flexible(child: Text(l10n.performanceLogSaveSuccess)),
+            ],
+          ),
+        ),
       );
     } catch (_) {
       if (!mounted) return;

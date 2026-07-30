@@ -10,6 +10,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/core/utils/date_labels.dart';
+import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
+import 'package:treino/core/widgets/motion/treino_success_check.dart';
+import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/coach/application/athlete_file_providers.dart';
@@ -208,8 +211,7 @@ class _BackLink extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
+    return TreinoTappable(
       onTap: () => context.go('/alumnos'),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -496,25 +498,35 @@ class _ChatTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final chatAsync = ref.watch(chatForOtherUidProvider(athleteId));
+    // El nombre ya está cargado en el header de la ficha (mismo provider,
+    // warm) — se lo pasamos al pane para evitar el flash "Usuario eliminado"
+    // → "…" al abrir el chat.
     final peerName = ref
         .watch(userPublicProfileProvider(athleteId))
         .valueOrNull
         ?.displayName;
-    return chatAsync.when(
-      loading: () => Center(
-        child: CircularProgressIndicator(color: palette.accent),
-      ),
-      error: (_, __) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-        child: Text(
-          'No pudimos abrir el chat. Reintentá.', // i18n: Fase W2
-          style: TextStyle(color: palette.textMuted, fontSize: 15),
+    return TreinoStateSwitcher(
+      childKey: ValueKey(chatAsync.when(
+        loading: () => 'loading',
+        error: (_, __) => 'error',
+        data: (_) => 'data',
+      )),
+      child: chatAsync.when(
+        loading: () => Center(
+          child: CircularProgressIndicator(color: palette.accent),
         ),
-      ),
-      data: (chat) => ChatDetailPane(
-        chatId: chat.chatId,
-        peerUid: athleteId,
-        peerNameInitial: peerName,
+        error: (_, __) => Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          child: Text(
+            'No pudimos abrir el chat. Reintentá.', // i18n: Fase W2
+            style: TextStyle(color: palette.textMuted, fontSize: 15),
+          ),
+        ),
+        data: (chat) => ChatDetailPane(
+          chatId: chat.chatId,
+          peerUid: athleteId,
+          peerNameInitial: peerName,
+        ),
       ),
     );
   }
@@ -534,70 +546,84 @@ class _ProgresoTab extends ConsumerWidget {
     // (spinner hasta que ambas tengan valor, error si alguna falla) y mostramos
     // cada sección por separado según haya datos.
     if (measAsync.isLoading || perfAsync.isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const TreinoStateSwitcher(
+        childKey: ValueKey('loading'),
+        child: Center(child: CircularProgressIndicator()),
+      );
     }
     if (measAsync.hasError || perfAsync.hasError) {
-      return _muted(palette, 'No se pudo cargar el progreso.'); // i18n: Fase W2
+      return TreinoStateSwitcher(
+        childKey: const ValueKey('error'),
+        child:
+            _muted(palette, 'No se pudo cargar el progreso.'), // i18n: Fase W2
+      );
     }
 
     final ms = measAsync.requireValue;
     final tests = perfAsync.requireValue;
     if (ms.isEmpty && tests.isEmpty) {
-      return _muted(palette, 'Sin datos de progreso todavía.'); // i18n: Fase W2
+      return TreinoStateSwitcher(
+        childKey: const ValueKey('empty'),
+        child:
+            _muted(palette, 'Sin datos de progreso todavía.'), // i18n: Fase W2
+      );
     }
 
     final latest = ms.isEmpty ? null : ms.last;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (latest != null) ...[
-            _sectionLabel(palette, 'ANTROPOMETRÍA'), // i18n: Fase W2
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                _MeasCard(
-                    label: 'Peso',
-                    value: latest.weightKg,
-                    unit: 'kg',
-                    palette: palette), // i18n: Fase W2
-                const SizedBox(width: 10),
-                _MeasCard(
-                    label: '% Graso',
-                    value: latest.fatPercentage,
-                    unit: '%',
-                    palette: palette), // i18n: Fase W2
-                const SizedBox(width: 10),
-                _MeasCard(
-                    label: 'Cintura',
-                    value: latest.waistCm,
-                    unit: 'cm',
-                    palette: palette), // i18n: Fase W2
+    return TreinoStateSwitcher(
+      childKey: const ValueKey('data'),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (latest != null) ...[
+              _sectionLabel(palette, 'ANTROPOMETRÍA'), // i18n: Fase W2
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  _MeasCard(
+                      label: 'Peso',
+                      value: latest.weightKg,
+                      unit: 'kg',
+                      palette: palette), // i18n: Fase W2
+                  const SizedBox(width: 10),
+                  _MeasCard(
+                      label: '% Graso',
+                      value: latest.fatPercentage,
+                      unit: '%',
+                      palette: palette), // i18n: Fase W2
+                  const SizedBox(width: 10),
+                  _MeasCard(
+                      label: 'Cintura',
+                      value: latest.waistCm,
+                      unit: 'cm',
+                      palette: palette), // i18n: Fase W2
+                ],
+              ),
+              if (ms.length >= 2) ...[
+                const SizedBox(height: 16),
+                // El chart trae su propia card + heading; no lo re-envolvemos.
+                MeasurementProgressChart(measurements: ms),
               ],
-            ),
-            if (ms.length >= 2) ...[
-              const SizedBox(height: 16),
-              // El chart trae su propia card + heading; no lo re-envolvemos.
-              MeasurementProgressChart(measurements: ms),
+            ],
+            // ── Rendimiento (W2 PR8) ──────────────────────────────────────────
+            // Ambos casos lideran con la misma sección «RENDIMIENTO» (consistencia
+            // con el módulo coach legacy). Con ≥2 tests el chart agrega ABAJO su
+            // propia card interna (heading l10n «PROGRESO»).
+            if (tests.isNotEmpty) ...[
+              if (latest != null) const SizedBox(height: 20),
+              _sectionLabel(palette, 'RENDIMIENTO'), // i18n: Fase W2
+              const SizedBox(height: 10),
+              if (tests.length >= 2)
+                PerformanceProgressChart(tests: tests)
+              else
+                _muted(palette,
+                    'Cargá al menos 2 tests para ver la evolución.'), // i18n: Fase W2
             ],
           ],
-          // ── Rendimiento (W2 PR8) ──────────────────────────────────────────
-          // Ambos casos lideran con la misma sección «RENDIMIENTO» (consistencia
-          // con el módulo coach legacy). Con ≥2 tests el chart agrega ABAJO su
-          // propia card interna (heading l10n «PROGRESO»).
-          if (tests.isNotEmpty) ...[
-            if (latest != null) const SizedBox(height: 20),
-            _sectionLabel(palette, 'RENDIMIENTO'), // i18n: Fase W2
-            const SizedBox(height: 10),
-            if (tests.length >= 2)
-              PerformanceProgressChart(tests: tests)
-            else
-              _muted(palette,
-                  'Cargá al menos 2 tests para ver la evolución.'), // i18n: Fase W2
-          ],
-        ],
+        ),
       ),
     );
   }
@@ -697,7 +723,10 @@ class _ResumenTab extends ConsumerWidget {
     if (sessionsAsync.isLoading ||
         measAsync.isLoading ||
         routinesAsync.isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const TreinoStateSwitcher(
+        childKey: ValueKey('loading'),
+        child: Center(child: CircularProgressIndicator()),
+      );
     }
     // measurements (trainer-owned) y routines SIEMPRE son legibles → si alguna
     // falla es un error real del resumen. Las SESIONES, en cambio, dependen de
@@ -708,7 +737,11 @@ class _ResumenTab extends ConsumerWidget {
     // dependientes de sesiones (adherencia, última sesión) muestran su propio
     // estado vacío.
     if (measAsync.hasError || routinesAsync.hasError) {
-      return _muted(palette, 'No se pudo cargar el resumen.'); // i18n: Fase W2
+      return TreinoStateSwitcher(
+        childKey: const ValueKey('error'),
+        child:
+            _muted(palette, 'No se pudo cargar el resumen.'), // i18n: Fase W2
+      );
     }
 
     final routines = routinesAsync.requireValue;
@@ -839,21 +872,24 @@ class _ResumenTab extends ConsumerWidget {
       ],
     );
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          kpiRow,
-          const SizedBox(height: 20),
-          heatmapBlock,
-          const SizedBox(height: 20),
-          ultimaSesionBlock,
-          const SizedBox(height: 20),
-          noteBlock,
-          const SizedBox(height: 20),
-          proxSesionBlock,
-        ],
+    return TreinoStateSwitcher(
+      childKey: const ValueKey('data'),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            kpiRow,
+            const SizedBox(height: 20),
+            heatmapBlock,
+            const SizedBox(height: 20),
+            ultimaSesionBlock,
+            const SizedBox(height: 20),
+            noteBlock,
+            const SizedBox(height: 20),
+            proxSesionBlock,
+          ],
+        ),
       ),
     );
   }
@@ -999,58 +1035,65 @@ class _NoteCard extends ConsumerWidget {
     final async = ref.watch(
       athleteNoteProvider((trainerId: trainerId, athleteId: athleteId)),
     );
-    return async.when(
-      loading: () => SizedBox(
-        height: 48,
-        child: Center(
-          child: SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(
-                strokeWidth: 2, color: palette.accent),
+    return TreinoStateSwitcher(
+      childKey: ValueKey(async.when(
+        loading: () => 'loading',
+        error: (_, __) => 'error',
+        data: (_) => 'data',
+      )),
+      child: async.when(
+        loading: () => SizedBox(
+          height: 48,
+          child: Center(
+            child: SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: palette.accent),
+            ),
           ),
         ),
+        error: (_, __) => _muted(palette, 'No se pudo cargar la nota.'),
+        data: (note) {
+          return Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: palette.bgCard,
+              border: Border.all(color: palette.border),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: note == null || note.note.trim().isEmpty
+                ? Text(
+                    'Sin nota fijada.', // i18n: Fase W2
+                    style: TextStyle(color: palette.textMuted, fontSize: 13),
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        note.note,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: palette.textPrimary,
+                          fontSize: 13,
+                          height: 1.45,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        _haceDias(note.updatedAt), // i18n: Fase W2
+                        style: TextStyle(
+                          color: palette.textMuted,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+          );
+        },
       ),
-      error: (_, __) => _muted(palette, 'No se pudo cargar la nota.'),
-      data: (note) {
-        return Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: palette.bgCard,
-            border: Border.all(color: palette.border),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: note == null || note.note.trim().isEmpty
-              ? Text(
-                  'Sin nota fijada.', // i18n: Fase W2
-                  style: TextStyle(color: palette.textMuted, fontSize: 13),
-                )
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      note.note,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: palette.textPrimary,
-                        fontSize: 13,
-                        height: 1.45,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      _haceDias(note.updatedAt), // i18n: Fase W2
-                      style: TextStyle(
-                        color: palette.textMuted,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-        );
-      },
     );
   }
 }
@@ -1098,78 +1141,85 @@ class _ProxSesionCard extends ConsumerWidget {
         toDate: todayStart.add(const Duration(days: 60)),
       ),
     ));
-    return async.when(
-      loading: () => SizedBox(
-        height: 48,
-        child: Center(
-          child: SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(
-                strokeWidth: 2, color: palette.accent),
+    return TreinoStateSwitcher(
+      childKey: ValueKey(async.when(
+        loading: () => 'loading',
+        error: (_, __) => 'error',
+        data: (_) => 'data',
+      )),
+      child: async.when(
+        loading: () => SizedBox(
+          height: 48,
+          child: Center(
+            child: SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: palette.accent),
+            ),
           ),
         ),
-      ),
-      error: (_, __) => _muted(palette, 'No se pudo cargar la agenda.'),
-      data: (appointments) {
-        final upcoming = appointments
-            .where((a) =>
-                a.athleteId == athleteId &&
-                a.status == AppointmentStatus.confirmed &&
-                a.startsAt.isAfter(now))
-            .toList()
-          ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
-        final next = upcoming.firstOrNull;
+        error: (_, __) => _muted(palette, 'No se pudo cargar la agenda.'),
+        data: (appointments) {
+          final upcoming = appointments
+              .where((a) =>
+                  a.athleteId == athleteId &&
+                  a.status == AppointmentStatus.confirmed &&
+                  a.startsAt.isAfter(now))
+              .toList()
+            ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
+          final next = upcoming.firstOrNull;
 
-        return Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: palette.bgCard,
-            border: Border.all(color: palette.border),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: next == null
-              ? Text(
-                  'Sin sesiones próximas.', // i18n: Fase W2
-                  style: TextStyle(color: palette.textMuted, fontSize: 13),
-                )
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _fmtDate(next.startsAt), // i18n: Fase W2
-                      style: TextStyle(
-                        color: palette.textPrimary,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${next.durationMin} min', // i18n: Fase W2
-                      style: TextStyle(
-                        color: palette.textMuted,
-                        fontSize: 12,
-                      ),
-                    ),
-                    if (next.noteBefore != null &&
-                        next.noteBefore!.trim().isNotEmpty) ...[
-                      const SizedBox(height: 6),
+          return Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: palette.bgCard,
+              border: Border.all(color: palette.border),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: next == null
+                ? Text(
+                    'Sin sesiones próximas.', // i18n: Fase W2
+                    style: TextStyle(color: palette.textMuted, fontSize: 13),
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        next.noteBefore!,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                        _fmtDate(next.startsAt), // i18n: Fase W2
+                        style: TextStyle(
+                          color: palette.textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${next.durationMin} min', // i18n: Fase W2
                         style: TextStyle(
                           color: palette.textMuted,
                           fontSize: 12,
-                          fontStyle: FontStyle.italic,
                         ),
                       ),
+                      if (next.noteBefore != null &&
+                          next.noteBefore!.trim().isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          next.noteBefore!,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: palette.textMuted,
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
-                ),
-        );
-      },
+                  ),
+          );
+        },
+      ),
     );
   }
 }
@@ -1195,14 +1245,19 @@ class _UltimaSessionCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Caja bordeada reutilizable para los estados de texto (error / vacío).
-    Widget box(Widget child) => Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: palette.bgCard,
-            border: Border.all(color: palette.border),
-            borderRadius: BorderRadius.circular(12),
+    // stateKey identifica el estado top-level de esta card para que
+    // TreinoStateSwitcher cross-fadee error/vacío/data en vez de saltar.
+    Widget box(String stateKey, Widget child) => TreinoStateSwitcher(
+          childKey: ValueKey(stateKey),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: palette.bgCard,
+              border: Border.all(color: palette.border),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: child,
           ),
-          child: child,
         );
 
     // Las sesiones dependen de `session_shares`, que el CF borra cuando el link
@@ -1213,20 +1268,26 @@ class _UltimaSessionCard extends ConsumerWidget {
     if (sessionsAsync.hasError) {
       final e = sessionsAsync.error;
       final noShare = e is FirebaseException && e.code == 'permission-denied';
-      return box(Text(
-        noShare
-            ? 'El alumno no compartió su historial.' // i18n: Fase W2
-            : 'No se pudo cargar la última sesión.', // i18n: Fase W2
-        style: TextStyle(color: palette.textMuted, fontSize: 13),
-      ));
+      return box(
+        'error',
+        Text(
+          noShare
+              ? 'El alumno no compartió su historial.' // i18n: Fase W2
+              : 'No se pudo cargar la última sesión.', // i18n: Fase W2
+          style: TextStyle(color: palette.textMuted, fontSize: 13),
+        ),
+      );
     }
 
     final sessions = sessionsAsync.valueOrNull ?? const <Session>[];
     if (sessions.isEmpty) {
-      return box(Text(
-        'Sin sesiones registradas.', // i18n: Fase W2
-        style: TextStyle(color: palette.textMuted, fontSize: 13),
-      ));
+      return box(
+        'empty',
+        Text(
+          'Sin sesiones registradas.', // i18n: Fase W2
+          style: TextStyle(color: palette.textMuted, fontSize: 13),
+        ),
+      );
     }
 
     final lastSession = sessions.first;
@@ -1236,6 +1297,7 @@ class _UltimaSessionCard extends ConsumerWidget {
     final muted = TextStyle(color: palette.textMuted, fontSize: 12);
 
     return box(
+      'data',
       Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1248,49 +1310,56 @@ class _UltimaSessionCard extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 8),
-          logsAsync.when(
-            loading: () => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: palette.accent),
+          TreinoStateSwitcher(
+            childKey: ValueKey(logsAsync.when(
+              loading: () => 'loading',
+              error: (_, __) => 'error',
+              data: (_) => 'data',
+            )),
+            child: logsAsync.when(
+              loading: () => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: palette.accent),
+                ),
               ),
-            ),
-            error: (e, _) {
-              final noShare =
-                  e is FirebaseException && e.code == 'permission-denied';
-              return Text(
-                noShare
-                    ? 'El alumno no compartió su historial.' // i18n: Fase W2
-                    : 'No se pudo cargar el detalle de la sesión.', // i18n: Fase W2
-                style: muted,
-              );
-            },
-            data: (logs) {
-              if (logs.isEmpty) {
+              error: (e, _) {
+                final noShare =
+                    e is FirebaseException && e.code == 'permission-denied';
                 return Text(
-                    'Sin series registradas en esta sesión.', // i18n: Fase W2
-                    style: muted);
-              }
-              final groups = <String, List<SetLog>>{};
-              for (final log in logs) {
-                groups.putIfAbsent(log.exerciseId, () => <SetLog>[]).add(log);
-              }
-              final lastWeight = lastWeightAsync.valueOrNull;
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (final entry in groups.entries)
-                    _UltimaEjercicioRow(
-                      palette: palette,
-                      logs: entry.value,
-                      progressionKg: lastWeight?[entry.key],
-                    ),
-                ],
-              );
-            },
+                  noShare
+                      ? 'El alumno no compartió su historial.' // i18n: Fase W2
+                      : 'No se pudo cargar el detalle de la sesión.', // i18n: Fase W2
+                  style: muted,
+                );
+              },
+              data: (logs) {
+                if (logs.isEmpty) {
+                  return Text(
+                      'Sin series registradas en esta sesión.', // i18n: Fase W2
+                      style: muted);
+                }
+                final groups = <String, List<SetLog>>{};
+                for (final log in logs) {
+                  groups.putIfAbsent(log.exerciseId, () => <SetLog>[]).add(log);
+                }
+                final lastWeight = lastWeightAsync.valueOrNull;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final entry in groups.entries)
+                      _UltimaEjercicioRow(
+                        palette: palette,
+                        logs: entry.value,
+                        progressionKg: lastWeight?[entry.key],
+                      ),
+                  ],
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -1530,14 +1599,33 @@ class _PagosTab extends ConsumerWidget {
     final paymentsAsync = ref.watch(trainerPaymentsProvider);
     final pendingAsync = ref.watch(pagosPorCobrarProvider);
 
+    Widget body;
+    String stateKey;
     if (paymentsAsync.isLoading || pendingAsync.isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      stateKey = 'loading';
+      body = const Center(child: CircularProgressIndicator());
+    } else if (paymentsAsync.hasError || pendingAsync.hasError) {
+      stateKey = 'error';
+      body =
+          _muted(palette, 'No se pudieron cargar los pagos.'); // i18n: Fase W2
+    } else {
+      stateKey = 'data';
+      body =
+          _buildPagosBody(context, ref, palette, paymentsAsync, pendingAsync);
     }
-    if (paymentsAsync.hasError || pendingAsync.hasError) {
-      return _muted(
-          palette, 'No se pudieron cargar los pagos.'); // i18n: Fase W2
-    }
+    return TreinoStateSwitcher(
+      childKey: ValueKey(stateKey),
+      child: body,
+    );
+  }
 
+  Widget _buildPagosBody(
+    BuildContext context,
+    WidgetRef ref,
+    AppPalette palette,
+    AsyncValue<List<Payment>> paymentsAsync,
+    AsyncValue<List<CobroPendiente>> pendingAsync,
+  ) {
     final history = paymentsAsync.requireValue
         .where((p) => p.athleteId == athleteId)
         .toList()
@@ -1663,48 +1751,62 @@ class _EntrenamientoTab extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 10),
-          routinesAsync.when(
-            loading: () => _muted(palette, 'Cargando…'), // i18n: Fase W2
-            error: (e, _) => _muted(
-                palette, 'No se pudo cargar la rutina.'), // i18n: Fase W2
-            data: (routines) {
-              final actives =
-                  routines.where((r) => r.status == RoutineStatus.active);
-              final active = actives
-                      .where((r) => r.assignedBy == trainerUid)
-                      .firstOrNull ??
-                  actives.firstOrNull;
-              if (active == null) {
-                return _muted(
-                    palette, 'Sin rutina activa asignada.'); // i18n: Fase W2
-              }
-              return _RutinaCard(
-                  routine: active, palette: palette, athleteId: athleteId);
-            },
+          TreinoStateSwitcher(
+            childKey: ValueKey(routinesAsync.when(
+              loading: () => 'loading',
+              error: (_, __) => 'error',
+              data: (_) => 'data',
+            )),
+            child: routinesAsync.when(
+              loading: () => _muted(palette, 'Cargando…'), // i18n: Fase W2
+              error: (e, _) => _muted(
+                  palette, 'No se pudo cargar la rutina.'), // i18n: Fase W2
+              data: (routines) {
+                final actives =
+                    routines.where((r) => r.status == RoutineStatus.active);
+                final active = actives
+                        .where((r) => r.assignedBy == trainerUid)
+                        .firstOrNull ??
+                    actives.firstOrNull;
+                if (active == null) {
+                  return _muted(
+                      palette, 'Sin rutina activa asignada.'); // i18n: Fase W2
+                }
+                return _RutinaCard(
+                    routine: active, palette: palette, athleteId: athleteId);
+              },
+            ),
           ),
           const SizedBox(height: 20),
           _sectionLabel(palette, 'HISTORIAL DE SESIONES'), // i18n: Fase W2
           const SizedBox(height: 10),
-          sessionsAsync.when(
-            loading: () => _muted(palette, 'Cargando…'), // i18n: Fase W2
-            error: (e, _) => _muted(
-                palette,
-                e is FirebaseException && e.code == 'permission-denied'
-                    ? 'El alumno no compartió su historial.' // i18n: Fase W2
-                    : 'No se pudo cargar el historial.'), // i18n: Fase W2
-            data: (sessions) {
-              // isCompletedSession excluye sesiones abandonadas (status=finished
-              // pero wasFullyCompleted=false) para no divergir del historial del
-              // propio alumno ni de los contadores públicos. // i18n: Fase W2
-              final finished =
-                  sessions.where(isCompletedSession).take(20).toList();
-              if (finished.isEmpty) {
-                return _muted(palette,
-                    'Sin sesiones registradas todavía.'); // i18n: Fase W2
-              }
-              return _HistorialTable(
-                  sessions: finished, palette: palette, athleteId: athleteId);
-            },
+          TreinoStateSwitcher(
+            childKey: ValueKey(sessionsAsync.when(
+              loading: () => 'loading',
+              error: (_, __) => 'error',
+              data: (_) => 'data',
+            )),
+            child: sessionsAsync.when(
+              loading: () => _muted(palette, 'Cargando…'), // i18n: Fase W2
+              error: (e, _) => _muted(
+                  palette,
+                  e is FirebaseException && e.code == 'permission-denied'
+                      ? 'El alumno no compartió su historial.' // i18n: Fase W2
+                      : 'No se pudo cargar el historial.'), // i18n: Fase W2
+              data: (sessions) {
+                // isCompletedSession excluye sesiones abandonadas (status=finished
+                // pero wasFullyCompleted=false) para no divergir del historial del
+                // propio alumno ni de los contadores públicos. // i18n: Fase W2
+                final finished =
+                    sessions.where(isCompletedSession).take(20).toList();
+                if (finished.isEmpty) {
+                  return _muted(palette,
+                      'Sin sesiones registradas todavía.'); // i18n: Fase W2
+                }
+                return _HistorialTable(
+                    sessions: finished, palette: palette, athleteId: athleteId);
+              },
+            ),
           ),
           const SizedBox(height: 24),
           _DailyHeatmapTabSection(athleteId: athleteId),
@@ -1876,24 +1978,31 @@ class _MostFrequentExercisesTabSectionState
     final entriesAsync = ref.watch(exerciseFrequencyProvider(
         (athleteUid: widget.athleteId, period: _selectedPeriod)));
 
-    return entriesAsync.when(
-      loading: () => const SizedBox.shrink(),
-      error: (e, _) => const SizedBox.shrink(),
-      data: (entries) => MostFrequentExercisesList(
-        entries: entries,
-        selectedPeriod: _selectedPeriod,
-        onSelectExercise: widget.onSelectExercise,
-        onSelectPeriod: (p) => setState(() => _selectedPeriod = p),
-        labels: MostFrequentExercisesListLabels(
-          sectionTitle: 'EJERCICIOS MÁS FRECUENTES', // i18n: Fase W2
-          sessionCountLabel: (n) => n == 1
-              ? '1 sesión' // i18n: Fase W2
-              : '$n sesiones', // i18n: Fase W2
-          emptyText: 'No hay datos todavía.', // i18n: Fase W2
-          periodLabels: const ChartPeriodLabels(
-            last30dLabel: 'Últimos 30 días', // i18n: Fase W2
-            thisWeekLabel: 'Esta semana', // i18n: Fase W2
-            monthLabel: 'Este mes', // i18n: Fase W2
+    return TreinoStateSwitcher(
+      childKey: ValueKey(entriesAsync.when(
+        loading: () => 'loading',
+        error: (_, __) => 'error',
+        data: (_) => 'data',
+      )),
+      child: entriesAsync.when(
+        loading: () => const SizedBox.shrink(),
+        error: (e, _) => const SizedBox.shrink(),
+        data: (entries) => MostFrequentExercisesList(
+          entries: entries,
+          selectedPeriod: _selectedPeriod,
+          onSelectExercise: widget.onSelectExercise,
+          onSelectPeriod: (p) => setState(() => _selectedPeriod = p),
+          labels: MostFrequentExercisesListLabels(
+            sectionTitle: 'EJERCICIOS MÁS FRECUENTES', // i18n: Fase W2
+            sessionCountLabel: (n) => n == 1
+                ? '1 sesión' // i18n: Fase W2
+                : '$n sesiones', // i18n: Fase W2
+            emptyText: 'No hay datos todavía.', // i18n: Fase W2
+            periodLabels: const ChartPeriodLabels(
+              last30dLabel: 'Últimos 30 días', // i18n: Fase W2
+              thisWeekLabel: 'Esta semana', // i18n: Fase W2
+              monthLabel: 'Este mes', // i18n: Fase W2
+            ),
           ),
         ),
       ),
@@ -2078,63 +2187,69 @@ class _ExpandableSessionRowState extends ConsumerState<_ExpandableSessionRow> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        InkWell(
-          onTap: () => setState(() => _expanded = !_expanded),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Row(
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: Text(
-                    // Historial tab shows active sessions too; fall back to
-                    // startedAt when finishedAt is null so the user still
-                    // sees WHEN the athlete started it.
-                    // Real UTC instants; fmtDate localizes them (#380).
-                    s.finishedAt != null
-                        ? fmtDate(s.finishedAt!)
-                        : widget.showStatusBadge
-                            ? fmtDate(s.startedAt)
-                            : '—',
-                    style: c,
-                  ),
-                ),
-                Expanded(
-                  flex: 4,
-                  child: widget.showStatusBadge
-                      ? Row(
-                          children: [
-                            _SessionStatusPill(session: s, palette: palette),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(s.routineName,
-                                  overflow: TextOverflow.ellipsis, style: c),
-                            ),
-                          ],
-                        )
-                      : Text(s.routineName,
-                          overflow: TextOverflow.ellipsis, style: c),
-                ),
-                Expanded(
-                  flex: 2,
-                  child:
-                      Text('${s.durationMin} min', style: c), // i18n: Fase W2
-                ),
-                Expanded(
-                  flex: 2,
-                  child: Text('${s.totalVolumeKg.round()} kg', // i18n: Fase W2
+        // MouseRegion(cursor): call-site web — InkWell daba cursor de mano
+        // al hover, TreinoTappable no trae MouseRegion. Fix local seguro.
+        MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: TreinoTappable(
+            onTap: () => setState(() => _expanded = !_expanded),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: Text(
+                      // Historial tab shows active sessions too; fall back to
+                      // startedAt when finishedAt is null so the user still
+                      // sees WHEN the athlete started it.
+                      // Real UTC instants; fmtDate localizes them (#380).
+                      s.finishedAt != null
+                          ? fmtDate(s.finishedAt!)
+                          : widget.showStatusBadge
+                              ? fmtDate(s.startedAt)
+                              : '—',
                       style: c,
-                      textAlign: TextAlign.right),
-                ),
-                SizedBox(
-                  width: 24,
-                  child: Icon(
-                    _expanded ? TreinoIcon.chevronUp : TreinoIcon.chevronDown,
-                    size: 16,
-                    color: palette.textMuted,
+                    ),
                   ),
-                ),
-              ],
+                  Expanded(
+                    flex: 4,
+                    child: widget.showStatusBadge
+                        ? Row(
+                            children: [
+                              _SessionStatusPill(session: s, palette: palette),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(s.routineName,
+                                    overflow: TextOverflow.ellipsis, style: c),
+                              ),
+                            ],
+                          )
+                        : Text(s.routineName,
+                            overflow: TextOverflow.ellipsis, style: c),
+                  ),
+                  Expanded(
+                    flex: 2,
+                    child:
+                        Text('${s.durationMin} min', style: c), // i18n: Fase W2
+                  ),
+                  Expanded(
+                    flex: 2,
+                    child:
+                        Text('${s.totalVolumeKg.round()} kg', // i18n: Fase W2
+                            style: c,
+                            textAlign: TextAlign.right),
+                  ),
+                  SizedBox(
+                    width: 24,
+                    child: Icon(
+                      _expanded ? TreinoIcon.chevronUp : TreinoIcon.chevronDown,
+                      size: 16,
+                      color: palette.textMuted,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -2168,47 +2283,54 @@ class _SetLogsExpansion extends ConsumerWidget {
     final muted = TextStyle(color: palette.textMuted, fontSize: 12);
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
-      child: async.when(
-        loading: () => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(
-                strokeWidth: 2, color: palette.accent),
+      child: TreinoStateSwitcher(
+        childKey: ValueKey(async.when(
+          loading: () => 'loading',
+          error: (_, __) => 'error',
+          data: (_) => 'data',
+        )),
+        child: async.when(
+          loading: () => Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: palette.accent),
+            ),
           ),
-        ),
-        error: (e, _) {
-          final noShare =
-              e is FirebaseException && e.code == 'permission-denied';
-          return Text(
-            noShare
-                ? 'El alumno no compartió su historial.' // i18n: Fase W2
-                : 'No se pudo cargar el detalle de la sesión.', // i18n: Fase W2
-            style: muted,
-          );
-        },
-        data: (logs) {
-          if (logs.isEmpty) {
+          error: (e, _) {
+            final noShare =
+                e is FirebaseException && e.code == 'permission-denied';
             return Text(
-                'Sin series registradas en esta sesión.', // i18n: Fase W2
-                style: muted);
-          }
-          final groups = <String, List<SetLog>>{};
-          for (final log in logs) {
-            groups.putIfAbsent(log.exerciseId, () => <SetLog>[]).add(log);
-          }
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (final entry in groups.entries)
-                SessionExerciseBlock(
-                  exerciseName: entry.value.first.exerciseName,
-                  sets: entry.value,
-                ),
-            ],
-          );
-        },
+              noShare
+                  ? 'El alumno no compartió su historial.' // i18n: Fase W2
+                  : 'No se pudo cargar el detalle de la sesión.', // i18n: Fase W2
+              style: muted,
+            );
+          },
+          data: (logs) {
+            if (logs.isEmpty) {
+              return Text(
+                  'Sin series registradas en esta sesión.', // i18n: Fase W2
+                  style: muted);
+            }
+            final groups = <String, List<SetLog>>{};
+            for (final log in logs) {
+              groups.putIfAbsent(log.exerciseId, () => <SetLog>[]).add(log);
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final entry in groups.entries)
+                  SessionExerciseBlock(
+                    exerciseName: entry.value.first.exerciseName,
+                    sets: entry.value,
+                  ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -2301,9 +2423,20 @@ class _NotasPrivadasTabState extends ConsumerState<_NotasPrivadasTab> {
         _lastSavedContent = content;
       });
       final l10n = AppL10n.of(context);
+      // Mismo patrón que las 4 snackbars de éxito de Agenda
+      // (appointment_detail_dialog.dart): mismo momento de éxito (guardado),
+      // mismo feedback — antes solo el guardado de notas del TURNO tenía el
+      // check y el de notas privadas del alumno quedaba en texto plano.
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(l10n.coachHubAlumnoDetailNotasSaveSuccess),
+          content: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const TreinoSuccessCheck(size: 18, strokeWidth: 2),
+              const SizedBox(width: 10),
+              Flexible(child: Text(l10n.coachHubAlumnoDetailNotasSaveSuccess)),
+            ],
+          ),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -2344,147 +2477,154 @@ class _NotasPrivadasTabState extends ConsumerState<_NotasPrivadasTab> {
       ),
     );
 
-    return noteAsync.when(
-      loading: () => Center(
-        child: CircularProgressIndicator(color: palette.accent),
-      ),
-      error: (_, __) => Center(
-        child: Text(
-          l10n.coachHubAlumnoDetailNotasLoadError,
-          style: TextStyle(color: palette.textMuted, fontSize: 14),
+    return TreinoStateSwitcher(
+      childKey: ValueKey(noteAsync.when(
+        loading: () => 'loading',
+        error: (_, __) => 'error',
+        data: (_) => 'data',
+      )),
+      child: noteAsync.when(
+        loading: () => Center(
+          child: CircularProgressIndicator(color: palette.accent),
         ),
-      ),
-      data: (note) {
-        // First data emission: seed the text controller. Subsequent emissions
-        // are ignored — the PF's local buffer wins to avoid clobbering typing.
-        _initFromStream(note);
-        final updatedAt = note?.updatedAt;
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // ── Header row: title + last-updated timestamp ─────────────
-              Row(
-                children: [
-                  Text(
-                    l10n.coachHubAlumnoDetailNotasTitle,
-                    style: TextStyle(
-                      color: palette.textPrimary,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const Spacer(),
-                  if (updatedAt != null)
-                    Text(
-                      l10n.coachHubAlumnoDetailNotasUpdatedAt(
-                          _formatUpdatedAt(updatedAt)),
-                      style: TextStyle(
-                        color: palette.textMuted,
-                        fontSize: 12,
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                l10n.coachHubAlumnoDetailNotasSubtitle,
-                style: TextStyle(color: palette.textMuted, fontSize: 13),
-              ),
-              const SizedBox(height: 16),
-              // ── Editable text area ──────────────────────────────────────
-              Expanded(
-                // Rounded box that clips the scrollable content. Instead of
-                // `TextField(expands: true)` which paints outside its parent
-                // in some Flutter Web configs, we let the TextField grow to
-                // its natural content height inside a SingleChildScrollView
-                // — the SCV owns the scrolling and clips reliably against
-                // the ClipRRect ancestor.
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: palette.border),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(11),
-                    child: ColoredBox(
-                      color: palette.bgCard,
-                      child: Scrollbar(
-                        controller: _scrollController,
-                        thumbVisibility: true,
-                        thickness: 6,
-                        child: SingleChildScrollView(
-                          controller: _scrollController,
-                          padding: const EdgeInsets.fromLTRB(16, 16, 20, 16),
-                          child: TextField(
-                            controller: _controller,
-                            maxLines: null,
-                            minLines: 12,
-                            keyboardType: TextInputType.multiline,
-                            style: TextStyle(
-                              color: palette.textPrimary,
-                              fontSize: 14,
-                              height: 1.4,
-                            ),
-                            decoration: InputDecoration.collapsed(
-                              hintText: l10n.coachHubAlumnoDetailNotasHint,
-                              hintStyle: TextStyle(
-                                color: palette.textMuted,
-                                fontSize: 14,
-                              ),
-                            ),
-                            onChanged: (_) {
-                              // Trigger rebuild to toggle save enabled state.
-                              setState(() {});
-                            },
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              // ── Save button ─────────────────────────────────────────────
-              Align(
-                alignment: Alignment.centerRight,
-                child: ElevatedButton(
-                  onPressed: (_saving || !_hasChanges)
-                      ? null
-                      : () => _save(trainerUid),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: palette.accent,
-                    foregroundColor: palette.bg,
-                    disabledBackgroundColor:
-                        palette.accent.withValues(alpha: 0.3),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 24, vertical: 12),
-                    shape: const StadiumBorder(),
-                  ),
-                  child: _saving
-                      ? SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: palette.bg,
-                          ),
-                        )
-                      : Text(
-                          l10n.coachHubAlumnoDetailNotasSaveButton,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.8,
-                          ),
-                        ),
-                ),
-              ),
-            ],
+        error: (_, __) => Center(
+          child: Text(
+            l10n.coachHubAlumnoDetailNotasLoadError,
+            style: TextStyle(color: palette.textMuted, fontSize: 14),
           ),
-        );
-      },
+        ),
+        data: (note) {
+          // First data emission: seed the text controller. Subsequent emissions
+          // are ignored — the PF's local buffer wins to avoid clobbering typing.
+          _initFromStream(note);
+          final updatedAt = note?.updatedAt;
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // ── Header row: title + last-updated timestamp ─────────────
+                Row(
+                  children: [
+                    Text(
+                      l10n.coachHubAlumnoDetailNotasTitle,
+                      style: TextStyle(
+                        color: palette.textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const Spacer(),
+                    if (updatedAt != null)
+                      Text(
+                        l10n.coachHubAlumnoDetailNotasUpdatedAt(
+                            _formatUpdatedAt(updatedAt)),
+                        style: TextStyle(
+                          color: palette.textMuted,
+                          fontSize: 12,
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  l10n.coachHubAlumnoDetailNotasSubtitle,
+                  style: TextStyle(color: palette.textMuted, fontSize: 13),
+                ),
+                const SizedBox(height: 16),
+                // ── Editable text area ──────────────────────────────────────
+                Expanded(
+                  // Rounded box that clips the scrollable content. Instead of
+                  // `TextField(expands: true)` which paints outside its parent
+                  // in some Flutter Web configs, we let the TextField grow to
+                  // its natural content height inside a SingleChildScrollView
+                  // — the SCV owns the scrolling and clips reliably against
+                  // the ClipRRect ancestor.
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: palette.border),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(11),
+                      child: ColoredBox(
+                        color: palette.bgCard,
+                        child: Scrollbar(
+                          controller: _scrollController,
+                          thumbVisibility: true,
+                          thickness: 6,
+                          child: SingleChildScrollView(
+                            controller: _scrollController,
+                            padding: const EdgeInsets.fromLTRB(16, 16, 20, 16),
+                            child: TextField(
+                              controller: _controller,
+                              maxLines: null,
+                              minLines: 12,
+                              keyboardType: TextInputType.multiline,
+                              style: TextStyle(
+                                color: palette.textPrimary,
+                                fontSize: 14,
+                                height: 1.4,
+                              ),
+                              decoration: InputDecoration.collapsed(
+                                hintText: l10n.coachHubAlumnoDetailNotasHint,
+                                hintStyle: TextStyle(
+                                  color: palette.textMuted,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              onChanged: (_) {
+                                // Trigger rebuild to toggle save enabled state.
+                                setState(() {});
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                // ── Save button ─────────────────────────────────────────────
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: ElevatedButton(
+                    onPressed: (_saving || !_hasChanges)
+                        ? null
+                        : () => _save(trainerUid),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: palette.accent,
+                      foregroundColor: palette.bg,
+                      disabledBackgroundColor:
+                          palette.accent.withValues(alpha: 0.3),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 12),
+                      shape: const StadiumBorder(),
+                    ),
+                    child: _saving
+                        ? SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: palette.bg,
+                            ),
+                          )
+                        : Text(
+                            l10n.coachHubAlumnoDetailNotasSaveButton,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -2514,63 +2654,71 @@ class _HistorialTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final sessionsAsync = ref.watch(sessionsByUidProvider(athleteId));
-    return sessionsAsync.when(
-      loading: () => Center(
-        child: CircularProgressIndicator(color: palette.accent),
-      ),
-      // Un link pausado borra session_shares → permission-denied. No es un
-      // fallo de carga: el alumno dejó de compartir. Lo decimos claro, igual
-      // que Entrenamientos y el card de última sesión del Resumen.
-      error: (e, _) => Center(
-        child: Text(
-          e is FirebaseException && e.code == 'permission-denied'
-              ? 'El alumno no compartió su historial.' // i18n: Fase W2
-              : 'No pudimos cargar el historial.', // i18n: Fase W2
-          style: TextStyle(color: palette.textMuted, fontSize: 14),
+    return TreinoStateSwitcher(
+      childKey: ValueKey(sessionsAsync.when(
+        loading: () => 'loading',
+        error: (_, __) => 'error',
+        data: (_) => 'data',
+      )),
+      child: sessionsAsync.when(
+        loading: () => Center(
+          child: CircularProgressIndicator(color: palette.accent),
         ),
-      ),
-      data: (sessions) {
-        if (sessions.isEmpty) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-              child: Text(
-                'Este alumno todavía no registró sesiones.', // i18n: Fase W2
-                textAlign: TextAlign.center,
-                style: TextStyle(color: palette.textMuted, fontSize: 14),
-              ),
-            ),
-          );
-        }
-        return SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Historial completo · ${sessions.length} sesiones', // i18n: Fase W2
-                style: TextStyle(
-                  color: palette.textPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
+        // Un link pausado borra session_shares → permission-denied. No es un
+        // fallo de carga: el alumno dejó de compartir. Lo decimos claro, igual
+        // que Entrenamientos y el card de última sesión del Resumen.
+        error: (e, _) => Center(
+          child: Text(
+            e is FirebaseException && e.code == 'permission-denied'
+                ? 'El alumno no compartió su historial.' // i18n: Fase W2
+                : 'No pudimos cargar el historial.', // i18n: Fase W2
+            style: TextStyle(color: palette.textMuted, fontSize: 14),
+          ),
+        ),
+        data: (sessions) {
+          if (sessions.isEmpty) {
+            return Center(
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                child: Text(
+                  'Este alumno todavía no registró sesiones.', // i18n: Fase W2
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: palette.textMuted, fontSize: 14),
                 ),
               ),
-              const SizedBox(height: 6),
-              Text(
-                'Todas las sesiones que registró — completas, incompletas y en curso.', // i18n: Fase W2
-                style: TextStyle(color: palette.textMuted, fontSize: 13),
-              ),
-              const SizedBox(height: 16),
-              _HistorialTable(
-                sessions: sessions,
-                palette: palette,
-                athleteId: athleteId,
-                showStatusBadge: true,
-              ),
-            ],
-          ),
-        );
-      },
+            );
+          }
+          return SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Historial completo · ${sessions.length} sesiones', // i18n: Fase W2
+                  style: TextStyle(
+                    color: palette.textPrimary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Todas las sesiones que registró — completas, incompletas y en curso.', // i18n: Fase W2
+                  style: TextStyle(color: palette.textMuted, fontSize: 13),
+                ),
+                const SizedBox(height: 16),
+                _HistorialTable(
+                  sessions: sessions,
+                  palette: palette,
+                  athleteId: athleteId,
+                  showStatusBadge: true,
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -2809,46 +2957,55 @@ class _ArchivosTabState extends ConsumerState<_ArchivosTab> {
             // Sticky-data pattern: si ya emitimos data alguna vez, la
             // seguimos mostrando aunque el stream emita error después
             // (ej. reconnect transient de Firestore). Solo mostramos el
-            // error state duro cuando NO hay data previa.
-            child: Builder(
-              builder: (_) {
-                if (filesAsync.hasValue) {
-                  final files = filesAsync.requireValue;
-                  if (files.isEmpty) {
+            // error state duro cuando NO hay data previa. El key del
+            // StateSwitcher espeja exactamente esa prioridad (hasValue >
+            // hasError > loading) para no alterar la lógica, solo agregar
+            // el cross-fade.
+            child: TreinoStateSwitcher(
+              childKey: ValueKey(filesAsync.hasValue
+                  ? 'data'
+                  : (filesAsync.hasError ? 'error' : 'loading')),
+              child: Builder(
+                builder: (_) {
+                  if (filesAsync.hasValue) {
+                    final files = filesAsync.requireValue;
+                    if (files.isEmpty) {
+                      return Center(
+                        child: Text(
+                          l10n.coachHubAlumnoDetailArchivosEmpty,
+                          textAlign: TextAlign.center,
+                          style:
+                              TextStyle(color: palette.textMuted, fontSize: 14),
+                        ),
+                      );
+                    }
+                    return ListView.separated(
+                      itemCount: files.length,
+                      separatorBuilder: (_, __) => Divider(
+                        height: 1,
+                        color: palette.border,
+                      ),
+                      itemBuilder: (_, i) => _ArchivoRow(
+                        file: files[i],
+                        palette: palette,
+                        onDelete: () => _confirmAndDelete(files[i]),
+                      ),
+                    );
+                  }
+                  if (filesAsync.hasError) {
                     return Center(
                       child: Text(
-                        l10n.coachHubAlumnoDetailArchivosEmpty,
-                        textAlign: TextAlign.center,
+                        l10n.coachHubAlumnoDetailArchivosLoadError,
                         style:
                             TextStyle(color: palette.textMuted, fontSize: 14),
                       ),
                     );
                   }
-                  return ListView.separated(
-                    itemCount: files.length,
-                    separatorBuilder: (_, __) => Divider(
-                      height: 1,
-                      color: palette.border,
-                    ),
-                    itemBuilder: (_, i) => _ArchivoRow(
-                      file: files[i],
-                      palette: palette,
-                      onDelete: () => _confirmAndDelete(files[i]),
-                    ),
-                  );
-                }
-                if (filesAsync.hasError) {
                   return Center(
-                    child: Text(
-                      l10n.coachHubAlumnoDetailArchivosLoadError,
-                      style: TextStyle(color: palette.textMuted, fontSize: 14),
-                    ),
+                    child: CircularProgressIndicator(color: palette.accent),
                   );
-                }
-                return Center(
-                  child: CircularProgressIndicator(color: palette.accent),
-                );
-              },
+                },
+              ),
             ),
           ),
         ],
@@ -2913,33 +3070,49 @@ class _ArchivoRow extends StatelessWidget {
     };
     final subtitle =
         '${_formatSize(file.sizeBytes)} · ${fmtDate(file.uploadedAt)}';
-    return InkWell(
-      onTap: _open,
+    // MouseRegion(cursor): call-site web — InkWell daba cursor de mano al
+    // hover, TreinoTappable no trae MouseRegion. Fix local seguro.
+    // TreinoTappable envuelve solo el icono+texto (Expanded): los IconButton
+    // quedan como siblings del Row exterior, fuera de su subtree, para que
+    // los dos recognizers no compitan en el gesture arena (ver
+    // _ExerciseRow en exercise_picker_sheet.dart).
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
         child: Row(
           children: [
-            Icon(icon, size: 24, color: palette.textMuted),
-            const SizedBox(width: 14),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    file.fileName,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: palette.textPrimary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
+              child: TreinoTappable(
+                onTap: _open,
+                child: Row(
+                  children: [
+                    Icon(icon, size: 24, color: palette.textMuted),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            file.fileName,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: palette.textPrimary,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            subtitle,
+                            style: TextStyle(
+                                color: palette.textMuted, fontSize: 12),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: TextStyle(color: palette.textMuted, fontSize: 12),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
             IconButton(
@@ -3191,28 +3364,32 @@ class _MedicionesToggle extends StatelessWidget {
   Widget build(BuildContext context) {
     Widget seg(_MedicionView v, String label) {
       final active = view == v;
+      // MouseRegion(cursor): call-site web — InkWell daba cursor de mano al
+      // hover, TreinoTappable no trae MouseRegion. Fix local seguro.
       return Expanded(
-        child: InkWell(
-          onTap: () => onChanged(v),
-          borderRadius: BorderRadius.circular(10),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            decoration: BoxDecoration(
-              color: active ? palette.accent.withValues(alpha: 0.15) : null,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: active ? palette.accent : palette.border,
-                width: active ? 1.5 : 1,
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: TreinoTappable(
+            onTap: () => onChanged(v),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              decoration: BoxDecoration(
+                color: active ? palette.accent.withValues(alpha: 0.15) : null,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: active ? palette.accent : palette.border,
+                  width: active ? 1.5 : 1,
+                ),
               ),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              label,
-              style: TextStyle(
-                color: active ? palette.accent : palette.textMuted,
-                fontSize: 13,
-                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                letterSpacing: 0.4,
+              alignment: Alignment.center,
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: active ? palette.accent : palette.textMuted,
+                  fontSize: 13,
+                  fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                  letterSpacing: 0.4,
+                ),
               ),
             ),
           ),
@@ -3252,34 +3429,47 @@ class _AntropoList extends ConsumerWidget {
       // Provider ordena ASC — queremos DESC para "más nuevas arriba".
       final ms = all.reversed.toList();
       if (ms.isEmpty) {
-        return Center(
-          child: Text(
-            'Este alumno todavía no tiene mediciones cargadas.', // i18n: Fase W2
-            textAlign: TextAlign.center,
-            style: TextStyle(color: palette.textMuted, fontSize: 14),
+        return TreinoStateSwitcher(
+          childKey: const ValueKey('empty'),
+          child: Center(
+            child: Text(
+              'Este alumno todavía no tiene mediciones cargadas.', // i18n: Fase W2
+              textAlign: TextAlign.center,
+              style: TextStyle(color: palette.textMuted, fontSize: 14),
+            ),
           ),
         );
       }
-      return ListView.separated(
-        itemCount: ms.length,
-        separatorBuilder: (_, __) => Divider(height: 1, color: palette.border),
-        itemBuilder: (_, i) => _MedicionRow(
-          measurement: ms[i],
-          palette: palette,
-          onDelete: () => onDelete(ms[i]),
-          onEdit: () => onEdit(ms[i]),
+      return TreinoStateSwitcher(
+        childKey: const ValueKey('data'),
+        child: ListView.separated(
+          itemCount: ms.length,
+          separatorBuilder: (_, __) =>
+              Divider(height: 1, color: palette.border),
+          itemBuilder: (_, i) => _MedicionRow(
+            measurement: ms[i],
+            palette: palette,
+            onDelete: () => onDelete(ms[i]),
+            onEdit: () => onEdit(ms[i]),
+          ),
         ),
       );
     }
     if (measAsync.hasError) {
-      return Center(
-        child: Text(
-          'No pudimos cargar las mediciones.', // i18n: Fase W2
-          style: TextStyle(color: palette.textMuted, fontSize: 14),
+      return TreinoStateSwitcher(
+        childKey: const ValueKey('error'),
+        child: Center(
+          child: Text(
+            'No pudimos cargar las mediciones.', // i18n: Fase W2
+            style: TextStyle(color: palette.textMuted, fontSize: 14),
+          ),
         ),
       );
     }
-    return Center(child: CircularProgressIndicator(color: palette.accent));
+    return TreinoStateSwitcher(
+      childKey: const ValueKey('loading'),
+      child: Center(child: CircularProgressIndicator(color: palette.accent)),
+    );
   }
 }
 
@@ -3304,34 +3494,47 @@ class _RendimientoList extends ConsumerWidget {
       final all = testsAsync.requireValue;
       final tests = all.reversed.toList();
       if (tests.isEmpty) {
-        return Center(
-          child: Text(
-            'Este alumno todavía no tiene pruebas de rendimiento cargadas.', // i18n: Fase W2
-            textAlign: TextAlign.center,
-            style: TextStyle(color: palette.textMuted, fontSize: 14),
+        return TreinoStateSwitcher(
+          childKey: const ValueKey('empty'),
+          child: Center(
+            child: Text(
+              'Este alumno todavía no tiene pruebas de rendimiento cargadas.', // i18n: Fase W2
+              textAlign: TextAlign.center,
+              style: TextStyle(color: palette.textMuted, fontSize: 14),
+            ),
           ),
         );
       }
-      return ListView.separated(
-        itemCount: tests.length,
-        separatorBuilder: (_, __) => Divider(height: 1, color: palette.border),
-        itemBuilder: (_, i) => _RendimientoRow(
-          test: tests[i],
-          palette: palette,
-          onDelete: () => onDelete(tests[i]),
-          onEdit: () => onEdit(tests[i]),
+      return TreinoStateSwitcher(
+        childKey: const ValueKey('data'),
+        child: ListView.separated(
+          itemCount: tests.length,
+          separatorBuilder: (_, __) =>
+              Divider(height: 1, color: palette.border),
+          itemBuilder: (_, i) => _RendimientoRow(
+            test: tests[i],
+            palette: palette,
+            onDelete: () => onDelete(tests[i]),
+            onEdit: () => onEdit(tests[i]),
+          ),
         ),
       );
     }
     if (testsAsync.hasError) {
-      return Center(
-        child: Text(
-          'No pudimos cargar las pruebas.', // i18n: Fase W2
-          style: TextStyle(color: palette.textMuted, fontSize: 14),
+      return TreinoStateSwitcher(
+        childKey: const ValueKey('error'),
+        child: Center(
+          child: Text(
+            'No pudimos cargar las pruebas.', // i18n: Fase W2
+            style: TextStyle(color: palette.textMuted, fontSize: 14),
+          ),
         ),
       );
     }
-    return Center(child: CircularProgressIndicator(color: palette.accent));
+    return TreinoStateSwitcher(
+      childKey: const ValueKey('loading'),
+      child: Center(child: CircularProgressIndicator(color: palette.accent)),
+    );
   }
 }
 
@@ -3373,8 +3576,15 @@ class _MedicionRowState extends State<_MedicionRow> {
   Widget build(BuildContext context) {
     final m = widget.measurement;
     final palette = widget.palette;
-    return InkWell(
-      onTap: () => setState(() => _expanded = !_expanded),
+    // MouseRegion(cursor): call-site web — InkWell daba cursor de mano al
+    // hover, TreinoTappable no trae MouseRegion. Fix local seguro.
+    // TreinoTappable envuelve solo el ícono de expandir + texto (Expanded):
+    // los IconButton de Editar/Eliminar quedan como siblings del Row
+    // exterior, fuera de su subtree, para que los dos recognizers no
+    // compitan en el gesture arena (ver _ExerciseRow en
+    // exercise_picker_sheet.dart).
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
         child: Column(
@@ -3382,35 +3592,44 @@ class _MedicionRowState extends State<_MedicionRow> {
           children: [
             Row(
               children: [
-                Icon(
-                  _expanded
-                      ? Icons.keyboard_arrow_down
-                      : Icons.keyboard_arrow_right,
-                  size: 22,
-                  color: palette.textMuted,
-                ),
-                const SizedBox(width: 8),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        fmtDate(m.recordedAt),
-                        style: TextStyle(
-                          color: palette.textPrimary,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _summary(),
-                        style: TextStyle(
+                  child: TreinoTappable(
+                    onTap: () => setState(() => _expanded = !_expanded),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _expanded
+                              ? Icons.keyboard_arrow_down
+                              : Icons.keyboard_arrow_right,
+                          size: 22,
                           color: palette.textMuted,
-                          fontSize: 12,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                fmtDate(m.recordedAt),
+                                style: TextStyle(
+                                  color: palette.textPrimary,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                _summary(),
+                                style: TextStyle(
+                                  color: palette.textMuted,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 IconButton(
@@ -4051,7 +4270,12 @@ class _NuevaMedicionSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (onToggle != null)
-          InkWell(onTap: onToggle, child: header)
+          // MouseRegion(cursor): call-site web — InkWell daba cursor de
+          // mano al hover, TreinoTappable no trae MouseRegion.
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: TreinoTappable(onTap: onToggle, child: header),
+          )
         else
           header,
         if (expanded)
@@ -4175,8 +4399,15 @@ class _RendimientoRowState extends State<_RendimientoRow> {
   Widget build(BuildContext context) {
     final t = widget.test;
     final palette = widget.palette;
-    return InkWell(
-      onTap: () => setState(() => _expanded = !_expanded),
+    // MouseRegion(cursor): call-site web — InkWell daba cursor de mano al
+    // hover, TreinoTappable no trae MouseRegion. Fix local seguro.
+    // TreinoTappable envuelve solo el ícono de expandir + texto (Expanded):
+    // los IconButton de Editar/Eliminar quedan como siblings del Row
+    // exterior, fuera de su subtree, para que los dos recognizers no
+    // compitan en el gesture arena (ver _ExerciseRow en
+    // exercise_picker_sheet.dart).
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
         child: Column(
@@ -4184,35 +4415,44 @@ class _RendimientoRowState extends State<_RendimientoRow> {
           children: [
             Row(
               children: [
-                Icon(
-                  _expanded
-                      ? Icons.keyboard_arrow_down
-                      : Icons.keyboard_arrow_right,
-                  size: 22,
-                  color: palette.textMuted,
-                ),
-                const SizedBox(width: 8),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        fmtDate(t.recordedAt),
-                        style: TextStyle(
-                          color: palette.textPrimary,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _summary(),
-                        style: TextStyle(
+                  child: TreinoTappable(
+                    onTap: () => setState(() => _expanded = !_expanded),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _expanded
+                              ? Icons.keyboard_arrow_down
+                              : Icons.keyboard_arrow_right,
+                          size: 22,
                           color: palette.textMuted,
-                          fontSize: 12,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                fmtDate(t.recordedAt),
+                                style: TextStyle(
+                                  color: palette.textPrimary,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                _summary(),
+                                style: TextStyle(
+                                  color: palette.textMuted,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 IconButton(
@@ -4892,43 +5132,51 @@ class _SeguimientoTabState extends ConsumerState<_SeguimientoTab> {
           ),
           const SizedBox(height: 20),
           Expanded(
-            child: Builder(
-              builder: (_) {
-                if (entriesAsync.hasValue) {
-                  final entries = entriesAsync.requireValue;
-                  if (entries.isEmpty) {
+            // Mismo patrón sticky-data que _ArchivosTab: el key espeja
+            // hasValue > hasError > loading para no cambiar la lógica.
+            child: TreinoStateSwitcher(
+              childKey: ValueKey(entriesAsync.hasValue
+                  ? 'data'
+                  : (entriesAsync.hasError ? 'error' : 'loading')),
+              child: Builder(
+                builder: (_) {
+                  if (entriesAsync.hasValue) {
+                    final entries = entriesAsync.requireValue;
+                    if (entries.isEmpty) {
+                      return Center(
+                        child: Text(
+                          'No hay entradas de seguimiento todavía.', // i18n: Fase W2
+                          textAlign: TextAlign.center,
+                          style:
+                              TextStyle(color: palette.textMuted, fontSize: 14),
+                        ),
+                      );
+                    }
+                    return ListView.separated(
+                      itemCount: entries.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (_, i) => _SeguimientoEntryCard(
+                        entry: entries[i],
+                        palette: palette,
+                        onEdit: () => _openDialog(initial: entries[i]),
+                        onDelete: () => _confirmDelete(entries[i]),
+                      ),
+                    );
+                  }
+                  if (entriesAsync.hasError) {
                     return Center(
                       child: Text(
-                        'No hay entradas de seguimiento todavía.', // i18n: Fase W2
-                        textAlign: TextAlign.center,
+                        'No pudimos cargar el seguimiento.', // i18n: Fase W2
                         style:
                             TextStyle(color: palette.textMuted, fontSize: 14),
                       ),
                     );
                   }
-                  return ListView.separated(
-                    itemCount: entries.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (_, i) => _SeguimientoEntryCard(
-                      entry: entries[i],
-                      palette: palette,
-                      onEdit: () => _openDialog(initial: entries[i]),
-                      onDelete: () => _confirmDelete(entries[i]),
-                    ),
-                  );
-                }
-                if (entriesAsync.hasError) {
                   return Center(
-                    child: Text(
-                      'No pudimos cargar el seguimiento.', // i18n: Fase W2
-                      style: TextStyle(color: palette.textMuted, fontSize: 14),
-                    ),
+                    child: CircularProgressIndicator(color: palette.accent),
                   );
-                }
-                return Center(
-                  child: CircularProgressIndicator(color: palette.accent),
-                );
-              },
+                },
+              ),
             ),
           ),
         ],
@@ -5429,120 +5677,129 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
     }
 
     if (_draft == null) {
-      return Center(child: CircularProgressIndicator(color: palette.accent));
+      return TreinoStateSwitcher(
+        childKey: const ValueKey('loading'),
+        child: Center(child: CircularProgressIndicator(color: palette.accent)),
+      );
     }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Expanded(
+    return TreinoStateSwitcher(
+      childKey: const ValueKey('form'),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Plan de alimentación', // i18n: Fase W2
+                        style: TextStyle(
+                          color: palette.textPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Armá el plan por comidas, grupos y opciones. Solo vos lo ves.', // i18n: Fase W2
+                        style:
+                            TextStyle(color: palette.textMuted, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: _saving ? null : _save,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: palette.accent,
+                    foregroundColor: palette.bg,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 12),
+                    shape: const StadiumBorder(),
+                  ),
+                  child: _saving
+                      ? SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: palette.bg,
+                          ),
+                        )
+                      : const Text('GUARDAR PLAN'), // i18n: Fase W2
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: SingleChildScrollView(
+                // Small top padding — el label flotante del TextFormField
+                // extiende ~8px arriba del border cuando el field tiene
+                // valor. Sin este padding el label queda clippeado por el
+                // SingleChildScrollView al scrollear.
+                padding: const EdgeInsets.only(top: 8),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(
-                      'Plan de alimentación', // i18n: Fase W2
-                      style: TextStyle(
-                        color: palette.textPrimary,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
+                    TextFormField(
+                      initialValue: _draft!.title,
+                      decoration: InputDecoration(
+                        labelText:
+                            'Título del plan (opcional)', // i18n: Fase W2
+                        hintText:
+                            'Ej: Progresión 4 - Semana 9 en adelante', // i18n: Fase W2
+                        labelStyle: TextStyle(color: palette.textMuted),
+                        hintStyle: TextStyle(
+                          color: palette.textMuted.withValues(alpha: 0.6),
+                        ),
+                        filled: true,
+                        fillColor: palette.bgCard,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: palette.border),
+                        ),
+                      ),
+                      style:
+                          TextStyle(color: palette.textPrimary, fontSize: 14),
+                      onChanged: _updateTitle,
+                    ),
+                    const SizedBox(height: 16),
+                    for (final meal in _draft!.meals)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _MealEditor(
+                          meal: meal,
+                          palette: palette,
+                          newIdFor: _newId,
+                          onChanged: (u) => _updateMeal(meal.id, u),
+                          onDelete: () => _removeMeal(meal.id),
+                        ),
+                      ),
+                    const SizedBox(height: 4),
+                    OutlinedButton.icon(
+                      onPressed: _addMeal,
+                      icon: const Icon(Icons.add, size: 16),
+                      label: const Text('AGREGAR COMIDA'), // i18n: Fase W2
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: palette.accent,
+                        side: BorderSide(color: palette.accent),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 18, vertical: 12),
+                        shape: const StadiumBorder(),
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Armá el plan por comidas, grupos y opciones. Solo vos lo ves.', // i18n: Fase W2
-                      style: TextStyle(color: palette.textMuted, fontSize: 13),
-                    ),
+                    const SizedBox(height: 24),
                   ],
                 ),
               ),
-              ElevatedButton(
-                onPressed: _saving ? null : _save,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: palette.accent,
-                  foregroundColor: palette.bg,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  shape: const StadiumBorder(),
-                ),
-                child: _saving
-                    ? SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: palette.bg,
-                        ),
-                      )
-                    : const Text('GUARDAR PLAN'), // i18n: Fase W2
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: SingleChildScrollView(
-              // Small top padding — el label flotante del TextFormField
-              // extiende ~8px arriba del border cuando el field tiene
-              // valor. Sin este padding el label queda clippeado por el
-              // SingleChildScrollView al scrollear.
-              padding: const EdgeInsets.only(top: 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  TextFormField(
-                    initialValue: _draft!.title,
-                    decoration: InputDecoration(
-                      labelText: 'Título del plan (opcional)', // i18n: Fase W2
-                      hintText:
-                          'Ej: Progresión 4 - Semana 9 en adelante', // i18n: Fase W2
-                      labelStyle: TextStyle(color: palette.textMuted),
-                      hintStyle: TextStyle(
-                        color: palette.textMuted.withValues(alpha: 0.6),
-                      ),
-                      filled: true,
-                      fillColor: palette.bgCard,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: palette.border),
-                      ),
-                    ),
-                    style: TextStyle(color: palette.textPrimary, fontSize: 14),
-                    onChanged: _updateTitle,
-                  ),
-                  const SizedBox(height: 16),
-                  for (final meal in _draft!.meals)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _MealEditor(
-                        meal: meal,
-                        palette: palette,
-                        newIdFor: _newId,
-                        onChanged: (u) => _updateMeal(meal.id, u),
-                        onDelete: () => _removeMeal(meal.id),
-                      ),
-                    ),
-                  const SizedBox(height: 4),
-                  OutlinedButton.icon(
-                    onPressed: _addMeal,
-                    icon: const Icon(Icons.add, size: 16),
-                    label: const Text('AGREGAR COMIDA'), // i18n: Fase W2
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: palette.accent,
-                      side: BorderSide(color: palette.accent),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 18, vertical: 12),
-                      shape: const StadiumBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                ],
-              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -5832,9 +6089,8 @@ class _SelectionModeSelector extends StatelessWidget {
   final ValueChanged<SelectionMode> onChanged;
 
   Widget _pill(String label, bool active, VoidCallback onTap) {
-    return GestureDetector(
+    return TreinoTappable(
       onTap: onTap,
-      behavior: HitTestBehavior.opaque,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(

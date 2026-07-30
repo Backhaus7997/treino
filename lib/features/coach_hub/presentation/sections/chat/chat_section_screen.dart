@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../app/theme/app_palette.dart';
+import '../../../../../core/widgets/motion/treino_state_switcher.dart';
 import 'widgets/chat_detail_pane.dart';
 import 'widgets/chat_empty_pane.dart';
 import 'widgets/chat_list_pane.dart';
@@ -47,9 +48,21 @@ class ChatSectionScreen extends ConsumerWidget {
         ),
         VerticalDivider(width: 1, color: palette.border),
         Expanded(
-          child: selectedChatId == null
-              ? const ChatEmptyPane()
-              : ChatDetailPane(chatId: selectedChatId),
+          child: TreinoStateSwitcher(
+            // ValueKey(selectedChatId == null), NO ValueKey(selectedChatId):
+            // la key solo debe diferenciar empty↔detail (el momento
+            // significativo que amerita cross-fade). Si la key varía en
+            // CADA cambio de chat, AnimatedSwitcher desmonta el
+            // ChatDetailPane viejo y monta uno nuevo — pierde el draft del
+            // composer y rompe la invariante del issue #435 (el adjunto en
+            // vuelo debe aterrizar en el chat donde el PF lo eligió; con
+            // remount, el guard `!mounted` lo descarta en silencio). Cambiar
+            // de chat→chat debe quedar in-place, sin remount, como en main.
+            childKey: ValueKey(selectedChatId == null),
+            child: selectedChatId == null
+                ? const ChatEmptyPane()
+                : ChatDetailPane(chatId: selectedChatId),
+          ),
         ),
       ],
     );

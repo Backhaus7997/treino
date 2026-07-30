@@ -4,7 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/motion/treino_fade_slide_in.dart';
+import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../application/agenda_providers.dart';
 import '../domain/availability_override.dart';
 import '../domain/availability_rule.dart';
@@ -82,65 +85,96 @@ class _EditorBody extends ConsumerWidget {
     // Distinguish loading and error from a genuinely empty config: collapsing
     // both into `?? const []` would show the empty-state hints on first load
     // and silently hide stream failures behind the same hints.
+    final stateKey = rulesAsync.isLoading || overridesAsync.isLoading
+        ? 'loading'
+        : (rulesAsync.hasError || overridesAsync.hasError ? 'error' : 'data');
+
+    Widget child;
     if (rulesAsync.isLoading || overridesAsync.isLoading) {
-      return Center(child: CircularProgressIndicator(color: palette.accent));
-    }
-    if (rulesAsync.hasError || overridesAsync.hasError) {
-      return _ErrorState(
+      child = Center(child: CircularProgressIndicator(color: palette.accent));
+    } else if (rulesAsync.hasError || overridesAsync.hasError) {
+      child = _ErrorState(
         palette: palette,
         onRetry: () {
           ref.invalidate(availabilityRulesStreamProvider(trainerId));
           ref.invalidate(overridesStreamProvider(overridesKey));
         },
       );
+    } else {
+      final rules = rulesAsync.valueOrNull ?? const [];
+      final overrides = overridesAsync.valueOrNull ?? const [];
+
+      // SingleChildScrollView + Column (no ListView(children:)): un ListView,
+      // aunque construya sus widgets eager, sigue siendo un viewport — los
+      // Elements/State de los TreinoFadeSlideIn que salen del cacheExtent se
+      // desmontan y re-animan al volver a scrollear. Column dentro de
+      // SingleChildScrollView scrollea como una sola unidad, sin reciclar
+      // Elements por ítem (ver doc de TreinoFadeSlideIn).
+      child = SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // ── Rules section ───────────────────────────────────────────────
+            const _SectionHeader(label: 'MIS HORARIOS DE TRABAJO'),
+            const SizedBox(height: 12),
+            if (rules.isEmpty)
+              const _EmptyHint(
+                message:
+                    'Sin horarios configurados. Agregá uno para que tus alumnos puedan reservar.',
+              )
+            else
+              for (final (i, rule) in rules.indexed)
+                TreinoFadeSlideIn(
+                  delay: AppMotion.stagger(i),
+                  child: _RuleTile(
+                    rule: rule,
+                    trainerId: trainerId,
+                    onEdit: () => _openRuleForm(context, ref, rule: rule),
+                    onDelete: () => _confirmDeleteRule(context, ref, rule),
+                  ),
+                ),
+            const SizedBox(height: 16),
+            _AddButton(
+              label: AppL10n.of(context).agendaAddRuleCta,
+              onTap: () => _openRuleForm(context, ref),
+            ),
+
+            const SizedBox(height: 32),
+
+            // ── Overrides section ───────────────────────────────────────────
+            const _SectionHeader(label: 'EXCEPCIONES'),
+            const SizedBox(height: 12),
+            if (overrides.isEmpty)
+              const _EmptyHint(message: 'Sin excepciones.'),
+            // Continúa el índice de MIS HORARIOS (rules.length + i) en vez de
+            // reiniciar en 0: dos cascadas paralelas que arrancan juntas
+            // rompían el orden de lectura top-to-bottom que el stagger
+            // comunica — el primer tile de EXCEPCIONES aparecía simultáneo
+            // con el primero de MIS HORARIOS pese a estar más abajo.
+            for (final (i, avOverride) in overrides.indexed)
+              TreinoFadeSlideIn(
+                delay: AppMotion.stagger(rules.length + i),
+                child: _OverrideTile(
+                  availOverride: avOverride,
+                  trainerId: trainerId,
+                  onDelete: () =>
+                      _confirmDeleteOverride(context, ref, avOverride),
+                ),
+              ),
+            const SizedBox(height: 16),
+            _AddButton(
+              label: AppL10n.of(context).agendaBlockDayCta,
+              onTap: () => _openBlockOverrideForm(context, ref),
+            ),
+          ],
+        ),
+      );
     }
 
-    final rules = rulesAsync.valueOrNull ?? const [];
-    final overrides = overridesAsync.valueOrNull ?? const [];
-
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-      children: [
-        // ── Rules section ───────────────────────────────────────────────────
-        const _SectionHeader(label: 'MIS HORARIOS DE TRABAJO'),
-        const SizedBox(height: 12),
-        if (rules.isEmpty)
-          const _EmptyHint(
-            message:
-                'Sin horarios configurados. Agregá uno para que tus alumnos puedan reservar.',
-          )
-        else
-          for (final rule in rules)
-            _RuleTile(
-              rule: rule,
-              trainerId: trainerId,
-              onEdit: () => _openRuleForm(context, ref, rule: rule),
-              onDelete: () => _confirmDeleteRule(context, ref, rule),
-            ),
-        const SizedBox(height: 16),
-        _AddButton(
-          label: AppL10n.of(context).agendaAddRuleCta,
-          onTap: () => _openRuleForm(context, ref),
-        ),
-
-        const SizedBox(height: 32),
-
-        // ── Overrides section ───────────────────────────────────────────────
-        const _SectionHeader(label: 'EXCEPCIONES'),
-        const SizedBox(height: 12),
-        if (overrides.isEmpty) const _EmptyHint(message: 'Sin excepciones.'),
-        for (final avOverride in overrides)
-          _OverrideTile(
-            availOverride: avOverride,
-            trainerId: trainerId,
-            onDelete: () => _confirmDeleteOverride(context, ref, avOverride),
-          ),
-        const SizedBox(height: 16),
-        _AddButton(
-          label: AppL10n.of(context).agendaBlockDayCta,
-          onTap: () => _openBlockOverrideForm(context, ref),
-        ),
-      ],
+    return TreinoStateSwitcher(
+      childKey: ValueKey(stateKey),
+      child: child,
     );
   }
 

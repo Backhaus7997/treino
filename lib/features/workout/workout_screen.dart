@@ -66,6 +66,16 @@ class _AthleteWorkout extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final theme = Theme.of(context);
+    final textScaler = MediaQuery.textScalerOf(context);
+    final labelStyle = theme.textTheme.labelLarge?.copyWith(
+      fontWeight: FontWeight.w700,
+      letterSpacing: 0.5,
+    );
+    final scaledLabelHeight = textScaler.scale(labelStyle?.fontSize ?? 14) *
+        (labelStyle?.height ?? 1.2);
+    final tabHeight =
+        scaledLabelHeight + 20 < 40 ? 40.0 : scaledLabelHeight + 20;
+    final scrollTabs = textScaler.scale(1) > 1.3;
 
     return DefaultTabController(
       length: _labels.length,
@@ -85,6 +95,8 @@ class _AthleteWorkout extends StatelessWidget {
               ),
             ),
             child: TabBar(
+              isScrollable: scrollTabs,
+              tabAlignment: scrollTabs ? TabAlignment.start : TabAlignment.fill,
               dividerColor: Colors.transparent,
               indicatorSize: TabBarIndicatorSize.tab,
               indicator: BoxDecoration(
@@ -94,11 +106,19 @@ class _AthleteWorkout extends StatelessWidget {
               splashBorderRadius: BorderRadius.circular(20),
               labelColor: palette.bg,
               unselectedLabelColor: palette.textMuted,
-              labelStyle: theme.textTheme.labelLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.5,
-              ),
-              tabs: [for (final l in _labels) Tab(text: l, height: 40)],
+              labelStyle: labelStyle,
+              tabs: [
+                for (final label in _labels)
+                  Tab(
+                    height: tabHeight,
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      softWrap: false,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+              ],
             ),
           ),
           const SizedBox(height: 8),
@@ -136,7 +156,13 @@ class _TuEntrenoPageState extends State<_TuEntrenoPage>
     super.build(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: ListView(
+      // SingleChildScrollView + Column (no ListView(children:)): un ListView,
+      // aunque construya sus widgets eager, sigue siendo un viewport — los
+      // Elements/State de los TreinoFadeSlideIn que salen del cacheExtent se
+      // desmontan y re-animan al volver a scrollear. Column dentro de
+      // SingleChildScrollView scrollea como una sola unidad, sin reciclar
+      // Elements por ítem (ver doc de TreinoFadeSlideIn).
+      child: SingleChildScrollView(
         // + bottom inset: the floating bar overlays the body (extendBody),
         // so the last item needs room to scroll out from behind it.
         padding: EdgeInsets.fromLTRB(
@@ -146,17 +172,20 @@ class _TuEntrenoPageState extends State<_TuEntrenoPage>
           20 + MediaQuery.paddingOf(context).bottom,
         ),
         physics: const AlwaysScrollableScrollPhysics(),
-        children: [
-          TreinoFadeSlideIn(
-            delay: AppMotion.stagger(0),
-            child: const RutinasSection(),
-          ),
-          const SizedBox(height: 12),
-          TreinoFadeSlideIn(
-            delay: AppMotion.stagger(1),
-            child: const HistorialSection(),
-          ),
-        ],
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TreinoFadeSlideIn(
+              delay: AppMotion.stagger(0),
+              child: const RutinasSection(),
+            ),
+            const SizedBox(height: 12),
+            TreinoFadeSlideIn(
+              delay: AppMotion.stagger(1),
+              child: const HistorialSection(),
+            ),
+          ],
+        ),
       ),
     );
   }

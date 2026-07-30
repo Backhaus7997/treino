@@ -6,6 +6,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../../../../app/theme/app_palette.dart';
+import '../../../../../../core/widgets/motion/treino_state_switcher.dart';
+import '../../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../../../core/widgets/treino_icon.dart';
 import '../../../../../chat/application/chat_media_send_controller.dart';
 import '../../../../../chat/application/chat_providers.dart';
@@ -230,23 +232,30 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
           ),
           Divider(height: 1, color: palette.border),
           Expanded(
-            child: messagesAsync.when(
-              loading: () => Center(
-                child: CircularProgressIndicator(color: palette.accent),
-              ),
-              error: (_, __) => Center(
-                child: Text(
-                  'No pudimos cargar los mensajes.', // i18n: Fase W2
-                  style: GoogleFonts.barlow(
-                    fontWeight: FontWeight.w400,
-                    fontSize: 13,
-                    color: palette.textMuted,
+            child: TreinoStateSwitcher(
+              childKey: ValueKey(messagesAsync.when(
+                loading: () => 'loading',
+                error: (_, __) => 'error',
+                data: (_) => 'data',
+              )),
+              child: messagesAsync.when(
+                loading: () => Center(
+                  child: CircularProgressIndicator(color: palette.accent),
+                ),
+                error: (_, __) => Center(
+                  child: Text(
+                    'No pudimos cargar los mensajes.', // i18n: Fase W2
+                    style: GoogleFonts.barlow(
+                      fontWeight: FontWeight.w400,
+                      fontSize: 13,
+                      color: palette.textMuted,
+                    ),
                   ),
                 ),
-              ),
-              data: (messages) => _MessagesList(
-                messages: messages,
-                currentUid: currentUid ?? '',
+                data: (messages) => _MessagesList(
+                  messages: messages,
+                  currentUid: currentUid ?? '',
+                ),
               ),
             ),
           ),
@@ -521,10 +530,9 @@ class _Composer extends StatelessWidget {
           // mientras hay upload o send en curso para evitar dobles envíos.
           Tooltip(
             message: 'Adjuntar foto o video', // i18n: Fase W2
-            child: GestureDetector(
+            child: TreinoTappable(
               key: const Key('chat_composer_attach_button'),
               onTap: sending ? null : onAttach,
-              behavior: HitTestBehavior.opaque,
               child: Container(
                 width: 40,
                 height: 40,
@@ -588,10 +596,9 @@ class _Composer extends StatelessWidget {
           const SizedBox(width: 8),
           // Botón enviar — mockup: cuadro mint sólido con el avión en el
           // color de fondo. Redondeado, no un IconButton suelto.
-          GestureDetector(
+          TreinoTappable(
             key: const Key('chat_send_button'),
             onTap: sending ? null : onSend,
-            behavior: HitTestBehavior.opaque,
             child: Container(
               width: 44,
               height: 44,

@@ -43,6 +43,15 @@ class AppMotion {
   /// `40ms` — intervalo entre hermanos en un stagger. Ver [stagger].
   static const Duration staggerStep = Duration(milliseconds: 40);
 
+  /// `1400ms` — flourish decorativo one-shot de cierre (p. ej.
+  /// `TreinoConfetti`), NO feedback de UI. Escalón aparte de
+  /// micro/fast/base/slow: esos cuatro miden qué tan rápido responde la
+  /// interfaz a una acción del usuario; este mide cuánto dura un festejo
+  /// visual puro que nadie espera para poder seguir interactuando. Usar solo
+  /// para el momento más celebratorio del flujo (no para transiciones ni
+  /// estados) — abusarlo banaliza el gesto.
+  static const Duration celebration = Duration(milliseconds: 1400);
+
   // ---------------------------------------------------------------------------
   // Curvas (semánticas).
   // ---------------------------------------------------------------------------

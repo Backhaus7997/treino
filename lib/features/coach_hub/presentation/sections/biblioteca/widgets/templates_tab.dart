@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/presentation/widgets/athlete_picker_sheet.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
@@ -50,59 +51,66 @@ class TemplatesTab extends ConsumerWidget {
           ),
         ),
         Expanded(
-          child: templatesAsync.when(
-            loading: () =>
-                Center(child: CircularProgressIndicator(color: palette.accent)),
-            error: (e, _) => Center(
-              child: Text(
-                'Error al cargar plantillas.', // i18n
-                style: GoogleFonts.barlow(
-                  color: palette.textMuted,
-                  fontSize: 14,
+          child: TreinoStateSwitcher(
+            childKey: ValueKey(templatesAsync.when(
+              loading: () => 'loading',
+              error: (_, __) => 'error',
+              data: (templates) => templates.isEmpty ? 'empty' : 'data',
+            )),
+            child: templatesAsync.when(
+              loading: () => Center(
+                  child: CircularProgressIndicator(color: palette.accent)),
+              error: (e, _) => Center(
+                child: Text(
+                  'Error al cargar plantillas.', // i18n
+                  style: GoogleFonts.barlow(
+                    color: palette.textMuted,
+                    fontSize: 14,
+                  ),
                 ),
               ),
-            ),
-            data: (templates) {
-              if (templates.isEmpty) {
-                return Center(
-                  child: Text(
-                    'Todavía no creaste plantillas.\n'
-                    'Tocá "Nueva plantilla" para armar una.', // i18n
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.barlow(
-                      color: palette.textMuted,
-                      fontSize: 14,
-                    ),
-                  ),
-                );
-              }
-
-              return GridView.builder(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: 360,
-                  childAspectRatio: 1.6,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                ),
-                itemCount: templates.length,
-                itemBuilder: (context, index) {
-                  final routine = templates[index];
-                  return TemplateGridCard(
-                    routine: routine,
-                    onTap: () => showTemplateDetailDialog(
-                      context,
-                      routine,
-                      onEdit: () =>
-                          context.push('/template-editor/${routine.id}'),
-                      onUse: () =>
-                          _assignTemplateToAthlete(context, ref, routine),
-                      onDelete: () => _deleteTemplate(context, ref, routine),
+              data: (templates) {
+                if (templates.isEmpty) {
+                  return Center(
+                    child: Text(
+                      'Todavía no creaste plantillas.\n'
+                      'Tocá "Nueva plantilla" para armar una.', // i18n
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.barlow(
+                        color: palette.textMuted,
+                        fontSize: 14,
+                      ),
                     ),
                   );
-                },
-              );
-            },
+                }
+
+                return GridView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: 360,
+                    childAspectRatio: 1.6,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                  ),
+                  itemCount: templates.length,
+                  itemBuilder: (context, index) {
+                    final routine = templates[index];
+                    return TemplateGridCard(
+                      routine: routine,
+                      onTap: () => showTemplateDetailDialog(
+                        context,
+                        routine,
+                        onEdit: () =>
+                            context.push('/template-editor/${routine.id}'),
+                        onUse: () =>
+                            _assignTemplateToAthlete(context, ref, routine),
+                        onDelete: () => _deleteTemplate(context, ref, routine),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
           ),
         ),
       ],

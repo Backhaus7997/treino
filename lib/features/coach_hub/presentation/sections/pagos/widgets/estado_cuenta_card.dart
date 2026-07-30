@@ -9,6 +9,8 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/core/widgets/motion/treino_count_up.dart';
+import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart'
     show CobroPendiente;
 
@@ -80,11 +82,14 @@ class _EstadoCuentaCardState extends State<EstadoCuentaCard> {
           Text('Pendiente de cobro', // i18n
               style: TextStyle(color: palette.textMuted, fontSize: 12)),
           const SizedBox(height: 4),
-          Text(fmtArs(total),
-              style: TextStyle(
-                  color: palette.warning,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700)),
+          TreinoCountUp(
+            value: total,
+            formatter: (v) => fmtArs(v.round()),
+            style: TextStyle(
+                color: palette.warning,
+                fontSize: 24,
+                fontWeight: FontWeight.w700),
+          ),
           const SizedBox(height: 12),
           for (final c in pending)
             Padding(
@@ -136,7 +141,10 @@ class _EstadoCuentaCardState extends State<EstadoCuentaCard> {
         border: Border.all(color: palette.border),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: inner,
+      child: TreinoStateSwitcher(
+        childKey: ValueKey(pending.isEmpty ? 'empty' : 'pending'),
+        child: inner,
+      ),
     );
   }
 }

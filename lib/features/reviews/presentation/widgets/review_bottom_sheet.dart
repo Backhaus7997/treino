@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/widgets/motion/treino_fade_slide_in.dart';
+import '../../../../core/widgets/motion/treino_success_check.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../application/review_notifier.dart';
 import '../../domain/review.dart';
@@ -106,7 +108,20 @@ class _ReviewBottomSheetState extends ConsumerState<ReviewBottomSheet> {
     } else {
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.reviewSnackBarSuccess)),
+        SnackBar(
+          content: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // El pop de la sheet ya pasó (línea de arriba) antes de armar
+              // este SnackBar, así que el check chico dibujándose acá no
+              // compite con ninguna navegación — solo acompaña el mensaje
+              // mientras el SnackBar hace su propia entrada.
+              const TreinoSuccessCheck(size: 18, strokeWidth: 2),
+              const SizedBox(width: 10),
+              Flexible(child: Text(l10n.reviewSnackBarSuccess)),
+            ],
+          ),
+        ),
       );
     }
   }
@@ -126,113 +141,115 @@ class _ReviewBottomSheetState extends ConsumerState<ReviewBottomSheet> {
           top: 20,
           bottom: MediaQuery.of(context).viewInsets.bottom + 20,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Drag handle
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: palette.border,
-                  borderRadius: BorderRadius.circular(2),
+        child: TreinoFadeSlideIn(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Drag handle
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: palette.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 18),
-            // Title
-            Text(
-              _title(l10n),
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 18,
-                color: palette.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 18),
-            // Star rating
-            Center(
-              child: StarRatingInput(
-                rating: _rating,
-                onRatingChanged: (v) => setState(() => _rating = v),
-              ),
-            ),
-            const SizedBox(height: 18),
-            // Comment field
-            TextField(
-              controller: _commentController,
-              maxLength: 500,
-              maxLines: 4,
-              minLines: 2,
-              style: GoogleFonts.barlow(color: palette.textPrimary),
-              decoration: InputDecoration(
-                hintText: l10n.reviewSheetCommentHint,
-                hintStyle: GoogleFonts.barlow(color: palette.textMuted),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: palette.border),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: palette.accent),
-                  borderRadius: BorderRadius.circular(12),
+              const SizedBox(height: 18),
+              // Title
+              Text(
+                _title(l10n),
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 18,
+                  color: palette.textPrimary,
                 ),
               ),
-            ),
-            const SizedBox(height: 18),
-            // Action row
-            Row(
-              children: [
-                Expanded(
-                  child: TextButton(
-                    onPressed:
-                        isLoading ? null : () => Navigator.of(context).pop(),
-                    child: Text(
-                      l10n.reviewSheetCancel,
-                      style: GoogleFonts.barlowCondensed(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                        letterSpacing: 0.8,
-                        color: palette.textMuted,
+              const SizedBox(height: 18),
+              // Star rating
+              Center(
+                child: StarRatingInput(
+                  rating: _rating,
+                  onRatingChanged: (v) => setState(() => _rating = v),
+                ),
+              ),
+              const SizedBox(height: 18),
+              // Comment field
+              TextField(
+                controller: _commentController,
+                maxLength: 500,
+                maxLines: 4,
+                minLines: 2,
+                style: GoogleFonts.barlow(color: palette.textPrimary),
+                decoration: InputDecoration(
+                  hintText: l10n.reviewSheetCommentHint,
+                  hintStyle: GoogleFonts.barlow(color: palette.textMuted),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: palette.border),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: palette.accent),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              // Action row
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed:
+                          isLoading ? null : () => Navigator.of(context).pop(),
+                      child: Text(
+                        l10n.reviewSheetCancel,
+                        style: GoogleFonts.barlowCondensed(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          letterSpacing: 0.8,
+                          color: palette.textMuted,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: (_rating > 0 && !isLoading) ? _onSubmit : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: palette.accent,
-                      foregroundColor: palette.bg,
-                      minimumSize: const Size.fromHeight(48),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(9999),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: (_rating > 0 && !isLoading) ? _onSubmit : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: palette.accent,
+                        foregroundColor: palette.bg,
+                        minimumSize: const Size.fromHeight(48),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(9999),
+                        ),
                       ),
+                      child: isLoading
+                          ? SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: palette.bg,
+                              ),
+                            )
+                          : Text(
+                              l10n.reviewSheetSubmit,
+                              style: GoogleFonts.barlowCondensed(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
                     ),
-                    child: isLoading
-                        ? SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: palette.bg,
-                            ),
-                          )
-                        : Text(
-                            l10n.reviewSheetSubmit,
-                            style: GoogleFonts.barlowCondensed(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                              letterSpacing: 0.8,
-                            ),
-                          ),
                   ),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

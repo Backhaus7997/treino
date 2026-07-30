@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/core/image/avatar_cropper.dart';
+import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/avatar_web_uploader.dart';
@@ -21,16 +22,23 @@ class CuentaTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profileAsync = ref.watch(userProfileProvider);
-    return profileAsync.when(
-      loading: () => const Padding(
-        padding: EdgeInsets.symmetric(vertical: 48),
-        child: Center(child: CircularProgressIndicator()),
+    return TreinoStateSwitcher(
+      childKey: ValueKey(profileAsync.when(
+        loading: () => 'loading',
+        error: (_, __) => 'error',
+        data: (profile) => profile == null ? 'error' : 'data',
+      )),
+      child: profileAsync.when(
+        loading: () => const Padding(
+          padding: EdgeInsets.symmetric(vertical: 48),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+        error: (_, __) =>
+            const _Muted('No se pudo cargar tu cuenta.'), // i18n: Fase W3
+        data: (profile) => profile == null
+            ? const _Muted('No se pudo cargar tu cuenta.') // i18n: Fase W3
+            : _CuentaForm(profile: profile),
       ),
-      error: (_, __) =>
-          const _Muted('No se pudo cargar tu cuenta.'), // i18n: Fase W3
-      data: (profile) => profile == null
-          ? const _Muted('No se pudo cargar tu cuenta.') // i18n: Fase W3
-          : _CuentaForm(profile: profile),
     );
   }
 }

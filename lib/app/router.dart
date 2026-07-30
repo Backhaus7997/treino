@@ -314,17 +314,25 @@ GoRouter buildRouter({
       // First-class destination for past sessions, reached from the "Ver todo"
       // affordance in HistorialSection. Declared before the `:sessionId` detail
       // route so the literal `/workout/historial` matches the list, not detail.
+      // TREINO Motion B9: _report (Cupertino nativo + fade) — se abre como un
+      // informe de sesiones pasadas, mismo criterio que el hub de insights.
       GoRoute(
         path: '/workout/historial',
-        builder: (context, state) => const SessionHistoryScreen(),
+        pageBuilder: (_, state) =>
+            _report(state.pageKey, const SessionHistoryScreen()),
       ),
 
       // ─── Historial detail — TOP-LEVEL ROUTE (outside ShellRoute) ──────────
       // Immersive: oculta la bottom bar. Design §11-12.
+      // TREINO Motion B9: _report — el detalle de una sesión pasada es, en
+      // esencia, el mismo tipo de "informe" que el resto de insights.
       GoRoute(
         path: '/workout/historial/:sessionId',
-        builder: (context, state) => SessionDetailScreen(
-          sessionId: state.pathParameters['sessionId']!,
+        pageBuilder: (_, state) => _report(
+          state.pageKey,
+          SessionDetailScreen(
+            sessionId: state.pathParameters['sessionId']!,
+          ),
         ),
       ),
 

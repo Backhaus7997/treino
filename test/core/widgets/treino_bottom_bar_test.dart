@@ -3,8 +3,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/treino_bottom_bar.dart';
 
-Widget _wrap(Widget child) => MaterialApp(
+Widget _wrap(
+  Widget child, {
+  TextScaler textScaler = TextScaler.noScaling,
+}) =>
+    MaterialApp(
       theme: AppTheme.dark(),
+      builder: (context, appChild) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+        child: appChild!,
+      ),
       home: Scaffold(body: child),
     );
 
@@ -145,5 +153,30 @@ void main() {
       expect(find.text('2'), findsOneWidget);
       expect(find.text('3'), findsOneWidget);
     });
+  });
+
+  testWidgets(
+      'accessibility text scale keeps every destination readable and tappable',
+      (tester) async {
+    await tester.pumpWidget(
+      _wrap(
+        TreinoBottomBar(currentIndex: 0, onTap: (_) {}),
+        textScaler: const TextScaler.linear(3.2),
+      ),
+    );
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    for (final label in ['ENTRENAR', 'FEED', 'INICIO', 'COACH', 'PERFIL']) {
+      expect(find.text(label, skipOffstage: false), findsOneWidget);
+      expect(find.bySemanticsLabel(label), findsOneWidget);
+      final text = tester.widget<Text>(
+        find.text(label, skipOffstage: false),
+      );
+      expect(text.maxLines, 1);
+      expect(text.softWrap, isFalse);
+    }
+    expect(find.byType(FittedBox), findsNothing);
+    expect(find.byType(SingleChildScrollView), findsOneWidget);
   });
 }

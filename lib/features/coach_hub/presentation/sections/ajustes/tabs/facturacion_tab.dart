@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/subscription_tier.dart';
@@ -204,9 +205,8 @@ class _ChangePlanButton extends StatelessWidget {
     return Semantics(
       button: true,
       label: 'Cambiar plan', // i18n: Fase W3
-      child: GestureDetector(
+      child: TreinoTappable(
         onTap: () => context.push('/facturacion/planes'),
-        behavior: HitTestBehavior.opaque,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(

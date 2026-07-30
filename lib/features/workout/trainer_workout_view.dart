@@ -3,8 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../app/theme/app_motion.dart';
 import '../../app/theme/app_palette.dart';
 import '../../l10n/app_l10n.dart';
+import '../../core/widgets/motion/treino_fade_slide_in.dart';
+import '../../core/widgets/motion/treino_state_switcher.dart';
 import '../../core/widgets/treino_icon.dart';
 import '../coach/presentation/widgets/athlete_picker_sheet.dart';
 import '../profile/application/user_public_profile_providers.dart';
@@ -44,38 +47,60 @@ class TrainerWorkoutView extends ConsumerWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: ListView(
+      // SingleChildScrollView + Column (no ListView(children:)): un
+      // ListView, aunque construya sus widgets eager, sigue siendo un
+      // viewport — los Elements/State de los TreinoFadeSlideIn que salen del
+      // cacheExtent se desmontan y re-animan al volver a scrollear. Column
+      // dentro de SingleChildScrollView scrollea como una sola unidad, sin
+      // reciclar Elements por ítem (ver doc de TreinoFadeSlideIn).
+      child: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(vertical: 20),
         physics: const ClampingScrollPhysics(),
-        children: [
-          Text(
-            'CREAR PLANES',
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 28,
-              letterSpacing: 0.5,
-              color: palette.textPrimary,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TreinoFadeSlideIn(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'CREAR PLANES',
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 28,
+                      letterSpacing: 0.5,
+                      color: palette.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Tu espacio para armar plantillas de rutina y asignarlas a tus alumnos.',
+                    style: GoogleFonts.barlow(
+                      fontWeight: FontWeight.w400,
+                      fontSize: 14,
+                      color: palette.textMuted,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Tu espacio para armar plantillas de rutina y asignarlas a tus alumnos.',
-            style: GoogleFonts.barlow(
-              fontWeight: FontWeight.w400,
-              fontSize: 14,
-              color: palette.textMuted,
+            const SizedBox(height: 20),
+            TreinoFadeSlideIn(
+              delay: AppMotion.stagger(1),
+              child: _AssignFromAlumnoCard(palette: palette),
             ),
-          ),
-          const SizedBox(height: 20),
-          _AssignFromAlumnoCard(palette: palette),
-          const SizedBox(height: 12),
-          _TemplateLibrarySection(
-            palette: palette,
-            templatesAsync: templatesAsync,
-            uid: uid,
-            sharedWithAthletes: sharedFlag,
-          ),
-        ],
+            const SizedBox(height: 12),
+            TreinoFadeSlideIn(
+              delay: AppMotion.stagger(2),
+              child: _TemplateLibrarySection(
+                palette: palette,
+                templatesAsync: templatesAsync,
+                uid: uid,
+                sharedWithAthletes: sharedFlag,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -239,50 +264,60 @@ class _TemplateLibrarySection extends ConsumerWidget {
             onChanged: (v) => _onToggleShared(context, ref, v),
           ),
           const SizedBox(height: 8),
-          templatesAsync.when(
-            loading: () => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              child: Center(
-                child: SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2.2, color: palette.accent),
+          TreinoStateSwitcher(
+            childKey: ValueKey(templatesAsync.when(
+              loading: () => 'loading',
+              error: (_, __) => 'error',
+              data: (templates) => templates.isEmpty ? 'empty' : 'data',
+            )),
+            child: templatesAsync.when(
+              loading: () => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: Center(
+                  child: SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2.2, color: palette.accent),
+                  ),
                 ),
               ),
-            ),
-            error: (_, __) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              child: Text(
-                'No pudimos cargar tus plantillas.',
-                style:
-                    GoogleFonts.barlow(color: palette.textMuted, fontSize: 13),
+              error: (_, __) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Text(
+                  'No pudimos cargar tus plantillas.',
+                  style: GoogleFonts.barlow(
+                      color: palette.textMuted, fontSize: 13),
+                ),
               ),
-            ),
-            data: (templates) {
-              if (templates.isEmpty) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Text(
-                    'Todavía no creaste ninguna plantilla. Pegale a NUEVA para armar la primera.',
-                    style: GoogleFonts.barlow(
-                      fontWeight: FontWeight.w400,
-                      fontSize: 13,
-                      height: 1.4,
-                      color: palette.textPrimary,
+              data: (templates) {
+                if (templates.isEmpty) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Text(
+                      'Todavía no creaste ninguna plantilla. Pegale a NUEVA para armar la primera.',
+                      style: GoogleFonts.barlow(
+                        fontWeight: FontWeight.w400,
+                        fontSize: 13,
+                        height: 1.4,
+                        color: palette.textPrimary,
+                      ),
                     ),
-                  ),
-                );
-              }
-              return Column(
-                children: [
-                  for (final t in templates) ...[
-                    _TemplateCard(template: t, palette: palette),
-                    const SizedBox(height: 8),
+                  );
+                }
+                return Column(
+                  children: [
+                    for (final (index, t) in templates.indexed) ...[
+                      TreinoFadeSlideIn(
+                        delay: AppMotion.stagger(index),
+                        child: _TemplateCard(template: t, palette: palette),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
                   ],
-                ],
-              );
-            },
+                );
+              },
+            ),
           ),
         ],
       ),

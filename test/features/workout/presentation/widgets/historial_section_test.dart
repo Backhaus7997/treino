@@ -52,6 +52,7 @@ Future<void> _pumpHistorialSection(
   bool loading = false,
   bool error = false,
   List<GoRoute> extraRoutes = const [],
+  TextScaler textScaler = TextScaler.noScaling,
 }) async {
   final router = GoRouter(
     initialLocation: '/workout',
@@ -85,6 +86,10 @@ Future<void> _pumpHistorialSection(
       ],
       child: MaterialApp.router(
         theme: AppTheme.dark(),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+          child: child!,
+        ),
         routerConfig: router,
         localizationsDelegates: AppL10n.localizationsDelegates,
         supportedLocales: AppL10n.supportedLocales,
@@ -98,6 +103,38 @@ Future<void> _pumpHistorialSection(
 
 void main() {
   group('HistorialSection', () {
+    testWidgets(
+        'accessibility text scale stacks header and session metrics without overflow',
+        (tester) async {
+      await _pumpHistorialSection(
+        tester,
+        sessions: [
+          _makeSession(
+            routineName: 'Rutina con nombre largo para Dynamic Type',
+          ),
+        ],
+        textScaler: const TextScaler.linear(3.2),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(
+        tester.getTopLeft(find.text('Ver todo')).dy,
+        greaterThan(tester.getTopLeft(find.text('HISTORIAL')).dy),
+      );
+      expect(
+        tester.getTopLeft(find.text('100 kg')).dy,
+        greaterThan(
+          tester
+              .getTopLeft(
+                find.text('Rutina con nombre largo para Dynamic Type'),
+              )
+              .dy,
+        ),
+      );
+      expect(find.text('Ver todo').hitTestable(), findsOneWidget);
+    });
+
     // SCENARIO-355: widget mounts without parameters
     testWidgets('SCENARIO-355: HistorialSection mounts without parameters',
         (tester) async {

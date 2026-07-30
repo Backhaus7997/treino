@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../../app/theme/app_palette.dart';
+import '../../../../../core/widgets/motion/treino_tappable.dart';
 
 /// Un alumno candidato a conservar en el flujo keep-2. Vista mínima — el
 /// wiring real (leer trainer_links + aplicar la selección vía CF) es PR5.
@@ -154,9 +155,8 @@ class _StudentRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Opacity(
       opacity: disabled ? 0.4 : 1,
-      child: GestureDetector(
+      child: TreinoTappable(
         onTap: disabled ? null : onTap,
-        behavior: HitTestBehavior.opaque,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
@@ -229,9 +229,8 @@ class _ConfirmButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Opacity(
       opacity: enabled ? 1 : 0.5,
-      child: GestureDetector(
+      child: TreinoTappable(
         onTap: enabled ? onTap : null,
-        behavior: HitTestBehavior.opaque,
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 13),
           alignment: Alignment.center,

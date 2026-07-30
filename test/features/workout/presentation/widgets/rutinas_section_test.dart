@@ -134,6 +134,7 @@ Future<_Mocks> _pumpSection(
   String? activeRoutineId,
   TrainerLink? link,
   List<Override> extraOverrides = const [],
+  TextScaler textScaler = TextScaler.noScaling,
 }) async {
   final userRepo = _MockUserRepository();
   when(() => userRepo.update(any(), any())).thenAnswer((_) async {});
@@ -191,6 +192,10 @@ Future<_Mocks> _pumpSection(
       ],
       child: MaterialApp.router(
         theme: AppTheme.dark(),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+          child: child!,
+        ),
         routerConfig: router,
         localizationsDelegates: AppL10n.localizationsDelegates,
         supportedLocales: AppL10n.supportedLocales,
@@ -216,6 +221,32 @@ void main() {
   });
 
   group('RutinasSection — unified list', () {
+    testWidgets(
+        'accessibility text scale stacks header and card status without overflow',
+        (tester) async {
+      await _pumpSection(
+        tester,
+        assigned: [_makeCoachPlan(id: 'coach-plan')],
+        own: [_makeUserRoutine(id: 'own-plan', name: 'Rutina personal larga')],
+        activeRoutineId: 'coach-plan',
+        textScaler: const TextScaler.linear(3.2),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(
+        tester.getTopLeft(find.text('CREAR RUTINA')).dy,
+        greaterThan(tester.getTopLeft(find.text('MIS RUTINAS')).dy),
+      );
+      expect(
+        tester.getTopLeft(find.text('DE TU COACH')).dy,
+        greaterThan(
+          tester.getTopLeft(find.text('Plan Fuerza')).dy,
+        ),
+      );
+      expect(find.text('CREAR RUTINA').hitTestable(), findsOneWidget);
+    });
+
     testWidgets('empty state renders motivational message + CTA enabled',
         (tester) async {
       await _pumpSection(tester);
@@ -546,6 +577,26 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const Key('routine_card_plan-1')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Detalles'), findsOneWidget);
+    });
+
+    testWidgets(
+        'tap on the SECOND self-created card (both non-active) navigates too '
+        '— QA #REGR: reported dead on real device/simulator, unreproduced '
+        'here', (tester) async {
+      await _pumpSection(
+        tester,
+        own: [
+          _makeUserRoutine(id: 'r1', name: 'Rutina A'),
+          _makeUserRoutine(id: 'r2', name: 'Rutina B'),
+        ],
+        activeRoutineId: 'r1',
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('routine_card_r2')));
       await tester.pumpAndSettle();
 
       expect(find.text('Detalles'), findsOneWidget);

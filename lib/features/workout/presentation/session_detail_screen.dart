@@ -4,8 +4,11 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_background.dart';
+import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/utils/kg_format.dart';
+import '../../../core/widgets/motion/treino_fade_slide_in.dart';
+import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../application/session_providers.dart';
 import '../domain/session.dart';
@@ -30,23 +33,30 @@ class SessionDetailScreen extends ConsumerWidget {
     return Scaffold(
       body: AppBackground(
         child: SafeArea(
-          child: summaryAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => _DetailError(
-              onRetry: () => ref.invalidate(
-                sessionSummaryProvider((uid: uid, sessionId: sessionId)),
+          child: TreinoStateSwitcher(
+            childKey: ValueKey(summaryAsync.when(
+              loading: () => 'loading',
+              error: (_, __) => 'error',
+              data: (data) => data.session == null ? 'notfound' : 'data',
+            )),
+            child: summaryAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => _DetailError(
+                onRetry: () => ref.invalidate(
+                  sessionSummaryProvider((uid: uid, sessionId: sessionId)),
+                ),
               ),
+              data: (data) {
+                final session = data.session;
+                if (session == null) {
+                  return const _DetailNotFound();
+                }
+                return _DetailLoaded(
+                  session: session,
+                  setLogs: data.setLogs,
+                );
+              },
             ),
-            data: (data) {
-              final session = data.session;
-              if (session == null) {
-                return const _DetailNotFound();
-              }
-              return _DetailLoaded(
-                session: session,
-                setLogs: data.setLogs,
-              );
-            },
           ),
         ),
       ),
@@ -73,6 +83,9 @@ class _DetailLoaded extends StatelessWidget {
     for (final log in setLogs) {
       grouped.putIfAbsent(log.exerciseName, () => []).add(log);
     }
+    // Indexado para el stagger de abajo — lista eager (no builder), así que
+    // TreinoFadeSlideIn es seguro (docs/design-system.md).
+    final groupedList = grouped.entries.toList();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -93,70 +106,79 @@ class _DetailLoaded extends StatelessWidget {
           // Header: date + time + routineName. startedAt is a real instant
           // (UTC via TimestampConverter) — convert to the viewer's local time
           // before formatting, or it reads +3h in Argentina (#380).
-          Text(
-            formatSessionDate(session.startedAt.toLocal()),
-            textAlign: TextAlign.center,
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w600,
-              fontSize: 14,
-              color: palette.textMuted,
-              letterSpacing: 1.0,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            _formatTime(session.startedAt.toLocal()),
-            textAlign: TextAlign.center,
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w600,
-              fontSize: 14,
-              color: palette.textMuted,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            session.routineName,
-            textAlign: TextAlign.center,
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w800,
-              fontSize: 28,
-              color: palette.textPrimary,
-              letterSpacing: 1.2,
+          TreinoFadeSlideIn(
+            child: Column(
+              children: [
+                Text(
+                  formatSessionDate(session.startedAt.toLocal()),
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: palette.textMuted,
+                    letterSpacing: 1.0,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _formatTime(session.startedAt.toLocal()),
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: palette.textMuted,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  session.routineName,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 28,
+                    color: palette.textPrimary,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 24),
 
           // 4-stat grid 2×2
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 16,
-            crossAxisSpacing: 16,
-            childAspectRatio: 2,
-            children: [
-              StatTile(
-                label: l10n.workoutDetailStatDurationMin,
-                value: session.durationMin.toString(),
-              ),
-              StatTile(
-                label: l10n.workoutDetailStatSets,
-                value: setLogs.length.toString(),
-              ),
-              StatTile(
-                label: l10n.workoutDetailStatVolumeKg,
-                value: formatVolumeKg(session.totalVolumeKg),
-              ),
-              StatTile(
-                label: l10n.workoutDetailStatPrsToday,
-                value: l10n.workoutStatPrsTodayStub,
-              ),
-            ],
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(1),
+            child: GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 16,
+              crossAxisSpacing: 16,
+              childAspectRatio: 2,
+              children: [
+                StatTile(
+                  label: l10n.workoutDetailStatDurationMin,
+                  value: session.durationMin.toString(),
+                ),
+                StatTile(
+                  label: l10n.workoutDetailStatSets,
+                  value: setLogs.length.toString(),
+                ),
+                StatTile(
+                  label: l10n.workoutDetailStatVolumeKg,
+                  value: formatVolumeKg(session.totalVolumeKg),
+                ),
+                StatTile(
+                  label: l10n.workoutDetailStatPrsToday,
+                  value: l10n.workoutStatPrsTodayStub,
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 32),
 
           // Exercise blocks — or empty state when no sets were logged.
-          if (grouped.isEmpty)
+          if (groupedList.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 32),
               child: Text(
@@ -171,12 +193,15 @@ class _DetailLoaded extends StatelessWidget {
               ),
             )
           else
-            ...grouped.entries.map(
-              (entry) => SessionExerciseBlock(
-                exerciseName: entry.key,
-                sets: entry.value,
-              ),
-            ),
+            ...groupedList.asMap().entries.map(
+                  (indexed) => TreinoFadeSlideIn(
+                    delay: AppMotion.stagger(indexed.key + 2),
+                    child: SessionExerciseBlock(
+                      exerciseName: indexed.value.key,
+                      sets: indexed.value.value,
+                    ),
+                  ),
+                ),
         ],
       ),
     );

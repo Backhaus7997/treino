@@ -4,6 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/exercise_asset_image.dart';
+import '../../../../core/widgets/motion/treino_state_switcher.dart';
+import '../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../workout/application/custom_exercise_providers.dart';
 import '../../../workout/application/exercise_filter.dart';
@@ -191,6 +193,11 @@ class _ExercisePickerSheetContentState
       backgroundColor: palette.bg,
       body: SafeArea(
         bottom: false,
+        // Sin TreinoFadeSlideIn de bloque: corre CONCURRENTE con el slide-up
+        // fullscreenDialog de la ruta (showExercisePicker) y queda
+        // completamente enmascarado — ruido en el picker más frecuente del
+        // flujo de armado de rutinas. El TreinoStateSwitcher interno
+        // (loading→data) sí se conserva, comunica su propia transición.
         child: Column(
           children: [
             // ── Header: cerrar + título ───────────────────────────────────
@@ -344,15 +351,21 @@ class _ExercisePickerSheetContentState
     required String uid,
   }) {
     if (defaults.isLoading || customs.isLoading) {
-      return Center(
-        child: CircularProgressIndicator(color: palette.accent),
+      return TreinoStateSwitcher(
+        childKey: const ValueKey('loading'),
+        child: Center(
+          child: CircularProgressIndicator(color: palette.accent),
+        ),
       );
     }
     if (defaults.hasError) {
-      return Center(
-        child: Text(
-          'No pudimos cargar ejercicios.',
-          style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
+      return TreinoStateSwitcher(
+        childKey: const ValueKey('error'),
+        child: Center(
+          child: Text(
+            'No pudimos cargar ejercicios.',
+            style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
+          ),
         ),
       );
     }
@@ -364,73 +377,79 @@ class _ExercisePickerSheetContentState
     final filteredDefaults = defaultList.where(_matches).toList();
 
     if (filteredCustoms.isEmpty && filteredDefaults.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                l10n.workoutPickerEmptyFiltered,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.barlow(
-                    color: palette.textMuted,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                l10n.workoutPickerEmptyFilteredHint,
-                textAlign: TextAlign.center,
-                style:
-                    GoogleFonts.barlow(color: palette.textMuted, fontSize: 12),
-              ),
-            ],
+      return TreinoStateSwitcher(
+        childKey: const ValueKey('empty'),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  l10n.workoutPickerEmptyFiltered,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.barlow(
+                      color: palette.textMuted,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  l10n.workoutPickerEmptyFilteredHint,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.barlow(
+                      color: palette.textMuted, fontSize: 12),
+                ),
+              ],
+            ),
           ),
         ),
       );
     }
 
-    return ListView(
-      controller: scrollController,
-      padding: const EdgeInsets.only(bottom: 16),
-      children: [
-        if (filteredCustoms.isNotEmpty) ...[
-          _SectionHeader('Tus ejercicios', palette: palette),
-          for (final c in filteredCustoms)
-            _ExerciseRow(
-              id: c.id,
-              name: c.name,
-              muscleGroup: c.muscleGroup,
-              subtitle: c.muscleGroup.isEmpty
-                  ? null
-                  : muscleGroupLabel(c.muscleGroup),
-              badge: 'MÍO',
-              isCustom: true,
-              ownerId: uid,
-              selected: _selected.contains(c.id),
-              palette: palette,
-              onTap: () => _toggle(c.id),
-            ),
+    return TreinoStateSwitcher(
+      childKey: const ValueKey('data'),
+      child: ListView(
+        controller: scrollController,
+        padding: const EdgeInsets.only(bottom: 16),
+        children: [
+          if (filteredCustoms.isNotEmpty) ...[
+            _SectionHeader('Tus ejercicios', palette: palette),
+            for (final c in filteredCustoms)
+              _ExerciseRow(
+                id: c.id,
+                name: c.name,
+                muscleGroup: c.muscleGroup,
+                subtitle: c.muscleGroup.isEmpty
+                    ? null
+                    : muscleGroupLabel(c.muscleGroup),
+                badge: 'MÍO',
+                isCustom: true,
+                ownerId: uid,
+                selected: _selected.contains(c.id),
+                palette: palette,
+                onTap: () => _toggle(c.id),
+              ),
+          ],
+          if (filteredDefaults.isNotEmpty) ...[
+            _SectionHeader('Catálogo', palette: palette),
+            for (final e in filteredDefaults)
+              _ExerciseRow(
+                id: e.id,
+                name: e.name,
+                muscleGroup: e.muscleGroup,
+                subtitle: muscleGroupLabel(e.muscleGroup),
+                badge: null,
+                isCustom: false,
+                ownerId: null,
+                selected: _selected.contains(e.id),
+                palette: palette,
+                onTap: () => _toggle(e.id),
+                thumbnailUrl: e.thumbnailUrl,
+              ),
+          ],
         ],
-        if (filteredDefaults.isNotEmpty) ...[
-          _SectionHeader('Catálogo', palette: palette),
-          for (final e in filteredDefaults)
-            _ExerciseRow(
-              id: e.id,
-              name: e.name,
-              muscleGroup: e.muscleGroup,
-              subtitle: muscleGroupLabel(e.muscleGroup),
-              badge: null,
-              isCustom: false,
-              ownerId: null,
-              selected: _selected.contains(e.id),
-              palette: palette,
-              onTap: () => _toggle(e.id),
-              thumbnailUrl: e.thumbnailUrl,
-            ),
-        ],
-      ],
+      ),
     );
   }
 }
@@ -496,76 +515,86 @@ class _ExerciseRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-        decoration: BoxDecoration(
-          color: selected
-              ? palette.accent.withValues(alpha: 0.08)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-          border: Border(
-            left: BorderSide(
-              color: selected ? palette.accent : Colors.transparent,
-              width: 3,
-            ),
+    // El IconButton de "Ver detalle" queda FUERA del subtree de
+    // TreinoTappable (sibling en el Row exterior, no trailing del ListTile
+    // envuelto): el IconButton tiene su propio recognizer y, si quedara
+    // adentro, competiría en el gesture arena con el GestureDetector de
+    // TreinoTappable — el externo dispara onTapDown por deadline y luego
+    // cancela cuando el interno gana, hundiendo y rebotando la fila entera
+    // en cada tap al ícono. TreinoTappable nunca debe envolver un subtree
+    // que ya maneja taps.
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: selected
+            ? palette.accent.withValues(alpha: 0.08)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+        border: Border(
+          left: BorderSide(
+            color: selected ? palette.accent : Colors.transparent,
+            width: 3,
           ),
         ),
-        child: ListTile(
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          // El leading de 68px necesita su propio mínimo vertical para no
-          // recortarse dentro del alto default del tile.
-          minVerticalPadding: 10,
-          leading: _ExerciseThumbnail(
-            id: id,
-            muscleGroup: muscleGroup,
-            isCustom: isCustom,
-            selected: selected,
-            palette: palette,
-            thumbnailUrl: thumbnailUrl,
-          ),
-          title: Text(
-            name,
-            style: GoogleFonts.barlow(
-              color: palette.textPrimary,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          subtitle: subtitle != null && subtitle!.isNotEmpty
-              ? Text(
-                  subtitle!,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: TreinoTappable(
+              onTap: onTap,
+              child: ListTile(
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                // El leading de 68px necesita su propio mínimo vertical para
+                // no recortarse dentro del alto default del tile.
+                minVerticalPadding: 10,
+                leading: _ExerciseThumbnail(
+                  id: id,
+                  muscleGroup: muscleGroup,
+                  isCustom: isCustom,
+                  selected: selected,
+                  palette: palette,
+                  thumbnailUrl: thumbnailUrl,
+                ),
+                title: Text(
+                  name,
                   style: GoogleFonts.barlow(
-                      color: palette.textMuted, fontSize: 12),
-                )
-              : null,
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (badge != null) ...[
-                _Badge(label: badge!, palette: palette),
-                const SizedBox(width: 8),
-              ],
-              IconButton(
-                onPressed: () => _openDetail(context),
-                icon: Icon(
-                  TreinoIcon.chartBar,
-                  size: 18,
-                  color: palette.textMuted,
+                    color: palette.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-                tooltip: 'Ver detalle',
-                visualDensity: VisualDensity.compact,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(
-                  minWidth: 36,
-                  minHeight: 36,
-                ),
+                subtitle: subtitle != null && subtitle!.isNotEmpty
+                    ? Text(
+                        subtitle!,
+                        style: GoogleFonts.barlow(
+                            color: palette.textMuted, fontSize: 12),
+                      )
+                    : null,
               ),
-            ],
+            ),
           ),
-        ),
+          if (badge != null) ...[
+            _Badge(label: badge!, palette: palette),
+            const SizedBox(width: 8),
+          ],
+          IconButton(
+            onPressed: () => _openDetail(context),
+            icon: Icon(
+              TreinoIcon.chartBar,
+              size: 18,
+              color: palette.textMuted,
+            ),
+            tooltip: 'Ver detalle',
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(
+              minWidth: 36,
+              minHeight: 36,
+            ),
+          ),
+          const SizedBox(width: 12),
+        ],
       ),
     );
   }
@@ -766,24 +795,29 @@ class _FilterButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final active = count > 0;
     final label = active ? '$baseLabel ($count)' : baseLabel;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 44,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: active ? palette.accent : palette.border,
-            width: active ? 1.5 : 1,
-          ),
-          color:
-              active ? palette.accent.withValues(alpha: 0.12) : palette.bgCard,
+    // El ícono de limpiar filtro NO puede quedar dentro del subtree del
+    // TreinoTappable del botón completo: dos GestureDetector anidados
+    // compiten en el mismo gesture arena (el externo hunde el botón entero
+    // por deadline y cancela cuando el interno gana). Se separan en
+    // TreinoTappable hermanos dentro del Row — el de la etiqueta abre el
+    // filtro, el del ícono (close o chevron) hace lo suyo sin superponerse.
+    return Container(
+      height: 44,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: active ? palette.accent : palette.border,
+          width: active ? 1.5 : 1,
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Flexible(
+        color: active ? palette.accent.withValues(alpha: 0.12) : palette.bgCard,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Flexible(
+            child: TreinoTappable(
+              onTap: onTap,
               child: Text(
                 label,
                 overflow: TextOverflow.ellipsis,
@@ -795,24 +829,27 @@ class _FilterButton extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            if (active && onClear != null)
-              GestureDetector(
-                onTap: onClear,
-                child: Icon(
-                  TreinoIcon.close,
-                  size: 14,
-                  color: palette.accent,
-                ),
-              )
-            else
-              Icon(
+          ),
+          const SizedBox(width: 8),
+          if (active && onClear != null)
+            TreinoTappable(
+              onTap: onClear,
+              child: Icon(
+                TreinoIcon.close,
+                size: 14,
+                color: palette.accent,
+              ),
+            )
+          else
+            TreinoTappable(
+              onTap: onTap,
+              child: Icon(
                 TreinoIcon.chevronDown,
                 size: 14,
                 color: active ? palette.accent : palette.textMuted,
               ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }
@@ -856,9 +893,8 @@ class _CreateNewTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
-      child: InkWell(
+      child: TreinoTappable(
         onTap: enabled ? onTap : null,
-        borderRadius: BorderRadius.circular(10),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(

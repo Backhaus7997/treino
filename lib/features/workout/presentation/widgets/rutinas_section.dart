@@ -51,35 +51,49 @@ class RutinasSection extends ConsumerWidget {
     final entriesAsync = ref.watch(unifiedRoutinesProvider(uid));
     final theme = Theme.of(context);
     final l10n = AppL10n.of(context);
+    final useStackedHeader = MediaQuery.textScalerOf(context).scale(1) > 1.3;
+    final Widget? headerAction = entriesAsync.maybeWhen(
+      skipLoadingOnReload: true,
+      data: (entries) {
+        final ownCount = entries.where((e) => !e.fromCoach).length;
+        if (ownCount >= _kRoutineCap) return null;
+        return _CtaButton(
+          onPressed: () => context.push('/workout/my-routine-editor'),
+        );
+      },
+      orElse: () => null,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // ── Header row ────────────────────────────────────────────────────────
-        Row(
-          children: [
-            Expanded(
-              child: Text(
+        if (useStackedHeader)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
                 l10n.workoutMisRutinasSectionTitle,
                 style: theme.textTheme.titleMedium,
               ),
-            ),
-            entriesAsync.maybeWhen(
-              skipLoadingOnReload: true,
-              data: (entries) {
-                final ownCount = entries.where((e) => !e.fromCoach).length;
-                // When cap-reached the header CTA is hidden and the cap
-                // message renders inline below the header (single source of
-                // feedback).
-                if (ownCount >= _kRoutineCap) return const SizedBox.shrink();
-                return _CtaButton(
-                  onPressed: () => context.push('/workout/my-routine-editor'),
-                );
-              },
-              orElse: () => const SizedBox.shrink(),
-            ),
-          ],
-        ),
+              if (headerAction != null) ...[
+                const SizedBox(height: 12),
+                headerAction,
+              ],
+            ],
+          )
+        else
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  l10n.workoutMisRutinasSectionTitle,
+                  style: theme.textTheme.titleMedium,
+                ),
+              ),
+              if (headerAction != null) headerAction,
+            ],
+          ),
         const SizedBox(height: 12),
         // ── Cap-reached inline message ───────────────────────────────────────
         // Renders only when there are 10 active SELF-CREATED routines.
@@ -371,6 +385,23 @@ class _RoutineCard extends ConsumerWidget {
     final showToggle = canToggleActive && !isActive;
     // Coach cards only carry the toggle; hide the whole menu when empty.
     final showMenu = !fromCoach || showToggle;
+    final useStackedTitle = MediaQuery.textScalerOf(context).scale(1) > 1.3;
+    final title = Text(
+      routine.name,
+      style: GoogleFonts.barlow(
+        fontWeight: FontWeight.w600,
+        fontSize: 14,
+        color: palette.textPrimary,
+      ),
+    );
+    final statusChips = Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        if (fromCoach) CoachChip(routineId: routine.id),
+        if (isActive) _ActivaChip(routineId: routine.id),
+      ],
+    );
 
     return InkWell(
       key: Key('routine_card_${routine.id}'),
@@ -394,32 +425,23 @@ class _RoutineCard extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          routine.name,
-                          style: GoogleFonts.barlow(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                            color: palette.textPrimary,
-                          ),
-                        ),
-                      ),
-                      if (fromCoach || isActive) ...[
-                        const SizedBox(width: 8),
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 4,
-                          children: [
-                            if (fromCoach) CoachChip(routineId: routine.id),
-                            if (isActive) _ActivaChip(routineId: routine.id),
-                          ],
-                        ),
-                      ],
+                  if (useStackedTitle) ...[
+                    title,
+                    if (fromCoach || isActive) ...[
+                      const SizedBox(height: 8),
+                      statusChips,
                     ],
-                  ),
+                  ] else
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: title),
+                        if (fromCoach || isActive) ...[
+                          const SizedBox(width: 8),
+                          statusChips,
+                        ],
+                      ],
+                    ),
                   if (fromCoach) ...[
                     // Mirrors the old _PlanCard: the trainer-name line only
                     // renders once the public profile resolves.

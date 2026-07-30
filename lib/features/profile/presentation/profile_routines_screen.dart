@@ -3,7 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/motion/treino_fade_slide_in.dart';
+import '../../../core/widgets/motion/treino_state_switcher.dart';
+import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../workout/application/session_providers.dart'
@@ -48,9 +52,8 @@ class ProfileRoutinesScreen extends ConsumerWidget {
         // ── Header ────────────────────────────────────────────────────────
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-          child: GestureDetector(
+          child: TreinoTappable(
             onTap: () => context.pop(),
-            behavior: HitTestBehavior.opaque,
             child: Row(
               children: [
                 Icon(TreinoIcon.back, size: 20, color: palette.textPrimary),
@@ -77,35 +80,62 @@ class ProfileRoutinesScreen extends ConsumerWidget {
               20,
               16 + MediaQuery.paddingOf(context).bottom,
             ),
-            child: entriesAsync.when(
-              skipLoadingOnReload: true,
-              loading: () => _LoadingBlock(palette: palette),
-              error: (_, __) => _ErrorBlock(
-                message: 'No pudimos cargar tus rutinas. Intentá de nuevo.',
-                palette: palette,
-              ),
-              data: (entries) {
-                final hasCoachPlan = entries.any((e) => e.fromCoach);
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (entries.isEmpty)
-                      _OwnEmptyState(palette: palette, l10n: l10n)
-                    else
-                      for (var i = 0; i < entries.length; i++) ...[
-                        if (i > 0) const SizedBox(height: 12),
-                        _RoutineRow(
-                          entry: entries[i],
-                          isActive: entries[i].routine.id == activeId,
+            child: TreinoStateSwitcher(
+              childKey: ValueKey(entriesAsync.when(
+                skipLoadingOnReload: true,
+                loading: () => 'loading',
+                error: (_, __) => 'error',
+                data: (entries) => entries.isEmpty ? 'empty' : 'data',
+              )),
+              child: entriesAsync.when(
+                skipLoadingOnReload: true,
+                loading: () => _LoadingBlock(palette: palette),
+                error: (_, __) => _ErrorBlock(
+                  message: 'No pudimos cargar tus rutinas. Intentá de nuevo.',
+                  palette: palette,
+                ),
+                data: (entries) {
+                  final hasCoachPlan = entries.any((e) => e.fromCoach);
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (entries.isEmpty)
+                        _OwnEmptyState(palette: palette, l10n: l10n)
+                      else
+                        for (var i = 0; i < entries.length; i++) ...[
+                          if (i > 0) const SizedBox(height: 12),
+                          // key por routine.id: sin ella, Flutter matchea los
+                          // TreinoFadeSlideIn por posición y una recomputación
+                          // en vivo (ej. el coach asigna un plan que se pinea
+                          // arriba) hace que las filas existentes reusen el
+                          // State one-shot de OTRO ítem — parpadea la fila
+                          // equivocada en vez de la realmente nueva.
+                          TreinoFadeSlideIn(
+                            key: ValueKey(entries[i].routine.id),
+                            delay: AppMotion.stagger(i),
+                            child: _RoutineRow(
+                              entry: entries[i],
+                              isActive: entries[i].routine.id == activeId,
+                            ),
+                          ),
+                        ],
+                      if (!hasCoachPlan) ...[
+                        const SizedBox(height: 28),
+                        // Continúa la cascada como último elemento: sin esto
+                        // el promo aparecía instantáneo en el frame 0 pese a
+                        // estar debajo de las rows que sí staggerean,
+                        // invirtiendo la jerarquía top-down que comunica el
+                        // stagger.
+                        TreinoFadeSlideIn(
+                          delay: AppMotion.stagger(entries.length),
+                          child:
+                              _FindTrainerPromo(palette: palette, l10n: l10n),
                         ),
                       ],
-                    if (!hasCoachPlan) ...[
-                      const SizedBox(height: 28),
-                      _FindTrainerPromo(palette: palette, l10n: l10n),
                     ],
-                  ],
-                );
-              },
+                  );
+                },
+              ),
             ),
           ),
         ),

@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/motion/treino_state_switcher.dart';
+import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../application/custom_exercise_providers.dart';
@@ -54,26 +56,33 @@ class MyExercisesScreen extends ConsumerWidget {
           ),
         ),
         Expanded(
-          child: exercisesAsync.when(
-            loading: () =>
-                Center(child: CircularProgressIndicator(color: palette.accent)),
-            error: (_, __) => Center(
-              child: Text(
-                'No pudimos cargar tus ejercicios.',
-                style:
-                    GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
+          child: TreinoStateSwitcher(
+            childKey: ValueKey(exercisesAsync.when(
+              loading: () => 'loading',
+              error: (_, __) => 'error',
+              data: (items) => items.isEmpty ? 'empty' : 'data',
+            )),
+            child: exercisesAsync.when(
+              loading: () => Center(
+                  child: CircularProgressIndicator(color: palette.accent)),
+              error: (_, __) => Center(
+                child: Text(
+                  'No pudimos cargar tus ejercicios.',
+                  style: GoogleFonts.barlow(
+                      fontSize: 14, color: palette.textMuted),
+                ),
               ),
+              data: (items) => items.isEmpty
+                  ? _EmptyState(palette: palette)
+                  : ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      itemCount: items.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      itemBuilder: (_, i) =>
+                          _ExerciseCard(exercise: items[i], palette: palette),
+                    ),
             ),
-            data: (items) => items.isEmpty
-                ? _EmptyState(palette: palette)
-                : ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    itemCount: items.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 10),
-                    itemBuilder: (_, i) =>
-                        _ExerciseCard(exercise: items[i], palette: palette),
-                  ),
           ),
         ),
         SafeArea(
@@ -172,9 +181,8 @@ class _ExerciseCard extends StatelessWidget {
       child: Semantics(
         button: true,
         label: label,
-        child: InkWell(
+        child: TreinoTappable(
           onTap: () => context.push('/profile/my-exercises/${exercise.id}'),
-          borderRadius: BorderRadius.circular(14),
           child: ExcludeSemantics(
             child: Container(
               decoration: BoxDecoration(

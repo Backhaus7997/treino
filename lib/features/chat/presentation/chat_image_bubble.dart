@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../l10n/app_l10n.dart';
 import '../domain/message.dart';
 import 'photo_viewer_screen.dart';
@@ -26,7 +27,7 @@ class ChatImageBubble extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        GestureDetector(
+        TreinoTappable(
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute<void>(

@@ -60,6 +60,12 @@ class TreinoBottomBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final textScaler = MediaQuery.textScalerOf(context);
+    final labelStyle = GoogleFonts.barlowCondensed(
+      fontSize: 10,
+      fontWeight: FontWeight.w700,
+      letterSpacing: 0.8,
+    );
 
     return SafeArea(
       top: false,
@@ -67,83 +73,131 @@ class TreinoBottomBar extends StatelessWidget {
         // Generous side/bottom margins lift the pill off the edges
         // (WhatsApp-style floating bar) — content scrolls visibly around it.
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-        child: DecoratedBox(
-          // Shadow lives OUTSIDE the ClipRRect — inside it gets clipped away.
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(36),
-            boxShadow: [
-              BoxShadow(
-                color: palette.bg.withValues(alpha: 0.45),
-                blurRadius: 24,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(36),
-            // NO BackdropFilter: blur re-samples on every frame content moves
-            // behind the bar (extendBody) and dropped frames on device even at
-            // sigma 8 (2026-06-11). A high-opacity fill keeps the translucent
-            // floating look on the dark theme at zero per-frame cost.
-            child: Container(
-              height: 72,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            var maxLabelWidth = 0.0;
+            var maxLabelHeight = 0.0;
+            for (final item in _items) {
+              final painter = TextPainter(
+                text: TextSpan(text: item.label, style: labelStyle),
+                maxLines: 1,
+                textDirection: Directionality.of(context),
+                textScaler: textScaler,
+              )..layout();
+              if (painter.width > maxLabelWidth) {
+                maxLabelWidth = painter.width;
+              }
+              if (painter.height > maxLabelHeight) {
+                maxLabelHeight = painter.height;
+              }
+            }
+
+            final equalTabContentWidth =
+                constraints.maxWidth / _items.length - 20;
+            final useScrollableTabs = maxLabelWidth > equalTabContentWidth;
+            final desiredHeight = 22 + 8 + maxLabelHeight + 20;
+            final barHeight = desiredHeight > 72 ? desiredHeight : 72.0;
+
+            return DecoratedBox(
+              // Shadow lives OUTSIDE the ClipRRect — inside it gets clipped.
               decoration: BoxDecoration(
-                color: palette.bgCard.withValues(alpha: 0.93),
                 borderRadius: BorderRadius.circular(36),
-                border: Border.all(color: palette.border),
+                boxShadow: [
+                  BoxShadow(
+                    color: palette.bg.withValues(alpha: 0.45),
+                    blurRadius: 24,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
               ),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final tabWidth = constraints.maxWidth / _items.length;
-                  return Stack(
-                    children: [
-                      AnimatedPositioned(
-                        duration: AppMotion.slow,
-                        curve: AppMotion.standard,
-                        left: tabWidth * currentIndex + 8,
-                        top: 8,
-                        bottom: 8,
-                        width: tabWidth - 16,
-                        child: _PillHighlight(palette: palette),
-                      ),
-                      Row(
-                        children: List.generate(_items.length, (i) {
-                          final item = _items[i];
-                          final active = i == currentIndex;
-                          // Index 1 = FEED (social chats), index 3 = COACH
-                          // (chats with the athlete's linked trainer). The
-                          // two badges are mutually exclusive by construction
-                          // — see `unreadFromFriendsProvider` and
-                          // `unreadFromCoachProvider`.
-                          final badgeCount = switch (i) {
-                            1 => feedUnreadCount,
-                            3 => coachUnreadCount,
-                            _ => 0,
-                          };
-                          return Expanded(
-                            child: GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onTap: () => onTap(i),
-                              child: _TabContent(
-                                spec: item,
-                                active: active,
-                                palette: palette,
-                                badgeCount: badgeCount,
-                              ),
-                            ),
-                          );
-                        }),
-                      ),
-                    ],
-                  );
-                },
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(36),
+                // NO BackdropFilter: blur re-samples on every frame content
+                // moves behind the bar (extendBody) and dropped frames on
+                // device even at sigma 8 (2026-06-11).
+                child: Container(
+                  height: barHeight,
+                  decoration: BoxDecoration(
+                    color: palette.bgCard.withValues(alpha: 0.93),
+                    borderRadius: BorderRadius.circular(36),
+                    border: Border.all(color: palette.border),
+                  ),
+                  child: useScrollableTabs
+                      ? SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          reverse: currentIndex >= 3,
+                          child: Row(
+                            children: List.generate(_items.length, (i) {
+                              return SizedBox(
+                                width: maxLabelWidth + 40,
+                                child: _ScrollableTab(
+                                  spec: _items[i],
+                                  active: i == currentIndex,
+                                  palette: palette,
+                                  badgeCount: _badgeCountFor(i),
+                                  onTap: () => onTap(i),
+                                ),
+                              );
+                            }),
+                          ),
+                        )
+                      : LayoutBuilder(
+                          builder: (context, innerConstraints) {
+                            final tabWidth =
+                                innerConstraints.maxWidth / _items.length;
+                            return Stack(
+                              children: [
+                                AnimatedPositioned(
+                                  duration: AppMotion.slow,
+                                  curve: AppMotion.standard,
+                                  left: tabWidth * currentIndex + 8,
+                                  top: 8,
+                                  bottom: 8,
+                                  width: tabWidth - 16,
+                                  child: _PillHighlight(palette: palette),
+                                ),
+                                Row(
+                                  children: List.generate(_items.length, (i) {
+                                    final item = _items[i];
+                                    final active = i == currentIndex;
+                                    return Expanded(
+                                      child: Semantics(
+                                        button: true,
+                                        selected: active,
+                                        label: item.label,
+                                        excludeSemantics: true,
+                                        child: GestureDetector(
+                                          behavior: HitTestBehavior.opaque,
+                                          onTap: () => onTap(i),
+                                          child: _TabContent(
+                                            spec: item,
+                                            active: active,
+                                            palette: palette,
+                                            badgeCount: _badgeCountFor(i),
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                ),
               ),
-            ),
-          ),
+            );
+          },
         ),
       ),
     );
   }
+
+  int _badgeCountFor(int index) => switch (index) {
+        1 => feedUnreadCount,
+        3 => coachUnreadCount,
+        _ => 0,
+      };
 }
 
 class _TabSpec {
@@ -184,6 +238,51 @@ class _PillHighlight extends StatelessWidget {
             offset: const Offset(0, 4),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ScrollableTab extends StatelessWidget {
+  const _ScrollableTab({
+    required this.spec,
+    required this.active,
+    required this.palette,
+    required this.badgeCount,
+    required this.onTap,
+  });
+
+  final _TabSpec spec;
+  final bool active;
+  final AppPalette palette;
+  final int badgeCount;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: active,
+      label: spec.label,
+      excludeSemantics: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (active) _PillHighlight(palette: palette),
+              _TabContent(
+                spec: spec,
+                active: active,
+                palette: palette,
+                badgeCount: badgeCount,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -271,11 +370,11 @@ class _TabContent extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 4),
-            // FittedBox scales the label down to fit the pill width on
-            // narrow tabs / >100% system text scaling rather than clipping.
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(spec.label),
+            Text(
+              spec.label,
+              maxLines: 1,
+              softWrap: false,
+              textAlign: TextAlign.center,
             ),
           ],
         ),

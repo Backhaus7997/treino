@@ -89,106 +89,114 @@ class _MonthlyReportScreenState extends ConsumerState<MonthlyReportScreen> {
                 final previousPoint = _previousPointFor(report, selectedPoint);
 
                 // TREINO Motion PR3: entrada fade+slide staggerada de las
-                // secciones. Seguro acá porque `ListView(children:)` es
-                // EAGER — nunca en builders lazy (ítems reciclados
-                // re-animarían). One-shot: cambiar de mes o de granularidad
-                // (setState) NO re-anima — el TreinoFadeSlideIn de cada
-                // posición conserva su State (el if/else del chart mantiene
-                // el mismo runtimeType en la misma posición).
-                return ListView(
+                // secciones. SingleChildScrollView + Column (no
+                // ListView(children:)): un ListView, aunque construya sus
+                // widgets eager, sigue siendo un viewport — los Elements/
+                // State de los TreinoFadeSlideIn que salen del cacheExtent
+                // se desmontan y re-animan al volver a scrollear. Column
+                // dentro de SingleChildScrollView scrollea como una sola
+                // unidad, sin reciclar Elements por ítem (ver doc de
+                // TreinoFadeSlideIn). One-shot: cambiar de mes o de
+                // granularidad (setState) NO re-anima — el TreinoFadeSlideIn
+                // de cada posición conserva su State (el if/else del chart
+                // mantiene el mismo runtimeType en la misma posición).
+                return SingleChildScrollView(
                   padding: EdgeInsets.fromLTRB(
                       20, 12, 20, 20 + MediaQuery.paddingOf(context).bottom),
                   physics: const AlwaysScrollableScrollPhysics(),
-                  children: [
-                    TreinoFadeSlideIn(
-                      delay: AppMotion.stagger(0),
-                      child: Text(
-                        _monthTitle(selectedPoint.month, l10n.localeName),
-                        style: GoogleFonts.barlowCondensed(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 20,
-                          letterSpacing: 0.6,
-                          color: palette.textPrimary,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      TreinoFadeSlideIn(
+                        delay: AppMotion.stagger(0),
+                        child: Text(
+                          _monthTitle(selectedPoint.month, l10n.localeName),
+                          style: GoogleFonts.barlowCondensed(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 20,
+                            letterSpacing: 0.6,
+                            color: palette.textPrimary,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 14),
-                    TreinoFadeSlideIn(
-                      delay: AppMotion.stagger(1),
-                      child: _GranularitySwitch(
-                        selected: _granularity,
-                        monthLabel: l10n.monthlyReportByMonthLabel,
-                        dayLabel: l10n.monthlyReportByDayLabel,
-                        onSelect: (value) =>
-                            setState(() => _granularity = value),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    if (_granularity == _MonthlyReportGranularity.month)
+                      const SizedBox(height: 14),
                       TreinoFadeSlideIn(
-                        delay: AppMotion.stagger(2),
-                        child: MonthlyReportChart(
-                          report: report,
-                          labels: MonthlyReportChartLabels(
+                        delay: AppMotion.stagger(1),
+                        child: _GranularitySwitch(
+                          selected: _granularity,
+                          monthLabel: l10n.monthlyReportByMonthLabel,
+                          dayLabel: l10n.monthlyReportByDayLabel,
+                          onSelect: (value) =>
+                              setState(() => _granularity = value),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      if (_granularity == _MonthlyReportGranularity.month)
+                        TreinoFadeSlideIn(
+                          delay: AppMotion.stagger(2),
+                          child: MonthlyReportChart(
+                            report: report,
+                            labels: MonthlyReportChartLabels(
+                              workoutsLabel: l10n.monthlyReportMetricWorkouts,
+                              durationLabel: l10n.monthlyReportMetricDuration,
+                              volumeLabel: l10n.monthlyReportMetricVolume,
+                              setsLabel: l10n.monthlyReportMetricSets,
+                              emptyHint: l10n.monthlyReportEmptyHint,
+                            ),
+                            localeName: l10n.localeName,
+                            onMonthSelected: (m) =>
+                                setState(() => _selectedMonth = m),
+                          ),
+                        )
+                      else
+                        TreinoFadeSlideIn(
+                          delay: AppMotion.stagger(2),
+                          child: _DailyDurationSection(
+                            uid: widget.uid,
+                            month: selectedPoint.month,
+                            emptyHint: l10n.monthlyReportDailyEmptyHint,
+                          ),
+                        ),
+                      const SizedBox(height: 14),
+                      TreinoFadeSlideIn(
+                        delay: AppMotion.stagger(3),
+                        child: MonthlyReportSummaryCards(
+                          selectedMonth: selectedPoint,
+                          previousMonth: previousPoint,
+                          labels: MonthlyReportSummaryLabels(
                             workoutsLabel: l10n.monthlyReportMetricWorkouts,
                             durationLabel: l10n.monthlyReportMetricDuration,
                             volumeLabel: l10n.monthlyReportMetricVolume,
                             setsLabel: l10n.monthlyReportMetricSets,
-                            emptyHint: l10n.monthlyReportEmptyHint,
+                            durationUnit: l10n.monthlyReportDurationHoursUnit,
+                            volumeUnit: l10n.monthlyReportVolumeUnit,
                           ),
-                          localeName: l10n.localeName,
-                          onMonthSelected: (m) =>
-                              setState(() => _selectedMonth = m),
                         ),
-                      )
-                    else
+                      ),
+                      const SizedBox(height: 14),
                       TreinoFadeSlideIn(
-                        delay: AppMotion.stagger(2),
-                        child: _DailyDurationSection(
+                        delay: AppMotion.stagger(4),
+                        child: _WorkoutDaysSection(
                           uid: widget.uid,
                           month: selectedPoint.month,
-                          emptyHint: l10n.monthlyReportDailyEmptyHint,
+                          l10n: l10n,
                         ),
                       ),
-                    const SizedBox(height: 14),
-                    TreinoFadeSlideIn(
-                      delay: AppMotion.stagger(3),
-                      child: MonthlyReportSummaryCards(
-                        selectedMonth: selectedPoint,
-                        previousMonth: previousPoint,
-                        labels: MonthlyReportSummaryLabels(
-                          workoutsLabel: l10n.monthlyReportMetricWorkouts,
-                          durationLabel: l10n.monthlyReportMetricDuration,
-                          volumeLabel: l10n.monthlyReportMetricVolume,
-                          setsLabel: l10n.monthlyReportMetricSets,
-                          durationUnit: l10n.monthlyReportDurationHoursUnit,
-                          volumeUnit: l10n.monthlyReportVolumeUnit,
+                      const SizedBox(height: 14),
+                      // [AD6/PR5c] Month-vs-month muscle distribution radar —
+                      // reuses MuscleDistributionRadar with a calendar-month
+                      // window anchored at the selected month (Hevy "June
+                      // Report" Muscle Distribution section).
+                      TreinoFadeSlideIn(
+                        delay: AppMotion.stagger(5),
+                        child: _MonthRadarSection(
+                          uid: widget.uid,
+                          month: selectedPoint.month,
+                          l10n: l10n,
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 14),
-                    TreinoFadeSlideIn(
-                      delay: AppMotion.stagger(4),
-                      child: _WorkoutDaysSection(
-                        uid: widget.uid,
-                        month: selectedPoint.month,
-                        l10n: l10n,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    // [AD6/PR5c] Month-vs-month muscle distribution radar —
-                    // reuses MuscleDistributionRadar with a calendar-month
-                    // window anchored at the selected month (Hevy "June
-                    // Report" Muscle Distribution section).
-                    TreinoFadeSlideIn(
-                      delay: AppMotion.stagger(5),
-                      child: _MonthRadarSection(
-                        uid: widget.uid,
-                        month: selectedPoint.month,
-                        l10n: l10n,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 );
               },
             ),

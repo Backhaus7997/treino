@@ -9,9 +9,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../../app/theme/app_motion.dart';
 import '../../../../../app/theme/app_palette.dart';
 import '../../../../../core/utils/argentina_time.dart'
     show argentinaNow, argentinaUtcOffset;
+import '../../../../../core/widgets/motion/treino_fade_slide_in.dart';
+import '../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../../core/widgets/treino_icon.dart';
 import '../../../../coach/application/agenda_providers.dart';
 import '../../../../coach/domain/agenda_exceptions.dart';
@@ -251,52 +254,57 @@ class _BatchCobrarDialogState extends ConsumerState<BatchCobrarDialog> {
       ),
       content: SizedBox(
         width: 420,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                widget.athleteName,
-                style: GoogleFonts.barlow(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 15,
-                  color: palette.textPrimary,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 16),
-              label('MONTO (ARS)'), // i18n
-              TextField(
-                controller: _amountController,
-                keyboardType: TextInputType.number,
-                inputFormatters: [ThousandsSeparatorInputFormatter()],
-                style: GoogleFonts.barlow(
-                    fontSize: 14, color: palette.textPrimary),
-                decoration: deco('Ej: 15000'), // i18n
-              ),
-              if (billing != null) ...[
-                const SizedBox(height: 6),
+        child: TreinoFadeSlideIn(
+          distance: AppMotion.slideSm,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
                 Text(
-                  'Tarifa de referencia: ${fmtArs(billing.amountArs)} x $_count = ${fmtArs(billing.amountArs * _count)}', // i18n
+                  widget.athleteName,
                   style: GoogleFonts.barlow(
-                      fontSize: 12, color: palette.textMuted),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                    color: palette.textPrimary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ],
-              const SizedBox(height: 14),
-              label('CONCEPTO'), // i18n
-              TextField(
-                controller: _conceptController,
-                style: GoogleFonts.barlow(
-                    fontSize: 14, color: palette.textPrimary),
-                decoration: deco('Ej: $_count sesiones'), // i18n
-              ),
-              const SizedBox(height: 14),
-              label('VENCE EL (OPCIONAL)'), // i18n
-              InkWell(
-                onTap: _pickDueDate,
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
+                const SizedBox(height: 16),
+                label('MONTO (ARS)'), // i18n
+                TextField(
+                  controller: _amountController,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [ThousandsSeparatorInputFormatter()],
+                  style: GoogleFonts.barlow(
+                      fontSize: 14, color: palette.textPrimary),
+                  decoration: deco('Ej: 15000'), // i18n
+                ),
+                if (billing != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'Tarifa de referencia: ${fmtArs(billing.amountArs)} x $_count = ${fmtArs(billing.amountArs * _count)}', // i18n
+                    style: GoogleFonts.barlow(
+                        fontSize: 12, color: palette.textMuted),
+                  ),
+                ],
+                const SizedBox(height: 14),
+                label('CONCEPTO'), // i18n
+                TextField(
+                  controller: _conceptController,
+                  style: GoogleFonts.barlow(
+                      fontSize: 14, color: palette.textPrimary),
+                  decoration: deco('Ej: $_count sesiones'), // i18n
+                ),
+                const SizedBox(height: 14),
+                label('VENCE EL (OPCIONAL)'), // i18n
+                // El TreinoTappable de "quitar fecha" NO puede quedar dentro
+                // del subtree del TreinoTappable del campo completo: dos
+                // GestureDetector anidados compiten en el gesture arena (el
+                // externo hunde el campo por deadline y cancela cuando el
+                // interno gana). Se separan en TreinoTappable hermanos
+                // dentro del Row.
+                Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                   decoration: BoxDecoration(
@@ -306,19 +314,32 @@ class _BatchCobrarDialogState extends ConsumerState<BatchCobrarDialog> {
                   ),
                   child: Row(
                     children: [
-                      Icon(TreinoIcon.calendar,
-                          size: 16, color: palette.textMuted),
-                      const SizedBox(width: 10),
                       Expanded(
-                        child: Text(
-                          _dueDate == null
-                              ? 'Sin fecha de vencimiento' // i18n
-                              : AgendaFormatters.formatDate(_dueDate!),
-                          style: GoogleFonts.barlow(
-                            fontSize: 14,
-                            color: _dueDate == null
-                                ? palette.textMuted
-                                : palette.textPrimary,
+                        child: MouseRegion(
+                          cursor: SystemMouseCursors.click,
+                          child: TreinoTappable(
+                            onTap: _pickDueDate,
+                            child: Row(
+                              children: [
+                                Icon(TreinoIcon.calendar,
+                                    size: 16, color: palette.textMuted),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    _dueDate == null
+                                        ? 'Sin fecha de vencimiento' // i18n
+                                        : AgendaFormatters.formatDate(
+                                            _dueDate!),
+                                    style: GoogleFonts.barlow(
+                                      fontSize: 14,
+                                      color: _dueDate == null
+                                          ? palette.textMuted
+                                          : palette.textPrimary,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -326,9 +347,8 @@ class _BatchCobrarDialogState extends ConsumerState<BatchCobrarDialog> {
                         Semantics(
                           button: true,
                           label: 'Quitar fecha de vencimiento', // i18n
-                          child: GestureDetector(
+                          child: TreinoTappable(
                             onTap: () => setState(() => _dueDate = null),
-                            behavior: HitTestBehavior.opaque,
                             child: Padding(
                               padding: const EdgeInsets.all(2),
                               child: Icon(TreinoIcon.close,
@@ -339,16 +359,16 @@ class _BatchCobrarDialogState extends ConsumerState<BatchCobrarDialog> {
                     ],
                   ),
                 ),
-              ),
-              if (_billingError != null) ...[
-                const SizedBox(height: 10),
-                Text(
-                  _billingError!,
-                  style: TextStyle(color: palette.danger, fontSize: 12),
-                ),
+                if (_billingError != null) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    _billingError!,
+                    style: TextStyle(color: palette.danger, fontSize: 12),
+                  ),
+                ],
+                const SizedBox(height: 8),
               ],
-              const SizedBox(height: 8),
-            ],
+            ),
           ),
         ),
       ),

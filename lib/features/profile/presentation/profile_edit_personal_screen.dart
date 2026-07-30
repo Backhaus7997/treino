@@ -9,6 +9,8 @@ import 'package:image_picker/image_picker.dart';
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/image/avatar_cropper.dart';
+import '../../../core/widgets/motion/treino_state_switcher.dart';
+import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../auth/application/auth_providers.dart';
@@ -473,18 +475,33 @@ class _ProfileEditPersonalScreenState
 
     // Loading: stream has not yet emitted and has not errored — show a spinner
     // instead of empty chrome with blank fields (matches trainer-edit screen).
+    //
+    // TreinoStateSwitcher por rama (mismo patrón que profile_edit_trainer_
+    // screen.dart): esta pantalla hermana quedó con corte seco en la misma
+    // transición loading/error→form pese a que este mismo diff le migró el
+    // header. childKey espeja EXACTAMENTE la prioridad de ramas mutuamente
+    // excluyentes de arriba — 3 `return` distintos con el mismo widget de
+    // switcher en la misma posición del árbol conviven en el mismo Element
+    // (AnimatedSwitcher) entre rebuilds, así que anima igual que un único
+    // switcher compartido.
     if (profileAsync.isLoading && !profileAsync.hasValue) {
-      return Center(child: CircularProgressIndicator(color: palette.accent));
+      return TreinoStateSwitcher(
+        childKey: const ValueKey('loading'),
+        child: Center(child: CircularProgressIndicator(color: palette.accent)),
+      );
     }
 
     // Error: the profile stream failed. Render a localized message + retry so
     // the form is not stranded blank with no signal.
     if (profileAsync.hasError && !profileAsync.hasValue) {
-      return _ProfileLoadError(
-        message: l10n.profileLoadError,
-        retryLabel: l10n.coachRetryLabel,
-        onRetry: () => ref.invalidate(userProfileProvider),
-        palette: palette,
+      return TreinoStateSwitcher(
+        childKey: const ValueKey('error'),
+        child: _ProfileLoadError(
+          message: l10n.profileLoadError,
+          retryLabel: l10n.coachRetryLabel,
+          onRetry: () => ref.invalidate(userProfileProvider),
+          palette: palette,
+        ),
       );
     }
 
@@ -493,9 +510,8 @@ class _ProfileEditPersonalScreenState
         // ── Header ──────────────────────────────────────────────────────────
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-          child: GestureDetector(
+          child: TreinoTappable(
             onTap: _onBackTap,
-            behavior: HitTestBehavior.opaque,
             child: Row(
               children: [
                 Icon(TreinoIcon.back, size: 20, color: palette.textPrimary),
@@ -704,13 +720,16 @@ class _ProfileEditPersonalScreenState
     // disposes the screen mid-upload, losing the save and orphaning the
     // freshly-uploaded avatar in Storage. Block the pop while busy so the
     // in-flight save is the only thing that can end this route.
-    return ValueListenableBuilder<_SaveState>(
-      valueListenable: _saveState,
-      builder: (context, _, child) => PopScope(
-        canPop: !_isBusy,
-        child: child!,
+    return TreinoStateSwitcher(
+      childKey: const ValueKey('form'),
+      child: ValueListenableBuilder<_SaveState>(
+        valueListenable: _saveState,
+        builder: (context, _, child) => PopScope(
+          canPop: !_isBusy,
+          child: child!,
+        ),
+        child: content,
       ),
-      child: content,
     );
   }
 
@@ -779,9 +798,12 @@ class _AvatarEditor extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    // TreinoTappable REEMPLAZA al GestureDetector pelado (no lo envuelve):
+    // ya trae HitTestBehavior.opaque, así que el swap es conducta-equivalente
+    // y de paso el avatar picker gana el mismo feedback de presión que el
+    // resto de los CTAs de la pantalla.
+    return TreinoTappable(
       onTap: onTap,
-      behavior: HitTestBehavior.opaque,
       child: Column(
         children: [
           Stack(
@@ -1009,7 +1031,13 @@ class _FilledPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    // TreinoTappable REEMPLAZA al GestureDetector pelado: el gating
+    // `busy ? null : _save` ya mapea 1:1 al contrato disabled de
+    // TreinoTappable (onTap null → child pelado sin gesture), y trae
+    // HitTestBehavior.opaque — swap conducta-equivalente. El CTA primario de
+    // la pantalla (GUARDAR) pasa a tener el mismo feedback de presión que ya
+    // tenía el back del header.
+    return TreinoTappable(
       onTap: onTap,
       child: Container(
         height: 44,
@@ -1046,7 +1074,9 @@ class _OutlinedPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    // TreinoTappable REEMPLAZA al GestureDetector pelado — mismo
+    // razonamiento que _FilledPill.
+    return TreinoTappable(
       onTap: onTap,
       child: Container(
         height: 44,
@@ -1117,9 +1147,10 @@ class _DateField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasValue = formatted != null;
-    return GestureDetector(
+    // TreinoTappable REEMPLAZA al GestureDetector pelado (campo bornAt): ya
+    // trae HitTestBehavior.opaque, swap conducta-equivalente.
+    return TreinoTappable(
       onTap: onTap,
-      behavior: HitTestBehavior.opaque,
       child: Container(
         height: 46,
         padding: const EdgeInsets.symmetric(horizontal: 14),

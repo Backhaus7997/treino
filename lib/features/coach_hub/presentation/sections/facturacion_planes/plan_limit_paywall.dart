@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../../app/theme/app_palette.dart';
+import '../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../coach/domain/subscription_tier.dart';
 
 /// Muestra el paywall de bloqueo cuando el PF intentó agregar un alumno que
@@ -86,9 +87,8 @@ class _PlanLimitPaywallDialog extends StatelessWidget {
                 palette: palette,
               ),
               const SizedBox(height: 10),
-              GestureDetector(
+              TreinoTappable(
                 onTap: () => Navigator.of(context).pop(),
-                behavior: HitTestBehavior.opaque,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 6),
                   child: Text(
@@ -234,7 +234,7 @@ class _PrimaryCta extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return TreinoTappable(
       onTap: () {
         Navigator.of(context).pop();
         if (hasNext) {
@@ -251,7 +251,6 @@ class _PrimaryCta extends StatelessWidget {
           );
         }
       },
-      behavior: HitTestBehavior.opaque,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 13),
         alignment: Alignment.center,

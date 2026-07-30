@@ -12,6 +12,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/features/payments/application/payment_providers.dart'
     show paymentRepositoryProvider;
 import 'package:treino/features/payments/domain/payment.dart';
@@ -258,22 +259,38 @@ class _PagosScreenState extends ConsumerState<PagosScreen>
     required String? paymentAlias,
     required bool showActions,
   }) {
-    return bucketsAsync.when(
-      data: (b) => PagosWebTable(
-        payments: getPayments(b),
-        profiles: profiles,
-        emptyLabel: emptyLabel,
-        onMarcarPagado:
-            showActions ? (p) => marcarPagadoDoc(context, ref, p) : null,
-        onRecordar:
-            showActions ? (p) => recordar(context, ref, p, paymentAlias) : null,
-        showActions: showActions,
-      ),
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(
-        child: Text(
-          'Error al cargar pagos.', // i18n
-          style: TextStyle(color: palette.danger),
+    return TreinoStateSwitcher(
+      // Incluye la vacuidad en la key (mismo patrón que rutinas_screen /
+      // athlete_routines_screen en esta misma rebanada): sin esto, marcar
+      // pagado el último vencido reemplaza la tabla por el empty state BAJO
+      // LA MISMA key 'data' — AnimatedSwitcher lo trata como el mismo widget
+      // y el swap queda seco, sin el cross-fade que sí tienen las pantallas
+      // hermanas. Seguro habilitarlo ahora: el child saliente (la tabla, que
+      // sí tiene botones) queda protegido por el IgnorePointer que
+      // TreinoStateSwitcher aplica a todo child en fade-out.
+      childKey: ValueKey(bucketsAsync.when(
+        loading: () => 'loading',
+        error: (_, __) => 'error',
+        data: (b) => getPayments(b).isEmpty ? 'empty' : 'data',
+      )),
+      child: bucketsAsync.when(
+        data: (b) => PagosWebTable(
+          payments: getPayments(b),
+          profiles: profiles,
+          emptyLabel: emptyLabel,
+          onMarcarPagado:
+              showActions ? (p) => marcarPagadoDoc(context, ref, p) : null,
+          onRecordar: showActions
+              ? (p) => recordar(context, ref, p, paymentAlias)
+              : null,
+          showActions: showActions,
+        ),
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(
+          child: Text(
+            'Error al cargar pagos.', // i18n
+            style: TextStyle(color: palette.danger),
+          ),
         ),
       ),
     );

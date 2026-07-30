@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/chat/domain/chat.dart';
 import 'package:treino/features/chat/domain/media_type.dart';
@@ -128,10 +129,11 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        // Chat redesign (mockup): el botón de adjuntar es un GestureDetector
-        // circular con "+" (antes IconButton con clip). Habilitado = onTap
-        // no-null.
-        final btn = tester.widget<GestureDetector>(
+        // Chat redesign (mockup): el botón de adjuntar es un TreinoTappable
+        // circular con "+" (antes IconButton con clip, después GestureDetector
+        // — TREINO Motion lo reemplazó por el widget del kit). Habilitado =
+        // onTap no-null.
+        final btn = tester.widget<TreinoTappable>(
           find.byKey(const Key('chat_composer_attach_button')),
         );
         expect(btn.onTap, isNotNull,

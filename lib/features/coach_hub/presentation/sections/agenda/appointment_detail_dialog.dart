@@ -8,9 +8,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../../app/theme/app_motion.dart';
 import '../../../../../app/theme/app_palette.dart';
 import '../../../../../core/utils/argentina_time.dart'
     show argentinaNow, argentinaUtcOffset;
+import '../../../../../core/widgets/motion/treino_fade_slide_in.dart';
+import '../../../../../core/widgets/motion/treino_state_switcher.dart';
+import '../../../../../core/widgets/motion/treino_success_check.dart';
+import '../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../../core/widgets/treino_icon.dart';
 import '../../../../coach/application/agenda_providers.dart';
 import '../../../../coach/domain/agenda_exceptions.dart';
@@ -101,7 +106,16 @@ class _AppointmentDetailDialogState
           );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Notas guardadas.')), // i18n
+        const SnackBar(
+          content: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TreinoSuccessCheck(size: 18, strokeWidth: 2),
+              SizedBox(width: 10),
+              Flexible(child: Text('Notas guardadas.')), // i18n
+            ],
+          ),
+        ),
       );
     } catch (_) {
       if (!mounted) return;
@@ -135,7 +149,17 @@ class _AppointmentDetailDialogState
       if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sesión cancelada.')), // i18n
+        const SnackBar(
+          // El pop ya pasó — el check no compite con la navegación.
+          content: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TreinoSuccessCheck(size: 18, strokeWidth: 2),
+              SizedBox(width: 10),
+              Flexible(child: Text('Sesión cancelada.')), // i18n
+            ],
+          ),
+        ),
       );
     } catch (_) {
       if (!mounted) return;
@@ -170,11 +194,23 @@ class _AppointmentDetailDialogState
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            n == 0
-                ? 'No había sesiones futuras para cancelar.' // i18n
-                : 'Se cancelaron $n sesiones de la serie.', // i18n
-          ),
+          // El pop ya pasó — el check no compite con la navegación. Solo se
+          // muestra si de verdad se canceló algo (n==0 no es un momento de
+          // éxito, es un no-op informativo).
+          content: n == 0
+              ? const Text('No había sesiones futuras para cancelar.') // i18n
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const TreinoSuccessCheck(size: 18, strokeWidth: 2),
+                    const SizedBox(width: 10),
+                    Flexible(
+                      child: Text(
+                        'Se cancelaron $n sesiones de la serie.', // i18n
+                      ),
+                    ),
+                  ],
+                ),
         ),
       );
     } catch (_) {
@@ -279,7 +315,17 @@ class _AppointmentDetailDialogState
       if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Turno cobrado.')), // i18n
+        const SnackBar(
+          // El pop ya pasó — el check no compite con la navegación.
+          content: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TreinoSuccessCheck(size: 18, strokeWidth: 2),
+              SizedBox(width: 10),
+              Flexible(child: Text('Turno cobrado.')), // i18n
+            ],
+          ),
+        ),
       );
     } on AppointmentAlreadyBilledException {
       if (!mounted) return;
@@ -374,49 +420,62 @@ class _AppointmentDetailDialogState
           ),
           const SizedBox(height: 14),
           label('VENCE EL (OPCIONAL)'), // i18n
-          InkWell(
-            onTap: _pickDueDate,
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-              decoration: BoxDecoration(
-                color: palette.bg,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: palette.border),
-              ),
-              child: Row(
-                children: [
-                  Icon(TreinoIcon.calendar, size: 16, color: palette.textMuted),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      _dueDate == null
-                          ? 'Sin fecha de vencimiento' // i18n
-                          : AgendaFormatters.formatDate(_dueDate!),
-                      style: GoogleFonts.barlow(
-                        fontSize: 14,
-                        color: _dueDate == null
-                            ? palette.textMuted
-                            : palette.textPrimary,
+          // El TreinoTappable de "quitar fecha" NO puede quedar dentro del
+          // subtree del TreinoTappable del campo completo: dos
+          // GestureDetector anidados compiten en el gesture arena (el
+          // externo hunde el campo por deadline y cancela cuando el interno
+          // gana). Se separan en TreinoTappable hermanos dentro del Row.
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            decoration: BoxDecoration(
+              color: palette.bg,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: palette.border),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: TreinoTappable(
+                      onTap: _pickDueDate,
+                      child: Row(
+                        children: [
+                          Icon(TreinoIcon.calendar,
+                              size: 16, color: palette.textMuted),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              _dueDate == null
+                                  ? 'Sin fecha de vencimiento' // i18n
+                                  : AgendaFormatters.formatDate(_dueDate!),
+                              style: GoogleFonts.barlow(
+                                fontSize: 14,
+                                color: _dueDate == null
+                                    ? palette.textMuted
+                                    : palette.textPrimary,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                  if (_dueDate != null)
-                    Semantics(
-                      button: true,
-                      label: 'Quitar fecha de vencimiento', // i18n
-                      child: GestureDetector(
-                        onTap: () => setState(() => _dueDate = null),
-                        behavior: HitTestBehavior.opaque,
-                        child: Padding(
-                          padding: const EdgeInsets.all(2),
-                          child: Icon(TreinoIcon.close,
-                              size: 16, color: palette.textMuted),
-                        ),
+                ),
+                if (_dueDate != null)
+                  Semantics(
+                    button: true,
+                    label: 'Quitar fecha de vencimiento', // i18n
+                    child: TreinoTappable(
+                      onTap: () => setState(() => _dueDate = null),
+                      child: Padding(
+                        padding: const EdgeInsets.all(2),
+                        child: Icon(TreinoIcon.close,
+                            size: 16, color: palette.textMuted),
                       ),
                     ),
-                ],
-              ),
+                  ),
+              ],
             ),
           ),
           if (_billingError != null) ...[
@@ -558,254 +617,261 @@ class _AppointmentDetailDialogState
       ),
       content: SizedBox(
         width: 480,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // ── Athlete row — NON-TAPPABLE (ADR-AGW-8) ──────────────────
-              Row(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: palette.accent.withAlpha(40),
-                      border: Border.all(color: palette.accent),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      initials(athleteName),
-                      style: GoogleFonts.barlowCondensed(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                        color: palette.accent,
+        child: TreinoFadeSlideIn(
+          distance: AppMotion.slideSm,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // ── Athlete row — NON-TAPPABLE (ADR-AGW-8) ──────────────────
+                Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: palette.accent.withAlpha(40),
+                        border: Border.all(color: palette.accent),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      athleteName,
-                      style: GoogleFonts.barlow(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15,
-                        color: palette.textPrimary,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  // Sin ícono de chevron — no es tappeable (ADR-AGW-8).
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // ── Antes de la sesión ────────────────────────────────────
-              Text(
-                'ANTES DE LA SESIÓN', // i18n
-                style: GoogleFonts.barlowCondensed(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 11,
-                  letterSpacing: 1.2,
-                  color: palette.textMuted,
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _beforeController,
-                maxLines: 3,
-                style: TextStyle(color: palette.textPrimary),
-                decoration: InputDecoration(
-                  hintText:
-                      'Ej: traer banda, viene de lesión de rodilla…', // i18n
-                  hintStyle: TextStyle(color: palette.textMuted),
-                  filled: true,
-                  fillColor: palette.bg,
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide(color: palette.border),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide(color: palette.accent, width: 1.5),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // ── Recordatorio (post) ───────────────────────────────────
-              Text(
-                'RECORDATORIO (POST)', // i18n
-                style: GoogleFonts.barlowCondensed(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 11,
-                  letterSpacing: 1.2,
-                  color: palette.textMuted,
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _afterController,
-                maxLines: 3,
-                style: TextStyle(color: palette.textPrimary),
-                decoration: InputDecoration(
-                  hintText:
-                      'Ej: subió a 80kg, la próxima bajar volumen…', // i18n
-                  hintStyle: TextStyle(color: palette.textMuted),
-                  filled: true,
-                  fillColor: palette.bg,
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide(color: palette.border),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide(color: palette.accent, width: 1.5),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // ── Guardar notas ─────────────────────────────────────────
-              ElevatedButton(
-                onPressed: _saving ? null : _saveNotes,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: palette.accent,
-                  foregroundColor: palette.bg,
-                  minimumSize: const Size.fromHeight(48),
-                  shape: const StadiumBorder(),
-                  disabledBackgroundColor:
-                      palette.accent.withValues(alpha: 0.3),
-                ),
-                child: _saving
-                    ? SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: palette.bg,
+                      alignment: Alignment.center,
+                      child: Text(
+                        initials(athleteName),
+                        style: GoogleFonts.barlowCondensed(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: palette.accent,
                         ),
-                      )
-                    : Text(
-                        'GUARDAR NOTAS', // i18n
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        athleteName,
+                        style: GoogleFonts.barlow(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                          color: palette.textPrimary,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    // Sin ícono de chevron — no es tappeable (ADR-AGW-8).
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // ── Antes de la sesión ────────────────────────────────────
+                Text(
+                  'ANTES DE LA SESIÓN', // i18n
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 11,
+                    letterSpacing: 1.2,
+                    color: palette.textMuted,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _beforeController,
+                  maxLines: 3,
+                  style: TextStyle(color: palette.textPrimary),
+                  decoration: InputDecoration(
+                    hintText:
+                        'Ej: traer banda, viene de lesión de rodilla…', // i18n
+                    hintStyle: TextStyle(color: palette.textMuted),
+                    filled: true,
+                    fillColor: palette.bg,
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(color: palette.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(color: palette.accent, width: 1.5),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // ── Recordatorio (post) ───────────────────────────────────
+                Text(
+                  'RECORDATORIO (POST)', // i18n
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 11,
+                    letterSpacing: 1.2,
+                    color: palette.textMuted,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _afterController,
+                  maxLines: 3,
+                  style: TextStyle(color: palette.textPrimary),
+                  decoration: InputDecoration(
+                    hintText:
+                        'Ej: subió a 80kg, la próxima bajar volumen…', // i18n
+                    hintStyle: TextStyle(color: palette.textMuted),
+                    filled: true,
+                    fillColor: palette.bg,
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(color: palette.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(color: palette.accent, width: 1.5),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // ── Guardar notas ─────────────────────────────────────────
+                ElevatedButton(
+                  onPressed: _saving ? null : _saveNotes,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: palette.accent,
+                    foregroundColor: palette.bg,
+                    minimumSize: const Size.fromHeight(48),
+                    shape: const StadiumBorder(),
+                    disabledBackgroundColor:
+                        palette.accent.withValues(alpha: 0.3),
+                  ),
+                  child: _saving
+                      ? SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: palette.bg,
+                          ),
+                        )
+                      : Text(
+                          'GUARDAR NOTAS', // i18n
+                          style: GoogleFonts.barlowCondensed(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                            letterSpacing: 1.4,
+                          ),
+                        ),
+                ),
+
+                // ── Cobrar (Slice 2a — Agenda→cobro bridge) ───────────────
+                // Available regardless of isPast — billing a session normally
+                // happens AFTER it took place. Cancelled turns never show this
+                // (guarded by the outer confirmed check).
+                if (appt.status == AppointmentStatus.confirmed) ...[
+                  const SizedBox(height: 12),
+                  TreinoStateSwitcher(
+                    childKey: ValueKey(appt.paymentId != null
+                        ? 'cobrado'
+                        : (_showCobrarForm ? 'form' : 'button')),
+                    child: appt.paymentId != null
+                        ? Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: palette.accent.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: palette.accent),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(TreinoIcon.checkCircleFill,
+                                    size: 18, color: palette.accent),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Cobrado', // i18n
+                                  style: GoogleFonts.barlowCondensed(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14,
+                                    letterSpacing: 0.8,
+                                    color: palette.accent,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : (!_showCobrarForm
+                            ? OutlinedButton(
+                                onPressed: _openCobrarForm,
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(color: palette.accent),
+                                  foregroundColor: palette.accent,
+                                  minimumSize: const Size.fromHeight(48),
+                                  shape: const StadiumBorder(),
+                                ),
+                                child: Text(
+                                  'COBRAR', // i18n
+                                  style: GoogleFonts.barlowCondensed(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14,
+                                    letterSpacing: 1.4,
+                                  ),
+                                ),
+                              )
+                            : _buildCobrarForm(palette, appt)),
+                  ),
+                ],
+
+                // ── Cancelar ─────────────────────────────────────────────
+                if (!widget.isPast) ...[
+                  const SizedBox(height: 12),
+                  if (canCancel)
+                    OutlinedButton(
+                      onPressed: _cancelAppointment,
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: palette.highlight),
+                        foregroundColor: palette.highlight,
+                        minimumSize: const Size.fromHeight(48),
+                        shape: const StadiumBorder(),
+                      ),
+                      child: Text(
+                        'CANCELAR RESERVA', // i18n
                         style: GoogleFonts.barlowCondensed(
                           fontWeight: FontWeight.w700,
                           fontSize: 14,
                           letterSpacing: 1.4,
                         ),
                       ),
-              ),
-
-              // ── Cobrar (Slice 2a — Agenda→cobro bridge) ───────────────
-              // Available regardless of isPast — billing a session normally
-              // happens AFTER it took place. Cancelled turns never show this
-              // (guarded by the outer confirmed check).
-              if (appt.status == AppointmentStatus.confirmed) ...[
-                const SizedBox(height: 12),
-                if (appt.paymentId != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: palette.accent.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: palette.accent),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(TreinoIcon.checkCircleFill,
-                            size: 18, color: palette.accent),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Cobrado', // i18n
-                          style: GoogleFonts.barlowCondensed(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                            letterSpacing: 0.8,
-                            color: palette.accent,
-                          ),
+                    )
+                  else if (isWithin24h)
+                    Center(
+                      child: Text(
+                        'No se puede cancelar (menos de 24h).', // i18n
+                        style: GoogleFonts.barlow(
+                          fontSize: 13,
+                          color: palette.textMuted,
                         ),
-                      ],
-                    ),
-                  )
-                else if (!_showCobrarForm)
-                  OutlinedButton(
-                    onPressed: _openCobrarForm,
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: palette.accent),
-                      foregroundColor: palette.accent,
-                      minimumSize: const Size.fromHeight(48),
-                      shape: const StadiumBorder(),
-                    ),
-                    child: Text(
-                      'COBRAR', // i18n
-                      style: GoogleFonts.barlowCondensed(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                        letterSpacing: 1.4,
                       ),
                     ),
-                  )
-                else
-                  _buildCobrarForm(palette, appt),
-              ],
-
-              // ── Cancelar ─────────────────────────────────────────────
-              if (!widget.isPast) ...[
-                const SizedBox(height: 12),
-                if (canCancel)
-                  OutlinedButton(
-                    onPressed: _cancelAppointment,
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: palette.highlight),
-                      foregroundColor: palette.highlight,
-                      minimumSize: const Size.fromHeight(48),
-                      shape: const StadiumBorder(),
-                    ),
-                    child: Text(
-                      'CANCELAR RESERVA', // i18n
-                      style: GoogleFonts.barlowCondensed(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                        letterSpacing: 1.4,
+                  if (isRecurring) ...[
+                    const SizedBox(height: 8),
+                    OutlinedButton(
+                      onPressed: _cancelSeries,
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: palette.danger),
+                        foregroundColor: palette.danger,
+                        minimumSize: const Size.fromHeight(48),
+                        shape: const StadiumBorder(),
+                      ),
+                      child: Text(
+                        'CANCELAR TODA LA SERIE', // i18n
+                        style: GoogleFonts.barlowCondensed(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          letterSpacing: 1.4,
+                        ),
                       ),
                     ),
-                  )
-                else if (isWithin24h)
-                  Center(
-                    child: Text(
-                      'No se puede cancelar (menos de 24h).', // i18n
-                      style: GoogleFonts.barlow(
-                        fontSize: 13,
-                        color: palette.textMuted,
-                      ),
-                    ),
-                  ),
-                if (isRecurring) ...[
-                  const SizedBox(height: 8),
-                  OutlinedButton(
-                    onPressed: _cancelSeries,
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: palette.danger),
-                      foregroundColor: palette.danger,
-                      minimumSize: const Size.fromHeight(48),
-                      shape: const StadiumBorder(),
-                    ),
-                    child: Text(
-                      'CANCELAR TODA LA SERIE', // i18n
-                      style: GoogleFonts.barlowCondensed(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                        letterSpacing: 1.4,
-                      ),
-                    ),
-                  ),
+                  ],
                 ],
+                const SizedBox(height: 8),
               ],
-              const SizedBox(height: 8),
-            ],
+            ),
           ),
         ),
       ),

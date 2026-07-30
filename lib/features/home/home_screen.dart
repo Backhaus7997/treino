@@ -110,7 +110,14 @@ class _AthleteHome extends ConsumerWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: ListView(
+      // SingleChildScrollView + Column (no ListView(children:)): un
+      // ListView, aunque construya sus widgets eager, sigue siendo un
+      // viewport — los Elements/State de los TreinoFadeSlideIn que salen
+      // del cacheExtent se desmontan y re-animan al volver a scrollear.
+      // Column dentro de SingleChildScrollView scrollea como una sola
+      // unidad, sin reciclar Elements por ítem (ver doc de
+      // TreinoFadeSlideIn).
+      child: SingleChildScrollView(
         // + bottom inset: the floating bar overlays the body (extendBody),
         // so the last item needs room to scroll out from behind it.
         padding: EdgeInsets.fromLTRB(
@@ -120,24 +127,27 @@ class _AthleteHome extends ConsumerWidget {
           20 + MediaQuery.paddingOf(context).bottom,
         ),
         physics: const AlwaysScrollableScrollPhysics(),
-        children: [
-          TreinoFadeSlideIn(
-            delay: AppMotion.stagger(0),
-            child: headerOrSkeleton,
-          ),
-          const SizedBox(height: 20),
-          TreinoFadeSlideIn(
-            delay: AppMotion.stagger(1),
-            child: hasNoRoutine
-                ? const _AthleteFirstRunCard()
-                : const EmpezarEntrenamientoCard(),
-          ),
-          const SizedBox(height: 12),
-          TreinoFadeSlideIn(
-            delay: AppMotion.stagger(2),
-            child: const EstaSemanaCard(),
-          ),
-        ],
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TreinoFadeSlideIn(
+              delay: AppMotion.stagger(0),
+              child: headerOrSkeleton,
+            ),
+            const SizedBox(height: 20),
+            TreinoFadeSlideIn(
+              delay: AppMotion.stagger(1),
+              child: hasNoRoutine
+                  ? const _AthleteFirstRunCard()
+                  : const EmpezarEntrenamientoCard(),
+            ),
+            const SizedBox(height: 12),
+            TreinoFadeSlideIn(
+              delay: AppMotion.stagger(2),
+              child: const EstaSemanaCard(),
+            ),
+          ],
+        ),
       ),
     );
   }

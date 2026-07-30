@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../../../app/theme/app_palette.dart';
+import '../../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../../chat/application/chat_providers.dart';
 import '../../../../../chat/domain/chat.dart';
 import '../../../../../profile/application/user_public_profile_providers.dart';
@@ -166,137 +167,147 @@ class _ChatRow extends ConsumerWidget {
     final pubAsync = ref.watch(userPublicProfileProvider(otherUid));
     final hasUnread = chatHasUnread(chat, currentUid);
 
-    return InkWell(
-      key: Key('chat_row_${chat.chatId}'),
-      onTap: () {
-        ref.read(selectedChatIdProvider.notifier).state = chat.chatId;
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          color: isSelected ? palette.bg : Colors.transparent,
-          border: Border(
-            left: BorderSide(
-              color: isSelected ? palette.accent : Colors.transparent,
-              width: 3,
+    // MouseRegion(cursor): único call-site del slice que migraba un InkWell
+    // (no un GestureDetector) — InkWell daba cursor de mano al hover;
+    // TreinoTappable es un GestureDetector pelado sin MouseRegion. Fix local
+    // seguro (el fix de fondo pertenece al widget core, fuera de este slice).
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: TreinoTappable(
+        key: Key('chat_row_${chat.chatId}'),
+        onTap: () {
+          ref.read(selectedChatIdProvider.notifier).state = chat.chatId;
+        },
+        child: Container(
+          decoration: BoxDecoration(
+            color: isSelected ? palette.bg : Colors.transparent,
+            border: Border(
+              left: BorderSide(
+                color: isSelected ? palette.accent : Colors.transparent,
+                width: 3,
+              ),
             ),
           ),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 14),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            CircleAvatar(
-              radius: 22,
-              // Mockup: avatares de color por usuario (inicial en blanco)
-              // cuando no hay foto.
-              backgroundColor: avatarColorFor(otherUid),
-              backgroundImage: pubAsync.maybeWhen(
-                data: (p) => (p?.avatarUrl != null && p!.avatarUrl!.isNotEmpty)
-                    ? NetworkImage(p.avatarUrl!)
-                    : null,
-                orElse: () => null,
+          padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              CircleAvatar(
+                radius: 22,
+                // Mockup: avatares de color por usuario (inicial en blanco)
+                // cuando no hay foto.
+                backgroundColor: avatarColorFor(otherUid),
+                backgroundImage: pubAsync.maybeWhen(
+                  data: (p) =>
+                      (p?.avatarUrl != null && p!.avatarUrl!.isNotEmpty)
+                          ? NetworkImage(p.avatarUrl!)
+                          : null,
+                  orElse: () => null,
+                ),
+                child: pubAsync.maybeWhen(
+                  data: (p) =>
+                      (p?.avatarUrl == null || (p?.avatarUrl ?? '').isEmpty)
+                          ? Text(
+                              (p?.displayName ?? '?').isNotEmpty
+                                  ? (p?.displayName ?? '?')[0].toUpperCase()
+                                  : '?',
+                              style: GoogleFonts.barlowCondensed(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                                color: Colors.white,
+                              ),
+                            )
+                          : null,
+                  orElse: () => const SizedBox.shrink(),
+                ),
               ),
-              child: pubAsync.maybeWhen(
-                data: (p) =>
-                    (p?.avatarUrl == null || (p?.avatarUrl ?? '').isEmpty)
-                        ? Text(
-                            (p?.displayName ?? '?').isNotEmpty
-                                ? (p?.displayName ?? '?')[0].toUpperCase()
-                                : '?',
-                            style: GoogleFonts.barlowCondensed(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 16,
-                              color: Colors.white,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            pubAsync.maybeWhen(
+                              data: (p) =>
+                                  p?.displayName ?? 'Usuario eliminado',
+                              orElse: () => '…',
                             ),
-                          )
-                        : null,
-                orElse: () => const SizedBox.shrink(),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          pubAsync.maybeWhen(
-                            data: (p) => p?.displayName ?? 'Usuario eliminado',
-                            orElse: () => '…',
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.barlow(
-                            fontWeight:
-                                hasUnread ? FontWeight.w700 : FontWeight.w600,
-                            fontSize: 14,
-                            color: palette.textPrimary,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.barlow(
+                              fontWeight:
+                                  hasUnread ? FontWeight.w700 : FontWeight.w600,
+                              fontSize: 14,
+                              color: palette.textPrimary,
+                            ),
                           ),
                         ),
-                      ),
-                      if (chat.lastMessageAt != null) ...[
-                        const SizedBox(width: 6),
-                        Text(
-                          _formatTimestamp(chat.lastMessageAt!),
-                          style: GoogleFonts.barlow(
-                            fontWeight: FontWeight.w400,
-                            fontSize: 11,
-                            color:
-                                hasUnread ? palette.accent : palette.textMuted,
+                        if (chat.lastMessageAt != null) ...[
+                          const SizedBox(width: 6),
+                          Text(
+                            _formatTimestamp(chat.lastMessageAt!),
+                            style: GoogleFonts.barlow(
+                              fontWeight: FontWeight.w400,
+                              fontSize: 11,
+                              color: hasUnread
+                                  ? palette.accent
+                                  : palette.textMuted,
+                            ),
                           ),
-                        ),
+                        ],
                       ],
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          (chat.lastMessageText ?? '').isEmpty
-                              ? 'Sin mensajes todavía' // i18n: Fase W2
-                              : chat.lastMessageText!,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.barlow(
-                            fontWeight:
-                                hasUnread ? FontWeight.w600 : FontWeight.w400,
-                            fontSize: 12,
-                            color: hasUnread
-                                ? palette.textPrimary
-                                : palette.textMuted,
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            (chat.lastMessageText ?? '').isEmpty
+                                ? 'Sin mensajes todavía' // i18n: Fase W2
+                                : chat.lastMessageText!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.barlow(
+                              fontWeight:
+                                  hasUnread ? FontWeight.w600 : FontWeight.w400,
+                              fontSize: 12,
+                              color: hasUnread
+                                  ? palette.textPrimary
+                                  : palette.textMuted,
+                            ),
                           ),
                         ),
-                      ),
-                      if (hasUnread) ...[
-                        const SizedBox(width: 6),
-                        // Mockup: badge circular mint con "●" (el conteo real
-                        // por-chat no está en el modelo hoy; se muestra el
-                        // indicador de no-leído como badge, no un puntito).
-                        Container(
-                          constraints: const BoxConstraints(minWidth: 18),
-                          height: 18,
-                          alignment: Alignment.center,
-                          padding: const EdgeInsets.symmetric(horizontal: 5),
-                          decoration: BoxDecoration(
-                            color: palette.accent,
-                            borderRadius: BorderRadius.circular(9999),
+                        if (hasUnread) ...[
+                          const SizedBox(width: 6),
+                          // Mockup: badge circular mint con "●" (el conteo real
+                          // por-chat no está en el modelo hoy; se muestra el
+                          // indicador de no-leído como badge, no un puntito).
+                          Container(
+                            constraints: const BoxConstraints(minWidth: 18),
+                            height: 18,
+                            alignment: Alignment.center,
+                            padding: const EdgeInsets.symmetric(horizontal: 5),
+                            decoration: BoxDecoration(
+                              color: palette.accent,
+                              borderRadius: BorderRadius.circular(9999),
+                            ),
+                            child: Icon(
+                              Icons.circle,
+                              size: 6,
+                              color: palette.bg,
+                            ),
                           ),
-                          child: Icon(
-                            Icons.circle,
-                            size: 6,
-                            color: palette.bg,
-                          ),
-                        ),
+                        ],
                       ],
-                    ],
-                  ),
-                ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

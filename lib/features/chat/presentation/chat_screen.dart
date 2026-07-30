@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/analytics/analytics_service.dart';
+import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../feed/presentation/widgets/post_avatar.dart';
@@ -195,83 +196,101 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           onPressed: () =>
               context.canPop() ? context.pop() : context.go('/feed/messages'),
         ),
-        title: pubAsync.when(
-          loading: () => const SizedBox.shrink(),
-          error: (_, __) => Text(
-            l10n.chatScreenTitleFallback,
-            style: TextStyle(color: palette.textPrimary, fontSize: 16),
-          ),
-          data: (pub) {
-            // When userPublicProfiles/{uid} is deleted, pub is null →
-            // show "Usuario eliminado" per ADR-ACCDEL-005.
-            final name = pub?.displayName ?? l10n.chatListDeletedUser;
-            final avatar = pub?.avatarUrl;
-            return Row(
-              children: [
-                Semantics(
-                  image: true,
-                  label: l10n.a11yAvatarLabel(name),
-                  child: PostAvatar(
-                    authorDisplayName: name,
-                    authorAvatarUrl: avatar,
-                    size: 36,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    name,
-                    style: TextStyle(
-                      color: palette.textPrimary,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
+        title: TreinoStateSwitcher(
+          childKey: ValueKey(pubAsync.when(
+            loading: () => 'loading',
+            error: (_, __) => 'error',
+            data: (_) => 'data',
+          )),
+          child: pubAsync.when(
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => Text(
+              l10n.chatScreenTitleFallback,
+              style: TextStyle(color: palette.textPrimary, fontSize: 16),
+            ),
+            data: (pub) {
+              // When userPublicProfiles/{uid} is deleted, pub is null →
+              // show "Usuario eliminado" per ADR-ACCDEL-005.
+              final name = pub?.displayName ?? l10n.chatListDeletedUser;
+              final avatar = pub?.avatarUrl;
+              return Row(
+                children: [
+                  Semantics(
+                    image: true,
+                    label: l10n.a11yAvatarLabel(name),
+                    child: PostAvatar(
+                      authorDisplayName: name,
+                      authorAvatarUrl: avatar,
+                      size: 36,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ],
-            );
-          },
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      name,
+                      style: TextStyle(
+                        color: palette.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
         ),
       ),
       body: SafeArea(
         child: Column(
           children: [
             Expanded(
-              child: messagesAsync.when(
-                loading: () => Center(
-                  child: CircularProgressIndicator(color: palette.accent),
-                ),
-                error: (_, __) => Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Text(
-                      l10n.chatScreenLoadError,
-                      style: TextStyle(color: palette.textMuted),
+              // Solo el estado (loading/error/empty/data) cross-fadea acá —
+              // NO stagger de mensajes: la lista es reverse:true + lazy
+              // (ListView.builder), reciclar ítems con TreinoFadeSlideIn los
+              // reanimaría en cada scroll (docs/design-system.md).
+              child: TreinoStateSwitcher(
+                childKey: ValueKey(messagesAsync.when(
+                  loading: () => 'loading',
+                  error: (_, __) => 'error',
+                  data: (messages) => messages.isEmpty ? 'empty' : 'data',
+                )),
+                child: messagesAsync.when(
+                  loading: () => Center(
+                    child: CircularProgressIndicator(color: palette.accent),
+                  ),
+                  error: (_, __) => Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Text(
+                        l10n.chatScreenLoadError,
+                        style: TextStyle(color: palette.textMuted),
+                      ),
                     ),
                   ),
+                  data: (messages) {
+                    if (messages.isEmpty) {
+                      return _ConversationEmpty(palette: palette);
+                    }
+                    return ListView.builder(
+                      reverse: true,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 12),
+                      itemCount: messages.length,
+                      itemBuilder: (_, i) {
+                        final msg = messages[i];
+                        final isMine = msg.senderId == currentUid;
+                        return _Bubble(
+                          message: msg,
+                          isMine: isMine,
+                          palette: palette,
+                        );
+                      },
+                    );
+                  },
                 ),
-                data: (messages) {
-                  if (messages.isEmpty) {
-                    return _ConversationEmpty(palette: palette);
-                  }
-                  return ListView.builder(
-                    reverse: true,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 12),
-                    itemCount: messages.length,
-                    itemBuilder: (_, i) {
-                      final msg = messages[i];
-                      final isMine = msg.senderId == currentUid;
-                      return _Bubble(
-                        message: msg,
-                        isMine: isMine,
-                        palette: palette,
-                      );
-                    },
-                  );
-                },
               ),
             ),
             if (mediaSend.uploading)
@@ -430,6 +449,12 @@ class _Composer extends StatelessWidget {
           const SizedBox(width: 8),
           IconButton(
             onPressed: sending ? null : onSend,
+            // Swap instantáneo (sin TreinoStateSwitcher): enviar es la acción
+            // más frecuente del chat — 240ms de cross-fade para una
+            // micro-acción rutinaria es más lento que el escalón que le
+            // corresponde. Mismo patrón que AuthPillButton.isLoading
+            // (auth_pill_button.dart), el hermano del sistema para este
+            // mismo gesto de "swap icono ↔ spinner".
             icon: sending
                 ? Semantics(
                     label: l10n.chatSendingA11y,

@@ -142,49 +142,56 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                   return const _EmptyState();
                 }
                 // TREINO Motion PR3: entrada fade+slide staggerada de las
-                // secciones. Seguro acá porque `ListView(children:)` es
-                // EAGER (todos los States montan juntos una sola vez) — en
-                // un builder lazy los ítems reciclados re-animarían al
-                // scrollear. Los setState locales (seleccionar día, pagear
-                // semana) NO re-animan: TreinoFadeSlideIn es one-shot y su
-                // State sobrevive al rebuild.
-                return ListView(
+                // secciones. SingleChildScrollView + Column (no
+                // ListView(children:)): un ListView, aunque construya sus
+                // widgets eager, sigue siendo un viewport — los Elements/
+                // State de los TreinoFadeSlideIn que salen del cacheExtent
+                // se desmontan y re-animan al volver a scrollear. Column
+                // dentro de SingleChildScrollView scrollea como una sola
+                // unidad, sin reciclar Elements por ítem (ver doc de
+                // TreinoFadeSlideIn). Los setState locales (seleccionar día,
+                // pagear semana) NO re-animan: TreinoFadeSlideIn es one-shot
+                // y su State sobrevive al rebuild.
+                return SingleChildScrollView(
                   padding: EdgeInsets.fromLTRB(
                       20, 12, 20, 20 + MediaQuery.paddingOf(context).bottom),
                   physics: const AlwaysScrollableScrollPhysics(),
-                  children: [
-                    TreinoFadeSlideIn(
-                      delay: AppMotion.stagger(0),
-                      child: _WeekStripCard(
-                        insights: insights,
-                        selectedDay: _selectedDay,
-                        onDaySelected: _onDaySelected,
-                        isCurrentWeek: isCurrentWeek,
-                        onPreviousWeek: () => _pageWeek(-1),
-                        onNextWeek: () => _pageWeek(1),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      TreinoFadeSlideIn(
+                        delay: AppMotion.stagger(0),
+                        child: _WeekStripCard(
+                          insights: insights,
+                          selectedDay: _selectedDay,
+                          onDaySelected: _onDaySelected,
+                          isCurrentWeek: isCurrentWeek,
+                          onPreviousWeek: () => _pageWeek(-1),
+                          onNextWeek: () => _pageWeek(1),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 14),
-                    TreinoFadeSlideIn(
-                      delay: AppMotion.stagger(1),
-                      child: _DailyMusclesCard(selectedDay: _selectedDay),
-                    ),
-                    const SizedBox(height: 20),
-                    TreinoFadeSlideIn(
-                      delay: AppMotion.stagger(2),
-                      child: const _AdvancedStatsHeading(),
-                    ),
-                    const SizedBox(height: 12),
-                    TreinoFadeSlideIn(
-                      delay: AppMotion.stagger(3),
-                      child: const _StatsHubTileList(),
-                    ),
-                    const SizedBox(height: 20),
-                    TreinoFadeSlideIn(
-                      delay: AppMotion.stagger(4),
-                      child: _VolverButton(),
-                    ),
-                  ],
+                      const SizedBox(height: 14),
+                      TreinoFadeSlideIn(
+                        delay: AppMotion.stagger(1),
+                        child: _DailyMusclesCard(selectedDay: _selectedDay),
+                      ),
+                      const SizedBox(height: 20),
+                      TreinoFadeSlideIn(
+                        delay: AppMotion.stagger(2),
+                        child: const _AdvancedStatsHeading(),
+                      ),
+                      const SizedBox(height: 12),
+                      TreinoFadeSlideIn(
+                        delay: AppMotion.stagger(3),
+                        child: const _StatsHubTileList(),
+                      ),
+                      const SizedBox(height: 20),
+                      TreinoFadeSlideIn(
+                        delay: AppMotion.stagger(4),
+                        child: _VolverButton(),
+                      ),
+                    ],
+                  ),
                 );
               },
             ),

@@ -3,8 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../app/theme/app_motion.dart';
 import '../../app/theme/app_palette.dart';
+import '../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../core/widgets/motion/treino_state_switcher.dart';
+import '../../core/widgets/motion/treino_tappable.dart';
 import '../../core/widgets/treino_icon.dart';
 import '../../l10n/app_l10n.dart';
 import '../chat/application/chat_providers.dart';
@@ -223,11 +226,10 @@ class _FeedHeader extends ConsumerWidget {
             label: pendingRequests > 0
                 ? l10n.feedFriendRequestsWithCountA11y(pendingRequests)
                 : l10n.feedFriendRequestsA11y,
-            child: GestureDetector(
+            child: TreinoTappable(
               // /feed twin of /profile/friend-requests so the bottom bar
               // keeps FEED highlighted while the inbox is open (issue #387).
               onTap: () => context.push('/feed/friend-requests'),
-              behavior: HitTestBehavior.opaque,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
                 child: Center(
@@ -273,9 +275,8 @@ class _FeedHeader extends ConsumerWidget {
             label: unreadChats > 0
                 ? l10n.feedMessagesWithUnreadA11y(unreadChats)
                 : l10n.feedMessagesA11y,
-            child: GestureDetector(
+            child: TreinoTappable(
               onTap: () => context.push('/feed/messages'),
-              behavior: HitTestBehavior.opaque,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
                 child: Center(
@@ -319,9 +320,8 @@ class _FeedHeader extends ConsumerWidget {
           Semantics(
             button: true,
             label: l10n.feedSearchA11y,
-            child: GestureDetector(
+            child: TreinoTappable(
               onTap: () => context.push('/feed/search'),
-              behavior: HitTestBehavior.opaque,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
                 child: Center(
@@ -338,9 +338,8 @@ class _FeedHeader extends ConsumerWidget {
           Semantics(
             button: true,
             label: l10n.feedCreatePostA11y,
-            child: GestureDetector(
+            child: TreinoTappable(
               onTap: () => context.push('/feed/create'),
-              behavior: HitTestBehavior.opaque,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
                 child: Center(
@@ -364,29 +363,71 @@ class _FeedHeader extends ConsumerWidget {
 }
 
 /// A scrollable list of [PostCard]s sharing the common feed layout.
-Widget _feedPostList(BuildContext context, List<Post> posts) {
-  // TODO(pagination): cursor-based pagination deferred (see explore §9)
-  return ListView.separated(
-    physics: const AlwaysScrollableScrollPhysics(),
-    padding: EdgeInsets.fromLTRB(
-      20,
-      0,
-      20,
-      MediaQuery.paddingOf(context).bottom,
-    ),
-    itemCount: posts.length,
-    separatorBuilder: (_, __) => const SizedBox(height: 14),
-    itemBuilder: (_, i) => PostCard(
-      // La card tiene estado local (el detalle del entreno expandido), así
-      // que la reconciliación POR POSICIÓN del ListView la corrompe: si
-      // entra un post nuevo arriba (refresh, o el propio usuario
-      // compartiendo), el Element de esa posición se reusa para OTRO post y
-      // muestra su detalle expandido. La key ata el estado al post.
-      key: ValueKey(posts[i].id),
-      post: posts[i],
-      onAuthorTap: () => context.go('/feed/profile/${posts[i].authorUid}'),
-    ),
-  );
+///
+/// StatefulWidget (no función suelta): [TreinoFadeSlideIn] está PROHIBIDO en
+/// builders lazy porque los ítems reciclados re-montan su State al re-entrar
+/// al viewport y la entrada re-animaría en cada scroll — el cap `i >= 8` NO
+/// alcanza porque el problema es el re-mount, no el índice. `_animatedIds`
+/// vive en el State de este widget (sobrevive al scroll, que solo
+/// monta/desmonta los Elements hijos del `ListView.separated`, no este
+/// State) y recuerda qué posts YA corrieron su entrada, así un post
+/// reciclado que vuelve a construirse nunca vuelve a animar.
+class _FeedPostList extends StatefulWidget {
+  const _FeedPostList({required this.posts});
+
+  final List<Post> posts;
+
+  @override
+  State<_FeedPostList> createState() => _FeedPostListState();
+}
+
+class _FeedPostListState extends State<_FeedPostList> {
+  final Set<String> _animatedIds = {};
+
+  @override
+  Widget build(BuildContext context) {
+    // TODO(pagination): cursor-based pagination deferred (see explore §9)
+    return ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        0,
+        20,
+        MediaQuery.paddingOf(context).bottom,
+      ),
+      itemCount: widget.posts.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 14),
+      itemBuilder: (_, i) {
+        final post = widget.posts[i];
+        void onAuthorTap() => context.go('/feed/profile/${post.authorUid}');
+
+        // La card tiene estado local (el detalle del entreno expandido), así
+        // que la reconciliación POR POSICIÓN del ListView la corrompe: si
+        // entra un post nuevo arriba (refresh, o el propio usuario
+        // compartiendo), el Element de esa posición se reusa para OTRO post y
+        // muestra su detalle expandido. La key ata el estado al post — vive en
+        // PostCard (invariante que un test cubre explícitamente) Y en
+        // cualquier wrapper que se interponga como raíz del builder, para que
+        // la reconciliación del ListView tampoco se confunda en esa capa.
+        final card = PostCard(
+            key: ValueKey(post.id), post: post, onAuthorTap: onAuthorTap);
+
+        // `add` devuelve false si el id ya estaba — ya animó una vez, no
+        // importa si el Element se recicló y se está reconstruyendo ahora.
+        final alreadyAnimated = !_animatedIds.add(post.id);
+        // Stagger sutil SOLO para los primeros 8 posts que entran sin haber
+        // animado antes (lo que se ve en cada carga/refresh) — cap explícito
+        // para no costear memoria/perf en listas largas ni generar una
+        // cascada interminable de delays.
+        if (i >= 8 || alreadyAnimated) return card;
+        return TreinoFadeSlideIn(
+          key: ValueKey(post.id),
+          delay: AppMotion.stagger(i),
+          child: card,
+        );
+      },
+    );
+  }
 }
 
 /// Wraps an empty/placeholder state in a scrollable so it can still be
@@ -503,7 +544,7 @@ class _AmigosBody extends ConsumerWidget {
             const FeedEmptyState(message: 'Aún no hay posts de tus amigos'),
           );
         }
-        return _feedPostList(context, posts);
+        return _FeedPostList(posts: posts);
       },
     );
   }
@@ -539,7 +580,7 @@ class _MiGymBody extends ConsumerWidget {
             const FeedEmptyState(message: 'Tu gym todavía no tiene posts'),
           );
         }
-        return _feedPostList(context, posts);
+        return _FeedPostList(posts: posts);
       },
     );
   }
@@ -561,7 +602,7 @@ class _PublicoBody extends ConsumerWidget {
             const FeedEmptyState(message: 'Aún no hay posts públicos'),
           );
         }
-        return _feedPostList(context, posts);
+        return _FeedPostList(posts: posts);
       },
     );
   }

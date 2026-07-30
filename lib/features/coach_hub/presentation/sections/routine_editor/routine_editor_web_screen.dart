@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../../app/theme/app_palette.dart';
+import '../../../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../../../core/widgets/treino_icon.dart';
 import '../../../../profile/application/user_public_profile_providers.dart';
 import '../../../../profile/domain/experience_level.dart';
@@ -1406,212 +1407,220 @@ class _RoutineEditorWebScreenState
           Divider(height: 1, color: palette.border),
           // ── Body: loading spinner / blocked notice / the form ───────────
           Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator())
-                : _fatalMessage != null
-                    ? _FatalMessage(
-                        message: _fatalMessage!,
-                        palette: palette,
-                        onBack: _onBackTap,
-                      )
-                    : SingleChildScrollView(
-                        padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-                        child: Align(
-                          alignment: Alignment.topCenter,
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 720),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                if (_errorMessage != null) ...[
-                                  _ErrorBanner(
-                                    message: _errorMessage!,
-                                    palette: palette,
+            child: TreinoStateSwitcher(
+              childKey: ValueKey(_loading
+                  ? 'loading'
+                  : (_fatalMessage != null ? 'fatal' : 'form')),
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _fatalMessage != null
+                      ? _FatalMessage(
+                          message: _fatalMessage!,
+                          palette: palette,
+                          onBack: _onBackTap,
+                        )
+                      : SingleChildScrollView(
+                          padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+                          child: Align(
+                            alignment: Alignment.topCenter,
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 720),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  if (_errorMessage != null) ...[
+                                    _ErrorBanner(
+                                      message: _errorMessage!,
+                                      palette: palette,
+                                    ),
+                                    const SizedBox(height: 16),
+                                  ],
+                                  _FieldLabel('NOMBRE', palette), // i18n
+                                  const SizedBox(height: 6),
+                                  TextField(
+                                    key: const Key('routine_editor_name_field'),
+                                    controller: _nameCtrl,
+                                    onChanged: (_) => _markDirty(),
+                                    style: GoogleFonts.barlow(
+                                      color: palette.textPrimary,
+                                    ),
+                                    decoration: _inputDecoration(
+                                      palette,
+                                      'Ej: Fuerza 4x semana',
+                                    ), // i18n
                                   ),
                                   const SizedBox(height: 16),
-                                ],
-                                _FieldLabel('NOMBRE', palette), // i18n
-                                const SizedBox(height: 6),
-                                TextField(
-                                  key: const Key('routine_editor_name_field'),
-                                  controller: _nameCtrl,
-                                  onChanged: (_) => _markDirty(),
-                                  style: GoogleFonts.barlow(
-                                    color: palette.textPrimary,
-                                  ),
-                                  decoration: _inputDecoration(
-                                    palette,
-                                    'Ej: Fuerza 4x semana',
-                                  ), // i18n
-                                ),
-                                const SizedBox(height: 16),
-                                _FieldLabel('SPLIT', palette), // i18n
-                                const SizedBox(height: 6),
-                                TextField(
-                                  key: const Key('routine_editor_split_field'),
-                                  controller: _splitCtrl,
-                                  onChanged: (_) => _markDirty(),
-                                  style: GoogleFonts.barlow(
-                                    color: palette.textPrimary,
-                                  ),
-                                  decoration: _inputDecoration(
-                                    palette,
-                                    'Ej: Push/Pull/Legs',
-                                  ), // i18n
-                                ),
-                                const SizedBox(height: 16),
-                                _FieldLabel('NIVEL', palette), // i18n
-                                const SizedBox(height: 8),
-                                _LevelSelector(
-                                  selected: _level,
-                                  palette: palette,
-                                  onChanged: (l) {
-                                    _markDirty();
-                                    setState(() => _level = l);
-                                  },
-                                ),
-                                const SizedBox(height: 24),
-                                _FieldLabel('SEMANAS', palette), // i18n
-                                const SizedBox(height: 8),
-                                _WeeksStepper(
-                                  numWeeks: _numWeeks,
-                                  palette: palette,
-                                  onChanged: _setNumWeeks,
-                                ),
-                                const SizedBox(height: 24),
-                                _FieldLabel('DÍAS', palette), // i18n
-                                const SizedBox(height: 8),
-                                // Global week switcher (Fase 4b) — one row for
-                                // the whole plan since `_selectedWeek` isn't
-                                // per-day. Hidden for single-week plans.
-                                if (_numWeeks > 1) ...[
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: _WeekTabs(
-                                          numWeeks: _numWeeks,
-                                          selectedWeek: _selectedWeek,
-                                          weeksWithError: _weeksWithError(),
-                                          palette: palette,
-                                          onSelected: (w) =>
-                                              setState(() => _selectedWeek = w),
-                                        ),
-                                      ),
-                                      // Nothing to copy from on week 1.
-                                      if (_selectedWeek > 0) ...[
-                                        const SizedBox(width: 8),
-                                        _DuplicateWeekButton(
-                                          sourceWeek: _selectedWeek - 1,
-                                          palette: palette,
-                                          onPressed: _duplicateWeek,
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                  const SizedBox(height: 12),
-                                ],
-                                // Live pointer to the first structural problem so a
-                                // long multi-week plan doesn't have to be submitted
-                                // blind (REQ-PERIOD-016). Name/split stay on submit.
-                                if (_firstInvalidHint() != null) ...[
-                                  Container(
-                                    key: const Key('invalid_week_hint'),
-                                    width: double.infinity,
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(
-                                      color: palette.danger
-                                          .withValues(alpha: 0.08),
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(
-                                        color: palette.danger
-                                            .withValues(alpha: 0.4),
-                                      ),
+                                  _FieldLabel('SPLIT', palette), // i18n
+                                  const SizedBox(height: 6),
+                                  TextField(
+                                    key:
+                                        const Key('routine_editor_split_field'),
+                                    controller: _splitCtrl,
+                                    onChanged: (_) => _markDirty(),
+                                    style: GoogleFonts.barlow(
+                                      color: palette.textPrimary,
                                     ),
-                                    child: Text(
-                                      _firstInvalidHint()!,
-                                      style: GoogleFonts.barlow(
-                                        color: palette.danger,
-                                        fontSize: 13,
-                                      ),
-                                    ),
+                                    decoration: _inputDecoration(
+                                      palette,
+                                      'Ej: Push/Pull/Legs',
+                                    ), // i18n
                                   ),
-                                  const SizedBox(height: 12),
-                                ],
-                                for (var i = 0; i < _days.length; i++) ...[
-                                  _DayCard(
-                                    day: _days[i],
+                                  const SizedBox(height: 16),
+                                  _FieldLabel('NIVEL', palette), // i18n
+                                  const SizedBox(height: 8),
+                                  _LevelSelector(
+                                    selected: _level,
                                     palette: palette,
-                                    selectedWeek: _selectedWeek,
+                                    onChanged: (l) {
+                                      _markDirty();
+                                      setState(() => _level = l);
+                                    },
+                                  ),
+                                  const SizedBox(height: 24),
+                                  _FieldLabel('SEMANAS', palette), // i18n
+                                  const SizedBox(height: 8),
+                                  _WeeksStepper(
                                     numWeeks: _numWeeks,
-                                    hasError: _dayHasError(_days[i]),
-                                    slotHasError: _slotHasError,
-                                    slotErrorText: _slotErrorText,
-                                    canRemove: _days.length > 1,
-                                    onNameChanged: (v) =>
-                                        _onDayNameChanged(i, v),
-                                    onRemove: () => _removeDay(i),
-                                    onAddExercises: () => _addExercisesToDay(i),
-                                    onRemoveSlot: (s) => _onDeleteSlot(i, s),
-                                    onReplaceSlot: (s) =>
-                                        _replaceSlotExercise(i, s),
-                                    onMoveSlot: (s, dir) =>
-                                        _moveSlot(i, s, dir),
-                                    onRestChanged: (s, v) =>
-                                        _onRestChanged(i, s, v),
-                                    onAddSet: (s) => _addSet(i, s),
-                                    onRemoveSet: (s, set) =>
-                                        _removeSet(i, s, set),
-                                    onSetRepsChanged: (s, set, v) =>
-                                        _onSetRepsChanged(i, s, set, v),
-                                    onSetRepsMinChanged: (s, set, v) =>
-                                        _onSetRepsMinChanged(i, s, set, v),
-                                    onSetRepsMaxChanged: (s, set, v) =>
-                                        _onSetRepsMaxChanged(i, s, set, v),
-                                    onSetDurationChanged: (s, set, v) =>
-                                        _onSetDurationChanged(i, s, set, v),
-                                    onSetWeightChanged: (s, set, v) =>
-                                        _onSetWeightChanged(i, s, set, v),
-                                    onSetTypeChanged: (s, set, t) =>
-                                        _onSetTypeChanged(i, s, set, t),
-                                    onModeChanged: (s, em, rm) =>
-                                        _setSlotMode(i, s, em, rm),
-                                    onNotesChanged: (s, v) =>
-                                        _onNotesChanged(i, s, v),
-                                    onToggleLink: (s) => _toggleSlotLink(i, s),
-                                    onTogglePresence: (s, w) =>
-                                        _toggleSlotWeekPresence(i, s, w),
+                                    palette: palette,
+                                    onChanged: _setNumWeeks,
                                   ),
-                                  const SizedBox(height: 12),
-                                ],
-                                if (_days.length < _kMaxDays)
-                                  OutlinedButton.icon(
-                                    key: const Key(
-                                        'routine_editor_add_day_button'),
-                                    onPressed: _addDay,
-                                    icon: Icon(
-                                      TreinoIcon.plus,
-                                      size: 18,
-                                      color: palette.accent,
+                                  const SizedBox(height: 24),
+                                  _FieldLabel('DÍAS', palette), // i18n
+                                  const SizedBox(height: 8),
+                                  // Global week switcher (Fase 4b) — one row for
+                                  // the whole plan since `_selectedWeek` isn't
+                                  // per-day. Hidden for single-week plans.
+                                  if (_numWeeks > 1) ...[
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: _WeekTabs(
+                                            numWeeks: _numWeeks,
+                                            selectedWeek: _selectedWeek,
+                                            weeksWithError: _weeksWithError(),
+                                            palette: palette,
+                                            onSelected: (w) => setState(
+                                                () => _selectedWeek = w),
+                                          ),
+                                        ),
+                                        // Nothing to copy from on week 1.
+                                        if (_selectedWeek > 0) ...[
+                                          const SizedBox(width: 8),
+                                          _DuplicateWeekButton(
+                                            sourceWeek: _selectedWeek - 1,
+                                            palette: palette,
+                                            onPressed: _duplicateWeek,
+                                          ),
+                                        ],
+                                      ],
                                     ),
-                                    label: Text(
-                                      'Agregar día', // i18n
-                                      style: GoogleFonts.barlowCondensed(
+                                    const SizedBox(height: 12),
+                                  ],
+                                  // Live pointer to the first structural problem so a
+                                  // long multi-week plan doesn't have to be submitted
+                                  // blind (REQ-PERIOD-016). Name/split stay on submit.
+                                  if (_firstInvalidHint() != null) ...[
+                                    Container(
+                                      key: const Key('invalid_week_hint'),
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: palette.danger
+                                            .withValues(alpha: 0.08),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: palette.danger
+                                              .withValues(alpha: 0.4),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        _firstInvalidHint()!,
+                                        style: GoogleFonts.barlow(
+                                          color: palette.danger,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                  ],
+                                  for (var i = 0; i < _days.length; i++) ...[
+                                    _DayCard(
+                                      day: _days[i],
+                                      palette: palette,
+                                      selectedWeek: _selectedWeek,
+                                      numWeeks: _numWeeks,
+                                      hasError: _dayHasError(_days[i]),
+                                      slotHasError: _slotHasError,
+                                      slotErrorText: _slotErrorText,
+                                      canRemove: _days.length > 1,
+                                      onNameChanged: (v) =>
+                                          _onDayNameChanged(i, v),
+                                      onRemove: () => _removeDay(i),
+                                      onAddExercises: () =>
+                                          _addExercisesToDay(i),
+                                      onRemoveSlot: (s) => _onDeleteSlot(i, s),
+                                      onReplaceSlot: (s) =>
+                                          _replaceSlotExercise(i, s),
+                                      onMoveSlot: (s, dir) =>
+                                          _moveSlot(i, s, dir),
+                                      onRestChanged: (s, v) =>
+                                          _onRestChanged(i, s, v),
+                                      onAddSet: (s) => _addSet(i, s),
+                                      onRemoveSet: (s, set) =>
+                                          _removeSet(i, s, set),
+                                      onSetRepsChanged: (s, set, v) =>
+                                          _onSetRepsChanged(i, s, set, v),
+                                      onSetRepsMinChanged: (s, set, v) =>
+                                          _onSetRepsMinChanged(i, s, set, v),
+                                      onSetRepsMaxChanged: (s, set, v) =>
+                                          _onSetRepsMaxChanged(i, s, set, v),
+                                      onSetDurationChanged: (s, set, v) =>
+                                          _onSetDurationChanged(i, s, set, v),
+                                      onSetWeightChanged: (s, set, v) =>
+                                          _onSetWeightChanged(i, s, set, v),
+                                      onSetTypeChanged: (s, set, t) =>
+                                          _onSetTypeChanged(i, s, set, t),
+                                      onModeChanged: (s, em, rm) =>
+                                          _setSlotMode(i, s, em, rm),
+                                      onNotesChanged: (s, v) =>
+                                          _onNotesChanged(i, s, v),
+                                      onToggleLink: (s) =>
+                                          _toggleSlotLink(i, s),
+                                      onTogglePresence: (s, w) =>
+                                          _toggleSlotWeekPresence(i, s, w),
+                                    ),
+                                    const SizedBox(height: 12),
+                                  ],
+                                  if (_days.length < _kMaxDays)
+                                    OutlinedButton.icon(
+                                      key: const Key(
+                                          'routine_editor_add_day_button'),
+                                      onPressed: _addDay,
+                                      icon: Icon(
+                                        TreinoIcon.plus,
+                                        size: 18,
                                         color: palette.accent,
-                                        fontWeight: FontWeight.w700,
+                                      ),
+                                      label: Text(
+                                        'Agregar día', // i18n
+                                        style: GoogleFonts.barlowCondensed(
+                                          color: palette.accent,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      style: OutlinedButton.styleFrom(
+                                        side: BorderSide(color: palette.accent),
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 14,
+                                        ),
                                       ),
                                     ),
-                                    style: OutlinedButton.styleFrom(
-                                      side: BorderSide(color: palette.accent),
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 14,
-                                      ),
-                                    ),
-                                  ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                         ),
-                      ),
+            ),
           ),
           // ── Footer (hidden while loading or when blocked) ───────────────
           if (!_loading && _fatalMessage == null)

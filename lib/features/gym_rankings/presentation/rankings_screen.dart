@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/motion/treino_fade_slide_in.dart';
+import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../gyms/domain/gym.dart' show kNoGymId;
@@ -525,27 +528,35 @@ class _DimensionSection extends StatelessWidget {
           ),
           const SizedBox(height: 12),
         ],
-        async.when(
-          loading: () => _LoadingBlock(palette: palette),
-          error: (_, __) => _ErrorBlock(palette: palette),
-          data: (profiles) {
-            // QA-GYM-506: filtrar ANTES de decidir vacío-vs-tabla, para que un
-            // board donde nadie registró el lift caiga en el estado vacío en
-            // vez de renderizar una tarjeta con cero filas.
-            final entries = rankableEntries(dimension, profiles);
-            if (entries.isEmpty) {
-              return _EmptyLeaderboard(
-                emptyKey: emptyKey,
+        TreinoStateSwitcher(
+          childKey: ValueKey(async.when(
+            loading: () => 'loading',
+            error: (_, __) => 'error',
+            data: (profiles) =>
+                rankableEntries(dimension, profiles).isEmpty ? 'empty' : 'data',
+          )),
+          child: async.when(
+            loading: () => _LoadingBlock(palette: palette),
+            error: (_, __) => _ErrorBlock(palette: palette),
+            data: (profiles) {
+              // QA-GYM-506: filtrar ANTES de decidir vacío-vs-tabla, para que un
+              // board donde nadie registró el lift caiga en el estado vacío en
+              // vez de renderizar una tarjeta con cero filas.
+              final entries = rankableEntries(dimension, profiles);
+              if (entries.isEmpty) {
+                return _EmptyLeaderboard(
+                  emptyKey: emptyKey,
+                  palette: palette,
+                  dimension: dimension,
+                );
+              }
+              return _LeaderboardList(
+                entries: entries,
+                myUid: myUid,
                 palette: palette,
-                dimension: dimension,
               );
-            }
-            return _LeaderboardList(
-              entries: entries,
-              myUid: myUid,
-              palette: palette,
-            );
-          },
+            },
+          ),
         ),
       ],
     );
@@ -628,6 +639,29 @@ class _LeaderboardList extends StatelessWidget {
   final String myUid;
   final AppPalette palette;
 
+  Widget _row(int i, List<int> ranks) {
+    final row = _LeaderboardRow(
+      rank: ranks[i],
+      profile: entries[i].profile,
+      value: entries[i].value,
+      isMe: entries[i].profile.uid == myUid,
+      palette: palette,
+    );
+    // Cap explícito en 8 (mismo patrón que feed_screen.dart
+    // _feedPostList): hasta 20 filas x 3 secciones visibles sin cap
+    // arrancarían hasta ~60 AnimationControllers one-shot al entrar a la
+    // pantalla, la mayoría por debajo del fold — y por el cap de
+    // AppMotion.stagger (maxItems 8) las filas 8+ ya comparten el mismo
+    // delay y aparecen igual como bloque, así que el stagger no comunicaba
+    // nada extra ahí.
+    if (i >= 8) return row;
+    return TreinoFadeSlideIn(
+      delay: AppMotion.stagger(i),
+      distance: AppMotion.slideSm,
+      child: row,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // QA-GYM-101: puestos con empates compartidos (1, 1, 3) en vez de índice+1.
@@ -644,13 +678,7 @@ class _LeaderboardList extends StatelessWidget {
             if (i > 0)
               Divider(
                   height: 1, color: palette.border, indent: 14, endIndent: 14),
-            _LeaderboardRow(
-              rank: ranks[i],
-              profile: entries[i].profile,
-              value: entries[i].value,
-              isMe: entries[i].profile.uid == myUid,
-              palette: palette,
-            ),
+            _row(i, ranks),
           ],
         ],
       ),

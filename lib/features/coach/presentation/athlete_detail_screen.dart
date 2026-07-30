@@ -7,6 +7,9 @@ import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/utils/date_labels.dart';
 import '../../../l10n/app_l10n.dart';
+import '../../../core/widgets/motion/treino_fade_slide_in.dart';
+import '../../../core/widgets/motion/treino_state_switcher.dart';
+import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../chat/application/chat_providers.dart';
 import '../../measurements/application/measurement_providers.dart';
@@ -145,55 +148,67 @@ class _AthleteDetailBody extends ConsumerWidget {
     return Column(
       children: [
         Expanded(
-          child: ListView(
+          // SingleChildScrollView + Column (no ListView(children:)): un
+          // ListView, aunque construya sus widgets eager, sigue siendo un
+          // viewport — los Elements/State de los TreinoFadeSlideIn que
+          // salen del cacheExtent se desmontan y re-animan al volver a
+          // scrollear. Column dentro de SingleChildScrollView scrollea
+          // como una sola unidad, sin reciclar Elements por ítem (ver doc
+          // de TreinoFadeSlideIn) — esta pantalla es larga, así que el
+          // riesgo era real (ver _PlanesSection más abajo).
+          child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-            children: [
-              // ── Athlete header ──────────────────────────────────────
-              _AthleteHeader(profileAsync: profileAsync),
-              if (profileAsync.hasError) ...[
-                const SizedBox(height: 8),
-                Text(
-                  AppL10n.of(context).athleteDetailProfileLoadError,
-                  style: GoogleFonts.barlow(
-                    fontSize: 13,
-                    color: palette.textMuted,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // ── Athlete header ──────────────────────────────────────
+                _AthleteHeader(profileAsync: profileAsync),
+                if (profileAsync.hasError) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    AppL10n.of(context).athleteDetailProfileLoadError,
+                    style: GoogleFonts.barlow(
+                      fontSize: 13,
+                      color: palette.textMuted,
+                    ),
                   ),
+                ],
+                const SizedBox(height: 20),
+
+                // ── Planes section ──────────────────────────────────────
+                _PlanesSection(
+                  athleteId: athleteId,
+                  trainerUid: trainerUid,
+                  plansAsync: plansAsync,
                 ),
+
+                // ── Antropometría section ────────────────────────────────
+                const SizedBox(height: 8),
+                _AntropometriaSection(
+                    athleteId: athleteId, trainerUid: trainerUid),
+
+                // ── Rendimiento section ──────────────────────────────────
+                const SizedBox(height: 20),
+                _RendimientoSection(athleteId: athleteId),
+
+                // ── Historial de sesiones section ─────────────────────────
+                const SizedBox(height: 20),
+                _EntrenamientosSection(athleteId: athleteId),
+
+                // ── Cobro section ─────────────────────────────────────────
+                const SizedBox(height: 20),
+                _CobroSection(athleteId: athleteId),
+
+                // ── Seguimiento section ───────────────────────────────────
+                const SizedBox(height: 20),
+                _SeguimientoSection(
+                    athleteId: athleteId, trainerUid: trainerUid),
+
+                // ── Nota del alumno section ───────────────────────────────
+                const SizedBox(height: 20),
+                _NotaSection(athleteId: athleteId, trainerUid: trainerUid),
               ],
-              const SizedBox(height: 20),
-
-              // ── Planes section ──────────────────────────────────────
-              _PlanesSection(
-                athleteId: athleteId,
-                trainerUid: trainerUid,
-                plansAsync: plansAsync,
-              ),
-
-              // ── Antropometría section ────────────────────────────────
-              const SizedBox(height: 8),
-              _AntropometriaSection(
-                  athleteId: athleteId, trainerUid: trainerUid),
-
-              // ── Rendimiento section ──────────────────────────────────
-              const SizedBox(height: 20),
-              _RendimientoSection(athleteId: athleteId),
-
-              // ── Historial de sesiones section ─────────────────────────
-              const SizedBox(height: 20),
-              _EntrenamientosSection(athleteId: athleteId),
-
-              // ── Cobro section ─────────────────────────────────────────
-              const SizedBox(height: 20),
-              _CobroSection(athleteId: athleteId),
-
-              // ── Seguimiento section ───────────────────────────────────
-              const SizedBox(height: 20),
-              _SeguimientoSection(athleteId: athleteId, trainerUid: trainerUid),
-
-              // ── Nota del alumno section ───────────────────────────────
-              const SizedBox(height: 20),
-              _NotaSection(athleteId: athleteId, trainerUid: trainerUid),
-            ],
+            ),
           ),
         ),
 
@@ -345,60 +360,72 @@ class _PlanesSection extends ConsumerWidget {
         const SizedBox(height: 12),
 
         // ── Async content ──────────────────────────────────────────────────
-        plansAsync.when(
-          loading: () => _card(
-            palette: palette,
-            child: Text(
-              'Cargando…',
-              style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+        TreinoStateSwitcher(
+          childKey: ValueKey(plansAsync.when(
+            loading: () => 'loading',
+            error: (_, __) => 'error',
+            data: (_) => 'data',
+          )),
+          child: plansAsync.when(
+            loading: () => _card(
+              palette: palette,
+              child: Text(
+                'Cargando…',
+                style:
+                    GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+              ),
             ),
-          ),
-          error: (e, __) => _card(
-            palette: palette,
-            child: Text(
-              (e is FirebaseException && e.code == 'permission-denied')
-                  ? 'No pudimos cargar los planes. Puede que el vínculo con '
-                      'este alumno se haya actualizado recién.'
-                  : 'No pudimos cargar los planes.',
-              style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+            error: (e, __) => _card(
+              palette: palette,
+              child: Text(
+                (e is FirebaseException && e.code == 'permission-denied')
+                    ? 'No pudimos cargar los planes. Puede que el vínculo con '
+                        'este alumno se haya actualizado recién.'
+                    : 'No pudimos cargar los planes.',
+                style:
+                    GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+              ),
             ),
-          ),
-          data: (allPlans) {
-            // Client-side filter: only show plans assigned by current trainer
-            final myPlans =
-                allPlans.where((r) => r.assignedBy == trainerUid).toList();
+            data: (allPlans) {
+              // Client-side filter: only show plans assigned by current trainer
+              final myPlans =
+                  allPlans.where((r) => r.assignedBy == trainerUid).toList();
 
-            if (myPlans.isEmpty) {
-              return Text(
-                AppL10n.of(context).coachAthleteDetailNoPlans,
-                style: GoogleFonts.barlow(
-                  fontWeight: FontWeight.w400,
-                  fontSize: 14,
-                  color: palette.textMuted,
-                ),
-              );
-            }
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (final plan in myPlans) ...[
-                  _PlanCard(
-                    plan: plan,
-                    onTap: () => context.push(
-                      '/coach/athlete/$athleteId/plan/${plan.id}',
-                    ),
-                    onEdit: () => context.push(
-                      '/workout/routine-editor/$athleteId',
-                      extra: plan.id,
-                    ),
-                    onDelete: () => _onDeletePlan(context, ref, plan),
+              if (myPlans.isEmpty) {
+                return Text(
+                  AppL10n.of(context).coachAthleteDetailNoPlans,
+                  style: GoogleFonts.barlow(
+                    fontWeight: FontWeight.w400,
+                    fontSize: 14,
+                    color: palette.textMuted,
                   ),
-                  const SizedBox(height: 12),
+                );
+              }
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final (i, plan) in myPlans.indexed) ...[
+                    TreinoFadeSlideIn(
+                      delay: AppMotion.stagger(i),
+                      child: _PlanCard(
+                        plan: plan,
+                        onTap: () => context.push(
+                          '/coach/athlete/$athleteId/plan/${plan.id}',
+                        ),
+                        onEdit: () => context.push(
+                          '/workout/routine-editor/$athleteId',
+                          extra: plan.id,
+                        ),
+                        onDelete: () => _onDeletePlan(context, ref, plan),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                 ],
-              ],
-            );
-          },
+              );
+            },
+          ),
         ),
       ],
     );
@@ -593,7 +620,7 @@ class _AntropometriaSection extends ConsumerWidget {
               ),
             ),
             const Spacer(),
-            GestureDetector(
+            TreinoTappable(
               onTap: () => _openLogForm(context),
               child: Text(
                 '+ Cargar',
@@ -609,143 +636,150 @@ class _AntropometriaSection extends ConsumerWidget {
         const SizedBox(height: 12),
 
         // ── Async content ──────────────────────────────────────────────────
-        measurementsAsync.when(
-          loading: () => _card(
-            palette: palette,
-            child: Text(
-              'Cargando…',
-              style: GoogleFonts.barlow(
-                fontSize: 13,
-                color: palette.textMuted,
-              ),
-            ),
-          ),
-          error: (_, __) => _card(
-            palette: palette,
-            child: Text(
-              'No pudimos cargar las medidas.',
-              style: GoogleFonts.barlow(
-                fontSize: 13,
-                color: palette.textMuted,
-              ),
-            ),
-          ),
-          data: (measurements) {
-            if (measurements.isEmpty) {
-              return _card(
-                palette: palette,
-                child: Text(
-                  'Sin mediciones todavía. Cargá la primera.',
-                  style: GoogleFonts.barlow(
-                    fontSize: 13,
-                    color: palette.textMuted,
-                  ),
+        TreinoStateSwitcher(
+          childKey: ValueKey(measurementsAsync.when(
+            loading: () => 'loading',
+            error: (_, __) => 'error',
+            data: (_) => 'data',
+          )),
+          child: measurementsAsync.when(
+            loading: () => _card(
+              palette: palette,
+              child: Text(
+                'Cargando…',
+                style: GoogleFonts.barlow(
+                  fontSize: 13,
+                  color: palette.textMuted,
                 ),
-              );
-            }
-
-            // List sorted ASC → latest is last
-            final latest = measurements.last;
-            final count = measurements.length;
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ── Latest-measurement summary card ────────────────────
-                _card(
+              ),
+            ),
+            error: (_, __) => _card(
+              palette: palette,
+              child: Text(
+                'No pudimos cargar las medidas.',
+                style: GoogleFonts.barlow(
+                  fontSize: 13,
+                  color: palette.textMuted,
+                ),
+              ),
+            ),
+            data: (measurements) {
+              if (measurements.isEmpty) {
+                return _card(
                   palette: palette,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Date
-                      Text(
-                        _formatMeasurementDate(latest.recordedAt, localeName),
-                        style: GoogleFonts.barlowCondensed(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                          color: palette.textPrimary,
-                          letterSpacing: 0.4,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-
-                      // Key metrics (non-null only)
-                      _MetricRow(
-                        metrics: [
-                          if (latest.weightKg != null)
-                            _Metric(
-                              'Peso',
-                              '${_formatMetricValue(latest.weightKg!)} kg',
-                            ),
-                          if (latest.fatPercentage != null)
-                            _Metric(
-                              '% Graso',
-                              '${_formatMetricValue(latest.fatPercentage!)}%',
-                            ),
-                          if (latest.muscleMassKg != null)
-                            _Metric(
-                              'Masa muscular',
-                              '${_formatMetricValue(latest.muscleMassKg!)} kg',
-                            ),
-                          if (latest.waistCm != null)
-                            _Metric(
-                              'Cintura',
-                              '${_formatMetricValue(latest.waistCm!)} cm',
-                            ),
-                        ],
-                        palette: palette,
-                      ),
-
-                      const SizedBox(height: 8),
-                      Text(
-                        '$count ${count == 1 ? 'medición registrada' : 'mediciones registradas'}',
-                        style: GoogleFonts.barlow(
-                          fontSize: 12,
-                          color: palette.textMuted,
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    'Sin mediciones todavía. Cargá la primera.',
+                    style: GoogleFonts.barlow(
+                      fontSize: 13,
+                      color: palette.textMuted,
+                    ),
                   ),
-                ),
+                );
+              }
 
-                // ── Progress chart (TANDA-3) ───────────────────────────
-                const SizedBox(height: 12),
-                if (measurements.length >= 2)
-                  MeasurementProgressChart(measurements: measurements)
-                else
+              // List sorted ASC → latest is last
+              final latest = measurements.last;
+              final count = measurements.length;
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── Latest-measurement summary card ────────────────────
                   _card(
                     palette: palette,
-                    child: Text(
-                      'Cargá otra medición para ver el progreso.',
-                      style: GoogleFonts.barlow(
-                        fontSize: 13,
-                        color: palette.textMuted,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Date
+                        Text(
+                          _formatMeasurementDate(latest.recordedAt, localeName),
+                          style: GoogleFonts.barlowCondensed(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            color: palette.textPrimary,
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+
+                        // Key metrics (non-null only)
+                        _MetricRow(
+                          metrics: [
+                            if (latest.weightKg != null)
+                              _Metric(
+                                'Peso',
+                                '${_formatMetricValue(latest.weightKg!)} kg',
+                              ),
+                            if (latest.fatPercentage != null)
+                              _Metric(
+                                '% Graso',
+                                '${_formatMetricValue(latest.fatPercentage!)}%',
+                              ),
+                            if (latest.muscleMassKg != null)
+                              _Metric(
+                                'Masa muscular',
+                                '${_formatMetricValue(latest.muscleMassKg!)} kg',
+                              ),
+                            if (latest.waistCm != null)
+                              _Metric(
+                                'Cintura',
+                                '${_formatMetricValue(latest.waistCm!)} cm',
+                              ),
+                          ],
+                          palette: palette,
+                        ),
+
+                        const SizedBox(height: 8),
+                        Text(
+                          '$count ${count == 1 ? 'medición registrada' : 'mediciones registradas'}',
+                          style: GoogleFonts.barlow(
+                            fontSize: 12,
+                            color: palette.textMuted,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
 
-                // ── Historial con editar/borrar por fila (#439) ────────
-                const SizedBox(height: 12),
-                Text(
-                  AppL10n.of(context).measurementsHistoryTitle,
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12,
-                    letterSpacing: 1.2,
-                    color: palette.textMuted,
+                  // ── Progress chart (TANDA-3) ───────────────────────────
+                  const SizedBox(height: 12),
+                  if (measurements.length >= 2)
+                    MeasurementProgressChart(measurements: measurements)
+                  else
+                    _card(
+                      palette: palette,
+                      child: Text(
+                        'Cargá otra medición para ver el progreso.',
+                        style: GoogleFonts.barlow(
+                          fontSize: 13,
+                          color: palette.textMuted,
+                        ),
+                      ),
+                    ),
+
+                  // ── Historial con editar/borrar por fila (#439) ────────
+                  const SizedBox(height: 12),
+                  Text(
+                    AppL10n.of(context).measurementsHistoryTitle,
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                      letterSpacing: 1.2,
+                      color: palette.textMuted,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                MeasurementHistoryList(
-                  measurements: measurements,
-                  currentUid: trainerUid,
-                  readOnlyLabel:
-                      AppL10n.of(context).measurementHistorySelfLoggedTag,
-                  onEdit: (m) => _openLogForm(context, initial: m),
-                ),
-              ],
-            );
-          },
+                  const SizedBox(height: 8),
+                  MeasurementHistoryList(
+                    measurements: measurements,
+                    currentUid: trainerUid,
+                    readOnlyLabel:
+                        AppL10n.of(context).measurementHistorySelfLoggedTag,
+                    onEdit: (m) => _openLogForm(context, initial: m),
+                  ),
+                ],
+              );
+            },
+          ),
         ),
       ],
     );
@@ -877,7 +911,7 @@ class _RendimientoSection extends ConsumerWidget {
               ),
             ),
             const Spacer(),
-            GestureDetector(
+            TreinoTappable(
               onTap: () => _openLogForm(context),
               child: Text(
                 '+ Cargar',
@@ -893,118 +927,125 @@ class _RendimientoSection extends ConsumerWidget {
         const SizedBox(height: 12),
 
         // ── Async content ──────────────────────────────────────────────────
-        testsAsync.when(
-          loading: () => _card(
-            palette: palette,
-            child: Text(
-              'Cargando…',
-              style: GoogleFonts.barlow(
-                fontSize: 13,
-                color: palette.textMuted,
-              ),
-            ),
-          ),
-          error: (_, __) => _card(
-            palette: palette,
-            child: Text(
-              'No pudimos cargar las evaluaciones.',
-              style: GoogleFonts.barlow(
-                fontSize: 13,
-                color: palette.textMuted,
-              ),
-            ),
-          ),
-          data: (tests) {
-            if (tests.isEmpty) {
-              return _card(
-                palette: palette,
-                child: Text(
-                  'Sin evaluaciones todavía. Cargá la primera.',
-                  style: GoogleFonts.barlow(
-                    fontSize: 13,
-                    color: palette.textMuted,
-                  ),
+        TreinoStateSwitcher(
+          childKey: ValueKey(testsAsync.when(
+            loading: () => 'loading',
+            error: (_, __) => 'error',
+            data: (_) => 'data',
+          )),
+          child: testsAsync.when(
+            loading: () => _card(
+              palette: palette,
+              child: Text(
+                'Cargando…',
+                style: GoogleFonts.barlow(
+                  fontSize: 13,
+                  color: palette.textMuted,
                 ),
-              );
-            }
-
-            // List sorted ASC → latest is last
-            final latest = tests.last;
-            final count = tests.length;
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ── Latest-test summary card ───────────────────────────
-                _card(
+              ),
+            ),
+            error: (_, __) => _card(
+              palette: palette,
+              child: Text(
+                'No pudimos cargar las evaluaciones.',
+                style: GoogleFonts.barlow(
+                  fontSize: 13,
+                  color: palette.textMuted,
+                ),
+              ),
+            ),
+            data: (tests) {
+              if (tests.isEmpty) {
+                return _card(
                   palette: palette,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Date
-                      Text(
-                        _formatMeasurementDate(latest.recordedAt, localeName),
-                        style: GoogleFonts.barlowCondensed(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                          color: palette.textPrimary,
-                          letterSpacing: 0.4,
+                  child: Text(
+                    'Sin evaluaciones todavía. Cargá la primera.',
+                    style: GoogleFonts.barlow(
+                      fontSize: 13,
+                      color: palette.textMuted,
+                    ),
+                  ),
+                );
+              }
+
+              // List sorted ASC → latest is last
+              final latest = tests.last;
+              final count = tests.length;
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── Latest-test summary card ───────────────────────────
+                  _card(
+                    palette: palette,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Date
+                        Text(
+                          _formatMeasurementDate(latest.recordedAt, localeName),
+                          style: GoogleFonts.barlowCondensed(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            color: palette.textPrimary,
+                            letterSpacing: 0.4,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
+                        const SizedBox(height: 8),
 
-                      // Key metrics (non-null only)
-                      _MetricRow(
-                        metrics: [
-                          // QA-PERF-104: formatear con el helper existente para
-                          // no interpolar el double crudo (30.0 -> 30),
-                          // consistente con la card de MEDICIONES vecina.
-                          if (latest.cmjCm != null)
-                            _Metric('CMJ',
-                                '${_formatMetricValue(latest.cmjCm!)} cm'),
-                          if (latest.squat1rmKg != null)
-                            _Metric('Sentadilla 1RM',
-                                '${_formatMetricValue(latest.squat1rmKg!)} kg'),
-                          if (latest.sprint20mS != null)
-                            _Metric('Sprint 20m',
-                                '${_formatMetricValue(latest.sprint20mS!)} s'),
-                          if (latest.vo2maxMlKgMin != null)
-                            _Metric('VO2máx',
-                                '${_formatMetricValue(latest.vo2maxMlKgMin!)} ml/kg/min'),
-                        ],
-                        palette: palette,
-                      ),
+                        // Key metrics (non-null only)
+                        _MetricRow(
+                          metrics: [
+                            // QA-PERF-104: formatear con el helper existente para
+                            // no interpolar el double crudo (30.0 -> 30),
+                            // consistente con la card de MEDICIONES vecina.
+                            if (latest.cmjCm != null)
+                              _Metric('CMJ',
+                                  '${_formatMetricValue(latest.cmjCm!)} cm'),
+                            if (latest.squat1rmKg != null)
+                              _Metric('Sentadilla 1RM',
+                                  '${_formatMetricValue(latest.squat1rmKg!)} kg'),
+                            if (latest.sprint20mS != null)
+                              _Metric('Sprint 20m',
+                                  '${_formatMetricValue(latest.sprint20mS!)} s'),
+                            if (latest.vo2maxMlKgMin != null)
+                              _Metric('VO2máx',
+                                  '${_formatMetricValue(latest.vo2maxMlKgMin!)} ml/kg/min'),
+                          ],
+                          palette: palette,
+                        ),
 
-                      const SizedBox(height: 8),
-                      Text(
-                        '$count ${count == 1 ? 'evaluación registrada' : 'evaluaciones registradas'}',
+                        const SizedBox(height: 8),
+                        Text(
+                          '$count ${count == 1 ? 'evaluación registrada' : 'evaluaciones registradas'}',
+                          style: GoogleFonts.barlow(
+                            fontSize: 12,
+                            color: palette.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // ── Progress chart ─────────────────────────────────────
+                  const SizedBox(height: 12),
+                  if (tests.length >= 2)
+                    PerformanceProgressChart(tests: tests)
+                  else
+                    _card(
+                      palette: palette,
+                      child: Text(
+                        'Cargá otra evaluación para ver el progreso.',
                         style: GoogleFonts.barlow(
-                          fontSize: 12,
+                          fontSize: 13,
                           color: palette.textMuted,
                         ),
                       ),
-                    ],
-                  ),
-                ),
-
-                // ── Progress chart ─────────────────────────────────────
-                const SizedBox(height: 12),
-                if (tests.length >= 2)
-                  PerformanceProgressChart(tests: tests)
-                else
-                  _card(
-                    palette: palette,
-                    child: Text(
-                      'Cargá otra evaluación para ver el progreso.',
-                      style: GoogleFonts.barlow(
-                        fontSize: 13,
-                        color: palette.textMuted,
-                      ),
                     ),
-                  ),
-              ],
-            );
-          },
+                ],
+              );
+            },
+          ),
         ),
       ],
     );
@@ -1059,7 +1100,7 @@ class _CobroSection extends ConsumerWidget {
               ),
             ),
             const Spacer(),
-            GestureDetector(
+            TreinoTappable(
               onTap: () =>
                   _openConfigSheet(context, ref, billingAsync.valueOrNull),
               child: Text(
@@ -1076,51 +1117,60 @@ class _CobroSection extends ConsumerWidget {
         const SizedBox(height: 12),
 
         // ── Content ─────────────────────────────────────────────────────
-        billingAsync.when(
-          loading: () => _card(
-            palette: palette,
-            child: Text(
-              'Cargando…',
-              style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+        TreinoStateSwitcher(
+          childKey: ValueKey(billingAsync.when(
+            loading: () => 'loading',
+            error: (_, __) => 'error',
+            data: (_) => 'data',
+          )),
+          child: billingAsync.when(
+            loading: () => _card(
+              palette: palette,
+              child: Text(
+                'Cargando…',
+                style:
+                    GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+              ),
             ),
-          ),
-          error: (_, __) => _card(
-            palette: palette,
-            child: Text(
-              'No pudimos cargar la config de cobro.',
-              style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+            error: (_, __) => _card(
+              palette: palette,
+              child: Text(
+                'No pudimos cargar la config de cobro.',
+                style:
+                    GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+              ),
             ),
-          ),
-          data: (billing) => _card(
-            palette: palette,
-            child: billing == null
-                ? Text(
-                    'Sin configurar.',
-                    style: GoogleFonts.barlow(
-                        fontSize: 13, color: palette.textMuted),
-                  )
-                : Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '\$${billing.amountArs} ARS',
-                          style: GoogleFonts.barlow(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 15,
-                            color: palette.textPrimary,
+            data: (billing) => _card(
+              palette: palette,
+              child: billing == null
+                  ? Text(
+                      'Sin configurar.',
+                      style: GoogleFonts.barlow(
+                          fontSize: 13, color: palette.textMuted),
+                    )
+                  : Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '\$${billing.amountArs} ARS',
+                            style: GoogleFonts.barlow(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                              color: palette.textPrimary,
+                            ),
                           ),
                         ),
-                      ),
-                      Text(
-                        _kCadenceLabels[billing.cadence] ??
-                            billing.cadence.name,
-                        style: GoogleFonts.barlow(
-                          fontSize: 13,
-                          color: palette.textMuted,
+                        Text(
+                          _kCadenceLabels[billing.cadence] ??
+                              billing.cadence.name,
+                          style: GoogleFonts.barlow(
+                            fontSize: 13,
+                            color: palette.textMuted,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
+            ),
           ),
         ),
       ],
@@ -1453,36 +1503,44 @@ class _SeguimientoSection extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 12),
-        entriesAsync.when(
-          loading: () => card(muted(l10n.dashboardCargando)),
-          error: (_, __) => card(muted(l10n.athleteDetailSeguimientoLoadError)),
-          data: (entries) {
-            if (entries.isEmpty) {
-              return card(muted(l10n.athleteDetailSeguimientoEmpty));
-            }
-            // Server-side DESC already; cap the mobile view — the full log
-            // lives in the web hub.
-            final shown = entries.take(10).toList();
-            return card(
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  for (var i = 0; i < shown.length; i++) ...[
-                    if (i > 0) ...[
-                      const SizedBox(height: 12),
-                      Divider(color: palette.border, height: 1),
-                      const SizedBox(height: 12),
+        TreinoStateSwitcher(
+          childKey: ValueKey(entriesAsync.when(
+            loading: () => 'loading',
+            error: (_, __) => 'error',
+            data: (_) => 'data',
+          )),
+          child: entriesAsync.when(
+            loading: () => card(muted(l10n.dashboardCargando)),
+            error: (_, __) =>
+                card(muted(l10n.athleteDetailSeguimientoLoadError)),
+            data: (entries) {
+              if (entries.isEmpty) {
+                return card(muted(l10n.athleteDetailSeguimientoEmpty));
+              }
+              // Server-side DESC already; cap the mobile view — the full log
+              // lives in the web hub.
+              final shown = entries.take(10).toList();
+              return card(
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (var i = 0; i < shown.length; i++) ...[
+                      if (i > 0) ...[
+                        const SizedBox(height: 12),
+                        Divider(color: palette.border, height: 1),
+                        const SizedBox(height: 12),
+                      ],
+                      _SeguimientoRow(
+                        entry: shown[i],
+                        tagStyle: _tagStyle(shown[i].tag, palette),
+                        palette: palette,
+                      ),
                     ],
-                    _SeguimientoRow(
-                      entry: shown[i],
-                      tagStyle: _tagStyle(shown[i].tag, palette),
-                      palette: palette,
-                    ),
                   ],
-                ],
-              ),
-            );
-          },
+                ),
+              );
+            },
+          ),
         ),
       ],
     );
@@ -1720,36 +1778,48 @@ class _NotaSectionState extends ConsumerState<_NotaSection> {
             card: card,
           )
         else
-          noteAsync.when(
-            loading: () => card(child: muted('Cargando…')),
-            error: (_, __) => card(child: muted('No pudimos cargar la nota.')),
-            data: (note) {
-              final text = note?.note.trim() ?? '';
-              return Semantics(
-                button: true,
-                container: true,
-                label: text.isEmpty
-                    ? 'Escribir una nota sobre el alumno'
-                    : 'Editar la nota del alumno',
-                child: GestureDetector(
-                  onTap: () => _startEditing(text),
-                  behavior: HitTestBehavior.opaque,
-                  child: card(
-                    child: text.isEmpty
-                        // The hint doubles as the affordance now that the
-                        // "Agregar" link is gone.
-                        ? muted('Tocá para escribir una nota.')
-                        : Text(
-                            text,
-                            style: GoogleFonts.barlow(
-                              fontSize: 14,
-                              color: palette.textPrimary,
+          // Cross-fade SOLO de la rama de display (loading→data→error). El
+          // editor inline queda deliberadamente afuera: envolverlo también
+          // re-montaría el TextField en cada transición y le robaría el foco
+          // mientras el PF escribe.
+          TreinoStateSwitcher(
+            childKey: ValueKey(noteAsync.when(
+              loading: () => 'loading',
+              error: (_, __) => 'error',
+              data: (_) => 'data',
+            )),
+            child: noteAsync.when(
+              loading: () => card(child: muted('Cargando…')),
+              error: (_, __) =>
+                  card(child: muted('No pudimos cargar la nota.')),
+              data: (note) {
+                final text = note?.note.trim() ?? '';
+                return Semantics(
+                  button: true,
+                  container: true,
+                  label: text.isEmpty
+                      ? 'Escribir una nota sobre el alumno'
+                      : 'Editar la nota del alumno',
+                  child: GestureDetector(
+                    onTap: () => _startEditing(text),
+                    behavior: HitTestBehavior.opaque,
+                    child: card(
+                      child: text.isEmpty
+                          // The hint doubles as the affordance now that the
+                          // "Agregar" link is gone.
+                          ? muted('Tocá para escribir una nota.')
+                          : Text(
+                              text,
+                              style: GoogleFonts.barlow(
+                                fontSize: 14,
+                                color: palette.textPrimary,
+                              ),
                             ),
-                          ),
+                    ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
       ],
     );

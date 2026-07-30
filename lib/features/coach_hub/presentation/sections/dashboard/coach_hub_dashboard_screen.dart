@@ -63,6 +63,12 @@ class CoachHubDashboardScreen extends ConsumerWidget {
             final wide =
                 constraints.maxWidth >= 900 && constraints.maxHeight.isFinite;
 
+            // Sin entrada one-shot: el resto de las secciones del hub
+            // (Agenda, Pagos, Biblioteca, Chat, Ajustes, Alumnos) aparecen
+            // instantáneas al click del sidebar, y cada sección monta vía
+            // NoTransitionPage — un TreinoFadeSlideIn acá se re-dispararía
+            // en CADA visita a la superficie más frecuentada del hub, no
+            // solo la primera vez. Mismo motion que sus hermanas.
             final content = _DashboardContent(wide: wide);
 
             if (wide) {
