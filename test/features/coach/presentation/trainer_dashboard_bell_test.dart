@@ -5,8 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart'
-    show trainerLinksStreamProvider;
+    show trainerLinkRepositoryProvider, trainerLinksStreamProvider;
+import 'package:treino/features/coach/data/trainer_link_repository.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach/presentation/trainer_dashboard_tab.dart';
@@ -31,6 +33,8 @@ Widget _wrap(Widget child) => MaterialApp(
       locale: const Locale('es', 'AR'),
       home: Scaffold(body: Center(child: child)),
     );
+
+class _MockLinkRepo extends Mock implements TrainerLinkRepository {}
 
 TrainerLink _pending(String id, String athleteId) => TrainerLink(
       id: id,
@@ -104,6 +108,35 @@ void main() {
       // (OutlinedButton) actions.
       expect(find.byType(ElevatedButton), findsNWidgets(2));
       expect(find.byType(OutlinedButton), findsNWidgets(2));
+    });
+
+    // QA H5: el catch de accept/decline solo reseteaba _busy, sin feedback —
+    // un fallo dejaba al PF creyendo que aceptó/rechazó cuando no pasó nada.
+    testWidgets('ACEPTAR que falla muestra SnackBar y no traga el error',
+        (tester) async {
+      final repo = _MockLinkRepo();
+      when(() => repo.accept(any())).thenThrow(Exception('permission-denied'));
+
+      await tester.pumpWidget(ProviderScope(
+        overrides: [
+          trainerLinksStreamProvider
+              .overrideWith((ref) => Stream.value([_pending('l1', 'a1')])),
+          userPublicProfileProvider.overrideWith(
+            (ref, uid) => Stream<UserPublicProfile?>.value(null),
+          ),
+          trainerLinkRepositoryProvider.overrideWithValue(repo),
+        ],
+        child: _wrap(const PendingRequestsSheetTestHarness()),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('ACEPTAR'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('No pudimos aceptar la solicitud. Probá de nuevo.'),
+        findsOneWidget,
+      );
     });
 
     // The sheet reaches "empty" two ways that need OPPOSITE behaviour, so both

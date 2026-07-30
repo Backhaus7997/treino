@@ -2,15 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
+import 'package:treino/features/coach/data/trainer_link_repository.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach/trainer_coach_view.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
+
+class _MockLinkRepo extends Mock implements TrainerLinkRepository {}
 
 Widget _wrap(Widget child, {List<Override> overrides = const []}) =>
     ProviderScope(
@@ -271,6 +275,46 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('unread-dot-a1')), findsNothing);
+    });
+  });
+
+  // ── Silent-failure guard (QA H5) ──────────────────────────────────────────
+  //
+  // TERMINAR/PAUSAR/REANUDAR corrían `await action()` sin try/catch: si el
+  // repo lanzaba (permission-denied, rules), la excepción escapaba como async
+  // no capturada → fatal en Crashlytics, y el PF no veía nada. Ahora falla con
+  // un SnackBar.
+  group('TrainerCoachView — acciones de vínculo con feedback en error', () {
+    testWidgets(
+        'TERMINAR VÍNCULO que falla muestra SnackBar en vez de tragar el error',
+        (tester) async {
+      final repo = _MockLinkRepo();
+      when(() => repo.terminate(any(), reason: any(named: 'reason')))
+          .thenThrow(Exception('permission-denied'));
+
+      await tester.pumpWidget(_wrap(
+        const TrainerCoachView(),
+        overrides: [
+          ..._stubLinks([
+            _link(id: 'l1', status: TrainerLinkStatus.active, athleteId: 'a1'),
+          ]),
+          trainerLinkRepositoryProvider.overrideWithValue(repo),
+        ],
+      ));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('ALUMNOS'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('TERMINAR VÍNCULO'));
+      await tester.pumpAndSettle();
+      // Confirmar en el diálogo.
+      await tester.tap(find.text('Terminar'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('No pudimos actualizar el vínculo. Probá de nuevo.'),
+        findsOneWidget,
+      );
     });
   });
 }
