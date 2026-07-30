@@ -1,13 +1,42 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/features/coach/application/trainer_link_providers.dart'
+    show trainerLinksStreamProvider;
+import 'package:treino/features/coach/domain/trainer_link.dart';
+import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/pagos_web_screen.dart';
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart'
     show pagosPorCobrarProvider;
 import 'package:treino/features/payments/application/payment_providers.dart'
-    show trainerPaymentsProvider;
+    show paymentRepositoryProvider, trainerPaymentsProvider;
+import 'package:treino/features/payments/data/payment_repository.dart';
+import 'package:treino/features/payments/domain/payment.dart';
+import 'package:treino/features/profile/application/user_public_profile_providers.dart'
+    show userPublicProfilesBatchProvider;
+import 'package:treino/features/profile/domain/user_public_profile.dart';
+import 'package:treino/features/workout/application/session_providers.dart'
+    show currentUidProvider;
 import 'package:treino/l10n/app_l10n.dart';
+
+// ── Mocks ─────────────────────────────────────────────────────────────────────
+
+class _MockPaymentRepo extends Mock implements PaymentRepository {}
+
+// ── Fakes ─────────────────────────────────────────────────────────────────────
+
+TrainerLink _link(String athleteId, TrainerLinkStatus status) => TrainerLink(
+      id: 'l_$athleteId',
+      trainerId: 'trainer-1',
+      athleteId: athleteId,
+      status: status,
+      requestedAt: DateTime.utc(2026, 1, 1),
+    );
+
+UserPublicProfile _prof(String uid, String name) =>
+    UserPublicProfile(uid: uid, displayName: name);
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
 
@@ -25,9 +54,23 @@ Widget _wrap(Widget child, {List<Override> overrides = const []}) =>
       ),
     );
 
-List<Override> _emptyOverrides() => [
+List<Override> _emptyOverrides({
+  List<TrainerLink> links = const [],
+  List<UserPublicProfile> profiles = const [],
+  PaymentRepository? repo,
+  String? trainerId,
+}) =>
+    [
       trainerPaymentsProvider.overrideWith((ref) => Stream.value(const [])),
       pagosPorCobrarProvider.overrideWith((ref) => const AsyncValue.data([])),
+      // RegistrarPagoDialog (opened by the "+ Registrar pago" button) now
+      // reads these to populate the alumno dropdown.
+      trainerLinksStreamProvider.overrideWith((ref) => Stream.value(links)),
+      userPublicProfilesBatchProvider.overrideWith(
+        (ref, key) => {for (final p in profiles) p.uid: p},
+      ),
+      if (repo != null) paymentRepositoryProvider.overrideWithValue(repo),
+      if (trainerId != null) currentUidProvider.overrideWithValue(trainerId),
     ];
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -126,9 +169,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Default tab is Vencidos (index 0) — it should show empty state.
+      // Default tab is Por vencer (index 0) — it should show empty state.
       expect(
-        find.text('No hay pagos vencidos'), // i18n
+        find.text('No hay pagos pendientes'), // i18n
         findsOneWidget,
       );
     });
@@ -147,6 +190,109 @@ void main() {
       expect(find.text('Ingreso del mes'), findsOneWidget); // i18n
       expect(find.text('Pendiente cobrar'), findsOneWidget); // i18n
       expect(find.text('Vencido'), findsOneWidget); // i18n
+    });
+  });
+
+  group('PagosScreen _onRegistrarPago persistence', () {
+    late _MockPaymentRepo mockRepo;
+
+    setUpAll(() {
+      registerFallbackValue(
+        Payment(
+          id: '',
+          trainerId: 'trainer-1',
+          athleteId: 'athlete-1',
+          amountArs: 1000,
+          concept: 'test',
+          status: PaymentStatus.paid,
+          createdAt: DateTime.utc(2026, 1, 1),
+        ),
+      );
+    });
+
+    setUp(() {
+      mockRepo = _MockPaymentRepo();
+      when(() => mockRepo.add(any())).thenAnswer((_) async {});
+    });
+
+    // Full round trip: open the dialog from the header button, fill it in,
+    // confirm → the caller (_onRegistrarPago) must build and persist a real
+    // Payment via paymentRepositoryProvider.add. Covers the wiring between
+    // the dialog's RegistrarPagoResult and the screen's write path.
+    testWidgets(
+        'SCENARIO — fill dialog + Registrar → repo.add called with a paid '
+        'Payment for the selected athlete', (tester) async {
+      tester.view.physicalSize = _kDesktopSize;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      await tester.pumpWidget(
+        _wrap(
+          const PagosScreen(),
+          overrides: _emptyOverrides(
+            links: [_link('athlete-1', TrainerLinkStatus.active)],
+            profiles: [_prof('athlete-1', 'Ana Activa')],
+            repo: mockRepo,
+            trainerId: 'trainer-1',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('+ Registrar pago'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Ana Activa').last);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+          find.widgetWithText(TextField, 'Monto (ARS)'), '5000');
+      await tester.enterText(
+          find.widgetWithText(TextField, 'Concepto'), 'Clase suelta');
+
+      await tester.tap(find.text('Registrar')); // i18n
+      await tester.pumpAndSettle();
+
+      final captured =
+          verify(() => mockRepo.add(captureAny())).captured.single as Payment;
+      expect(captured.trainerId, 'trainer-1');
+      expect(captured.athleteId, 'athlete-1');
+      expect(captured.amountArs, 5000);
+      expect(captured.concept, 'Clase suelta');
+      expect(captured.status, PaymentStatus.paid);
+      expect(captured.dueAt, isNull);
+      expect(find.text('Pago registrado.'), findsOneWidget); // i18n
+    });
+
+    // Cancelling the dialog must not touch the repository at all.
+    testWidgets('SCENARIO — cancel dialog → repo.add NOT called',
+        (tester) async {
+      tester.view.physicalSize = _kDesktopSize;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      await tester.pumpWidget(
+        _wrap(
+          const PagosScreen(),
+          overrides: _emptyOverrides(
+            links: [_link('athlete-1', TrainerLinkStatus.active)],
+            profiles: [_prof('athlete-1', 'Ana Activa')],
+            repo: mockRepo,
+            trainerId: 'trainer-1',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('+ Registrar pago'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Cancelar')); // i18n
+      await tester.pumpAndSettle();
+
+      verifyNever(() => mockRepo.add(any()));
     });
   });
 }

@@ -463,6 +463,22 @@ class AppL10nEn extends AppL10n {
   String get agendaBookingCancelledByCoach => '';
 
   @override
+  String get agendaBlockedDayTitle => '';
+
+  @override
+  String agendaBlockedDayBodySingle(String date) {
+    return '';
+  }
+
+  @override
+  String agendaBlockedDayBodyRecurring(int count) {
+    return '';
+  }
+
+  @override
+  String get agendaBlockedDayConfirm => '';
+
+  @override
   String get agendaSlotFreeLabel => '';
 
   @override
