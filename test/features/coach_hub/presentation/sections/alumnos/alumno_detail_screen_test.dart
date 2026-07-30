@@ -14,6 +14,9 @@ import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/locale_resolver.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/features/chat/application/chat_providers.dart';
+import 'package:treino/features/chat/domain/chat.dart';
+import 'package:treino/features/chat/domain/message.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/application/athlete_note_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
@@ -23,6 +26,7 @@ import 'package:treino/features/coach/domain/athlete_note.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/alumnos/alumno_detail_screen.dart';
+import 'package:treino/features/coach_hub/presentation/sections/chat/widgets/chat_detail_pane.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/payment_format.dart'
     show fmtDayMonth, nextDueDate;
 import 'package:treino/features/coach_hub/presentation/sections/alumnos/alumnos_screen.dart';
@@ -250,6 +254,12 @@ UserProfile _trainerProfile({String? paymentAlias = 'Pepe Coach'}) =>
       paymentAlias: paymentAlias,
     );
 
+Chat _chat({String chatId = 'chat-a1'}) => Chat(
+      chatId: chatId,
+      members: const ['t1', 'a1'],
+      createdAt: DateTime.utc(2026, 6, 1),
+    );
+
 /// Future start — always after DateTime.now() in test context.
 Appointment _appointment({
   String id = 'ap1',
@@ -297,6 +307,18 @@ Future<void> _pump(
   // athleteLast7DaysInsightsProvider. Defaults to an empty-history mock so
   // existing tests that don't care about this section keep passing.
   SessionRepository? sessionRepository,
+  // Chat tab (name-flash fix): the resolved Chat for PF↔alumno + its
+  // messages. Defaults keep every existing test (which never taps into
+  // Chat) unaffected — `chatForOtherUidProvider` only resolves when the
+  // tab actually builds.
+  Chat? chat,
+  List<Message> chatMessages = const [],
+  // Escape hatch for id-specific overrides (e.g. a delayed
+  // `userPublicProfileProvider('a1')`) that must win over the family-wide
+  // defaults above — Riverpod resolves instance-specific overrides before
+  // family-wide ones regardless of list position, so appending these last
+  // is just for readability, not correctness.
+  List<Override> extraOverrides = const [],
 }) async {
   tester.view.physicalSize = const Size(1200, 900);
   tester.view.devicePixelRatio = 1.0;
@@ -359,6 +381,14 @@ Future<void> _pump(
           sessionRepository ?? _emptySessionRepository(),
         ),
         exercisesProvider.overrideWith((ref) async => const []),
+        // Chat tab (name-flash fix).
+        chatForOtherUidProvider.overrideWith(
+          (ref, otherUid) async => chat ?? _chat(),
+        ),
+        messagesProvider.overrideWith(
+          (ref, chatId) => Stream.value(chatMessages),
+        ),
+        ...extraOverrides,
       ],
       child: MaterialApp(
         // l10n EXACTO como CoachHubApp (W2 PR8): delegates + supportedLocales +
@@ -475,6 +505,53 @@ void main() {
           reason: 'falta el tab $t',
         );
       }
+    });
+
+    testWidgets(
+        'Chat: el header muestra el nombre real SIN depender de '
+        'chatsForCurrentUserProvider (root cause del flash original — ese '
+        'stream está cold acá y el fix nunca debería tocarlo)', (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(name: 'Agustín'),
+        link: _link(TrainerLinkStatus.active),
+        extraOverrides: [
+          // Si `_Header` cayera al camino viejo (derivar otherUid escaneando
+          // chatsForCurrentUserProvider) esto explotaría o dejaría el nombre
+          // colgado en el placeholder — el fix pasa `peerUid` directo y
+          // nunca debería leer este provider en el contexto del Chat tab.
+          chatsForCurrentUserProvider.overrideWith(
+            (ref) => Stream<List<Chat>>.error(
+              StateError('chatsForCurrentUserProvider should not be read '
+                  'from the alumno-detail Chat tab'),
+            ),
+          ),
+        ],
+      );
+
+      await tester.tap(find.descendant(
+          of: find.byType(TabBar), matching: find.text('Chat')));
+      await tester.pumpAndSettle();
+
+      // Scoped a ChatDetailPane: el header de arriba (misma pantalla)
+      // TAMBIÉN muestra "Agustín" — sería un false-positive si buscáramos
+      // el texto sin acotar. Lo que este test prueba es específicamente que
+      // el header DEL CHAT PANE (antes vacío/placeholder) ahora resuelve el
+      // nombre.
+      final chatPane = find.byType(ChatDetailPane);
+      expect(chatPane, findsOneWidget);
+      expect(
+        find.descendant(of: chatPane, matching: find.text('Agustín')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: chatPane, matching: find.text('Usuario eliminado')),
+        findsNothing,
+      );
+      expect(
+        find.descendant(of: chatPane, matching: find.text('…')),
+        findsNothing,
+      );
     });
 
     testWidgets(

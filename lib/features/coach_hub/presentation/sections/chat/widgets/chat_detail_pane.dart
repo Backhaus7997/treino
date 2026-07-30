@@ -28,9 +28,31 @@ import 'chat_message_bubble.dart';
 /// Videos se renderean inline en la burbuja usando el mismo
 /// `FirebaseStorageVideoPlayer` que mobile, para mantener UX consistente.
 class ChatDetailPane extends ConsumerStatefulWidget {
-  const ChatDetailPane({super.key, required this.chatId});
+  const ChatDetailPane({
+    super.key,
+    required this.chatId,
+    this.peerUid,
+    this.peerNameInitial,
+  });
 
   final String chatId;
+
+  /// Peer's uid when the caller already knows it (e.g. the alumno-detail
+  /// Chat tab, which is fixed to one athlete). When provided, [_Header]
+  /// uses it directly instead of scanning [chatsForCurrentUserProvider] —
+  /// skips a cold stream hop that otherwise causes a placeholder flash
+  /// ("Usuario eliminado" → "…" → real name) the first time this pane
+  /// mounts. `null` preserves the original chat-derived resolution (global
+  /// chat section, which doesn't know the peer up front).
+  final String? peerUid;
+
+  /// Peer's already-resolved display name when the caller has it warm
+  /// (e.g. from the athlete-detail header's own profile watch). Used as
+  /// the header's fallback/initial text WHILE [userPublicProfileProvider]
+  /// is loading, instead of the generic '…' / 'Usuario eliminado'
+  /// placeholders. The live profile value is preferred once it resolves
+  /// with a non-empty `displayName` — this is only a warm-start hint.
+  final String? peerNameInitial;
 
   @override
   ConsumerState<ChatDetailPane> createState() => _ChatDetailPaneState();
@@ -201,7 +223,11 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _Header(chatId: widget.chatId),
+          _Header(
+            chatId: widget.chatId,
+            peerUid: widget.peerUid,
+            peerNameInitial: widget.peerNameInitial,
+          ),
           Divider(height: 1, color: palette.border),
           Expanded(
             child: messagesAsync.when(
@@ -249,30 +275,67 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
 /// Resuelve `otherUid` desde el chat document para evitar duplicar la
 /// lógica con el row de la lista (cada uno hace su `_otherUidOf`).
 class _Header extends ConsumerWidget {
-  const _Header({required this.chatId});
+  const _Header({required this.chatId, this.peerUid, this.peerNameInitial});
   final String chatId;
+
+  /// See [ChatDetailPane.peerUid].
+  final String? peerUid;
+
+  /// See [ChatDetailPane.peerNameInitial].
+  final String? peerNameInitial;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final uid = ref.watch(currentUidProvider);
-    final chatsAsync = ref.watch(chatsForCurrentUserProvider);
-    // `valueOrNull` preserva la lista previa durante reloads/errores
-    // transitorios → el header no parpadea a "Usuario eliminado" al cambiar
-    // de chat (mismo bug que la lista).
-    String? otherUid;
-    for (final c in (chatsAsync.valueOrNull ?? const [])) {
-      if (c.chatId != chatId) continue;
-      final others = c.members.where((m) => m != uid).toList();
-      otherUid = others.isNotEmpty
-          ? others.first
-          : (c.members.isNotEmpty ? c.members.first : null);
-      break;
+
+    // Cuando el caller YA conoce el peer (alumno-detail Chat tab) usamos ese
+    // uid directo — evita el hop frío por `chatsForCurrentUserProvider`, que
+    // no está warm ahí (issue: name flash). Sin `peerUid` (sección de chat
+    // global, que no sabe el peer de antemano) se preserva la derivación
+    // original desde el chat.
+    String? otherUid = peerUid;
+    if (otherUid == null) {
+      final chatsAsync = ref.watch(chatsForCurrentUserProvider);
+      // `valueOrNull` preserva la lista previa durante reloads/errores
+      // transitorios → el header no parpadea a "Usuario eliminado" al cambiar
+      // de chat (mismo bug que la lista).
+      for (final c in (chatsAsync.valueOrNull ?? const [])) {
+        if (c.chatId != chatId) continue;
+        final others = c.members.where((m) => m != uid).toList();
+        otherUid = others.isNotEmpty
+            ? others.first
+            : (c.members.isNotEmpty ? c.members.first : null);
+        break;
+      }
     }
 
     final pubAsync = otherUid != null
         ? ref.watch(userPublicProfileProvider(otherUid))
         : const AsyncValue.data(null);
+
+    // Nombre a mostrar mientras el perfil vivo está loading/ausente. Con
+    // `peerNameInitial` (ya resuelto por el caller, p.ej. el header del
+    // alumno-detail) lo mostramos de entrada en vez de '…' /
+    // 'Usuario eliminado' — el perfil vivo puede estar más fresco, así que
+    // sólo pisa el initial cuando resuelve con un `displayName` no vacío.
+    //
+    // `_usableName` normaliza '' como "ausente" (igual que `null`) en TODOS
+    // los puntos de uso (nombre y avatar) — antes de este fix, `''` se
+    // trataba de forma inconsistente: a veces "ausente" (`isNotEmpty`) y a
+    // veces se dejaba pasar (`?? '…'` sólo atrapa `null`). Nota: esto es una
+    // normalización deliberada vs. el comportamiento pre-fix, donde un
+    // `displayName` vivo == '' en el chat global (peerNameInitial null)
+    // renderaba el header en blanco — un bug latente, no un comportamiento
+    // a preservar. Con la normalización, ese caso ahora cae en 'Usuario
+    // eliminado', que es más sensato que un header vacío.
+    final resolvedName = pubAsync.maybeWhen(
+      data: (p) =>
+          _usableName(p?.displayName) ??
+          _usableName(peerNameInitial) ??
+          'Usuario eliminado', // i18n: Fase W2
+      orElse: () => _usableName(peerNameInitial) ?? '…', // i18n: Fase W2
+    );
 
     return Container(
       color: palette.bgCard,
@@ -293,9 +356,7 @@ class _Header extends ConsumerWidget {
               data: (p) =>
                   (p?.avatarUrl == null || (p?.avatarUrl ?? '').isEmpty)
                       ? Text(
-                          (p?.displayName ?? '?').isNotEmpty
-                              ? (p?.displayName ?? '?')[0].toUpperCase()
-                              : '?',
+                          _avatarInitial(p?.displayName),
                           style: GoogleFonts.barlowCondensed(
                             fontWeight: FontWeight.w700,
                             fontSize: 14,
@@ -303,16 +364,30 @@ class _Header extends ConsumerWidget {
                           ),
                         )
                       : null,
-              orElse: () => const SizedBox.shrink(),
+              // Loading/error SIN `peerNameInitial` usable (sección de chat
+              // global, o alumno-detail con initial vacío): preserva el
+              // círculo vacío — mismo criterio "ausente" que el nombre
+              // (`_usableName`), así avatar y nombre nunca se contradicen
+              // (nombre '…' con avatar en blanco, nunca con una letra).
+              // Loading/error CON `peerNameInitial` usable (alumno-detail
+              // Chat tab): la letra debe verse desde el primer frame, igual
+              // que el nombre — evita el mismo flash que motivó este fix.
+              orElse: () => _usableName(peerNameInitial) == null
+                  ? const SizedBox.shrink()
+                  : Text(
+                      _avatarInitial(null),
+                      style: GoogleFonts.barlowCondensed(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: Colors.white,
+                      ),
+                    ),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              pubAsync.maybeWhen(
-                data: (p) => p?.displayName ?? 'Usuario eliminado',
-                orElse: () => '…',
-              ),
+              resolvedName,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: GoogleFonts.barlow(
@@ -326,6 +401,25 @@ class _Header extends ConsumerWidget {
       ),
     );
   }
+
+  /// Letra del avatar: prioriza el `displayName` VIVO del perfil, cae a
+  /// [peerNameInitial] (warm-start del caller) y por último a `'?'`. Mismo
+  /// orden de prioridad y misma regla de "ausente" (vía [_usableName]) que
+  /// [resolvedName] en `build` — avatar y nombre nunca deberían disentir.
+  String _avatarInitial(String? liveDisplayName) {
+    final name = _usableName(liveDisplayName) ?? _usableName(peerNameInitial);
+    // `.characters.first` en vez de `name[0]`: grapheme-cluster safe para
+    // emoji/caracteres astrales en el displayName (mismo patrón que
+    // `_computeInitials` en `lib/features/home/widgets/home_header.dart`).
+    return name != null ? name.characters.first.toUpperCase() : '?';
+  }
+
+  /// Normaliza `''` como "ausente" (igual que `null`) — único punto de
+  /// verdad para la regla de emptiness usada por [resolvedName] y
+  /// [_avatarInitial], así el nombre y la letra del avatar nunca disienten
+  /// sobre si un valor cuenta como "hay dato" o no.
+  static String? _usableName(String? s) =>
+      (s != null && s.isNotEmpty) ? s : null;
 }
 
 class _MessagesList extends StatelessWidget {

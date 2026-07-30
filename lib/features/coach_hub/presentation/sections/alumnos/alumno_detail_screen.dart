@@ -478,6 +478,16 @@ class _Tabs extends StatelessWidget {
 ///
 /// V1 (2026-06-30): solo texto. La V2 con media reusa el mismo upgrade que
 /// la sección de chat global del sidebar.
+///
+/// Name-flash fix: [AlumnoDetailScreen.build] ya watchea
+/// `userPublicProfileProvider(athleteId)` para el header de arriba (misma
+/// pantalla, línea 117) — ese watch mantiene el stream warm mientras este
+/// tab está montado. Volver a watchearlo acá es una lectura cacheada
+/// (autoDispose cuenta listeners activos, no reinicia el stream), NO un
+/// fetch nuevo. Pasamos `athleteId` + el nombre ya resuelto a
+/// [ChatDetailPane] para que su header muestre el nombre real desde el
+/// primer frame en vez de re-derivarlo en frío vía
+/// `chatsForCurrentUserProvider` (issue: flash "Usuario eliminado" → "…").
 class _ChatTab extends ConsumerWidget {
   const _ChatTab({required this.athleteId});
   final String athleteId;
@@ -486,6 +496,10 @@ class _ChatTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final chatAsync = ref.watch(chatForOtherUidProvider(athleteId));
+    final peerName = ref
+        .watch(userPublicProfileProvider(athleteId))
+        .valueOrNull
+        ?.displayName;
     return chatAsync.when(
       loading: () => Center(
         child: CircularProgressIndicator(color: palette.accent),
@@ -497,7 +511,11 @@ class _ChatTab extends ConsumerWidget {
           style: TextStyle(color: palette.textMuted, fontSize: 15),
         ),
       ),
-      data: (chat) => ChatDetailPane(chatId: chat.chatId),
+      data: (chat) => ChatDetailPane(
+        chatId: chat.chatId,
+        peerUid: athleteId,
+        peerNameInitial: peerName,
+      ),
     );
   }
 }
