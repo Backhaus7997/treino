@@ -1035,64 +1035,73 @@ class _NoteCard extends ConsumerWidget {
     final async = ref.watch(
       athleteNoteProvider((trainerId: trainerId, athleteId: athleteId)),
     );
-    return TreinoStateSwitcher(
-      childKey: ValueKey(async.when(
-        loading: () => 'loading',
-        error: (_, __) => 'error',
-        data: (_) => 'data',
-      )),
-      child: async.when(
-        loading: () => SizedBox(
-          height: 48,
-          child: Center(
-            child: SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(
-                  strokeWidth: 2, color: palette.accent),
+    // El layoutBuilder de TreinoStateSwitcher es un Stack(topCenter) con
+    // StackFit.loose: le pasa al hijo minWidth:0, así que un Container con
+    // contenido corto (esta card) se encoge y queda centrado. El fix real es
+    // dar `width: double.infinity` al Container de adentro (ver el `data`
+    // branch abajo); el SizedBox externo solo mantiene el maxWidth completo.
+    return SizedBox(
+      width: double.infinity,
+      child: TreinoStateSwitcher(
+        childKey: ValueKey(async.when(
+          loading: () => 'loading',
+          error: (_, __) => 'error',
+          data: (_) => 'data',
+        )),
+        child: async.when(
+          loading: () => SizedBox(
+            height: 48,
+            child: Center(
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: palette.accent),
+              ),
             ),
           ),
+          error: (_, __) => _muted(palette, 'No se pudo cargar la nota.'),
+          data: (note) {
+            return Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: palette.bgCard,
+                border: Border.all(color: palette.border),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: note == null || note.note.trim().isEmpty
+                  ? Text(
+                      'Sin nota fijada.', // i18n: Fase W2
+                      style: TextStyle(color: palette.textMuted, fontSize: 13),
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          note.note,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: palette.textPrimary,
+                            fontSize: 13,
+                            height: 1.45,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          _haceDias(note.updatedAt), // i18n: Fase W2
+                          style: TextStyle(
+                            color: palette.textMuted,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+            );
+          },
         ),
-        error: (_, __) => _muted(palette, 'No se pudo cargar la nota.'),
-        data: (note) {
-          return Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: palette.bgCard,
-              border: Border.all(color: palette.border),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: note == null || note.note.trim().isEmpty
-                ? Text(
-                    'Sin nota fijada.', // i18n: Fase W2
-                    style: TextStyle(color: palette.textMuted, fontSize: 13),
-                  )
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        note.note,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: palette.textPrimary,
-                          fontSize: 13,
-                          height: 1.45,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        _haceDias(note.updatedAt), // i18n: Fase W2
-                        style: TextStyle(
-                          color: palette.textMuted,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-          );
-        },
       ),
     );
   }
@@ -1141,84 +1150,90 @@ class _ProxSesionCard extends ConsumerWidget {
         toDate: todayStart.add(const Duration(days: 60)),
       ),
     ));
-    return TreinoStateSwitcher(
-      childKey: ValueKey(async.when(
-        loading: () => 'loading',
-        error: (_, __) => 'error',
-        data: (_) => 'data',
-      )),
-      child: async.when(
-        loading: () => SizedBox(
-          height: 48,
-          child: Center(
-            child: SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(
-                  strokeWidth: 2, color: palette.accent),
+    // width: infinity — ver nota en _NoteCard: el switcher encoge/centra su
+    // hijo, sin esto la card queda angosta al medio.
+    return SizedBox(
+      width: double.infinity,
+      child: TreinoStateSwitcher(
+        childKey: ValueKey(async.when(
+          loading: () => 'loading',
+          error: (_, __) => 'error',
+          data: (_) => 'data',
+        )),
+        child: async.when(
+          loading: () => SizedBox(
+            height: 48,
+            child: Center(
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: palette.accent),
+              ),
             ),
           ),
-        ),
-        error: (_, __) => _muted(palette, 'No se pudo cargar la agenda.'),
-        data: (appointments) {
-          final upcoming = appointments
-              .where((a) =>
-                  a.athleteId == athleteId &&
-                  a.status == AppointmentStatus.confirmed &&
-                  a.startsAt.isAfter(now))
-              .toList()
-            ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
-          final next = upcoming.firstOrNull;
+          error: (_, __) => _muted(palette, 'No se pudo cargar la agenda.'),
+          data: (appointments) {
+            final upcoming = appointments
+                .where((a) =>
+                    a.athleteId == athleteId &&
+                    a.status == AppointmentStatus.confirmed &&
+                    a.startsAt.isAfter(now))
+                .toList()
+              ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
+            final next = upcoming.firstOrNull;
 
-          return Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: palette.bgCard,
-              border: Border.all(color: palette.border),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: next == null
-                ? Text(
-                    'Sin sesiones próximas.', // i18n: Fase W2
-                    style: TextStyle(color: palette.textMuted, fontSize: 13),
-                  )
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _fmtDate(next.startsAt), // i18n: Fase W2
-                        style: TextStyle(
-                          color: palette.textPrimary,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${next.durationMin} min', // i18n: Fase W2
-                        style: TextStyle(
-                          color: palette.textMuted,
-                          fontSize: 12,
-                        ),
-                      ),
-                      if (next.noteBefore != null &&
-                          next.noteBefore!.trim().isNotEmpty) ...[
-                        const SizedBox(height: 6),
+            return Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: palette.bgCard,
+                border: Border.all(color: palette.border),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: next == null
+                  ? Text(
+                      'Sin sesiones próximas.', // i18n: Fase W2
+                      style: TextStyle(color: palette.textMuted, fontSize: 13),
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text(
-                          next.noteBefore!,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                          _fmtDate(next.startsAt), // i18n: Fase W2
+                          style: TextStyle(
+                            color: palette.textPrimary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${next.durationMin} min', // i18n: Fase W2
                           style: TextStyle(
                             color: palette.textMuted,
                             fontSize: 12,
-                            fontStyle: FontStyle.italic,
                           ),
                         ),
+                        if (next.noteBefore != null &&
+                            next.noteBefore!.trim().isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            next.noteBefore!,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: palette.textMuted,
+                              fontSize: 12,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
-                  ),
-          );
-        },
+                    ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -1247,16 +1262,22 @@ class _UltimaSessionCard extends ConsumerWidget {
     // Caja bordeada reutilizable para los estados de texto (error / vacío).
     // stateKey identifica el estado top-level de esta card para que
     // TreinoStateSwitcher cross-fadee error/vacío/data en vez de saltar.
-    Widget box(String stateKey, Widget child) => TreinoStateSwitcher(
-          childKey: ValueKey(stateKey),
-          child: Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: palette.bgCard,
-              border: Border.all(color: palette.border),
-              borderRadius: BorderRadius.circular(12),
+    // width: infinity — ver nota en _NoteCard: el switcher encoge/centra su
+    // hijo, sin esto la caja queda angosta al medio.
+    Widget box(String stateKey, Widget child) => SizedBox(
+          width: double.infinity,
+          child: TreinoStateSwitcher(
+            childKey: ValueKey(stateKey),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: palette.bgCard,
+                border: Border.all(color: palette.border),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: child,
             ),
-            child: child,
           ),
         );
 
@@ -1310,55 +1331,61 @@ class _UltimaSessionCard extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 8),
-          TreinoStateSwitcher(
-            childKey: ValueKey(logsAsync.when(
-              loading: () => 'loading',
-              error: (_, __) => 'error',
-              data: (_) => 'data',
-            )),
-            child: logsAsync.when(
-              loading: () => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: palette.accent),
+          // width: infinity — ver nota en _NoteCard: el switcher encoge/centra.
+          SizedBox(
+            width: double.infinity,
+            child: TreinoStateSwitcher(
+              childKey: ValueKey(logsAsync.when(
+                loading: () => 'loading',
+                error: (_, __) => 'error',
+                data: (_) => 'data',
+              )),
+              child: logsAsync.when(
+                loading: () => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: palette.accent),
+                  ),
                 ),
-              ),
-              error: (e, _) {
-                final noShare =
-                    e is FirebaseException && e.code == 'permission-denied';
-                return Text(
-                  noShare
-                      ? 'El alumno no compartió su historial.' // i18n: Fase W2
-                      : 'No se pudo cargar el detalle de la sesión.', // i18n: Fase W2
-                  style: muted,
-                );
-              },
-              data: (logs) {
-                if (logs.isEmpty) {
+                error: (e, _) {
+                  final noShare =
+                      e is FirebaseException && e.code == 'permission-denied';
                   return Text(
-                      'Sin series registradas en esta sesión.', // i18n: Fase W2
-                      style: muted);
-                }
-                final groups = <String, List<SetLog>>{};
-                for (final log in logs) {
-                  groups.putIfAbsent(log.exerciseId, () => <SetLog>[]).add(log);
-                }
-                final lastWeight = lastWeightAsync.valueOrNull;
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    for (final entry in groups.entries)
-                      _UltimaEjercicioRow(
-                        palette: palette,
-                        logs: entry.value,
-                        progressionKg: lastWeight?[entry.key],
-                      ),
-                  ],
-                );
-              },
+                    noShare
+                        ? 'El alumno no compartió su historial.' // i18n: Fase W2
+                        : 'No se pudo cargar el detalle de la sesión.', // i18n: Fase W2
+                    style: muted,
+                  );
+                },
+                data: (logs) {
+                  if (logs.isEmpty) {
+                    return Text(
+                        'Sin series registradas en esta sesión.', // i18n: Fase W2
+                        style: muted);
+                  }
+                  final groups = <String, List<SetLog>>{};
+                  for (final log in logs) {
+                    groups
+                        .putIfAbsent(log.exerciseId, () => <SetLog>[])
+                        .add(log);
+                  }
+                  final lastWeight = lastWeightAsync.valueOrNull;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (final entry in groups.entries)
+                        _UltimaEjercicioRow(
+                          palette: palette,
+                          logs: entry.value,
+                          progressionKg: lastWeight?[entry.key],
+                        ),
+                    ],
+                  );
+                },
+              ),
             ),
           ),
         ],
