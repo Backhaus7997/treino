@@ -2555,7 +2555,7 @@ class _NotasPrivadasTabState extends ConsumerState<_NotasPrivadasTab> {
                           thickness: 6,
                           child: SingleChildScrollView(
                             controller: _scrollController,
-                            padding: const EdgeInsets.fromLTRB(16, 16, 20, 16),
+                            padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
                             child: TextField(
                               controller: _controller,
                               maxLines: null,
