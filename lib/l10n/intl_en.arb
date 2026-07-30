@@ -178,6 +178,24 @@
   "agendaRuleDeleteConfirm": "",
   "agendaRuleInvalidWindow": "",
   "agendaBookingCancelledByCoach": "",
+  "agendaBlockedDayTitle": "",
+  "agendaBlockedDayBodySingle": "",
+  "@agendaBlockedDayBodySingle": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "agendaBlockedDayBodyRecurring": "",
+  "@agendaBlockedDayBodyRecurring": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "agendaBlockedDayConfirm": "",
   "agendaSlotFreeLabel": "",
   "agendaSlotBlockedLabel": "",
   "agendaSlotBookedByLabel": "",

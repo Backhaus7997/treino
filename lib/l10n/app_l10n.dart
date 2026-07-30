@@ -956,6 +956,30 @@ abstract class AppL10n {
   /// **'Reserva cancelada por el entrenador.'**
   String get agendaBookingCancelledByCoach;
 
+  /// No description provided for @agendaBlockedDayTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Día bloqueado'**
+  String get agendaBlockedDayTitle;
+
+  /// No description provided for @agendaBlockedDayBodySingle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'El {date} está marcado como bloqueado en tus horarios. ¿Querés cargar la sesión igual?'**
+  String agendaBlockedDayBodySingle(String date);
+
+  /// No description provided for @agendaBlockedDayBodyRecurring.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count} de las fechas caen en días bloqueados. ¿Continuar igual?'**
+  String agendaBlockedDayBodyRecurring(int count);
+
+  /// No description provided for @agendaBlockedDayConfirm.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cargar igual'**
+  String get agendaBlockedDayConfirm;
+
   /// No description provided for @agendaSlotFreeLabel.
   ///
   /// In es_AR, this message translates to:

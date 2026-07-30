@@ -12,7 +12,9 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/data/appointment_repository.dart';
+import 'package:treino/features/coach/data/availability_repository.dart';
 import 'package:treino/features/coach/domain/appointment.dart';
+import 'package:treino/features/coach/domain/availability_override.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/agenda/agenda_web_screen.dart';
@@ -73,6 +75,24 @@ class _StubAppointmentRepository extends Fake implements AppointmentRepository {
   }
 }
 
+/// Fake [AvailabilityRepository] that returns a fixed [overrides] list for
+/// any [watchOverrides] call, regardless of the requested date range — the
+/// dialog only needs a single-day check so the range itself isn't asserted.
+class _FakeAvailabilityRepository extends Fake
+    implements AvailabilityRepository {
+  _FakeAvailabilityRepository({this.overrides = const []});
+
+  final List<AvailabilityOverride> overrides;
+
+  @override
+  Stream<List<AvailabilityOverride>> watchOverrides(
+    String trainerId,
+    DateTime fromDate,
+    DateTime toDate,
+  ) =>
+      Stream.value(overrides);
+}
+
 // ─── Factories ───────────────────────────────────────────────────────────────
 
 final _kRequestedAt = DateTime(2026, 1, 1);
@@ -119,6 +139,7 @@ List<Override> _overrides({
   List<TrainerLink> links = const [],
   Map<String, UserPublicProfile> profiles = const {},
   _StubAppointmentRepository? repo,
+  List<AvailabilityOverride> availabilityOverrides = const [],
 }) {
   final stub = repo ?? _StubAppointmentRepository();
   return [
@@ -130,6 +151,9 @@ List<Override> _overrides({
       (ref, key) => Stream.value(const []),
     ),
     appointmentRepositoryProvider.overrideWithValue(stub),
+    availabilityRepositoryProvider.overrideWithValue(
+      _FakeAvailabilityRepository(overrides: availabilityOverrides),
+    ),
     for (final entry in profiles.entries)
       userPublicProfileProvider(entry.key).overrideWith(
         (ref) => Stream.value(entry.value),
@@ -145,11 +169,17 @@ Future<void> _openDialogViaScreen(
   List<TrainerLink> links = const [],
   Map<String, UserPublicProfile> profiles = const {},
   _StubAppointmentRepository? repo,
+  List<AvailabilityOverride> availabilityOverrides = const [],
 }) async {
   await tester.pumpWidget(
     _wrap(
       const AgendaWebScreen(),
-      overrides: _overrides(links: links, profiles: profiles, repo: repo),
+      overrides: _overrides(
+        links: links,
+        profiles: profiles,
+        repo: repo,
+        availabilityOverrides: availabilityOverrides,
+      ),
     ),
   );
   await tester.pumpAndSettle();
@@ -375,6 +405,157 @@ void main() {
         find.text('No podés registrar una sesión en el pasado.'), // i18n
         findsOneWidget,
       );
+    });
+  });
+
+  // Blocked-day soft warning: creating a session on a day the trainer
+  // blocked shows a confirm dialog; confirming proceeds to createByTrainer,
+  // cancelling does NOT call the repo.
+  group('Aviso de día bloqueado', () {
+    // Fixed future date so the past-date guard never interferes with this
+    // test regardless of when it runs.
+    final blockedDate = DateTime.now().add(const Duration(days: 10));
+    final blockedDateOnly =
+        DateTime(blockedDate.year, blockedDate.month, blockedDate.day);
+
+    Future<void> openDialogDirect(
+      WidgetTester tester, {
+      required List<AvailabilityOverride> availabilityOverrides,
+      _StubAppointmentRepository? repo,
+    }) async {
+      await tester.pumpWidget(
+        _wrap(
+          Builder(
+            builder: (context) => TextButton(
+              onPressed: () => showDialog<bool>(
+                context: context,
+                builder: (_) => NewSessionDialog(
+                  initialDate: blockedDateOnly,
+                ),
+              ),
+              child: const Text('abrir'),
+            ),
+          ),
+          overrides: _overrides(
+            links: [_activeLink(_kAthleteId1)],
+            profiles: {_kAthleteId1: _pub(_kAthleteId1, 'Carlos Pérez')},
+            repo: repo,
+            availabilityOverrides: availabilityOverrides,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('abrir'));
+      await tester.pumpAndSettle();
+
+      // Seleccionar alumno
+      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Carlos Pérez').last);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('crear sesión en día bloqueado muestra dialog "Día bloqueado"',
+        (tester) async {
+      final blockOverride = AvailabilityOverride.block(
+        id: 'block-1',
+        trainerId: _kTrainerId,
+        date: blockedDateOnly,
+      );
+
+      await openDialogDirect(
+        tester,
+        availabilityOverrides: [blockOverride],
+      );
+
+      await tester.tap(find.text('REGISTRAR SESIÓN')); // i18n
+      await tester.pumpAndSettle();
+
+      expect(find.text('Día bloqueado'), findsOneWidget); // i18n
+      expect(
+        find.textContaining('marcado como bloqueado'), // i18n
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('confirmar en el dialog de día bloqueado llama createByTrainer',
+        (tester) async {
+      final blockOverride = AvailabilityOverride.block(
+        id: 'block-1',
+        trainerId: _kTrainerId,
+        date: blockedDateOnly,
+      );
+      final stub = _StubAppointmentRepository();
+
+      await openDialogDirect(
+        tester,
+        availabilityOverrides: [blockOverride],
+        repo: stub,
+      );
+
+      await tester.tap(find.text('REGISTRAR SESIÓN')); // i18n
+      await tester.pumpAndSettle();
+
+      expect(find.text('Día bloqueado'), findsOneWidget); // i18n
+
+      // Confirmar "Cargar igual"
+      await tester.tap(find.text('Cargar igual')); // i18n
+      await tester.pumpAndSettle();
+
+      // El dialog original debe cerrarse y el repo debe haber sido llamado.
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(stub.capturedTrainerId, equals(_kTrainerId));
+      expect(stub.capturedAthleteId, equals(_kAthleteId1));
+    });
+
+    testWidgets('cancelar en el dialog de día bloqueado NO llama al repo',
+        (tester) async {
+      final blockOverride = AvailabilityOverride.block(
+        id: 'block-1',
+        trainerId: _kTrainerId,
+        date: blockedDateOnly,
+      );
+      final stub = _StubAppointmentRepository();
+
+      await openDialogDirect(
+        tester,
+        availabilityOverrides: [blockOverride],
+        repo: stub,
+      );
+
+      await tester.tap(find.text('REGISTRAR SESIÓN')); // i18n
+      await tester.pumpAndSettle();
+
+      expect(find.text('Día bloqueado'), findsOneWidget); // i18n
+
+      // Cancelar
+      await tester.tap(find.text('Cancelar').last); // i18n
+      await tester.pumpAndSettle();
+
+      // El dialog de aviso se cierra, pero el NewSessionDialog original
+      // sigue abierto (aborta la creación, no navega).
+      expect(find.text('Día bloqueado'), findsNothing); // i18n
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(stub.capturedTrainerId, isNull);
+      expect(stub.capturedAthleteId, isNull);
+    });
+
+    testWidgets('día NO bloqueado no muestra el dialog de aviso',
+        (tester) async {
+      final stub = _StubAppointmentRepository();
+
+      await openDialogDirect(
+        tester,
+        availabilityOverrides: const [], // sin bloqueo
+        repo: stub,
+      );
+
+      await tester.tap(find.text('REGISTRAR SESIÓN')); // i18n
+      await tester.pumpAndSettle();
+
+      // Sin aviso — el submit va directo a createByTrainer.
+      expect(find.text('Día bloqueado'), findsNothing); // i18n
+      expect(stub.capturedTrainerId, equals(_kTrainerId));
     });
   });
 

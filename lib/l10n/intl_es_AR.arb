@@ -197,6 +197,24 @@
   "agendaRuleDeleteConfirm": "¿Borrar este horario? Las reservas existentes se mantienen.",
   "agendaRuleInvalidWindow": "La hora de fin debe ser posterior al inicio y dejar espacio para al menos un turno.",
   "agendaBookingCancelledByCoach": "Reserva cancelada por el entrenador.",
+  "agendaBlockedDayTitle": "Día bloqueado",
+  "agendaBlockedDayBodySingle": "El {date} está marcado como bloqueado en tus horarios. ¿Querés cargar la sesión igual?",
+  "@agendaBlockedDayBodySingle": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "agendaBlockedDayBodyRecurring": "{count} de las fechas caen en días bloqueados. ¿Continuar igual?",
+  "@agendaBlockedDayBodyRecurring": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "agendaBlockedDayConfirm": "Cargar igual",
   "agendaSlotFreeLabel": "Disponible",
   "agendaSlotBlockedLabel": "Bloqueado",
   "agendaSlotBookedByLabel": "Reservado por {athleteName}",

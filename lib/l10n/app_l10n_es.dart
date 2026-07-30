@@ -477,6 +477,22 @@ class AppL10nEs extends AppL10n {
       'Reserva cancelada por el entrenador.';
 
   @override
+  String get agendaBlockedDayTitle => 'Día bloqueado';
+
+  @override
+  String agendaBlockedDayBodySingle(String date) {
+    return 'El $date está marcado como bloqueado en tus horarios. ¿Querés cargar la sesión igual?';
+  }
+
+  @override
+  String agendaBlockedDayBodyRecurring(int count) {
+    return '$count de las fechas caen en días bloqueados. ¿Continuar igual?';
+  }
+
+  @override
+  String get agendaBlockedDayConfirm => 'Cargar igual';
+
+  @override
   String get agendaSlotFreeLabel => 'Disponible';
 
   @override
@@ -3651,6 +3667,22 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get agendaBookingCancelledByCoach =>
       'Reserva cancelada por el entrenador.';
+
+  @override
+  String get agendaBlockedDayTitle => 'Día bloqueado';
+
+  @override
+  String agendaBlockedDayBodySingle(String date) {
+    return 'El $date está marcado como bloqueado en tus horarios. ¿Querés cargar la sesión igual?';
+  }
+
+  @override
+  String agendaBlockedDayBodyRecurring(int count) {
+    return '$count de las fechas caen en días bloqueados. ¿Continuar igual?';
+  }
+
+  @override
+  String get agendaBlockedDayConfirm => 'Cargar igual';
 
   @override
   String get agendaSlotFreeLabel => 'Disponible';
