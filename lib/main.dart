@@ -40,10 +40,30 @@ Future<void> main() async {
     // En release: Play Integrity (Android) y AppAttest (iOS). Estos
     // requieren signed builds y firebase config correcta en Console.
     //
-    // Modo de enforcement (accept/reject sin token): se controla desde
-    // Firebase Console, no desde código. Lo dejamos en monitoring por
-    // ahora — Firestore acepta todo, el dashboard muestra qué % de
-    // requests pasarían si activáramos enforce.
+    // ⚠️ ENFORCEMENT ESTÁ ACTIVO para Cloud Firestore en `treino-dev`
+    // (verificado 2026-07-27). El modo se controla desde Firebase Console,
+    // no desde código, así que este comentario puede quedar desactualizado
+    // otra vez — chequealo en Console → App Check → APIs antes de creerle.
+    //
+    // Consecuencia práctica: en un device de dev cuyo debug token NO esté
+    // registrado, TODA escritura a Firestore se rechaza. No falla el login
+    // (Auth no está enforced), falla lo que venga después, y el síntoma no
+    // se parece a App Check — p.ej. crear cuenta muere con "Hubo un problema
+    // creando tu perfil" (AuthService.signUpWithEmail → getOrCreate).
+    //
+    // Cómo diagnosticarlo sin depender de la consola de `flutter run`:
+    //   xcrun simctl spawn <udid> log show --last 10m --style compact \
+    //     --predicate 'process == "Runner"' \
+    //     | rg -i "attestation|AppCheck failed|Write at"
+    //
+    // Cómo sacar el token ya generado de un simulador iOS:
+    //   CONT=$(xcrun simctl get_app_container <udid> com.backhaus.treino data)
+    //   plutil -p "$CONT/Library/Preferences/com.backhaus.treino.plist" \
+    //     | rg -i appcheck        # key GACAppCheckDebugToken
+    //
+    // OJO: el log "(AppCheckCore) App Check debug token: 'XXX'" aparece
+    // SIEMPRE al arrancar y NO significa que el server lo aceptó. La señal
+    // de que está bien es la AUSENCIA de "App attestation failed".
     if (!kIsWeb) {
       await FirebaseAppCheck.instance.activate(
         androidProvider:
