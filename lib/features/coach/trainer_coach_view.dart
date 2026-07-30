@@ -246,7 +246,22 @@ class _ActiveAlumnoCard extends ConsumerWidget {
       ),
     );
     if (confirmed != true) return;
-    await action();
+    // try/catch obligatorio (QA C1-siblings, hallazgo H5): sin él, si
+    // pause/resume/terminate lanza (permission-denied de App Check, rules, o
+    // cualquier FirebaseException) la excepción escapa como async no capturada,
+    // cae en runZonedGuarded y se registra en Crashlytics como error FATAL, y
+    // el PF no recibe ningún feedback: el diálogo ya se cerró y la card no
+    // cambia. Ahora falla con un SnackBar y sin fatal.
+    try {
+      await action();
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No pudimos actualizar el vínculo. Probá de nuevo.'),
+        ),
+      );
+    }
   }
 
   @override

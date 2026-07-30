@@ -346,6 +346,16 @@ class _PendingRequestCardState extends ConsumerState<_PendingRequestCard> {
   // on error so the trainer can retry.
   bool _busy = false;
 
+  // El catch resetea _busy Y muestra feedback (hallazgo H5): antes solo
+  // reseteaba el flag, así que un fallo (permission-denied, rules) dejaba al PF
+  // creyendo que aceptó/rechazó cuando no pasó nada. `_showError` chequea
+  // mounted porque corre después del await.
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
+
   Future<void> _decline() async {
     if (_busy) return;
     setState(() => _busy = true);
@@ -353,6 +363,7 @@ class _PendingRequestCardState extends ConsumerState<_PendingRequestCard> {
       await ref.read(trainerLinkRepositoryProvider).decline(widget.link.id);
     } catch (_) {
       if (mounted) setState(() => _busy = false);
+      _showError('No pudimos rechazar la solicitud. Probá de nuevo.');
     }
   }
 
@@ -366,6 +377,7 @@ class _PendingRequestCardState extends ConsumerState<_PendingRequestCard> {
           .logLinkAccepted(linkId: widget.link.id);
     } catch (_) {
       if (mounted) setState(() => _busy = false);
+      _showError('No pudimos aceptar la solicitud. Probá de nuevo.');
     }
   }
 
