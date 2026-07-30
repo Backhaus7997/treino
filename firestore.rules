@@ -1589,10 +1589,33 @@ service cloud.firestore {
       allow read: if request.auth != null
                   && (resource == null
                       || request.auth.uid == resource.data.trainerId);
-      allow create, update: if request.auth != null
+      // Create y update SEPARADOS (QA-2026-07-30 C1). Antes iban combinados
+      // validando SOLO el post-image, con dos agujeros que el docId
+      // determinístico `{trainerId}_{athleteId}` (enumerable) hacía triviales:
+      //   1) Squat: un atacante creaba el doc en el docId de OTRO PF con su
+      //      propio trainerId, dejando a la víctima sin poder escribir su nota
+      //      (su update fallaba porque resource.data.trainerId != su uid).
+      //   2) Hijack: como update no fijaba el trainerId previo, un tercero
+      //      reasignaba trainerId con set(merge:true) preservando `note`, y
+      //      después leía la nota privada (la read gate mira resource.data.
+      //      trainerId, el mismo campo que el update dejaba reescribir).
+      // Fix (mismo patrón que follow_up_entries / nutrition_plans): en create
+      // ligar el docId al uid firmante; en update fijar la identidad al
+      // pre-image para que trainerId/athleteId sean inmutables.
+      allow create: if request.auth != null
                   && request.resource.data.trainerId == request.auth.uid
                   && request.resource.data.athleteId is string
-                  && request.resource.data.athleteId.size() > 0;
+                  && request.resource.data.athleteId.size() > 0
+                  && docId == request.resource.data.trainerId + '_'
+                              + request.resource.data.athleteId
+                  && request.resource.data.note is string
+                  && request.resource.data.note.size() < 5000;
+      allow update: if request.auth != null
+                  && resource.data.trainerId == request.auth.uid
+                  && request.resource.data.trainerId == resource.data.trainerId
+                  && request.resource.data.athleteId == resource.data.athleteId
+                  && request.resource.data.note is string
+                  && request.resource.data.note.size() < 5000;
       allow delete: if request.auth != null && resource.data.trainerId == request.auth.uid;
     }
 
