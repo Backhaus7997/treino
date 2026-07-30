@@ -178,20 +178,34 @@ class _PersonalRecordRow extends StatelessWidget {
 
     // El bloque valor+unidad tiene ancho INTRÍNSECO, y un hijo no flexible de un
     // Row recibe ancho ILIMITADO: sin acotarlo no puede achicarse y la fila
-    // desborda en pantallas angostas o con font scale de accesibilidad grande
-    // (iOS "Texto más grande"). Mismo blindaje que `_SessionRecordRow` en
-    // session_highlights_section.dart (PR #593), pero con un TOPE por fracción
-    // del ancho disponible en vez de un reparto fijo de flex.
+    // desborda con font scale de accesibilidad grande (iOS "Texto más grande").
+    // Ése es el bug que este blindaje arregla.
     //
-    // El motivo del cambio de construcción: acá el texto de la izquierda es un
-    // label corto y FIJO ('Peso máximo', '1RM', …), no un nombre de ejercicio
-    // arbitrario. Un reparto fijo (Expanded 3:2) le asigna al valor sólo 2/5 del
-    // ancho y termina escalando récords de volumen normales a 65-88% en
-    // cualquier teléfono común — la fila de al lado se ve más grande que esta.
-    // Un TOPE, en cambio, no asigna nada: mientras el valor entre en el 70% no
-    // se toca (el Expanded del label absorbe el resto y lo deja pegado a la
-    // derecha, igual que antes de este fix) y sólo escala cuando de verdad
-    // desbordaría. El 30% restante es el piso que le queda garantizado al label.
+    // El constraint es un TOPE por fracción del ancho disponible, no el reparto
+    // fijo de flex que usaba `_SessionRecordRow` (PR #593, ya migrado también en
+    // el #599). Un reparto ASIGNA: dimensiona el bloque a su intrínseco pero
+    // deja el sobrante de su 2/5 a la DERECHA, así que el bloque no llega al
+    // borde de la card y —como cada récord tiene un valor de largo distinto—
+    // las filas de la misma card no alinean entre sí.
+    //
+    // Medido con las TTF reales de Barlow, dPR 1.0, card con un récord de
+    // volumen ('12487.5 kg·reps') y uno de peso ('137.5 kg'):
+    //
+    //   · Alineación: con 3:2 al bloque le faltaban 12 a 56px para el borde
+    //     según el ancho, y las dos filas quedaban desalineadas entre sí 39.9px
+    //     a CUALQUIER ancho. Con el tope, las dos a 1px del borde y 0px de
+    //     desalineación.
+    //   · Font scale a 390 de ancho: 3:2 dejaba el valor al 99.5% a 1.5x, 74.3%
+    //     a 2x y 50.6% a 3x. El tope: 100%, 98.1% y 90.8%.
+    //
+    // Ojo con lo que este tope NO arregla: a font scale 1x el reparto 3:2
+    // tampoco achicaba nada acá (el bloque mide 87px y 2/5 sobran hasta 320px
+    // de pantalla). La ganancia a 1x es de alineación, no de tamaño.
+    //
+    // El 30% restante es el piso que le queda garantizado al label, que además
+    // acá es corto y FIJO ('Peso máximo', '1RM', …) — a diferencia de
+    // `_SessionRecordRow`, donde a la izquierda hay un nombre de ejercicio de
+    // largo arbitrario.
     return LayoutBuilder(
       builder: (context, constraints) => Row(
         crossAxisAlignment: CrossAxisAlignment.center,

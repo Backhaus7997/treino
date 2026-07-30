@@ -2306,6 +2306,12 @@ abstract class AppL10n {
   /// **'HOLA'**
   String get dashboardHolaSinNombre;
 
+  /// Semantics label for the trainer dashboard header avatar, which opens the professional-profile editor. Distinct from a11yHomeAvatarButton (athlete home), which opens a read-only public profile.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Editar tu perfil profesional'**
+  String get a11yDashboardAvatarButton;
+
   /// Empty state of the pending-requests sheet, shown when the trainer opens the header bell with no incoming link requests.
   ///
   /// In es_AR, this message translates to:

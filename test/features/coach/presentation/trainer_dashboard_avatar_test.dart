@@ -19,8 +19,10 @@ import 'package:treino/l10n/app_l10n.dart';
 
 // The dashboard header avatar was a bare decoration — no tap handler at all
 // (unlike the bell right next to it, which was already wired to the
-// pending-requests modal and only looks inert at badgeCount == 0). It now
-// shortcuts to the trainer's own profile.
+// pending-requests modal and only looked inert at badgeCount == 0). It now
+// opens the professional-profile EDITOR: from the dashboard the useful
+// destination is the form, not the PERFIL tab root the trainer would then
+// have to tap through.
 
 const _kTrainer = 'trainer-1';
 
@@ -33,7 +35,16 @@ UserProfile _trainerProfile() => UserProfile(
       updatedAt: DateTime.utc(2026, 1, 1),
     );
 
+/// Records what the editor route was actually entered with.
+///
+/// Asserting on `router.currentConfiguration.uri` does NOT work here: with an
+/// imperative `push` it keeps reporting the declarative location (`/home`)
+/// even though the pushed page is on screen. Capturing the route's own
+/// [GoRouterState] is the accurate read.
+Uri? _editorEnteredWith;
+
 Future<GoRouter> _pumpDashboard(WidgetTester tester) async {
+  _editorEnteredWith = null;
   final router = GoRouter(
     initialLocation: '/home',
     routes: [
@@ -43,7 +54,16 @@ Future<GoRouter> _pumpDashboard(WidgetTester tester) async {
       ),
       GoRoute(
         path: '/profile',
-        builder: (_, __) => const Scaffold(body: Text('PERFIL-STUB')),
+        builder: (_, __) => const Scaffold(body: Text('PERFIL-TAB-STUB')),
+        routes: [
+          GoRoute(
+            path: 'edit-trainer',
+            builder: (_, state) {
+              _editorEnteredWith = state.uri;
+              return const Scaffold(body: Text('EDITOR-STUB'));
+            },
+          ),
+        ],
       ),
     ],
   );
@@ -77,9 +97,10 @@ Future<GoRouter> _pumpDashboard(WidgetTester tester) async {
 
 void main() {
   group('trainer dashboard header avatar', () {
-    testWidgets('tapping the avatar navigates to the profile tab',
-        (tester) async {
-      final router = await _pumpDashboard(tester);
+    testWidgets(
+        'tapping the avatar opens the professional-profile EDITOR, not the '
+        'PERFIL tab root', (tester) async {
+      await _pumpDashboard(tester);
 
       // The initials come from the trainer's own display name.
       expect(find.text('MP'), findsOneWidget);
@@ -87,13 +108,39 @@ void main() {
       await tester.tap(find.text('MP'));
       await tester.pumpAndSettle();
 
-      expect(find.text('PERFIL-STUB'), findsOneWidget);
-      // `go`, not `push` — PERFIL is a shell tab, so this is a tab switch and
-      // must REPLACE the location rather than stack on top of /home.
-      expect(
-        router.routerDelegate.currentConfiguration.uri.toString(),
-        equals('/profile'),
-      );
+      expect(find.text('EDITOR-STUB'), findsOneWidget);
+      expect(find.text('PERFIL-TAB-STUB'), findsNothing);
+      expect(_editorEnteredWith?.path, equals('/profile/edit-trainer'));
+    });
+
+    // `push`, not `go`: the editor ends its edit-mode save with
+    // `context.pop()` (ADR-TPO-006). With `go` there would be nothing to pop
+    // and the trainer would be stranded on the form after saving.
+    testWidgets('it is PUSHED — popping returns to the dashboard',
+        (tester) async {
+      final router = await _pumpDashboard(tester);
+
+      await tester.tap(find.text('MP'));
+      await tester.pumpAndSettle();
+      expect(find.text('EDITOR-STUB'), findsOneWidget);
+
+      // Exactly what the editor does after a successful save.
+      router.pop();
+      await tester.pumpAndSettle();
+
+      expect(find.text('MP'), findsOneWidget, reason: 'back on the dashboard');
+      expect(find.text('EDITOR-STUB'), findsNothing);
+    });
+
+    // The editor carries no ?mode: that param drives the first-run onboarding
+    // gate, and any other value falls through to edit mode.
+    testWidgets('does not request onboarding mode', (tester) async {
+      await _pumpDashboard(tester);
+
+      await tester.tap(find.text('MP'));
+      await tester.pumpAndSettle();
+
+      expect(_editorEnteredWith?.queryParameters, isEmpty);
     });
 
     testWidgets('the avatar exposes button semantics with an action label',
@@ -101,7 +148,8 @@ void main() {
       final handle = tester.ensureSemantics();
       await _pumpDashboard(tester);
 
-      expect(find.bySemanticsLabel('Ver tu perfil'), findsOneWidget);
+      expect(find.bySemanticsLabel('Editar tu perfil profesional'),
+          findsOneWidget);
       handle.dispose();
     });
 
@@ -116,7 +164,8 @@ void main() {
       await _pumpDashboard(tester);
 
       expect(find.bySemanticsLabel('0 solicitudes pendientes'), findsOneWidget);
-      expect(find.bySemanticsLabel('Ver tu perfil'), findsOneWidget);
+      expect(find.bySemanticsLabel('Editar tu perfil profesional'),
+          findsOneWidget);
       // The greeting must NOT carry either control's label.
       expect(
         find.bySemanticsLabel(RegExp(r'HOLA, MATEO.*(solicitudes|perfil)')),

@@ -400,4 +400,218 @@ void main() {
       expect(avatar.backgroundImage, isNull);
     });
   });
+
+  group('RutinasScreen filters, search and view toggle', () {
+    // Fixture roster reused across this group: a1 activo sin rutina, a2
+    // activo con 2 rutinas activas, a3 pausado sin rutina, a4 terminado
+    // (inactivo) con 1 rutina activa.
+    List<TrainerLink> roster() => [
+          _link(id: '1', status: TrainerLinkStatus.active, athleteId: 'a1'),
+          _link(id: '2', status: TrainerLinkStatus.active, athleteId: 'a2'),
+          _link(id: '3', status: TrainerLinkStatus.paused, athleteId: 'a3'),
+          _link(id: '4', status: TrainerLinkStatus.terminated, athleteId: 'a4'),
+        ];
+
+    const names = {
+      'a1': 'Ana Sinrutina',
+      'a2': 'Beto Conrutina',
+      'a3': 'Caro Pausada',
+      'a4': 'Dario Terminado',
+    };
+
+    Map<String, List<Routine>> routines() => {
+          'a1': const [],
+          'a2': [_activeRoutine('r1'), _activeRoutine('r2')],
+          'a3': const [],
+          'a4': [_activeRoutine('r3')],
+        };
+
+    testWidgets('"Sin rutina" filter shows only athletes with 0 active',
+        (tester) async {
+      await _pumpRutinas(
+        tester,
+        links: roster(),
+        names: names,
+        routines: routines(),
+      );
+
+      await tester.tap(find.text('SIN RUTINA · 2'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ana Sinrutina'), findsOneWidget);
+      expect(find.text('Caro Pausada'), findsOneWidget);
+      expect(find.text('Beto Conrutina'), findsNothing);
+      expect(find.text('Dario Terminado'), findsNothing);
+    });
+
+    testWidgets('"Con rutina" filter shows only athletes with >=1 active',
+        (tester) async {
+      await _pumpRutinas(
+        tester,
+        links: roster(),
+        names: names,
+        routines: routines(),
+      );
+
+      await tester.tap(find.text('CON RUTINA · 2'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Beto Conrutina'), findsOneWidget);
+      expect(find.text('Dario Terminado'), findsOneWidget);
+      expect(find.text('Ana Sinrutina'), findsNothing);
+      expect(find.text('Caro Pausada'), findsNothing);
+    });
+
+    testWidgets('"Activos" filter shows only active-status athletes',
+        (tester) async {
+      await _pumpRutinas(
+        tester,
+        links: roster(),
+        names: names,
+        routines: routines(),
+      );
+
+      await tester.tap(find.text('ACTIVOS · 2'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ana Sinrutina'), findsOneWidget);
+      expect(find.text('Beto Conrutina'), findsOneWidget);
+      expect(find.text('Caro Pausada'), findsNothing);
+      expect(find.text('Dario Terminado'), findsNothing);
+    });
+
+    testWidgets('"Inactivos" filter shows only inactive-status athletes',
+        (tester) async {
+      await _pumpRutinas(
+        tester,
+        links: roster(),
+        names: names,
+        routines: routines(),
+      );
+
+      await tester.tap(find.text('INACTIVOS · 1'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Dario Terminado'), findsOneWidget);
+      expect(find.text('Ana Sinrutina'), findsNothing);
+      expect(find.text('Beto Conrutina'), findsNothing);
+      expect(find.text('Caro Pausada'), findsNothing);
+    });
+
+    testWidgets('"Todos" filter shows every athlete', (tester) async {
+      await _pumpRutinas(
+        tester,
+        links: roster(),
+        names: names,
+        routines: routines(),
+      );
+
+      // Default filter is already "Todos" — tap it explicitly to also cover
+      // the chip's own label/count rendering.
+      await tester.tap(find.text('TODOS · 4'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ana Sinrutina'), findsOneWidget);
+      expect(find.text('Beto Conrutina'), findsOneWidget);
+      expect(find.text('Caro Pausada'), findsOneWidget);
+      expect(find.text('Dario Terminado'), findsOneWidget);
+    });
+
+    testWidgets('chip counts reflect the whole roster', (tester) async {
+      await _pumpRutinas(
+        tester,
+        links: roster(),
+        names: names,
+        routines: routines(),
+      );
+
+      expect(find.text('TODOS · 4'), findsOneWidget);
+      expect(find.text('SIN RUTINA · 2'), findsOneWidget);
+      expect(find.text('CON RUTINA · 2'), findsOneWidget);
+      expect(find.text('ACTIVOS · 2'), findsOneWidget);
+      expect(find.text('INACTIVOS · 1'), findsOneWidget);
+    });
+
+    testWidgets(
+        'search filters by name (substring, case-insensitive), combined with the active filter',
+        (tester) async {
+      await _pumpRutinas(
+        tester,
+        links: roster(),
+        names: names,
+        routines: routines(),
+      );
+
+      await tester.enterText(find.byType(TextField), 'CONRUTINA');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Beto Conrutina'), findsOneWidget);
+      expect(find.text('Ana Sinrutina'), findsNothing);
+      expect(find.text('Caro Pausada'), findsNothing);
+      expect(find.text('Dario Terminado'), findsNothing);
+
+      // Combine with a status filter: "Beto Conrutina" is active, so it
+      // still matches "Activos" + the same search term.
+      await tester.tap(find.text('ACTIVOS · 2'));
+      await tester.pumpAndSettle();
+      expect(find.text('Beto Conrutina'), findsOneWidget);
+
+      // But it drops out under "Inactivos" even though the name still
+      // matches — the status filter wins the intersection.
+      await tester.tap(find.text('INACTIVOS · 1'));
+      await tester.pumpAndSettle();
+      expect(find.text('Beto Conrutina'), findsNothing);
+    });
+
+    testWidgets(
+        'switching to Cards renders the cards grid with avatar+name+count badge and tap still navigates',
+        (tester) async {
+      await _pumpRutinas(
+        tester,
+        links: [
+          _link(id: '1', status: TrainerLinkStatus.active, athleteId: 'a1'),
+        ],
+        names: {'a1': 'Ana Conrutina'},
+        routines: {
+          'a1': [_activeRoutine('r1')],
+        },
+      );
+
+      await tester.tap(find.text('Cards'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ana Conrutina'), findsOneWidget);
+      expect(find.text('1 rutina'), findsOneWidget);
+      final avatar = tester.widget<CircleAvatar>(find.byType(CircleAvatar));
+      expect(avatar.backgroundImage, isNull);
+
+      await tester.tap(find.text('Ana Conrutina'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('ROUTINES a1'), findsOneWidget);
+    });
+
+    testWidgets(
+        'shows a distinct empty state when filters/search yield nothing',
+        (tester) async {
+      await _pumpRutinas(
+        tester,
+        links: roster(),
+        names: names,
+        routines: routines(),
+      );
+
+      await tester.enterText(find.byType(TextField), 'nadie-coincide');
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('No encontramos alumnos con esos filtros.'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Todavía no tenés alumnos vinculados.'),
+        findsNothing,
+      );
+    });
+  });
 }
