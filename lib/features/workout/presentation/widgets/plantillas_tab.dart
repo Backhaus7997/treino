@@ -190,6 +190,7 @@ class _TemplatesGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final useSingleColumn = MediaQuery.textScalerOf(context).scale(1) > 1.3;
     final cells = <Widget>[
       for (final entry in entries)
         RoutineCard(
@@ -200,7 +201,7 @@ class _TemplatesGrid extends StatelessWidget {
           variant: entry.fromCoach || entry.routine.id.hashCode % 3 == 0
               ? RoutineCardVariant.highlight
               : RoutineCardVariant.accent,
-          reserveTitleLines: true,
+          reserveTitleLines: !useSingleColumn,
           badge: switch (entry.origin) {
             TemplateOrigin.coach => CoachChip(routineId: entry.routine.id),
             TemplateOrigin.community => CoachChip(
@@ -211,6 +212,16 @@ class _TemplatesGrid extends StatelessWidget {
           },
         ),
     ];
+
+    if (useSingleColumn) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var index = 0; index < cells.length; index++)
+            _gridCell(cells[index], lastRow: index == cells.length - 1),
+        ],
+      );
+    }
 
     return Table(
       columnWidths: const {

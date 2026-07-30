@@ -440,8 +440,8 @@ void main() {
     });
 
     testWidgets(
-        'text-scale 3x: la fila del badge queda capeada a 40px y las alturas '
-        'de card siguen uniformes', (tester) async {
+        'text-scale 3x: cards de plantillas usan una columna sin achicar texto',
+        (tester) async {
       final catalog = [
         makeRoutine(id: 'sys-1', name: 'Sistema 1'),
         makeRoutine(id: 'sys-2', name: 'Sistema 2'),
@@ -483,16 +483,18 @@ void main() {
       final cards = find.byType(RoutineCard, skipOffstage: false);
       expect(cards, findsNWidgets(3));
 
-      // Con accesibilidad 3x el chip escalaría por encima de los 40px del
-      // ícono — el SizedBox de la fila lo capea (FittedBox lo achica) y la
-      // card del coach sigue midiendo EXACTO lo mismo que las del catálogo.
-      final firstHeight = tester.getSize(cards.at(0)).height;
+      final firstLeft = tester.getTopLeft(cards.at(0)).dx;
       for (var i = 1; i < 3; i++) {
         expect(
-          tester.getSize(cards.at(i)).height,
-          moreOrLessEquals(firstHeight, epsilon: 0.01),
+          tester.getTopLeft(cards.at(i)).dx,
+          moreOrLessEquals(firstLeft, epsilon: 0.01),
+        );
+        expect(
+          tester.getTopLeft(cards.at(i)).dy,
+          greaterThan(tester.getTopLeft(cards.at(i - 1)).dy),
         );
       }
+      expect(find.byType(FittedBox), findsNothing);
       expect(tester.takeException(), isNull);
     });
 

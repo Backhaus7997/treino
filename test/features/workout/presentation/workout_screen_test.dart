@@ -62,7 +62,11 @@ TrainerLink makeLink() => TrainerLink(
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-Widget _wrapWorkout(Widget w, {List<Override> overrides = const []}) =>
+Widget _wrapWorkout(
+  Widget w, {
+  List<Override> overrides = const [],
+  TextScaler textScaler = TextScaler.noScaling,
+}) =>
     ProviderScope(
       overrides: [
         currentUidProvider.overrideWithValue('test-uid'),
@@ -78,6 +82,10 @@ Widget _wrapWorkout(Widget w, {List<Override> overrides = const []}) =>
       ],
       child: MaterialApp(
         theme: AppTheme.dark(),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+          child: child!,
+        ),
         localizationsDelegates: AppL10n.localizationsDelegates,
         supportedLocales: AppL10n.supportedLocales,
         locale: const Locale('es', 'AR'),
@@ -201,6 +209,31 @@ void main() {
   // ─── WorkoutScreen tests (workout redesign slice 2: 2 tabs) ───────────────
 
   group('WorkoutScreen — tab TU ENTRENO (page 0)', () {
+    testWidgets(
+        'accessibility text scale grows and scrolls the top tabs without overflow',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapWorkout(
+          const WorkoutScreen(),
+          textScaler: const TextScaler.linear(3.2),
+          overrides: [
+            routinesProvider.overrideWith((ref) async => []),
+          ],
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(tester.takeException(), isNull);
+      expect(find.byType(TabBar), findsOneWidget);
+      expect(find.text('TU ENTRENO').hitTestable(), findsOneWidget);
+      for (final label in ['TU ENTRENO', 'PLANTILLAS']) {
+        final text = tester.widget<Text>(find.text(label));
+        expect(text.maxLines, 1);
+        expect(text.softWrap, isFalse);
+      }
+    });
+
     testWidgets(
         'default: pill tabs TU ENTRENO | PLANTILLAS y page 0 con '
         'RUTINAS → HISTORIAL (sin secciones de plantillas)', (tester) async {

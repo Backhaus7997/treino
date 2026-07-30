@@ -66,6 +66,16 @@ class _AthleteWorkout extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final theme = Theme.of(context);
+    final textScaler = MediaQuery.textScalerOf(context);
+    final labelStyle = theme.textTheme.labelLarge?.copyWith(
+      fontWeight: FontWeight.w700,
+      letterSpacing: 0.5,
+    );
+    final scaledLabelHeight = textScaler.scale(labelStyle?.fontSize ?? 14) *
+        (labelStyle?.height ?? 1.2);
+    final tabHeight =
+        scaledLabelHeight + 20 < 40 ? 40.0 : scaledLabelHeight + 20;
+    final scrollTabs = textScaler.scale(1) > 1.3;
 
     return DefaultTabController(
       length: _labels.length,
@@ -85,6 +95,8 @@ class _AthleteWorkout extends StatelessWidget {
               ),
             ),
             child: TabBar(
+              isScrollable: scrollTabs,
+              tabAlignment: scrollTabs ? TabAlignment.start : TabAlignment.fill,
               dividerColor: Colors.transparent,
               indicatorSize: TabBarIndicatorSize.tab,
               indicator: BoxDecoration(
@@ -94,11 +106,19 @@ class _AthleteWorkout extends StatelessWidget {
               splashBorderRadius: BorderRadius.circular(20),
               labelColor: palette.bg,
               unselectedLabelColor: palette.textMuted,
-              labelStyle: theme.textTheme.labelLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.5,
-              ),
-              tabs: [for (final l in _labels) Tab(text: l, height: 40)],
+              labelStyle: labelStyle,
+              tabs: [
+                for (final label in _labels)
+                  Tab(
+                    height: tabHeight,
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      softWrap: false,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+              ],
             ),
           ),
           const SizedBox(height: 8),

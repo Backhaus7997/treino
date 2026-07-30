@@ -28,8 +28,8 @@ class RoutineCard extends StatelessWidget {
   /// icon row — never overlaid — so it can't collide with the icon on narrow
   /// screens. The row is hard-capped to the icon square's 40px (SizedBox),
   /// so card heights stay deterministic whether the badge is present or not
-  /// (see #402) — [FittedBox] scales the chip down when the cell is too
-  /// narrow OR when large accessibility text would outgrow the 40px row.
+  /// (see #402). At large accessibility text sizes the card becomes
+  /// content-sized instead, so the badge remains fully legible.
   final Widget? badge;
 
   /// When true, the title block always reserves its full two lines even if
@@ -49,6 +49,7 @@ class RoutineCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final theme = Theme.of(context);
+    final useAccessibleLayout = MediaQuery.textScalerOf(context).scale(1) > 1.3;
 
     final tint = variant == RoutineCardVariant.highlight
         ? palette.highlight
@@ -58,7 +59,7 @@ class RoutineCard extends StatelessWidget {
       color: palette.textPrimary,
     );
     StrutStyle? titleStrut;
-    if (reserveTitleLines) {
+    if (reserveTitleLines && !useAccessibleLayout) {
       // Strut pins every title line to the style's own metrics even when a
       // glyph falls back to another font (e.g. an emoji in the name) —
       // without it the real line height could exceed the reservation
@@ -72,10 +73,11 @@ class RoutineCard extends StatelessWidget {
       routine.name.toUpperCase(),
       style: titleStyle,
       strutStyle: titleStrut,
-      maxLines: 2,
-      overflow: TextOverflow.ellipsis,
+      maxLines: useAccessibleLayout ? null : 2,
+      overflow:
+          useAccessibleLayout ? TextOverflow.visible : TextOverflow.ellipsis,
     );
-    if (reserveTitleLines) {
+    if (reserveTitleLines && !useAccessibleLayout) {
       // minHeight (not a tight height) so a real two-line title can never be
       // clipped if the measured reservation is off by a sub-pixel.
       title = ConstrainedBox(
@@ -123,7 +125,11 @@ class RoutineCard extends StatelessWidget {
           children: [
             if (badge == null)
               iconSquare
-            else
+            else if (useAccessibleLayout) ...[
+              iconSquare,
+              const SizedBox(height: 8),
+              badge!,
+            ] else
               // Hard 40px cap: without it the row height tracks the chip
               // (Align shrink-wraps under an unbounded cross axis), and at
               // large accessibility text scales the chip outgrows the icon —
@@ -139,10 +145,7 @@ class RoutineCard extends StatelessWidget {
                     Expanded(
                       child: Align(
                         alignment: Alignment.topRight,
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: badge,
-                        ),
+                        child: badge,
                       ),
                     ),
                   ],
@@ -156,8 +159,10 @@ class RoutineCard extends StatelessWidget {
               style: theme.textTheme.bodySmall?.copyWith(
                 color: palette.textMuted,
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+              maxLines: useAccessibleLayout ? null : 1,
+              overflow: useAccessibleLayout
+                  ? TextOverflow.visible
+                  : TextOverflow.ellipsis,
             ),
           ],
         ),
