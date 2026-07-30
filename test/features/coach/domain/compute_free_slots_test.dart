@@ -236,4 +236,132 @@ void main() {
       expect(slots.single, slot(2026, 6, 1, 9, 0));
     });
   });
+
+  group('isDayBlocked', () {
+    test('true when a block override matches the calendar day', () {
+      final blockOverride = AvailabilityOverride.block(
+        id: 'o1',
+        trainerId: 'tA',
+        date: kMonday,
+      );
+
+      expect(isDayBlocked([blockOverride], kMonday), isTrue);
+    });
+
+    test('false when no override matches the date', () {
+      final blockOverride = AvailabilityOverride.block(
+        id: 'o1',
+        trainerId: 'tA',
+        date: kMonday,
+      );
+      final tuesday = kMonday.add(const Duration(days: 1));
+
+      expect(isDayBlocked([blockOverride], tuesday), isFalse);
+    });
+
+    test('false when overrides list is empty', () {
+      expect(isDayBlocked(const [], kMonday), isFalse);
+    });
+
+    test('an `extra` override does not count as blocked', () {
+      final extraOverride = AvailabilityOverride.extra(
+        id: 'o2',
+        trainerId: 'tA',
+        date: kMonday,
+        startHour: 7,
+        startMinute: 0,
+        endHour: 8,
+        endMinute: 0,
+        slotDurationMin: 60,
+      );
+
+      expect(isDayBlocked([extraOverride], kMonday), isFalse);
+    });
+
+    test('matches regardless of the time-of-day component on [date]', () {
+      // Timezone/day-boundary: a block stored at midnight UTC must still
+      // match a `date` argument carrying an arbitrary time component, since
+      // isDayBlocked only compares year/month/day.
+      final blockOverride = AvailabilityOverride.block(
+        id: 'o1',
+        trainerId: 'tA',
+        date: kMonday, // midnight UTC
+      );
+      final sameDayWithTime = DateTime.utc(2026, 6, 1, 23, 59);
+
+      expect(isDayBlocked([blockOverride], sameDayWithTime), isTrue);
+    });
+
+    test('does not match the neighboring day across a month boundary', () {
+      // 2026-06-30 23:59 UTC vs a block on 2026-07-01 — must not match.
+      final blockOverride = AvailabilityOverride.block(
+        id: 'o1',
+        trainerId: 'tA',
+        date: DateTime.utc(2026, 7, 1),
+      );
+      final endOfJune = DateTime.utc(2026, 6, 30, 23, 59);
+
+      expect(isDayBlocked([blockOverride], endOfJune), isFalse);
+    });
+  });
+
+  group('blockedDatesAmong', () {
+    test('returns only the dates that are blocked', () {
+      final tuesday = kMonday.add(const Duration(days: 1));
+      final wednesday = kMonday.add(const Duration(days: 2));
+      final blockOverride = AvailabilityOverride.block(
+        id: 'o1',
+        trainerId: 'tA',
+        date: tuesday,
+      );
+
+      final result = blockedDatesAmong(
+        [blockOverride],
+        [kMonday, tuesday, wednesday],
+      );
+
+      expect(result, equals([tuesday]));
+    });
+
+    test('returns empty list when no dates are blocked', () {
+      final tuesday = kMonday.add(const Duration(days: 1));
+
+      final result = blockedDatesAmong(const [], [kMonday, tuesday]);
+
+      expect(result, isEmpty);
+    });
+
+    test('returns all dates when every date is blocked', () {
+      final tuesday = kMonday.add(const Duration(days: 1));
+      final blockMonday = AvailabilityOverride.block(
+        id: 'o1',
+        trainerId: 'tA',
+        date: kMonday,
+      );
+      final blockTuesday = AvailabilityOverride.block(
+        id: 'o2',
+        trainerId: 'tA',
+        date: tuesday,
+      );
+
+      final result = blockedDatesAmong(
+        [blockMonday, blockTuesday],
+        [kMonday, tuesday],
+      );
+
+      expect(result, equals([kMonday, tuesday]));
+    });
+
+    test('returns empty list when input dates list is empty', () {
+      final blockOverride = AvailabilityOverride.block(
+        id: 'o1',
+        trainerId: 'tA',
+        date: kMonday,
+      );
+
+      final result = blockedDatesAmong([blockOverride], const []);
+
+      expect(result, isEmpty);
+    });
+  });
 }

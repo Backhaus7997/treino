@@ -28,15 +28,8 @@ List<DateTime> computeFreeSlots({
   final date = DateTime.utc(forDate.year, forDate.month, forDate.day);
 
   // Step 1: block override check.
-  for (final override in overrides) {
-    if (override is AvailabilityOverrideBlock) {
-      final oDate = override.date;
-      if (oDate.year == date.year &&
-          oDate.month == date.month &&
-          oDate.day == date.day) {
-        return const [];
-      }
-    }
+  if (isDayBlocked(overrides, date)) {
+    return const [];
   }
 
   // ISO weekday: DateTime.weekday returns 1=Monday … 7=Sunday (same as our
@@ -87,6 +80,34 @@ List<DateTime> computeFreeSlots({
 
   return slotSet.toList();
 }
+
+/// Returns true if a `block` override falls on [date]'s calendar day.
+///
+/// Same matching logic [computeFreeSlots] uses for its step-1 block check —
+/// extracted so callers outside slot computation (e.g. the new-session UI)
+/// can ask "is this day blocked?" without re-implementing the date match.
+bool isDayBlocked(List<AvailabilityOverride> overrides, DateTime date) {
+  final d = DateTime.utc(date.year, date.month, date.day);
+  for (final o in overrides) {
+    if (o is AvailabilityOverrideBlock &&
+        o.date.year == d.year &&
+        o.date.month == d.month &&
+        o.date.day == d.day) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/// Returns the subset of [dates] that fall on a blocked day per [overrides].
+///
+/// Used by recurring-session creation to warn "N of your dates land on
+/// blocked days" without hiding or skipping any of them (soft warning only).
+List<DateTime> blockedDatesAmong(
+  List<AvailabilityOverride> overrides,
+  List<DateTime> dates,
+) =>
+    dates.where((d) => isDayBlocked(overrides, d)).toList();
 
 /// Generates slots in the half-open window [startHour:startMinute,
 /// endHour:endMinute) spaced by [slotDurationMin] and inserts them into [set].

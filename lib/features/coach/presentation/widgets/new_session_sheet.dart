@@ -8,10 +8,13 @@ import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../../profile/application/user_public_profile_providers.dart';
+import '../agenda_formatters.dart';
 import '../../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../../application/agenda_providers.dart';
 import '../../application/trainer_link_providers.dart';
+import '../../domain/compute_free_slots.dart'
+    show blockedDatesAmong, isDayBlocked;
 import '../../domain/trainer_link.dart';
 import '../../domain/trainer_link_status.dart';
 
@@ -343,6 +346,178 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
     }
   }
 
+  // ── Blocked-day soft warning helpers ────────────────────────────────────
+
+  /// Reads overrides covering [date] ± 1 day and checks [isDayBlocked].
+  ///
+  /// Reads the repository directly (`watchOverrides(...).first`) rather than
+  /// `overridesStreamProvider(...).future` — the provider is `autoDispose`
+  /// and nothing else keeps it alive from this one-shot pre-submit read, so
+  /// going through the repo avoids relying on provider lifecycle for a value
+  /// only needed once.
+  ///
+  /// Fail-open: this is a soft warning, not a hard stop. If the read throws
+  /// (permission/offline/etc.) we must not let the exception escape the
+  /// async onPressed handler — that would silently no-op the whole submit.
+  /// On any error we treat the day as NOT blocked so submit proceeds
+  /// normally, just without the warning.
+  Future<bool> _isDateBlocked({
+    required String trainerId,
+    required DateTime date,
+  }) async {
+    try {
+      final from = date.subtract(const Duration(days: 1));
+      final to = date.add(const Duration(days: 1));
+      final overrides = await ref
+          .read(availabilityRepositoryProvider)
+          .watchOverrides(trainerId, from, to)
+          .first;
+      return isDayBlocked(overrides, date);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Reads overrides covering the full [candidateDates] span and returns
+  /// which of those dates are blocked, via [blockedDatesAmong].
+  ///
+  /// Fail-open: same rationale as [_isDateBlocked] — on any error, treat no
+  /// dates as blocked so the recurring submit proceeds without the warning
+  /// instead of the exception escaping the async onPressed handler.
+  Future<List<DateTime>> _blockedDatesAmongCandidates(
+    String trainerId,
+    List<DateTime> candidateDates,
+  ) async {
+    if (candidateDates.isEmpty) return const [];
+    try {
+      final sorted = [...candidateDates]..sort();
+      final from = sorted.first.subtract(const Duration(days: 1));
+      final to = sorted.last.add(const Duration(days: 1));
+      final overrides = await ref
+          .read(availabilityRepositoryProvider)
+          .watchOverrides(trainerId, from, to)
+          .first;
+      return blockedDatesAmong(overrides, candidateDates);
+    } catch (_) {
+      return const <DateTime>[];
+    }
+  }
+
+  /// Replicates createRecurringByTrainer's weekday-expansion algorithm
+  /// (appointment_repository.dart:156-212) client-side, so the blocked-day
+  /// check can be run BEFORE any write happens. Returns the calendar dates
+  /// (date-only, UTC) of every future occurrence that will be created.
+  List<DateTime> _materializeRecurringDates({
+    required Set<int> weekdays,
+    required DateTime fromDate,
+    required DateTime untilDate,
+    required int startHour,
+    required int startMinute,
+  }) {
+    final now = DateTime.now();
+    final nowWall =
+        DateTime.utc(now.year, now.month, now.day, now.hour, now.minute);
+    final dates = <DateTime>[];
+
+    var cursor = DateTime.utc(fromDate.year, fromDate.month, fromDate.day);
+    final end = DateTime.utc(untilDate.year, untilDate.month, untilDate.day);
+
+    while (!cursor.isAfter(end)) {
+      if (weekdays.contains(cursor.weekday)) {
+        final startsAt = DateTime.utc(
+            cursor.year, cursor.month, cursor.day, startHour, startMinute);
+        if (startsAt.isAfter(nowWall)) {
+          dates.add(cursor);
+        }
+      }
+      cursor = cursor.add(const Duration(days: 1));
+    }
+    return dates;
+  }
+
+  /// Shows the single-session "Día bloqueado" confirm dialog. Returns true
+  /// if the trainer chose to proceed anyway (soft warning — always offers a
+  /// confirm path, never a hard stop).
+  Future<bool> _confirmBlockedDaySingle(DateTime date) {
+    final l10n = AppL10n.of(context);
+    return _showBlockedDayDialog(
+      title: l10n.agendaBlockedDayTitle,
+      body: l10n.agendaBlockedDayBodySingle(AgendaFormatters.formatDate(date)),
+      confirmLabel: l10n.agendaBlockedDayConfirm,
+      cancelLabel: l10n.commonCancel,
+    );
+  }
+
+  /// Shows the recurring-session "N fechas caen en días bloqueados" confirm
+  /// dialog. Returns true if the trainer chose to proceed anyway — confirming
+  /// creates ALL occurrences (soft warning only; blocked dates are never
+  /// skipped, the trainer decides).
+  Future<bool> _confirmBlockedDayRecurring(int blockedCount) {
+    final l10n = AppL10n.of(context);
+    return _showBlockedDayDialog(
+      title: l10n.agendaBlockedDayTitle,
+      body: l10n.agendaBlockedDayBodyRecurring(blockedCount),
+      confirmLabel: l10n.agendaBlockedDayConfirm,
+      cancelLabel: l10n.commonCancel,
+    );
+  }
+
+  Future<bool> _showBlockedDayDialog({
+    required String title,
+    required String body,
+    required String confirmLabel,
+    required String cancelLabel,
+  }) async {
+    final palette = AppPalette.of(context);
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: palette.bgCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          title,
+          style: GoogleFonts.barlowCondensed(
+            fontWeight: FontWeight.w700,
+            fontSize: 18,
+            color: palette.textPrimary,
+          ),
+        ),
+        content: Text(
+          body,
+          style: GoogleFonts.barlow(fontSize: 14, color: palette.textPrimary),
+        ),
+        actions: [
+          OutlinedButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(
+              cancelLabel,
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                color: palette.textPrimary,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: palette.accent,
+              foregroundColor: palette.bg,
+            ),
+            child: Text(
+              confirmLabel,
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
   // ── Single submit ─────────────────────────────────────────────────────────
 
   Future<void> _submitSingle() async {
@@ -389,6 +564,16 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
             content: Text('Error de autenticación. Intentá de nuevo.')),
       );
       return;
+    }
+
+    // Blocked-day soft warning: after cheap sync validations (athlete, date,
+    // duration, auth) and before the async overrides read + repo call, so an
+    // already-invalid form never triggers the extra network round trip.
+    final blocked = await _isDateBlocked(trainerId: trainerId, date: _date);
+    if (!mounted) return;
+    if (blocked) {
+      final proceed = await _confirmBlockedDaySingle(_date);
+      if (!mounted || !proceed) return;
     }
 
     setState(() => _saving = true);
@@ -456,6 +641,33 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
       return;
     }
 
+    // Compute the same fromDate/untilDate window createRecurringByTrainer
+    // uses, up front (pure sync — no await needed), so the blocked-day check
+    // below and the actual creation call agree on the exact same window.
+    final today = DateTime.now();
+    final fromDate = DateTime(today.year, today.month, today.day);
+    final untilDate = fromDate.add(Duration(days: _weeks * 7 - 1));
+
+    // Blocked-day soft warning: replicate createRecurringByTrainer's weekday
+    // expansion client-side (agenda_providers.dart / appointment_repository
+    // .dart:156-212) so we can list which materialized dates are blocked
+    // BEFORE writing anything. Comes after cheap sync validations (athlete,
+    // weekdays, duration, auth) and before the async overrides read.
+    final candidateDates = _materializeRecurringDates(
+      weekdays: _weekdays,
+      fromDate: fromDate,
+      untilDate: untilDate,
+      startHour: _time.hour,
+      startMinute: _time.minute,
+    );
+    final blockedDates =
+        await _blockedDatesAmongCandidates(trainerId, candidateDates);
+    if (!mounted) return;
+    if (blockedDates.isNotEmpty) {
+      final proceed = await _confirmBlockedDayRecurring(blockedDates.length);
+      if (!mounted || !proceed) return;
+    }
+
     setState(() => _saving = true);
 
     try {
@@ -463,10 +675,6 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
           await ref.read(userPublicProfileProvider(athleteId).future);
       final rawName = profile?.displayName?.trim() ?? '';
       final athleteDisplayName = rawName.isEmpty ? athleteId : rawName;
-
-      final today = DateTime.now();
-      final fromDate = DateTime(today.year, today.month, today.day);
-      final untilDate = fromDate.add(Duration(days: _weeks * 7 - 1));
 
       final note = _noteController.text.trim();
 
