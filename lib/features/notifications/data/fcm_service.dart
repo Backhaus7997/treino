@@ -25,6 +25,7 @@ class FcmService {
   final FcmTokenRepository _repo;
 
   StreamSubscription<String>? _refreshSub;
+  String? _disposedUid;
 
   /// QA-502: monotonic guard against interleaved lifecycle calls.
   ///
@@ -59,6 +60,7 @@ class FcmService {
     // on a token refresh. Mirrors the cleanup in dispose().
     // QA-502: reclamamos esta generación ANTES del primer await.
     final generation = ++_generation;
+    _disposedUid = null;
 
     await _refreshSub?.cancel();
     _refreshSub = null;
@@ -102,6 +104,13 @@ class FcmService {
   ///
   /// REQ-PN-CLIENT-003, SCENARIO-648, 649, 679.
   Future<void> dispose(String uid) async {
+    // Explicit logout disposes while auth is still valid. The auth lifecycle
+    // then observes `null` and calls dispose for the same uid again. Keep that
+    // second pass a true no-op so it cannot mint/delete another device token
+    // or retry the Firestore write after authentication is gone.
+    if (_disposedUid == uid) return;
+    _disposedUid = uid;
+
     // QA-502: reclamamos esta generación ANTES del primer await.
     final generation = ++_generation;
 

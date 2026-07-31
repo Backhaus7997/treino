@@ -208,6 +208,18 @@ void main() {
   });
 
   group('FcmService.dispose', () {
+    test('repeated dispose for the same uid is a no-op', () async {
+      const uid = 'user-idempotent';
+      when(() => messaging.getToken()).thenAnswer((_) async => 'tok-current');
+
+      await service.dispose(uid);
+      await service.dispose(uid);
+
+      verify(() => messaging.getToken()).called(1);
+      verify(() => repo.removeToken(uid, 'tok-current')).called(1);
+      verify(() => messaging.deleteToken()).called(1);
+    });
+
     // SCENARIO-648: dispose calls removeToken with the current token
     test(
       'SCENARIO-648: dispose calls removeToken with current token',
