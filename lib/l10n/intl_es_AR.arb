@@ -560,6 +560,10 @@
   "dashboardIniciaSesion": "Iniciá sesión para ver tus próximos turnos.",
   "dashboardCargando": "Cargando…",
   "dashboardErrorTurnos": "No pudimos cargar tus próximos turnos.",
+  "dashboardErrorResumen": "No pudimos cargar el resumen del día.",
+  "@dashboardErrorResumen": {
+    "description": "Error state of the trainer dashboard 'Resumen del día' card when the appointments stream fails, instead of silently showing 0/0/0."
+  },
   "dashboardSinTurnosProximos": "No tenés turnos próximos confirmados.",
   "dashboardNadieEntreno": "Nadie entrenó hoy todavía.",
   "athleteDetailSeguimientoEmpty": "Todavía no dejaste seguimiento de este alumno.",
