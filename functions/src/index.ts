@@ -23,6 +23,7 @@ export { notifyOnChatMessage } from "./notifications/notify-chat-message";
 export { notifyOnAppointment } from "./notifications/notify-appointment";
 export { notifyOnLinkChange } from "./notifications/notify-link-change";
 export { notifyOnFriendship } from "./notifications/notify-friendship";
+export { notifyOnReaction } from "./notifications/notify-reaction";
 export { maintainFollowCounters } from "./social/maintain-follow-counters";
 export { maintainReactionCounters } from "./social/maintain-reaction-counters";
 export { notifyOnReview } from "./notifications/notify-review";
