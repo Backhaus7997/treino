@@ -2766,10 +2766,7 @@ class AppL10nEs extends AppL10n {
 
   @override
   String dashboardAlertBannerSummary(
-    int vencidos,
-    int solicitudes,
-    int inactivos,
-  ) {
+      int vencidos, int solicitudes, int inactivos) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,
@@ -6049,10 +6046,7 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String dashboardAlertBannerSummary(
-    int vencidos,
-    int solicitudes,
-    int inactivos,
-  ) {
+      int vencidos, int solicitudes, int inactivos) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,

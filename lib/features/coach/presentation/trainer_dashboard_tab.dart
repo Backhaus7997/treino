@@ -302,10 +302,10 @@ class BellWithBadgeTestHarness extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _BellWithBadge(
-    badgeCount: badgeCount,
-    palette: AppPalette.of(context),
-    onTap: onTap,
-  );
+        badgeCount: badgeCount,
+        palette: AppPalette.of(context),
+        onTap: onTap,
+      );
 }
 
 class _AvatarInitials extends StatelessWidget {
@@ -549,9 +549,7 @@ class _DejarFeedbackSheetState extends ConsumerState<_DejarFeedbackSheet> {
     });
 
     try {
-      await ref
-          .read(followUpEntryRepositoryProvider)
-          .add(
+      await ref.read(followUpEntryRepositoryProvider).add(
             trainerId: trainerId,
             athleteId: _athleteId!,
             text: text,
@@ -679,9 +677,8 @@ class _DejarFeedbackSheetState extends ConsumerState<_DejarFeedbackSheet> {
                 child: FilledButton(
                   // Disabled on empty text — an empty FollowUpEntry is noise
                   // in the athlete's history, not a saved note.
-                  onPressed: _saving || _controller.text.trim().isEmpty
-                      ? null
-                      : _save,
+                  onPressed:
+                      _saving || _controller.text.trim().isEmpty ? null : _save,
                   style: FilledButton.styleFrom(
                     backgroundColor: palette.accent,
                     foregroundColor: palette.bg,
@@ -1198,15 +1195,14 @@ class _ProximasSesionesList extends ConsumerWidget {
         // QA-HOME-001: startsAt is Argentina wall-clock; compare against ART
         // wall-clock "now" so the next few hours aren't dropped.
         final now = argentinaNow();
-        final upcoming =
-            all
-                .where(
-                  (a) =>
-                      a.status == AppointmentStatus.confirmed &&
-                      a.startsAt.isAfter(now),
-                )
-                .toList()
-              ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
+        final upcoming = all
+            .where(
+              (a) =>
+                  a.status == AppointmentStatus.confirmed &&
+                  a.startsAt.isAfter(now),
+            )
+            .toList()
+          ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
         final next3 = upcoming.take(3).toList();
 
         if (next3.isEmpty) {
@@ -1686,11 +1682,11 @@ class _CobroPendienteRow extends ConsumerWidget {
   final CobroPendiente cobro;
 
   static String _cadenceLabel(AppL10n l10n, BillingCadence c) => switch (c) {
-    BillingCadence.mensual => l10n.dashboardCadenceMensual,
-    BillingCadence.semanal => l10n.dashboardCadenceSemanal,
-    BillingCadence.porSesion => l10n.dashboardCadencePorSesion,
-    BillingCadence.suelto => l10n.dashboardCadenceSuelto,
-  };
+        BillingCadence.mensual => l10n.dashboardCadenceMensual,
+        BillingCadence.semanal => l10n.dashboardCadenceSemanal,
+        BillingCadence.porSesion => l10n.dashboardCadencePorSesion,
+        BillingCadence.suelto => l10n.dashboardCadenceSuelto,
+      };
 
   static String _formatAmount(int amount) {
     // Thousands separator for ARS amounts
@@ -2199,9 +2195,7 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
               59,
               59,
             ).add(argentinaUtcOffset);
-      await ref
-          .read(paymentRepositoryProvider)
-          .add(
+      await ref.read(paymentRepositoryProvider).add(
             Payment(
               id: '',
               trainerId: widget.trainerId,
