@@ -672,6 +672,36 @@
       }
     }
   },
+  "a11yRankingRowButton": "View {name}'s profile",
+  "@a11yRankingRowButton": {
+    "description": "Semantics label for a leaderboard row in gym rankings. The row is a button that opens that athlete's public profile. Describes the ACTION, not the visuals — the row shows rank, name and metric, so reusing an avatar label would announce something the row is not.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "a11yReactionStrong": "Strength",
+  "@a11yReactionStrong": {
+    "description": "Localized accessible name for the strength reaction in a feed post's reaction row."
+  },
+  "a11yReactionFire": "Fire",
+  "@a11yReactionFire": {
+    "description": "Localized accessible name for the fire reaction in a feed post's reaction row."
+  },
+  "a11yReactionClap": "Applause",
+  "@a11yReactionClap": {
+    "description": "Localized accessible name for the applause reaction in a feed post's reaction row."
+  },
+  "a11yReactionCount": "{count, plural, =0{no reactions} =1{1 reaction} other{{count} reactions}}",
+  "@a11yReactionCount": {
+    "description": "Localized reaction count announced after the reaction name in a feed post's reaction row.",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
   "a11yAvatarLabelGeneric": "Profile photo",
   "a11yHomeAvatarButton": "View your profile",
   "homePendingRequestsA11y": "{count} pending requests",
@@ -1136,5 +1166,27 @@
   "templateRatingSheetCancel": "CANCEL",
   "templateRatingSheetSubmit": "SUBMIT",
   "templateRatingSheetSuccess": "Thanks for rating!",
-  "templateRatingSheetError": "We couldn't save your rating."
+  "templateRatingSheetError": "We couldn't save your rating.",
+  "postPrivacySelectorTitle": "VISIBILITY",
+  "postPrivacyFriends": "FRIENDS",
+  "postPrivacyGym": "MY GYM",
+  "postPrivacyPublic": "PUBLIC",
+  "postPrivacyNoGymHint": "Join a gym to post here",
+  "suggestedUsersTitle": "PEOPLE FROM YOUR GYM",
+  "@suggestedUsersTitle": {
+    "description": "Section heading for same-gym people suggested below the empty Friends feed."
+  },
+  "suggestedUserAnonymous": "Anonymous",
+  "@suggestedUserAnonymous": {
+    "description": "Fallback display name for a suggested public profile without a name."
+  },
+  "a11ySuggestedUserButton": "View {name}'s profile",
+  "@a11ySuggestedUserButton": {
+    "description": "Semantics label for a suggested-user row that opens that person's public profile.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  }
 }

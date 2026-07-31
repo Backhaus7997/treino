@@ -43,6 +43,12 @@ class TreinoIcon {
   static const IconData clock = PhosphorIconsRegular.clock;
   static const IconData timer = PhosphorIconsRegular.timer;
 
+  // Métricas de sesión (resumen post-entreno). Alias semánticos: el ícono de
+  // PR es un trofeo igual que [ranking], pero un récord personal no es un
+  // ranking — nombrarlos distinto evita que el call site mienta.
+  static const IconData statSets = PhosphorIconsRegular.rows;
+  static const IconData statPr = PhosphorIconsRegular.trophy;
+
   // Comparación mes-a-mes (Monthly Report summary cards).
   static const IconData trendUp = PhosphorIconsRegular.trendUp;
   static const IconData trendDown = PhosphorIconsRegular.trendDown;
@@ -90,6 +96,9 @@ class TreinoIcon {
   static const IconData chevronRight = PhosphorIconsRegular.caretRight;
   static const IconData chevronDown = PhosphorIconsRegular.caretDown;
   static const IconData chevronUp = PhosphorIconsRegular.caretUp;
+  static const IconData reactionStrong = PhosphorIconsRegular.barbell;
+  static const IconData reactionFire = PhosphorIconsRegular.flame;
+  static const IconData reactionClap = PhosphorIconsRegular.handsClapping;
   // Hamburger clásico (3 líneas) — toggle de sidebar/menú.
   static const IconData menu = PhosphorIconsRegular.list;
 

@@ -3482,6 +3482,36 @@ abstract class AppL10n {
   /// **'Foto de perfil de {name}'**
   String a11yAvatarLabel(String name);
 
+  /// Semantics label for a leaderboard row in gym rankings. The row is a button that opens that athlete's public profile. Describes the ACTION, not the visuals — the row shows rank, name and metric, so reusing an avatar label would announce something the row is not.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver el perfil de {name}'**
+  String a11yRankingRowButton(String name);
+
+  /// Localized accessible name for the strength reaction in a feed post's reaction row.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Fuerza'**
+  String get a11yReactionStrong;
+
+  /// Localized accessible name for the fire reaction in a feed post's reaction row.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Fuego'**
+  String get a11yReactionFire;
+
+  /// Localized accessible name for the applause reaction in a feed post's reaction row.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Aplausos'**
+  String get a11yReactionClap;
+
+  /// Localized reaction count announced after the reaction name in a feed post's reaction row.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =0{sin reacciones} =1{1 reacción} other{{count} reacciones}}'**
+  String a11yReactionCount(num count);
+
   /// Non-parametric avatar Semantics label used when the display name is unavailable/null (findings 4,6,7,16,18,19).
   ///
   /// In es_AR, this message translates to:
@@ -5714,6 +5744,54 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'hace {count} {count, plural, =1{mes} other{meses}}'**
   String reviewTileDateMonthsAgo(int count);
+
+  /// Section label above the privacy pills in the shared PostPrivacySelector, used by the manual post composer and the share-workout composer.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VISIBILIDAD'**
+  String get postPrivacySelectorTitle;
+
+  /// PostPrivacySelector pill for posts visible only to the author's friends. Doubles as the pill's Semantics label.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'AMIGOS'**
+  String get postPrivacyFriends;
+
+  /// PostPrivacySelector pill for posts visible to the author's gym. Disabled when the athlete has no gym.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MI GYM'**
+  String get postPrivacyGym;
+
+  /// PostPrivacySelector pill for posts visible to everyone.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PÚBLICO'**
+  String get postPrivacyPublic;
+
+  /// Hint shown under the PostPrivacySelector pills when the athlete has no gym, explaining why MI GYM is disabled.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Asociate a un gym para postear acá'**
+  String get postPrivacyNoGymHint;
+
+  /// Section heading for same-gym people suggested below the empty Friends feed.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PERSONAS DE TU GYM'**
+  String get suggestedUsersTitle;
+
+  /// Fallback display name for a suggested public profile without a name.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Anónimo'**
+  String get suggestedUserAnonymous;
+
+  /// Semantics label for a suggested-user row that opens that person's public profile.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver el perfil de {name}'**
+  String a11ySuggestedUserButton(String name);
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

@@ -241,6 +241,36 @@
       }
     }
   },
+  "a11yRankingRowButton": "Ver el perfil de {name}",
+  "@a11yRankingRowButton": {
+    "description": "Semantics label for a leaderboard row in gym rankings. The row is a button that opens that athlete's public profile. Describes the ACTION, not the visuals — the row shows rank, name and metric, so reusing an avatar label would announce something the row is not.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "a11yReactionStrong": "Fuerza",
+  "@a11yReactionStrong": {
+    "description": "Localized accessible name for the strength reaction in a feed post's reaction row."
+  },
+  "a11yReactionFire": "Fuego",
+  "@a11yReactionFire": {
+    "description": "Localized accessible name for the fire reaction in a feed post's reaction row."
+  },
+  "a11yReactionClap": "Aplausos",
+  "@a11yReactionClap": {
+    "description": "Localized accessible name for the applause reaction in a feed post's reaction row."
+  },
+  "a11yReactionCount": "{count, plural, =0{sin reacciones} =1{1 reacción} other{{count} reacciones}}",
+  "@a11yReactionCount": {
+    "description": "Localized reaction count announced after the reaction name in a feed post's reaction row.",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
   "a11yAvatarLabelGeneric": "Foto de perfil",
   "a11yHomeAvatarButton": "Ver tu perfil",
   "homePendingRequestsA11y": "{count} solicitudes pendientes",
@@ -741,5 +771,27 @@
   "templateRatingSheetCancel": "CANCELAR",
   "templateRatingSheetSubmit": "ENVIAR",
   "templateRatingSheetSuccess": "¡Gracias por calificar!",
-  "templateRatingSheetError": "No pudimos guardar tu calificación."
+  "templateRatingSheetError": "No pudimos guardar tu calificación.",
+  "postPrivacySelectorTitle": "VISIBILIDAD",
+  "postPrivacyFriends": "AMIGOS",
+  "postPrivacyGym": "MI GYM",
+  "postPrivacyPublic": "PÚBLICO",
+  "postPrivacyNoGymHint": "Asociate a un gym para postear acá",
+  "suggestedUsersTitle": "PERSONAS DE TU GYM",
+  "@suggestedUsersTitle": {
+    "description": "Section heading for same-gym people suggested below the empty Friends feed."
+  },
+  "suggestedUserAnonymous": "Anónimo",
+  "@suggestedUserAnonymous": {
+    "description": "Fallback display name for a suggested public profile without a name."
+  },
+  "a11ySuggestedUserButton": "Ver el perfil de {name}",
+  "@a11ySuggestedUserButton": {
+    "description": "Semantics label for a suggested-user row that opens that person's public profile.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  }
 }

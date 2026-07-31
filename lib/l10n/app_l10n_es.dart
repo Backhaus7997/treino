@@ -1884,6 +1884,32 @@ class AppL10nEs extends AppL10n {
   }
 
   @override
+  String a11yRankingRowButton(String name) {
+    return 'Ver el perfil de $name';
+  }
+
+  @override
+  String get a11yReactionStrong => 'Fuerza';
+
+  @override
+  String get a11yReactionFire => 'Fuego';
+
+  @override
+  String get a11yReactionClap => 'Aplausos';
+
+  @override
+  String a11yReactionCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count reacciones',
+      one: '1 reacción',
+      zero: 'sin reacciones',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get a11yAvatarLabelGeneric => 'Foto de perfil';
 
   @override
@@ -3193,6 +3219,32 @@ class AppL10nEs extends AppL10n {
       one: 'mes',
     );
     return 'hace $count $_temp0';
+  }
+
+  @override
+  String get postPrivacySelectorTitle => 'VISIBILIDAD';
+
+  @override
+  String get postPrivacyFriends => 'AMIGOS';
+
+  @override
+  String get postPrivacyGym => 'MI GYM';
+
+  @override
+  String get postPrivacyPublic => 'PÚBLICO';
+
+  @override
+  String get postPrivacyNoGymHint => 'Asociate a un gym para postear acá';
+
+  @override
+  String get suggestedUsersTitle => 'PERSONAS DE TU GYM';
+
+  @override
+  String get suggestedUserAnonymous => 'Anónimo';
+
+  @override
+  String a11ySuggestedUserButton(String name) {
+    return 'Ver el perfil de $name';
   }
 }
 
@@ -5078,6 +5130,32 @@ class AppL10nEsAr extends AppL10nEs {
   }
 
   @override
+  String a11yRankingRowButton(String name) {
+    return 'Ver el perfil de $name';
+  }
+
+  @override
+  String get a11yReactionStrong => 'Fuerza';
+
+  @override
+  String get a11yReactionFire => 'Fuego';
+
+  @override
+  String get a11yReactionClap => 'Aplausos';
+
+  @override
+  String a11yReactionCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count reacciones',
+      one: '1 reacción',
+      zero: 'sin reacciones',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get a11yAvatarLabelGeneric => 'Foto de perfil';
 
   @override
@@ -6382,5 +6460,31 @@ class AppL10nEsAr extends AppL10nEs {
       one: 'mes',
     );
     return 'hace $count $_temp0';
+  }
+
+  @override
+  String get postPrivacySelectorTitle => 'VISIBILIDAD';
+
+  @override
+  String get postPrivacyFriends => 'AMIGOS';
+
+  @override
+  String get postPrivacyGym => 'MI GYM';
+
+  @override
+  String get postPrivacyPublic => 'PÚBLICO';
+
+  @override
+  String get postPrivacyNoGymHint => 'Asociate a un gym para postear acá';
+
+  @override
+  String get suggestedUsersTitle => 'PERSONAS DE TU GYM';
+
+  @override
+  String get suggestedUserAnonymous => 'Anónimo';
+
+  @override
+  String a11ySuggestedUserButton(String name) {
+    return 'Ver el perfil de $name';
   }
 }

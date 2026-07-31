@@ -1833,6 +1833,32 @@ class AppL10nEn extends AppL10n {
   }
 
   @override
+  String a11yRankingRowButton(String name) {
+    return 'View $name\'s profile';
+  }
+
+  @override
+  String get a11yReactionStrong => 'Strength';
+
+  @override
+  String get a11yReactionFire => 'Fire';
+
+  @override
+  String get a11yReactionClap => 'Applause';
+
+  @override
+  String a11yReactionCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count reactions',
+      one: '1 reaction',
+      zero: 'no reactions',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get a11yAvatarLabelGeneric => 'Profile photo';
 
   @override
@@ -3132,5 +3158,31 @@ class AppL10nEn extends AppL10n {
       one: '1 month',
     );
     return '$_temp0 ago';
+  }
+
+  @override
+  String get postPrivacySelectorTitle => 'VISIBILITY';
+
+  @override
+  String get postPrivacyFriends => 'FRIENDS';
+
+  @override
+  String get postPrivacyGym => 'MY GYM';
+
+  @override
+  String get postPrivacyPublic => 'PUBLIC';
+
+  @override
+  String get postPrivacyNoGymHint => 'Join a gym to post here';
+
+  @override
+  String get suggestedUsersTitle => 'PEOPLE FROM YOUR GYM';
+
+  @override
+  String get suggestedUserAnonymous => 'Anonymous';
+
+  @override
+  String a11ySuggestedUserButton(String name) {
+    return 'View $name\'s profile';
   }
 }
