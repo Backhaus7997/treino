@@ -70,11 +70,13 @@ export async function notifyOnReviewHandler(
     app,
     {
       uids: [trainerId],
+      kind: "review",
       notification: {
         title: "Nueva reseña", // i18n: Fase 6 Etapa 2
         body,
       },
       data: { deepLink },
+      actorUid: athleteId,
     },
     messaging,
   );

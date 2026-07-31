@@ -180,6 +180,7 @@ describe("notifyOnReactionHandler — integration", () => {
       deepLink: "/feed",
       postId,
       actorUid: reactorUid,
+      kind: "reaction",
     });
   });
 

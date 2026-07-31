@@ -237,7 +237,7 @@ describe("notifyOnFriendshipHandler — integration", () => {
       "Alicia te envió una solicitud de seguidor",
     );
     expect(callArg.data?.deepLink).toBe(`/feed/profile/${alice}`);
-    expect(callArg.data?.kind).toBe("request-received");
+    expect(callArg.data?.kind).toBe("friend-request");
   });
 
   it("create accepted (auto) → sends to target with 'empezó a seguirte'", async () => {
@@ -249,7 +249,7 @@ describe("notifyOnFriendshipHandler — integration", () => {
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
     expect(callArg.tokens).toContain("bob-token");
     expect(callArg.notification?.body).toBe("Alicia empezó a seguirte");
-    expect(callArg.data?.kind).toBe("auto-followed");
+    expect(callArg.data?.kind).toBe("friend-follow");
   });
 
   it("pending → accepted → sends to requester (alice) with 'aceptó tu solicitud'", async () => {
@@ -264,7 +264,7 @@ describe("notifyOnFriendshipHandler — integration", () => {
     expect(callArg.tokens).not.toContain("bob-token");
     expect(callArg.notification?.body).toBe("Bruno aceptó tu solicitud");
     expect(callArg.data?.deepLink).toBe(`/feed/profile/${bob}`);
-    expect(callArg.data?.kind).toBe("request-accepted");
+    expect(callArg.data?.kind).toBe("friend-accepted");
   });
 
   it("delete (after undefined) → sendFcm NOT called", async () => {

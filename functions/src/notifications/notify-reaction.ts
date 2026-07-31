@@ -161,6 +161,7 @@ export async function notifyOnReactionHandler(
     app,
     {
       uids: [notification.recipientUid],
+      kind: "reaction",
       notification: {
         title: notification.title,
         body: notification.body,
@@ -170,6 +171,7 @@ export async function notifyOnReactionHandler(
         postId: notification.postId,
         actorUid: notification.actorUid,
       },
+      actorUid: notification.actorUid,
     },
     messaging,
   );

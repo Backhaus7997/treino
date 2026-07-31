@@ -87,15 +87,18 @@ export async function notifyOnLinkChangeHandler(
   let recipientUids: string[];
   let title: string;
   let body: string;
+  let actorUid: string | undefined;
 
   if (afterStatus === "pending") {
     // New link request → notify trainer.
     recipientUids = [trainerId];
+    actorUid = athleteId;
     title = "Nueva solicitud de vinculación"; // i18n: Fase 6 Etapa 2
     body = "Un atleta quiere vincularse contigo."; // i18n: Fase 6 Etapa 2
   } else if (afterStatus === "active") {
     // pending → active = accept; paused → active = resume.
     recipientUids = [athleteId];
+    actorUid = trainerId;
     if (beforeStatus === "paused") {
       title = "Vinculación reanudada"; // i18n: Fase 6 Etapa 3
       body = "Tu PF reanudó el vínculo."; // i18n: Fase 6 Etapa 3
@@ -106,6 +109,7 @@ export async function notifyOnLinkChangeHandler(
   } else if (afterStatus === "paused") {
     // active → paused → notify athlete.
     recipientUids = [athleteId];
+    actorUid = trainerId;
     title = "Vinculación pausada"; // i18n: Fase 6 Etapa 3
     body = "Tu PF pausó el vínculo."; // i18n: Fase 6 Etapa 3
   } else if (afterStatus === "terminated") {
@@ -125,8 +129,10 @@ export async function notifyOnLinkChangeHandler(
     app,
     {
       uids: recipientUids,
+      kind: "link-change",
       notification: { title, body },
       data: { deepLink },
+      actorUid,
     },
     messaging,
   );

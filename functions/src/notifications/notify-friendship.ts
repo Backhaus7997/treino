@@ -42,6 +42,7 @@ import * as admin from "firebase-admin";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 import { sendFcm } from "./send-fcm";
+import type { NotificationKind } from "./send-fcm";
 
 function getApp(): admin.app.App {
   try {
@@ -136,12 +137,12 @@ export function buildFriendshipCopy(
   displayName: string,
 ): string {
   switch (kind) {
-    case "request-received":
-      return `${displayName} te envió una solicitud de seguidor`; // i18n: Fase W3
-    case "auto-followed":
-      return `${displayName} empezó a seguirte`; // i18n: Fase W3
-    case "request-accepted":
-      return `${displayName} aceptó tu solicitud`; // i18n: Fase W3
+  case "request-received":
+    return `${displayName} te envió una solicitud de seguidor`; // i18n: Fase W3
+  case "auto-followed":
+    return `${displayName} empezó a seguirte`; // i18n: Fase W3
+  case "request-accepted":
+    return `${displayName} aceptó tu solicitud`; // i18n: Fase W3
   }
 }
 
@@ -176,20 +177,27 @@ export async function notifyOnFriendshipHandler(
   // profile screen (`/feed/profile/:uid`). A bare `/profile/:uid` would
   // 404 and fall back to the general router fallback (`/coach`).
   const deepLink = `/feed/profile/${notif.actorUid}`;
+  const historyKind: NotificationKind =
+    notif.kind === "request-received"
+      ? "friend-request"
+      : notif.kind === "auto-followed"
+        ? "friend-follow"
+        : "friend-accepted";
 
   await sendFcm(
     app,
     {
       uids: [notif.recipientUid],
+      kind: historyKind,
       notification: {
         title: "TREINO", // i18n: Fase W3
         body,
       },
       data: {
         deepLink,
-        kind: notif.kind,
         actorUid: notif.actorUid,
       },
+      actorUid: notif.actorUid,
     },
     messaging,
   );

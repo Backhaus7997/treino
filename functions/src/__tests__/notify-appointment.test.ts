@@ -88,6 +88,7 @@ describe("SCENARIO-632: new appointment status=requested → notify trainer", ()
     // QA-NOT-002: el trainer va a SU agenda (ruta role-aware), no al host de
     // atleta /coach/agenda que le mostraba "Necesitás un vínculo con un PF".
     expect(callArg.data?.deepLink).toBe("/coach?tab=agenda");
+    expect(callArg.data?.kind).toBe("appointment");
   });
 });
 

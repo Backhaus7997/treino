@@ -74,10 +74,27 @@ service cloud.firestore {
                     && request.resource.data.createdAt == resource.data.createdAt
                     // subscription/weightedLoad: CF-write-only (paywall Fase 7).
                     && request.resource.data.get('subscription', null) == resource.data.get('subscription', null)
-                    && request.resource.data.get('weightedLoad', null) == resource.data.get('weightedLoad', null);
+                    && request.resource.data.get('weightedLoad', null) == resource.data.get('weightedLoad', null)
+                    // Notification inbox read cursor: owner-writeable, timestamp-only.
+                    && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['notificationsLastSeenAt'])
+                        || request.resource.data.notificationsLastSeenAt is timestamp);
 
       // Delete denied — account deletion goes through privileged Cloud Function.
       allow delete: if false;
+
+      match /notifications/{notificationId} {
+        // History is private to the owning user.
+        allow read: if request.auth != null
+                    && request.auth.uid == uid;
+
+        // Only notification Cloud Functions may create or mutate history.
+        // Admin SDK writes bypass Firestore Security Rules.
+        allow create, update: if false;
+
+        // Owners may remove individual history entries.
+        allow delete: if request.auth != null
+                      && request.auth.uid == uid;
+      }
     }
 
     match /exercises/{exerciseId} {

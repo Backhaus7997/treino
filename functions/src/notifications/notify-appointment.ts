@@ -85,10 +85,12 @@ export async function notifyOnAppointmentHandler(
   let title: string;
   let body: string;
   let deepLink: string;
+  let actorUid: string | undefined;
 
   if (afterStatus === "requested") {
     // New appointment request → notify trainer.
     recipientUids = [trainerId];
+    actorUid = athleteId;
     title = "Nueva solicitud de sesión"; // i18n: Fase 6 Etapa 2
     body = "Un atleta solicitó una sesión contigo."; // i18n: Fase 6 Etapa 2
     // QA-NOT-002: "/coach/agenda" monta el host de ATLETA (resuelve el vínculo
@@ -99,6 +101,7 @@ export async function notifyOnAppointmentHandler(
   } else if (afterStatus === "confirmed") {
     // Appointment confirmed → notify athlete.
     recipientUids = [athleteId];
+    actorUid = trainerId;
     title = "Sesión confirmada"; // i18n: Fase 6 Etapa 2
     body = "Tu entrenador confirmó la sesión."; // i18n: Fase 6 Etapa 2
     deepLink = "/coach?tab=agenda";
@@ -107,6 +110,7 @@ export async function notifyOnAppointmentHandler(
     // TODO(cancelledBy): when `cancelledBy` field lands on the appointments schema,
     // notify only the OTHER party. For now, defaults to both.
     const cancelledBy = after.cancelledBy as string | undefined;
+    actorUid = cancelledBy;
     if (cancelledBy) {
       // Notify the other party only.
       recipientUids = cancelledBy === trainerId ? [athleteId] : [trainerId];
@@ -129,8 +133,10 @@ export async function notifyOnAppointmentHandler(
     app,
     {
       uids: recipientUids,
+      kind: "appointment",
       notification: { title, body },
       data: { deepLink },
+      actorUid,
     },
     messaging,
   );
