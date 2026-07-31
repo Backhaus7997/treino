@@ -985,6 +985,7 @@
   "athleteDetailSeguimientoEmpty": "You haven't logged any follow-up for this athlete yet.",
   "athleteDetailSeguimientoLoadError": "We couldn't load the follow-up log.",
   "a11yDashboardAvatarButton": "Edit your professional profile",
+  "dashboardErrorResumen": "We couldn't load the day summary.",
   "dashboardSolicitudesPendientesEmpty": "You have no pending requests.",
   "dashboardFeedbackSheetTitle": "Leave feedback",
   "dashboardFeedbackPickAthlete": "Who do you want to leave feedback for?",

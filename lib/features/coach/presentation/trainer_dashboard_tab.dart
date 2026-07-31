@@ -60,7 +60,11 @@ class TrainerDashboardTab extends ConsumerWidget {
       // floating bar's height must be added back — otherwise the last row
       // (CTA buttons) can never scroll out from behind the translucent bar.
       padding: EdgeInsets.fromLTRB(
-          20, 14, 20, 24 + MediaQuery.paddingOf(context).bottom),
+        20,
+        14,
+        20,
+        24 + MediaQuery.paddingOf(context).bottom,
+      ),
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
         const _DashboardHeader(),
@@ -138,8 +142,9 @@ class _DashboardHeader extends ConsumerWidget {
               child: Text(
                 firstName.isEmpty
                     ? AppL10n.of(context).dashboardHolaSinNombre
-                    : AppL10n.of(context)
-                        .dashboardHolaConNombre(firstName.toUpperCase()),
+                    : AppL10n.of(
+                        context,
+                      ).dashboardHolaConNombre(firstName.toUpperCase()),
                 style: GoogleFonts.barlowCondensed(
                   fontWeight: FontWeight.w700,
                   fontSize: 28,
@@ -189,8 +194,10 @@ class _DashboardHeader extends ConsumerWidget {
                 // The avatar itself is 36px — under the 44pt minimum touch
                 // target. `opaque` makes the whole padded box tappable.
                 child: ConstrainedBox(
-                  constraints:
-                      const BoxConstraints(minWidth: 44, minHeight: 44),
+                  constraints: const BoxConstraints(
+                    minWidth: 44,
+                    minHeight: 44,
+                  ),
                   child: Center(
                     child: _AvatarInitials(
                       initials: initials.isEmpty ? '·' : initials,
@@ -251,8 +258,10 @@ class _BellWithBadge extends StatelessWidget {
                   right: -4,
                   top: -4,
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 1,
+                    ),
                     decoration: BoxDecoration(
                       color: palette.accent,
                       borderRadius: BorderRadius.circular(9999),
@@ -293,10 +302,10 @@ class BellWithBadgeTestHarness extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _BellWithBadge(
-        badgeCount: badgeCount,
-        palette: AppPalette.of(context),
-        onTap: onTap,
-      );
+    badgeCount: badgeCount,
+    palette: AppPalette.of(context),
+    onTap: onTap,
+  );
 }
 
 class _AvatarInitials extends StatelessWidget {
@@ -352,8 +361,9 @@ class _PendingRequestCardState extends ConsumerState<_PendingRequestCard> {
   // mounted porque corre después del await.
   void _showError(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _decline() async {
@@ -385,8 +395,9 @@ class _PendingRequestCardState extends ConsumerState<_PendingRequestCard> {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    final profileAsync =
-        ref.watch(userPublicProfileProvider(widget.link.athleteId));
+    final profileAsync = ref.watch(
+      userPublicProfileProvider(widget.link.athleteId),
+    );
     final name =
         profileAsync.valueOrNull?.displayName ?? l10n.dashboardAlumnoFallback;
     final initials = _initials(name);
@@ -538,7 +549,9 @@ class _DejarFeedbackSheetState extends ConsumerState<_DejarFeedbackSheet> {
     });
 
     try {
-      await ref.read(followUpEntryRepositoryProvider).add(
+      await ref
+          .read(followUpEntryRepositoryProvider)
+          .add(
             trainerId: trainerId,
             athleteId: _athleteId!,
             text: text,
@@ -592,8 +605,11 @@ class _DejarFeedbackSheetState extends ConsumerState<_DejarFeedbackSheet> {
                     behavior: HitTestBehavior.opaque,
                     child: Padding(
                       padding: const EdgeInsets.only(right: 10),
-                      child: Icon(TreinoIcon.back,
-                          size: 20, color: palette.textPrimary),
+                      child: Icon(
+                        TreinoIcon.back,
+                        size: 20,
+                        color: palette.textPrimary,
+                      ),
                     ),
                   ),
                 Expanded(
@@ -626,11 +642,15 @@ class _DejarFeedbackSheetState extends ConsumerState<_DejarFeedbackSheet> {
                 enabled: !_saving,
                 onChanged: (_) => setState(() {}),
                 style: GoogleFonts.barlow(
-                    fontSize: 14, color: palette.textPrimary),
+                  fontSize: 14,
+                  color: palette.textPrimary,
+                ),
                 decoration: InputDecoration(
                   hintText: l10n.dashboardFeedbackComposerHint,
                   hintStyle: GoogleFonts.barlow(
-                      fontSize: 14, color: palette.textMuted),
+                    fontSize: 14,
+                    color: palette.textMuted,
+                  ),
                   filled: true,
                   fillColor: palette.bg,
                   border: OutlineInputBorder(
@@ -647,8 +667,10 @@ class _DejarFeedbackSheetState extends ConsumerState<_DejarFeedbackSheet> {
                 const SizedBox(height: 10),
                 Text(
                   l10n.dashboardFeedbackSaveError,
-                  style:
-                      GoogleFonts.barlow(fontSize: 13, color: palette.danger),
+                  style: GoogleFonts.barlow(
+                    fontSize: 13,
+                    color: palette.danger,
+                  ),
                 ),
               ],
               const SizedBox(height: 16),
@@ -657,8 +679,9 @@ class _DejarFeedbackSheetState extends ConsumerState<_DejarFeedbackSheet> {
                 child: FilledButton(
                   // Disabled on empty text — an empty FollowUpEntry is noise
                   // in the athlete's history, not a saved note.
-                  onPressed:
-                      _saving || _controller.text.trim().isEmpty ? null : _save,
+                  onPressed: _saving || _controller.text.trim().isEmpty
+                      ? null
+                      : _save,
                   style: FilledButton.styleFrom(
                     backgroundColor: palette.accent,
                     foregroundColor: palette.bg,
@@ -706,17 +729,23 @@ class _FeedbackAthletePicker extends ConsumerWidget {
 
     if (todayAsync.isLoading && !todayAsync.hasValue) {
       return _PlaceholderCard(
-          palette: palette, message: l10n.dashboardCargando);
+        palette: palette,
+        message: l10n.dashboardCargando,
+      );
     }
     if (todayAsync.hasError && !todayAsync.hasValue) {
       return _PlaceholderCard(
-          palette: palette, message: l10n.dashboardErrorActividad);
+        palette: palette,
+        message: l10n.dashboardErrorActividad,
+      );
     }
 
     final entries = todayAsync.valueOrNull ?? const <TrainedTodayEntry>[];
     if (entries.isEmpty) {
       return _PlaceholderCard(
-          palette: palette, message: l10n.dashboardNadieEntreno);
+        palette: palette,
+        message: l10n.dashboardNadieEntreno,
+      );
     }
 
     return Column(
@@ -735,10 +764,8 @@ class _FeedbackAthletePicker extends ConsumerWidget {
             shrinkWrap: true,
             itemCount: entries.length,
             separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (_, i) => _FeedbackAthleteTile(
-              entry: entries[i],
-              onPick: onPick,
-            ),
+            itemBuilder: (_, i) =>
+                _FeedbackAthleteTile(entry: entries[i], onPick: onPick),
           ),
         ),
       ],
@@ -924,19 +951,42 @@ class _ResumenDelDiaCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final trainerId = ref.watch(currentUidProvider) ?? '';
     final apptAsync = trainerId.isEmpty
         ? const AsyncValue<List<Appointment>>.data(<Appointment>[])
         : ref.watch(
-            trainerAppointmentsStreamProvider(_appointmentsKey(trainerId)));
+            trainerAppointmentsStreamProvider(_appointmentsKey(trainerId)),
+          );
 
-    final all = apptAsync.valueOrNull ?? const <Appointment>[];
-    // QA-HOME-001: startsAt is Argentina wall-clock, so "now" must be too.
-    final now = argentinaNow();
-    final counts = dashboardDayCounts(all, now);
-    final pending = counts.pending;
-    final done = counts.done;
-    final cancelled = counts.cancelled;
+    // Distinguir loading/error de un día genuinamente en cero (QA H3): antes
+    // `apptAsync.valueOrNull ?? []` colapsaba AMBOS a 0/0/0, así que un
+    // permission-denied (p.ej. App Check no registrado) se leía como
+    // "0 pendientes, 0 hechas, 0 canceladas" — un día tranquilo, no un fallo.
+    // El hermano _ProximasSesionesList ya distinguía los estados con el mismo
+    // provider; esto lo empareja. Loading muestra "—"; error, un mensaje.
+    final Widget body = apptAsync.when(
+      loading: () =>
+          _statsRow(context, palette, pending: '—', done: '—', cancelled: '—'),
+      error: (_, __) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Text(
+          l10n.dashboardErrorResumen,
+          style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+        ),
+      ),
+      data: (all) {
+        // QA-HOME-001: startsAt is Argentina wall-clock, so "now" must be too.
+        final counts = dashboardDayCounts(all, argentinaNow());
+        return _statsRow(
+          context,
+          palette,
+          pending: '${counts.pending}',
+          done: '${counts.done}',
+          cancelled: '${counts.cancelled}',
+        );
+      },
+    );
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
@@ -949,7 +999,7 @@ class _ResumenDelDiaCard extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            AppL10n.of(context).dashboardResumenDelDiaTitle,
+            l10n.dashboardResumenDelDiaTitle,
             style: GoogleFonts.barlowCondensed(
               fontWeight: FontWeight.w700,
               fontSize: 11,
@@ -958,32 +1008,43 @@ class _ResumenDelDiaCard extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              _StatColumn(
-                value: '$pending',
-                label: AppL10n.of(context).dashboardStatPendientes,
-                color: palette.accent,
-                palette: palette,
-              ),
-              _Divider(palette: palette),
-              _StatColumn(
-                value: '$done',
-                label: AppL10n.of(context).dashboardStatCompletadas,
-                color: palette.textPrimary,
-                palette: palette,
-              ),
-              _Divider(palette: palette),
-              _StatColumn(
-                value: '$cancelled',
-                label: AppL10n.of(context).dashboardStatCanceladas,
-                color: palette.danger,
-                palette: palette,
-              ),
-            ],
-          ),
+          body,
         ],
       ),
+    );
+  }
+
+  Widget _statsRow(
+    BuildContext context,
+    AppPalette palette, {
+    required String pending,
+    required String done,
+    required String cancelled,
+  }) {
+    final l10n = AppL10n.of(context);
+    return Row(
+      children: [
+        _StatColumn(
+          value: pending,
+          label: l10n.dashboardStatPendientes,
+          color: palette.accent,
+          palette: palette,
+        ),
+        _Divider(palette: palette),
+        _StatColumn(
+          value: done,
+          label: l10n.dashboardStatCompletadas,
+          color: palette.textPrimary,
+          palette: palette,
+        ),
+        _Divider(palette: palette),
+        _StatColumn(
+          value: cancelled,
+          label: l10n.dashboardStatCanceladas,
+          color: palette.danger,
+          palette: palette,
+        ),
+      ],
     );
   }
 }
@@ -1118,16 +1179,17 @@ class _ProximasSesionesList extends ConsumerWidget {
     final trainerId = ref.watch(currentUidProvider) ?? '';
     if (trainerId.isEmpty) {
       return _PlaceholderCard(
-          palette: palette, message: l10n.dashboardIniciaSesion);
+        palette: palette,
+        message: l10n.dashboardIniciaSesion,
+      );
     }
-    final apptAsync = ref
-        .watch(trainerAppointmentsStreamProvider(_appointmentsKey(trainerId)));
+    final apptAsync = ref.watch(
+      trainerAppointmentsStreamProvider(_appointmentsKey(trainerId)),
+    );
 
     return apptAsync.when(
-      loading: () => _PlaceholderCard(
-        palette: palette,
-        message: l10n.dashboardCargando,
-      ),
+      loading: () =>
+          _PlaceholderCard(palette: palette, message: l10n.dashboardCargando),
       error: (_, __) => _PlaceholderCard(
         palette: palette,
         message: l10n.dashboardErrorTurnos,
@@ -1136,12 +1198,15 @@ class _ProximasSesionesList extends ConsumerWidget {
         // QA-HOME-001: startsAt is Argentina wall-clock; compare against ART
         // wall-clock "now" so the next few hours aren't dropped.
         final now = argentinaNow();
-        final upcoming = all
-            .where((a) =>
-                a.status == AppointmentStatus.confirmed &&
-                a.startsAt.isAfter(now))
-            .toList()
-          ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
+        final upcoming =
+            all
+                .where(
+                  (a) =>
+                      a.status == AppointmentStatus.confirmed &&
+                      a.startsAt.isAfter(now),
+                )
+                .toList()
+              ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
         final next3 = upcoming.take(3).toList();
 
         if (next3.isEmpty) {
@@ -1185,8 +1250,9 @@ class _ProximaSesionRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
-    final profileAsync =
-        ref.watch(userPublicProfileProvider(appointment.athleteId));
+    final profileAsync = ref.watch(
+      userPublicProfileProvider(appointment.athleteId),
+    );
     final athleteName =
         profileAsync.valueOrNull?.displayName ?? appointment.athleteDisplayName;
     final showName = _looksLikeUid(athleteName)
@@ -1274,7 +1340,9 @@ class _EntrenaronHoyList extends ConsumerWidget {
 
     if (todayAsync.isLoading && !todayAsync.hasValue) {
       return _PlaceholderCard(
-          palette: palette, message: l10n.dashboardCargando);
+        palette: palette,
+        message: l10n.dashboardCargando,
+      );
     }
     if (todayAsync.hasError && !todayAsync.hasValue) {
       return _PlaceholderCard(
@@ -1400,7 +1468,9 @@ class _ActividadRecienteList extends ConsumerWidget {
 
     if (activityAsync.isLoading && !activityAsync.hasValue) {
       return _PlaceholderCard(
-          palette: palette, message: l10n.dashboardCargando);
+        palette: palette,
+        message: l10n.dashboardCargando,
+      );
     }
     if (activityAsync.hasError && !activityAsync.hasValue) {
       return _PlaceholderCard(
@@ -1536,9 +1606,7 @@ class _PagosPorCobrarSection extends ConsumerWidget {
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
-        builder: (_) => _AddSueltoSheet(
-          trainerId: trainerId,
-        ),
+        builder: (_) => _AddSueltoSheet(trainerId: trainerId),
       );
     }
 
@@ -1569,7 +1637,9 @@ class _PagosPorCobrarList extends ConsumerWidget {
 
     if (cobrosAsync.isLoading && !cobrosAsync.hasValue) {
       return _PlaceholderCard(
-          palette: palette, message: l10n.dashboardCargando);
+        palette: palette,
+        message: l10n.dashboardCargando,
+      );
     }
     if (cobrosAsync.hasError && !cobrosAsync.hasValue) {
       return _PlaceholderCard(
@@ -1616,11 +1686,11 @@ class _CobroPendienteRow extends ConsumerWidget {
   final CobroPendiente cobro;
 
   static String _cadenceLabel(AppL10n l10n, BillingCadence c) => switch (c) {
-        BillingCadence.mensual => l10n.dashboardCadenceMensual,
-        BillingCadence.semanal => l10n.dashboardCadenceSemanal,
-        BillingCadence.porSesion => l10n.dashboardCadencePorSesion,
-        BillingCadence.suelto => l10n.dashboardCadenceSuelto,
-      };
+    BillingCadence.mensual => l10n.dashboardCadenceMensual,
+    BillingCadence.semanal => l10n.dashboardCadenceSemanal,
+    BillingCadence.porSesion => l10n.dashboardCadencePorSesion,
+    BillingCadence.suelto => l10n.dashboardCadenceSuelto,
+  };
 
   static String _formatAmount(int amount) {
     // Thousands separator for ARS amounts
@@ -1662,21 +1732,22 @@ class _CobroPendienteRow extends ConsumerWidget {
           ),
           content: Text(
             '${cobro.concept} — \$${_formatAmount(cobro.amountArs)}',
-            style: GoogleFonts.barlow(
-              fontSize: 14,
-              color: palette.textMuted,
-            ),
+            style: GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text(l10n.dashboardCancelarLabel,
-                  style: TextStyle(color: palette.textMuted)),
+              child: Text(
+                l10n.dashboardCancelarLabel,
+                style: TextStyle(color: palette.textMuted),
+              ),
             ),
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(true),
-              child: Text(l10n.dashboardCobradoLabel,
-                  style: TextStyle(color: palette.accent)),
+              child: Text(
+                l10n.dashboardCobradoLabel,
+                style: TextStyle(color: palette.accent),
+              ),
             ),
           ],
         ),
@@ -1697,29 +1768,33 @@ class _CobroPendienteRow extends ConsumerWidget {
             final periodKey = cobro.cadence == BillingCadence.mensual
                 ? '${now2.year}-${now2.month.toString().padLeft(2, '0')}'
                 : isoWeekPeriodKey(now2);
-            await repo.add(Payment(
-              id: '',
-              trainerId: trainerId,
-              athleteId: cobro.athleteId,
-              amountArs: cobro.amountArs,
-              concept: cobro.concept,
-              status: PaymentStatus.paid,
-              periodKey: periodKey,
-              createdAt: now,
-              paidAt: now,
-            ));
+            await repo.add(
+              Payment(
+                id: '',
+                trainerId: trainerId,
+                athleteId: cobro.athleteId,
+                amountArs: cobro.amountArs,
+                concept: cobro.concept,
+                status: PaymentStatus.paid,
+                periodKey: periodKey,
+                createdAt: now,
+                paidAt: now,
+              ),
+            );
 
           case BillingCadence.porSesion:
-            await repo.add(Payment(
-              id: '',
-              trainerId: trainerId,
-              athleteId: cobro.athleteId,
-              amountArs: cobro.amountArs,
-              concept: cobro.concept,
-              status: PaymentStatus.paid,
-              createdAt: now,
-              paidAt: now,
-            ));
+            await repo.add(
+              Payment(
+                id: '',
+                trainerId: trainerId,
+                athleteId: cobro.athleteId,
+                amountArs: cobro.amountArs,
+                concept: cobro.concept,
+                status: PaymentStatus.paid,
+                createdAt: now,
+                paidAt: now,
+              ),
+            );
 
           case BillingCadence.suelto:
             // Flip all pending one-off charges atomically: a mid-loop failure
@@ -1735,9 +1810,9 @@ class _CobroPendienteRow extends ConsumerWidget {
         }
       } catch (_) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.dashboardCobroError)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(l10n.dashboardCobroError)));
         }
       }
     }
@@ -1881,10 +1956,7 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
           if (activeLinks.isEmpty)
             Text(
               l10n.dashboardSinAlumnosActivos,
-              style: GoogleFonts.barlow(
-                fontSize: 13,
-                color: palette.textMuted,
-              ),
+              style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
             )
           else
             _AthleteDropdown(
@@ -1908,10 +1980,7 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
             controller: _amountController,
             keyboardType: TextInputType.number,
             inputFormatters: [ThousandsSeparatorInputFormatter()],
-            style: GoogleFonts.barlow(
-              fontSize: 14,
-              color: palette.textPrimary,
-            ),
+            style: GoogleFonts.barlow(fontSize: 14, color: palette.textPrimary),
             decoration: InputDecoration(
               hintText: l10n.dashboardMontoHint,
               hintStyle: GoogleFonts.barlow(
@@ -1947,10 +2016,7 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
           const SizedBox(height: 8),
           TextField(
             controller: _conceptController,
-            style: GoogleFonts.barlow(
-              fontSize: 14,
-              color: palette.textPrimary,
-            ),
+            style: GoogleFonts.barlow(fontSize: 14, color: palette.textPrimary),
             decoration: InputDecoration(
               hintText: l10n.dashboardConceptoHint,
               hintStyle: GoogleFonts.barlow(
@@ -2099,17 +2165,17 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
     final concept = _conceptController.text.trim();
 
     if (athleteId == null || amountText.isEmpty || concept.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.dashboardCompletaCampos)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.dashboardCompletaCampos)));
       return;
     }
 
     final amount = parseGroupedInt(amountText);
     if (amount == null || amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.dashboardMontoInvalido)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.dashboardMontoInvalido)));
       return;
     }
 
@@ -2125,18 +2191,28 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
       final dueDate = _dueDate;
       final dueAt = dueDate == null
           ? null
-          : DateTime.utc(dueDate.year, dueDate.month, dueDate.day, 23, 59, 59)
-              .add(argentinaUtcOffset);
-      await ref.read(paymentRepositoryProvider).add(Payment(
-            id: '',
-            trainerId: widget.trainerId,
-            athleteId: athleteId,
-            amountArs: amount,
-            concept: concept,
-            status: PaymentStatus.pending,
-            createdAt: now,
-            dueAt: dueAt,
-          ));
+          : DateTime.utc(
+              dueDate.year,
+              dueDate.month,
+              dueDate.day,
+              23,
+              59,
+              59,
+            ).add(argentinaUtcOffset);
+      await ref
+          .read(paymentRepositoryProvider)
+          .add(
+            Payment(
+              id: '',
+              trainerId: widget.trainerId,
+              athleteId: athleteId,
+              amountArs: amount,
+              concept: concept,
+              status: PaymentStatus.pending,
+              createdAt: now,
+              dueAt: dueAt,
+            ),
+          );
 
       if (mounted) {
         Navigator.of(context).pop();
@@ -2147,9 +2223,9 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
     } catch (_) {
       if (mounted) {
         setState(() => _saving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.dashboardGuardarError)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.dashboardGuardarError)));
       }
     }
   }
@@ -2210,8 +2286,9 @@ class _AthleteDropdown extends ConsumerWidget {
         ),
       ),
       items: links.map((link) {
-        final profileAsync =
-            ref.watch(userPublicProfileProvider(link.athleteId));
+        final profileAsync = ref.watch(
+          userPublicProfileProvider(link.athleteId),
+        );
         final rawName = profileAsync.valueOrNull?.displayName ?? '';
         final showName = rawName.isEmpty || _looksLikeUid(rawName)
             ? '${l10n.dashboardAlumnoFallback} (${link.athleteId.substring(0, 6)})'
