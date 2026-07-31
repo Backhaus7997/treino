@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
+import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../l10n/app_l10n.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../gyms/domain/gym.dart' show kNoGymId;
 import '../../profile/application/ranking_optin_controller_provider.dart';
@@ -703,46 +706,68 @@ class _LeaderboardRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      key: Key('rankings_row_${profile.uid}'),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: isMe ? palette.accent.withValues(alpha: 0.08) : null,
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 28,
-            child: Text(
-              '$rank',
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 15,
-                color: palette.textMuted,
+    final l10n = AppL10n.of(context);
+    final displayName = profile.displayName ?? '—';
+
+    return Semantics(
+      // `container: true` es necesario: sin él este Semantics no forma un nodo
+      // propio y los Text hijos (puesto, nombre, métrica) aportan los suyos,
+      // dejando el label de la fila sin nodo buscable.
+      container: true,
+      button: true,
+      // La fila NO es un avatar: muestra puesto, nombre y métrica, y al tocarla
+      // abre el perfil. El label describe esa ACCIÓN — reusar a11yAvatarLabel
+      // haría que un lector de pantalla anuncie una foto que no está ahí.
+      label: isMe
+          ? l10n.a11yHomeAvatarButton
+          : l10n.a11yRankingRowButton(displayName),
+      child: TreinoTappable(
+        // PublicProfileScreen already models `isSelf`: navigating for every
+        // row keeps the leaderboard consistent and lets owners see the same
+        // public-profile surface without duplicating a special-case route.
+        onTap: () => context.go('/feed/profile/${profile.uid}'),
+        child: Container(
+          key: Key('rankings_row_${profile.uid}'),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: isMe ? palette.accent.withValues(alpha: 0.08) : null,
+          ),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 28,
+                child: Text(
+                  '$rank',
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    color: palette.textMuted,
+                  ),
+                ),
               ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              profile.displayName ?? '—',
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.barlow(
-                fontWeight: isMe ? FontWeight.w700 : FontWeight.w400,
-                fontSize: 14,
-                color: isMe ? palette.accent : palette.textPrimary,
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  displayName,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.barlow(
+                    fontWeight: isMe ? FontWeight.w700 : FontWeight.w400,
+                    fontSize: 14,
+                    color: isMe ? palette.accent : palette.textPrimary,
+                  ),
+                ),
               ),
-            ),
+              Text(
+                _formatValue(value),
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                  color: isMe ? palette.accent : palette.textPrimary,
+                ),
+              ),
+            ],
           ),
-          Text(
-            _formatValue(value),
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 16,
-              color: isMe ? palette.accent : palette.textPrimary,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

@@ -91,6 +91,15 @@ Widget _buildScreen({required List<Override> overrides}) {
         path: '/profile/rankings',
         builder: (_, __) => const Scaffold(body: RankingsScreen()),
       ),
+      GoRoute(
+        path: '/feed/profile/:uid',
+        builder: (_, state) => Scaffold(
+          body: Text(
+            state.pathParameters['uid']!,
+            key: const Key('public_profile_destination'),
+          ),
+        ),
+      ),
     ],
   );
   return ProviderScope(
@@ -221,6 +230,76 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('rankings_row_$_uid')), findsWidgets);
+    });
+
+    testWidgets(
+        'tapping a ranking row navigates to the matching public profile uid',
+        (tester) async {
+      await tester.pumpWidget(_buildScreen(
+        overrides: baseOverrides(
+          streak: [
+            _rankedProfile(uid: 'athlete-42', displayName: 'Lu', racha: 12),
+          ],
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('rankings_row_athlete-42')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('public_profile_destination')),
+        findsOneWidget,
+      );
+      expect(find.text('athlete-42'), findsOneWidget);
+    });
+
+    testWidgets(
+        'tapping the current user row navigates to their own public profile',
+        (tester) async {
+      await tester.pumpWidget(_buildScreen(
+        overrides: baseOverrides(
+          streak: [
+            _rankedProfile(uid: _uid, displayName: 'Yo', racha: 8),
+          ],
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      // PublicProfileScreen owns the `isSelf` behavior, so rankings navigate
+      // self rows through the same public-profile route as every other row.
+      await tester.tap(find.byKey(const Key('rankings_row_$_uid')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('public_profile_destination')),
+        findsOneWidget,
+      );
+      expect(find.text(_uid), findsOneWidget);
+    });
+
+    testWidgets('ranking rows expose a descriptive button semantics label',
+        (tester) async {
+      final semantics = tester.ensureSemantics();
+      await tester.pumpWidget(_buildScreen(
+        overrides: baseOverrides(
+          streak: [
+            _rankedProfile(uid: 'u2', displayName: 'Lu', racha: 12),
+          ],
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      // Se busca por key y se assertea `contains`, no `bySemanticsLabel` con
+      // match exacto: la fila es un `Semantics(container: true)` y los Text
+      // hijos (puesto, nombre, métrica) mergean su texto en el label del nodo.
+      // Eso es DESEABLE — un lector de pantalla anuncia la fila completa — pero
+      // hace que el label nunca sea exactamente la cadena de la acción.
+      final node =
+          tester.getSemantics(find.byKey(const Key('rankings_row_u2')));
+      expect(node.label, contains('Ver el perfil de Lu'));
+      expect(node.flagsCollection.isButton, isTrue);
+      semantics.dispose();
     });
 
     testWidgets('empty state renders when the gym has zero opted-in athletes',
