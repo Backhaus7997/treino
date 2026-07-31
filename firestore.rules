@@ -595,11 +595,12 @@ service cloud.firestore {
                     && request.resource.data.get('authorAvatarUrl', null) == resource.data.get('authorAvatarUrl', null)
                     && request.resource.data.get('id', null) == resource.data.get('id', null)
                     && request.resource.data.get('createdAt', null) == resource.data.get('createdAt', null)
+                    && request.resource.data.get('reactionCounts', null) == resource.data.get('reactionCounts', null)
                     && request.resource.data.keys().hasOnly([
                          'id', 'authorUid', 'authorDisplayName',
                          'authorAvatarUrl', 'authorGymId', 'text',
                          'routineTag', 'privacy', 'createdAt', 'workoutStats',
-                         'photoUrl', 'workoutSnapshot'
+                         'photoUrl', 'workoutSnapshot', 'reactionCounts'
                        ])
                     && request.resource.data.text is string
                     && request.resource.data.text.size() <= 1120
@@ -613,6 +614,42 @@ service cloud.firestore {
       // Delete: only the original author.
       allow delete: if request.auth != null
                     && request.auth.uid == resource.data.authorUid;
+
+      // One reaction per user and post: the reaction document id IS the
+      // reactor uid. `reactionCounts` on the parent is maintained exclusively
+      // by the Admin SDK Cloud Function and is therefore never writable here.
+      match /reactions/{reactorUid} {
+        function reactionPost() {
+          return get(/databases/$(database)/documents/posts/$(postId)).data;
+        }
+
+        function reactionPostReadable() {
+          let post = reactionPost();
+          return post.privacy == 'public'
+                 || request.auth.uid == post.authorUid
+                 || (post.privacy == 'friends'
+                     && postFriendAccepted(post.authorUid))
+                 || (post.privacy == 'gym'
+                     && postSameGym(post.get('authorGymId', null)));
+        }
+
+        function reactionPayloadOk() {
+          return request.resource.data.keys().hasOnly(['type', 'createdAt'])
+                 && request.resource.data.type in ['strong', 'fire', 'clap']
+                 && request.resource.data.createdAt is timestamp;
+        }
+
+        allow read: if request.auth != null
+                    && reactionPostReadable();
+
+        allow create, update: if request.auth != null
+                              && request.auth.uid == reactorUid
+                              && reactionPostReadable()
+                              && reactionPayloadOk();
+
+        allow delete: if request.auth != null
+                      && request.auth.uid == reactorUid;
+      }
     }
 
     // Public identity documents — one per user, public-readable by any
