@@ -61,6 +61,44 @@ void main() {
       expect(fromA.chatId, fromB.chatId);
       expect(fromA.members, fromB.members);
     });
+
+    // QA H8: pausar un vínculo es un hold temporal, no un corte. Antes solo un
+    // link 'active' estampaba el linkId, así que crear el chat con un alumno
+    // pausado sin chat previo fallaba contra las rules (que exigían 'active').
+    // Ahora 'paused' también cuenta.
+    Future<void> seedLink(String id, String status) => firestore
+        .collection('trainer_links')
+        .doc(id)
+        .set({'trainerId': uidA, 'athleteId': uidB, 'status': status});
+
+    test('vínculo paused → getOrCreate estampa el linkId', () async {
+      await seedLink('link-paused', 'paused');
+
+      await repo.getOrCreate(selfId: uidA, otherId: uidB);
+
+      final snap = await firestore.collection('chats').doc('aaa_bbb').get();
+      expect(snap.data()!['linkId'], 'link-paused');
+    });
+
+    test('vínculo active → getOrCreate estampa el linkId (regresión)',
+        () async {
+      await seedLink('link-active', 'active');
+
+      await repo.getOrCreate(selfId: uidA, otherId: uidB);
+
+      final snap = await firestore.collection('chats').doc('aaa_bbb').get();
+      expect(snap.data()!['linkId'], 'link-active');
+    });
+
+    test('vínculo terminated → NO estampa linkId (no cuenta como vigente)',
+        () async {
+      await seedLink('link-terminated', 'terminated');
+
+      await repo.getOrCreate(selfId: uidA, otherId: uidB);
+
+      final snap = await firestore.collection('chats').doc('aaa_bbb').get();
+      expect(snap.data()!.containsKey('linkId'), isFalse);
+    });
   });
 
   // ─── getOrCreate — createdAt sin resolver (#501) ─────────────────────────
