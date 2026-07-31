@@ -33,7 +33,9 @@ mixin _$Post {
   RoutineTag? get routineTag => throw _privateConstructorUsedError;
   PostPrivacy get privacy => throw _privateConstructorUsedError;
   @TimestampConverter()
-  DateTime get createdAt =>
+  DateTime get createdAt => throw _privateConstructorUsedError;
+  @ReactionCountsConverter()
+  Map<ReactionType, int> get reactionCounts =>
       throw _privateConstructorUsedError; // QA-FEED-364/389: workout metrics for the feed card's stats row. Optional
 // (NOT `required`) on purpose — a manual post or a legacy doc simply omits
 // it and the card hides the row. Keeping it non-required also means the
@@ -72,6 +74,7 @@ abstract class $PostCopyWith<$Res> {
       RoutineTag? routineTag,
       PostPrivacy privacy,
       @TimestampConverter() DateTime createdAt,
+      @ReactionCountsConverter() Map<ReactionType, int> reactionCounts,
       WorkoutStats? workoutStats,
       String? photoUrl,
       WorkoutSnapshot? workoutSnapshot});
@@ -105,6 +108,7 @@ class _$PostCopyWithImpl<$Res, $Val extends Post>
     Object? routineTag = freezed,
     Object? privacy = null,
     Object? createdAt = null,
+    Object? reactionCounts = null,
     Object? workoutStats = freezed,
     Object? photoUrl = freezed,
     Object? workoutSnapshot = freezed,
@@ -146,6 +150,10 @@ class _$PostCopyWithImpl<$Res, $Val extends Post>
           ? _value.createdAt
           : createdAt // ignore: cast_nullable_to_non_nullable
               as DateTime,
+      reactionCounts: null == reactionCounts
+          ? _value.reactionCounts
+          : reactionCounts // ignore: cast_nullable_to_non_nullable
+              as Map<ReactionType, int>,
       workoutStats: freezed == workoutStats
           ? _value.workoutStats
           : workoutStats // ignore: cast_nullable_to_non_nullable
@@ -221,6 +229,7 @@ abstract class _$$PostImplCopyWith<$Res> implements $PostCopyWith<$Res> {
       RoutineTag? routineTag,
       PostPrivacy privacy,
       @TimestampConverter() DateTime createdAt,
+      @ReactionCountsConverter() Map<ReactionType, int> reactionCounts,
       WorkoutStats? workoutStats,
       String? photoUrl,
       WorkoutSnapshot? workoutSnapshot});
@@ -254,6 +263,7 @@ class __$$PostImplCopyWithImpl<$Res>
     Object? routineTag = freezed,
     Object? privacy = null,
     Object? createdAt = null,
+    Object? reactionCounts = null,
     Object? workoutStats = freezed,
     Object? photoUrl = freezed,
     Object? workoutSnapshot = freezed,
@@ -295,6 +305,10 @@ class __$$PostImplCopyWithImpl<$Res>
           ? _value.createdAt
           : createdAt // ignore: cast_nullable_to_non_nullable
               as DateTime,
+      reactionCounts: null == reactionCounts
+          ? _value._reactionCounts
+          : reactionCounts // ignore: cast_nullable_to_non_nullable
+              as Map<ReactionType, int>,
       workoutStats: freezed == workoutStats
           ? _value.workoutStats
           : workoutStats // ignore: cast_nullable_to_non_nullable
@@ -324,9 +338,12 @@ class _$PostImpl implements _Post {
       required this.routineTag,
       required this.privacy,
       @TimestampConverter() required this.createdAt,
+      @ReactionCountsConverter()
+      final Map<ReactionType, int> reactionCounts = const <ReactionType, int>{},
       this.workoutStats,
       this.photoUrl,
-      this.workoutSnapshot});
+      this.workoutSnapshot})
+      : _reactionCounts = reactionCounts;
 
   factory _$PostImpl.fromJson(Map<String, dynamic> json) =>
       _$$PostImplFromJson(json);
@@ -355,6 +372,16 @@ class _$PostImpl implements _Post {
   @override
   @TimestampConverter()
   final DateTime createdAt;
+  final Map<ReactionType, int> _reactionCounts;
+  @override
+  @JsonKey()
+  @ReactionCountsConverter()
+  Map<ReactionType, int> get reactionCounts {
+    if (_reactionCounts is EqualUnmodifiableMapView) return _reactionCounts;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableMapView(_reactionCounts);
+  }
+
 // QA-FEED-364/389: workout metrics for the feed card's stats row. Optional
 // (NOT `required`) on purpose — a manual post or a legacy doc simply omits
 // it and the card hides the row. Keeping it non-required also means the
@@ -374,7 +401,7 @@ class _$PostImpl implements _Post {
 
   @override
   String toString() {
-    return 'Post(id: $id, authorUid: $authorUid, authorDisplayName: $authorDisplayName, authorAvatarUrl: $authorAvatarUrl, authorGymId: $authorGymId, text: $text, routineTag: $routineTag, privacy: $privacy, createdAt: $createdAt, workoutStats: $workoutStats, photoUrl: $photoUrl, workoutSnapshot: $workoutSnapshot)';
+    return 'Post(id: $id, authorUid: $authorUid, authorDisplayName: $authorDisplayName, authorAvatarUrl: $authorAvatarUrl, authorGymId: $authorGymId, text: $text, routineTag: $routineTag, privacy: $privacy, createdAt: $createdAt, reactionCounts: $reactionCounts, workoutStats: $workoutStats, photoUrl: $photoUrl, workoutSnapshot: $workoutSnapshot)';
   }
 
   @override
@@ -397,6 +424,8 @@ class _$PostImpl implements _Post {
             (identical(other.privacy, privacy) || other.privacy == privacy) &&
             (identical(other.createdAt, createdAt) ||
                 other.createdAt == createdAt) &&
+            const DeepCollectionEquality()
+                .equals(other._reactionCounts, _reactionCounts) &&
             (identical(other.workoutStats, workoutStats) ||
                 other.workoutStats == workoutStats) &&
             (identical(other.photoUrl, photoUrl) ||
@@ -418,6 +447,7 @@ class _$PostImpl implements _Post {
       routineTag,
       privacy,
       createdAt,
+      const DeepCollectionEquality().hash(_reactionCounts),
       workoutStats,
       photoUrl,
       workoutSnapshot);
@@ -449,6 +479,7 @@ abstract class _Post implements Post {
       required final RoutineTag? routineTag,
       required final PostPrivacy privacy,
       @TimestampConverter() required final DateTime createdAt,
+      @ReactionCountsConverter() final Map<ReactionType, int> reactionCounts,
       final WorkoutStats? workoutStats,
       final String? photoUrl,
       final WorkoutSnapshot? workoutSnapshot}) = _$PostImpl;
@@ -477,8 +508,11 @@ abstract class _Post implements Post {
   PostPrivacy get privacy;
   @override
   @TimestampConverter()
-  DateTime
-      get createdAt; // QA-FEED-364/389: workout metrics for the feed card's stats row. Optional
+  DateTime get createdAt;
+  @override
+  @ReactionCountsConverter()
+  Map<ReactionType, int>
+      get reactionCounts; // QA-FEED-364/389: workout metrics for the feed card's stats row. Optional
 // (NOT `required`) on purpose — a manual post or a legacy doc simply omits
 // it and the card hides the row. Keeping it non-required also means the
 // other Post(...) call sites (e.g. manual create-post) need no change.

@@ -4,6 +4,8 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../../profile/data/timestamp_converter.dart';
 import 'post_privacy.dart';
+import 'reaction_counts_converter.dart';
+import 'reaction_type.dart';
 import 'routine_tag.dart';
 import 'workout_snapshot.dart';
 import 'workout_stats.dart';
@@ -27,6 +29,9 @@ class Post with _$Post {
     required RoutineTag? routineTag,
     required PostPrivacy privacy,
     @TimestampConverter() required DateTime createdAt,
+    @ReactionCountsConverter()
+    @Default(<ReactionType, int>{})
+    Map<ReactionType, int> reactionCounts,
     // QA-FEED-364/389: workout metrics for the feed card's stats row. Optional
     // (NOT `required`) on purpose — a manual post or a legacy doc simply omits
     // it and the card hides the row. Keeping it non-required also means the

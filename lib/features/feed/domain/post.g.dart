@@ -19,6 +19,10 @@ _$PostImpl _$$PostImplFromJson(Map<String, dynamic> json) => _$PostImpl(
       privacy: $enumDecode(_$PostPrivacyEnumMap, json['privacy']),
       createdAt:
           const TimestampConverter().fromJson(json['createdAt'] as Timestamp),
+      reactionCounts: json['reactionCounts'] == null
+          ? const <ReactionType, int>{}
+          : const ReactionCountsConverter()
+              .fromJson(json['reactionCounts'] as Map<String, dynamic>?),
       workoutStats: json['workoutStats'] == null
           ? null
           : WorkoutStats.fromJson(json['workoutStats'] as Map<String, dynamic>),
@@ -40,6 +44,8 @@ Map<String, dynamic> _$$PostImplToJson(_$PostImpl instance) =>
       'routineTag': instance.routineTag?.toJson(),
       'privacy': _$PostPrivacyEnumMap[instance.privacy]!,
       'createdAt': const TimestampConverter().toJson(instance.createdAt),
+      'reactionCounts':
+          const ReactionCountsConverter().toJson(instance.reactionCounts),
       'workoutStats': instance.workoutStats?.toJson(),
       'photoUrl': instance.photoUrl,
       'workoutSnapshot': instance.workoutSnapshot?.toJson(),
