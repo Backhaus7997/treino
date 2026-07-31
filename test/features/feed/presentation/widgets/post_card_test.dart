@@ -9,9 +9,12 @@ import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/feed/application/post_providers.dart';
+import 'package:treino/features/feed/application/reaction_providers.dart';
 import 'package:treino/features/feed/data/post_repository.dart';
 import 'package:treino/features/feed/domain/post.dart';
 import 'package:treino/features/feed/domain/post_privacy.dart';
+import 'package:treino/features/feed/domain/reaction.dart';
+import 'package:treino/features/feed/domain/reaction_type.dart';
 import 'package:treino/features/feed/domain/routine_tag.dart';
 import 'package:treino/features/feed/domain/workout_snapshot.dart';
 import 'package:treino/features/feed/domain/workout_stats.dart';
@@ -95,12 +98,20 @@ Widget _wrap(
   Widget w, {
   String? viewerUid = 'u1',
   MockPostRepository? mockRepo,
+  Map<ReactionType, int> reactionCounts = const {},
+  Reaction? myReaction,
   List<Override> overrides = const [],
 }) {
   final user = viewerUid == null ? null : _MockUser(uid: viewerUid);
   return ProviderScope(
     overrides: [
       authStateChangesProvider.overrideWith((ref) => Stream.value(user)),
+      reactionCountsProvider.overrideWith(
+        (ref, postId) => Stream.value(reactionCounts),
+      ),
+      myReactionProvider.overrideWith(
+        (ref, postId) => Stream.value(myReaction),
+      ),
       if (mockRepo != null) postRepositoryProvider.overrideWithValue(mockRepo),
       ...overrides,
     ],
@@ -142,6 +153,12 @@ Widget _wrapRouter(
   return ProviderScope(
     overrides: [
       authStateChangesProvider.overrideWith((ref) => Stream.value(user)),
+      reactionCountsProvider.overrideWith(
+        (ref, postId) => Stream.value(const <ReactionType, int>{}),
+      ),
+      myReactionProvider.overrideWith(
+        (ref, postId) => Stream.value(null),
+      ),
       if (mockRepo != null) postRepositoryProvider.overrideWithValue(mockRepo),
       ...overrides,
     ],
@@ -157,6 +174,43 @@ Widget _wrapRouter(
 
 void main() {
   group('PostCard', () {
+    testWidgets('renders the reactions footer with provider data',
+        (tester) async {
+      final post = makePost(id: 'post-with-reactions');
+      await tester.pumpWidget(_wrap(
+        PostCard(post: post),
+        reactionCounts: const {
+          ReactionType.strong: 2,
+          ReactionType.fire: 1,
+        },
+        myReaction: Reaction(
+          uid: 'u1',
+          type: ReactionType.fire,
+          createdAt: DateTime.utc(2026, 7, 30),
+        ),
+      ));
+      await tester.pump();
+
+      expect(
+        find.byKey(const ValueKey('post-reactions-row')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('reaction-strong-icon')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('reaction-fire-icon')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('reaction-clap-icon')),
+        findsOneWidget,
+      );
+      expect(find.text('2'), findsOneWidget);
+      expect(find.text('1'), findsOneWidget);
+    });
+
     // SCENARIO-166: author display name is rendered
     testWidgets('SCENARIO-166: renders authorDisplayName', (tester) async {
       final post = makePost(authorDisplayName: 'Tincho');

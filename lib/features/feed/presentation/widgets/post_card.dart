@@ -17,6 +17,7 @@ import '../../domain/post.dart';
 import '../../domain/routine_tag.dart';
 import '../../domain/workout_snapshot.dart';
 import 'post_avatar.dart';
+import 'post_reactions_row.dart';
 import 'workout_snapshot_detail.dart';
 
 /// #547: the theme's Barlow families carry no emoji glyphs, so an emoji inside
@@ -234,6 +235,9 @@ class PostCard extends ConsumerWidget {
             const SizedBox(height: 12),
             _WorkoutDetailSection(snapshot: post.workoutSnapshot!),
           ],
+
+          const SizedBox(height: 12),
+          PostReactionsRow(postId: post.id),
         ],
       ),
     );
