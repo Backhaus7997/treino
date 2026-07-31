@@ -39,6 +39,7 @@ import '../features/feed/domain/post.dart';
 import '../features/feed/feed_screen.dart';
 import '../features/feed/presentation/create_post_screen.dart';
 import '../features/feed/presentation/friend_requests_inbox_screen.dart';
+import '../features/feed/presentation/post_detail_screen.dart';
 import '../features/notifications/presentation/notification_history_screen.dart';
 import '../features/profile/application/account_deletion_notifier.dart';
 import '../features/feed/presentation/public_profile_screen.dart';
@@ -609,6 +610,14 @@ GoRouter buildRouter({
               return _noAnim(FeedScreen(initialTab: tab));
             },
             routes: [
+              GoRoute(
+                path: 'post/:postId',
+                builder: (_, state) => _withBg(
+                  PostDetailScreen(
+                    postId: state.pathParameters['postId']!,
+                  ),
+                ),
+              ),
               GoRoute(
                 path: 'create',
                 builder: (_, state) => _withBg(

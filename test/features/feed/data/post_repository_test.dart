@@ -41,6 +41,28 @@ void main() {
     repo = PostRepository(firestore: firestore);
   });
 
+  group('PostRepository.watchById', () {
+    test('watches posts/{postId} and injects the document id', () async {
+      await firestore.collection('posts').doc('other').set(
+            _makePost(id: 'other', text: 'Wrong post').toJson(),
+          );
+      final targetJson = _makePost(id: 'ignored-body-id', text: 'Target post')
+          .toJson()
+        ..remove('id');
+      await firestore.collection('posts').doc('target').set(targetJson);
+
+      final result = await repo.watchById('target').first;
+
+      expect(result, isNotNull);
+      expect(result!.id, equals('target'));
+      expect(result.text, equals('Target post'));
+    });
+
+    test('emits null when posts/{postId} does not exist', () async {
+      expect(await repo.watchById('missing').first, isNull);
+    });
+  });
+
   // ---------------------------------------------------------------------------
   // T16: create and byAuthor
   // ---------------------------------------------------------------------------

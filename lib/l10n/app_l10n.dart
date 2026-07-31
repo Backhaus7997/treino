@@ -5828,6 +5828,18 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Abrir notificaciones, {count} pendientes'**
   String notificationBellWithCountA11y(int count);
+
+  /// Título de la pantalla de post individual del feed.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PUBLICACIÓN'**
+  String get postDetailTitle;
+
+  /// Estado seguro mostrado cuando el post no existe, fue borrado o no se puede leer.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Este post ya no está disponible.'**
+  String get postDetailUnavailable;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

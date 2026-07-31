@@ -2810,5 +2810,9 @@
   "notificationBellA11y": "Abrir notificaciones",
   "@notificationBellA11y": {"description": "Etiqueta accesible de la campanita de notificaciones del feed."},
   "notificationBellWithCountA11y": "Abrir notificaciones, {count} pendientes",
-  "@notificationBellWithCountA11y": {"description": "Etiqueta accesible de la campanita con su badge combinado.", "placeholders": {"count": {"type": "int"}}}
+  "@notificationBellWithCountA11y": {"description": "Etiqueta accesible de la campanita con su badge combinado.", "placeholders": {"count": {"type": "int"}}},
+  "postDetailTitle": "PUBLICACIÓN",
+  "@postDetailTitle": {"description": "Título de la pantalla de post individual del feed."},
+  "postDetailUnavailable": "Este post ya no está disponible.",
+  "@postDetailUnavailable": {"description": "Estado seguro mostrado cuando el post no existe, fue borrado o no se puede leer."}
 }

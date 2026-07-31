@@ -3275,6 +3275,12 @@ class AppL10nEs extends AppL10n {
   String notificationBellWithCountA11y(int count) {
     return 'Abrir notificaciones, $count pendientes';
   }
+
+  @override
+  String get postDetailTitle => 'PUBLICACIÓN';
+
+  @override
+  String get postDetailUnavailable => 'Este post ya no está disponible.';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -6545,4 +6551,10 @@ class AppL10nEsAr extends AppL10nEs {
   String notificationBellWithCountA11y(int count) {
     return 'Abrir notificaciones, $count pendientes';
   }
+
+  @override
+  String get postDetailTitle => 'PUBLICACIÓN';
+
+  @override
+  String get postDetailUnavailable => 'Este post ya no está disponible.';
 }

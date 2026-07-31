@@ -5,7 +5,9 @@ import 'package:treino/app/router.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/feed/application/friendship_providers.dart';
+import 'package:treino/features/feed/application/post_providers.dart';
 import 'package:treino/features/feed/presentation/friend_requests_inbox_screen.dart';
+import 'package:treino/features/feed/presentation/post_detail_screen.dart';
 import 'package:treino/features/profile/application/profile_stats_providers.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
@@ -49,6 +51,48 @@ List<Override> _baseOverrides() => [
 // ---------------------------------------------------------------------------
 
 void main() {
+  group('Router — /feed/post/:postId', () {
+    testWidgets('resolves the post detail route and forwards postId',
+        (tester) async {
+      String? requestedId;
+      final container = ProviderContainer(
+        overrides: [
+          ..._baseOverrides(),
+          postByIdProvider.overrideWith((_, postId) {
+            requestedId = postId;
+            return Stream.value(null);
+          }),
+        ],
+      );
+      addTearDown(container.dispose);
+      final router = buildRouter(
+        refreshListenable: ValueNotifier<int>(0),
+        read: container.read,
+      );
+      router.go('/feed/post/post-123');
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp.router(
+            theme: AppTheme.dark(),
+            routerConfig: router,
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('es', 'AR'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final screen = tester.widget<PostDetailScreen>(
+        find.byType(PostDetailScreen),
+      );
+      expect(screen.postId, equals('post-123'));
+      expect(requestedId, equals('post-123'));
+    });
+  });
+
   group('Router — /profile/friend-requests route (SCENARIO-468b)', () {
     testWidgets(
         'SCENARIO-468b: pushing /profile/friend-requests renders FriendRequestsInboxScreen',

@@ -9,9 +9,8 @@
  * step when the user base grows. It is intentionally omitted today to avoid
  * over-designing before that scale requires it.
  *
- * There is no route for an individual post yet. The deep link therefore opens
- * `/feed`, where the recipient must locate the post; adding that route belongs
- * to a separate Flutter task.
+ * Reaction notifications deep-link to the individual post. The Flutter route
+ * handles deleted and no-longer-readable posts as an unavailable state.
  *
  * All user-facing strings are in es-AR, matching the existing notification
  * functions.
@@ -88,7 +87,7 @@ export function resolveReactionNotification({
     actorUid: reactorUid,
     title: "TREINO", // i18n: server-side notification copy is currently hardcoded
     body: `${displayName} reaccionó a tu publicación`, // i18n: es-AR
-    deepLink: "/feed",
+    deepLink: `/feed/post/${postId}`,
     postId,
   };
 }

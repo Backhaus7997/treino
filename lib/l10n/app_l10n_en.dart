@@ -3215,4 +3215,10 @@ class AppL10nEn extends AppL10n {
   String notificationBellWithCountA11y(int count) {
     return 'Open notifications, $count pending';
   }
+
+  @override
+  String get postDetailTitle => 'POST';
+
+  @override
+  String get postDetailUnavailable => 'This post is no longer available.';
 }

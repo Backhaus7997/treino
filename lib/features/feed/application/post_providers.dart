@@ -15,6 +15,16 @@ final postRepositoryProvider = Provider<PostRepository>(
   (ref) => PostRepository(firestore: ref.watch(firestoreProvider)),
 );
 
+/// A live post document keyed by its stable Firestore document id.
+///
+/// The family key is deliberately a [String], never a `List`, for the same
+/// value-equality/cache-stability reason documented on
+/// [feedForFriendsProvider].
+final postByIdProvider =
+    StreamProvider.autoDispose.family<Post?, String>((ref, postId) {
+  return ref.watch(postRepositoryProvider).watchById(postId);
+});
+
 const publicFeedPaginationKey = 'public';
 const _friendsFeedPaginationPrefix = 'friends:';
 const _gymFeedPaginationPrefix = 'gym:';

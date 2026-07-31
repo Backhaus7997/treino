@@ -47,6 +47,14 @@ class PostRepository {
     await _posts.doc(postId).delete();
   }
 
+  /// Watches a single post so reaction-count updates are reflected without a
+  /// manual refresh. A missing document and a malformed document both degrade
+  /// to `null`; Firestore errors (including permission-denied) remain stream
+  /// errors so the presentation layer can decide how to render them.
+  Stream<Post?> watchById(String postId) {
+    return _posts.doc(postId).snapshots().map(_fromDoc);
+  }
+
   /// Updates the editable fields of an existing post: `text`, `privacy`, and
   /// `routineTag`. Author fields, `authorGymId`, `createdAt`, and `id` are
   /// immutable on edit — this writes an explicit partial map (not

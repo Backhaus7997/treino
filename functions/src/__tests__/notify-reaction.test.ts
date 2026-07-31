@@ -29,7 +29,7 @@ describe("resolveReactionNotification — pure truth table", () => {
       actorUid: "reactor",
       title: "TREINO",
       body: "Sofía reaccionó a tu publicación",
-      deepLink: "/feed",
+      deepLink: "/feed/post/post-1",
       postId: "post-1",
     });
   });
@@ -177,7 +177,7 @@ describe("notifyOnReactionHandler — integration", () => {
       body: "Sofía reaccionó a tu publicación",
     });
     expect(message.data).toMatchObject({
-      deepLink: "/feed",
+      deepLink: `/feed/post/${postId}`,
       postId,
       actorUid: reactorUid,
       kind: "reaction",

@@ -1200,5 +1200,9 @@
   "notificationBellA11y": "Open notifications",
   "@notificationBellA11y": {"description": "Accessibility label for the feed notification bell."},
   "notificationBellWithCountA11y": "Open notifications, {count} pending",
-  "@notificationBellWithCountA11y": {"description": "Accessibility label for the feed notification bell with its combined badge count.", "placeholders": {"count": {"type": "int"}}}
+  "@notificationBellWithCountA11y": {"description": "Accessibility label for the feed notification bell with its combined badge count.", "placeholders": {"count": {"type": "int"}}},
+  "postDetailTitle": "POST",
+  "@postDetailTitle": {"description": "Title of the individual feed post screen."},
+  "postDetailUnavailable": "This post is no longer available.",
+  "@postDetailUnavailable": {"description": "Privacy-safe state shown when a post is missing, deleted, or cannot be read."}
 }
