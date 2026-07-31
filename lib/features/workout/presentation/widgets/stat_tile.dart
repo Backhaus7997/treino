@@ -14,10 +14,27 @@ class StatTile extends StatelessWidget {
     required this.value,
     this.countUpValue,
     this.countUpFormatter,
+    this.icon,
+    this.isAccent = false,
   });
 
   final String label;
   final String? value;
+
+  /// Ícono opcional de la métrica, a la izquierda del número.
+  ///
+  /// Cuando es no-null el tile alinea a la izquierda en vez de centrar: con el
+  /// contenido centrado, [TreinoCountUp] cambia el ancho del número en cada
+  /// tick y empujaría el ícono de un lado a otro mientras cuenta. Anclado a la
+  /// izquierda, el ícono queda quieto y sólo crece el número.
+  ///
+  /// `null` (default) → comportamiento sin cambios: centrado y sin ícono.
+  final IconData? icon;
+
+  /// Usa el color de acento para destacar el valor.
+  ///
+  /// `false` (default) conserva el color primario de todos los usos existentes.
+  final bool isAccent;
 
   /// Si no-null, el número se cuenta 0 → [countUpValue] al montarse
   /// (TreinoCountUp) en vez de mostrar [value] estático — para el momento de
@@ -35,29 +52,61 @@ class StatTile extends StatelessWidget {
     final valueStyle = GoogleFonts.barlowCondensed(
       fontWeight: FontWeight.w700,
       fontSize: 22,
-      color: palette.textPrimary,
+      color: isAccent ? palette.accent : palette.textPrimary,
     );
     final countUpValue = this.countUpValue;
+    final icon = this.icon;
+    final valueWidget = countUpValue == null
+        ? Text(value ?? '—', style: valueStyle)
+        : TreinoCountUp(
+            value: countUpValue,
+            formatter: countUpFormatter,
+            style: valueStyle,
+          );
+    final labelWidget = Text(
+      label.toUpperCase(),
+      style: GoogleFonts.barlowCondensed(
+        fontWeight: FontWeight.w600,
+        fontSize: 10,
+        letterSpacing: 1.2,
+        color: palette.textMuted,
+      ),
+    );
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
+      crossAxisAlignment:
+          icon == null ? CrossAxisAlignment.center : CrossAxisAlignment.start,
       children: [
-        countUpValue == null
-            ? Text(value ?? '—', style: valueStyle)
-            : TreinoCountUp(
-                value: countUpValue,
-                formatter: countUpFormatter,
-                style: valueStyle,
+        if (icon == null)
+          valueWidget
+        else
+          Row(
+            children: [
+              Icon(icon, size: 15, color: palette.textMuted),
+              const SizedBox(width: 8),
+              // El ícono ocupa ancho fijo, así que el número se queda con el
+              // resto: sin Flexible + scaleDown desborda en pantallas angostas
+              // y con font scale de accesibilidad. Mismo patrón que las filas
+              // del resumen post-entreno.
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: valueWidget,
+                ),
               ),
-        const SizedBox(height: 4),
-        Text(
-          label.toUpperCase(),
-          style: GoogleFonts.barlowCondensed(
-            fontWeight: FontWeight.w600,
-            fontSize: 10,
-            letterSpacing: 1.2,
-            color: palette.textMuted,
+            ],
           ),
-        ),
+        const SizedBox(height: 4),
+        // Sólo la variante con ícono acota el label: la variante centrada
+        // (7 pantallas) queda exactamente como estaba.
+        if (icon == null)
+          labelWidget
+        else
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: labelWidget,
+          ),
       ],
     );
   }

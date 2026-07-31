@@ -98,7 +98,7 @@ void main() {
 
       final notifier = container.read(postWorkoutNotifierProvider.notifier);
       await notifier.shareWorkout(_makeSession(),
-          text: _sharedText, exerciseCount: 3);
+          text: _sharedText, exerciseCount: 3, privacy: PostPrivacy.friends);
 
       expect(fakeRepo.capturedPost, isNotNull);
       expect(fakeRepo.capturedPost!.authorDisplayName, equals('Ana'));
@@ -114,16 +114,21 @@ void main() {
 
       final notifier = container.read(postWorkoutNotifierProvider.notifier);
       await notifier.shareWorkout(_makeSession(),
-          text: _sharedText, exerciseCount: 3);
+          text: _sharedText, exerciseCount: 3, privacy: PostPrivacy.friends);
 
       expect(fakeRepo.capturedPost, isNotNull);
       expect(fakeRepo.capturedPost!.authorDisplayName, equals(''));
     });
 
-    // ── SCENARIO-339: privacy=friends + routineTag ────────────────────────
+    // ── SCENARIO-339: pass-through de privacy + routineTag ────────────────
+    //
+    // El default (friends) ya no se decide acá: lo elige el composer y lo
+    // pinea share_workout_composer_screen_test.dart. Este test verifica que
+    // el notifier reenvía SIN alterar la privacidad que recibe — por eso usa
+    // un valor distinto del default, para que un hardcode reintroducido falle.
 
     test(
-        'SCENARIO-339: shareWorkout calls PostRepository.create with privacy=friends and routineTag',
+        'SCENARIO-339: shareWorkout reenvía la privacidad recibida a PostRepository.create, con routineTag',
         () async {
       final container = makeContainer();
       addTearDown(container.dispose);
@@ -133,10 +138,11 @@ void main() {
         _makeSession(routineId: 'r1', routineName: 'Push'),
         text: _sharedText,
         exerciseCount: 3,
+        privacy: PostPrivacy.public,
       );
 
       expect(fakeRepo.capturedPost, isNotNull);
-      expect(fakeRepo.capturedPost!.privacy, equals(PostPrivacy.friends));
+      expect(fakeRepo.capturedPost!.privacy, equals(PostPrivacy.public));
       expect(
           fakeRepo.capturedPost!.routineTag,
           isA<RoutineTag>()
@@ -154,7 +160,7 @@ void main() {
 
       final notifier = container.read(postWorkoutNotifierProvider.notifier);
       await notifier.shareWorkout(_makeSession(),
-          text: _sharedText, exerciseCount: 3);
+          text: _sharedText, exerciseCount: 3, privacy: PostPrivacy.friends);
 
       expect(fakeRepo.capturedPost, isNotNull);
       expect(fakeRepo.capturedPost!.text, equals(_sharedText));
@@ -170,7 +176,7 @@ void main() {
       const englishText = 'Finished my workout! 💪';
       final notifier = container.read(postWorkoutNotifierProvider.notifier);
       await notifier.shareWorkout(_makeSession(),
-          text: englishText, exerciseCount: 3);
+          text: englishText, exerciseCount: 3, privacy: PostPrivacy.friends);
 
       expect(fakeRepo.capturedPost, isNotNull);
       expect(fakeRepo.capturedPost!.text, equals(englishText));
@@ -189,7 +195,7 @@ void main() {
 
       await expectLater(
         () => notifier.shareWorkout(_makeSession(),
-            text: _sharedText, exerciseCount: 3),
+            text: _sharedText, exerciseCount: 3, privacy: PostPrivacy.friends),
         throwsException,
       );
 
@@ -211,6 +217,7 @@ class _FakeNotifier extends PostWorkoutNotifier {
     Session session, {
     required String text,
     required int exerciseCount,
+    required PostPrivacy privacy,
     String? localPhotoPath,
   }) async {
     state = const AsyncLoading();
@@ -227,7 +234,7 @@ class _FakeNotifier extends PostWorkoutNotifier {
           routineId: session.routineId,
           routineName: session.routineName,
         ),
-        privacy: PostPrivacy.friends,
+        privacy: privacy,
         createdAt: DateTime.now().toUtc(),
         workoutStats: WorkoutStats(
           volumeKg: session.totalVolumeKg,

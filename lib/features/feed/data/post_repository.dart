@@ -1,7 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart'
-    show CollectionReference, DocumentSnapshot, FirebaseFirestore;
+    show CollectionReference, DocumentSnapshot, FirebaseFirestore, Timestamp;
 
 import '../domain/post.dart';
+import '../domain/post_page.dart';
 import '../domain/post_privacy.dart';
 
 class PostRepository {
@@ -97,50 +98,116 @@ class PostRepository {
     return snap.docs.map(_fromDoc).whereType<Post>().toList();
   }
 
-  Future<List<Post>> feedPublic() async {
-    final snap = await _posts
-        .where('privacy', isEqualTo: PostPrivacy.public.toJson())
-        .orderBy('createdAt', descending: true)
-        .get();
-    return snap.docs.map(_fromDoc).whereType<Post>().toList();
+  Future<PostPage> feedPublic({int limit = 20, DateTime? after}) async {
+    var query = _posts.where('privacy', isEqualTo: PostPrivacy.public.toJson());
+    if (after != null) {
+      query = query.where(
+        'createdAt',
+        isLessThan: Timestamp.fromDate(after),
+      );
+    }
+    final snap =
+        await query.orderBy('createdAt', descending: true).limit(limit).get();
+    return _pageFromSnapshot(
+      posts: snap.docs.map(_fromDoc).whereType<Post>().toList(),
+      fetchedDocumentCount: snap.docs.length,
+      limit: limit,
+    );
   }
 
   /// Returns friends-privacy posts authored by any of the given UIDs.
   /// Chunks into batches of ≤10 due to Firestore `in` operator limit.
-  Future<List<Post>> feedForFriends(List<String> friendUids) async {
-    if (friendUids.isEmpty) return const [];
+  Future<PostPage> feedForFriends(
+    List<String> friendUids, {
+    int limit = 20,
+    DateTime? after,
+  }) async {
+    if (friendUids.isEmpty) {
+      return const PostPage(
+        posts: [],
+        nextCursor: null,
+        hasMore: false,
+      );
+    }
 
     const chunkSize = 10;
     final results = <Post>[];
+    var chunkReachedLimit = false;
 
     for (var i = 0; i < friendUids.length; i += chunkSize) {
       final chunk = friendUids.sublist(
         i,
         (i + chunkSize).clamp(0, friendUids.length),
       );
-      final snap = await _posts
+      var query = _posts
           .where('privacy', isEqualTo: PostPrivacy.friends.toJson())
-          .where('authorUid', whereIn: chunk)
-          .orderBy('createdAt', descending: true)
-          .get();
+          .where('authorUid', whereIn: chunk);
+      if (after != null) {
+        query = query.where(
+          'createdAt',
+          isLessThan: Timestamp.fromDate(after),
+        );
+      }
+      final snap =
+          await query.orderBy('createdAt', descending: true).limit(limit).get();
+      chunkReachedLimit = chunkReachedLimit || snap.docs.length == limit;
       results.addAll(snap.docs.map(_fromDoc).whereType<Post>());
     }
 
     // Each chunk is sorted server-side, but the merged list across chunks is
     // not globally ordered — re-sort newest-first client-side.
     results.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    return results;
+    final mergedCount = results.length;
+    final posts = results.take(limit).toList();
+    // See [_pageFromSnapshot] for the strict DateTime cursor trade-off. The
+    // follow-up accumulator must deduplicate pages by post.id.
+    return PostPage(
+      posts: posts,
+      nextCursor: posts.isEmpty ? null : posts.last.createdAt,
+      hasMore: mergedCount > limit || chunkReachedLimit,
+    );
   }
 
   /// Returns gym-privacy posts where `authorGymId == gymId`.
   /// Posts with null `authorGymId` are excluded (user has no gym).
-  Future<List<Post>> feedForGym(String gymId) async {
-    final snap = await _posts
+  Future<PostPage> feedForGym(
+    String gymId, {
+    int limit = 20,
+    DateTime? after,
+  }) async {
+    var query = _posts
         .where('privacy', isEqualTo: PostPrivacy.gym.toJson())
-        .where('authorGymId', isEqualTo: gymId)
-        .orderBy('createdAt', descending: true)
-        .get();
-    return snap.docs.map(_fromDoc).whereType<Post>().toList();
+        .where('authorGymId', isEqualTo: gymId);
+    if (after != null) {
+      query = query.where(
+        'createdAt',
+        isLessThan: Timestamp.fromDate(after),
+      );
+    }
+    final snap =
+        await query.orderBy('createdAt', descending: true).limit(limit).get();
+    return _pageFromSnapshot(
+      posts: snap.docs.map(_fromDoc).whereType<Post>().toList(),
+      fetchedDocumentCount: snap.docs.length,
+      limit: limit,
+    );
+  }
+
+  PostPage _pageFromSnapshot({
+    required List<Post> posts,
+    required int fetchedDocumentCount,
+    required int limit,
+  }) {
+    // The DateTime-only cursor deliberately uses a strict range. Two posts
+    // with the exact same Firestore microsecond timestamp could therefore be
+    // split across pages and one skipped. This keeps cursors portable across
+    // the independent friends-feed chunk queries; page accumulation must
+    // deduplicate by post.id when it is added in the follow-up pagination task.
+    return PostPage(
+      posts: posts,
+      nextCursor: posts.isEmpty ? null : posts.last.createdAt,
+      hasMore: fetchedDocumentCount == limit,
+    );
   }
 
   Post? _fromDoc(DocumentSnapshot<Map<String, Object?>> snap) {

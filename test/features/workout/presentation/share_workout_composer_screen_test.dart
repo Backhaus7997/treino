@@ -4,6 +4,8 @@
 // channel; lo que sí se pinea es que shareWorkout recibe el texto editado y
 // el localPhotoPath (null cuando no se adjuntó nada).
 
+import 'dart:ui' show Tristate;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,7 +13,11 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
+import 'package:treino/features/feed/domain/post_privacy.dart';
 import 'package:treino/features/feed/presentation/widgets/workout_snapshot_detail.dart';
+import 'package:treino/features/profile/application/user_providers.dart';
+import 'package:treino/features/profile/domain/user_profile.dart';
+import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/workout/application/post_workout_notifier.dart';
 import 'package:treino/features/workout/application/session_muscle_distribution.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
@@ -35,6 +41,7 @@ class _CapturingNotifier extends PostWorkoutNotifier {
   String? capturedText;
   String? capturedPhotoPath;
   int? capturedExerciseCount;
+  PostPrivacy? capturedPrivacy;
   int calls = 0;
   bool shouldThrow = false;
 
@@ -43,11 +50,13 @@ class _CapturingNotifier extends PostWorkoutNotifier {
     Session session, {
     required String text,
     required int exerciseCount,
+    required PostPrivacy privacy,
     String? localPhotoPath,
   }) async {
     calls++;
     capturedText = text;
     capturedExerciseCount = exerciseCount;
+    capturedPrivacy = privacy;
     capturedPhotoPath = localPhotoPath;
     if (shouldThrow) {
       final err = Exception('fail');
@@ -84,6 +93,15 @@ SetLog _log(String name, {String id = 'e1', int setNumber = 1}) => SetLog(
 
 const _defaultText = '¡Terminé mi entreno! 💪';
 
+UserProfile _profile() => UserProfile(
+      uid: 'u1',
+      email: 'ana@test.com',
+      displayName: 'Ana',
+      role: UserRole.athlete,
+      createdAt: DateTime.utc(2026, 1, 1),
+      updatedAt: DateTime.utc(2026, 1, 1),
+    );
+
 Widget _wrap({
   required _CapturingNotifier notifier,
   List<SetLog>? setLogs,
@@ -108,6 +126,7 @@ Widget _wrap({
       authStateChangesProvider.overrideWith(
         (ref) => Stream.value(_MockUser(uid: 'u1')),
       ),
+      userProfileProvider.overrideWith((ref) => Stream.value(_profile())),
       sessionSummaryProvider.overrideWith((ref, key) async => (
             session: session ?? _session(),
             setLogs: setLogs ??
@@ -180,6 +199,32 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(notifier.capturedText, _defaultText);
+    });
+
+    testWidgets('preselecciona AMIGOS y publica con esa privacidad',
+        (tester) async {
+      await tester.pumpWidget(_wrap(notifier: notifier));
+      await tester.pumpAndSettle();
+
+      final semantics = tester.getSemantics(find.bySemanticsLabel('AMIGOS'));
+      expect(semantics.flagsCollection.isSelected, Tristate.isTrue);
+
+      await tester.tap(find.text('PUBLICAR'));
+      await tester.pumpAndSettle();
+
+      expect(notifier.capturedPrivacy, PostPrivacy.friends);
+    });
+
+    testWidgets('permite elegir PÚBLICO y lo pasa al notifier', (tester) async {
+      await tester.pumpWidget(_wrap(notifier: notifier));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('PÚBLICO'));
+      await tester.pump();
+      await tester.tap(find.text('PUBLICAR'));
+      await tester.pumpAndSettle();
+
+      expect(notifier.capturedPrivacy, PostPrivacy.public);
     });
 
     testWidgets('pasa la cuenta de ejercicios DISTINTOS', (tester) async {

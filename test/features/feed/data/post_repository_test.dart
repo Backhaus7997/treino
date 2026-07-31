@@ -175,8 +175,61 @@ void main() {
 
       final result = await repo.feedPublic();
 
-      expect(result.length, equals(1));
-      expect(result.first.privacy, equals(PostPrivacy.public));
+      expect(result.posts.length, equals(1));
+      expect(result.posts.first.privacy, equals(PostPrivacy.public));
+    });
+
+    test('less than limit has no more pages and cursors from last post',
+        () async {
+      final newest = DateTime.utc(2026, 3, 1);
+      final oldest = DateTime.utc(2026, 2, 1);
+      await repo.create(_makePost(id: 'new', createdAt: newest));
+      await repo.create(_makePost(id: 'old', createdAt: oldest));
+
+      final result = await repo.feedPublic(limit: 3);
+
+      expect(result.posts.map((post) => post.id), ['new', 'old']);
+      expect(result.hasMore, isFalse);
+      expect(result.nextCursor, oldest);
+    });
+
+    test('exactly limit posts reports another possible page', () async {
+      await repo.create(
+        _makePost(id: 'new', createdAt: DateTime.utc(2026, 3, 1)),
+      );
+      await repo.create(
+        _makePost(id: 'old', createdAt: DateTime.utc(2026, 2, 1)),
+      );
+
+      final result = await repo.feedPublic(limit: 2);
+
+      expect(result.posts, hasLength(2));
+      expect(result.hasMore, isTrue);
+    });
+
+    test('after applies a strict createdAt range filter', () async {
+      final cursor = DateTime.utc(2026, 2, 1);
+      await repo.create(
+        _makePost(id: 'new', createdAt: DateTime.utc(2026, 3, 1)),
+      );
+      await repo.create(_makePost(id: 'at-cursor', createdAt: cursor));
+      await repo.create(
+        _makePost(id: 'old', createdAt: DateTime.utc(2026, 1, 1)),
+      );
+
+      final result = await repo.feedPublic(after: cursor);
+
+      expect(result.posts.map((post) => post.id), ['old']);
+      expect(result.nextCursor, DateTime.utc(2026, 1, 1));
+      expect(result.hasMore, isFalse);
+    });
+
+    test('empty page has a null cursor and no more pages', () async {
+      final result = await repo.feedPublic();
+
+      expect(result.posts, isEmpty);
+      expect(result.nextCursor, isNull);
+      expect(result.hasMore, isFalse);
     });
   });
 
@@ -195,21 +248,96 @@ void main() {
 
       final result = await repo.feedForFriends(['uidB', 'uidC']);
 
-      expect(result.length, equals(2));
-      final authorUids = result.map((p) => p.authorUid).toList();
+      expect(result.posts.length, equals(2));
+      final authorUids = result.posts.map((p) => p.authorUid).toList();
       expect(authorUids, containsAll(['uidB', 'uidC']));
     });
 
-    // TODO: edge case — feedForFriends with >10 UIDs requires chunking
-    // (Firestore `in` operator limit is 10). No SCENARIO defined for this,
-    // but the implementation chunks client-side. Consider adding a stress test.
     test('feedForFriends: empty list returns empty result', () async {
       await repo.create(
           _makePost(id: 'f1', authorUid: 'uidB', privacy: PostPrivacy.friends));
 
       final result = await repo.feedForFriends([]);
 
-      expect(result, isEmpty);
+      expect(result.posts, isEmpty);
+    });
+
+    test('2+ chunks merge globally newest-first and truncate to limit',
+        () async {
+      final friendUids = List.generate(11, (index) => 'uid-$index');
+      final posts = [
+        _makePost(
+          id: 'chunk-1-new',
+          authorUid: 'uid-0',
+          privacy: PostPrivacy.friends,
+          createdAt: DateTime.utc(2026, 6, 5),
+        ),
+        _makePost(
+          id: 'chunk-1-mid',
+          authorUid: 'uid-1',
+          privacy: PostPrivacy.friends,
+          createdAt: DateTime.utc(2026, 6, 3),
+        ),
+        _makePost(
+          id: 'chunk-1-old',
+          authorUid: 'uid-2',
+          privacy: PostPrivacy.friends,
+          createdAt: DateTime.utc(2026, 6, 1),
+        ),
+        _makePost(
+          id: 'chunk-2-new',
+          authorUid: 'uid-10',
+          privacy: PostPrivacy.friends,
+          createdAt: DateTime.utc(2026, 6, 6),
+        ),
+        _makePost(
+          id: 'chunk-2-mid',
+          authorUid: 'uid-10',
+          privacy: PostPrivacy.friends,
+          createdAt: DateTime.utc(2026, 6, 4),
+        ),
+        _makePost(
+          id: 'chunk-2-old',
+          authorUid: 'uid-10',
+          privacy: PostPrivacy.friends,
+          createdAt: DateTime.utc(2026, 6, 2),
+        ),
+      ];
+      for (final post in posts) {
+        await repo.create(post);
+      }
+
+      final result = await repo.feedForFriends(friendUids, limit: 3);
+
+      expect(
+        result.posts.map((post) => post.id),
+        ['chunk-2-new', 'chunk-1-new', 'chunk-2-mid'],
+      );
+      expect(result.nextCursor, DateTime.utc(2026, 6, 4));
+      expect(result.hasMore, isTrue);
+    });
+
+    test('newer second chunk leads the globally sorted result', () async {
+      final friendUids = List.generate(11, (index) => 'uid-$index');
+      await repo.create(_makePost(
+        id: 'first-chunk',
+        authorUid: 'uid-0',
+        privacy: PostPrivacy.friends,
+        createdAt: DateTime.utc(2026, 1, 1),
+      ));
+      await repo.create(_makePost(
+        id: 'second-chunk',
+        authorUid: 'uid-10',
+        privacy: PostPrivacy.friends,
+        createdAt: DateTime.utc(2026, 2, 1),
+      ));
+
+      final result = await repo.feedForFriends(friendUids);
+
+      expect(
+        result.posts.map((post) => post.id),
+        ['second-chunk', 'first-chunk'],
+      );
     });
   });
 
@@ -245,9 +373,9 @@ void main() {
 
       final result = await repo.feedForGym('gym1');
 
-      expect(result.length, equals(1));
-      expect(result.first.authorGymId, equals('gym1'));
-      expect(result.first.privacy, equals(PostPrivacy.gym));
+      expect(result.posts.length, equals(1));
+      expect(result.posts.first.authorGymId, equals('gym1'));
+      expect(result.posts.first.privacy, equals(PostPrivacy.gym));
     });
   });
 
@@ -271,7 +399,10 @@ void main() {
 
       final result = await repo.feedPublic();
 
-      expect(result.map((p) => p.id).toList(), equals(['new', 'mid', 'old']));
+      expect(
+        result.posts.map((p) => p.id).toList(),
+        equals(['new', 'mid', 'old']),
+      );
     });
 
     test('feedForFriends orders merged posts by createdAt descending',
@@ -297,7 +428,10 @@ void main() {
 
       final result = await repo.feedForFriends(['uidB', 'uidC']);
 
-      expect(result.map((p) => p.id).toList(), equals(['new', 'mid', 'old']));
+      expect(
+        result.posts.map((p) => p.id).toList(),
+        equals(['new', 'mid', 'old']),
+      );
     });
 
     test('feedForGym orders posts by createdAt descending', () async {
@@ -322,7 +456,10 @@ void main() {
 
       final result = await repo.feedForGym('gym1');
 
-      expect(result.map((p) => p.id).toList(), equals(['new', 'mid', 'old']));
+      expect(
+        result.posts.map((p) => p.id).toList(),
+        equals(['new', 'mid', 'old']),
+      );
     });
   });
 

@@ -99,6 +99,16 @@ class FriendshipRepository {
         .toList();
   }
 
+  /// Returns every friendship where [uid] is a member.
+  ///
+  /// Deliberately does not filter by status or request direction: callers use
+  /// this single query for bulk exclusion checks (for example, suggestions)
+  /// and must see accepted and pending relationships in both directions.
+  Future<List<Friendship>> allOf(String uid) async {
+    final snap = await _friendships.where('members', arrayContains: uid).get();
+    return snap.docs.map(_fromDoc).whereType<Friendship>().toList();
+  }
+
   /// Live stream of pending friendships where [uid] is the recipient
   /// (not the requester). This is the inbox feed for the friend-requests
   /// inbox screen. Emits an empty list when none exist.

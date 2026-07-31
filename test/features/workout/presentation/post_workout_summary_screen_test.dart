@@ -7,9 +7,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/features/feed/domain/post_privacy.dart';
 import 'package:treino/features/insights/domain/radar_axis.dart';
 import 'package:treino/features/insights/presentation/widgets/muscle_distribution_radar.dart';
 import 'package:treino/features/workout/application/post_workout_notifier.dart';
@@ -22,6 +24,7 @@ import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/presentation/post_workout_summary_screen.dart';
+import 'package:treino/features/workout/presentation/widgets/session_stats_card.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -263,6 +266,37 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('5'), findsOneWidget);
+  });
+
+  testWidgets('stat card owns tile stagger and mood follows its four slots',
+      (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+    ));
+    await tester.pump();
+    await tester.pump();
+
+    final card = tester.widget<SessionStatsCard>(
+      find.byType(SessionStatsCard),
+    );
+    expect(card.animateTiles, isTrue);
+    expect(card.entryDelay, AppMotion.stagger(1));
+
+    final cardEntries = tester.widgetList<TreinoFadeSlideIn>(
+      find.descendant(
+        of: find.byType(SessionStatsCard),
+        matching: find.byType(TreinoFadeSlideIn),
+      ),
+    );
+    expect(cardEntries, hasLength(4));
+
+    final moodEntry = tester.widget<TreinoFadeSlideIn>(
+      find.ancestor(
+        of: find.text('😐'),
+        matching: find.byType(TreinoFadeSlideIn),
+      ),
+    );
+    expect(moodEntry.delay, AppMotion.stagger(5));
   });
 
   // ── PRs reales (reemplaza el stub de SCENARIO-347) ───────────────────────
@@ -850,6 +884,7 @@ class _TrackingNotifier extends PostWorkoutNotifier {
     Session session, {
     required String text,
     required int exerciseCount,
+    required PostPrivacy privacy,
     String? localPhotoPath,
   }) async {
     capturedExerciseCount = exerciseCount;

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/feed/presentation/widgets/public_profile_stats_row.dart';
+import 'package:treino/features/workout/presentation/widgets/session_stats_card.dart';
+import 'package:treino/features/workout/presentation/widgets/stat_tile.dart';
 
 Widget _wrap(Widget w) => MaterialApp(
       theme: AppTheme.dark(),
@@ -14,6 +17,8 @@ void main() {
       await tester.pumpWidget(_wrap(const PublicProfileStatsRow()));
       await tester.pump();
 
+      expect(find.byType(SessionStatsCard), findsOneWidget);
+      expect(find.byType(StatTile), findsNWidgets(4));
       expect(find.text('WORKOUTS'), findsOneWidget);
       expect(find.text('RACHA'), findsOneWidget);
       expect(find.text('SEGUIDORES'), findsOneWidget);
@@ -66,6 +71,18 @@ void main() {
       expect(find.text('412'), findsOneWidget);
       // SIGUIENDO: 284 < 1000 → '284'
       expect(find.text('284'), findsOneWidget);
+    });
+
+    testWidgets('RACHA preserves the accent-color highlight', (tester) async {
+      await tester.pumpWidget(_wrap(
+        const PublicProfileStatsRow(racha: 23),
+      ));
+      await tester.pump();
+
+      final context = tester.element(find.byType(PublicProfileStatsRow));
+      final rachaValue = tester.widget<Text>(find.text('23'));
+
+      expect(rachaValue.style?.color, AppPalette.of(context).accent);
     });
 
     // SCENARIO-324b: kFormat applied to WORKOUTS

@@ -24,6 +24,7 @@ import 'package:treino/features/feed/application/post_providers.dart';
 import 'package:treino/features/feed/data/post_repository.dart';
 import 'package:treino/features/feed/domain/feed_segment.dart';
 import 'package:treino/features/feed/domain/post.dart';
+import 'package:treino/features/feed/domain/post_page.dart';
 import 'package:treino/features/feed/domain/post_privacy.dart';
 import 'package:treino/features/feed/feed_screen.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
@@ -49,25 +50,35 @@ class _CountingPostRepository extends Fake implements PostRepository {
   bool failNextFriendsQuery = false;
 
   @override
-  Future<List<Post>> feedForFriends(List<String> friendUids) async {
+  Future<PostPage> feedForFriends(
+    List<String> friendUids, {
+    int limit = 20,
+    DateTime? after,
+  }) async {
     friendsQueryUids.add(List.of(friendUids));
     if (failNextFriendsQuery) {
       failNextFriendsQuery = false;
       throw Exception('feed down');
     }
-    return store
+    final posts = store
         .where(
           (p) =>
               p.privacy == PostPrivacy.friends &&
               friendUids.contains(p.authorUid),
         )
         .toList();
+    return PostPage(posts: posts, nextCursor: null, hasMore: false);
   }
 
   @override
-  Future<List<Post>> feedForGym(String gymId) async {
+  Future<PostPage> feedForGym(
+    String gymId, {
+    int limit = 20,
+    DateTime? after,
+  }) async {
     gymQueryIds.add(gymId);
-    return store.where((p) => p.privacy == PostPrivacy.gym).toList();
+    final posts = store.where((p) => p.privacy == PostPrivacy.gym).toList();
+    return PostPage(posts: posts, nextCursor: null, hasMore: false);
   }
 }
 

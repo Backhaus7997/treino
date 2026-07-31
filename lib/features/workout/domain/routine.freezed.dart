@@ -49,8 +49,10 @@ mixin _$Routine {
 // `includeToJson: false` keeps them out of every client write payload;
 // firestore.rules additionally rejects them on create and never lists
 // them in any update affectedKeys allowlist.
+// ignore: invalid_annotation_target
   @JsonKey(includeToJson: false)
-  double? get ratingAvg => throw _privateConstructorUsedError;
+  double? get ratingAvg =>
+      throw _privateConstructorUsedError; // ignore: invalid_annotation_target
   @JsonKey(includeToJson: false)
   int? get ratingsCount => throw _privateConstructorUsedError;
 
@@ -391,9 +393,11 @@ class _$RoutineImpl implements _Routine {
 // `includeToJson: false` keeps them out of every client write payload;
 // firestore.rules additionally rejects them on create and never lists
 // them in any update affectedKeys allowlist.
+// ignore: invalid_annotation_target
   @override
   @JsonKey(includeToJson: false)
   final double? ratingAvg;
+// ignore: invalid_annotation_target
   @override
   @JsonKey(includeToJson: false)
   final int? ratingsCount;
@@ -530,9 +534,10 @@ abstract class _Routine implements Routine {
 // `includeToJson: false` keeps them out of every client write payload;
 // firestore.rules additionally rejects them on create and never lists
 // them in any update affectedKeys allowlist.
+// ignore: invalid_annotation_target
   @override
   @JsonKey(includeToJson: false)
-  double? get ratingAvg;
+  double? get ratingAvg; // ignore: invalid_annotation_target
   @override
   @JsonKey(includeToJson: false)
   int? get ratingsCount;

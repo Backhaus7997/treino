@@ -16,6 +16,7 @@ import 'package:treino/features/feed/application/post_providers.dart';
 import 'package:treino/features/feed/data/post_photo_upload_service.dart';
 import 'package:treino/features/feed/data/post_repository.dart';
 import 'package:treino/features/feed/domain/post.dart';
+import 'package:treino/features/feed/domain/post_privacy.dart';
 import 'package:treino/features/insights/domain/radar_axis.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
@@ -163,6 +164,7 @@ void main() {
           _makeSession(),
           text: '¡Terminé mi entreno! 💪',
           exerciseCount: 2,
+          privacy: PostPrivacy.friends,
           localPhotoPath: localPhotoPath,
         );
   }

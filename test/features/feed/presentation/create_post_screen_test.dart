@@ -125,6 +125,9 @@ Widget _wrapWithRouter({
     ],
     child: MaterialApp.router(
       theme: AppTheme.dark(),
+      // Pinned so the Spanish assertions below stay stable: without it the
+      // test host resolves to `en` and localized copy renders in English.
+      locale: const Locale('es', 'AR'),
       localizationsDelegates: AppL10n.localizationsDelegates,
       supportedLocales: AppL10n.supportedLocales,
       routerConfig: router,

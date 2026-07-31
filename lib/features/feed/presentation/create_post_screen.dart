@@ -12,8 +12,8 @@ import '../../auth/application/auth_providers.dart';
 import '../../profile/application/user_providers.dart';
 import '../application/create_post_notifier.dart';
 import '../domain/post.dart';
-import '../domain/post_privacy.dart';
 import 'routine_tag_picker_sheet.dart';
+import 'widgets/post_privacy_selector.dart';
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -237,18 +237,11 @@ class _CreatePostBodyState extends ConsumerState<_CreatePostBody> {
                   palette: palette,
                 ),
                 const SizedBox(height: 20),
-                _PrivacyLabel(palette: palette),
-                const SizedBox(height: 12),
-                _PrivacyPills(
+                PostPrivacySelector(
                   selected: state.privacy,
                   hasGym: hasGym,
                   onSelect: notifier.setPrivacy,
-                  palette: palette,
                 ),
-                if (!hasGym) ...[
-                  const SizedBox(height: 8),
-                  _PrivacyHelperText(palette: palette),
-                ],
                 const SizedBox(height: 20),
                 _RoutineTagField(state: state, notifier: notifier),
                 const SizedBox(height: 20),
@@ -460,160 +453,6 @@ class _CharCounter extends StatelessWidget {
         fontWeight: FontWeight.w400,
         fontSize: 12,
         color: isOver ? palette.danger : palette.textMuted,
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Privacy
-// ---------------------------------------------------------------------------
-
-class _PrivacyLabel extends StatelessWidget {
-  const _PrivacyLabel({required this.palette});
-
-  final AppPalette palette;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      'VISIBILIDAD',
-      style: GoogleFonts.barlowCondensed(
-        fontWeight: FontWeight.w700,
-        fontSize: 12,
-        letterSpacing: 1.0,
-        color: palette.textMuted,
-      ),
-    );
-  }
-}
-
-class _PrivacyPills extends StatelessWidget {
-  const _PrivacyPills({
-    required this.selected,
-    required this.hasGym,
-    required this.onSelect,
-    required this.palette,
-  });
-
-  final PostPrivacy selected;
-  final bool hasGym;
-  final ValueChanged<PostPrivacy> onSelect;
-  final AppPalette palette;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        _PrivacyPill(
-          label: 'AMIGOS',
-          privacy: PostPrivacy.friends,
-          selected: selected,
-          isEnabled: true,
-          onSelect: onSelect,
-          palette: palette,
-        ),
-        const SizedBox(width: 12),
-        _PrivacyPill(
-          label: 'MI GYM',
-          privacy: PostPrivacy.gym,
-          selected: selected,
-          isEnabled: hasGym,
-          onSelect: onSelect,
-          palette: palette,
-        ),
-        const SizedBox(width: 12),
-        _PrivacyPill(
-          label: 'PÚBLICO',
-          privacy: PostPrivacy.public,
-          selected: selected,
-          isEnabled: true,
-          onSelect: onSelect,
-          palette: palette,
-        ),
-      ],
-    );
-  }
-}
-
-class _PrivacyPill extends StatelessWidget {
-  const _PrivacyPill({
-    required this.label,
-    required this.privacy,
-    required this.selected,
-    required this.isEnabled,
-    required this.onSelect,
-    required this.palette,
-  });
-
-  final String label;
-  final PostPrivacy privacy;
-  final PostPrivacy selected;
-  final bool isEnabled;
-  final ValueChanged<PostPrivacy> onSelect;
-  final AppPalette palette;
-
-  bool get _isActive => selected == privacy;
-
-  @override
-  Widget build(BuildContext context) {
-    final pill = Semantics(
-      button: true,
-      selected: _isActive,
-      enabled: isEnabled,
-      label: label,
-      child: GestureDetector(
-        onTap: isEnabled ? () => onSelect(privacy) : null,
-        behavior: HitTestBehavior.opaque,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 44),
-          child: Center(
-            widthFactor: 1,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-              decoration: BoxDecoration(
-                color: _isActive ? palette.accent : palette.bgCard,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: _isActive ? palette.accent : palette.border,
-                ),
-              ),
-              child: ExcludeSemantics(
-                child: Text(
-                  label,
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                    color: _isActive ? palette.bg : palette.textPrimary,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-
-    if (!isEnabled) {
-      return Opacity(opacity: 0.4, child: pill);
-    }
-    return pill;
-  }
-}
-
-class _PrivacyHelperText extends StatelessWidget {
-  const _PrivacyHelperText({required this.palette});
-
-  final AppPalette palette;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      'Asociate a un gym para postear acá',
-      style: GoogleFonts.barlow(
-        fontWeight: FontWeight.w400,
-        fontSize: 12,
-        color: palette.textMuted,
       ),
     );
   }

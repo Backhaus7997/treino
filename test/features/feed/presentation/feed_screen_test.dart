@@ -12,6 +12,7 @@ import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
+import 'package:treino/features/feed/application/feed_pagination_notifier.dart';
 import 'package:treino/features/feed/application/feed_screen_providers.dart';
 import 'package:treino/features/feed/application/friendship_providers.dart';
 import 'package:treino/features/feed/application/post_providers.dart';
@@ -893,6 +894,60 @@ void main() {
       // away — keep-alive means the FutureProvider result is cached, so the
       // fetch only runs once.
       expect(buildCount, equals(1));
+    });
+  });
+
+  group('infinite-scroll footer', () {
+    List<Override> publicOverrides(List<Post> posts) => [
+          feedSegmentProvider.overrideWith((ref) => FeedSegment.public),
+          myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myGymFeedProvider.overrideWith((ref) async => null),
+          feedPublicProvider.overrideWith((ref) async => posts),
+        ];
+
+    testWidgets('shows a footer indicator while another page is loading',
+        (tester) async {
+      final posts = PaginatedPostList(
+        FeedPaginationState(
+          posts: [_makePost(id: 'loading-more')],
+          nextCursor: DateTime.utc(2026, 7, 30),
+          hasMore: true,
+          isLoadingMore: true,
+        ),
+      );
+
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), publicOverrides(posts)),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(
+        find.byKey(const ValueKey('feed-loading-more-indicator')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('shows no footer when the feed has no more pages',
+        (tester) async {
+      final posts = PaginatedPostList(
+        FeedPaginationState(
+          posts: [_makePost(id: 'last-page')],
+          nextCursor: null,
+          hasMore: false,
+          isLoadingMore: false,
+        ),
+      );
+
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), publicOverrides(posts)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('feed-loading-more-indicator')),
+        findsNothing,
+      );
     });
   });
 }

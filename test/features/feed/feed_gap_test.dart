@@ -117,14 +117,15 @@ void main() {
       }
 
       final result = await repo.feedForFriends(friendUids);
+      final posts = result.posts;
 
       // All 11 friends-privacy posts are aggregated across both chunks.
-      expect(result.length, equals(11));
+      expect(posts.length, equals(11));
 
       // The merged list is globally newest-first (client re-sort across the
       // chunk boundary). The newest post is by friend-10 (2nd chunk), the
       // oldest by friend-00 (1st chunk).
-      final times = result.map((p) => p.createdAt).toList();
+      final times = posts.map((p) => p.createdAt).toList();
       for (var i = 0; i < times.length - 1; i++) {
         expect(
           times[i].isAfter(times[i + 1]) ||
@@ -133,9 +134,9 @@ void main() {
           reason: 'result must be sorted newest-first across chunk boundaries',
         );
       }
-      expect(result.first.authorUid, equals('friend-10'),
+      expect(posts.first.authorUid, equals('friend-10'),
           reason: 'newest post (2nd chunk) must lead the merged list');
-      expect(result.last.authorUid, equals('friend-00'),
+      expect(posts.last.authorUid, equals('friend-00'),
           reason: 'oldest post (1st chunk) must trail the merged list');
     });
 
@@ -150,7 +151,7 @@ void main() {
 
       final result = await repo.feedForFriends(const <String>[]);
 
-      expect(result, isEmpty);
+      expect(result.posts, isEmpty);
     });
   });
 

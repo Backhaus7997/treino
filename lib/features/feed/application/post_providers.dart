@@ -6,18 +6,59 @@ import '../../profile/application/user_public_profile_providers.dart';
 import '../data/post_repository.dart';
 import '../domain/friendship_status.dart';
 import '../domain/post.dart';
+import '../domain/post_page.dart';
 import '../domain/post_privacy.dart';
+import 'feed_pagination_notifier.dart';
 import 'public_profile_providers.dart';
 
 final postRepositoryProvider = Provider<PostRepository>(
   (ref) => PostRepository(firestore: ref.watch(firestoreProvider)),
 );
 
+const publicFeedPaginationKey = 'public';
+const _friendsFeedPaginationPrefix = 'friends:';
+const _gymFeedPaginationPrefix = 'gym:';
+
+String friendsFeedPaginationKey(String friendUidsKey) =>
+    '$_friendsFeedPaginationPrefix$friendUidsKey';
+
+String gymFeedPaginationKey(String gymId) => '$_gymFeedPaginationPrefix$gymId';
+
+/// Maps stable string query keys to the matching repository query.
+class PostFeedPaginationNotifier extends FeedPaginationNotifier {
+  @override
+  Future<PostPage> fetchPage(String queryKey, {DateTime? after}) {
+    final repository = ref.read(postRepositoryProvider);
+    if (queryKey == publicFeedPaginationKey) {
+      return repository.feedPublic(after: after);
+    }
+    if (queryKey.startsWith(_friendsFeedPaginationPrefix)) {
+      final serializedUids =
+          queryKey.substring(_friendsFeedPaginationPrefix.length);
+      final friendUids =
+          serializedUids.isEmpty ? const <String>[] : serializedUids.split(' ');
+      return repository.feedForFriends(friendUids, after: after);
+    }
+    if (queryKey.startsWith(_gymFeedPaginationPrefix)) {
+      final gymId = queryKey.substring(_gymFeedPaginationPrefix.length);
+      return repository.feedForGym(gymId, after: after);
+    }
+    throw ArgumentError.value(queryKey, 'queryKey', 'Unknown feed query');
+  }
+}
+
+final feedPaginationProvider = AsyncNotifierProvider.family<
+    PostFeedPaginationNotifier, FeedPaginationState, String>(
+  PostFeedPaginationNotifier.new,
+);
+
 /// All public posts, ordered newest-first (createdAt desc) server-side.
 /// Requires the posts (privacy, createdAt desc) composite index in
 /// firestore.indexes.json.
-final feedPublicProvider = FutureProvider<List<Post>>((ref) {
-  return ref.watch(postRepositoryProvider).feedPublic();
+final feedPublicProvider = FutureProvider<List<Post>>((ref) async {
+  final state =
+      await ref.watch(feedPaginationProvider(publicFeedPaginationKey).future);
+  return PaginatedPostList(state);
 });
 
 /// Friends-privacy posts for the given set of friend UIDs.
@@ -32,10 +73,11 @@ final feedPublicProvider = FutureProvider<List<Post>>((ref) {
 ///
 /// Use [friendUidsKey] to build the key from a UID list.
 final feedForFriendsProvider =
-    FutureProvider.family<List<Post>, String>((ref, friendUidsKey) {
-  final friendUids =
-      friendUidsKey.isEmpty ? const <String>[] : friendUidsKey.split(' ');
-  return ref.watch(postRepositoryProvider).feedForFriends(friendUids);
+    FutureProvider.family<List<Post>, String>((ref, friendUidsKey) async {
+  final state = await ref.watch(
+    feedPaginationProvider(friendsFeedPaginationKey(friendUidsKey)).future,
+  );
+  return PaginatedPostList(state);
 });
 
 /// Builds a stable, value-equal key for [feedForFriendsProvider] from a list of
@@ -45,8 +87,11 @@ String friendUidsKey(List<String> friendUids) =>
 
 /// Gym-privacy posts for the given gym ID.
 final feedForGymProvider =
-    FutureProvider.family<List<Post>, String>((ref, gymId) {
-  return ref.watch(postRepositoryProvider).feedForGym(gymId);
+    FutureProvider.family<List<Post>, String>((ref, gymId) async {
+  final state = await ref.watch(
+    feedPaginationProvider(gymFeedPaginationKey(gymId)).future,
+  );
+  return PaginatedPostList(state);
 });
 
 /// All posts authored by a given UID.

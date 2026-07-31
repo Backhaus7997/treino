@@ -14,8 +14,11 @@ import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../feed/application/create_post_notifier.dart' show kMaxPostChars;
+import '../../feed/domain/post_privacy.dart';
 import '../../feed/domain/workout_snapshot.dart';
+import '../../feed/presentation/widgets/post_privacy_selector.dart';
 import '../../feed/presentation/widgets/workout_snapshot_detail.dart';
+import '../../profile/application/user_providers.dart';
 import '../application/post_workout_notifier.dart';
 import '../application/session_muscle_distribution.dart';
 import '../application/session_providers.dart';
@@ -109,6 +112,7 @@ class _ComposerBodyState extends ConsumerState<_ComposerBody> {
   TextEditingController? _controller;
   String? _photoPath;
   bool _photoError = false;
+  PostPrivacy _privacy = PostPrivacy.friends;
 
   @override
   void dispose() {
@@ -149,6 +153,7 @@ class _ComposerBodyState extends ConsumerState<_ComposerBody> {
             // de la card.
             exerciseCount:
                 widget.setLogs.map((s) => s.exerciseId).toSet().length,
+            privacy: _privacy,
             localPhotoPath: _photoPath,
           );
       if (!mounted) return;
@@ -171,6 +176,11 @@ class _ComposerBodyState extends ConsumerState<_ComposerBody> {
     final l10n = AppL10n.of(context);
     final controller = _ensureController(l10n.workoutPostAutoCompleteText);
     final isSharing = ref.watch(postWorkoutNotifierProvider).isLoading;
+    final hasGym = ref.watch(
+      userProfileProvider.select(
+        (profileAsync) => profileAsync.valueOrNull?.gymId != null,
+      ),
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -218,6 +228,12 @@ class _ComposerBodyState extends ConsumerState<_ComposerBody> {
                     ),
                   ),
                   const SizedBox(height: 12),
+                  PostPrivacySelector(
+                    selected: _privacy,
+                    hasGym: hasGym,
+                    onSelect: (privacy) => setState(() => _privacy = privacy),
+                  ),
+                  const SizedBox(height: 20),
                   _PhotoField(
                     photoPath: _photoPath,
                     hasError: _photoError,

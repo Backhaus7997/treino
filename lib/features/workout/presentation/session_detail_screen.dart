@@ -15,6 +15,7 @@ import '../domain/session.dart';
 import '../domain/set_log.dart';
 import 'utils/date_helpers.dart';
 import 'widgets/session_exercise_block.dart';
+import 'widgets/session_stats_card.dart';
 import 'widgets/stat_tile.dart';
 import '../../../l10n/app_l10n.dart';
 
@@ -143,39 +144,37 @@ class _DetailLoaded extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
 
-          // 4-stat grid 2×2
+          // 4 stats agrupadas en una tarjeta 2×2.
           TreinoFadeSlideIn(
             delay: AppMotion.stagger(1),
-            child: GridView.count(
-              crossAxisCount: 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              mainAxisSpacing: 16,
-              crossAxisSpacing: 16,
-              childAspectRatio: 2,
-              children: [
+            child: SessionStatsCard(
+              tiles: [
                 StatTile(
+                  icon: TreinoIcon.clock,
                   label: l10n.workoutDetailStatDurationMin,
                   value: session.durationMin.toString(),
                 ),
                 StatTile(
+                  icon: TreinoIcon.statSets,
                   label: l10n.workoutDetailStatSets,
                   value: setLogs.length.toString(),
                 ),
                 StatTile(
+                  icon: TreinoIcon.dumbbell,
                   label: l10n.workoutDetailStatVolumeKg,
                   value: formatVolumeKg(session.totalVolumeKg),
                 ),
                 StatTile(
+                  icon: TreinoIcon.statPr,
                   label: l10n.workoutDetailStatPrsToday,
                   value: l10n.workoutStatPrsTodayStub,
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 20),
 
           // Exercise blocks — or empty state when no sets were logged.
           if (groupedList.isEmpty)

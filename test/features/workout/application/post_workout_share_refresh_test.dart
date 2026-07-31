@@ -21,6 +21,7 @@ import 'package:treino/features/feed/application/friendship_providers.dart';
 import 'package:treino/features/feed/application/post_providers.dart';
 import 'package:treino/features/feed/data/post_repository.dart';
 import 'package:treino/features/feed/domain/post.dart';
+import 'package:treino/features/feed/domain/post_page.dart';
 import 'package:treino/features/feed/domain/post_privacy.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
@@ -51,14 +52,19 @@ class _InMemoryPostRepository extends Fake implements PostRepository {
   }
 
   @override
-  Future<List<Post>> feedForFriends(List<String> friendUids) async {
+  Future<PostPage> feedForFriends(
+    List<String> friendUids, {
+    int limit = 20,
+    DateTime? after,
+  }) async {
     feedForFriendsCalls++;
-    return store
+    final posts = store
         .where((p) =>
             p.privacy == PostPrivacy.friends &&
             friendUids.contains(p.authorUid))
         .toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return PostPage(posts: posts, nextCursor: null, hasMore: false);
   }
 }
 
@@ -131,6 +137,7 @@ void main() {
             _makeSession(),
             text: '¡Terminé mi entreno! 💪',
             exerciseCount: 3,
+            privacy: PostPrivacy.friends,
           );
 
       // 3. Sin reiniciar: el feed AMIGOS debe exponer el post nuevo.
@@ -156,6 +163,7 @@ void main() {
             _makeSession(),
             text: 'Entreno compartido',
             exerciseCount: 3,
+            privacy: PostPrivacy.friends,
           );
 
       await container.read(myFriendsFeedProvider.future);

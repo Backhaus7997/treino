@@ -227,6 +227,78 @@ void main() {
     });
   });
 
+  group('FriendshipRepository.allOf', () {
+    test('returns accepted and pending friendships in both directions',
+        () async {
+      final now = DateTime.utc(2026, 1, 1);
+      final friendships = [
+        Friendship(
+          id: 'me_outgoing-accepted',
+          uidA: 'me',
+          uidB: 'outgoing-accepted',
+          status: FriendshipStatus.accepted,
+          requesterId: 'me',
+          members: ['me', 'outgoing-accepted'],
+          createdAt: now,
+        ),
+        Friendship(
+          id: 'incoming-accepted_me',
+          uidA: 'incoming-accepted',
+          uidB: 'me',
+          status: FriendshipStatus.accepted,
+          requesterId: 'incoming-accepted',
+          members: ['incoming-accepted', 'me'],
+          createdAt: now,
+        ),
+        Friendship(
+          id: 'me_outgoing-pending',
+          uidA: 'me',
+          uidB: 'outgoing-pending',
+          status: FriendshipStatus.pending,
+          requesterId: 'me',
+          members: ['me', 'outgoing-pending'],
+          createdAt: now,
+        ),
+        Friendship(
+          id: 'incoming-pending_me',
+          uidA: 'incoming-pending',
+          uidB: 'me',
+          status: FriendshipStatus.pending,
+          requesterId: 'incoming-pending',
+          members: ['incoming-pending', 'me'],
+          createdAt: now,
+        ),
+      ];
+      for (final friendship in friendships) {
+        await firestore
+            .collection('friendships')
+            .doc(friendship.id)
+            .set(friendship.toJson());
+      }
+
+      final result = await repo.allOf('me');
+
+      expect(result.map((friendship) => friendship.id), {
+        'me_outgoing-accepted',
+        'incoming-accepted_me',
+        'me_outgoing-pending',
+        'incoming-pending_me',
+      });
+      expect(
+        result.map((friendship) => friendship.status).toSet(),
+        {FriendshipStatus.accepted, FriendshipStatus.pending},
+      );
+      expect(
+        result.where((friendship) => friendship.requesterId == 'me'),
+        hasLength(2),
+      );
+      expect(
+        result.where((friendship) => friendship.requesterId != 'me'),
+        hasLength(2),
+      );
+    });
+  });
+
   // ---------------------------------------------------------------------------
   // T32-T35: delete (BREAKING: gains myUid param) + cross-feature write
   // ---------------------------------------------------------------------------

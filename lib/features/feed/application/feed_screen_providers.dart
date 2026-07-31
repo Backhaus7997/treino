@@ -11,9 +11,13 @@ final feedSegmentProvider = StateProvider<FeedSegment>(
   (ref) => FeedSegment.amigos,
 );
 
-final myFriendsFeedProvider = FutureProvider<List<Post>>((ref) async {
+/// Stable pagination key for the authenticated user's AMIGOS segment.
+///
+/// `null` means unauthenticated. The current UID is intentionally part of the
+/// serialized key so the author's own friends-privacy posts remain visible.
+final myFriendsFeedPaginationKeyProvider = FutureProvider<String?>((ref) async {
   final auth = await ref.watch(authStateChangesProvider.future);
-  if (auth == null) return const <Post>[];
+  if (auth == null) return null;
 
   final friendUids = await ref.watch(acceptedFriendsProvider(auth.uid).future);
   // QA-FEED-003: incluir el propio uid para que los posts AMIGOS del autor
@@ -23,8 +27,24 @@ final myFriendsFeedProvider = FutureProvider<List<Post>>((ref) async {
   // propios posts privacy=friends. La regla de posts ya permite leer los
   // propios (request.auth.uid == authorUid), así que la query no falla.
   final authorUids = <String>{...friendUids, auth.uid}.toList();
-  return await ref
-      .watch(feedForFriendsProvider(friendUidsKey(authorUids)).future);
+  return friendsFeedPaginationKey(friendUidsKey(authorUids));
+});
+
+final myFriendsFeedProvider = FutureProvider<List<Post>>((ref) async {
+  final paginationKey =
+      await ref.watch(myFriendsFeedPaginationKeyProvider.future);
+  if (paginationKey == null) return const <Post>[];
+  final friendKey = paginationKey.substring('friends:'.length);
+  return ref.watch(feedForFriendsProvider(friendKey).future);
+});
+
+/// Stable pagination key for the current user's MI GYM segment.
+///
+/// `null` retains the existing "user has no gym" semantic.
+final myGymFeedPaginationKeyProvider = FutureProvider<String?>((ref) async {
+  final profile = await ref.watch(userProfileProvider.future);
+  final gymId = profile?.gymId;
+  return gymId == null ? null : gymFeedPaginationKey(gymId);
 });
 
 /// Returns the gym-privacy feed for the current user's gym.
@@ -35,9 +55,9 @@ final myFriendsFeedProvider = FutureProvider<List<Post>>((ref) async {
 ///
 /// Mirrors [myFriendsFeedProvider] in semantics.
 final myGymFeedProvider = FutureProvider<List<Post>?>((ref) async {
-  final profile = await ref.watch(userProfileProvider.future);
-  final gymId = profile?.gymId;
-  if (gymId == null) return null;
+  final paginationKey = await ref.watch(myGymFeedPaginationKeyProvider.future);
+  if (paginationKey == null) return null;
+  final gymId = paginationKey.substring('gym:'.length);
   return ref.watch(feedForGymProvider(gymId).future);
 });
 
@@ -58,12 +78,16 @@ final myGymFeedProvider = FutureProvider<List<Post>?>((ref) async {
 /// propia lista y ya habían divergido (ADR-CP-006 pedía todos los feeds y
 /// shareWorkout invalidaba sólo 2 wrappers).
 void invalidateAllFeedProviders(Ref ref) {
+  // Estado acumulado — invalidar la family descarta cursor y páginas previas.
+  ref.invalidate(feedPaginationProvider);
   // Families subyacentes — acá vive el resultado del query.
   ref.invalidate(feedForFriendsProvider);
   ref.invalidate(feedForGymProvider);
   ref.invalidate(feedPublicProvider);
   // Wrappers — recomputan solos vía las families, pero invalidarlos cubre el
   // caso en que quedaron en error antes de llegar a watchear la family.
+  ref.invalidate(myFriendsFeedPaginationKeyProvider);
+  ref.invalidate(myGymFeedPaginationKeyProvider);
   ref.invalidate(myFriendsFeedProvider);
   ref.invalidate(myGymFeedProvider);
   // Read models por autor (ACTIVIDAD del perfil) — autoDispose; se invalidan

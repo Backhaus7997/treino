@@ -20,6 +20,7 @@ import '../domain/session.dart';
 import '../domain/set_log.dart';
 import 'widgets/session_highlights_section.dart';
 import 'widgets/session_muscle_distribution_section.dart';
+import 'widgets/session_stats_card.dart';
 import 'widgets/stat_tile.dart';
 import '../../../l10n/app_l10n.dart';
 
@@ -177,48 +178,46 @@ class _LoadedBody extends StatelessWidget {
           _RecognitionSlot(highlights: highlights),
           const SizedBox(height: 32),
 
-          // 2×2 stat grid
-          TreinoFadeSlideIn(
-            delay: AppMotion.stagger(1),
-            child: GridView.count(
-              crossAxisCount: 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              mainAxisSpacing: 16,
-              crossAxisSpacing: 16,
-              childAspectRatio: 2,
-              children: [
-                StatTile(
-                  label: l10n.workoutStatDurationMin,
-                  value: session.durationMin.toString(),
-                  countUpValue: session.durationMin,
-                ),
-                StatTile(
-                  label: l10n.workoutStatVolumeKg,
-                  value: formatVolumeKg(session.totalVolumeKg),
-                  countUpValue: session.totalVolumeKg,
-                  countUpFormatter: (v) => formatVolumeKg(v.toDouble()),
-                ),
-                StatTile(
-                  label: l10n.workoutStatSets,
-                  value: setLogs.length.toString(),
-                  countUpValue: setLogs.length,
-                ),
-                StatTile(
-                  label: l10n.workoutStatPrsToday,
-                  // null → "—": mientras el scan de récords corre (o falló),
-                  // y para sesiones que no cuentan como entreno (#372 — un
-                  // "0" en una sesión abandonada afirmaría una medición que
-                  // no se hizo).
-                  value: highlights == null || !session.countsAsWorkout
-                      ? null
-                      : highlights.recordCount.toString(),
-                  countUpValue: highlights == null || !session.countsAsWorkout
-                      ? null
-                      : highlights.recordCount,
-                ),
-              ],
-            ),
+          // 2×2 stat grid, agrupado en una sola tarjeta para que los números
+          // no queden sueltos sobre el fondo.
+          SessionStatsCard(
+            animateTiles: true,
+            entryDelay: AppMotion.stagger(1),
+            tiles: [
+              StatTile(
+                icon: TreinoIcon.clock,
+                label: l10n.workoutStatDurationMin,
+                value: session.durationMin.toString(),
+                countUpValue: session.durationMin,
+              ),
+              StatTile(
+                icon: TreinoIcon.dumbbell,
+                label: l10n.workoutStatVolumeKg,
+                value: formatVolumeKg(session.totalVolumeKg),
+                countUpValue: session.totalVolumeKg,
+                countUpFormatter: (v) => formatVolumeKg(v.toDouble()),
+              ),
+              StatTile(
+                icon: TreinoIcon.statSets,
+                label: l10n.workoutStatSets,
+                value: setLogs.length.toString(),
+                countUpValue: setLogs.length,
+              ),
+              StatTile(
+                icon: TreinoIcon.statPr,
+                label: l10n.workoutStatPrsToday,
+                // null → "—": mientras el scan de récords corre (o falló),
+                // y para sesiones que no cuentan como entreno (#372 — un
+                // "0" en una sesión abandonada afirmaría una medición que
+                // no se hizo).
+                value: highlights == null || !session.countsAsWorkout
+                    ? null
+                    : highlights.recordCount.toString(),
+                countUpValue: highlights == null || !session.countsAsWorkout
+                    ? null
+                    : highlights.recordCount,
+              ),
+            ],
           ),
           const SizedBox(height: 32),
 
@@ -235,7 +234,7 @@ class _LoadedBody extends StatelessWidget {
           // expected (tofu .notdef, large font scale) the row scales down
           // instead of overflowing (#456).
           TreinoFadeSlideIn(
-            delay: AppMotion.stagger(2),
+            delay: AppMotion.stagger(5),
             child: const ExcludeSemantics(
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,

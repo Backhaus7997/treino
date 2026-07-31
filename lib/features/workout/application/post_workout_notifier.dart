@@ -28,6 +28,7 @@ class PostWorkoutNotifier extends AutoDisposeAsyncNotifier<void> {
     Session session, {
     required String text,
     required int exerciseCount,
+    required PostPrivacy privacy,
     String? localPhotoPath,
   }) async {
     // Guard de reentrancia: el gate del botón depende de que la UI vea el
@@ -69,7 +70,7 @@ class PostWorkoutNotifier extends AutoDisposeAsyncNotifier<void> {
           routineId: session.routineId,
           routineName: session.routineName,
         ),
-        privacy: PostPrivacy.friends,
+        privacy: privacy,
         createdAt: DateTime.now().toUtc(),
         workoutStats: WorkoutStats(
           volumeKg: session.totalVolumeKg,

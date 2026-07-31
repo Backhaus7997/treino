@@ -8,12 +8,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/presentation/utils/date_helpers.dart';
 import 'package:treino/features/workout/presentation/session_detail_screen.dart';
+import 'package:treino/features/workout/presentation/widgets/session_stats_card.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -178,6 +180,21 @@ void main() {
     expect(find.text('3'), findsOneWidget);
     expect(find.text('1800'), findsOneWidget);
     expect(find.text('1800.0'), findsNothing);
+
+    // Historical details use the shared card without post-workout count-ups.
+    final statsCard = tester.widget<SessionStatsCard>(
+      find.byType(SessionStatsCard),
+    );
+    expect(
+      statsCard.tiles.map((tile) => tile.icon),
+      [
+        TreinoIcon.clock,
+        TreinoIcon.statSets,
+        TreinoIcon.dumbbell,
+        TreinoIcon.statPr,
+      ],
+    );
+    expect(statsCard.tiles.every((tile) => tile.countUpValue == null), isTrue);
 
     // Exercise group headings
     expect(find.text('Bench Press'), findsOneWidget);

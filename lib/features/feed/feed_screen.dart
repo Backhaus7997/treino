@@ -16,6 +16,7 @@ import '../profile/application/user_providers.dart';
 import '../profile/domain/user_role.dart';
 import '../workout/application/session_providers.dart' show currentUidProvider;
 import 'application/feed_screen_providers.dart';
+import 'application/feed_pagination_notifier.dart';
 import 'application/friendship_providers.dart';
 import 'application/post_providers.dart';
 import 'domain/feed_segment.dart';
@@ -23,6 +24,7 @@ import 'domain/post.dart';
 import 'presentation/widgets/feed_empty_state.dart';
 import 'presentation/widgets/feed_segment_pills.dart';
 import 'presentation/widgets/post_card.dart';
+import 'presentation/widgets/suggested_users_section.dart';
 
 /// Role-aware Feed tab.
 ///
@@ -373,21 +375,51 @@ class _FeedHeader extends ConsumerWidget {
 /// State) y recuerda qué posts YA corrieron su entrada, así un post
 /// reciclado que vuelve a construirse nunca vuelve a animar.
 class _FeedPostList extends StatefulWidget {
-  const _FeedPostList({required this.posts});
+  const _FeedPostList({
+    required this.posts,
+    required this.isLoadingMore,
+    required this.onLoadMore,
+  });
 
   final List<Post> posts;
+  final bool isLoadingMore;
+  final VoidCallback onLoadMore;
 
   @override
   State<_FeedPostList> createState() => _FeedPostListState();
 }
 
 class _FeedPostListState extends State<_FeedPostList> {
+  static const _loadMoreThreshold = 400.0;
+
   final Set<String> _animatedIds = {};
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_handleScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController
+      ..removeListener(_handleScroll)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _handleScroll() {
+    if (!_scrollController.hasClients) return;
+    if (_scrollController.position.extentAfter <= _loadMoreThreshold) {
+      widget.onLoadMore();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    // TODO(pagination): cursor-based pagination deferred (see explore §9)
     return ListView.separated(
+      controller: _scrollController,
       physics: const AlwaysScrollableScrollPhysics(),
       padding: EdgeInsets.fromLTRB(
         20,
@@ -395,9 +427,27 @@ class _FeedPostListState extends State<_FeedPostList> {
         20,
         MediaQuery.paddingOf(context).bottom,
       ),
-      itemCount: widget.posts.length,
+      itemCount: widget.posts.length + (widget.isLoadingMore ? 1 : 0),
       separatorBuilder: (_, __) => const SizedBox(height: 14),
       itemBuilder: (_, i) {
+        if (i == widget.posts.length) {
+          final palette = AppPalette.of(context);
+          return Padding(
+            key: const ValueKey('feed-loading-more-indicator'),
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  color: palette.accent,
+                  strokeWidth: 2,
+                ),
+              ),
+            ),
+          );
+        }
+
         final post = widget.posts[i];
         void onAuthorTap() => context.go('/feed/profile/${post.authorUid}');
 
@@ -448,8 +498,8 @@ Widget _scrollableEmptyState(BuildContext context, Widget child) {
 ///
 /// Renders a consistent loading spinner and — critically — an error state
 /// that pairs the localized message with a Reintentar CTA. Because the feed
-/// providers are [FutureProvider]s they do NOT self-heal, so the retry
-/// invalidates [onRetry]'s provider to force a refetch.
+/// providers do NOT self-heal, so the retry invalidates [onRetry]'s provider
+/// to force a refetch.
 class _FeedAsyncBody<T> extends StatelessWidget {
   const _FeedAsyncBody({
     required this.async,
@@ -523,28 +573,62 @@ class _AmigosBody extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return _FeedAsyncBody<List<Post>>(
       async: ref.watch(myFriendsFeedProvider),
-      // El wrapper compone feedForFriendsProvider, una family NO autoDispose
-      // que cachea el query por key. invalidate/refresh del wrapper no
-      // cascada a sus dependencias: con la misma key (mismos amigos) el
-      // wrapper re-usa la instancia cacheada y el query a Firestore nunca se
-      // re-emite — ni el retry tras error ni el pull-to-refresh traerían
-      // posts nuevos. Tumbar la family primero fuerza el re-fetch real.
       onRetry: () {
+        ref.invalidate(feedPaginationProvider);
         ref.invalidate(feedForFriendsProvider);
         ref.invalidate(myFriendsFeedProvider);
       },
-      onRefresh: () {
+      onRefresh: () async {
+        final paginationKey =
+            ref.read(myFriendsFeedPaginationKeyProvider).valueOrNull;
+        if (paginationKey == null) {
+          ref.invalidate(myFriendsFeedPaginationKeyProvider);
+          await ref.read(myFriendsFeedPaginationKeyProvider.future);
+          return;
+        }
+        await ref
+            .read(feedPaginationProvider(paginationKey).notifier)
+            .refresh();
         ref.invalidate(feedForFriendsProvider);
-        return ref.refresh(myFriendsFeedProvider.future);
+        ref.invalidate(myFriendsFeedProvider);
       },
       dataBuilder: (context, posts) {
         if (posts.isEmpty) {
+          final gymId = ref.watch(
+            userProfileProvider.select(
+              (profile) => profile.valueOrNull?.gymId,
+            ),
+          );
           return _scrollableEmptyState(
             context,
-            const FeedEmptyState(message: 'Aún no hay posts de tus amigos'),
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const FeedEmptyState(
+                  message: 'Aún no hay posts de tus amigos',
+                ),
+                SuggestedUsersSection(gymId: gymId),
+              ],
+            ),
           );
         }
-        return _FeedPostList(posts: posts);
+        final pagination = posts is PaginatedPostList ? posts : null;
+        return _FeedPostList(
+          posts: posts,
+          isLoadingMore: pagination?.isLoadingMore ?? false,
+          onLoadMore: () async {
+            final paginationKey =
+                ref.read(myFriendsFeedPaginationKeyProvider).valueOrNull;
+            if (paginationKey == null || !(pagination?.hasMore ?? false)) {
+              return;
+            }
+            await ref
+                .read(feedPaginationProvider(paginationKey).notifier)
+                .loadMore();
+            ref.invalidate(feedForFriendsProvider);
+            ref.invalidate(myFriendsFeedProvider);
+          },
+        );
       },
     );
   }
@@ -557,15 +641,24 @@ class _MiGymBody extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return _FeedAsyncBody<List<Post>?>(
       async: ref.watch(myGymFeedProvider),
-      // Mismo patrón que _AmigosBody: tumbar la family cacheada
-      // (feedForGymProvider) antes del wrapper para re-emitir el query.
       onRetry: () {
+        ref.invalidate(feedPaginationProvider);
         ref.invalidate(feedForGymProvider);
         ref.invalidate(myGymFeedProvider);
       },
-      onRefresh: () {
+      onRefresh: () async {
+        final paginationKey =
+            ref.read(myGymFeedPaginationKeyProvider).valueOrNull;
+        if (paginationKey == null) {
+          ref.invalidate(myGymFeedPaginationKeyProvider);
+          await ref.read(myGymFeedPaginationKeyProvider.future);
+          return;
+        }
+        await ref
+            .read(feedPaginationProvider(paginationKey).notifier)
+            .refresh();
         ref.invalidate(feedForGymProvider);
-        return ref.refresh(myGymFeedProvider.future);
+        ref.invalidate(myGymFeedProvider);
       },
       dataBuilder: (context, posts) {
         if (posts == null) {
@@ -580,7 +673,23 @@ class _MiGymBody extends ConsumerWidget {
             const FeedEmptyState(message: 'Tu gym todavía no tiene posts'),
           );
         }
-        return _FeedPostList(posts: posts);
+        final pagination = posts is PaginatedPostList ? posts : null;
+        return _FeedPostList(
+          posts: posts,
+          isLoadingMore: pagination?.isLoadingMore ?? false,
+          onLoadMore: () async {
+            final paginationKey =
+                ref.read(myGymFeedPaginationKeyProvider).valueOrNull;
+            if (paginationKey == null || !(pagination?.hasMore ?? false)) {
+              return;
+            }
+            await ref
+                .read(feedPaginationProvider(paginationKey).notifier)
+                .loadMore();
+            ref.invalidate(feedForGymProvider);
+            ref.invalidate(myGymFeedProvider);
+          },
+        );
       },
     );
   }
@@ -591,10 +700,17 @@ class _PublicoBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final provider = feedPaginationProvider(publicFeedPaginationKey);
     return _FeedAsyncBody<List<Post>>(
       async: ref.watch(feedPublicProvider),
-      onRetry: () => ref.invalidate(feedPublicProvider),
-      onRefresh: () => ref.refresh(feedPublicProvider.future),
+      onRetry: () {
+        ref.invalidate(provider);
+        ref.invalidate(feedPublicProvider);
+      },
+      onRefresh: () async {
+        await ref.read(provider.notifier).refresh();
+        ref.invalidate(feedPublicProvider);
+      },
       dataBuilder: (context, posts) {
         if (posts.isEmpty) {
           return _scrollableEmptyState(
@@ -602,7 +718,16 @@ class _PublicoBody extends ConsumerWidget {
             const FeedEmptyState(message: 'Aún no hay posts públicos'),
           );
         }
-        return _FeedPostList(posts: posts);
+        final pagination = posts is PaginatedPostList ? posts : null;
+        return _FeedPostList(
+          posts: posts,
+          isLoadingMore: pagination?.isLoadingMore ?? false,
+          onLoadMore: () async {
+            if (!(pagination?.hasMore ?? false)) return;
+            await ref.read(provider.notifier).loadMore();
+            ref.invalidate(feedPublicProvider);
+          },
+        );
       },
     );
   }
