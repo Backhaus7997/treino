@@ -1181,6 +1181,9 @@ class AppL10nEs extends AppL10n {
   String get dashboardErrorTurnos => 'No pudimos cargar tus próximos turnos.';
 
   @override
+  String get dashboardErrorResumen => 'No pudimos cargar el resumen del día.';
+
+  @override
   String get dashboardSinTurnosProximos =>
       'No tenés turnos próximos confirmados.';
 
@@ -2737,7 +2740,10 @@ class AppL10nEs extends AppL10n {
 
   @override
   String dashboardAlertBannerSummary(
-      int vencidos, int solicitudes, int inactivos) {
+    int vencidos,
+    int solicitudes,
+    int inactivos,
+  ) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,
@@ -4373,6 +4379,9 @@ class AppL10nEsAr extends AppL10nEs {
   String get dashboardErrorTurnos => 'No pudimos cargar tus próximos turnos.';
 
   @override
+  String get dashboardErrorResumen => 'No pudimos cargar el resumen del día.';
+
+  @override
   String get dashboardSinTurnosProximos =>
       'No tenés turnos próximos confirmados.';
 
@@ -5927,7 +5936,10 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String dashboardAlertBannerSummary(
-      int vencidos, int solicitudes, int inactivos) {
+    int vencidos,
+    int solicitudes,
+    int inactivos,
+  ) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,
