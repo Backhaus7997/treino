@@ -12,12 +12,12 @@ import '../../core/widgets/treino_icon.dart';
 import '../../l10n/app_l10n.dart';
 import '../chat/application/chat_providers.dart';
 import '../gym_rankings/presentation/rankings_screen.dart' show RankingsBody;
+import '../notifications/application/notification_history_providers.dart';
 import '../profile/application/user_providers.dart';
 import '../profile/domain/user_role.dart';
 import '../workout/application/session_providers.dart' show currentUidProvider;
 import 'application/feed_screen_providers.dart';
 import 'application/feed_pagination_notifier.dart';
-import 'application/friendship_providers.dart';
 import 'application/post_providers.dart';
 import 'domain/feed_segment.dart';
 import 'domain/post.dart';
@@ -200,8 +200,8 @@ class _FeedHeader extends ConsumerWidget {
     final l10n = AppL10n.of(context);
 
     final uid = ref.watch(currentUidProvider);
-    final pendingRequests =
-        uid == null ? 0 : ref.watch(pendingRequestCountProvider(uid));
+    final notificationBadge =
+        uid == null ? 0 : ref.watch(notificationHeaderBadgeProvider(uid));
     // REQ-CHATUNREAD-005: count of chats with unread messages for the badge.
     // Only user↔user (social) chats feed this badge — messages from the
     // athlete's coach live under the COACH tab badge. See
@@ -225,13 +225,11 @@ class _FeedHeader extends ConsumerWidget {
           const Spacer(),
           Semantics(
             button: true,
-            label: pendingRequests > 0
-                ? l10n.feedFriendRequestsWithCountA11y(pendingRequests)
-                : l10n.feedFriendRequestsA11y,
+            label: notificationBadge > 0
+                ? l10n.notificationBellWithCountA11y(notificationBadge)
+                : l10n.notificationBellA11y,
             child: TreinoTappable(
-              // /feed twin of /profile/friend-requests so the bottom bar
-              // keeps FEED highlighted while the inbox is open (issue #387).
-              onTap: () => context.push('/feed/friend-requests'),
+              onTap: () => context.push('/feed/notifications'),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
                 child: Center(
@@ -239,7 +237,7 @@ class _FeedHeader extends ConsumerWidget {
                     clipBehavior: Clip.none,
                     children: [
                       Icon(TreinoIcon.bell, size: 20, color: palette.textMuted),
-                      if (pendingRequests > 0)
+                      if (notificationBadge > 0)
                         Positioned(
                           top: -4,
                           right: -5,
@@ -254,7 +252,9 @@ class _FeedHeader extends ConsumerWidget {
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
-                              pendingRequests > 9 ? '9+' : '$pendingRequests',
+                              notificationBadge > 9
+                                  ? '9+'
+                                  : '$notificationBadge',
                               textAlign: TextAlign.center,
                               style: GoogleFonts.barlow(
                                 fontSize: 10,

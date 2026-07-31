@@ -5792,6 +5792,42 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Ver el perfil de {name}'**
   String a11ySuggestedUserButton(String name);
+
+  /// Título de la pantalla de historial de notificaciones.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'NOTIFICACIONES'**
+  String get notificationHistoryTitle;
+
+  /// Estado vacío del historial de notificaciones.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no tenés notificaciones'**
+  String get notificationHistoryEmpty;
+
+  /// Estado de error del historial de notificaciones.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar tus notificaciones.'**
+  String get notificationHistoryError;
+
+  /// Acceso compacto a solicitudes de amistad pendientes.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =1{1 solicitud de amistad pendiente} other{{count} solicitudes de amistad pendientes}}'**
+  String notificationPendingRequests(int count);
+
+  /// Etiqueta accesible de la campanita de notificaciones del feed.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Abrir notificaciones'**
+  String get notificationBellA11y;
+
+  /// Etiqueta accesible de la campanita con su badge combinado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Abrir notificaciones, {count} pendientes'**
+  String notificationBellWithCountA11y(int count);
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

@@ -793,5 +793,17 @@
         "type": "String"
       }
     }
-  }
+  },
+  "notificationHistoryTitle": "NOTIFICACIONES",
+  "@notificationHistoryTitle": {"description": "Título de la pantalla de historial de notificaciones."},
+  "notificationHistoryEmpty": "Todavía no tenés notificaciones",
+  "@notificationHistoryEmpty": {"description": "Estado vacío del historial de notificaciones."},
+  "notificationHistoryError": "No pudimos cargar tus notificaciones.",
+  "@notificationHistoryError": {"description": "Estado de error del historial de notificaciones."},
+  "notificationPendingRequests": "{count, plural, =1{1 solicitud de amistad pendiente} other{{count} solicitudes de amistad pendientes}}",
+  "@notificationPendingRequests": {"description": "Acceso compacto a solicitudes de amistad pendientes.", "placeholders": {"count": {"type": "int"}}},
+  "notificationBellA11y": "Abrir notificaciones",
+  "@notificationBellA11y": {"description": "Etiqueta accesible de la campanita de notificaciones del feed."},
+  "notificationBellWithCountA11y": "Abrir notificaciones, {count} pendientes",
+  "@notificationBellWithCountA11y": {"description": "Etiqueta accesible de la campanita con su badge combinado.", "placeholders": {"count": {"type": "int"}}}
 }

@@ -1188,5 +1188,17 @@
         "type": "String"
       }
     }
-  }
+  },
+  "notificationHistoryTitle": "NOTIFICATIONS",
+  "@notificationHistoryTitle": {"description": "Title of the notification history screen."},
+  "notificationHistoryEmpty": "You don't have any notifications yet",
+  "@notificationHistoryEmpty": {"description": "Empty state for notification history."},
+  "notificationHistoryError": "We couldn't load your notifications.",
+  "@notificationHistoryError": {"description": "Error state for notification history."},
+  "notificationPendingRequests": "{count, plural, =1{1 pending friend request} other{{count} pending friend requests}}",
+  "@notificationPendingRequests": {"description": "Compact link to pending friend requests.", "placeholders": {"count": {"type": "int"}}},
+  "notificationBellA11y": "Open notifications",
+  "@notificationBellA11y": {"description": "Accessibility label for the feed notification bell."},
+  "notificationBellWithCountA11y": "Open notifications, {count} pending",
+  "@notificationBellWithCountA11y": {"description": "Accessibility label for the feed notification bell with its combined badge count.", "placeholders": {"count": {"type": "int"}}}
 }

@@ -25,6 +25,7 @@ import 'package:treino/features/feed/presentation/widgets/feed_empty_state.dart'
 import 'package:treino/features/feed/presentation/widgets/feed_segment_pills.dart';
 import 'package:treino/features/feed/presentation/widgets/post_card.dart';
 import 'package:treino/features/gym_rankings/application/ranking_providers.dart';
+import 'package:treino/features/notifications/application/notification_history_providers.dart';
 import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/profile/application/ranking_optin_controller_provider.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
@@ -723,6 +724,7 @@ void main() {
           myGymFeedProvider.overrideWith((ref) async => null),
           feedPublicProvider.overrideWith((ref) async => const <Post>[]),
           unreadFromFriendsProvider.overrideWith((_) => 0),
+          unreadNotificationCountProvider.overrideWith((_) => 0),
           pendingRequestCountProvider(uid).overrideWith((_) => 0),
           // Page 1 (rankings) dependencies — mirrors the override set the
           // Entrenar tab used while it hosted rankings.

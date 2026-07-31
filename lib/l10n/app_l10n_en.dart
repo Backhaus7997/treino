@@ -3185,4 +3185,34 @@ class AppL10nEn extends AppL10n {
   String a11ySuggestedUserButton(String name) {
     return 'View $name\'s profile';
   }
+
+  @override
+  String get notificationHistoryTitle => 'NOTIFICATIONS';
+
+  @override
+  String get notificationHistoryEmpty =>
+      'You don\'t have any notifications yet';
+
+  @override
+  String get notificationHistoryError =>
+      'We couldn\'t load your notifications.';
+
+  @override
+  String notificationPendingRequests(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count pending friend requests',
+      one: '1 pending friend request',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get notificationBellA11y => 'Open notifications';
+
+  @override
+  String notificationBellWithCountA11y(int count) {
+    return 'Open notifications, $count pending';
+  }
 }

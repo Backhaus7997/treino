@@ -39,6 +39,7 @@ import '../features/feed/domain/post.dart';
 import '../features/feed/feed_screen.dart';
 import '../features/feed/presentation/create_post_screen.dart';
 import '../features/feed/presentation/friend_requests_inbox_screen.dart';
+import '../features/notifications/presentation/notification_history_screen.dart';
 import '../features/profile/application/account_deletion_notifier.dart';
 import '../features/feed/presentation/public_profile_screen.dart';
 import '../features/feed/presentation/search_users_screen.dart';
@@ -624,6 +625,10 @@ GoRouter buildRouter({
               GoRoute(
                 path: 'search',
                 builder: (_, __) => _withBg(const SearchUsersScreen()),
+              ),
+              GoRoute(
+                path: 'notifications',
+                builder: (_, __) => _withBg(const NotificationHistoryScreen()),
               ),
               GoRoute(
                 // Friend-requests inbox reached from the feed header bell.

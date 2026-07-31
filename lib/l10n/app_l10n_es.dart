@@ -3246,6 +3246,35 @@ class AppL10nEs extends AppL10n {
   String a11ySuggestedUserButton(String name) {
     return 'Ver el perfil de $name';
   }
+
+  @override
+  String get notificationHistoryTitle => 'NOTIFICACIONES';
+
+  @override
+  String get notificationHistoryEmpty => 'Todavía no tenés notificaciones';
+
+  @override
+  String get notificationHistoryError =>
+      'No pudimos cargar tus notificaciones.';
+
+  @override
+  String notificationPendingRequests(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count solicitudes de amistad pendientes',
+      one: '1 solicitud de amistad pendiente',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get notificationBellA11y => 'Abrir notificaciones';
+
+  @override
+  String notificationBellWithCountA11y(int count) {
+    return 'Abrir notificaciones, $count pendientes';
+  }
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -6486,5 +6515,34 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String a11ySuggestedUserButton(String name) {
     return 'Ver el perfil de $name';
+  }
+
+  @override
+  String get notificationHistoryTitle => 'NOTIFICACIONES';
+
+  @override
+  String get notificationHistoryEmpty => 'Todavía no tenés notificaciones';
+
+  @override
+  String get notificationHistoryError =>
+      'No pudimos cargar tus notificaciones.';
+
+  @override
+  String notificationPendingRequests(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count solicitudes de amistad pendientes',
+      one: '1 solicitud de amistad pendiente',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get notificationBellA11y => 'Abrir notificaciones';
+
+  @override
+  String notificationBellWithCountA11y(int count) {
+    return 'Abrir notificaciones, $count pendientes';
   }
 }
