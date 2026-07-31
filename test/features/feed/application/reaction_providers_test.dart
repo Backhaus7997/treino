@@ -24,7 +24,7 @@ void main() {
   late MockUser user;
 
   setUpAll(() {
-    registerFallbackValue(ReactionType.strong);
+    registerFallbackValue(ReactionType.like);
   });
 
   setUp(() {
@@ -63,14 +63,14 @@ void main() {
 
     await container.read(reactionActionsProvider).toggle(
           postId: 'post-1',
-          type: ReactionType.strong,
+          type: ReactionType.like,
         );
 
     verify(
       () => repository.react(
         postId: 'post-1',
         uid: 'user-1',
-        type: ReactionType.strong,
+        type: ReactionType.like,
       ),
     ).called(1);
     verifyNever(
@@ -120,14 +120,14 @@ void main() {
 
     await container.read(reactionActionsProvider).toggle(
           postId: 'post-1',
-          type: ReactionType.strong,
+          type: ReactionType.like,
         );
 
     verify(
       () => repository.react(
         postId: 'post-1',
         uid: 'user-1',
-        type: ReactionType.strong,
+        type: ReactionType.like,
       ),
     ).called(1);
     verifyNever(

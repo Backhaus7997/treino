@@ -22,7 +22,7 @@ Map<String, dynamic> _$$ReactionImplToJson(_$ReactionImpl instance) =>
     };
 
 const _$ReactionTypeEnumMap = {
-  ReactionType.strong: 'strong',
+  ReactionType.like: 'like',
   ReactionType.fire: 'fire',
   ReactionType.clap: 'clap',
 };

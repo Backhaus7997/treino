@@ -1114,9 +1114,9 @@
       }
     }
   },
-  "a11yReactionStrong": "Fuerza",
-  "@a11yReactionStrong": {
-    "description": "Localized accessible name for the strength reaction in a feed post's reaction row."
+  "a11yReactionLike": "Me gusta",
+  "@a11yReactionLike": {
+    "description": "Localized accessible name for the like reaction in a feed post's reaction row."
   },
   "a11yReactionFire": "Fuego",
   "@a11yReactionFire": {

@@ -635,7 +635,7 @@ service cloud.firestore {
 
         function reactionPayloadOk() {
           return request.resource.data.keys().hasOnly(['type', 'createdAt'])
-                 && request.resource.data.type in ['strong', 'fire', 'clap']
+                 && request.resource.data.type in ['like', 'fire', 'clap']
                  && request.resource.data.createdAt is timestamp;
         }
 

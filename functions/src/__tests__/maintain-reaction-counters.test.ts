@@ -10,13 +10,13 @@ describe("aggregateReactionCounts", () => {
   it("groups reactions by supported type", () => {
     expect(
       aggregateReactionCounts([
-        { type: "strong" },
+        { type: "like" },
         { type: "fire" },
-        { type: "strong" },
+        { type: "like" },
         { type: "clap" },
         { type: "fire" },
       ]),
-    ).toEqual({ strong: 2, fire: 2, clap: 1 });
+    ).toEqual({ like: 2, fire: 2, clap: 1 });
   });
 
   it("returns an empty map when there are no reactions", () => {
@@ -30,11 +30,34 @@ describe("aggregateReactionCounts", () => {
   it("ignores malformed and unsupported reaction documents", () => {
     expect(
       aggregateReactionCounts([
-        { type: "strong" },
+        { type: "like" },
         { type: "heart" },
         { type: 42 },
         {},
       ]),
-    ).toEqual({ strong: 1 });
+    ).toEqual({ like: 1 });
+  });
+
+  // Guard against the failure that shipped when `strong` was renamed to `like`:
+  // this function keeps its own copy of the type list, so a rename in Dart and
+  // in firestore.rules left it silently dropping every reaction and writing an
+  // empty counter. Nothing failed — the counter just stayed at zero.
+  //
+  // Keep this list in sync with:
+  //   - `ReactionType` in lib/features/feed/domain/reaction_type.dart
+  //   - the allowlist in `reactionPayloadOk()` in firestore.rules
+  it("counts exactly the reaction types the app and rules allow", () => {
+    const appReactionTypes = ["like", "fire", "clap"];
+
+    const counts = aggregateReactionCounts(
+      appReactionTypes.map((type) => ({ type })),
+    );
+
+    expect(Object.keys(counts).sort()).toEqual([...appReactionTypes].sort());
+    expect(counts).toEqual({ like: 1, fire: 1, clap: 1 });
+  });
+
+  it("no longer counts the retired `strong` type", () => {
+    expect(aggregateReactionCounts([{ type: "strong" }])).toEqual({});
   });
 });

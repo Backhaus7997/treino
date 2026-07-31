@@ -1,8 +1,8 @@
 import 'package:json_annotation/json_annotation.dart';
 
 enum ReactionType {
-  @JsonValue('strong')
-  strong,
+  @JsonValue('like')
+  like,
   @JsonValue('fire')
   fire,
   @JsonValue('clap')
@@ -11,7 +11,7 @@ enum ReactionType {
 
 extension ReactionTypeX on ReactionType {
   static const _wireMap = {
-    'strong': ReactionType.strong,
+    'like': ReactionType.like,
     'fire': ReactionType.fire,
     'clap': ReactionType.clap,
   };
@@ -29,7 +29,7 @@ extension ReactionTypeX on ReactionType {
   }
 
   String toJson() => switch (this) {
-        ReactionType.strong => 'strong',
+        ReactionType.like => 'like',
         ReactionType.fire => 'fire',
         ReactionType.clap => 'clap',
       };

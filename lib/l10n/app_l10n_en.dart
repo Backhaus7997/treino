@@ -1838,7 +1838,7 @@ class AppL10nEn extends AppL10n {
   }
 
   @override
-  String get a11yReactionStrong => 'Strength';
+  String get a11yReactionLike => 'Like';
 
   @override
   String get a11yReactionFire => 'Fire';

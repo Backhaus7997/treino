@@ -180,7 +180,7 @@ void main() {
       await tester.pumpWidget(_wrap(
         PostCard(post: post),
         reactionCounts: const {
-          ReactionType.strong: 2,
+          ReactionType.like: 2,
           ReactionType.fire: 1,
         },
         myReaction: Reaction(
@@ -196,7 +196,7 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.byKey(const ValueKey('reaction-strong-icon')),
+        find.byKey(const ValueKey('reaction-like-icon')),
         findsOneWidget,
       );
       expect(

@@ -6,7 +6,7 @@ void main() {
   const converter = ReactionCountsConverter();
 
   group('ReactionCountsConverter', () {
-    test('ignores unknown keys without throwing', () {
+    test('ignores legacy strong and unknown keys without throwing', () {
       expect(
         converter.fromJson({
           'strong': 2,
@@ -14,7 +14,6 @@ void main() {
           'fire': 1,
         }),
         {
-          ReactionType.strong: 2,
           ReactionType.fire: 1,
         },
       );
@@ -27,7 +26,7 @@ void main() {
     test('discards non-int values', () {
       expect(
         converter.fromJson({
-          'strong': '2',
+          'like': '2',
           'fire': 1.5,
           'clap': null,
         }),
@@ -38,10 +37,10 @@ void main() {
     test('writes enum keys back to wire strings', () {
       expect(
         converter.toJson({
-          ReactionType.strong: 3,
+          ReactionType.like: 3,
           ReactionType.clap: 4,
         }),
-        {'strong': 3, 'clap': 4},
+        {'like': 3, 'clap': 4},
       );
     });
   });

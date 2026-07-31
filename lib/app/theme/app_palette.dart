@@ -30,6 +30,9 @@ class AppPalette extends ThemeExtension<AppPalette> {
     required this.espresso,
     required this.danger,
     required this.warning,
+    required this.reactionLike,
+    required this.reactionFire,
+    required this.reactionClap,
     required this.onDanger,
     required this.scrimDark,
   });
@@ -61,6 +64,12 @@ class AppPalette extends ThemeExtension<AppPalette> {
   /// tell at a glance whether action is required or just attention.
   final Color warning;
 
+  /// Active feed reaction colors. These are expressive tokens, intentionally
+  /// separate from semantic status colors such as [danger] and [warning].
+  final Color reactionLike;
+  final Color reactionFire;
+  final Color reactionClap;
+
   /// Foreground (text/icon) rendered on top of [danger] backgrounds.
   /// Achieves ≥ 4.5:1 contrast ratio against [danger] (WCAG AA).
   final Color onDanger;
@@ -83,6 +92,9 @@ class AppPalette extends ThemeExtension<AppPalette> {
     espresso: AppColors.espresso,
     danger: Color(0xFFE53935),
     warning: Color(0xFFFFB300),
+    reactionLike: Color(0xFFFF4D6D),
+    reactionFire: Color(0xFFFF7A2F),
+    reactionClap: Color(0xFFFFC93C),
     onDanger: Color(0xFFFFFFFF),
     scrimDark: Color(0xFF000000),
   );
@@ -100,6 +112,16 @@ class AppPalette extends ThemeExtension<AppPalette> {
     espresso: Color(0xFFEDE5E2),
     danger: Color(0xFFD32F2F),
     warning: Color(0xFFFB8C00),
+    reactionLike: Color(0xFFE63950),
+    reactionFire: Color(0xFFF4630C),
+    // Ámbar dorado, no el mostaza #B87500 que salía de maximizar contraste: a
+    // ese tono los aplausos se leían apagados y no como el emoji 👏.
+    //
+    // Da ~3:1 sobre bgCard, algo menos que los otros dos, y es aceptable acá
+    // porque el color NO es el único indicador de estado: la reacción propia
+    // además cambia de contorno a relleno. Un daltónico distingue el estado por
+    // la forma sin depender del tono. Ver `_iconFor` en post_reactions_row.dart.
+    reactionClap: Color(0xFFD99000),
     onDanger: Color(0xFFFFFFFF),
     scrimDark: Color(0xFF000000),
   );
@@ -121,6 +143,9 @@ class AppPalette extends ThemeExtension<AppPalette> {
     Color? espresso,
     Color? danger,
     Color? warning,
+    Color? reactionLike,
+    Color? reactionFire,
+    Color? reactionClap,
     Color? onDanger,
     Color? scrimDark,
   }) =>
@@ -137,6 +162,9 @@ class AppPalette extends ThemeExtension<AppPalette> {
         espresso: espresso ?? this.espresso,
         danger: danger ?? this.danger,
         warning: warning ?? this.warning,
+        reactionLike: reactionLike ?? this.reactionLike,
+        reactionFire: reactionFire ?? this.reactionFire,
+        reactionClap: reactionClap ?? this.reactionClap,
         onDanger: onDanger ?? this.onDanger,
         scrimDark: scrimDark ?? this.scrimDark,
       );
@@ -157,6 +185,9 @@ class AppPalette extends ThemeExtension<AppPalette> {
       espresso: Color.lerp(espresso, other.espresso, t)!,
       danger: Color.lerp(danger, other.danger, t)!,
       warning: Color.lerp(warning, other.warning, t)!,
+      reactionLike: Color.lerp(reactionLike, other.reactionLike, t)!,
+      reactionFire: Color.lerp(reactionFire, other.reactionFire, t)!,
+      reactionClap: Color.lerp(reactionClap, other.reactionClap, t)!,
       onDanger: Color.lerp(onDanger, other.onDanger, t)!,
       scrimDark: Color.lerp(scrimDark, other.scrimDark, t)!,
     );

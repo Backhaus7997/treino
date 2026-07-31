@@ -1889,7 +1889,7 @@ class AppL10nEs extends AppL10n {
   }
 
   @override
-  String get a11yReactionStrong => 'Fuerza';
+  String get a11yReactionLike => 'Me gusta';
 
   @override
   String get a11yReactionFire => 'Fuego';
@@ -5135,7 +5135,7 @@ class AppL10nEsAr extends AppL10nEs {
   }
 
   @override
-  String get a11yReactionStrong => 'Fuerza';
+  String get a11yReactionLike => 'Me gusta';
 
   @override
   String get a11yReactionFire => 'Fuego';

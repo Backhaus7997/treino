@@ -96,9 +96,16 @@ class TreinoIcon {
   static const IconData chevronRight = PhosphorIconsRegular.caretRight;
   static const IconData chevronDown = PhosphorIconsRegular.caretDown;
   static const IconData chevronUp = PhosphorIconsRegular.caretUp;
-  static const IconData reactionStrong = PhosphorIconsRegular.barbell;
+  // Reacciones del feed. Cada una tiene su par contorno/relleno: el contorno
+  // es el estado sin reaccionar y el relleno es la reacción propia, que además
+  // se pinta con su color de AppPalette. Pintar solo el contorno no alcanza —
+  // el ícono se lee como un borde de color, no como un emoji encendido.
+  static const IconData reactionLike = PhosphorIconsRegular.heart;
+  static const IconData reactionLikeFill = PhosphorIconsFill.heart;
   static const IconData reactionFire = PhosphorIconsRegular.flame;
+  static const IconData reactionFireFill = PhosphorIconsFill.flame;
   static const IconData reactionClap = PhosphorIconsRegular.handsClapping;
+  static const IconData reactionClapFill = PhosphorIconsFill.handsClapping;
   // Hamburger clásico (3 líneas) — toggle de sidebar/menú.
   static const IconData menu = PhosphorIconsRegular.list;
 

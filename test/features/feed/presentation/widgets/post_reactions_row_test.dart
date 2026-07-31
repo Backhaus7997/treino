@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +8,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
+import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/feed/application/reaction_providers.dart';
 import 'package:treino/features/feed/domain/reaction.dart';
 import 'package:treino/features/feed/domain/reaction_type.dart';
@@ -54,7 +56,7 @@ void main() {
       await tester.pump();
 
       expect(
-        find.byKey(const ValueKey('reaction-strong-icon')),
+        find.byKey(const ValueKey('reaction-like-icon')),
         findsOneWidget,
       );
       expect(
@@ -65,13 +67,17 @@ void main() {
         find.byKey(const ValueKey('reaction-clap-icon')),
         findsOneWidget,
       );
+      expect(
+        find.byKey(const ValueKey('reaction-strong-icon')),
+        findsNothing,
+      );
     });
 
     testWidgets('hides counters whose value is zero', (tester) async {
       await tester.pumpWidget(_wrap(
         overrides: _reactionOverrides(
           counts: const {
-            ReactionType.strong: 0,
+            ReactionType.like: 0,
             ReactionType.fire: 0,
             ReactionType.clap: 0,
           },
@@ -80,7 +86,7 @@ void main() {
       await tester.pump();
 
       expect(
-        find.byKey(const ValueKey('reaction-strong-count')),
+        find.byKey(const ValueKey('reaction-like-count')),
         findsNothing,
       );
       expect(
@@ -99,7 +105,7 @@ void main() {
       await tester.pumpWidget(_wrap(
         overrides: _reactionOverrides(
           counts: const {
-            ReactionType.strong: 3,
+            ReactionType.like: 3,
             ReactionType.fire: 1,
           },
         ),
@@ -107,7 +113,7 @@ void main() {
       await tester.pump();
 
       expect(
-        find.byKey(const ValueKey('reaction-strong-count')),
+        find.byKey(const ValueKey('reaction-like-count')),
         findsOneWidget,
       );
       expect(find.text('3'), findsOneWidget);
@@ -118,7 +124,51 @@ void main() {
       );
     });
 
-    testWidgets('uses accent only for the current user reaction',
+    for (final selectedType in ReactionType.values) {
+      testWidgets('${selectedType.name} uses its dedicated active color',
+          (tester) async {
+        await tester.pumpWidget(_wrap(
+          overrides: _reactionOverrides(
+            counts: {selectedType: 1},
+            myReaction: Reaction(
+              uid: 'user-1',
+              type: selectedType,
+              createdAt: DateTime.utc(2026, 7, 30),
+            ),
+          ),
+        ));
+        await tester.pump();
+
+        final context = tester.element(find.byType(PostReactionsRow));
+        final palette = AppPalette.of(context);
+        final expected = switch (selectedType) {
+          ReactionType.like => palette.reactionLike,
+          ReactionType.fire => palette.reactionFire,
+          ReactionType.clap => palette.reactionClap,
+        };
+        final icon = tester.widget<Icon>(
+          find.byKey(ValueKey('reaction-${selectedType.name}-icon')),
+        );
+        final count = tester.widget<Text>(
+          find.byKey(ValueKey('reaction-${selectedType.name}-count')),
+        );
+
+        final expectedFilledIcon = switch (selectedType) {
+          ReactionType.like => TreinoIcon.reactionLikeFill,
+          ReactionType.fire => TreinoIcon.reactionFireFill,
+          ReactionType.clap => TreinoIcon.reactionClapFill,
+        };
+
+        expect(icon.color, expected);
+        expect(icon.color, isNot(palette.accent));
+        expect(count.style?.color, expected);
+        // La reacción propia va RELLENA, no solo teñida: un ícono de contorno
+        // pintado se lee como un borde de color, no como reacción activa.
+        expect(icon.icon, expectedFilledIcon);
+      });
+    }
+
+    testWidgets('inactive reactions use the muted palette color',
         (tester) async {
       await tester.pumpWidget(_wrap(
         overrides: _reactionOverrides(
@@ -131,23 +181,23 @@ void main() {
       ));
       await tester.pump();
 
-      final context = tester.element(find.byType(PostReactionsRow));
-      final palette = AppPalette.of(context);
-      final strong = tester.widget<Icon>(
-        find.byKey(const ValueKey('reaction-strong-icon')),
+      final palette = AppPalette.of(
+        tester.element(find.byType(PostReactionsRow)),
       );
-      final fire = tester.widget<Icon>(
-        find.byKey(const ValueKey('reaction-fire-icon')),
-      );
-      final clap = tester.widget<Icon>(
-        find.byKey(const ValueKey('reaction-clap-icon')),
-      );
-
-      expect(fire.color, palette.accent);
-      expect(strong.color, palette.textMuted);
-      expect(clap.color, palette.textMuted);
-      expect(strong.color, isNot(palette.accent));
-      expect(clap.color, isNot(palette.accent));
+      for (final type in [ReactionType.like, ReactionType.clap]) {
+        final icon = tester.widget<Icon>(
+          find.byKey(ValueKey('reaction-${type.name}-icon')),
+        );
+        final expectedOutlineIcon = switch (type) {
+          ReactionType.like => TreinoIcon.reactionLike,
+          ReactionType.fire => TreinoIcon.reactionFire,
+          ReactionType.clap => TreinoIcon.reactionClap,
+        };
+        expect(icon.color, palette.textMuted);
+        // Las que no puso el usuario quedan en contorno: si todas fueran
+        // rellenas, la fila competiría con el contenido del post.
+        expect(icon.icon, expectedOutlineIcon);
+      }
     });
 
     testWidgets('tapping a reaction delegates the post id and type',
@@ -204,7 +254,7 @@ void main() {
       expect(find.byType(Icon), findsNWidgets(3));
       expect(find.byType(CircularProgressIndicator), findsNothing);
       expect(
-        find.byKey(const ValueKey('reaction-strong-count')),
+        find.byKey(const ValueKey('reaction-like-count')),
         findsNothing,
       );
       expect(tester.takeException(), isNull);
@@ -226,6 +276,14 @@ void main() {
       );
     });
 
+    test('contains no literal HEX colors', () {
+      final source = File(
+        'lib/features/feed/presentation/widgets/post_reactions_row.dart',
+      ).readAsStringSync();
+
+      expect(RegExp(r'0x[0-9A-Fa-f]{6,8}').hasMatch(source), isFalse);
+    });
+
     testWidgets('exposes descriptive button semantics', (tester) async {
       // El handle se libera al final del cuerpo del test, NO con addTearDown:
       // los tearDowns corren después de _endOfTestVerifications, así que
@@ -233,13 +291,13 @@ void main() {
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(_wrap(
         overrides: _reactionOverrides(
-          counts: const {ReactionType.strong: 1},
+          counts: const {ReactionType.like: 1},
         ),
       ));
       await tester.pump();
 
-      final strong = tester.getSemantics(
-        find.byKey(const ValueKey('reaction-strong-semantics')),
+      final like = tester.getSemantics(
+        find.byKey(const ValueKey('reaction-like-semantics')),
       );
       final fire = tester.getSemantics(
         find.byKey(const ValueKey('reaction-fire-semantics')),
@@ -248,7 +306,7 @@ void main() {
         find.byKey(const ValueKey('reaction-clap-semantics')),
       );
 
-      expect(strong.label, contains('Fuerza, 1 reacción'));
+      expect(like.label, contains('Me gusta, 1 reacción'));
       expect(fire.label, contains('Fuego, sin reacciones'));
       expect(clap.label, contains('Aplausos, sin reacciones'));
 

@@ -26,7 +26,13 @@ function getApp(): admin.app.App {
   }
 }
 
-const REACTION_TYPES = ["strong", "fire", "clap"] as const;
+// DEBE espejar `ReactionType` en lib/features/feed/domain/reaction_type.dart y
+// la allowlist de `reactionPayloadOk()` en firestore.rules. Los tres se
+// mantienen a mano y no hay nada que los sincronice: si agregás o renombrás un
+// tipo, actualizá los tres. Un tipo que falte acá NO rompe la función — se
+// descarta en silencio y el contador queda en cero, que es un modo de falla
+// mudo y difícil de diagnosticar (ya pasó al renombrar `strong` a `like`).
+const REACTION_TYPES = ["like", "fire", "clap"] as const;
 type ReactionType = (typeof REACTION_TYPES)[number];
 type ReactionData = Record<string, unknown>;
 

@@ -67,10 +67,19 @@ function reaction(uid: string, reactorUid: string) {
 }
 
 describe("post reactions rules", () => {
+  it("allows the owner to create a like reaction", async () => {
+    await assertSucceeds(
+      reaction(REACTOR, REACTOR).set({
+        type: "like",
+        createdAt: new Date(),
+      }),
+    );
+  });
+
   it("denies creating a reaction under another user's uid", async () => {
     await assertFails(
       reaction(REACTOR, OTHER).set({
-        type: "strong",
+        type: "like",
         createdAt: new Date(),
       }),
     );

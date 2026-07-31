@@ -188,11 +188,11 @@ void main() {
         'routineTag': null,
         'privacy': 'public',
         'createdAt': Timestamp.fromDate(createdAt),
-        'reactionCounts': {'strong': 2, 'fire': 1},
+        'reactionCounts': {'like': 2, 'fire': 1},
       });
 
       expect(result.reactionCounts, {
-        ReactionType.strong: 2,
+        ReactionType.like: 2,
         ReactionType.fire: 1,
       });
     });

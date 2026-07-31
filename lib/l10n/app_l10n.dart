@@ -3488,11 +3488,11 @@ abstract class AppL10n {
   /// **'Ver el perfil de {name}'**
   String a11yRankingRowButton(String name);
 
-  /// Localized accessible name for the strength reaction in a feed post's reaction row.
+  /// Localized accessible name for the like reaction in a feed post's reaction row.
   ///
   /// In es_AR, this message translates to:
-  /// **'Fuerza'**
-  String get a11yReactionStrong;
+  /// **'Me gusta'**
+  String get a11yReactionLike;
 
   /// Localized accessible name for the fire reaction in a feed post's reaction row.
   ///
