@@ -81,6 +81,50 @@ void main() {
       expect(state.value?.gymId, 'ChIJ_1');
     });
 
+    // `select` DEBE devolver el resultado, no dejarlo solo en el estado del
+    // provider. Step2Gym lo necesita así porque leer `ref` después del await
+    // tira "Cannot use ref after the widget was disposed" si la pantalla se
+    // desmontó con la operación en vuelo — y eso trababa el onboarding en el
+    // paso del gimnasio sin ningún mensaje.
+    test('select devuelve true cuando resuelve y guarda bien', () async {
+      when(() => mockResolve.call(
+            placeId: any(named: 'placeId'),
+            sessionToken: any(named: 'sessionToken'),
+          )).thenAnswer((_) async => const ResolveGymPlaceResult(
+            gymId: 'ChIJ_1',
+            name: 'SportClub Belgrano',
+            address: 'Cabildo 1789',
+            source: 'google-places',
+          ));
+      when(() => mockUserRepo.update(any(), any())).thenAnswer((_) async {});
+
+      final container = buildContainer();
+      addTearDown(container.dispose);
+
+      final ok = await container
+          .read(selectGymActionProvider.notifier)
+          .select(uid: 'uid-1', placeId: 'ChIJ_1');
+
+      expect(ok, isTrue);
+    });
+
+    test('select devuelve false cuando la resolución falla', () async {
+      when(() => mockResolve.call(
+            placeId: any(named: 'placeId'),
+            sessionToken: any(named: 'sessionToken'),
+          )).thenThrow(Exception('places down'));
+
+      final container = buildContainer();
+      addTearDown(container.dispose);
+
+      final ok = await container
+          .read(selectGymActionProvider.notifier)
+          .select(uid: 'uid-1', placeId: 'ChIJ_1');
+
+      expect(ok, isFalse);
+      expect(container.read(selectGymActionProvider).hasError, isTrue);
+    });
+
     test(
         'passing useSessionToken: true does not change the resolved '
         'sessionToken — Text Search/nearby have no session concept (AD-12)',
