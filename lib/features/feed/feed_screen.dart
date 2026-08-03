@@ -554,6 +554,17 @@ class _FeedScrollViewState extends State<_FeedScrollView> {
         MediaQuery.paddingOf(context).bottom + TreinoBottomBar.minHeight;
 
     return CustomScrollView(
+      // Restaura el offset aunque el widget se reconstruya. Hace falta porque
+      // este scroll vive dentro del AnimatedSwitcher de TreinoStateSwitcher, y
+      // la primera página extra cambia la forma de la lista (hasMore true →
+      // false), lo que dispara un reemplazo del subtree: se monta un scroll
+      // nuevo y muere el que tenía la posición. Sin esto, la primera vez que
+      // entraban posts extra el feed volvía al principio.
+      //
+      // No alcanza con darle una key al widget: el switcher decide el
+      // reemplazo más arriba en el árbol. PageStorageKey resuelve el síntoma
+      // donde importa — la posición sobrevive a la reconstrucción.
+      key: const PageStorageKey<String>('feed-scroll-position'),
       controller: _scrollController,
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
