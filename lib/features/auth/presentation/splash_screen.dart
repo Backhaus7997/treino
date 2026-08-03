@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -67,10 +69,28 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     // Si el stream del perfil falla navegamos igual: authRedirect trata un
     // perfil ausente como incompleto y manda a /profile-setup. Preferible a
     // dejar al usuario clavado en el splash por un error de Firestore.
+    //
+    // QA H6: el `.timeout` es load-bearing, no defensivo. `userProfileProvider`
+    // se alimenta de UserRepository.watch, que FILTRA los snapshots cache-only
+    // sin confirmación de server. Si el doc no está en cache y no hay red, el
+    // stream NUNCA emite — ni dato ni error — así que sin timeout este await no
+    // completa nunca y el splash queda con spinner para siempre (Auth persiste
+    // en Keychain, así que reabrir reproduce el freeze).
     try {
-      await ref.read(userProfileProvider.future);
+      await ref
+          .read(userProfileProvider.future)
+          .timeout(const Duration(seconds: 8));
+    } on TimeoutException {
+      // El stream no emitió: NO navegamos. /home con el perfil en loading
+      // perpetuo dejaría al PF en la home de atleta sin gate (authRedirect
+      // devuelve null mientras isLoading). Mostramos Reintentar, igual que
+      // ante un fallo de auth.
+      if (!mounted) return;
+      setState(() => _hasError = true);
+      return;
     } catch (_) {
-      // Intencional: el redirect decide con lo que haya.
+      // El stream EMITIÓ un error (permission-denied, etc.): navegamos igual,
+      // el redirect decide con lo que haya (perfil ausente → /profile-setup).
     }
     if (!mounted) return;
 
