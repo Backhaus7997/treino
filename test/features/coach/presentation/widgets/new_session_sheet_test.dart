@@ -172,10 +172,15 @@ List<Override> _overrides({
   Map<String, UserPublicProfile> profiles = const {},
   _MockAppointmentRepository? appointmentRepo,
   AvailabilityRepository? availabilityRepo,
+  bool errorLinks = false,
 }) {
   return [
     currentUidProvider.overrideWithValue(_kTrainerId),
-    trainerLinksStreamProvider.overrideWith((ref) => Stream.value(links)),
+    trainerLinksStreamProvider.overrideWith(
+      (ref) => errorLinks
+          ? Stream<List<TrainerLink>>.error(Exception('links failed'))
+          : Stream.value(links),
+    ),
     if (appointmentRepo != null)
       appointmentRepositoryProvider.overrideWithValue(appointmentRepo),
     availabilityRepositoryProvider.overrideWithValue(
@@ -733,6 +738,24 @@ void main() {
       expect(size.width, greaterThanOrEqualTo(44));
       expect(size.height, greaterThanOrEqualTo(44));
       handle.dispose();
+    });
+  });
+
+  // ── H3: a failed links read must not read as "no athletes" ─────────────────
+  group('H3 — links error surfaces a retry, not a false "no athletes"', () {
+    testWidgets(
+        'links stream error → shows retry, hides the "no active athletes" copy',
+        (tester) async {
+      _useTallViewport(tester);
+      await tester.pumpWidget(_wrap(overrides: _overrides(errorLinks: true)));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      // The honest error + Reintentar replace the misleading empty copy...
+      expect(find.text('Hubo un problema. Intentá de nuevo.'), findsOneWidget);
+      expect(find.text('Reintentar'), findsOneWidget);
+      // ...so a transient failure never claims the trainer has no athletes.
+      expect(find.text('No tenés alumnos activos.'), findsNothing);
     });
   });
 }
