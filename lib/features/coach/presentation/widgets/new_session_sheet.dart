@@ -317,7 +317,8 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: (_saving ||
+                        onPressed:
+                            (_saving ||
                                 activeLinks.isEmpty ||
                                 _selectedAthleteId == null)
                             ? null
@@ -650,7 +651,9 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
 
       final note = _noteController.text.trim();
 
-      await ref.read(appointmentRepositoryProvider).createByTrainer(
+      await ref
+          .read(appointmentRepositoryProvider)
+          .createByTrainer(
             trainerId: trainerId,
             athleteId: athleteId,
             athleteDisplayName: athleteDisplayName,
@@ -869,25 +872,35 @@ class _Pill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Semantics de botón + estado (QA H13): TreinoTappable es un
+    // GestureDetector pelado, sin rol ni estado. `selected` le dice al lector
+    // qué modo está activo; `excludeSemantics` evita que el Text interno
+    // duplique el nodo.
     return Expanded(
-      child: TreinoTappable(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: AppMotion.fast,
-          curve: AppMotion.emphasized,
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: selected ? palette.accent : Colors.transparent,
-            borderRadius: BorderRadius.circular(21),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            label,
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-              letterSpacing: 0.6,
-              color: selected ? palette.bg : palette.textMuted,
+      child: Semantics(
+        button: true,
+        selected: selected,
+        label: label,
+        excludeSemantics: true,
+        child: TreinoTappable(
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: AppMotion.fast,
+            curve: AppMotion.emphasized,
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(
+              color: selected ? palette.accent : Colors.transparent,
+              borderRadius: BorderRadius.circular(21),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              label,
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                letterSpacing: 0.6,
+                color: selected ? palette.bg : palette.textMuted,
+              ),
             ),
           ),
         ),
@@ -898,14 +911,17 @@ class _Pill extends StatelessWidget {
 
 // ── Weekday chips ─────────────────────────────────────────────────────────────
 
+// `name` es el nombre completo para el lector de pantalla (QA H13): la 'L'/'M'
+// sola no alcanza — hay DOS 'M' (martes y miércoles) imposibles de distinguir
+// con VoiceOver. El `label` corto sigue siendo lo que se dibuja.
 const _kWeekdays = [
-  (label: 'L', wd: 1),
-  (label: 'M', wd: 2),
-  (label: 'M', wd: 3),
-  (label: 'J', wd: 4),
-  (label: 'V', wd: 5),
-  (label: 'S', wd: 6),
-  (label: 'D', wd: 7),
+  (label: 'L', wd: 1, name: 'Lunes'),
+  (label: 'M', wd: 2, name: 'Martes'),
+  (label: 'M', wd: 3, name: 'Miércoles'),
+  (label: 'J', wd: 4, name: 'Jueves'),
+  (label: 'V', wd: 5, name: 'Viernes'),
+  (label: 'S', wd: 6, name: 'Sábado'),
+  (label: 'D', wd: 7, name: 'Domingo'),
 ];
 
 class _WeekdayChips extends StatelessWidget {
@@ -926,26 +942,41 @@ class _WeekdayChips extends StatelessWidget {
       runSpacing: 8,
       children: _kWeekdays.map((entry) {
         final isSelected = selected.contains(entry.wd);
-        return TreinoTappable(
-          onTap: () => onToggle(entry.wd),
-          child: AnimatedContainer(
-            duration: AppMotion.fast,
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: isSelected ? palette.accent : palette.bg,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: isSelected ? palette.accent : palette.border,
-              ),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              entry.label,
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-                color: isSelected ? palette.bg : palette.textPrimary,
+        // Semantics con el nombre COMPLETO del día + estado seleccionado
+        // (QA H13). El círculo visible sigue midiendo 36px, pero el área
+        // tocable se expande a 44 (mínimo accesible) con un SizedBox centrado.
+        return Semantics(
+          button: true,
+          selected: isSelected,
+          label: entry.name,
+          excludeSemantics: true,
+          child: TreinoTappable(
+            onTap: () => onToggle(entry.wd),
+            child: SizedBox(
+              width: 44,
+              height: 44,
+              child: Center(
+                child: AnimatedContainer(
+                  duration: AppMotion.fast,
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: isSelected ? palette.accent : palette.bg,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isSelected ? palette.accent : palette.border,
+                    ),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    entry.label,
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      color: isSelected ? palette.bg : palette.textPrimary,
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
