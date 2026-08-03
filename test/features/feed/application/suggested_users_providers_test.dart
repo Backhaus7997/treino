@@ -141,11 +141,12 @@ void main() {
     );
   });
 
-  test('returns at most five suggestions', () async {
-    for (var index = 0; index < 7; index++) {
+  test('returns at most twenty suggestions', () async {
+    for (var index = 0; index < 22; index++) {
+      final suffix = index.toString().padLeft(2, '0');
       await seedProfile(
-        uid: 'candidate-$index',
-        displayName: 'Candidate $index',
+        uid: 'candidate-$suffix',
+        displayName: 'Candidate $suffix',
       );
     }
 
@@ -156,13 +157,44 @@ void main() {
     expect(
       result.map((profile) => profile.uid),
       [
-        'candidate-0',
-        'candidate-1',
-        'candidate-2',
-        'candidate-3',
-        'candidate-4',
+        for (var index = 0; index < kSuggestedUsersLimit; index++)
+          'candidate-${index.toString().padLeft(2, '0')}',
       ],
     );
+  });
+
+  test('page N returns the Nth block of eight candidates', () {
+    final candidates = [
+      for (var index = 0; index < kSuggestedUsersLimit; index++)
+        UserPublicProfile(uid: 'candidate-$index', gymId: 'gym-a'),
+    ];
+
+    expect(
+      suggestedUsersPage(candidates, 1).map((profile) => profile.uid),
+      [for (var index = 8; index < 16; index++) 'candidate-$index'],
+    );
+    expect(
+      suggestedUsersPage(candidates, 2).map((profile) => profile.uid),
+      [for (var index = 16; index < 20; index++) 'candidate-$index'],
+    );
+  });
+
+  test('zero candidates produce no suggestion slot', () {
+    expect(suggestedUsersAfterPost(const [], 9), isEmpty);
+  });
+
+  test('25 posts and 20 candidates produce slots after posts 10 and 20', () {
+    final candidates = [
+      for (var index = 0; index < kSuggestedUsersLimit; index++)
+        UserPublicProfile(uid: 'candidate-$index', gymId: 'gym-a'),
+    ];
+    final insertionIndexes = [
+      for (var postIndex = 0; postIndex < 25; postIndex++)
+        if (suggestedUsersAfterPost(candidates, postIndex).isNotEmpty)
+          postIndex,
+    ];
+
+    expect(insertionIndexes, [9, 19]);
   });
 
   test('loads friendships once and never performs per-candidate pair lookups',

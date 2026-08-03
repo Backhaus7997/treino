@@ -145,7 +145,7 @@ void main() {
     expect(find.byKey(const Key('suggested_users_section')), findsOneWidget);
   });
 
-  testWidgets('renders an eager row for each supplied suggestion', (
+  testWidgets('renders suggestions in a horizontal carousel', (
     tester,
   ) async {
     final suggestions = [
@@ -158,12 +158,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    for (final suggestion in suggestions) {
+    final listView = tester.widget<ListView>(find.byType(ListView));
+    expect(listView.scrollDirection, Axis.horizontal);
+    for (final suggestion in suggestions.take(2)) {
       expect(
         find.byKey(Key('suggested_user_${suggestion.uid}')),
         findsOneWidget,
       );
     }
-    expect(find.byType(ListView), findsNothing);
   });
 }

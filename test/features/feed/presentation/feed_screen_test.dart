@@ -17,6 +17,7 @@ import 'package:treino/features/feed/application/feed_pagination_notifier.dart';
 import 'package:treino/features/feed/application/feed_screen_providers.dart';
 import 'package:treino/features/feed/application/friendship_providers.dart';
 import 'package:treino/features/feed/application/post_providers.dart';
+import 'package:treino/features/feed/application/suggested_users_providers.dart';
 import 'package:treino/features/feed/data/post_repository.dart';
 import 'package:treino/features/feed/domain/feed_segment.dart';
 import 'package:treino/features/feed/domain/post.dart';
@@ -1202,6 +1203,145 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(repository.pageRequests, 2);
+    });
+  });
+
+  // ── Sugerencias intercaladas ────────────────────────────────────────────
+  //
+  // `suggestedUsersAfterPost` ya tiene tests unitarios, pero probar la función
+  // pura contra sí misma no protege la frontera: el feed podría no llamarla
+  // nunca y esos tests seguirían verdes. Estos tests scrollean el feed REAL y
+  // miran si el carrusel aparece entre los posts.
+  group('sugerencias intercaladas en el scroll del feed', () {
+    List<Post> manyPosts() => List.generate(
+          24,
+          (index) => _makePost(
+            id: 'inter-$index',
+            authorUid: 'author-$index',
+            text: 'Post $index',
+            privacy: PostPrivacy.public,
+          ),
+        );
+
+    List<Override> overridesWith({
+      required List<UserPublicProfile> candidates,
+    }) =>
+        [
+          feedSegmentProvider.overrideWith((ref) => FeedSegment.public),
+          myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myGymFeedProvider.overrideWith((ref) async => null),
+          feedPublicProvider.overrideWith((ref) async => manyPosts()),
+          userProfileProvider.overrideWith(
+            (ref) => Stream.value(_makeProfile(gymId: 'gym-a')),
+          ),
+          suggestedUsersProvider('gym-a')
+              .overrideWith((ref) async => candidates),
+        ];
+
+    List<UserPublicProfile> candidates(int count) => [
+          for (var index = 0; index < count; index++)
+            UserPublicProfile(
+              uid: 'cand-$index',
+              displayName: 'Candidato $index',
+              gymId: 'gym-a',
+            ),
+        ];
+
+    /// Baja de a poco hasta encontrar [target]. El `SliverList` es perezoso:
+    /// el post 10 no existe en el árbol hasta que el viewport se le acerca.
+    Future<bool> scrollUntil(WidgetTester tester, Finder target) async {
+      for (var step = 0; step < 40; step++) {
+        if (target.evaluate().isNotEmpty) return true;
+        await tester.drag(find.byType(CustomScrollView), const Offset(0, -300));
+        await tester.pumpAndSettle();
+      }
+      return target.evaluate().isNotEmpty;
+    }
+
+    testWidgets('con candidatos, el carrusel aparece después del post 10', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+            const FeedScreen(), overridesWith(candidates: candidates(20))),
+      );
+      await tester.pumpAndSettle();
+
+      final carousel = find.byKey(const Key('suggested_users_section'));
+      expect(await scrollUntil(tester, carousel), isTrue,
+          reason: 'el carrusel nunca se renderizó entre los posts');
+
+      // Y está DEBAJO del post 10 (índice 9), no en cualquier lado.
+      final post10 = find.byKey(const ValueKey('inter-9'));
+      if (post10.evaluate().isNotEmpty) {
+        expect(
+          tester.getRect(carousel).top,
+          greaterThan(tester.getRect(post10).top),
+        );
+      }
+    });
+
+    testWidgets(
+        'el carrusel vuelve al principio después de reciclarse (regresión)', (
+      tester,
+    ) async {
+      // Bug visto en device: `Scrollable` guarda su offset en `PageStorage` y
+      // el `CustomScrollView` del feed abre ese bucket, así que al alejarse y
+      // volver el carrusel reaparecía scrolleado al final —con las primeras
+      // sugerencias escondidas—. Ningún test lo veía porque todos lo miraban
+      // recién montado.
+      await tester.pumpWidget(
+        _wrapProvider(
+          const FeedScreen(),
+          overridesWith(candidates: candidates(20)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final carousel = find.byKey(const Key('suggested_users_section'));
+      Finder row() =>
+          find.descendant(of: carousel, matching: find.byType(ListView));
+      double rowOffset() =>
+          tester.widget<ListView>(row()).controller!.position.pixels;
+
+      expect(await scrollUntil(tester, carousel), isTrue);
+      // `scrollUntil` corta cuando el carrusel EXISTE, y el cacheExtent lo
+      // construye antes de que se vea. Sin este ensureVisible el drag de abajo
+      // no impacta y el test pasa sin haber probado nada.
+      await tester.ensureVisible(carousel);
+      await tester.pumpAndSettle();
+
+      // Lo scrolleamos a mano hasta el fondo…
+      await tester.drag(row(), const Offset(-1200, 0));
+      await tester.pumpAndSettle();
+      expect(rowOffset(), greaterThan(0),
+          reason: 'setup del test: el carrusel tiene que haberse movido');
+
+      // …lo sacamos del viewport para que el sliver lo destruya…
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, -2500));
+      await tester.pumpAndSettle();
+      expect(carousel.evaluate(), isEmpty,
+          reason: 'setup del test: el sliver tiene que haberlo reciclado');
+
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, 2500));
+      await tester.pumpAndSettle();
+
+      // …y al volver tiene que estar en cero otra vez.
+      expect(await scrollUntil(tester, carousel), isTrue);
+      expect(rowOffset(), 0,
+          reason: 'una fila de sugerencias siempre empieza por la primera');
+    });
+
+    testWidgets('sin candidatos no se intercala nada en todo el scroll', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), overridesWith(candidates: const [])),
+      );
+      await tester.pumpAndSettle();
+
+      final carousel = find.byKey(const Key('suggested_users_section'));
+      expect(await scrollUntil(tester, carousel), isFalse);
     });
   });
 }

@@ -9,17 +9,21 @@ import '../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../core/widgets/motion/treino_state_switcher.dart';
 import '../../core/widgets/motion/treino_tappable.dart';
 import '../../core/widgets/treino_bottom_bar.dart';
+import '../../core/widgets/treino_glass_surface.dart';
 import '../../core/widgets/treino_icon.dart';
 import '../../l10n/app_l10n.dart';
 import '../chat/application/chat_providers.dart';
 import '../gym_rankings/presentation/rankings_screen.dart' show RankingsBody;
+import '../gyms/domain/gym.dart' show kNoGymId;
 import '../notifications/application/notification_history_providers.dart';
 import '../profile/application/user_providers.dart';
+import '../profile/domain/user_public_profile.dart';
 import '../profile/domain/user_role.dart';
 import '../workout/application/session_providers.dart' show currentUidProvider;
 import 'application/feed_screen_providers.dart';
 import 'application/feed_pagination_notifier.dart';
 import 'application/post_providers.dart';
+import 'application/suggested_users_providers.dart';
 import 'domain/feed_segment.dart';
 import 'domain/post.dart';
 import 'presentation/widgets/feed_empty_state.dart';
@@ -458,6 +462,12 @@ class _FeedActions extends ConsumerWidget {
   }
 }
 
+/// Burbuja de vidrio de los accesos del header (campana, chat, búsqueda).
+///
+/// Mismo acabado que la barra de navegación —relleno translúcido + reflejo
+/// especular, ver [TreinoGlassSurface]— para que las dos superficies flotantes
+/// de la app hablen el mismo idioma. El botón de crear post NO lo usa a
+/// propósito: es el CTA primario y va lleno de accent, sin competencia.
 class _FeedIconBubble extends StatelessWidget {
   const _FeedIconBubble({required this.icon});
 
@@ -466,17 +476,15 @@ class _FeedIconBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    return Container(
+    return SizedBox(
       width: 36,
       height: 36,
-      decoration: BoxDecoration(
-        color: palette.bgCard,
+      child: TreinoGlassSurface(
         shape: BoxShape.circle,
-        border: Border.all(
-          color: palette.textMuted.withValues(alpha: 0.12),
-        ),
+        fillOpacity: TreinoGlassSurface.bubbleFillOpacity,
+        borderColor: palette.textMuted.withValues(alpha: 0.12),
+        child: Icon(icon, size: 20, color: palette.textMuted),
       ),
-      child: Icon(icon, size: 20, color: palette.textMuted),
     );
   }
 }
@@ -486,17 +494,45 @@ class _FeedContent {
     required this.posts,
     required this.isLoadingMore,
     required this.onLoadMore,
+    this.suggestions = const [],
   }) : emptyState = null;
 
   const _FeedContent.empty(this.emptyState)
       : posts = null,
         isLoadingMore = false,
-        onLoadMore = null;
+        onLoadMore = null,
+        suggestions = const [];
 
   final List<Post>? posts;
   final bool isLoadingMore;
   final VoidCallback? onLoadMore;
   final Widget? emptyState;
+  final List<UserPublicProfile> suggestions;
+}
+
+sealed class _FeedSlot {
+  const _FeedSlot();
+}
+
+class _PostSlot extends _FeedSlot {
+  const _PostSlot(this.post, this.postIndex);
+
+  final Post post;
+  final int postIndex;
+}
+
+class _SuggestionsSlot extends _FeedSlot {
+  const _SuggestionsSlot(this.profiles);
+
+  final List<UserPublicProfile> profiles;
+}
+
+class _LoaderSlot extends _FeedSlot {
+  const _LoaderSlot();
+}
+
+class _SeparatorSlot extends _FeedSlot {
+  const _SeparatorSlot();
 }
 
 /// The feed's single vertical scroll surface: collapsible app bar, pinned
@@ -593,51 +629,70 @@ class _FeedScrollViewState extends State<_FeedScrollView> {
   }
 
   Widget _buildPostList(AppPalette palette, List<Post> posts) {
-    final childCount = posts.isEmpty
-        ? 0
-        : posts.length * 2 - 1 + (widget.content.isLoadingMore ? 2 : 0);
+    final contentSlots = <_FeedSlot>[];
+    for (var postIndex = 0; postIndex < posts.length; postIndex++) {
+      contentSlots.add(_PostSlot(posts[postIndex], postIndex));
+      final page = suggestedUsersAfterPost(
+        widget.content.suggestions,
+        postIndex,
+      );
+      if (page.isNotEmpty) contentSlots.add(_SuggestionsSlot(page));
+    }
+    if (widget.content.isLoadingMore) {
+      contentSlots.add(const _LoaderSlot());
+    }
+
+    final slots = <_FeedSlot>[];
+    for (final slot in contentSlots) {
+      if (slots.isNotEmpty) slots.add(const _SeparatorSlot());
+      slots.add(slot);
+    }
 
     return SliverList(
       delegate: SliverChildBuilderDelegate(
         (context, index) {
-          if (index.isOdd) return const SizedBox(height: 14);
-
-          final postIndex = index ~/ 2;
-          if (postIndex == posts.length) {
-            return Padding(
-              key: const ValueKey('feed-loading-more-indicator'),
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              child: Center(
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    color: palette.accent,
-                    strokeWidth: 2,
+          final slot = slots[index];
+          return switch (slot) {
+            _SeparatorSlot() => const SizedBox(height: 14),
+            _SuggestionsSlot(:final profiles) =>
+              SuggestedUsersSection.profiles(profiles: profiles),
+            _LoaderSlot() => Padding(
+                key: const ValueKey('feed-loading-more-indicator'),
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                child: Center(
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      color: palette.accent,
+                      strokeWidth: 2,
+                    ),
                   ),
                 ),
               ),
-            );
-          }
-
-          final post = posts[postIndex];
-          void onAuthorTap() => context.go('/feed/profile/${post.authorUid}');
-          final card = PostCard(
-            key: ValueKey(post.id),
-            post: post,
-            onAuthorTap: onAuthorTap,
-          );
-
-          final alreadyAnimated = !_animatedIds.add(post.id);
-          if (postIndex >= 8 || alreadyAnimated) return card;
-          return TreinoFadeSlideIn(
-            key: ValueKey(post.id),
-            delay: AppMotion.stagger(postIndex),
-            child: card,
-          );
+            _PostSlot(:final post, :final postIndex) =>
+              _buildPost(context, post, postIndex),
+          };
         },
-        childCount: childCount,
+        childCount: slots.length,
       ),
+    );
+  }
+
+  Widget _buildPost(BuildContext context, Post post, int postIndex) {
+    void onAuthorTap() => context.go('/feed/profile/${post.authorUid}');
+    final card = PostCard(
+      key: ValueKey(post.id),
+      post: post,
+      onAuthorTap: onAuthorTap,
+    );
+
+    final alreadyAnimated = !_animatedIds.add(post.id);
+    if (postIndex >= 8 || alreadyAnimated) return card;
+    return TreinoFadeSlideIn(
+      key: ValueKey(post.id),
+      delay: AppMotion.stagger(postIndex),
+      child: card,
     );
   }
 }
@@ -770,6 +825,13 @@ class _AmigosBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final gymId = ref.watch(
+      userProfileProvider.select((p) => p.valueOrNull?.gymId),
+    );
+    final suggestions = (gymId == null || gymId.isEmpty || gymId == kNoGymId)
+        ? const <UserPublicProfile>[]
+        : ref.watch(suggestedUsersProvider(gymId)).valueOrNull ?? const [];
+
     return _FeedAsyncBody<List<Post>>(
       showTitle: showTitle,
       async: ref.watch(myFriendsFeedProvider),
@@ -794,11 +856,6 @@ class _AmigosBody extends ConsumerWidget {
       },
       dataBuilder: (context, posts) {
         if (posts.isEmpty) {
-          final gymId = ref.watch(
-            userProfileProvider.select(
-              (profile) => profile.valueOrNull?.gymId,
-            ),
-          );
           return _FeedContent.empty(
             Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -814,6 +871,7 @@ class _AmigosBody extends ConsumerWidget {
         final pagination = posts is PaginatedPostList ? posts : null;
         return _FeedContent.posts(
           posts: posts,
+          suggestions: suggestions,
           isLoadingMore: pagination?.isLoadingMore ?? false,
           onLoadMore: () async {
             final paginationKey =
@@ -840,6 +898,13 @@ class _MiGymBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final gymId = ref.watch(
+      userProfileProvider.select((p) => p.valueOrNull?.gymId),
+    );
+    final suggestions = (gymId == null || gymId.isEmpty || gymId == kNoGymId)
+        ? const <UserPublicProfile>[]
+        : ref.watch(suggestedUsersProvider(gymId)).valueOrNull ?? const [];
+
     return _FeedAsyncBody<List<Post>?>(
       showTitle: showTitle,
       async: ref.watch(myGymFeedProvider),
@@ -876,6 +941,7 @@ class _MiGymBody extends ConsumerWidget {
         final pagination = posts is PaginatedPostList ? posts : null;
         return _FeedContent.posts(
           posts: posts,
+          suggestions: suggestions,
           isLoadingMore: pagination?.isLoadingMore ?? false,
           onLoadMore: () async {
             final paginationKey =
@@ -903,6 +969,12 @@ class _PublicoBody extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final provider = feedPaginationProvider(publicFeedPaginationKey);
+    final gymId = ref.watch(
+      userProfileProvider.select((p) => p.valueOrNull?.gymId),
+    );
+    final suggestions = (gymId == null || gymId.isEmpty || gymId == kNoGymId)
+        ? const <UserPublicProfile>[]
+        : ref.watch(suggestedUsersProvider(gymId)).valueOrNull ?? const [];
     return _FeedAsyncBody<List<Post>>(
       showTitle: showTitle,
       async: ref.watch(feedPublicProvider),
@@ -923,6 +995,7 @@ class _PublicoBody extends ConsumerWidget {
         final pagination = posts is PaginatedPostList ? posts : null;
         return _FeedContent.posts(
           posts: posts,
+          suggestions: suggestions,
           isLoadingMore: pagination?.isLoadingMore ?? false,
           onLoadMore: () async {
             if (!(pagination?.hasMore ?? false)) return;

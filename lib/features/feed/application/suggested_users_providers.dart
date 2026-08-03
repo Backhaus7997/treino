@@ -7,7 +7,32 @@ import '../../workout/application/session_providers.dart'
     show currentUidProvider;
 import 'friendship_providers.dart' show friendshipRepositoryProvider;
 
-const int kSuggestedUsersLimit = 5;
+const int kSuggestedUsersLimit = 20;
+const int kSuggestedUsersPageSize = 8;
+const int _kSuggestedUsersPostCadence = 10;
+
+List<UserPublicProfile> suggestedUsersPage(
+  List<UserPublicProfile> candidates,
+  int pageIndex,
+) {
+  if (pageIndex < 0) return const [];
+  return candidates
+      .skip(pageIndex * kSuggestedUsersPageSize)
+      .take(kSuggestedUsersPageSize)
+      .toList(growable: false);
+}
+
+List<UserPublicProfile> suggestedUsersAfterPost(
+  List<UserPublicProfile> candidates,
+  int postIndex,
+) {
+  if (postIndex < 0 || (postIndex + 1) % _kSuggestedUsersPostCadence != 0) {
+    return const [];
+  }
+
+  final pageIndex = (postIndex + 1) ~/ _kSuggestedUsersPostCadence - 1;
+  return suggestedUsersPage(candidates, pageIndex);
+}
 
 /// People from [gymId] who have no friendship document with the current user.
 ///
