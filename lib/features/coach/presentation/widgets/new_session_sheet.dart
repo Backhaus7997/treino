@@ -26,11 +26,7 @@ import '../../domain/trainer_link_status.dart';
 /// Optional [initialDate] and [initialTime] let the timeline "+" button prefill
 /// (single mode only).
 class NewSessionSheet extends ConsumerStatefulWidget {
-  const NewSessionSheet({
-    super.key,
-    this.initialDate,
-    this.initialTime,
-  });
+  const NewSessionSheet({super.key, this.initialDate, this.initialTime});
 
   final DateTime? initialDate;
   final TimeOfDay? initialTime;
@@ -48,7 +44,13 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
   late TimeOfDay _time;
   final _durationController = TextEditingController(text: '60');
   final _noteController = TextEditingController();
+  // Drives the button spinner — true SOLO durante la escritura real.
   bool _saving = false;
+  // Guard de re-entrada (QA M7), independiente de [_saving]: cubre TODO el
+  // submit —incluido el chequeo async de días bloqueados y el diálogo que
+  // #607 dejó por delante del spinner— sin mostrar el spinner antes de tiempo.
+  // Sin él, un doble tap durante ese chequeo creaba la sesión/serie dos veces.
+  bool _submitting = false;
 
   // ── Single-mode fields ────────────────────────────────────────────────────
   late DateTime _date;
@@ -149,8 +151,9 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
 
                     // ── Athlete picker ────────────────────────────────────────────
                     _FieldLabel(
-                        label: AppL10n.of(context).newSessionSheetAlumnoLabel,
-                        palette: palette),
+                      label: AppL10n.of(context).newSessionSheetAlumnoLabel,
+                      palette: palette,
+                    ),
                     const SizedBox(height: 8),
                     if (activeLinks.isEmpty)
                       Text(
@@ -189,8 +192,9 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
                                 children: [
                                   // SINGLE: date picker
                                   _FieldLabel(
-                                    label: AppL10n.of(context)
-                                        .newSessionSheetFechaLabel,
+                                    label: AppL10n.of(
+                                      context,
+                                    ).newSessionSheetFechaLabel,
                                     palette: palette,
                                   ),
                                   const SizedBox(height: 8),
@@ -224,7 +228,9 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
 
                                   // RECURRING: repeat-for chips
                                   _FieldLabel(
-                                      label: 'REPETIR POR', palette: palette),
+                                    label: 'REPETIR POR',
+                                    palette: palette,
+                                  ),
                                   const SizedBox(height: 8),
                                   _WeeksChips(
                                     selected: _weeks,
@@ -240,8 +246,9 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
 
                     // ── Time ──────────────────────────────────────────────────────
                     _FieldLabel(
-                        label: AppL10n.of(context).newSessionSheetHoraLabel,
-                        palette: palette),
+                      label: AppL10n.of(context).newSessionSheetHoraLabel,
+                      palette: palette,
+                    ),
                     const SizedBox(height: 8),
                     _TappableField(
                       palette: palette,
@@ -253,8 +260,9 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
 
                     // ── Duration ─────────────────────────────────────────────────
                     _FieldLabel(
-                        label: AppL10n.of(context).newSessionSheetDuracionLabel,
-                        palette: palette),
+                      label: AppL10n.of(context).newSessionSheetDuracionLabel,
+                      palette: palette,
+                    ),
                     const SizedBox(height: 8),
                     _DurationSection(
                       controller: _durationController,
@@ -267,8 +275,9 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
 
                     // ── Note ──────────────────────────────────────────────────────
                     _FieldLabel(
-                        label: AppL10n.of(context).newSessionSheetNotaLabel,
-                        palette: palette),
+                      label: AppL10n.of(context).newSessionSheetNotaLabel,
+                      palette: palette,
+                    ),
                     const SizedBox(height: 8),
                     TextField(
                       controller: _noteController,
@@ -295,8 +304,10 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide:
-                              BorderSide(color: palette.accent, width: 1.5),
+                          borderSide: BorderSide(
+                            color: palette.accent,
+                            width: 1.5,
+                          ),
                         ),
                       ),
                     ),
@@ -329,10 +340,12 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
                               )
                             : Text(
                                 _recurring
-                                    ? AppL10n.of(context)
-                                        .newSessionSheetSubmitRecurring
-                                    : AppL10n.of(context)
-                                        .newSessionSheetSubmitSingle,
+                                    ? AppL10n.of(
+                                        context,
+                                      ).newSessionSheetSubmitRecurring
+                                    : AppL10n.of(
+                                        context,
+                                      ).newSessionSheetSubmitSingle,
                                 style: GoogleFonts.barlowCondensed(
                                   fontWeight: FontWeight.w700,
                                   fontSize: 13,
@@ -365,10 +378,7 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
   }
 
   Future<void> _pickTime() async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: _time,
-    );
+    final picked = await showTimePicker(context: context, initialTime: _time);
     if (picked != null && mounted) {
       setState(() => _time = picked);
     }
@@ -443,8 +453,13 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
     required int startMinute,
   }) {
     final now = DateTime.now();
-    final nowWall =
-        DateTime.utc(now.year, now.month, now.day, now.hour, now.minute);
+    final nowWall = DateTime.utc(
+      now.year,
+      now.month,
+      now.day,
+      now.hour,
+      now.minute,
+    );
     final dates = <DateTime>[];
 
     var cursor = DateTime.utc(fromDate.year, fromDate.month, fromDate.day);
@@ -453,7 +468,12 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
     while (!cursor.isAfter(end)) {
       if (weekdays.contains(cursor.weekday)) {
         final startsAt = DateTime.utc(
-            cursor.year, cursor.month, cursor.day, startHour, startMinute);
+          cursor.year,
+          cursor.month,
+          cursor.day,
+          startHour,
+          startMinute,
+        );
         if (startsAt.isAfter(nowWall)) {
           dates.add(cursor);
         }
@@ -549,11 +569,24 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
   // ── Single submit ─────────────────────────────────────────────────────────
 
   Future<void> _submitSingle() async {
+    // Guard de re-entrada ANTES del primer await (QA M7): ver [_submitting].
+    // El try/finally lo desbloquea en TODA salida (validación, cancelación,
+    // éxito o error) sin tener que tocarlo en cada return.
+    if (_submitting) return;
+    _submitting = true;
+    try {
+      await _submitSingleInner();
+    } finally {
+      _submitting = false;
+    }
+  }
+
+  Future<void> _submitSingleInner() async {
     final athleteId = _selectedAthleteId;
     if (athleteId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Elegí un alumno.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Elegí un alumno.')));
       return;
     }
 
@@ -589,14 +622,16 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
     if (trainerId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Error de autenticación. Intentá de nuevo.')),
+          content: Text('Error de autenticación. Intentá de nuevo.'),
+        ),
       );
       return;
     }
 
     // Blocked-day soft warning: after cheap sync validations (athlete, date,
-    // duration, auth) and before the async overrides read + repo call, so an
-    // already-invalid form never triggers the extra network round trip.
+    // duration, auth), so an already-invalid form never triggers the extra
+    // network round trip. El guard _submitting ya cubre esta ventana; el
+    // spinner (_saving) sigue apareciendo recién en la escritura real.
     final blocked = await _isDateBlocked(trainerId: trainerId, date: _date);
     if (!mounted) return;
     if (blocked) {
@@ -607,8 +642,9 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
     setState(() => _saving = true);
 
     try {
-      final profile =
-          await ref.read(userPublicProfileProvider(athleteId).future);
+      final profile = await ref.read(
+        userPublicProfileProvider(athleteId).future,
+      );
       final rawName = profile?.displayName?.trim() ?? '';
       final athleteDisplayName = rawName.isEmpty ? athleteId : rawName;
 
@@ -625,9 +661,9 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
 
       if (!mounted) return;
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sesión registrada.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Sesión registrada.')));
     } catch (_) {
       if (!mounted) return;
       setState(() => _saving = false);
@@ -642,18 +678,31 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
   // ── Recurring submit ──────────────────────────────────────────────────────
 
   Future<void> _submitRecurring() async {
+    // Guard de re-entrada (QA M7): mismo defecto que _submitSingle — #607 dejó
+    // el chequeo async de días bloqueados arriba del spinner, así que un doble
+    // tap creaba la SERIE completa dos veces. Ver [_submitting].
+    if (_submitting) return;
+    _submitting = true;
+    try {
+      await _submitRecurringInner();
+    } finally {
+      _submitting = false;
+    }
+  }
+
+  Future<void> _submitRecurringInner() async {
     final athleteId = _selectedAthleteId;
     if (athleteId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Elegí un alumno.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Elegí un alumno.')));
       return;
     }
 
     if (_weekdays.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Elegí al menos un día.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Elegí al menos un día.')));
       return;
     }
 
@@ -664,7 +713,8 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
     if (trainerId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Error de autenticación. Intentá de nuevo.')),
+          content: Text('Error de autenticación. Intentá de nuevo.'),
+        ),
       );
       return;
     }
@@ -688,8 +738,13 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
       startHour: _time.hour,
       startMinute: _time.minute,
     );
-    final blockedDates =
-        await _blockedDatesAmongCandidates(trainerId, candidateDates);
+
+    // El guard _submitting ya cubre esta ventana async; el spinner (_saving)
+    // aparece recién en la escritura real, debajo.
+    final blockedDates = await _blockedDatesAmongCandidates(
+      trainerId,
+      candidateDates,
+    );
     if (!mounted) return;
     if (blockedDates.isNotEmpty) {
       final proceed = await _confirmBlockedDayRecurring(blockedDates.length);
@@ -699,8 +754,9 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
     setState(() => _saving = true);
 
     try {
-      final profile =
-          await ref.read(userPublicProfileProvider(athleteId).future);
+      final profile = await ref.read(
+        userPublicProfileProvider(athleteId).future,
+      );
       final rawName = profile?.displayName?.trim() ?? '';
       final athleteDisplayName = rawName.isEmpty ? athleteId : rawName;
 
@@ -934,9 +990,7 @@ class _WeeksChips extends StatelessWidget {
           selected: isSelected,
           selectedColor: palette.accent,
           backgroundColor: palette.bg,
-          side: BorderSide(
-            color: isSelected ? palette.accent : palette.border,
-          ),
+          side: BorderSide(color: isSelected ? palette.accent : palette.border),
           onSelected: (_) => onChanged(w),
           showCheckmark: false,
         );
@@ -995,8 +1049,10 @@ class _DurationSectionState extends State<_DurationSection> {
           style: GoogleFonts.barlow(fontSize: 14, color: palette.textPrimary),
           decoration: InputDecoration(
             hintText: '60',
-            hintStyle:
-                GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
+            hintStyle: GoogleFonts.barlow(
+              fontSize: 14,
+              color: palette.textMuted,
+            ),
             filled: true,
             fillColor: palette.bg,
             border: OutlineInputBorder(
@@ -1012,8 +1068,10 @@ class _DurationSectionState extends State<_DurationSection> {
               borderSide: BorderSide(color: palette.accent, width: 1.5),
             ),
             suffixText: 'min',
-            suffixStyle:
-                GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+            suffixStyle: GoogleFonts.barlow(
+              fontSize: 13,
+              color: palette.textMuted,
+            ),
           ),
         ),
         const SizedBox(height: 8),
@@ -1159,8 +1217,9 @@ class _AthleteDropdown extends ConsumerWidget {
         ),
       ),
       items: links.map((link) {
-        final profileAsync =
-            ref.watch(userPublicProfileProvider(link.athleteId));
+        final profileAsync = ref.watch(
+          userPublicProfileProvider(link.athleteId),
+        );
         final rawName = profileAsync.valueOrNull?.displayName ?? '';
         final showName = rawName.isEmpty || _looksLikeUid(rawName)
             ? 'Alumno (${link.athleteId.substring(0, 6)})'
