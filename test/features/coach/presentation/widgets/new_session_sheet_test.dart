@@ -660,4 +660,79 @@ void main() {
       ).called(1);
     });
   });
+
+  // ── H13: accesibilidad del toggle y los chips ────────────────────────────
+  group('Accesibilidad (H13)', () {
+    Future<void> pumpSheet(WidgetTester tester) async {
+      _useTallViewport(tester);
+      await tester.pumpWidget(_wrap(
+        overrides: _overrides(
+          links: [_activeLink(_kAthleteId1)],
+          profiles: {_kAthleteId1: _pub(_kAthleteId1, 'Carlos Pérez')},
+          appointmentRepo: mockAppointmentRepo,
+        ),
+      ));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('los pills del toggle exponen rol de botón y estado',
+        (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpSheet(tester);
+
+      // 'Una vez' arranca seleccionado; 'Se repite' no.
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('Una vez')),
+        isSemantics(isButton: true, isSelected: true, label: 'Una vez'),
+      );
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('Se repite')),
+        isSemantics(isButton: true, isSelected: false),
+      );
+      handle.dispose();
+    });
+
+    testWidgets(
+        'los chips de día anuncian el nombre COMPLETO (las dos "M" dejan de '
+        'ser ambiguas) con rol y estado', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpSheet(tester);
+
+      // Pasar a modo recurrente para revelar los chips.
+      await tester.tap(find.text('Se repite'));
+      await tester.pumpAndSettle();
+
+      // Antes solo se anunciaba 'L'/'M'/'M'/... — con dos 'M' indistinguibles.
+      for (final name in [
+        'Lunes',
+        'Martes',
+        'Miércoles',
+        'Jueves',
+        'Viernes',
+        'Sábado',
+        'Domingo'
+      ]) {
+        expect(find.bySemanticsLabel(name), findsOneWidget,
+            reason: 'el chip debe anunciar "$name"');
+      }
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('Lunes')),
+        isSemantics(isButton: true, isSelected: false),
+      );
+      handle.dispose();
+    });
+
+    testWidgets('los chips de día cumplen el área tocable mínima de 44pt',
+        (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpSheet(tester);
+      await tester.tap(find.text('Se repite'));
+      await tester.pumpAndSettle();
+
+      final size = tester.getSize(find.bySemanticsLabel('Lunes'));
+      expect(size.width, greaterThanOrEqualTo(44));
+      expect(size.height, greaterThanOrEqualTo(44));
+      handle.dispose();
+    });
+  });
 }
