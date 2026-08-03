@@ -18,6 +18,8 @@
 //     watchOverrides errors → creation still proceeds WITHOUT the warning
 //     dialog. This test MUST fail if either try/catch is removed.
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -75,6 +77,27 @@ class _FakeAvailabilityRepository extends Fake
       return Stream.error(Exception('permission-denied'));
     }
     return Stream.value(overrides);
+  }
+}
+
+/// Availability repo whose `watchOverrides` stays PENDING until [gate]
+/// completes. Lets a test hold the submit inside the blocked-day async read —
+/// the window that M7 left unguarded — while it fires a second tap.
+class _GatedAvailabilityRepository extends Fake
+    implements AvailabilityRepository {
+  _GatedAvailabilityRepository({required this.gate});
+
+  final Completer<void> gate;
+
+  @override
+  Stream<List<AvailabilityOverride>> watchOverrides(
+    String trainerId,
+    DateTime fromDate,
+    DateTime toDate,
+  ) {
+    return Stream.fromFuture(
+      gate.future.then((_) => const <AvailabilityOverride>[]),
+    );
   }
 }
 
@@ -148,7 +171,7 @@ List<Override> _overrides({
   List<TrainerLink> links = const [],
   Map<String, UserPublicProfile> profiles = const {},
   _MockAppointmentRepository? appointmentRepo,
-  _FakeAvailabilityRepository? availabilityRepo,
+  AvailabilityRepository? availabilityRepo,
 }) {
   return [
     currentUidProvider.overrideWithValue(_kTrainerId),
@@ -582,6 +605,56 @@ void main() {
           durationMin: any(named: 'durationMin'),
           fromDate: any(named: 'fromDate'),
           untilDate: any(named: 'untilDate'),
+          noteBefore: any(named: 'noteBefore'),
+        ),
+      ).called(1);
+    });
+  });
+
+  // ── M7: doble tap no duplica ─────────────────────────────────────────────
+  //
+  // #607 insertó el chequeo async de días bloqueados ARRIBA del
+  // `setState(_saving=true)`, dejando una ventana en la que un segundo tap
+  // corría el submit de nuevo → sesión/serie duplicada en Firestore. El fake
+  // gateado sostiene el submit dentro de esa ventana mientras se dispara el
+  // segundo tap.
+  group('Doble tap (M7)', () {
+    testWidgets('single: dos taps rápidos crean la sesión UNA sola vez',
+        (tester) async {
+      _useTallViewport(tester);
+      final gate = Completer<void>();
+
+      await tester.pumpWidget(_wrap(
+        initialDate: targetDateOnly,
+        overrides: _overrides(
+          links: [_activeLink(_kAthleteId1)],
+          profiles: {_kAthleteId1: _pub(_kAthleteId1, 'Carlos Pérez')},
+          appointmentRepo: mockAppointmentRepo,
+          availabilityRepo: _GatedAvailabilityRepository(gate: gate),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      await _selectAthlete(tester, 'Carlos Pérez');
+
+      // Tap 1: entra a _submitSingle, setea _saving=true y queda esperando el
+      // chequeo de días bloqueados (gateado).
+      await tester.tap(find.text('REGISTRAR SESIÓN'));
+      await tester.pump();
+      // Tap 2 en la ventana que M7 dejaba sin proteger.
+      await tester.tap(find.text('REGISTRAR SESIÓN'), warnIfMissed: false);
+      await tester.pump();
+
+      // Liberar el gate → el único submit vivo continúa hasta createByTrainer.
+      gate.complete();
+      await tester.pumpAndSettle();
+
+      verify(
+        () => mockAppointmentRepo.createByTrainer(
+          trainerId: any(named: 'trainerId'),
+          athleteId: any(named: 'athleteId'),
+          athleteDisplayName: any(named: 'athleteDisplayName'),
+          startsAt: any(named: 'startsAt'),
+          durationMin: any(named: 'durationMin'),
           noteBefore: any(named: 'noteBefore'),
         ),
       ).called(1);
