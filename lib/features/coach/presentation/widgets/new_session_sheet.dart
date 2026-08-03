@@ -155,7 +155,17 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
                       palette: palette,
                     ),
                     const SizedBox(height: 8),
-                    if (activeLinks.isEmpty)
+                    // A failed links read must NOT read as "no athletes": that
+                    // false empty state blocks creating a session for a trainer
+                    // who actually has athletes. Surface a retry instead; the
+                    // genuine empty (data with no active links) keeps its copy.
+                    if (linksAsync.hasError && !linksAsync.hasValue)
+                      _AthletePickerError(
+                        palette: palette,
+                        onRetry: () =>
+                            ref.invalidate(trainerLinksStreamProvider),
+                      )
+                    else if (activeLinks.isEmpty)
                       Text(
                         AppL10n.of(context).newSessionSheetNoActiveAthletes,
                         style: GoogleFonts.barlow(
@@ -1207,6 +1217,49 @@ class _FieldLabel extends StatelessWidget {
 }
 
 // ── Athlete dropdown ──────────────────────────────────────────────────────────
+
+/// Shown in the athlete-picker slot when the trainer-links stream fails
+/// outright (error with no cached value). Replaces the misleading "no active
+/// athletes" copy with an honest, retryable error so a transient failure never
+/// reads as "you have no athletes" and blocks creating a session.
+class _AthletePickerError extends StatelessWidget {
+  const _AthletePickerError({required this.palette, required this.onRetry});
+
+  final AppPalette palette;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          l10n.agendaGenericError,
+          style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+        ),
+        const SizedBox(height: 6),
+        TextButton(
+          onPressed: onRetry,
+          style: TextButton.styleFrom(
+            padding: EdgeInsets.zero,
+            minimumSize: const Size(0, 36),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          child: Text(
+            l10n.coachRetryLabel,
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+              letterSpacing: 0.8,
+              color: palette.accent,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 class _AthleteDropdown extends ConsumerWidget {
   const _AthleteDropdown({
