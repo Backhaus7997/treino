@@ -97,6 +97,22 @@ final trainerLinksStreamProvider =
   return ref.read(trainerLinkRepositoryProvider).watchForTrainer(uid);
 });
 
+/// Count of pending trainer-link requests for the current PF. Derived
+/// synchronously from [trainerLinksStreamProvider] — returns 0 during
+/// loading/error so the top-bar bell badge renders without flicker.
+///
+/// Mirrors [pendingRequestCountProvider] (feed). Uses the SAME raw
+/// `.where(...pending).length` the dashboard's pending-requests section
+/// uses (no dedup by athleteId) so the badge count always agrees with the
+/// dashboard.
+final pendingTrainerLinkCountProvider = Provider.autoDispose<int>((ref) {
+  return ref.watch(trainerLinksStreamProvider).maybeWhen(
+        data: (links) =>
+            links.where((l) => l.status == TrainerLinkStatus.pending).length,
+        orElse: () => 0,
+      );
+});
+
 /// Privacy-grant repository — wraps the `session_shares/{athleteId}` doc.
 /// Used by the athlete's "Compartir con mi PF" toggle to keep the Firestore
 /// security grant in sync with `trainer_links.sharedWithTrainer`.

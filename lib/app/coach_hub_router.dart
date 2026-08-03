@@ -25,6 +25,7 @@ import '../features/coach_hub/presentation/sections/recetas/routes.dart';
 import '../features/coach_hub/presentation/sections/reportes/routes.dart';
 import '../features/coach_hub/presentation/sections/routine_editor/routes.dart';
 import '../features/coach_hub/presentation/sections/rutinas/routes.dart';
+import '../features/coach_hub/presentation/sections/solicitudes/routes.dart';
 import '../features/coach_hub/presentation/sections/suplementos/routes.dart';
 import '../features/coach_hub/presentation/sections/templates/routes.dart';
 import '../features/coach_hub/presentation/shell/coach_hub_scaffold.dart';
@@ -105,6 +106,7 @@ final List<RouteBase> _signedInRoutes = [
   ...agendaRoutes,
   ...alumnosRoutes,
   ...invitacionesRoutes,
+  ...solicitudesRoutes, // /solicitudes — sin item de sidebar, entry: bell
   ...cuestionarioRoutes,
   ...rutinasRoutes,
   ...plannerRoutes,
