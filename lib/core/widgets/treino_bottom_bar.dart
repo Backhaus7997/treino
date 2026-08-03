@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/material.dart';
@@ -8,9 +9,134 @@ import '../../app/theme/app_palette.dart';
 import 'treino_glass_surface.dart';
 import 'treino_icon.dart';
 
+/// Medidas de layout de [TreinoBottomBar], resueltas a partir del ancho
+/// disponible y del texto ya medido.
+///
+/// Existe como tipo aparte, y [resolveBarMetrics] como función pura, por una
+/// razón concreta: **el álgebra de esta barra no se puede testear con un widget
+/// test**. El proyecto usa `google_fonts` sin bundlear las tipografías (no hay
+/// sección `fonts:` en el pubspec ni ningún `.ttf` en el repo), así que se
+/// bajan por red en runtime; y `flutter_test` mockea HTTP devolviendo 400 a
+/// todo. Resultado: en test Barlow Condensed NUNCA carga y todo se mide con una
+/// fuente fallback bastante más ancha que la real. Cualquier aserción sobre
+/// "¿entra ENTRENAR?" hecha en un widget test mide la fuente equivocada.
+///
+/// Tomando `maxLabelWidth` como ENTRADA, la decisión queda testeable con
+/// aritmética exacta y sin fuentes de por medio.
+@immutable
+class TreinoBarMetrics {
+  const TreinoBarMetrics({
+    required this.tabWidth,
+    required this.labelBoxWidth,
+    required this.labelsFit,
+    required this.barHeight,
+  });
+
+  /// Ancho de cada tab: el ancho disponible repartido en partes iguales.
+  final double tabWidth;
+
+  /// Ancho útil REAL para el label adentro del pill.
+  ///
+  /// No es simplemente el ancho del pill: el label se apoya abajo del ícono,
+  /// justo donde el pill se curva y se angosta. Este valor ya tiene descontado
+  /// lo que se come el redondeo a esa altura (ver [resolveBarMetrics]).
+  final double labelBoxWidth;
+
+  /// Si el label más largo entra en [labelBoxWidth].
+  final bool labelsFit;
+
+  /// Alto de la barra expandida.
+  final double barHeight;
+}
+
+/// Cuánto se mete el redondeo hacia adentro, a `dy` de distancia del centro
+/// vertical de una caja de media altura `halfHeight` y radio `radius`.
+///
+/// Mientras `dy` no pase de la parte recta del costado, el redondeo no come
+/// nada. Después, el borde es un arco de circunferencia y se calcula así.
+double _cornerInsetAt({
+  required double dy,
+  required double halfHeight,
+  required double radius,
+}) {
+  final straight = halfHeight - radius;
+  if (dy <= straight) return 0;
+  final d = dy - straight;
+  if (d >= radius) return radius;
+  return radius - math.sqrt(radius * radius - d * d);
+}
+
+/// Resuelve las medidas de la barra. Ver [TreinoBarMetrics] para por qué esto
+/// es una función pura y no lógica adentro del `build`.
+TreinoBarMetrics resolveBarMetrics({
+  required double availableWidth,
+  required int itemCount,
+  required double maxLabelWidth,
+  required double maxLabelHeight,
+}) {
+  final tabWidth = availableWidth / itemCount;
+  // 16 = los dos insets de 8 con los que el pill se separa del borde del tab
+  // (ver el AnimatedPositioned: left = tabWidth*i + 8, width = tabWidth - 16).
+  final pillWidth = tabWidth - 16;
+  final desiredHeight = 22 + 8 + maxLabelHeight + 20;
+  final barHeight = desiredHeight > TreinoBottomBar.minHeight
+      ? desiredHeight
+      : TreinoBottomBar.minHeight;
+
+  // El label es lo último de la columna (ícono 22 + separación 4 + label), y su
+  // borde inferior es el punto que más se acerca al redondeo del pill. Medir
+  // solo contra el ancho del pill —su caja— daba por bueno un label que la
+  // curva igual recortaba: la tinta de la primera y la última letra caía
+  // AFUERA del pill, pintada en `palette.bg` sobre el fondo de la barra, y en
+  // modo oscuro eso es negro sobre negro. Era el "ENTRENAR → ENTRENR".
+  final pillHalfHeight = (barHeight - 2 * _kPillInset) / 2;
+  final contentHeight = 22 + 4 + maxLabelHeight;
+  final labelBottomFromPillCenter =
+      (barHeight + contentHeight) / 2 - _kPillInset - pillHalfHeight;
+  final cornerInset = _cornerInsetAt(
+    dy: labelBottomFromPillCenter,
+    halfHeight: pillHalfHeight,
+    radius: _kPillRadius,
+  );
+  final labelBoxWidth = pillWidth - 2 * cornerInset;
+
+  return TreinoBarMetrics(
+    tabWidth: tabWidth,
+    labelBoxWidth: labelBoxWidth,
+    labelsFit: maxLabelWidth <= labelBoxWidth,
+    barHeight: barHeight,
+  );
+}
+
+/// Cuánto se separa el pill del borde de su tab, en los cuatro lados.
+const double _kPillInset = 8;
+
+/// Redondeo del pill activo.
+///
+/// Era 28, que sobre un pill de 56 de alto lo volvía un círculo perfecto — y a
+/// la altura del label la curva entraba 7,4px por lado cuando el label solo
+/// tenía 6px de margen, así que lo recortaba. Con 20 la curva entra 3,3px y la
+/// palabra entra entera, sin dejar de verse bien redondeado.
+const double _kPillRadius = 20;
+
 /// Bottom bar de TREINO: pill flotante de vidrio (fill translúcido + reflejo
 /// especular, SIN blur — ver [TreinoGlassSurface]), pill de gradient que se
 /// desliza al tab activo, íconos `TreinoIcon` + labels Barlow Condensed.
+///
+/// **Los cinco destinos se ven SIEMPRE.** Cuando los labels no entran a lo
+/// ancho —pantalla chica, o el usuario agrandó la tipografía del sistema— la
+/// barra se queda con los íconos, que es el mismo estado compacto que produce
+/// [collapsed] y no un tercer modo. Antes había acá un camino aparte que la
+/// volvía una tira scrolleable horizontal: en un iPhone 17 Pro a textScale 1.0
+/// eso dejaba PERFIL fuera de pantalla. Una barra de navegación que hay que
+/// scrollear para llegar a una pestaña no es una barra de navegación, y
+/// `docs/design-decisions.md` pide explícitamente que la barra esté siempre
+/// visible.
+///
+/// Achicar el texto con `FittedBox` se descartó: si el usuario agrandó la
+/// tipografía del sistema, devolvérsela a 10px le desarma justo lo que pidió.
+/// Se sacrifica el label —que el lector de pantalla sigue anunciando por el
+/// `Semantics` de cada tab— y no la legibilidad ni el acceso a los destinos.
 class TreinoBottomBar extends StatelessWidget {
   const TreinoBottomBar({
     super.key,
@@ -28,9 +154,16 @@ class TreinoBottomBar extends StatelessWidget {
   /// dejando solo los íconos. La dispara el shell al detectar scroll hacia
   /// abajo en cualquier pantalla (ver `_ShellScaffold` en `app/router.dart`).
   ///
-  /// Es presentación pura: los tabs siguen siendo tapeables con el mismo
-  /// tamaño de target y el `minHeight` que usan los scrollables para su padding
-  /// inferior NO cambia — el contenido no salta cuando la barra se achica.
+  /// **No es el único disparador del estado compacto**: la barra también se
+  /// queda con los íconos cuando los labels no entran a lo ancho (ver
+  /// [resolveBarMetrics]). Este flag es "el usuario está leyendo"; el otro es
+  /// "el texto no entra". Cualquiera de los dos alcanza.
+  ///
+  /// El `minHeight` que usan los scrollables para su padding inferior NO
+  /// cambia, así que el contenido no salta cuando la barra se achica. El área
+  /// tapeable de cada tab SÍ se achica con la barra (de [minHeight] a
+  /// [collapsedHeight]), porque el `GestureDetector` vive adentro de la caja
+  /// animada; a 52px sigue holgadamente por encima del mínimo de 44 de la HIG.
   final bool collapsed;
 
   /// Count of unread chats with the athlete's coach — shown as a badge on
@@ -124,20 +257,26 @@ class TreinoBottomBar extends StatelessWidget {
               if (painter.height > maxLabelHeight) {
                 maxLabelHeight = painter.height;
               }
+              // Cada TextPainter retiene un ui.Paragraph nativo. Este loop
+              // corre en cada pasada de layout (rotación, teclado, split view),
+              // así que sin esto se acumulan hasta que pase el GC.
+              painter.dispose();
             }
 
-            final equalTabContentWidth =
-                constraints.maxWidth / _items.length - 20;
-            final useScrollableTabs = maxLabelWidth > equalTabContentWidth;
-            final desiredHeight = 22 + 8 + maxLabelHeight + 20;
-            final barHeight =
-                desiredHeight > minHeight ? desiredHeight : minHeight;
+            final metrics = resolveBarMetrics(
+              availableWidth: constraints.maxWidth,
+              itemCount: _items.length,
+              maxLabelWidth: maxLabelWidth,
+              maxLabelHeight: maxLabelHeight,
+            );
+            final barHeight = metrics.barHeight;
+            final expanded = !collapsed && metrics.labelsFit;
 
             // Una sola animación gobierna alto Y labels. Si fueran dos
             // (AnimatedContainer + AnimatedOpacity) podrían desincronizarse
             // un frame y el contenido desbordaría la caja mientras se achica.
             return TweenAnimationBuilder<double>(
-              tween: Tween<double>(end: collapsed ? 0 : 1),
+              tween: Tween<double>(end: expanded ? 1 : 0),
               duration: AppMotion.base,
               curve: AppMotion.standard,
               builder: (context, expansion, _) {
@@ -160,72 +299,50 @@ class TreinoBottomBar extends StatelessWidget {
                       height: lerpDouble(collapsedHeight, barHeight, expansion),
                       child: TreinoGlassSurface(
                         borderRadius: BorderRadius.circular(36),
-                        child: useScrollableTabs
-                            ? SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                reverse: currentIndex >= 3,
-                                child: Row(
+                        child: LayoutBuilder(
+                          builder: (context, innerConstraints) {
+                            final tabWidth =
+                                innerConstraints.maxWidth / _items.length;
+                            return Stack(
+                              children: [
+                                AnimatedPositioned(
+                                  duration: AppMotion.slow,
+                                  curve: AppMotion.standard,
+                                  left: tabWidth * currentIndex + 8,
+                                  top: 8,
+                                  bottom: 8,
+                                  width: tabWidth - 16,
+                                  child: _PillHighlight(palette: palette),
+                                ),
+                                Row(
                                   children: List.generate(_items.length, (i) {
-                                    return SizedBox(
-                                      width: maxLabelWidth + 40,
-                                      child: _ScrollableTab(
-                                        spec: _items[i],
-                                        active: i == currentIndex,
-                                        palette: palette,
-                                        badgeCount: _badgeCountFor(i),
-                                        expansion: expansion,
-                                        onTap: () => onTap(i),
+                                    final item = _items[i];
+                                    final active = i == currentIndex;
+                                    return Expanded(
+                                      child: Semantics(
+                                        button: true,
+                                        selected: active,
+                                        label: item.label,
+                                        excludeSemantics: true,
+                                        child: GestureDetector(
+                                          behavior: HitTestBehavior.opaque,
+                                          onTap: () => onTap(i),
+                                          child: _TabContent(
+                                            spec: item,
+                                            active: active,
+                                            palette: palette,
+                                            badgeCount: _badgeCountFor(i),
+                                            expansion: expansion,
+                                          ),
+                                        ),
                                       ),
                                     );
                                   }),
                                 ),
-                              )
-                            : LayoutBuilder(
-                                builder: (context, innerConstraints) {
-                                  final tabWidth =
-                                      innerConstraints.maxWidth / _items.length;
-                                  return Stack(
-                                    children: [
-                                      AnimatedPositioned(
-                                        duration: AppMotion.slow,
-                                        curve: AppMotion.standard,
-                                        left: tabWidth * currentIndex + 8,
-                                        top: 8,
-                                        bottom: 8,
-                                        width: tabWidth - 16,
-                                        child: _PillHighlight(palette: palette),
-                                      ),
-                                      Row(
-                                        children:
-                                            List.generate(_items.length, (i) {
-                                          final item = _items[i];
-                                          final active = i == currentIndex;
-                                          return Expanded(
-                                            child: Semantics(
-                                              button: true,
-                                              selected: active,
-                                              label: item.label,
-                                              excludeSemantics: true,
-                                              child: GestureDetector(
-                                                behavior:
-                                                    HitTestBehavior.opaque,
-                                                onTap: () => onTap(i),
-                                                child: _TabContent(
-                                                  spec: item,
-                                                  active: active,
-                                                  palette: palette,
-                                                  badgeCount: _badgeCountFor(i),
-                                                  expansion: expansion,
-                                                ),
-                                              ),
-                                            ),
-                                          );
-                                        }),
-                                      ),
-                                    ],
-                                  );
-                                },
-                              ),
+                              ],
+                            );
+                          },
+                        ),
                       ),
                     ),
                   ),
@@ -274,7 +391,7 @@ class _PillHighlight extends StatelessWidget {
             Color.lerp(palette.accent, palette.highlight, 0.25)!,
           ],
         ),
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(_kPillRadius),
         boxShadow: [
           BoxShadow(
             color: palette.accent.withValues(alpha: 0.35),
@@ -283,57 +400,6 @@ class _PillHighlight extends StatelessWidget {
             offset: const Offset(0, 4),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _ScrollableTab extends StatelessWidget {
-  const _ScrollableTab({
-    required this.spec,
-    required this.active,
-    required this.palette,
-    required this.badgeCount,
-    required this.expansion,
-    required this.onTap,
-  });
-
-  final _TabSpec spec;
-  final bool active;
-  final AppPalette palette;
-  final int badgeCount;
-
-  /// Ver [_TabContent.expansion].
-  final double expansion;
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      selected: active,
-      label: spec.label,
-      excludeSemantics: true,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              if (active) _PillHighlight(palette: palette),
-              _TabContent(
-                spec: spec,
-                active: active,
-                palette: palette,
-                badgeCount: badgeCount,
-                expansion: expansion,
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

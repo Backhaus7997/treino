@@ -16,6 +16,18 @@ Widget _wrap(
       home: Scaffold(body: child),
     );
 
+/// Opacidad del label de un tab. Vive acá arriba porque lo usan dos grupos.
+double labelOpacityOf(WidgetTester tester, String label) => tester
+    .widget<Opacity>(
+      find
+          .ancestor(
+            of: find.text(label, skipOffstage: false),
+            matching: find.byType(Opacity),
+          )
+          .first,
+    )
+    .opacity;
+
 void main() {
   group('TreinoBottomBar — Coach tab badge', () {
     testWidgets('coachUnreadCount 0 → no badge rendered', (tester) async {
@@ -155,29 +167,147 @@ void main() {
     });
   });
 
-  testWidgets(
-      'accessibility text scale keeps every destination readable and tappable',
-      (tester) async {
-    await tester.pumpWidget(
-      _wrap(
-        TreinoBottomBar(currentIndex: 0, onTap: (_) {}),
-        textScaler: const TextScaler.linear(3.2),
-      ),
-    );
-    await tester.pump();
+  // El álgebra de la barra, sin fuentes de por medio.
+  //
+  // Por qué unit test y no widget test: el proyecto usa google_fonts sin
+  // bundlear las tipografías, así que se bajan por red; y flutter_test mockea
+  // HTTP devolviendo 400 a todo. En test Barlow Condensed NUNCA carga y todo
+  // se mide con una fuente fallback bastante más ancha. Un widget test que
+  // preguntara "¿entra ENTRENAR?" estaría midiendo la fuente equivocada.
+  // Tomando maxLabelWidth como entrada, esto es aritmética exacta.
+  group('resolveBarMetrics', () {
+    TreinoBarMetrics metrics({
+      double availableWidth = 350,
+      int itemCount = 5,
+      double maxLabelWidth = 46,
+      double maxLabelHeight = 12,
+    }) =>
+        resolveBarMetrics(
+          availableWidth: availableWidth,
+          itemCount: itemCount,
+          maxLabelWidth: maxLabelWidth,
+          maxLabelHeight: maxLabelHeight,
+        );
 
-    expect(tester.takeException(), isNull);
-    for (final label in ['ENTRENAR', 'FEED', 'INICIO', 'COACH', 'PERFIL']) {
-      expect(find.text(label, skipOffstage: false), findsOneWidget);
-      expect(find.bySemanticsLabel(label), findsOneWidget);
-      final text = tester.widget<Text>(
-        find.text(label, skipOffstage: false),
+    test('reparte el ancho en partes iguales', () {
+      expect(metrics(availableWidth: 350).tabWidth, 70);
+    });
+
+    test('la caja del label descuenta la CURVA del pill, no solo su caja', () {
+      // Este es el bug que se arregló. El pill mide `tabWidth - 16` = 54, pero
+      // el label se apoya abajo, donde el redondeo ya se metió ~3.3px por lado.
+      // Medir contra 54 daba por bueno un label que la curva igual recortaba.
+      final m = metrics(availableWidth: 350);
+      expect(m.labelBoxWidth, lessThan(54));
+      expect(m.labelBoxWidth, closeTo(47.41, 0.01));
+    });
+
+    test('un label que entra en la caja pero NO en la curva no entra', () {
+      // 50 < 54 (la caja del pill) pero > 47.41 (lo que deja la curva).
+      // Con la lógica vieja esto daba `true` y la palabra salía recortada.
+      expect(metrics(maxLabelWidth: 50).labelsFit, isFalse);
+    });
+
+    test('el label entra cuando mide menos que su caja útil', () {
+      expect(metrics(maxLabelWidth: 46).labelsFit, isTrue);
+      expect(metrics(maxLabelWidth: 60).labelsFit, isFalse);
+    });
+
+    test('la frontera exacta cuenta como que entra', () {
+      final box = metrics().labelBoxWidth;
+      expect(metrics(maxLabelWidth: box).labelsFit, isTrue);
+      expect(metrics(maxLabelWidth: box + 0.1).labelsFit, isFalse);
+    });
+
+    test('textScale grande deja de entrar', () {
+      expect(metrics(maxLabelWidth: 46 * 1.6).labelsFit, isFalse);
+    });
+
+    test('no hardcodea 5 tabs — role-aware-shell propone 4 para trainer', () {
+      expect(metrics(availableWidth: 350, itemCount: 4).tabWidth, 87.5);
+    });
+
+    test('el alto nunca baja de minHeight', () {
+      expect(metrics(maxLabelHeight: 12).barHeight, TreinoBottomBar.minHeight);
+      expect(metrics(maxLabelHeight: 40).barHeight, 90);
+    });
+  });
+
+  group('TreinoBottomBar — los 5 destinos entran siempre', () {
+    const labels = ['ENTRENAR', 'FEED', 'INICIO', 'COACH', 'PERFIL'];
+
+    testWidgets('nunca scrollea horizontalmente, a ninguna escala', (
+      tester,
+    ) async {
+      // Invariante de docs/design-decisions.md: "la barra permanece visible
+      // siempre". Es independiente de la fuente — el widget no existe en
+      // ningún camino de código.
+      for (final scale in [1.0, 2.0, 3.2]) {
+        await tester.pumpWidget(
+          _wrap(
+            TreinoBottomBar(currentIndex: 0, onTap: (_) {}),
+            textScaler: TextScaler.linear(scale),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.byType(SingleChildScrollView),
+          findsNothing,
+          reason: 'a escala $scale la barra se volvió scrolleable',
+        );
+      }
+    });
+
+    testWidgets('los 5 destinos son TAPEABLES a escala normal', (tester) async {
+      await tester.pumpWidget(
+        _wrap(TreinoBottomBar(currentIndex: 0, onTap: (_) {})),
       );
-      expect(text.maxLines, 1);
-      expect(text.softWrap, isFalse);
-    }
-    expect(find.byType(FittedBox), findsNothing);
-    expect(find.byType(SingleChildScrollView), findsOneWidget);
+      await tester.pumpAndSettle();
+
+      for (final label in labels) {
+        // hitTestable() es el assert que faltaba: el test viejo se llamaba
+        // "...and tappable" y nunca lo llamaba, así que pasaba en verde
+        // mientras COACH y PERFIL quedaban fuera de pantalla.
+        expect(
+          find.bySemanticsLabel(label).hitTestable(),
+          findsOneWidget,
+          reason: '$label no es tapeable',
+        );
+      }
+    });
+
+    testWidgets('los 5 destinos siguen siendo TAPEABLES a textScale 3.2', (
+      tester,
+    ) async {
+      // Viewport forzado al ancho de un teléfono real. En el viewport default
+      // de flutter_test (800x600) la caja del label mide 136, y ahí la fuente
+      // fallback (262) y la real (~134) caen de LADOS DISTINTOS del umbral: el
+      // test afirmaría cosas opuestas según qué fuente cargó. A 390 lógicos la
+      // caja mide 54 y las dos fuentes coinciden en que no entra.
+      tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        _wrap(
+          TreinoBottomBar(currentIndex: 0, onTap: (_) {}),
+          textScaler: const TextScaler.linear(3.2),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      for (final label in labels) {
+        expect(
+          find.bySemanticsLabel(label).hitTestable(),
+          findsOneWidget,
+          reason: '$label dejó de ser alcanzable a textScale 3.2',
+        );
+      }
+      // El label se apaga, pero el nombre sigue anunciándose: se sacrifica el
+      // texto visible, no el acceso.
+      expect(labelOpacityOf(tester, 'ENTRENAR'), 0);
+    });
   });
 
   group('TreinoBottomBar — colapso al scrollear', () {
