@@ -78,13 +78,47 @@ class _AthleteFeed extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final theme = Theme.of(context);
+
     return DefaultTabController(
       length: _labels.length,
       initialIndex: _resolveInitialIndex(initialTab),
-      child: const TabBarView(
+      child: Column(
         children: [
-          _FeedPage(showTitle: false, showFeedTabs: true),
-          _RankingsPage(),
+          Container(
+            margin: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: palette.bgCard,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: palette.textMuted.withValues(alpha: 0.12),
+              ),
+            ),
+            child: TabBar(
+              dividerColor: Colors.transparent,
+              indicatorSize: TabBarIndicatorSize.tab,
+              indicator: BoxDecoration(
+                color: palette.accent,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              splashBorderRadius: BorderRadius.circular(20),
+              labelColor: palette.bg,
+              unselectedLabelColor: palette.textMuted,
+              labelStyle: theme.textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
+              ),
+              tabs: [for (final label in _labels) Tab(text: label, height: 40)],
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Expanded(
+            child: TabBarView(
+              children: [_FeedPage(showTitle: false), _RankingsPage()],
+            ),
+          ),
         ],
       ),
     );
@@ -95,7 +129,7 @@ class _AthleteFeed extends StatelessWidget {
 /// with [AutomaticKeepAliveClientMixin] so its feed providers are NOT rebuilt
 /// when swiping to Rankings and back.
 class _FeedPage extends ConsumerStatefulWidget {
-  const _FeedPage({this.showTitle = true, this.showFeedTabs = false});
+  const _FeedPage({this.showTitle = true});
 
   /// Whether the header renders its "FEED" title.
   ///
@@ -104,7 +138,6 @@ class _FeedPage extends ConsumerStatefulWidget {
   /// (default) for the trainer view, which has no pill and would otherwise
   /// lose every label identifying the screen.
   final bool showTitle;
-  final bool showFeedTabs;
 
   @override
   ConsumerState<_FeedPage> createState() => _FeedPageState();
@@ -121,18 +154,9 @@ class _FeedPageState extends ConsumerState<_FeedPage>
     final segment = ref.watch(feedSegmentProvider);
 
     return switch (segment) {
-      FeedSegment.amigos => _AmigosBody(
-          showTitle: widget.showTitle,
-          showFeedTabs: widget.showFeedTabs,
-        ),
-      FeedSegment.gym => _MiGymBody(
-          showTitle: widget.showTitle,
-          showFeedTabs: widget.showFeedTabs,
-        ),
-      FeedSegment.public => _PublicoBody(
-          showTitle: widget.showTitle,
-          showFeedTabs: widget.showFeedTabs,
-        ),
+      FeedSegment.amigos => _AmigosBody(showTitle: widget.showTitle),
+      FeedSegment.gym => _MiGymBody(showTitle: widget.showTitle),
+      FeedSegment.public => _PublicoBody(showTitle: widget.showTitle),
     };
   }
 }
@@ -140,10 +164,8 @@ class _FeedPageState extends ConsumerState<_FeedPage>
 SliverAppBar _feedAppBar(
   BuildContext context, {
   required bool showTitle,
-  required bool showFeedTabs,
 }) {
   final palette = AppPalette.of(context);
-  final theme = Theme.of(context);
 
   return SliverAppBar(
     key: const ValueKey('feed-collapsible-header'),
@@ -157,41 +179,6 @@ SliverAppBar _feedAppBar(
     toolbarHeight: 80,
     titleSpacing: 0,
     title: _FeedHeader(showTitle: showTitle),
-    bottom: showFeedTabs
-        ? PreferredSize(
-            preferredSize: const Size.fromHeight(72),
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: palette.bgCard,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: palette.textMuted.withValues(alpha: 0.12),
-                ),
-              ),
-              child: TabBar(
-                dividerColor: Colors.transparent,
-                indicatorSize: TabBarIndicatorSize.tab,
-                indicator: BoxDecoration(
-                  color: palette.accent,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                splashBorderRadius: BorderRadius.circular(20),
-                labelColor: palette.bg,
-                unselectedLabelColor: palette.textMuted,
-                labelStyle: theme.textTheme.labelLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5,
-                ),
-                tabs: [
-                  for (final label in _AthleteFeed._labels)
-                    Tab(text: label, height: 40),
-                ],
-              ),
-            ),
-          )
-        : null,
   );
 }
 
@@ -238,7 +225,7 @@ class _RankingsPage extends StatelessWidget {
     return NestedScrollView(
       floatHeaderSlivers: true,
       headerSliverBuilder: (context, innerBoxIsScrolled) => [
-        _feedAppBar(context, showTitle: false, showFeedTabs: true),
+        _feedAppBar(context, showTitle: false),
       ],
       body: const RankingsBody(),
     );
@@ -294,11 +281,11 @@ class _FeedHeader extends ConsumerWidget {
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      Icon(TreinoIcon.bell, size: 20, color: palette.textMuted),
+                      const _FeedIconBubble(icon: TreinoIcon.bell),
                       if (notificationBadge > 0)
                         Positioned(
-                          top: -4,
-                          right: -5,
+                          top: -2,
+                          right: -3,
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 4,
@@ -343,11 +330,11 @@ class _FeedHeader extends ConsumerWidget {
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      Icon(TreinoIcon.chat, size: 20, color: palette.textMuted),
+                      const _FeedIconBubble(icon: TreinoIcon.chat),
                       if (unreadChats > 0)
                         Positioned(
-                          top: -4,
-                          right: -5,
+                          top: -2,
+                          right: -3,
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 4,
@@ -384,12 +371,8 @@ class _FeedHeader extends ConsumerWidget {
               onTap: () => context.push('/feed/search'),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-                child: Center(
-                  child: Icon(
-                    TreinoIcon.search,
-                    size: 20,
-                    color: palette.textMuted,
-                  ),
+                child: const Center(
+                  child: _FeedIconBubble(icon: TreinoIcon.search),
                 ),
               ),
             ),
@@ -422,6 +405,29 @@ class _FeedHeader extends ConsumerWidget {
   }
 }
 
+class _FeedIconBubble extends StatelessWidget {
+  const _FeedIconBubble({required this.icon});
+
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: palette.textMuted.withValues(alpha: 0.12),
+        ),
+      ),
+      child: Icon(icon, size: 20, color: palette.textMuted),
+    );
+  }
+}
+
 class _FeedContent {
   const _FeedContent.posts({
     required this.posts,
@@ -448,12 +454,10 @@ class _FeedContent {
 class _FeedScrollView extends StatefulWidget {
   const _FeedScrollView({
     required this.showTitle,
-    required this.showFeedTabs,
     required this.content,
   });
 
   final bool showTitle;
-  final bool showFeedTabs;
   final _FeedContent content;
 
   @override
@@ -499,11 +503,7 @@ class _FeedScrollViewState extends State<_FeedScrollView> {
       controller: _scrollController,
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
-        _feedAppBar(
-          context,
-          showTitle: widget.showTitle,
-          showFeedTabs: widget.showFeedTabs,
-        ),
+        _feedAppBar(context, showTitle: widget.showTitle),
         SliverPersistentHeader(
           pinned: true,
           delegate: _FeedSegmentHeaderDelegate(
@@ -580,12 +580,10 @@ class _FeedScrollViewState extends State<_FeedScrollView> {
 class _FeedStaticScrollView extends StatelessWidget {
   const _FeedStaticScrollView({
     required this.showTitle,
-    required this.showFeedTabs,
     required this.child,
   });
 
   final bool showTitle;
-  final bool showFeedTabs;
   final Widget child;
 
   @override
@@ -594,11 +592,7 @@ class _FeedStaticScrollView extends StatelessWidget {
     return CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
-        _feedAppBar(
-          context,
-          showTitle: showTitle,
-          showFeedTabs: showFeedTabs,
-        ),
+        _feedAppBar(context, showTitle: showTitle),
         SliverPersistentHeader(
           pinned: true,
           delegate: _FeedSegmentHeaderDelegate(backgroundColor: palette.bg),
@@ -618,7 +612,6 @@ class _FeedStaticScrollView extends StatelessWidget {
 class _FeedAsyncBody<T> extends StatelessWidget {
   const _FeedAsyncBody({
     required this.showTitle,
-    required this.showFeedTabs,
     required this.async,
     required this.onRetry,
     required this.onRefresh,
@@ -626,7 +619,6 @@ class _FeedAsyncBody<T> extends StatelessWidget {
   });
 
   final bool showTitle;
-  final bool showFeedTabs;
   final AsyncValue<T> async;
   final VoidCallback onRetry;
   final Future<void> Function() onRefresh;
@@ -655,7 +647,6 @@ class _FeedAsyncBody<T> extends StatelessWidget {
               onRefresh: onRefresh,
               child: _FeedScrollView(
                 showTitle: showTitle,
-                showFeedTabs: showFeedTabs,
                 content: content,
               ),
             ),
@@ -663,14 +654,12 @@ class _FeedAsyncBody<T> extends StatelessWidget {
         },
         loading: () => _FeedStaticScrollView(
           showTitle: showTitle,
-          showFeedTabs: showFeedTabs,
           child: Center(
             child: CircularProgressIndicator(color: palette.accent),
           ),
         ),
         error: (_, __) => _FeedStaticScrollView(
           showTitle: showTitle,
-          showFeedTabs: showFeedTabs,
           child: Center(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -704,16 +693,14 @@ class _FeedAsyncBody<T> extends StatelessWidget {
 }
 
 class _AmigosBody extends ConsumerWidget {
-  const _AmigosBody({required this.showTitle, required this.showFeedTabs});
+  const _AmigosBody({required this.showTitle});
 
   final bool showTitle;
-  final bool showFeedTabs;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return _FeedAsyncBody<List<Post>>(
       showTitle: showTitle,
-      showFeedTabs: showFeedTabs,
       async: ref.watch(myFriendsFeedProvider),
       onRetry: () {
         ref.invalidate(feedPaginationProvider);
@@ -776,16 +763,14 @@ class _AmigosBody extends ConsumerWidget {
 }
 
 class _MiGymBody extends ConsumerWidget {
-  const _MiGymBody({required this.showTitle, required this.showFeedTabs});
+  const _MiGymBody({required this.showTitle});
 
   final bool showTitle;
-  final bool showFeedTabs;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return _FeedAsyncBody<List<Post>?>(
       showTitle: showTitle,
-      showFeedTabs: showFeedTabs,
       async: ref.watch(myGymFeedProvider),
       onRetry: () {
         ref.invalidate(feedPaginationProvider);
@@ -840,17 +825,15 @@ class _MiGymBody extends ConsumerWidget {
 }
 
 class _PublicoBody extends ConsumerWidget {
-  const _PublicoBody({required this.showTitle, required this.showFeedTabs});
+  const _PublicoBody({required this.showTitle});
 
   final bool showTitle;
-  final bool showFeedTabs;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final provider = feedPaginationProvider(publicFeedPaginationKey);
     return _FeedAsyncBody<List<Post>>(
       showTitle: showTitle,
-      showFeedTabs: showFeedTabs,
       async: ref.watch(feedPublicProvider),
       onRetry: () {
         ref.invalidate(provider);

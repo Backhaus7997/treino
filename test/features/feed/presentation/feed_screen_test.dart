@@ -1003,6 +1003,33 @@ void main() {
 
     Finder feedScrollView() => find.byType(CustomScrollView);
 
+    testWidgets('FEED/RANKINGS toggle stays visible after scrolling', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), publicOverrides(longPosts())),
+      );
+      await tester.pumpAndSettle();
+
+      final scrollView = feedScrollView();
+      await tester.drag(scrollView, const Offset(0, -500));
+      await tester.pumpAndSettle();
+
+      expect(find.text('FEED'), findsOneWidget);
+      expect(find.text('RANKINGS'), findsOneWidget);
+    });
+
+    testWidgets('renders exactly one FEED/RANKINGS toggle', (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), publicOverrides(longPosts())),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TabBar, skipOffstage: false), findsOneWidget);
+      expect(find.text('FEED', skipOffstage: false), findsOneWidget);
+      expect(find.text('RANKINGS', skipOffstage: false), findsOneWidget);
+    });
+
     testWidgets('header collapses when scrolling down', (tester) async {
       await tester.pumpWidget(
         _wrapProvider(const FeedScreen(), publicOverrides(longPosts())),
