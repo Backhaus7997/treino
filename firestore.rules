@@ -1116,7 +1116,10 @@ service cloud.firestore {
         ) || (
           'linkId' in data
           && exists(/databases/$(database)/documents/trainer_links/$(data.linkId))
-          && get(/databases/$(database)/documents/trainer_links/$(data.linkId)).data.status == 'active'
+          // QA H8: 'paused' cuenta como vínculo vigente para chatear (pausar es
+          // un hold temporal, no un corte). Espeja el filtro cliente en
+          // ChatRepository._activeLinkIdBetween.
+          && get(/databases/$(database)/documents/trainer_links/$(data.linkId)).data.status in ['active', 'paused']
           && get(/databases/$(database)/documents/trainer_links/$(data.linkId)).data.trainerId in members
           && get(/databases/$(database)/documents/trainer_links/$(data.linkId)).data.athleteId in members
         );
