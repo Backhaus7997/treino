@@ -143,13 +143,38 @@ void main() {
       expect(_editorEnteredWith?.queryParameters, isEmpty);
     });
 
-    testWidgets('the avatar exposes button semantics with an action label',
+    // A label and the button flag are NOT enough, and this test used to check
+    // only those. The Semantics carried `excludeSemantics: true` to keep the
+    // decorative initials out of the label, but that flag drops the semantics
+    // of EVERY descendant — including the tap action the GestureDetector
+    // contributes. VoiceOver announced a button whose double-tap fired
+    // nothing, while an ordinary touch kept working, so only the a11y path was
+    // broken. The fix is the bell's shape: no `excludeSemantics` on the
+    // annotation, an `ExcludeSemantics` around the decorative subtree only.
+    //
+    // `isSemantics`, not `matchesSemantics`: its parameters are nullable, so
+    // this pins the two properties that carry the contract and stays silent
+    // about every other flag the framework may add. (`matchesSemantics` and
+    // `containsSemantics` are both deprecated in favour of it.)
+    testWidgets('the avatar is an ACTIVATABLE button, not just a labelled one',
         (tester) async {
+      // Disposed inline, not via addTearDown: the framework's
+      // "SemanticsHandle was active at the end of the test" check runs BEFORE
+      // tear-downs, so a deferred dispose fails the test.
       final handle = tester.ensureSemantics();
       await _pumpDashboard(tester);
 
-      expect(find.bySemanticsLabel('Editar tu perfil profesional'),
-          findsOneWidget);
+      final avatar = find.bySemanticsLabel('Editar tu perfil profesional');
+      expect(avatar, findsOneWidget);
+      expect(
+        tester.getSemantics(avatar),
+        isSemantics(isButton: true, hasTapAction: true),
+      );
+
+      // The initials must still be excluded, or the label reads
+      // "Editar tu perfil profesional MP".
+      expect(find.bySemanticsLabel(RegExp('perfil profesional.*MP')),
+          findsNothing);
       handle.dispose();
     });
 
