@@ -182,11 +182,6 @@ class _DashboardHeader extends ConsumerWidget {
               // the whole header — date, greeting, bell label and this one —
               // is announced as a single blob.
               container: true,
-              // excludeSemantics: the initials render as a Text that would
-              // otherwise merge into the label and be read out as
-              // "Ver tu perfil MP". They are decorative — derived from the
-              // display name the trainer already knows is theirs.
-              excludeSemantics: true,
               label: AppL10n.of(context).a11yDashboardAvatarButton,
               child: GestureDetector(
                 onTap: () => context.push('/profile/edit-trainer'),
@@ -199,9 +194,23 @@ class _DashboardHeader extends ConsumerWidget {
                     minHeight: 44,
                   ),
                   child: Center(
-                    child: _AvatarInitials(
-                      initials: initials.isEmpty ? '·' : initials,
-                      palette: palette,
+                    // The initials render as a Text that would otherwise merge
+                    // into the label and be read out as "Editar tu perfil
+                    // profesional MP". They are decorative — derived from the
+                    // display name the trainer already knows is theirs.
+                    //
+                    // Excluded HERE, wrapping only the decorative subtree, and
+                    // NOT via `excludeSemantics: true` on the Semantics above:
+                    // that flag drops the semantics of EVERY descendant,
+                    // including the tap action the GestureDetector contributes.
+                    // The node was still announced as a button but VoiceOver's
+                    // double-tap had no action to fire. Same shape as
+                    // _BellWithBadge.
+                    child: ExcludeSemantics(
+                      child: _AvatarInitials(
+                        initials: initials.isEmpty ? '·' : initials,
+                        palette: palette,
+                      ),
                     ),
                   ),
                 ),
