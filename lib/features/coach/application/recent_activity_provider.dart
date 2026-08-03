@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/utils/argentina_time.dart';
+import '../../../core/utils/firestore_error.dart';
 import '../../workout/application/session_providers.dart'
     show finishedInWindowByUidProvider;
 import '../../workout/domain/session.dart';
@@ -62,6 +63,9 @@ final recentActivityProvider =
 
   final entries = <RecentActivityEntry>[];
   bool anyLoading = false;
+  // First non-permission-denied athlete error, kept so an all-failed read can
+  // surface it instead of a misleading "no recent activity".
+  (Object, StackTrace)? firstRealError;
 
   for (final athleteId in athleteIds) {
     final sessionsAsync = ref.watch(finishedInWindowByUidProvider(
@@ -72,7 +76,12 @@ final recentActivityProvider =
       continue;
     }
     if (sessionsAsync.hasError && !sessionsAsync.hasValue) {
-      continue; // athlete not sharing → permission-denied → skip
+      // permission-denied → athlete not sharing → skip, as before. Any OTHER
+      // code is a real failure — remember it (see the all-failed guard below).
+      if (!isPermissionDenied(sessionsAsync.error)) {
+        firstRealError ??= (sessionsAsync.error!, sessionsAsync.stackTrace!);
+      }
+      continue;
     }
 
     for (final s in sessionsAsync.valueOrNull ?? const <Session>[]) {
@@ -87,6 +96,13 @@ final recentActivityProvider =
   // this cannot hang on a non-sharing athlete.
   if (anyLoading) {
     return const AsyncValue.loading();
+  }
+
+  // Settled with nothing to show but a real (non-permission-denied) read
+  // failed: surface it so the UI shows a retryable error state instead of a
+  // false "no recent activity". A partial result is still shown.
+  if (entries.isEmpty && firstRealError != null) {
+    return AsyncValue.error(firstRealError.$1, firstRealError.$2);
   }
 
   entries
