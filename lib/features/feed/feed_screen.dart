@@ -8,6 +8,7 @@ import '../../app/theme/app_palette.dart';
 import '../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../core/widgets/motion/treino_state_switcher.dart';
 import '../../core/widgets/motion/treino_tappable.dart';
+import '../../core/widgets/treino_bottom_bar.dart';
 import '../../core/widgets/treino_icon.dart';
 import '../../l10n/app_l10n.dart';
 import '../chat/application/chat_providers.dart';
@@ -77,50 +78,13 @@ class _AthleteFeed extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    final theme = Theme.of(context);
-
     return DefaultTabController(
       length: _labels.length,
       initialIndex: _resolveInitialIndex(initialTab),
-      child: Column(
+      child: const TabBarView(
         children: [
-          // Segmented pill control — same sub-tab language as the Entrenar
-          // tab's former pill and TrainerCoachView's week tabs.
-          Container(
-            margin: const EdgeInsets.fromLTRB(20, 10, 20, 0),
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: palette.bgCard,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: palette.textMuted.withValues(alpha: 0.12),
-              ),
-            ),
-            child: TabBar(
-              dividerColor: Colors.transparent,
-              indicatorSize: TabBarIndicatorSize.tab,
-              indicator: BoxDecoration(
-                color: palette.accent,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              splashBorderRadius: BorderRadius.circular(20),
-              labelColor: palette.bg,
-              unselectedLabelColor: palette.textMuted,
-              labelStyle: theme.textTheme.labelLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.5,
-              ),
-              tabs: [for (final l in _labels) Tab(text: l, height: 40)],
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Expanded(
-            child: TabBarView(
-              // showTitle: false — the pill above already reads "FEED".
-              children: [_FeedPage(showTitle: false), _RankingsPage()],
-            ),
-          ),
+          _FeedPage(showTitle: false, showFeedTabs: true),
+          _RankingsPage(),
         ],
       ),
     );
@@ -131,7 +95,7 @@ class _AthleteFeed extends StatelessWidget {
 /// with [AutomaticKeepAliveClientMixin] so its feed providers are NOT rebuilt
 /// when swiping to Rankings and back.
 class _FeedPage extends ConsumerStatefulWidget {
-  const _FeedPage({this.showTitle = true});
+  const _FeedPage({this.showTitle = true, this.showFeedTabs = false});
 
   /// Whether the header renders its "FEED" title.
   ///
@@ -140,6 +104,7 @@ class _FeedPage extends ConsumerStatefulWidget {
   /// (default) for the trainer view, which has no pill and would otherwise
   /// lose every label identifying the screen.
   final bool showTitle;
+  final bool showFeedTabs;
 
   @override
   ConsumerState<_FeedPage> createState() => _FeedPageState();
@@ -155,23 +120,110 @@ class _FeedPageState extends ConsumerState<_FeedPage>
     super.build(context);
     final segment = ref.watch(feedSegmentProvider);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _FeedHeader(showTitle: widget.showTitle),
-        const SizedBox(height: 14),
-        const FeedSegmentPills(),
-        const SizedBox(height: 18),
-        Expanded(
-          child: switch (segment) {
-            FeedSegment.amigos => const _AmigosBody(),
-            FeedSegment.gym => const _MiGymBody(),
-            FeedSegment.public => const _PublicoBody(),
-          },
+    return switch (segment) {
+      FeedSegment.amigos => _AmigosBody(
+          showTitle: widget.showTitle,
+          showFeedTabs: widget.showFeedTabs,
         ),
-      ],
+      FeedSegment.gym => _MiGymBody(
+          showTitle: widget.showTitle,
+          showFeedTabs: widget.showFeedTabs,
+        ),
+      FeedSegment.public => _PublicoBody(
+          showTitle: widget.showTitle,
+          showFeedTabs: widget.showFeedTabs,
+        ),
+    };
+  }
+}
+
+SliverAppBar _feedAppBar(
+  BuildContext context, {
+  required bool showTitle,
+  required bool showFeedTabs,
+}) {
+  final palette = AppPalette.of(context);
+  final theme = Theme.of(context);
+
+  return SliverAppBar(
+    key: const ValueKey('feed-collapsible-header'),
+    floating: true,
+    snap: true,
+    automaticallyImplyLeading: false,
+    backgroundColor: palette.bg,
+    surfaceTintColor: Colors.transparent,
+    elevation: 0,
+    scrolledUnderElevation: 0,
+    toolbarHeight: 80,
+    titleSpacing: 0,
+    title: _FeedHeader(showTitle: showTitle),
+    bottom: showFeedTabs
+        ? PreferredSize(
+            preferredSize: const Size.fromHeight(72),
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: palette.bgCard,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: palette.textMuted.withValues(alpha: 0.12),
+                ),
+              ),
+              child: TabBar(
+                dividerColor: Colors.transparent,
+                indicatorSize: TabBarIndicatorSize.tab,
+                indicator: BoxDecoration(
+                  color: palette.accent,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                splashBorderRadius: BorderRadius.circular(20),
+                labelColor: palette.bg,
+                unselectedLabelColor: palette.textMuted,
+                labelStyle: theme.textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                ),
+                tabs: [
+                  for (final label in _AthleteFeed._labels)
+                    Tab(text: label, height: 40),
+                ],
+              ),
+            ),
+          )
+        : null,
+  );
+}
+
+class _FeedSegmentHeaderDelegate extends SliverPersistentHeaderDelegate {
+  const _FeedSegmentHeaderDelegate({required this.backgroundColor});
+
+  final Color backgroundColor;
+
+  @override
+  double get minExtent => 62;
+
+  @override
+  double get maxExtent => 62;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return ColoredBox(
+      color: backgroundColor,
+      child: const Padding(
+        padding: EdgeInsets.symmetric(vertical: 14),
+        child: FeedSegmentPills(),
+      ),
     );
   }
+
+  @override
+  bool shouldRebuild(_FeedSegmentHeaderDelegate oldDelegate) =>
+      backgroundColor != oldDelegate.backgroundColor;
 }
 
 /// Page 1 — thin host for the self-contained rankings surface. Owns its own
@@ -183,7 +235,13 @@ class _RankingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const RankingsBody();
+    return NestedScrollView(
+      floatHeaderSlivers: true,
+      headerSliverBuilder: (context, innerBoxIsScrolled) => [
+        _feedAppBar(context, showTitle: false, showFeedTabs: true),
+      ],
+      body: const RankingsBody(),
+    );
   }
 }
 
@@ -364,32 +422,45 @@ class _FeedHeader extends ConsumerWidget {
   }
 }
 
-/// A scrollable list of [PostCard]s sharing the common feed layout.
-///
-/// StatefulWidget (no función suelta): [TreinoFadeSlideIn] está PROHIBIDO en
-/// builders lazy porque los ítems reciclados re-montan su State al re-entrar
-/// al viewport y la entrada re-animaría en cada scroll — el cap `i >= 8` NO
-/// alcanza porque el problema es el re-mount, no el índice. `_animatedIds`
-/// vive en el State de este widget (sobrevive al scroll, que solo
-/// monta/desmonta los Elements hijos del `ListView.separated`, no este
-/// State) y recuerda qué posts YA corrieron su entrada, así un post
-/// reciclado que vuelve a construirse nunca vuelve a animar.
-class _FeedPostList extends StatefulWidget {
-  const _FeedPostList({
+class _FeedContent {
+  const _FeedContent.posts({
     required this.posts,
     required this.isLoadingMore,
     required this.onLoadMore,
-  });
+  }) : emptyState = null;
 
-  final List<Post> posts;
+  const _FeedContent.empty(this.emptyState)
+      : posts = null,
+        isLoadingMore = false,
+        onLoadMore = null;
+
+  final List<Post>? posts;
   final bool isLoadingMore;
-  final VoidCallback onLoadMore;
-
-  @override
-  State<_FeedPostList> createState() => _FeedPostListState();
+  final VoidCallback? onLoadMore;
+  final Widget? emptyState;
 }
 
-class _FeedPostListState extends State<_FeedPostList> {
+/// The feed's single vertical scroll surface: collapsible app bar, pinned
+/// navigation pills, and lazy post sliver.
+///
+/// `_animatedIds` belongs to the scroll surface rather than a lazy child. A
+/// recycled post can therefore be rebuilt without replaying its entrance.
+class _FeedScrollView extends StatefulWidget {
+  const _FeedScrollView({
+    required this.showTitle,
+    required this.showFeedTabs,
+    required this.content,
+  });
+
+  final bool showTitle;
+  final bool showFeedTabs;
+  final _FeedContent content;
+
+  @override
+  State<_FeedScrollView> createState() => _FeedScrollViewState();
+}
+
+class _FeedScrollViewState extends State<_FeedScrollView> {
   static const _loadMoreThreshold = 400.0;
 
   final Set<String> _animatedIds = {};
@@ -411,87 +482,131 @@ class _FeedPostListState extends State<_FeedPostList> {
 
   void _handleScroll() {
     if (!_scrollController.hasClients) return;
-    if (_scrollController.position.extentAfter <= _loadMoreThreshold) {
-      widget.onLoadMore();
+    final onLoadMore = widget.content.onLoadMore;
+    if (onLoadMore != null &&
+        _scrollController.position.extentAfter <= _loadMoreThreshold) {
+      onLoadMore();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return ListView.separated(
+    final palette = AppPalette.of(context);
+    final bottomInset =
+        MediaQuery.paddingOf(context).bottom + TreinoBottomBar.minHeight;
+
+    return CustomScrollView(
       controller: _scrollController,
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: EdgeInsets.fromLTRB(
-        20,
-        0,
-        20,
-        MediaQuery.paddingOf(context).bottom,
-      ),
-      itemCount: widget.posts.length + (widget.isLoadingMore ? 1 : 0),
-      separatorBuilder: (_, __) => const SizedBox(height: 14),
-      itemBuilder: (_, i) {
-        if (i == widget.posts.length) {
-          final palette = AppPalette.of(context);
-          return Padding(
-            key: const ValueKey('feed-loading-more-indicator'),
-            padding: const EdgeInsets.symmetric(vertical: 20),
-            child: Center(
-              child: SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  color: palette.accent,
-                  strokeWidth: 2,
+      slivers: [
+        _feedAppBar(
+          context,
+          showTitle: widget.showTitle,
+          showFeedTabs: widget.showFeedTabs,
+        ),
+        SliverPersistentHeader(
+          pinned: true,
+          delegate: _FeedSegmentHeaderDelegate(
+            backgroundColor: palette.bg,
+          ),
+        ),
+        if (widget.content.posts case final posts?)
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(20, 0, 20, bottomInset),
+            sliver: _buildPostList(palette, posts),
+          )
+        else
+          SliverPadding(
+            padding: EdgeInsets.only(bottom: bottomInset),
+            sliver: SliverFillRemaining(
+              hasScrollBody: false,
+              child: widget.content.emptyState,
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildPostList(AppPalette palette, List<Post> posts) {
+    final childCount = posts.isEmpty
+        ? 0
+        : posts.length * 2 - 1 + (widget.content.isLoadingMore ? 2 : 0);
+
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (context, index) {
+          if (index.isOdd) return const SizedBox(height: 14);
+
+          final postIndex = index ~/ 2;
+          if (postIndex == posts.length) {
+            return Padding(
+              key: const ValueKey('feed-loading-more-indicator'),
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    color: palette.accent,
+                    strokeWidth: 2,
+                  ),
                 ),
               ),
-            ),
+            );
+          }
+
+          final post = posts[postIndex];
+          void onAuthorTap() => context.go('/feed/profile/${post.authorUid}');
+          final card = PostCard(
+            key: ValueKey(post.id),
+            post: post,
+            onAuthorTap: onAuthorTap,
           );
-        }
 
-        final post = widget.posts[i];
-        void onAuthorTap() => context.go('/feed/profile/${post.authorUid}');
-
-        // La card tiene estado local (el detalle del entreno expandido), así
-        // que la reconciliación POR POSICIÓN del ListView la corrompe: si
-        // entra un post nuevo arriba (refresh, o el propio usuario
-        // compartiendo), el Element de esa posición se reusa para OTRO post y
-        // muestra su detalle expandido. La key ata el estado al post — vive en
-        // PostCard (invariante que un test cubre explícitamente) Y en
-        // cualquier wrapper que se interponga como raíz del builder, para que
-        // la reconciliación del ListView tampoco se confunda en esa capa.
-        final card = PostCard(
-            key: ValueKey(post.id), post: post, onAuthorTap: onAuthorTap);
-
-        // `add` devuelve false si el id ya estaba — ya animó una vez, no
-        // importa si el Element se recicló y se está reconstruyendo ahora.
-        final alreadyAnimated = !_animatedIds.add(post.id);
-        // Stagger sutil SOLO para los primeros 8 posts que entran sin haber
-        // animado antes (lo que se ve en cada carga/refresh) — cap explícito
-        // para no costear memoria/perf en listas largas ni generar una
-        // cascada interminable de delays.
-        if (i >= 8 || alreadyAnimated) return card;
-        return TreinoFadeSlideIn(
-          key: ValueKey(post.id),
-          delay: AppMotion.stagger(i),
-          child: card,
-        );
-      },
+          final alreadyAnimated = !_animatedIds.add(post.id);
+          if (postIndex >= 8 || alreadyAnimated) return card;
+          return TreinoFadeSlideIn(
+            key: ValueKey(post.id),
+            delay: AppMotion.stagger(postIndex),
+            child: card,
+          );
+        },
+        childCount: childCount,
+      ),
     );
   }
 }
 
-/// Wraps an empty/placeholder state in a scrollable so it can still be
-/// pulled-to-refresh even when there is nothing to scroll.
-Widget _scrollableEmptyState(BuildContext context, Widget child) {
-  return LayoutBuilder(
-    builder: (context, constraints) => SingleChildScrollView(
+class _FeedStaticScrollView extends StatelessWidget {
+  const _FeedStaticScrollView({
+    required this.showTitle,
+    required this.showFeedTabs,
+    required this.child,
+  });
+
+  final bool showTitle;
+  final bool showFeedTabs;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(minHeight: constraints.maxHeight),
-        child: child,
-      ),
-    ),
-  );
+      slivers: [
+        _feedAppBar(
+          context,
+          showTitle: showTitle,
+          showFeedTabs: showFeedTabs,
+        ),
+        SliverPersistentHeader(
+          pinned: true,
+          delegate: _FeedSegmentHeaderDelegate(backgroundColor: palette.bg),
+        ),
+        SliverFillRemaining(hasScrollBody: false, child: child),
+      ],
+    );
+  }
 }
 
 /// Shared async resolver for the three feed segments.
@@ -502,16 +617,20 @@ Widget _scrollableEmptyState(BuildContext context, Widget child) {
 /// to force a refetch.
 class _FeedAsyncBody<T> extends StatelessWidget {
   const _FeedAsyncBody({
+    required this.showTitle,
+    required this.showFeedTabs,
     required this.async,
     required this.onRetry,
     required this.onRefresh,
     required this.dataBuilder,
   });
 
+  final bool showTitle;
+  final bool showFeedTabs;
   final AsyncValue<T> async;
   final VoidCallback onRetry;
   final Future<void> Function() onRefresh;
-  final Widget Function(BuildContext context, T data) dataBuilder;
+  final _FeedContent Function(BuildContext context, T data) dataBuilder;
 
   @override
   Widget build(BuildContext context) {
@@ -527,37 +646,55 @@ class _FeedAsyncBody<T> extends StatelessWidget {
         ),
       ),
       child: async.when(
-        data: (data) => Semantics(
-          label: l10n.feedPullToRefreshA11y,
-          child: RefreshIndicator(
-            color: palette.accent,
-            onRefresh: onRefresh,
-            child: dataBuilder(context, data),
+        data: (data) {
+          final content = dataBuilder(context, data);
+          return Semantics(
+            label: l10n.feedPullToRefreshA11y,
+            child: RefreshIndicator(
+              color: palette.accent,
+              onRefresh: onRefresh,
+              child: _FeedScrollView(
+                showTitle: showTitle,
+                showFeedTabs: showFeedTabs,
+                content: content,
+              ),
+            ),
+          );
+        },
+        loading: () => _FeedStaticScrollView(
+          showTitle: showTitle,
+          showFeedTabs: showFeedTabs,
+          child: Center(
+            child: CircularProgressIndicator(color: palette.accent),
           ),
         ),
-        loading: () =>
-            Center(child: CircularProgressIndicator(color: palette.accent)),
-        error: (_, __) => Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  l10n.feedLoadError,
-                  style: GoogleFonts.barlow(
-                    fontSize: 14,
-                    color: palette.textMuted,
+        error: (_, __) => _FeedStaticScrollView(
+          showTitle: showTitle,
+          showFeedTabs: showFeedTabs,
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    l10n.feedLoadError,
+                    style: GoogleFonts.barlow(
+                      fontSize: 14,
+                      color: palette.textMuted,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 16),
-                TextButton(
-                  onPressed: onRetry,
-                  style: TextButton.styleFrom(foregroundColor: palette.accent),
-                  child: Text(l10n.coachRetryLabel),
-                ),
-              ],
+                  const SizedBox(height: 16),
+                  TextButton(
+                    onPressed: onRetry,
+                    style: TextButton.styleFrom(
+                      foregroundColor: palette.accent,
+                    ),
+                    child: Text(l10n.coachRetryLabel),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -567,11 +704,16 @@ class _FeedAsyncBody<T> extends StatelessWidget {
 }
 
 class _AmigosBody extends ConsumerWidget {
-  const _AmigosBody();
+  const _AmigosBody({required this.showTitle, required this.showFeedTabs});
+
+  final bool showTitle;
+  final bool showFeedTabs;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return _FeedAsyncBody<List<Post>>(
+      showTitle: showTitle,
+      showFeedTabs: showFeedTabs,
       async: ref.watch(myFriendsFeedProvider),
       onRetry: () {
         ref.invalidate(feedPaginationProvider);
@@ -599,8 +741,7 @@ class _AmigosBody extends ConsumerWidget {
               (profile) => profile.valueOrNull?.gymId,
             ),
           );
-          return _scrollableEmptyState(
-            context,
+          return _FeedContent.empty(
             Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -613,7 +754,7 @@ class _AmigosBody extends ConsumerWidget {
           );
         }
         final pagination = posts is PaginatedPostList ? posts : null;
-        return _FeedPostList(
+        return _FeedContent.posts(
           posts: posts,
           isLoadingMore: pagination?.isLoadingMore ?? false,
           onLoadMore: () async {
@@ -635,11 +776,16 @@ class _AmigosBody extends ConsumerWidget {
 }
 
 class _MiGymBody extends ConsumerWidget {
-  const _MiGymBody();
+  const _MiGymBody({required this.showTitle, required this.showFeedTabs});
+
+  final bool showTitle;
+  final bool showFeedTabs;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return _FeedAsyncBody<List<Post>?>(
+      showTitle: showTitle,
+      showFeedTabs: showFeedTabs,
       async: ref.watch(myGymFeedProvider),
       onRetry: () {
         ref.invalidate(feedPaginationProvider);
@@ -662,19 +808,17 @@ class _MiGymBody extends ConsumerWidget {
       },
       dataBuilder: (context, posts) {
         if (posts == null) {
-          return _scrollableEmptyState(
-            context,
-            const FeedEmptyState(message: 'Todavía no estás en un gym'),
+          return const _FeedContent.empty(
+            FeedEmptyState(message: 'Todavía no estás en un gym'),
           );
         }
         if (posts.isEmpty) {
-          return _scrollableEmptyState(
-            context,
-            const FeedEmptyState(message: 'Tu gym todavía no tiene posts'),
+          return const _FeedContent.empty(
+            FeedEmptyState(message: 'Tu gym todavía no tiene posts'),
           );
         }
         final pagination = posts is PaginatedPostList ? posts : null;
-        return _FeedPostList(
+        return _FeedContent.posts(
           posts: posts,
           isLoadingMore: pagination?.isLoadingMore ?? false,
           onLoadMore: () async {
@@ -696,12 +840,17 @@ class _MiGymBody extends ConsumerWidget {
 }
 
 class _PublicoBody extends ConsumerWidget {
-  const _PublicoBody();
+  const _PublicoBody({required this.showTitle, required this.showFeedTabs});
+
+  final bool showTitle;
+  final bool showFeedTabs;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final provider = feedPaginationProvider(publicFeedPaginationKey);
     return _FeedAsyncBody<List<Post>>(
+      showTitle: showTitle,
+      showFeedTabs: showFeedTabs,
       async: ref.watch(feedPublicProvider),
       onRetry: () {
         ref.invalidate(provider);
@@ -713,13 +862,12 @@ class _PublicoBody extends ConsumerWidget {
       },
       dataBuilder: (context, posts) {
         if (posts.isEmpty) {
-          return _scrollableEmptyState(
-            context,
-            const FeedEmptyState(message: 'Aún no hay posts públicos'),
+          return const _FeedContent.empty(
+            FeedEmptyState(message: 'Aún no hay posts públicos'),
           );
         }
         final pagination = posts is PaginatedPostList ? posts : null;
-        return _FeedPostList(
+        return _FeedContent.posts(
           posts: posts,
           isLoadingMore: pagination?.isLoadingMore ?? false,
           onLoadMore: () async {

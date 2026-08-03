@@ -9,6 +9,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_background.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
+import 'package:treino/core/widgets/treino_bottom_bar.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
@@ -16,8 +17,10 @@ import 'package:treino/features/feed/application/feed_pagination_notifier.dart';
 import 'package:treino/features/feed/application/feed_screen_providers.dart';
 import 'package:treino/features/feed/application/friendship_providers.dart';
 import 'package:treino/features/feed/application/post_providers.dart';
+import 'package:treino/features/feed/data/post_repository.dart';
 import 'package:treino/features/feed/domain/feed_segment.dart';
 import 'package:treino/features/feed/domain/post.dart';
+import 'package:treino/features/feed/domain/post_page.dart';
 import 'package:treino/features/feed/domain/post_privacy.dart';
 import 'package:treino/features/feed/domain/routine_tag.dart';
 import 'package:treino/features/feed/feed_screen.dart';
@@ -60,6 +63,23 @@ class _FakeRankingOptInController implements RankingOptInControllerBase {
 
   @override
   Future<void> syncGymIfDesynced(String uid) async {}
+}
+
+class _CountingPublicPostRepository extends Fake implements PostRepository {
+  _CountingPublicPostRepository(this.initialPosts);
+
+  final List<Post> initialPosts;
+  int pageRequests = 0;
+
+  @override
+  Future<PostPage> feedPublic({int limit = 20, DateTime? after}) async {
+    pageRequests++;
+    return PostPage(
+      posts: after == null ? initialPosts : const <Post>[],
+      nextCursor: after == null ? DateTime.utc(2026, 8, 1) : null,
+      hasMore: after == null,
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -161,7 +181,7 @@ void main() {
     testWidgets('SCENARIO-144: labels FEED once — the pill, not a duplicate',
         (tester) async {
       await tester.pumpWidget(_wrapProvider(const FeedScreen(), baseOverrides));
-      await tester.pump();
+      await tester.pumpAndSettle();
 
       expect(find.text('FEED'), findsOneWidget);
     });
@@ -176,7 +196,7 @@ void main() {
           unreadFromFriendsProvider.overrideWith((_) => 3),
         ]),
       );
-      await tester.pump();
+      await tester.pumpAndSettle();
 
       expect(find.text('3'), findsOneWidget);
     });
@@ -211,7 +231,7 @@ void main() {
       tester,
     ) async {
       await tester.pumpWidget(_wrapProvider(const FeedScreen(), baseOverrides));
-      await tester.pump();
+      await tester.pumpAndSettle();
 
       expect(find.byType(FeedSegmentPills), findsOneWidget);
     });
@@ -241,14 +261,27 @@ void main() {
             ),
           ),
         );
-        await tester.pump();
+        await tester.pumpAndSettle();
 
         // Only 1 Scaffold: the outer test wrapper
         expect(find.byType(Scaffold), findsOneWidget);
         // No AppBackground anywhere
         expect(find.byType(AppBackground), findsNothing);
-        // No SafeArea inside FeedScreen subtree
-        expect(find.byType(SafeArea), findsNothing);
+        // SliverAppBar owns an internal SafeArea for its toolbar. What the
+        // shell contract forbids is FeedScreen wrapping its whole scroll
+        // surface in another SafeArea.
+        final feedScrollView = find.ancestor(
+          of: find.byKey(const ValueKey('feed-collapsible-header')),
+          matching: find.byType(CustomScrollView),
+        );
+        expect(feedScrollView, findsOneWidget);
+        expect(
+          find.ancestor(
+            of: feedScrollView,
+            matching: find.byType(SafeArea),
+          ),
+          findsNothing,
+        );
       },
     );
 
@@ -753,8 +786,7 @@ void main() {
       await tester.pumpWidget(
         _wrapProvider(const FeedScreen(), tabOverrides()),
       );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pumpAndSettle();
 
       expect(find.byType(FeedSegmentPills), findsOneWidget);
       expect(find.byKey(const Key('rankings_invitation_state')), findsNothing);
@@ -843,8 +875,7 @@ void main() {
           ),
         ]),
       );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('rankings_section_streak')), findsNothing);
       expect(find.byKey(const Key('rankings_invitation_state')), findsNothing);
@@ -860,8 +891,7 @@ void main() {
           ),
         ]),
       );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pumpAndSettle();
 
       expect(find.byType(TabBar), findsOneWidget);
       expect(find.text('RANKINGS'), findsOneWidget);
@@ -950,6 +980,130 @@ void main() {
         find.byKey(const ValueKey('feed-loading-more-indicator')),
         findsNothing,
       );
+    });
+  });
+
+  group('sliver feed surface', () {
+    List<Post> longPosts() => List.generate(
+          24,
+          (index) => _makePost(
+            id: 'sliver-$index',
+            authorUid: 'author-$index',
+            text: 'Post largo $index ${'contenido ' * 10}',
+            privacy: PostPrivacy.public,
+          ),
+        );
+
+    List<Override> publicOverrides(List<Post> posts) => [
+          feedSegmentProvider.overrideWith((ref) => FeedSegment.public),
+          myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myGymFeedProvider.overrideWith((ref) async => null),
+          feedPublicProvider.overrideWith((ref) async => posts),
+        ];
+
+    Finder feedScrollView() => find.byType(CustomScrollView);
+
+    testWidgets('header collapses when scrolling down', (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), publicOverrides(longPosts())),
+      );
+      await tester.pumpAndSettle();
+
+      final scrollView = feedScrollView();
+      expect(scrollView, findsOneWidget);
+      final chatIcon = find.byIcon(TreinoIcon.chat);
+      expect(chatIcon, findsOneWidget);
+
+      await tester.drag(scrollView, const Offset(0, -500));
+      await tester.pumpAndSettle();
+
+      expect(chatIcon, findsNothing);
+    });
+
+    testWidgets('floating header returns on the first up-scroll', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), publicOverrides(longPosts())),
+      );
+      await tester.pumpAndSettle();
+
+      final scrollView = feedScrollView();
+      final chatIcon = find.byIcon(TreinoIcon.chat);
+      await tester.drag(scrollView, const Offset(0, -500));
+      await tester.pumpAndSettle();
+      expect(chatIcon, findsNothing);
+
+      await tester.drag(scrollView, const Offset(0, 120));
+      await tester.pumpAndSettle();
+      expect(chatIcon, findsOneWidget);
+    });
+
+    testWidgets('segment pills remain visible after scrolling', (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), publicOverrides(longPosts())),
+      );
+      await tester.pumpAndSettle();
+
+      final scrollView = feedScrollView();
+      await tester.drag(scrollView, const Offset(0, -700));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(FeedSegmentPills), findsOneWidget);
+      final pillsRect = tester.getRect(find.text('PÚBLICO'));
+      final viewportRect = tester.getRect(scrollView);
+      expect(pillsRect.bottom, greaterThan(viewportRect.top));
+      expect(pillsRect.top, lessThan(viewportRect.bottom));
+    });
+
+    testWidgets('post sliver preserves shell-safe bottom padding', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), publicOverrides(longPosts())),
+      );
+      await tester.pumpAndSettle();
+
+      final context = tester.element(find.byType(PostCard).first);
+      final expectedBottom =
+          MediaQuery.paddingOf(context).bottom + TreinoBottomBar.minHeight;
+      final paddings = tester.widgetList<SliverPadding>(
+        find.descendant(
+          of: feedScrollView(),
+          matching: find.byType(SliverPadding),
+        ),
+      );
+
+      expect(
+        paddings.any(
+          (sliver) => (sliver.padding as EdgeInsets).bottom == expectedBottom,
+        ),
+        isTrue,
+      );
+    });
+
+    testWidgets('loadMore still fires within 400px of the end', (tester) async {
+      final posts = longPosts();
+      final repository = _CountingPublicPostRepository(posts);
+
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), [
+          feedSegmentProvider.overrideWith((ref) => FeedSegment.public),
+          myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myGymFeedProvider.overrideWith((ref) async => null),
+          postRepositoryProvider.overrideWithValue(repository),
+        ]),
+      );
+      await tester.pumpAndSettle();
+      expect(repository.pageRequests, 1);
+
+      final scrollView = feedScrollView();
+      final controller =
+          tester.widget<CustomScrollView>(scrollView).controller!;
+      controller.jumpTo(controller.position.maxScrollExtent - 399);
+      await tester.pumpAndSettle();
+
+      expect(repository.pageRequests, 2);
     });
   });
 }

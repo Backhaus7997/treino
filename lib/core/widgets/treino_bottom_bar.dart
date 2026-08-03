@@ -29,6 +29,19 @@ class TreinoBottomBar extends StatelessWidget {
   /// having to open the tab first. Pass 0 (default) to hide the badge.
   final int feedUnreadCount;
 
+  /// Altura mínima de la barra, sin contar el safe area.
+  ///
+  /// Las pantallas del shell corren con `extendBody: true`, así que su
+  /// contenido pasa POR DEBAJO de la barra: cualquier lista scrolleable tiene
+  /// que sumar esto (más `MediaQuery.paddingOf(context).bottom`) a su padding
+  /// inferior, o el último item queda tapado y el scroll rebota antes de
+  /// dejarlo ver.
+  ///
+  /// Es el piso, no la altura exacta: con textScale grande la barra crece
+  /// (`22 + 8 + altoDelLabel + 20`) y el padding queda algo justo, pero el
+  /// contenido sigue siendo alcanzable.
+  static const double minHeight = 72;
+
   static const List<_TabSpec> _items = [
     _TabSpec(
       label: 'ENTRENAR',
@@ -96,7 +109,8 @@ class TreinoBottomBar extends StatelessWidget {
                 constraints.maxWidth / _items.length - 20;
             final useScrollableTabs = maxLabelWidth > equalTabContentWidth;
             final desiredHeight = 22 + 8 + maxLabelHeight + 20;
-            final barHeight = desiredHeight > 72 ? desiredHeight : 72.0;
+            final barHeight =
+                desiredHeight > minHeight ? desiredHeight : minHeight;
 
             return DecoratedBox(
               // Shadow lives OUTSIDE the ClipRRect — inside it gets clipped.
