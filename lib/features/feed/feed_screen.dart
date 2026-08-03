@@ -86,31 +86,62 @@ class _AthleteFeed extends StatelessWidget {
       initialIndex: _resolveInitialIndex(initialTab),
       child: Column(
         children: [
-          Container(
-            margin: const EdgeInsets.fromLTRB(20, 10, 20, 0),
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: palette.bgCard,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: palette.textMuted.withValues(alpha: 0.12),
-              ),
-            ),
-            child: TabBar(
-              dividerColor: Colors.transparent,
-              indicatorSize: TabBarIndicatorSize.tab,
-              indicator: BoxDecoration(
-                color: palette.accent,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              splashBorderRadius: BorderRadius.circular(20),
-              labelColor: palette.bg,
-              unselectedLabelColor: palette.textMuted,
-              labelStyle: theme.textTheme.labelLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.5,
-              ),
-              tabs: [for (final label in _labels) Tab(text: label, height: 40)],
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final compactActions = constraints.maxWidth < 360;
+                return Row(
+                  key: const ValueKey('feed-fixed-navigation-row'),
+                  children: [
+                    Flexible(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 176),
+                        child: Container(
+                          key: const ValueKey('feed-rankings-toggle'),
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: palette.bgCard,
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(
+                              color: palette.textMuted.withValues(alpha: 0.12),
+                            ),
+                          ),
+                          child: TabBar(
+                            dividerColor: Colors.transparent,
+                            indicatorSize: TabBarIndicatorSize.tab,
+                            indicator: BoxDecoration(
+                              color: palette.accent,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            splashBorderRadius: BorderRadius.circular(20),
+                            labelPadding:
+                                const EdgeInsets.symmetric(horizontal: 8),
+                            labelColor: palette.bg,
+                            unselectedLabelColor: palette.textMuted,
+                            labelStyle: theme.textTheme.labelLarge?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.5,
+                            ),
+                            tabs: [
+                              for (final label in _labels)
+                                Tab(
+                                  height: 40,
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(label),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _FeedActions(compact: compactActions),
+                  ],
+                );
+              },
             ),
           ),
           const SizedBox(height: 8),
@@ -213,45 +244,27 @@ class _FeedSegmentHeaderDelegate extends SliverPersistentHeaderDelegate {
       backgroundColor != oldDelegate.backgroundColor;
 }
 
-/// Page 1 — thin host for the self-contained rankings surface. Owns its own
-/// slim `RANKINGS` header and all state-branching (no-gym / opted-out /
-/// leaderboards). NOT kept alive — its leaderboard listeners are
-/// `autoDispose` and release on swipe-away.
+/// Page 1 — thin host for the self-contained rankings surface. The shared
+/// fixed navigation row lives above the [TabBarView]. NOT kept alive — its
+/// leaderboard listeners are `autoDispose` and release on swipe-away.
 class _RankingsPage extends StatelessWidget {
   const _RankingsPage();
 
   @override
   Widget build(BuildContext context) {
-    return NestedScrollView(
-      floatHeaderSlivers: true,
-      headerSliverBuilder: (context, innerBoxIsScrolled) => [
-        _feedAppBar(context, showTitle: false),
-      ],
-      body: const RankingsBody(),
-    );
+    return const RankingsBody();
   }
 }
 
-class _FeedHeader extends ConsumerWidget {
+class _FeedHeader extends StatelessWidget {
   const _FeedHeader({required this.showTitle});
 
-  /// See [_FeedPage.showTitle]. When `false` only the action icons render,
-  /// still right-aligned — the Spacer takes over the room the title had.
+  /// See [_FeedPage.showTitle].
   final bool showTitle;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final l10n = AppL10n.of(context);
-
-    final uid = ref.watch(currentUidProvider);
-    final notificationBadge =
-        uid == null ? 0 : ref.watch(notificationHeaderBadgeProvider(uid));
-    // REQ-CHATUNREAD-005: count of chats with unread messages for the badge.
-    // Only user↔user (social) chats feed this badge — messages from the
-    // athlete's coach live under the COACH tab badge. See
-    // `unreadFromCoachProvider` / `unreadFromFriendsProvider`.
-    final unreadChats = ref.watch(unreadFromFriendsProvider);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
@@ -268,139 +281,179 @@ class _FeedHeader extends ConsumerWidget {
               ),
             ),
           const Spacer(),
-          Semantics(
-            button: true,
-            label: notificationBadge > 0
-                ? l10n.notificationBellWithCountA11y(notificationBadge)
-                : l10n.notificationBellA11y,
-            child: TreinoTappable(
-              onTap: () => context.push('/feed/notifications'),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-                child: Center(
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      const _FeedIconBubble(icon: TreinoIcon.bell),
-                      if (notificationBadge > 0)
-                        Positioned(
-                          top: -2,
-                          right: -3,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 4,
-                              vertical: 1,
-                            ),
-                            constraints: const BoxConstraints(minWidth: 16),
-                            decoration: BoxDecoration(
-                              color: palette.accent,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              notificationBadge > 9
-                                  ? '9+'
-                                  : '$notificationBadge',
-                              textAlign: TextAlign.center,
-                              style: GoogleFonts.barlow(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                height: 1.2,
-                                color: palette.bg,
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 4),
-          Semantics(
-            button: true,
-            label: unreadChats > 0
-                ? l10n.feedMessagesWithUnreadA11y(unreadChats)
-                : l10n.feedMessagesA11y,
-            child: TreinoTappable(
-              onTap: () => context.push('/feed/messages'),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-                child: Center(
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      const _FeedIconBubble(icon: TreinoIcon.chat),
-                      if (unreadChats > 0)
-                        Positioned(
-                          top: -2,
-                          right: -3,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 4,
-                              vertical: 1,
-                            ),
-                            constraints: const BoxConstraints(minWidth: 16),
-                            decoration: BoxDecoration(
-                              color: palette.accent,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              unreadChats > 99 ? '99+' : '$unreadChats',
-                              textAlign: TextAlign.center,
-                              style: GoogleFonts.barlow(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                height: 1.2,
-                                color: palette.bg,
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 4),
-          Semantics(
-            button: true,
-            label: l10n.feedSearchA11y,
-            child: TreinoTappable(
-              onTap: () => context.push('/feed/search'),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-                child: const Center(
-                  child: _FeedIconBubble(icon: TreinoIcon.search),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 4),
-          Semantics(
-            button: true,
-            label: l10n.feedCreatePostA11y,
-            child: TreinoTappable(
-              onTap: () => context.push('/feed/create'),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-                child: Center(
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: palette.accent,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(TreinoIcon.plus, size: 20, color: palette.bg),
-                  ),
-                ),
-              ),
-            ),
-          ),
+          const _FeedActions(),
         ],
       ),
+    );
+  }
+}
+
+class _FeedActions extends ConsumerWidget {
+  const _FeedActions({this.compact = false});
+
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    final uid = ref.watch(currentUidProvider);
+    final notificationBadge =
+        uid == null ? 0 : ref.watch(notificationHeaderBadgeProvider(uid));
+    // REQ-CHATUNREAD-005: count of chats with unread messages for the badge.
+    // Only user↔user (social) chats feed this badge — messages from the
+    // athlete's coach live under the COACH tab badge. See
+    // `unreadFromCoachProvider` / `unreadFromFriendsProvider`.
+    final unreadChats = ref.watch(unreadFromFriendsProvider);
+    final spacing = compact ? 0.0 : 4.0;
+    final tapTarget = compact ? 36.0 : 44.0;
+
+    return Row(
+      key: const ValueKey('feed-header-actions'),
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Semantics(
+          button: true,
+          label: notificationBadge > 0
+              ? l10n.notificationBellWithCountA11y(notificationBadge)
+              : l10n.notificationBellA11y,
+          child: TreinoTappable(
+            onTap: () => context.push('/feed/notifications'),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minWidth: tapTarget,
+                minHeight: 44,
+              ),
+              child: Center(
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    const _FeedIconBubble(icon: TreinoIcon.bell),
+                    if (notificationBadge > 0)
+                      Positioned(
+                        top: -2,
+                        right: -3,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 1,
+                          ),
+                          constraints: const BoxConstraints(minWidth: 16),
+                          decoration: BoxDecoration(
+                            color: palette.accent,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            notificationBadge > 9 ? '9+' : '$notificationBadge',
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.barlow(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              height: 1.2,
+                              color: palette.bg,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        SizedBox(width: spacing),
+        Semantics(
+          button: true,
+          label: unreadChats > 0
+              ? l10n.feedMessagesWithUnreadA11y(unreadChats)
+              : l10n.feedMessagesA11y,
+          child: TreinoTappable(
+            onTap: () => context.push('/feed/messages'),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minWidth: tapTarget,
+                minHeight: 44,
+              ),
+              child: Center(
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    const _FeedIconBubble(icon: TreinoIcon.chat),
+                    if (unreadChats > 0)
+                      Positioned(
+                        top: -2,
+                        right: -3,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 1,
+                          ),
+                          constraints: const BoxConstraints(minWidth: 16),
+                          decoration: BoxDecoration(
+                            color: palette.accent,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            unreadChats > 99 ? '99+' : '$unreadChats',
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.barlow(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              height: 1.2,
+                              color: palette.bg,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        SizedBox(width: spacing),
+        Semantics(
+          button: true,
+          label: l10n.feedSearchA11y,
+          child: TreinoTappable(
+            onTap: () => context.push('/feed/search'),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minWidth: tapTarget,
+                minHeight: 44,
+              ),
+              child: const Center(
+                child: _FeedIconBubble(icon: TreinoIcon.search),
+              ),
+            ),
+          ),
+        ),
+        SizedBox(width: spacing),
+        Semantics(
+          button: true,
+          label: l10n.feedCreatePostA11y,
+          child: TreinoTappable(
+            onTap: () => context.push('/feed/create'),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minWidth: tapTarget,
+                minHeight: 44,
+              ),
+              child: Center(
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: palette.accent,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(TreinoIcon.plus, size: 20, color: palette.bg),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -453,6 +506,7 @@ class _FeedContent {
 /// recycled post can therefore be rebuilt without replaying its entrance.
 class _FeedScrollView extends StatefulWidget {
   const _FeedScrollView({
+    super.key,
     required this.showTitle,
     required this.content,
   });
@@ -503,7 +557,7 @@ class _FeedScrollViewState extends State<_FeedScrollView> {
       controller: _scrollController,
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
-        _feedAppBar(context, showTitle: widget.showTitle),
+        if (widget.showTitle) _feedAppBar(context, showTitle: true),
         SliverPersistentHeader(
           pinned: true,
           delegate: _FeedSegmentHeaderDelegate(
@@ -512,7 +566,7 @@ class _FeedScrollViewState extends State<_FeedScrollView> {
         ),
         if (widget.content.posts case final posts?)
           SliverPadding(
-            padding: EdgeInsets.fromLTRB(20, 0, 20, bottomInset),
+            padding: EdgeInsets.fromLTRB(20, 14, 20, bottomInset),
             sliver: _buildPostList(palette, posts),
           )
         else
@@ -592,7 +646,7 @@ class _FeedStaticScrollView extends StatelessWidget {
     return CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
-        _feedAppBar(context, showTitle: showTitle),
+        if (showTitle) _feedAppBar(context, showTitle: true),
         SliverPersistentHeader(
           pinned: true,
           delegate: _FeedSegmentHeaderDelegate(backgroundColor: palette.bg),
@@ -645,7 +699,13 @@ class _FeedAsyncBody<T> extends StatelessWidget {
             child: RefreshIndicator(
               color: palette.accent,
               onRefresh: onRefresh,
+              // Key estable: sin ella, el AnimatedSwitcher de
+              // TreinoStateSwitcher trata cada página nueva de posts como un
+              // CAMBIO DE ESTADO y hace cross-fade — monta un scroll nuevo y
+              // destruye el que tenía la posición. El resultado era volver al
+              // principio del feed cada vez que entraba una página.
               child: _FeedScrollView(
+                key: const ValueKey('feed-scroll-view'),
                 showTitle: showTitle,
                 content: content,
               ),

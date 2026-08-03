@@ -267,11 +267,10 @@ void main() {
         expect(find.byType(Scaffold), findsOneWidget);
         // No AppBackground anywhere
         expect(find.byType(AppBackground), findsNothing);
-        // SliverAppBar owns an internal SafeArea for its toolbar. What the
-        // shell contract forbids is FeedScreen wrapping its whole scroll
-        // surface in another SafeArea.
+        // What the shell contract forbids is FeedScreen wrapping its whole
+        // scroll surface in another SafeArea.
         final feedScrollView = find.ancestor(
-          of: find.byKey(const ValueKey('feed-collapsible-header')),
+          of: find.byType(FeedSegmentPills),
           matching: find.byType(CustomScrollView),
         );
         expect(feedScrollView, findsOneWidget);
@@ -1030,7 +1029,41 @@ void main() {
       expect(find.text('RANKINGS', skipOffstage: false), findsOneWidget);
     });
 
-    testWidgets('header collapses when scrolling down', (tester) async {
+    testWidgets('toggle and action icons share the same fixed row', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), publicOverrides(longPosts())),
+      );
+      await tester.pumpAndSettle();
+
+      final toggleRect = tester.getRect(
+        find.byKey(const ValueKey('feed-rankings-toggle')),
+      );
+      final actionsRect = tester.getRect(
+        find.byKey(const ValueKey('feed-header-actions')),
+      );
+
+      expect(toggleRect.center.dy, closeTo(actionsRect.center.dy, 1));
+      expect(
+        find.ancestor(
+          of: find.byKey(const ValueKey('feed-rankings-toggle')),
+          matching: find.byKey(const ValueKey('feed-fixed-navigation-row')),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.ancestor(
+          of: find.byKey(const ValueKey('feed-header-actions')),
+          matching: find.byKey(const ValueKey('feed-fixed-navigation-row')),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('fixed merged header remains visible when scrolling down', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         _wrapProvider(const FeedScreen(), publicOverrides(longPosts())),
       );
@@ -1044,10 +1077,14 @@ void main() {
       await tester.drag(scrollView, const Offset(0, -500));
       await tester.pumpAndSettle();
 
-      expect(chatIcon, findsNothing);
+      expect(chatIcon, findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('feed-rankings-toggle')),
+        findsOneWidget,
+      );
     });
 
-    testWidgets('floating header returns on the first up-scroll', (
+    testWidgets('merged header does not duplicate after reverse scrolling', (
       tester,
     ) async {
       await tester.pumpWidget(
@@ -1059,11 +1096,45 @@ void main() {
       final chatIcon = find.byIcon(TreinoIcon.chat);
       await tester.drag(scrollView, const Offset(0, -500));
       await tester.pumpAndSettle();
-      expect(chatIcon, findsNothing);
+      expect(chatIcon, findsOneWidget);
 
       await tester.drag(scrollView, const Offset(0, 120));
       await tester.pumpAndSettle();
       expect(chatIcon, findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('feed-header-actions')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('large text scale does not overflow the merged header', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(320, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        _wrapProvider(
+          const MediaQuery(
+            data: MediaQueryData(
+              size: Size(320, 800),
+              textScaler: TextScaler.linear(2.5),
+            ),
+            child: FeedScreen(),
+          ),
+          publicOverrides(longPosts()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byType(TabBar, skipOffstage: false), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('feed-header-actions')),
+        findsOneWidget,
+      );
     });
 
     testWidgets('segment pills remain visible after scrolling', (tester) async {
