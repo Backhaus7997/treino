@@ -179,4 +179,82 @@ void main() {
     expect(find.byType(FittedBox), findsNothing);
     expect(find.byType(SingleChildScrollView), findsOneWidget);
   });
+
+  group('TreinoBottomBar — colapso al scrollear', () {
+    /// Alto VISUAL de la pill. No sirve medir `TreinoBottomBar`: en el
+    /// `Scaffold.body` del wrapper recibe constraints tight y ocupa la
+    /// pantalla entera. El `ClipRRect` es el que envuelve la caja animada.
+    double barHeight(WidgetTester tester) => tester
+        .getSize(
+          find
+              .descendant(
+                of: find.byType(TreinoBottomBar),
+                matching: find.byType(ClipRRect),
+              )
+              .first,
+        )
+        .height;
+
+    double labelOpacity(WidgetTester tester) => tester
+        .widget<Opacity>(
+          find
+              .ancestor(
+                of: find.text('ENTRENAR', skipOffstage: false),
+                matching: find.byType(Opacity),
+              )
+              .first,
+        )
+        .opacity;
+
+    testWidgets('collapsed false → alto expandido y labels a la vista', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrap(TreinoBottomBar(currentIndex: 0, onTap: (_) {})),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+          barHeight(tester), greaterThanOrEqualTo(TreinoBottomBar.minHeight));
+      expect(labelOpacity(tester), 1);
+    });
+
+    testWidgets('collapsed true → la barra se achica y el label se apaga', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrap(
+          TreinoBottomBar(currentIndex: 0, onTap: (_) {}, collapsed: true),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(barHeight(tester), TreinoBottomBar.collapsedHeight);
+      // El label sigue en el árbol —la semántica no se pierde— pero invisible.
+      expect(labelOpacity(tester), 0);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('colapsar y expandir no desborda en ningún frame intermedio', (
+      tester,
+    ) async {
+      // El overflow por desincronización entre alto y label es JUSTO el bug
+      // que la animación única previene. Pumpeamos frame a frame para que,
+      // si alguna vez desborda, el test lo vea.
+      await tester.pumpWidget(
+        _wrap(TreinoBottomBar(currentIndex: 0, onTap: (_) {})),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.pumpWidget(
+        _wrap(
+          TreinoBottomBar(currentIndex: 0, onTap: (_) {}, collapsed: true),
+        ),
+      );
+      for (var frame = 0; frame < 20; frame++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        expect(tester.takeException(), isNull);
+      }
+    });
+  });
 }

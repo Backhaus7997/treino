@@ -1,13 +1,16 @@
+import 'dart:ui' show lerpDouble;
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../app/theme/app_motion.dart';
 import '../../app/theme/app_palette.dart';
+import 'treino_glass_surface.dart';
 import 'treino_icon.dart';
 
-/// Bottom bar de TREINO: pill flotante translúcida (fill de alta opacidad,
-/// SIN blur — ver nota en el build), pill de gradient que se desliza al tab
-/// activo, íconos `TreinoIcon` + labels Barlow Condensed.
+/// Bottom bar de TREINO: pill flotante de vidrio (fill translúcido + reflejo
+/// especular, SIN blur — ver [TreinoGlassSurface]), pill de gradient que se
+/// desliza al tab activo, íconos `TreinoIcon` + labels Barlow Condensed.
 class TreinoBottomBar extends StatelessWidget {
   const TreinoBottomBar({
     super.key,
@@ -15,10 +18,20 @@ class TreinoBottomBar extends StatelessWidget {
     required this.onTap,
     this.coachUnreadCount = 0,
     this.feedUnreadCount = 0,
+    this.collapsed = false,
   });
 
   final int currentIndex;
   final ValueChanged<int> onTap;
+
+  /// Cuando es `true` la barra se compacta: pierde alto y esconde los labels,
+  /// dejando solo los íconos. La dispara el shell al detectar scroll hacia
+  /// abajo en cualquier pantalla (ver `_ShellScaffold` en `app/router.dart`).
+  ///
+  /// Es presentación pura: los tabs siguen siendo tapeables con el mismo
+  /// tamaño de target y el `minHeight` que usan los scrollables para su padding
+  /// inferior NO cambia — el contenido no salta cuando la barra se achica.
+  final bool collapsed;
 
   /// Count of unread chats with the athlete's coach — shown as a badge on
   /// the COACH tab (index 3). Pass 0 (default) to hide the badge.
@@ -41,6 +54,14 @@ class TreinoBottomBar extends StatelessWidget {
   /// (`22 + 8 + altoDelLabel + 20`) y el padding queda algo justo, pero el
   /// contenido sigue siendo alcanzable.
   static const double minHeight = 72;
+
+  /// Alto de la barra compactada ([collapsed] en `true`): solo íconos.
+  ///
+  /// Deliberadamente NO afecta a [minHeight]: si el padding inferior de los
+  /// scrollables siguiera al alto real de la barra, colapsar la barra
+  /// reacomodaría toda la lista y el scroll saltaría bajo el dedo. El padding
+  /// se queda en el caso expandido (el peor caso) y punto.
+  static const double collapsedHeight = 52;
 
   static const List<_TabSpec> _items = [
     _TabSpec(
@@ -112,94 +133,104 @@ class TreinoBottomBar extends StatelessWidget {
             final barHeight =
                 desiredHeight > minHeight ? desiredHeight : minHeight;
 
-            return DecoratedBox(
-              // Shadow lives OUTSIDE the ClipRRect — inside it gets clipped.
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(36),
-                boxShadow: [
-                  BoxShadow(
-                    color: palette.bg.withValues(alpha: 0.45),
-                    blurRadius: 24,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(36),
-                // NO BackdropFilter: blur re-samples on every frame content
-                // moves behind the bar (extendBody) and dropped frames on
-                // device even at sigma 8 (2026-06-11).
-                child: Container(
-                  height: barHeight,
+            // Una sola animación gobierna alto Y labels. Si fueran dos
+            // (AnimatedContainer + AnimatedOpacity) podrían desincronizarse
+            // un frame y el contenido desbordaría la caja mientras se achica.
+            return TweenAnimationBuilder<double>(
+              tween: Tween<double>(end: collapsed ? 0 : 1),
+              duration: AppMotion.base,
+              curve: AppMotion.standard,
+              builder: (context, expansion, _) {
+                return DecoratedBox(
+                  // Shadow lives OUTSIDE the ClipRRect — inside it gets
+                  // clipped.
                   decoration: BoxDecoration(
-                    color: palette.bgCard.withValues(alpha: 0.93),
                     borderRadius: BorderRadius.circular(36),
-                    border: Border.all(color: palette.border),
+                    boxShadow: [
+                      BoxShadow(
+                        color: palette.bg.withValues(alpha: 0.45),
+                        blurRadius: 24,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
                   ),
-                  child: useScrollableTabs
-                      ? SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          reverse: currentIndex >= 3,
-                          child: Row(
-                            children: List.generate(_items.length, (i) {
-                              return SizedBox(
-                                width: maxLabelWidth + 40,
-                                child: _ScrollableTab(
-                                  spec: _items[i],
-                                  active: i == currentIndex,
-                                  palette: palette,
-                                  badgeCount: _badgeCountFor(i),
-                                  onTap: () => onTap(i),
-                                ),
-                              );
-                            }),
-                          ),
-                        )
-                      : LayoutBuilder(
-                          builder: (context, innerConstraints) {
-                            final tabWidth =
-                                innerConstraints.maxWidth / _items.length;
-                            return Stack(
-                              children: [
-                                AnimatedPositioned(
-                                  duration: AppMotion.slow,
-                                  curve: AppMotion.standard,
-                                  left: tabWidth * currentIndex + 8,
-                                  top: 8,
-                                  bottom: 8,
-                                  width: tabWidth - 16,
-                                  child: _PillHighlight(palette: palette),
-                                ),
-                                Row(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(36),
+                    child: SizedBox(
+                      height: lerpDouble(collapsedHeight, barHeight, expansion),
+                      child: TreinoGlassSurface(
+                        borderRadius: BorderRadius.circular(36),
+                        child: useScrollableTabs
+                            ? SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                reverse: currentIndex >= 3,
+                                child: Row(
                                   children: List.generate(_items.length, (i) {
-                                    final item = _items[i];
-                                    final active = i == currentIndex;
-                                    return Expanded(
-                                      child: Semantics(
-                                        button: true,
-                                        selected: active,
-                                        label: item.label,
-                                        excludeSemantics: true,
-                                        child: GestureDetector(
-                                          behavior: HitTestBehavior.opaque,
-                                          onTap: () => onTap(i),
-                                          child: _TabContent(
-                                            spec: item,
-                                            active: active,
-                                            palette: palette,
-                                            badgeCount: _badgeCountFor(i),
-                                          ),
-                                        ),
+                                    return SizedBox(
+                                      width: maxLabelWidth + 40,
+                                      child: _ScrollableTab(
+                                        spec: _items[i],
+                                        active: i == currentIndex,
+                                        palette: palette,
+                                        badgeCount: _badgeCountFor(i),
+                                        expansion: expansion,
+                                        onTap: () => onTap(i),
                                       ),
                                     );
                                   }),
                                 ),
-                              ],
-                            );
-                          },
-                        ),
-                ),
-              ),
+                              )
+                            : LayoutBuilder(
+                                builder: (context, innerConstraints) {
+                                  final tabWidth =
+                                      innerConstraints.maxWidth / _items.length;
+                                  return Stack(
+                                    children: [
+                                      AnimatedPositioned(
+                                        duration: AppMotion.slow,
+                                        curve: AppMotion.standard,
+                                        left: tabWidth * currentIndex + 8,
+                                        top: 8,
+                                        bottom: 8,
+                                        width: tabWidth - 16,
+                                        child: _PillHighlight(palette: palette),
+                                      ),
+                                      Row(
+                                        children:
+                                            List.generate(_items.length, (i) {
+                                          final item = _items[i];
+                                          final active = i == currentIndex;
+                                          return Expanded(
+                                            child: Semantics(
+                                              button: true,
+                                              selected: active,
+                                              label: item.label,
+                                              excludeSemantics: true,
+                                              child: GestureDetector(
+                                                behavior:
+                                                    HitTestBehavior.opaque,
+                                                onTap: () => onTap(i),
+                                                child: _TabContent(
+                                                  spec: item,
+                                                  active: active,
+                                                  palette: palette,
+                                                  badgeCount: _badgeCountFor(i),
+                                                  expansion: expansion,
+                                                ),
+                                              ),
+                                            ),
+                                          );
+                                        }),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              ),
+                      ),
+                    ),
+                  ),
+                );
+              },
             );
           },
         ),
@@ -263,6 +294,7 @@ class _ScrollableTab extends StatelessWidget {
     required this.active,
     required this.palette,
     required this.badgeCount,
+    required this.expansion,
     required this.onTap,
   });
 
@@ -270,6 +302,10 @@ class _ScrollableTab extends StatelessWidget {
   final bool active;
   final AppPalette palette;
   final int badgeCount;
+
+  /// Ver [_TabContent.expansion].
+  final double expansion;
+
   final VoidCallback onTap;
 
   @override
@@ -293,6 +329,7 @@ class _ScrollableTab extends StatelessWidget {
                 active: active,
                 palette: palette,
                 badgeCount: badgeCount,
+                expansion: expansion,
               ),
             ],
           ),
@@ -307,12 +344,18 @@ class _TabContent extends StatelessWidget {
     required this.spec,
     required this.active,
     required this.palette,
+    required this.expansion,
     this.badgeCount = 0,
   });
 
   final _TabSpec spec;
   final bool active;
   final AppPalette palette;
+
+  /// `1` = barra expandida, `0` = compactada. Gobierna el label: se desvanece
+  /// y colapsa su alto al mismo ritmo con el que se achica la barra, así que
+  /// el contenido nunca desborda la caja durante la transición.
+  final double expansion;
 
   /// When > 0, renders a count badge over the tab icon.
   /// Values above 99 are shown as '99+'.
@@ -383,12 +426,23 @@ class _TabContent extends StatelessWidget {
                   ),
               ],
             ),
-            const SizedBox(height: 4),
-            Text(
-              spec.label,
-              maxLines: 1,
-              softWrap: false,
-              textAlign: TextAlign.center,
+            ClipRect(
+              child: Align(
+                alignment: Alignment.topCenter,
+                heightFactor: expansion,
+                child: Opacity(
+                  opacity: expansion,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      spec.label,
+                      maxLines: 1,
+                      softWrap: false,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              ),
             ),
           ],
         ),
