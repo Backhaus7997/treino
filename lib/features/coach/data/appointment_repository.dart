@@ -244,7 +244,7 @@ class AppointmentRepository {
       'cancelledAt': FieldValue.serverTimestamp(),
       'cancelledBy': actorUid,
       'cancellationLog': FieldValue.arrayUnion([logEntry]),
-    });
+    }).boundedWrite;
   }
 
   // ─── cancelFutureSeries ─────────────────────────────────────────────────────
@@ -309,13 +309,13 @@ class AppointmentRepository {
       count++;
       opsInBatch++;
       if (opsInBatch == maxBatchOps) {
-        await batch.commit();
+        await batch.commit().boundedWrite;
         batch = _firestore.batch();
         opsInBatch = 0;
       }
     }
     if (opsInBatch > 0) {
-      await batch.commit();
+      await batch.commit().boundedWrite;
     }
     return count;
   }
@@ -333,7 +333,7 @@ class AppointmentRepository {
     await _appointments.doc(appointmentId).update({
       'noteBefore': noteBefore,
       'noteAfter': noteAfter,
-    });
+    }).boundedWrite;
   }
 
   // ─── markBilled ───────────────────────────────────────────────────────────

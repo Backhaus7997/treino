@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../../core/utils/firestore_write.dart';
 import '../domain/availability_override.dart';
 import '../domain/availability_rule.dart';
 
@@ -26,13 +27,13 @@ class AvailabilityRepository {
   /// SCENARIO-485.
   Future<void> addRule(AvailabilityRule rule) async {
     _assertBookableWindow(rule);
-    await _rules.doc(rule.id).set(rule.toJson());
+    await _rules.doc(rule.id).set(rule.toJson()).boundedWrite;
   }
 
   /// Updates an existing [AvailabilityRule] at `coach_availability_rules/{rule.id}`.
   Future<void> updateRule(AvailabilityRule rule) async {
     _assertBookableWindow(rule);
-    await _rules.doc(rule.id).update(rule.toJson());
+    await _rules.doc(rule.id).update(rule.toJson()).boundedWrite;
   }
 
   /// Guards against persisting a rule whose window cannot fit a single slot.
@@ -71,7 +72,7 @@ class AvailabilityRepository {
   /// Persists a new [AvailabilityOverride] at
   /// `coach_availability_overrides/{override.id}`.
   Future<void> addOverride(AvailabilityOverride override) async {
-    await _overrides.doc(override.id).set(override.toJson());
+    await _overrides.doc(override.id).set(override.toJson()).boundedWrite;
   }
 
   /// Deletes the override doc at `coach_availability_overrides/{overrideId}`.
