@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../../core/utils/firestore_write.dart';
 import '../../payments/domain/payment.dart';
 import '../domain/agenda_exceptions.dart';
 import '../domain/appointment.dart';
@@ -141,7 +142,7 @@ class AppointmentRepository {
       noteBefore:
           (trimmedNote == null || trimmedNote.isEmpty) ? null : trimmedNote,
     );
-    await docRef.set(appt.toJson());
+    await docRef.set(appt.toJson()).boundedWrite;
     return appt;
   }
 
@@ -206,7 +207,7 @@ class AppointmentRepository {
     }
 
     if (count > 0) {
-      await batch.commit();
+      await batch.commit().boundedWrite;
     }
     return count;
   }

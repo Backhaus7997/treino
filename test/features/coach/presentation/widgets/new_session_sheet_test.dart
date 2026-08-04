@@ -25,6 +25,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/utils/firestore_write.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/data/appointment_repository.dart';
@@ -426,6 +427,55 @@ void main() {
           noteBefore: any(named: 'noteBefore'),
         ),
       ).called(1);
+    });
+  });
+
+  // ── H4: a write that never acks (offline) must not hang the spinner ──────
+  //
+  // The repo bounds its Firestore write with `.boundedWrite`; here the stub
+  // stands in for that bound (a real offline stall never acks). Before the fix
+  // the button's spinner sat forever; now the write times out and the SAME
+  // catch that already handled a thrown write clears the spinner + shows the
+  // error.
+  group('H4 — a stalled write times out instead of hanging the spinner', () {
+    testWidgets('single: stalled createByTrainer → error shown, spinner gone',
+        (tester) async {
+      when(
+        () => mockAppointmentRepo.createByTrainer(
+          trainerId: any(named: 'trainerId'),
+          athleteId: any(named: 'athleteId'),
+          athleteDisplayName: any(named: 'athleteDisplayName'),
+          startsAt: any(named: 'startsAt'),
+          durationMin: any(named: 'durationMin'),
+          noteBefore: any(named: 'noteBefore'),
+        ),
+      ).thenAnswer((_) => Completer<Appointment>().future.boundedWrite);
+
+      _useTallViewport(tester);
+      await tester.pumpWidget(_wrap(
+        initialDate: targetDateOnly,
+        overrides: _overrides(
+          links: [_activeLink(_kAthleteId1)],
+          profiles: {_kAthleteId1: _pub(_kAthleteId1, 'Carlos Pérez')},
+          appointmentRepo: mockAppointmentRepo,
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      await _selectAthlete(tester, 'Carlos Pérez');
+      await tester.tap(find.text('REGISTRAR SESIÓN'));
+      // Let the blocked-day check resolve and the (stalled) write begin.
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+      // Advance past the 15s write bound → the timeout reaches the catch.
+      await tester.pump(const Duration(seconds: 16));
+
+      expect(
+        find.text('No pudimos registrar la sesión. Probá de nuevo.'),
+        findsOneWidget,
+      );
+      expect(find.byType(CircularProgressIndicator), findsNothing);
     });
   });
 
