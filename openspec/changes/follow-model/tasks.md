@@ -122,7 +122,7 @@ Nota de convención: el proposal decía `scripts/migrations/follows/*`; sigo el 
 - [x] **1.29 [GREEN]** `functions/package.json` — agregar `follows-rules` al regex de `"test:rules"` (sin esto, LD-09 no se cumple: el archivo no corre en el job `functions-test`).
 - [x] **1.30 [GATE]** `npm --prefix functions run test:rules:emulator` verde (incluye `follows-rules.test.ts`).
 - [x] **1.31 [GATE]** `flutter analyze` 0 issues + `dart format .` + `flutter test` verde en `lib/features/feed/{domain,data,application}`.
-- [ ] **1.32 [MANUAL]** `firebase deploy --only firestore:rules,firestore:indexes --project treino-dev` (M-03). Deploy seguro por construcción: aditivo, nada lo lee todavía (LD-10).
+- [x] **1.32 [MANUAL]** `firebase deploy --only firestore:rules,firestore:indexes --project treino-dev` (M-03). Deploy seguro por construcción: aditivo, nada lo lee todavía (LD-10).
 
 ---
 
