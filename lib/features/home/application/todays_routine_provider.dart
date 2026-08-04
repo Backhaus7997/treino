@@ -5,6 +5,7 @@ import '../../workout/application/assigned_routine_providers.dart';
 import '../../workout/application/session_providers.dart'
     show currentUidProvider, sessionsByUidProvider;
 import '../../workout/application/user_routines_providers.dart';
+import '../../workout/domain/plan_advance.dart';
 import '../../workout/domain/routine.dart';
 import '../../workout/domain/routine_day.dart';
 import '../../workout/domain/session.dart';
@@ -128,30 +129,23 @@ final todaysRoutineProvider = FutureProvider.autoDispose<TodaysRoutine?>(
       }
     }
 
+    // La aritmética vive en `nextPlanPosition` (workout/domain/plan_advance.dart)
+    // porque el cliente watchOS la reimplementa en Swift y los fixtures
+    // compartidos de `conformance/plan_advance.json` son el contrato entre las
+    // dos implementaciones. Acá solo se resuelven las entradas.
     final numDays = routine.days.length;
-    final int nextDayNumber;
-    final int weekNumber;
-    if (lastFinished == null) {
-      // First session ever for this routine.
-      nextDayNumber = 1;
-      weekNumber = 0;
-    } else {
-      nextDayNumber = (lastFinished.dayNumber % numDays) + 1;
-      // Runtime guard: a corrupt/legacy Firestore doc with an EXPLICIT
-      // `numWeeks: 0` bypasses the `?? 1` in the generated fromJson (which
-      // only covers an ABSENT field), and `% 0` throws
-      // IntegerDivisionByZeroException — killing the card's "empezar en 1 tap".
-      // A negative value doesn't throw but yields an out-of-range week.
-      // Treat anything <= 0 as 1, same criterion as `derivePlanProgress`
-      // (plan_progress.dart) and `SessionNotifier._buildFresh`.
-      final numWeeks = routine.numWeeks > 0 ? routine.numWeeks : 1;
-      // Week rolls over only when day wraps. numWeeks is 1 for non-periodized
-      // plans, so the modulo is a no-op there.
-      final rolledOver = lastFinished.dayNumber >= numDays;
-      weekNumber = rolledOver
-          ? (lastFinished.weekNumber + 1) % numWeeks
-          : lastFinished.weekNumber;
-    }
+    final position = nextPlanPosition(
+      lastFinished: lastFinished == null
+          ? null
+          : (
+              dayNumber: lastFinished.dayNumber,
+              weekNumber: lastFinished.weekNumber,
+            ),
+      numDays: numDays,
+      numWeeks: routine.numWeeks,
+    );
+    final nextDayNumber = position.dayNumber;
+    final weekNumber = position.weekNumber;
 
     // Resolve the RoutineDay. Defensive against non-contiguous dayNumbers
     // (shouldn't happen, but a hand-edited Firestore doc could).
