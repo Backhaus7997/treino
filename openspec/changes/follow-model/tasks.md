@@ -1,0 +1,328 @@
+# Tasks: follow-model — seguimiento asimétrico direccional
+
+> Nota de cobertura (encontrada al leer el código antes de planificar, no en `proposal.md`/`design.md`):
+> hay 4 consumidores reales de `Friendship`/`friendshipRepositoryProvider` que el proposal no lista en
+> Affected Areas: `suggested_users_providers.dart` (`allOf` para exclusión), `friend_requests_inbox_screen.dart`
+> + `friend_request_inbox_tile.dart` (inbox de solicitudes), y `public_profile_view.dart` (el propio
+> view-model, no solo su provider). Además `public_profile_screen.dart:245-246` tiene un `_MessageButton`
+> que gatea el botón MENSAJE con `friendship?.status==accepted` (un solo doc) — con el chat direccional
+> ya decidido (LD-08) tiene que mirar la arista **entrante** (`incoming?.status==accepted`, espejo exacto
+> de `chatCreateOk`), si no el botón queda mal habilitado/deshabilitado del lado cliente (el servidor
+> igual autoriza bien vía rules, pero el UX miente). Y `chat_screen.dart` suma el composer bloqueado.
+> Por esto el PR3 del proposal (~700 líneas, un solo PR) se parte en 4 PRs más finos abajo, no en 2.
+
+## Review Workload Forecast
+
+| Field | Value |
+|---|---|
+| Estimated changed lines | ~2.870 (mandatorios PR0–PR4) + ~90 opcional (PR5) — revisado al alza vs. el proposal por la nota de cobertura de arriba. ADR-FOLLOW-013 (dos aristas por `accepted`) no mueve este número. ADR-FOLLOW-015 (freeze adelantado) tampoco mueve el total: **redistribuye** ~30 líneas de PR3a a PR2. **ADR-FOLLOW-005 (chat direccional) suma ~310**: gate nuevo en `messages/create` + 5 casos de rules con expectativas nuevas (~90 a PR3a) y composer bloqueado + `_MessageButton` + tests (~150 a PR3c-3) + keys de l10n del aviso (~20 a PR4), más 3 casos RED de la corrección de C4 (G1 asimétrica, `partialPair`, cardinalidad sobre bien formadas) |
+| 400-line budget risk | **Medium-High** — **PR2 rompe el presupuesto (~530) y se parte en PR2a/PR2b**, y **PR3c pasa de "al límite" a romperlo (~540) con el composer del chat: su partición deja de ser contingente**. Ver tabla de dimensionamiento abajo |
+| Chained PRs recommended | Yes — **ya decidido por el dueño, no se vuelve a preguntar** (AGENTS.md: "Delivery cacheada: PRs encadenados") |
+| Suggested split | PR0 → PR1 → **PR2a → PR2b** → PR3a → PR3b → **PR3c-1 → PR3c-2 → PR3c-3** → PR3d → PR4 → (PR5 opcional). El orden **no es negociable por conveniencia de review**: tres eslabones son restricciones de corrección de datos, no de legibilidad — ver la nota bajo la tabla de dimensionamiento |
+| Delivery strategy | **Chained PRs — cacheada, decisión cerrada del dueño.** No es `ask-on-risk`: no hay riesgo que evaluar porque no hay pregunta pendiente. Lo único que este forecast controla es que cada slice individual quede dentro de presupuesto |
+| Chain strategy | feature-branch-chain |
+
+Decision needed before apply: **No** — la estrategia de delivery está resuelta. **Actualizado 2026-08-04**: de las tres decisiones de `proposal.md` §"Requiere decisión del dueño", dos ya se cerraron — M-00 (uids de `treino-dev` ⊆ equipo + testers conocidos, confirma Rama A) y el label visible "SEGUIDORES" —. Lo único que sigue abierto es el copy del aviso de chat bloqueado (bloqueante de 4.7), y tampoco es una decisión de *delivery*.
+
+> ✅ **RESUELTO POR EL DUEÑO — chat direccional.** **X le puede escribir a Y sólo si Y sigue a X.** Dejar de seguir a alguien le saca a esa persona la escritura hacia vos, con una sola acción. **El gate se muda de `chats/create` a `chats/{chatId}/messages/create`**: hoy `messages/create` gatea sólo por membresía (`firestore.rules:1167-1170`), así que la relación se evalúa una única vez, al crear el chat — y la asimetría pedida es *dentro del mismo chat*, o sea imposible de expresar ahí. Impacta **3a.6 y siguientes** (rules + tests, expectativas nuevas, no sólo reseed), **3c.9/3c.10** (`_MessageButton` pasa a mirar la arista **entrante**, no el OR) y **PR3c-3** (composer bloqueado, nuevo). Consecuencia que el dueño **evaluó y aceptó explícitamente**, no un efecto colateral hallado después: un chat preexistente sin ninguna arista queda mudo para los dos, conservando la lectura — hoy funciona (riesgo R12/A14). Detalle en `design.md` ADR-FOLLOW-005, §3.3 y §6.1.
+Chained PRs recommended: Yes (cerrado)
+Chain strategy: feature-branch-chain
+400-line budget risk: Medium-High
+
+### Dimensionamiento por PR (mandatorios)
+
+Estimación de diff por slice — código + tests, redondeado. Ninguno supera 400 salvo la excepción declarada de PR3d.
+
+| PR | ~Líneas | ¿≤400? | Por qué |
+|---|---|---|---|
+| PR0 | ~110 | Sí | 1 script chico (`.count()` + dump) + 1 test unitario de `buildSnapshotPayload` |
+| PR1 | ~400 | Justo en el límite | Modelo + repo + providers + bloque de rules `follows` + índices + `follows-rules.test.ts` (5 tests) en CI — mismo slice que el proposal ya presupuestaba en 400, sin cambios por ADR-FOLLOW-013 |
+| PR2 | ~560 | **No** | Dos scripts (`migrate-*`, `verify-*`) + `backfill-follow-counters.ts` modificado + 4 archivos de test con ~20 casos, **más el bloque de freeze de `friendships` y su test que absorbió de PR3a** (ADR-FOLLOW-015, ~30 líneas), los 2 casos RED de G1 asimétrica y cardinalidad-sobre-bien-formadas, y **el modo `--delta --manifest` con su test (2.5d)**, sin el cual la compuerta de 3a.19c es insatisfacible. Partición **obligatoria**: **PR2a** (`migrate-friendships-to-follows.ts` + su test, ~300) → **PR2b** (`verify-follows-migration.ts` + `backfill-follow-counters.ts` + freeze + sus tests, ~260). **El freeze va en el slice que se mergea último** — su deploy tiene que quedar pegado a M-04 |
+| PR3a | ~380 | Justo en el límite | Rules (`postFollowerAccepted` + **chat direccional en sus DOS superficies**: `chatCreateOk` en `chats/create` y `senderMayPost` en `messages/create`) + 3 CFs (path/query only, lógica intacta) + 5 archivos de test (rules-jest + jest). **Baja ~30** por el freeze que se fue a PR2 y **sube ~90** por el gate de mensajes y sus 5 casos nuevos (ADR-FOLLOW-005) |
+| PR3b | ~170 | Sí | 3 archivos de cliente (`post_privacy`, `post_providers`, `feed_screen_providers`) + 3 tests. El más chico de la cadena de flip |
+| PR3c | ~540 | **No** | 7 archivos de cliente (perfil público ×4, sugerencias, inbox ×2) + 7 tests —la nota de cobertura del inicio del documento— **más el composer bloqueado del chat (~150, ADR-FOLLOW-005 §6.1)**. Con eso la partición **deja de ser contingente**: **PR3c-1** (perfil público: `public_profile_view`/`providers`/`follow_button`/`screen` + `_MessageButton` direccional, ~230) → **PR3c-2** (sugerencias + inbox, ~160) → **PR3c-3** (`chat_screen.dart`: composer deshabilitado + aviso inline + tests, ~150) |
+| PR3d | variable, declarado > 400 | **No, excepción aceptada** | Deletion-only (código generado + 33 tests borrados). Ver nota de excepción en la sección del PR |
+| PR4 | ~270 | Sí | Cancelar solicitud + `TreinoTappable` + 3 ARBs (copy seguidor **+ el aviso de chat bloqueado**) + `gen-l10n` |
+| **Total mandatorio** | **~2.450 + PR3d (deletion, fuera del cómputo de riesgo)** | — | Coherente con el ~2.870 de la fila de arriba una vez que se suma el diff crudo de PR3d |
+
+**Conclusión del dimensionamiento**: con la cadena PR0→PR1→PR2→PR3a→PR3b→PR3c→PR3d→PR4, **dos** slices quedan por encima de 400 (PR2 y PR3c) y otros dos al límite (PR1, PR3a). **Los dos se parten y ninguna partición es contingente**: PR2 → PR2a/PR2b, PR3c → PR3c-1/PR3c-2/PR3c-3. PR3a queda en ~380 y hay que vigilarlo en `sdd-apply`: si el gate de `messages/create` sale más largo de lo estimado, el corte natural es separar el chat (rules del chat + `chat-relationship-rules.test.ts`) de las CFs.
+
+**PR3c-3 va al final de la subcadena de 3c, y no es arbitrario**: el composer bloqueado es la UI de una regla que ya está desplegada desde 3a.20, así que cuanto antes llegue mejor — pero depende de `followEdgeProvider` (PR1) y comparte revisor con el resto del perfil. Si en `sdd-apply` se puede adelantar sin romper el orden 3a→3b, mejor: acorta la ventana en la que un usuario ve el composer habilitado y recibe un error al enviar.
+
+> **La cadena es un orden de corrección, no sólo de review.** Tres eslabones son obligatorios por razones de datos, no de legibilidad: el freeze (2.8b) tiene que preceder a M-04; PR3a tiene que preceder a **PR3c** (si no, un unfollow escribe en `follows` mientras el gate todavía lee `friendships` → el usuario cree que revocó y no revocó); y el sweep (3a.20b) tiene que caer entre el deploy de rules y el de las CFs. Reordenar la cadena por conveniencia de review rompe cosas.
+
+### Suggested Work Units
+
+| Unit | Goal | Likely PR | Notes |
+|---|---|---|---|
+| 0 | Backup/export de `friendships` + gate de volumen M-00 | PR 0 | base = tracker `feat/follow-model`. **Rama A confirmada por el dueño (2026-08-04)** — el `.count()` de 0.5 sigue corriendo como evidencia obligatoria, no como decisión pendiente (ADR-FOLLOW-010) |
+| 1 | `Follow`/`FollowStatus`/`FollowRepository`/providers + rules aditivas `follows` + índices, CI | PR 1 | base = PR0. Código inerte, mergeable solo |
+| 2 | Scripts de migración + verificación + **freeze de `friendships`**, aislados | PR 2 | base = PR1. Depende de que PR1 ya esté deployada (M-03) antes de correr `--apply`. El freeze (M-03b) se deploya **antes** de M-04 (ADR-FOLLOW-015) |
+| 3a | Servidor: rules direccionales (posts + **chat en sus dos superficies**) + Cloud Functions + **M-09 en la ventana muda** + **M-08b tras el repunte** | PR 3a | base = PR2. Depende de M-06 exit 0 **y de su re-verificación si venció** (3a.19c, en el modo que corresponda). Ya no incluye el freeze |
+| 3b | Cliente: posts + feed (`post_privacy`, `post_providers`, `feed_screen_providers`) | PR 3b | base = PR3a. Va pegado a 3a — mismo release, ventana corta |
+| 3c | Cliente: perfil público + sugerencias + inbox + **composer del chat** | PR 3c-1/3c-2/**3c-3** | base = PR3b. **NO puede preceder a PR3a**: mueve la escritura a `follows` y con el gate viejo un unfollow no revoca nada (phantom access). No es sólo orden de review. La partición en 3 es obligatoria (dimensionamiento) |
+| 3d | Retiro de `Friendship*` (código muerto) | PR 3d | base = PR3c. Deletion-only, depende de que 3b y 3c ya migraron todos los consumidores. **Ya no contiene M-09** (movido a 3a.20b) |
+| 4 | UX: cancelar solicitud + `TreinoTappable` + copy + l10n | PR 4 | base = PR3d |
+| 5 (opcional) | `chunkSize` 10→30, gated por test de emulador | PR 5 | base = PR3b. Fuera de la cadena obligatoria (ADR-FOLLOW-008) |
+
+---
+
+## PR 0 — Backup y gate de volumen (M-00, M-01) — primera tarea de todo el change
+
+Archivos: `functions/scripts/export-friendships-snapshot.ts` (new), `functions/src/__tests__/export-friendships-snapshot.test.ts` (new).
+Nota de convención: el proposal decía `scripts/migrations/follows/*`; sigo el patrón real del repo para scripts admin TS con test (`functions/scripts/backfill-follow-counters.ts` + `functions/src/__tests__/backfill-follow-counters.test.ts`) — `docs/architecture.md` está desactualizado, se sigue el código.
+
+- [ ] **0.1 [RED]** `export-friendships-snapshot.test.ts` — test unitario de `buildSnapshotPayload(docs)`: dado `[{id,data}]` devuelve `{exportedAt, count, docs}` exacto, sin Firestore real. *(REQ-FOLLOW-014 — el snapshot es la base de la paridad)*
+- [ ] **0.2 [GREEN]** `export-friendships-snapshot.ts` — exporta `buildSnapshotPayload` (testeable) + `main()`: `.count()` sobre `friendships` (M-00, `firebase-admin ^12`) + dump completo a `functions/scripts/migrations/friendships-snapshot-{ISO}.json`. Solo lee, no escribe Firestore.
+- [ ] **0.3 [GATE]** `npm --prefix functions test -- export-friendships-snapshot` verde.
+- [ ] **0.4 [MANUAL]** Correr el script con credenciales admin contra `treino-dev` real. Registrar en el reporte de apply: el número de `.count()` y la ruta del snapshot generado.
+- [ ] **0.5 [MANUAL] — evidencia obligatoria, decisión ya cerrada** El dueño confirmó (2026-08-04) que los uids de `friendships` ⊆ equipo + testers conocidos → **Rama A** fija (el resto de este `tasks.md`, orden rules-antes-que-cliente). Este paso **igual se ejecuta**: correr el `.count()` de M-00 y registrar el número real en el reporte de apply — la confirmación fija la decisión de diseño, el conteo es la evidencia que la sostiene en producción. Si alguna vez el conteo real contradijera la confirmación → **Rama B** (ADR-FOLLOW-010, dual-DELETE): el plan de PRs queda en pausa a partir de PR3a y requiere volver a `sdd-design` — no está detallado acá.
+
+---
+
+## PR 1 — Modelo `Follow` inerte (dominio + data + providers + rules aditivas + índices, M-03)
+
+### Dominio — `lib/features/feed/domain/`
+- [ ] **1.1 [RED]** `test/features/feed/domain/follow_status_test.dart` — round-trip `fromJson`/`toJson` `'pending'`/`'accepted'`. *(REQ-FOLLOW-002, SCENARIO-801)*
+- [ ] **1.2 [GREEN]** `follow_status.dart` — enum `FollowStatus`, `@JsonValue` + `_wireMap`, calcado de `friendship_status.dart`.
+- [ ] **1.3 [RED]** `test/features/feed/domain/follow_test.dart` — `Follow.edgeId('u1','u2')=='u1_u2'`, `members==[follower,followee]`. *(REQ-FOLLOW-001, SCENARIO-800)*
+- [ ] **1.4 [GREEN]** `follow.dart` — `@freezed Follow` (id, followerUid, followeeUid, status, members, `createdAt` `@TimestampConverter`) + `static String edgeId(follower, followee)`.
+- [ ] **1.5 [GREEN]** `dart run build_runner build --delete-conflicting-outputs` — genera `follow.freezed.dart`/`.g.dart`.
+
+### Data — `lib/features/feed/data/follow_repository.dart`
+- [ ] **1.6 [RED]** `follow_repository_test.dart` — `follow('u1','u2', targetIsPublic:true)` escribe `follows/u1_u2` `accepted`. *(REQ-FOLLOW-001, REQ-FOLLOW-004, SCENARIO-800/804)*
+- [ ] **1.7 [GREEN]** `follow(myUid, targetUid, {required bool targetIsPublic})` — idempotente (`get`+`set`).
+- [ ] **1.8 [RED]** `follow_repository_test.dart` — `acceptRequest` solo si `myUid==followeeUid`. *(REQ-FOLLOW-005, SCENARIO-805)*
+- [ ] **1.9 [GREEN]** `acceptRequest(edgeId, myUid)`.
+- [ ] **1.10 [RED]** `follow_repository_test.dart` — `deleteEdge` borra el doc. *(REQ-FOLLOW-006, REQ-FOLLOW-007, SCENARIO-806/808)*
+- [ ] **1.11 [GREEN]** `deleteEdge(edgeId)`.
+- [ ] **1.12 [RED]** `follow_repository_test.dart` — `followingOf`/`watchFollowingOf` devuelven followees `accepted`. *(REQ-FOLLOW-011)*
+- [ ] **1.13 [GREEN]** `followingOf(uid)` / `watchFollowingOf(uid)`.
+- [ ] **1.14 [RED]** `follow_repository_test.dart` — `watchPendingReceivedFor`/`pendingReceivedFor` sin post-filtrado en memoria (filtro server-side por `followeeUid`). *(REQ-FOLLOW-005)*
+- [ ] **1.15 [GREEN]** `watchPendingReceivedFor(uid)` / `pendingReceivedFor(uid)`.
+- [ ] **1.16 [RED]** `follow_repository_test.dart` — `getEdge`/`watchEdge` por doc id. *(REQ-FOLLOW-003, SCENARIO-802)*
+- [ ] **1.17 [GREEN]** `getEdge(id)` / `watchEdge(id)`.
+- [ ] **1.18 [RED]** `follow_repository_test.dart` — `allOf(uid)` vía `members array-contains`. *(soporte de `sweepFollows`/exclusión en sugerencias)*
+- [ ] **1.19 [GREEN]** `allOf(uid)`.
+  > No se implementa `followersOf`/`watchFollowersOf` — sin consumidor en este change (ADR-FOLLOW-009, diferido a `follow-lists`).
+
+### Application — `lib/features/feed/application/follow_providers.dart`
+- [ ] **1.20 [GREEN]** `follow_providers.dart` — `followRepositoryProvider`, `followEdgeProvider` (family `String`), `followingProvider` (family `String`), `pendingReceivedStreamProvider` (family `String`), `pendingRequestCountProvider` (family `String`). Key SIEMPRE `String` (nunca record ni `List`).
+
+### Rules + índices (M-03, aditivo — nada lo lee todavía)
+- [ ] **1.21 [RED]** `functions/src/__tests__/follows-rules.test.ts` (NUEVO, `@firebase/rules-unit-testing` con enforcement real, seed vía `withSecurityRulesDisabled`) — crea arista con id determinístico. *(REQ-FOLLOW-001, SCENARIO-800, capa rules-jest)*
+- [ ] **1.22 [RED]** `follows-rules.test.ts` — auto-accept si `isProfilePublic==true`. *(REQ-FOLLOW-004, SCENARIO-804)*
+- [ ] **1.23 [RED]** `follows-rules.test.ts` — pending si `isProfilePublic==false`; self-accept denegado (equivalente a SCENARIO-132, ahora sí en CI). *(REQ-FOLLOW-005, SCENARIO-805)*
+- [ ] **1.24 [RED]** `follows-rules.test.ts` — `delete` de la propia arista `pending`. *(REQ-FOLLOW-006, SCENARIO-806)*
+- [ ] **1.25 [RED]** `follows-rules.test.ts` — `delete` de arista `accepted` por CUALQUIERA de los 2 miembros. *(REQ-FOLLOW-008, SCENARIO-809)*
+- [ ] **1.25b [RED]** `follows-rules.test.ts` — **allowlist cerrada también en el `update`**: el `followeeUid` acepta agregando un campo fuera de las 6 keys → **denegado**; y el `followeeUid` acepta cambiando `id` a un valor distinto del doc id → **denegado**. *(REQ-FOLLOW-005, design §3.1 — sin `hasOnly` y sin el pin de `id` en el `update`, la única escritura legítima puede fabricar un doc que **V5 de la verificación rechaza**)*
+- [ ] **1.26 [GREEN]** `firestore.rules` — bloque `match /follows/{followId}` completo (`create`/`update`/`delete`/`read`, design §3.1). El `update` lleva `keys().hasOnly([...6 keys])` **y** `id == followId`, además de los pines de `followerUid`/`followeeUid`/`members`/`createdAt` y la transición `pending → accepted`.
+- [ ] **1.27 [GATE]** 1.21–1.25b pasan contra la regla nueva.
+- [ ] **1.28 [GREEN]** `firestore.indexes.json` — 2 compuestos `{followerUid,status,createdAt DESC}` y `{followeeUid,status,createdAt DESC}`. NO tocar el índice huérfano `friendships{members,status}` (ADR-FOLLOW-003).
+- [ ] **1.29 [GREEN]** `functions/package.json` — agregar `follows-rules` al regex de `"test:rules"` (sin esto, LD-09 no se cumple: el archivo no corre en el job `functions-test`).
+- [ ] **1.30 [GATE]** `npm --prefix functions run test:rules:emulator` verde (incluye `follows-rules.test.ts`).
+- [ ] **1.31 [GATE]** `flutter analyze` 0 issues + `dart format .` + `flutter test` verde en `lib/features/feed/{domain,data,application}`.
+- [ ] **1.32 [MANUAL]** `firebase deploy --only firestore:rules,firestore:indexes --project treino-dev` (M-03). Deploy seguro por construcción: aditivo, nada lo lee todavía (LD-10).
+
+---
+
+## PR 2 — Migración `friendships → follows` (M-02, **M-03b**, M-04, M-05, M-06) — aislada
+
+Precondición: PR1 deployada (1.32).
+Archivos: `functions/scripts/migrate-friendships-to-follows.ts`, `functions/scripts/verify-follows-migration.ts` (new), `functions/src/__tests__/migrate-friendships-to-follows.test.ts`, `functions/src/__tests__/verify-follows-migration.test.ts` (new), `functions/scripts/backfill-follow-counters.ts` + `functions/src/__tests__/backfill-follow-counters.test.ts` (modified — agregador nuevo sobre aristas, design §7.4), **`firestore.rules` + `functions/src/__tests__/follows-rules.test.ts` (freeze de `friendships`, movido desde PR3a)**.
+Contratos completos de los dos scripts: **design §7.2** (migración) y **design §7.3** (verificación). No improvisar el shape acá.
+
+> **Cambio de alcance vs. la versión anterior de este plan (ADR-FOLLOW-015, design §7.0):** el freeze de `friendships` **se adelanta**. Deja de ser parte de M-07 (PR3a) y pasa a ser **M-03b**, deployado inmediatamente **antes** de M-04, o sea acá. Motivo: con el freeze en M-07 quedaba una ventana de días en la que una build vieja podía **borrar** una amistad ya migrada; el delta sweep sólo crea aristas y no absorbe borrados, así que las dos aristas sobrevivían al unfollow → **phantom access**, la falla que LD-04 declara la peor posible. Efecto colateral bienvenido: también cierra el pisado de contadores por la CF vieja (`maintainFollowCounters` sigue apuntando a `friendships` hasta 3a.21). Las tareas 3a.17/3a.18 se mudaron acá como 2.7b/2.7c.
+
+Nota de dimensionamiento (Review Workload Forecast): este PR es el más denso de la cadena por la cantidad de casos RED (guardas G1–G4 con G1 asimétrica por modo, dos tipos de arista, 6 invariantes, **dos modos de verificación**) **más el bloque de freeze que absorbió de PR3a (~30 líneas)**. Supera 400 con margen, así que la partición es **obligatoria**: **PR2a** (2.1–2.3, `migrate-friendships-to-follows.ts`) → **PR2b** (2.4–2.7c, `verify-follows-migration.ts` + `backfill-follow-counters.ts` + freeze), ambos con base en PR1 y aislados igual que hoy. **El freeze va en el slice que se mergea último**, porque su deploy (2.8b) tiene que quedar pegado a M-04. El orden operativo M-03b→M-04→M-05→M-06 no cambia con el split.
+
+- [ ] **2.1 [RED]** `migrate-friendships-to-follows.test.ts` — friendship `accepted` con `requesterId='u1'` migra a **DOS** aristas (`follows/u1_u2` y `follows/u2_u1`, ambas `accepted`, mismo `createdAt`). *(REQ-FOLLOW-015, SCENARIO-819 — ADR-FOLLOW-013)*
+- [ ] **2.1b [RED]** `migrate-friendships-to-follows.test.ts` — friendship `pending` migra a **UNA** sola arista `follows/{requesterId}_{otro}`, y la inversa NO se crea. *(REQ-FOLLOW-015, SCENARIO-825)*
+- [ ] **2.2 [RED]** `migrate-friendships-to-follows.test.ts` — doc sin `requesterId`, con `members.length!=2` o con `requesterId ∉ members` se lista como malformado y se excluye del `--apply`. *(REQ-FOLLOW-015, SCENARIO-820)*
+- [ ] **2.2b [RED]** `migrate-friendships-to-follows.test.ts` — **idempotencia**: segunda corrida sobre un estado ya migrado **y completo** (las 2 aristas de cada accepted presentes) → `toCreate` vacío, 0 writes, exit 0. *(REQ-FOLLOW-019, SCENARIO-828)*
+- [ ] **2.2c [RED]** `migrate-friendships-to-follows.test.ts` — **guarda por par CON `--since`** (delta sweep post-flip): par accepted con una sola de las dos aristas → `skippedPair: 'already-migrated'`, NO se recrea la faltante, `toCreate` vacío. Ahí "falta una dirección" significa **unfollow** y recrearla revertiría una decisión de privacidad. *(REQ-FOLLOW-019, SCENARIO-829, ADR-FOLLOW-014)*
+- [ ] **2.2c-bis [RED]** `migrate-friendships-to-follows.test.ts` — **guarda por par SIN `--since`** (corrida inicial, reintento tras batch interrumpido): par accepted con **una sola** de las dos aristas → la faltante va a `toCreate` y el par se reporta en `partialPair`; exit 0 con warning ruidoso. **Este test es el contrapunto exacto de 2.2c y los dos tienen que convivir**: el mismo estado observado significa cosas opuestas según el modo, y sin la asimetría un batch de 400 que muere a la mitad deja la migración incompleta reportando exit 0 (design §7.2, G1 corregida). Sin flip todavía publicado, una dirección faltante **no puede** ser un unfollow: el cliente que los produce (PR3c) no existe. *(REQ-FOLLOW-019, ADR-FOLLOW-014)*
+- [ ] **2.2d [RED]** `migrate-friendships-to-follows.test.ts` — **divergencia**: arista existente con `status` distinto del esperado → se reporta y no se pisa; exit ≠0 sin `--since`, warning con `--since`. *(REQ-FOLLOW-019, SCENARIO-830)*
+- [ ] **2.3 [GREEN]** `migrate-friendships-to-follows.ts` — función pura `planMigration(friendships, existing, {since})` → `{toCreate, skippedPair, partialPair, divergent, conflicts, malformed, stats}` (testeable sin Firestore, contrato exacto en design §7.2); `--dry-run` por defecto; `--apply` **lee por doc id con `getAll()` (chunks de 300) y escribe con `batch.create()`** en batches de 400 — nunca `set()` (ADR-FOLLOW-014). **G1 asimétrica por modo**: con `--since`, guarda por par (alguna arista presente → par entero salteado); sin `--since`, se completan las aristas faltantes y el par se reporta en `partialPair`.
+- [ ] **2.3a [RED]** `migrate-friendships-to-follows.test.ts` — `buildApplyManifest(writtenEdges, plan, {since})` (función pura, sin Firestore): dado lo **efectivamente escrito** por `--apply` más el `Plan` de 2.3, devuelve `{appliedAt, since, created: Edge[], skippedPair, partialPair, divergent, conflicts, malformed}`, con los `Edge` de `created` **completos** (`id`/`followerUid`/`followeeUid`/`status`/`members`/`createdAt`, no solo ids) — es lo que V2/V3 de `verify --delta --manifest` (2.5d) necesitan para comparar `status`/`createdAt`/dirección sin volver a leer `friendships`. *(design §7.2 paso 4 — sin esto, 3a.19c no tiene manifiesto que consumir)*
+- [ ] **2.3b [GREEN]** `migrate-friendships-to-follows.ts` — implementa `buildApplyManifest` y lo conecta a `--apply`: después de escribir los batches (re-planificados doc a doc ante `ALREADY_EXISTS`), vuelca el resultado a `functions/scripts/migrations/apply-{ISO}.json` (o `delta-{ISO}.json` si corrió con `--since`). En `--dry-run` no se escribe manifiesto — no hay nada efectivamente escrito que registrar.
+- [ ] **2.4 [RED]** `verify-follows-migration.test.ts` — **la cardinalidad es `count(follows) == 2 × count(accepted BIEN FORMADAS) + count(pending BIEN FORMADAS)`**; una fixture que no la cumple → exit ≠0. *(REQ-FOLLOW-014, SCENARIO-818)* + arista inventada → exit ≠0 *(SCENARIO-824)*
+  > **Ojo con la fórmula: esto termina escrito como aserción de test, así que un error acá se vuelve código.** La forma `2×accepted + pending − malformados` es **aritméticamente falsa** y no debe aparecer en el test ni en el script. Desarrollando con `A = A_wf + A_mf` y `P = P_wf + P_mf`: `2A + P − (A_mf + P_mf) = 2·A_wf + P_wf + A_mf` → **sobra `A_mf`**, sobre-cuenta una arista por cada `accepted` malformada; y una malformada por `status` inválido no está en `count(accepted)` ni en `count(pending)` pero igual se restaría → sub-cuenta. Los dos errores conviven y se cancelan parcialmente, o sea que la fórmula puede dar bien por casualidad. **Los malformados se EXCLUYEN del universo, no se restan del resultado.** Fuente de verdad: design §7.3 (V1) y SCENARIO-818.
+- [ ] **2.4b [RED]** `verify-follows-migration.test.ts` — fixture con **una `accepted` malformada** (p.ej. `requesterId ∉ members`) más N bien formadas: la cardinalidad se evalúa sólo sobre las bien formadas y la corrida sale **exit 0** con la malformada enumerada como warning. Es el test que ancla "excluir ≠ restar" y que hubiera fallado con la fórmula vieja. *(REQ-FOLLOW-014, SCENARIO-818)*
+- [ ] **2.5 [RED]** `verify-follows-migration.test.ts` — fixture a la que le falta UNA de las dos direcciones de un `accepted` → `followingRecalc(u2) != deg(u2)` → exit ≠0. *(REQ-FOLLOW-016, SCENARIO-821)*
+- [ ] **2.5b [RED]** `verify-follows-migration.test.ts` — `pending` con dirección invertida → exit ≠0 aunque los contadores no se muevan. *(REQ-FOLLOW-016, SCENARIO-826)*
+- [ ] **2.5c [RED]** `verify-follows-migration.test.ts` — contadores sin recalcular (valores pre-migración en `userPublicProfiles`) → exit ≠0 (V6b). *(REQ-FOLLOW-016, SCENARIO-827)*
+- [ ] **2.5d [RED]** `verify-follows-migration.test.ts` — **modo `--delta --manifest`**: fixture con las aristas del manifiesto intactas **más** aristas nuevas sin friendship de origen (simulan follows post-flip escritos por clientes) → **exit 0**. **Las dos únicas mutaciones legítimas de la ventana 3a.19b→3a.19c** — probadas por separado y combinadas —: una arista `accepted` del manifiesto **borrada** (unfollow) y una arista `pending` del manifiesto pasada a **`accepted`** con `followerUid`/`followeeUid`/`members`/`createdAt` intactos (accept) → **exit 0**, reportadas como **warning**, nunca error. **Cualquier otra desviación sigue siendo error**: una arista del manifiesto presente con `createdAt` distinto, o una arista `accepted` presente cuyo `status` ya no es `accepted` → **exit ≠0** (V2/V3 sobre el manifiesto). Y `--delta` **sin** `--manifest` → **exit 2**. Es el test que hace ejecutable la re-verificación de 3a.19c sin que un unfollow o un accept de tester la rompan — sin esta distinción la compuerta pasa de insatisfacible por cualquier follow nuevo a insatisfacible por cualquier unfollow o accept, la misma clase de falla que esta corrección vino a eliminar. *(REQ-FOLLOW-014, SCENARIO-846, design §7.3.1)*
+- [ ] **2.6 [GREEN]** `verify-follows-migration.ts` — las **6 invariantes V1–V6** de design §7.3 (que mapean a los chequeos ①–⑤ de M-06 del proposal, más V5 de forma del doc), con los dos modos de §7.3.1: `--cutover` (default, estricto) y `--delta --manifest <file>`. **`--delta` es "verificación relativa a un manifiesto", no "verificación del sweep"**: acepta el manifiesto de **cualquier** `--apply` — `apply-{ISO}.json` de M-04 (lo usa la re-verificación de 3a.19c) o `delta-{ISO}.json` de M-09. En ese modo **V1 no se evalúa** (la cardinalidad global deja de ser función del origen apenas hay un cliente escribiendo, y una invariante que falla por actividad legítima enseña a ignorar el reporte), V2/V3/V4 se restringen al manifiesto, V5 corre sobre toda la colección y de V6 sólo V6b. Evalúa **todas** las invariantes del modo, no corta en la primera; exit `0`/`1`/`2` (`2` incluye `--delta` sin manifiesto). Importa el predicado de "bien formado" de `migrate-friendships-to-follows.ts`, **no lo reimplementa**.
+- [ ] **2.6b [RED]** `backfill-follow-counters.test.ts` — `tallyFollowCountersFromEdges(edges)` agrega `followerUid`→`following` y `followeeUid`→`followers` sin split en memoria (contra fixture de aristas, sin Firestore); caso de dos aristas del mismo par (`{A}_{B}` y `{B}_{A}` accepted) suma 1 a cada lado, no colapsa. *(REQ-FOLLOW-016, design §7.4)*
+- [ ] **2.6c [GREEN]** `backfill-follow-counters.ts` — implementa `tallyFollowCountersFromEdges`; lectura pasa de `friendships where status=='accepted'` a `follows where status=='accepted'` (design §7.4). Se conserva `--dry-run` por defecto, recompute-from-scratch, batches de 400.
+- [ ] **2.7 [GATE]** `npm --prefix functions test -- "migrate-friendships-to-follows|verify-follows-migration|backfill-follow-counters"` verde.
+- [ ] **2.7b [RED]** `follows-rules.test.ts` (o archivo propio) — **movido desde 3a.17**: escritura sobre `friendships` denegada post-freeze, lectura permitida. *(REQ-FOLLOW-017, SCENARIO-822)*
+- [ ] **2.7c [GREEN]** `firestore.rules` — **movido desde 3a.18**: freeze `friendships/{friendshipId}`: `create/update/delete: if false`; `read` se conserva (rollback y auditoría, ADR-FOLLOW-012). *(REQ-FOLLOW-017)*
+- [ ] **2.7d [GATE]** `npm --prefix functions run test:rules:emulator` verde con 2.7b incluido.
+
+> **Secuencia operativa de 2.8 a 2.11 — se corre back-to-back, en una sola sesión de operador.** No es una preferencia de estilo: desde 2.8b la escritura social queda caída para builds viejas (design §7.5, riesgo A11), así que la ventana la define el reloj del operador. A volumen de equipo, M-04+M-05+M-06 son segundos de script (design §7.3).
+
+- [ ] **2.8 [MANUAL]** M-02: correr `migrate-friendships-to-follows.ts` en `--dry-run` contra `treino-dev`. Adjuntar el plan (N docs, N aristas esperadas = `2 × accepted bien formadas + pending bien formadas`, malformados nominales) al reporte de apply.
+- [ ] **2.8a [MANUAL]** **Compilar y SUBIR a TestFlight** la build de M-06b — desde la **punta de la cadena** (rama de PR3c, que ya contiene PR3a+PR3b+PR3c), **sin mergear ni deployar nada**. Subir acá porque el procesado de App Store Connect tarda y no queremos esa latencia adentro de la ventana. **NO distribuir al grupo de testers todavía**: si un tester actualizara antes de M-06, el cliente nuevo escribiría aristas en `follows` sin friendship de origen y **V4 marcaría la migración como inválida** (design §7.5). La distribución es 3a.19b.
+- [ ] **2.8b [MANUAL]** **M-03b — deploy del freeze**: `firebase deploy --only firestore:rules --project treino-dev` con el bloque de 2.7c. **Va antes de M-04, no después.** Desde acá `friendships` no acepta más escrituras de cliente: la fuente queda inmóvil mientras se la migra, la CF vieja `maintainFollowCounters` no puede volver a dispararse, y desaparece la ventana en la que un borrado con build vieja dejaba dos aristas huérfanas dando acceso a posts (ADR-FOLLOW-015). **Este deploy NO incluye el flip direccional del gate** — eso sigue siendo M-07 (3a.20).
+- [ ] **2.9 [MANUAL]** M-04: correr con `--apply` contra `treino-dev`. Dos precondiciones de orden, las dos vigentes: **(a)** después de 2.8b (freeze), para que el conjunto de origen no se mueva durante la migración; **(b)** **antes** de repuntar `maintainFollowCounters`/`notifyOnFollow` a `follows` (3a.12/3a.16, deployadas en 3a.21) — "regla de la ventana muda" (design §7.2): las dos CFs son `onDocumentWritten` sobre el path de la colección, así que cada arista escrita sería un evento (`2 × accepted + pending` eventos de Eventarc con 4 queries + transacción cada uno, **más** un push *"empezó a seguirte"* por arista a testers reales).
+- [ ] **2.10 [MANUAL]** M-05 (**obligatorio, no opcional**): correr `backfill-follow-counters.ts` sobre `follows` en `--dry-run`, revisar el delta (los contadores **suben** — ADR-FOLLOW-013), correr `--apply`, y **volver a correr en `--dry-run`: debe reportar 0 perfiles fuera de sync**. Registrar el delta agregado en el reporte de apply. Va **antes** de 2.11: V6b compara contra lo almacenado.
+- [ ] **2.11 [MANUAL]** M-06: correr `verify-follows-migration.ts --cutover` contra `treino-dev` — **debe salir exit 0**. Si falla: borrar `follows`, revertir contadores (backfill contra `friendships`), volver a 2.8. No avanzar a PR3a sin exit 0.
+  > **Este exit 0 vence.** Autoriza un deploy (3a.20) que ocurre varios PRs después y hay escritores que saltean rules (el cascade de borrado de cuenta usa Admin SDK, `cascade/friendships.ts:25-28`). La compuerta caduca a los **7 días** o ante cualquier actividad conocida sobre `follows`/`friendships`/`userPublicProfiles`; en cualquiera de los dos casos se re-corre en **3a.19c** antes del flip. Cuesta segundos (design §7.1.1).
+
+---
+
+## PR 3a — Flip servidor: rules direccionales + Cloud Functions (M-07 + mitad server de M-08)
+
+Precondición: PR2.11 (M-06) salió exit 0. Verificar la **compuerta de cutover completa (design §7.1, 6 condiciones + M-06b)** antes del deploy de 3a.20, y su **vencimiento** (§7.1.1) en 3a.19c.
+> **El freeze ya no está en este PR.** Se adelantó a PR2 (2.7b/2.7c/2.8b) como M-03b — ADR-FOLLOW-015, design §7.0. Acá queda **sólo** el flip direccional del gate. Las tareas 3a.17/3a.18 de la versión anterior de este plan viven ahora en 2.7b/2.7c.
+
+Archivos: `firestore.rules`, `functions/src/social/maintain-follow-counters.ts`, `functions/src/notifications/notify-friendship.ts`, `functions/src/cascade/friendships.ts`, `functions/src/__tests__/post-privacy-rules.test.ts` (reescrito), `functions/src/__tests__/chat-relationship-rules.test.ts` (**expectativas nuevas + 5 casos de `messages/create`**, no sólo reseed), `functions/src/__tests__/maintain-follow-counters.test.ts`, `functions/src/__tests__/notify-friendship.test.ts`, `functions/src/__tests__/cascade/friendships.test.ts`.
+
+- [ ] **3a.1 [RED]** `post-privacy-rules.test.ts` (reescritura) — B no sigue a A (`follows/b_a` no existe) → B no lee post `friends` de A. *(REQ-FOLLOW-010, SCENARIO-811)*
+- [ ] **3a.2 [RED]** `post-privacy-rules.test.ts` — `follows/b_a` `accepted` → B lee. *(REQ-FOLLOW-010, SCENARIO-812)*
+- [ ] **3a.3 [RED]** `post-privacy-rules.test.ts` — reacciones espejan el mismo gate. *(REQ-FOLLOW-010, SCENARIO-813)*
+- [ ] **3a.4 [GREEN]** `firestore.rules` — `postFriendAccepted`→`postFollowerAccepted(authorUid)`: `exists(follows/{auth.uid}_{authorUid}) && status=='accepted'`, en los 2 call sites (posts read, `reactionPostReadable`). *(design §3.2)*
+- [ ] **3a.5 [GATE]** 3a.1–3a.3 pasan.
+> **Chat direccional — decisión cerrada del dueño (LD-08 / ADR-FOLLOW-005).** `chat-relationship-rules.test.ts` **cambia expectativas, no sólo seeding**: el caso "dos amigos aceptados pueden abrir chat" pasa a ser direccional, y se suman los casos de `messages/create`, que hoy no tiene ni un test de relación porque hoy no tiene gate de relación. **Verificado en el código antes de escribir esto**: `chatRelationshipOk` se invoca en un único call site (`firestore.rules:1134`), `messages/create` gatea sólo por membresía (`:1167-1170`) y borrar la amistad no toca el chat (`friendship_repository.dart:150-151`) — o sea que hoy eliminar una amistad **no** corta un chat existente. Mover el gate es una restricción nueva, no la conservación de una vigente.
+
+- [ ] **3a.6 [RED]** `chat-relationship-rules.test.ts` — **`chats/create` direccional**: u1 puede abrir chat con u2 si `follows/u2_u1` está `accepted` (el destinatario lo sigue); si sólo existe `follows/u1_u2`, u1 **NO** puede abrirlo. *(REQ-FOLLOW-012, design §3.3.2)*
+- [ ] **3a.6b [RED]** `chat-relationship-rules.test.ts` — **`messages/create` asimétrico dentro del MISMO chat**: con `follows/u1_u2` `accepted` y `u2_u1` ausente, u2 envía (su destinatario u1 lo sigue) y u1 **NO** envía; los dos siguen **leyendo** el chat y sus mensajes. Es el caso que justifica mudar el gate: sin él la asimetría no existe. *(REQ-FOLLOW-012, SCENARIO-815)*
+- [ ] **3a.6c [RED]** `chat-relationship-rules.test.ts` — **par migrado mutuo**: con `follows/u1_u2` y `follows/u2_u1` ambas `accepted`, los dos envían. Es la garantía de que el chat de un par migrado queda igual que antes. *(REQ-FOLLOW-012, SCENARIO-839)*
+- [ ] **3a.6d [RED]** `chat-relationship-rules.test.ts` — **chat preexistente sin ninguna arista**: los dos denegados en `messages/create`, los dos permitidos en `read` y en `chats/update` (`lastRead`). **Es la regresión que el dueño aceptó explícitamente al cerrar la decisión (R12/A14) y va testeada a propósito**, no descubierta en producción. *(REQ-FOLLOW-012, SCENARIO-841)*
+- [ ] **3a.6e [RED]** `chat-relationship-rules.test.ts` — **rama `trainer_link` intacta**: chat con `linkId` activo y **cero** aristas `follows` → `messages/create` permitido para los dos. Ancla que el Coach no se aprieta de rebote. *(REQ-FOLLOW-012, SCENARIO-842)*
+- [ ] **3a.7 [GREEN]** `firestore.rules` — chat direccional en sus **dos** superficies (design §3.3.2): `chatCreateOk(members, data)` reemplaza a `chatRelationshipOk` en `chats/create` (`followAccepted(otro, yo)`, rama `trainer_link` sin tocar), y **`senderMayPost(uid)` nuevo en `messages/create`**, que **absorbe** el check de membresía en vez de sumarse a él —reusa el mismo `get(chats/{chatId})`— y evalúa `'linkId' in chat` **antes** que la arista. `chats/read`, `messages/read` y `chats/update` NO se tocan.
+- [ ] **3a.8 [GATE]** `chat-relationship-rules.test.ts` verde: los 8 casos existentes (uno con expectativa nueva: el simétrico pasa a direccional) + los 5 nuevos de 3a.6–3a.6e. Presupuesto de llamadas de acceso verificado contra el emulador: `chats/create` **2** (peor caso ≤6, igual que hoy — cierra R5/A2), `messages/create` **3** en chat social y **1** en chat con `linkId`.
+- [ ] **3a.9 [RED]** `functions/src/__tests__/cascade/friendships.test.ts` → adaptar a `sweepFollows`: `members array-contains uid` sobre `follows`, una sola query.
+- [ ] **3a.10 [GREEN]** `functions/src/cascade/friendships.ts` → `sweepFollows`, colección `follows` (ADR-FOLLOW-002).
+- [ ] **3a.11 [RED]** `maintain-follow-counters.test.ts` — `partiesOf` lee `followerUid`/`followeeUid` directo, sin buscar en `members`. *(REQ-FOLLOW-013)*
+- [ ] **3a.12 [GREEN]** `maintain-follow-counters.ts` — `partiesOf()` nueva versión (design §4.1a), trigger repuntado a `follows/{followId}`.
+- [ ] **3a.13 [RED]** `maintain-follow-counters.test.ts` — `countAcceptedFor` hace 2 queries direccionales (`followerUid==uid`, `followeeUid==uid`, ambas `accepted`). *(REQ-FOLLOW-013, SCENARIO-816/817)*
+- [ ] **3a.14 [GREEN]** `maintain-follow-counters.ts` — `countAcceptedFor()` 2 queries (design §4.1b); se mantiene el recompute-from-scratch transaccional (QA-507).
+- [ ] **3a.15 [RED]** `notify-friendship.test.ts` — las 3 ramas leen `followerUid`/`followeeUid` en vez de `requesterId`+búsqueda en `members`.
+- [ ] **3a.16 [GREEN]** `notify-friendship.ts` — solo cambia de dónde sale la dirección (design §4.2); copy intacto; trigger repuntado a `follows`.
+- [ ] **3a.17 / 3a.18** — **movidas a PR2 (2.7b / 2.7c)**: el freeze de `friendships` se adelantó a M-03b (ADR-FOLLOW-015). Se dejan los números para que las referencias cruzadas no queden colgadas.
+- [ ] **3a.19 [GATE]** `npm --prefix functions run test:rules:emulator` + `npm --prefix functions test` verdes (job `functions-test` completo).
+- [ ] **3a.19b [MANUAL] — M-06b, precondición no negociable del deploy** **Distribuir** al grupo de testers la build ya subida en 2.8a y avisar (incluyendo el salto de contadores), y **confirmar a mano** que actualizaron. La app **no tiene gate de versión mínima** (verificado): con `friendships` congelada desde M-03b, una build vieja conserva la lectura pero **ya perdió la escritura**. Decisión del dueño: no se bloquea el change, se avisa y se sigue. Registrar la confirmación en el reporte de apply (design §7.5).
+  > **Cómo se rompe la circularidad que tenía este plan.** La versión anterior pedía acá "subir la build que incluye PR3b/PR3c", mientras PR3b declaraba como precondición que PR3a estuviera *mergeada y deployada* — y 3a.20 no corre sin este paso. **Ciclo cerrado: el plan no era ejecutable.** Se rompe separando dos cosas distintas: la **precondición de merge/review** es la cadena lineal PR3a→PR3b→PR3c; la **precondición de build** no es ninguna de esas, porque en una cadena encadenada la rama de PR3c **ya contiene** PR3a+PR3b+PR3c. La build se compila desde la punta de la cadena **sin mergear ni deployar nada** (se hace en 2.8a). El orden de merge y el de deploy no cambian.
+- [ ] **3a.19c [MANUAL] — vencimiento de la compuerta (design §7.1.1 / §7.1.1b)** Corre **después de 3a.19b** e inmediatamente **antes de 3a.20** — ése es el punto en el que la foto tiene que estar fresca. Si el exit 0 de 2.11 tiene **más de 7 días**, o si hubo cualquier actividad conocida sobre `follows` / `friendships` / `userPublicProfiles`, re-verificar **en el modo que corresponda al estado de `follows`**:
+  - **`follows` todavía 100% producto de la migración** (la build de 3a.19b no llegó a distribuirse, o se confirmó que ningún tester escribió): `verify-follows-migration.ts --cutover` → **exit 0**.
+  - **Ya hay aristas nuevas legítimas** (el caso esperado después de 3a.19b): `verify-follows-migration.ts --delta --manifest apply-{ISO}.json`, con el manifiesto **de M-04** (el que emitió el `--apply` de 2.9) → **exit 0**. Evalúa V2/V3/V4 restringidas al manifiesto, V5 sobre toda la colección y V6b; **V1 y V6a no se evalúan** (design §7.3.1).
+  - En los dos casos, además: `migrate-friendships-to-follows.ts --dry-run --since <ISO de M-04>` con `toCreate` vacío, y `backfill-follow-counters.ts --dry-run` con **0 perfiles fuera de sync**.
+  > **Por qué acá `--cutover` NO se puede exigir a secas — la versión anterior de esta tarea era insatisfacible por construcción.** 3a.19b distribuye la build de M-06b, que se corta de la **punta de la cadena** y por lo tanto **contiene PR3c**: ya escribe en `follows` (botón de seguir, inbox). En cuanto un tester sigue a alguien, `--cutover` falla por V1 (cardinalidad), V4 (arista sin friendship de origen) y, si es `accepted`, V6a — **por actividad legítima**. Una compuerta que no puede salir verde se termina salteando, que es peor que no tenerla. Las dos alternativas se evaluaron y se descartan: correr 3a.19c **antes** de 3a.19b sólo mueve el problema (la foto envejece durante el paso más lento del rollout y A13 se reabre entero); y **cortar la build de un punto anterior a PR3c** destruye el propósito de M-06b — sin PR3c el cliente sigue escribiendo el grafo social contra `friendships`, **congelada desde M-03b**, o sea que el tester actualiza y sigue sin poder seguir a nadie.
+  > **Sigue siendo la única red que atrapa el residuo del cascade de borrado de cuenta**, que borra `friendships` con Admin SDK y saltea el freeze (`cascade/friendships.ts:25-28`): V4 sobre el manifiesto ve la arista migrada que perdió su origen, y V6b los contadores desincronizados (design §7.1.2, riesgo A12). Ante la duda se re-corre igual: son 3 lecturas de colección, segundos a volumen de equipo.
+- [ ] **3a.20 [MANUAL]** `firebase deploy --only firestore:rules --project treino-dev` (M-07, **sólo el flip direccional del gate** — el freeze ya se deployó en 2.8b). **No correr sin 3a.19b ni sin 3a.19c.**
+- [ ] **3a.20b [MANUAL] — M-09 (sweep), movido acá desde 3d.6 y degradado a aserción** Correr `migrate-friendships-to-follows.ts --dry-run --since <ISO del run de M-04>`. **Resultado esperado: `toCreate` vacío** — con el freeze en M-03b la ventana de escrituras sobre `friendships` es vacía por construcción, así que esto es una **aserción de que nadie escribió salteando rules**, no un paso de migración. Registrar el resultado en el reporte de apply.
+  - **Si `toCreate` NO es vacío**: alguien escribió con Admin SDK (típicamente el cascade de §7.1.2) o a mano. **No se aplica reflejamente**: primero se entiende qué pasó. Si corresponde aplicar, se aplica **acá y sólo acá** — esta es la "ventana muda" (design §7.2): las rules ya flipearon pero las CFs **todavía apuntan a `friendships`**, así que escribir en `follows` no emite ni un evento. Después: `backfill-follow-counters.ts` → `verify-follows-migration.ts --delta --manifest delta-{ISO}.json`. Los pares en `conflicts` se revisan a mano, nunca se fuerzan.
+  - **Por qué NO puede correr después de 3a.21** (que es donde estaba, en PR3d): con las CFs repuntadas, cada arista que el sweep escriba dispara `notifyOnFollow` — rama `auto-followed`, copy *"X empezó a seguirte"* (`notify-friendship.ts:142-143`) — o sea **push reales a testers por relaciones de hace meses**; y dispara `maintainFollowCounters` (4 queries + transacción) en carrera con el backfill que corre inmediatamente después.
+- [ ] **3a.21 [MANUAL]** `firebase deploy --only functions:maintainFollowCounters,functions:notifyOnFollow,functions:sweepFollows --project treino-dev` — mitad server de M-08. **Cierra la ventana muda: después de esto ningún script vuelve a escribir en `follows`.** Coordinar con el release de PR3b (no antes: las CFs nuevas cuentan sobre `follows`, fuente de verdad recién después del flip de rules).
+- [ ] **3a.22 [MANUAL] — M-08b, obligatorio: el flip no se cierra sin esto (design §7.4.1)** Inmediatamente después de 3a.21: `backfill-follow-counters.ts --dry-run` → revisar el delta → `--apply` → **`--dry-run` otra vez, que debe reportar 0 perfiles fuera de sync**. Ese último dry-run **es** la aserción V6b (almacenado == recalculado sobre `follows`). Registrar el delta agregado en el reporte de apply. *(REQ-FOLLOW-016, SCENARIO-837)*
+  > **Por qué el freeze de M-03b NO reemplaza este paso — son dos ventanas distintas.** El freeze impide que **la fuente vieja escriba**: que la CF vieja recompute sobre `friendships` y pise lo que el backfill de 2.10 dejó. No impide que **la fuente nueva escriba sin oyente**: desde 3a.19b los testers actualizados crean aristas en `follows` mientras las CFs siguen apuntando a `friendships`, y **nadie las cuenta**. Peor, la CF repuntada sólo recomputa los pares que reciban un evento **posterior**, así que un par que se movió en esa ventana y después queda quieto conserva el contador viejo **indefinidamente**. Riesgo R3b del proposal / A15 del design.
+  > **Por qué acá no se corre `verify --delta`**: ese modo exige un manifiesto (design §7.3.1) y en esta ventana las aristas nuevas las escribieron **clientes**, no un `--apply` de script — no hay manifiesto que pasarle. La aserción disponible y suficiente es el dry-run del backfill.
+
+---
+
+## PR 3b — Flip cliente: posts y feed (mitad cliente urgente de M-08, va pegado a 3a)
+
+Precondición **de merge y de release**: PR3a mergeada y deployada. **No es precondición de build**: el binario de TestFlight de 2.8a/M-06b se compila desde la punta de la cadena (rama de PR3c) antes de que nada se mergee o deploye — ver la nota de 3a.19b. Confundir las dos cosas es lo que hacía circular a este plan.
+El query nuevo del cliente es subconjunto estricto del viejo → legal bajo las 2 versiones de rules (ADR-FOLLOW-010), pero la ventana entre 3a y este release debe ser corta: el cliente viejo pide autores que no sigo → `permission-denied` sobre el query entero, feed SEGUIDORES en blanco.
+Archivos: `lib/features/feed/domain/post_privacy.dart`, `lib/features/feed/application/post_providers.dart`, `lib/features/feed/application/feed_screen_providers.dart`.
+
+- [ ] **3b.1 [RED]** `test/features/feed/domain/post_privacy_test.dart` — `PostPrivacy.followers.toJson()=='friends'`. *(REQ-FOLLOW-009, SCENARIO-810)*
+- [ ] **3b.2 [GREEN]** `post_privacy.dart` — rename `friends`→`followers`, `@JsonValue('friends')`/`_wireMap`/`toJson()` intactos.
+- [ ] **3b.3 [RED]** `test/features/feed/application/post_providers_test.dart` — gate del tier `followers` usa "¿yo sigo al autor?" (no "¿existe alguna relación?"). *(REQ-FOLLOW-010, SCENARIO-814)*
+- [ ] **3b.4 [GREEN]** `post_providers.dart` — el gate pasa a `followingProvider(viewerUid)` (`.contains(authorUid)`).
+- [ ] **3b.5 [RED]** `test/features/feed/application/feed_screen_providers_test.dart` — feed SEGUIDORES = posts de a quienes YO sigo; NO incluye a quien me sigue sin que yo lo siga. *(REQ-FOLLOW-011, SCENARIO-814)*
+- [ ] **3b.6 [GREEN]** `feed_screen_providers.dart` — `myFollowingFeedProvider` (ex `myFriendsFeedProvider`) usa `followingProvider`.
+- [ ] **3b.7 [GATE]** `flutter analyze` 0 issues + `flutter test` verde en los 3 archivos tocados.
+- [ ] **3b.8 [MANUAL]** Release del build con 3b — coordinar con 3a.21 (deploy de CFs), mismo release, ventana mínima entre ambos.
+
+---
+
+## PR 3c — Flip cliente: perfil público, sugerencias, inbox de solicitudes, composer del chat
+
+Precondición: PR1 (rules `follows` live), PR2 (datos migrados) y **PR3a deployada (M-07)**.
+
+> **Partición obligatoria, ya no contingente (~540 líneas):** **PR3c-1** = 3c.1–3c.10 (perfil público, incluido el `_MessageButton` direccional) → **PR3c-2** = 3c.11–3c.17 (sugerencias + inbox) → **PR3c-3** = 3c.18–3c.21 (composer del chat). Lo que rompió el presupuesto es el composer bloqueado, que entra por ADR-FOLLOW-005 (chat direccional).
+
+> **Corrección — la versión anterior decía "no depende de PR3a/3b, es ortogonal a privacidad de posts". Es FALSO, y la afirmación abría phantom access.** PR3c mueve el botón de seguir, el inbox y el perfil público a escribir en `follows`. Si llegara **antes** de PR3a, el gate de lectura de posts seguiría evaluándose sobre `friendships`: un unfollow borraría la arista de `follows` y **no tocaría el doc legacy**, así que el gate viejo seguiría devolviendo `true`. El usuario cree que revocó y no revocó — exactamente lo que LD-04 prohíbe, y el mismo modo de falla que motiva el dual-DELETE de la rama B (ADR-FOLLOW-010). **PR3c NO puede preceder a PR3a.** El encadenamiento PR3a→PR3b→PR3c no es sólo para que el review sea lineal: es una restricción de corrección.
+Archivos: `lib/features/feed/domain/public_profile_view.dart`, `lib/features/feed/application/public_profile_providers.dart`, `lib/features/feed/presentation/widgets/public_profile_follow_button.dart`, `lib/features/feed/presentation/public_profile_screen.dart`, `lib/features/feed/application/suggested_users_providers.dart`, `lib/features/feed/presentation/friend_requests_inbox_screen.dart`, `lib/features/feed/presentation/widgets/friend_request_inbox_tile.dart`.
+
+- [ ] **3c.1 [RED]** `test/features/feed/domain/public_profile_view_test.dart` — construye con `outgoingFollow`/`incomingFollow` en vez de `friendship`.
+- [ ] **3c.2 [GREEN]** `public_profile_view.dart` — reemplaza `Friendship? friendship` por `Follow? outgoingFollow` (`follows/{viewer}_{target}`) y `Follow? incomingFollow` (`follows/{target}_{viewer}`). *(design §6)*
+- [ ] **3c.3 [RED]** `test/features/feed/application/public_profile_providers_test.dart` — `PublicProfileViewNotifier` compone 2 `followEdgeProvider` (saliente + entrante), no 1 `friendshipByPairProvider`.
+- [ ] **3c.4 [GREEN]** `public_profile_providers.dart` — retira `friendshipByPairProvider`/`FriendshipPair`; agrega los 2 listeners vía `followEdgeProvider('{viewer}_{target}')` / `followEdgeProvider('{target}_{viewer}')`.
+- [ ] **3c.5 [RED]** `test/features/feed/presentation/widgets/public_profile_follow_button_test.dart` — los 4 estados (SEGUIR/SIGUIENDO/SOLICITUD ENVIADA/ACEPTAR) mapean a `outgoing`/`incoming` según la tabla de precedencia (design §6: la arista saliente manda). *(REQ-FOLLOW-018, SCENARIO-823, semantics — nunca ancho de texto)*
+- [ ] **3c.6 [GREEN]** `public_profile_follow_button.dart` — reescribe el mapa de estados sobre `outgoing`/`incoming`. SOLICITUD ENVIADA sigue con `onTap: null` en este PR — cancelar entra en PR4.
+- [ ] **3c.7 [RED]** `test/features/feed/presentation/public_profile_screen_test.dart` — `isAcceptedFollower` (gate de privacidad del perfil, línea 78) usa `outgoingFollow?.status==accepted`, no `friendship`.
+- [ ] **3c.8 [GREEN]** `public_profile_screen.dart` — pasa `outgoingFollow`/`incomingFollow` a `PublicProfileFollowButton`; `isAcceptedFollower` lee `outgoingFollow`.
+- [ ] **3c.9 [RED]** `test/.../public_profile_screen_test.dart` (o test dedicado de `_MessageButton`) — elegibilidad de MENSAJE es **la arista ENTRANTE**: `incoming?.status == accepted`. Con `outgoing` `accepted` e `incoming` ausente (lo sigo pero no me sigue) el botón está **deshabilitado**; con `incoming` `accepted` y `outgoing` `null` está **habilitado**. *(REQ-FOLLOW-012 + REQ-FOLLOW-021, SCENARIO-845 — espejo exacto de `chatCreateOk`; corrige además el bug real de `_isAcceptedFriend`, línea 245-246, que hoy mira 1 solo doc)*
+  > **No es el OR de las 2 direcciones.** El OR era el espejo de la regla vieja y de la decisión provisoria que el dueño ya cerró: abrir un chat es poder mandar el primer mensaje, y eso requiere que el **destinatario me siga**. Cliente y rules se mueven juntos: si 3a.7 cambia, esta tarea cambia con ella, o el UX miente en una dirección u otra.
+- [ ] **3c.10 [GREEN]** `public_profile_screen.dart` — `_MessageButton` (`friendship` → `outgoing`+`incoming`), `_isAcceptedFriend` → `_chatEligible => incoming?.status == FollowStatus.accepted`.
+- [ ] **3c.11 [RED]** `test/features/feed/application/suggested_users_providers_test.dart` — exclusión usa `followRepositoryProvider.allOf(uid)`.
+- [ ] **3c.12 [GREEN]** `suggested_users_providers.dart` — `friendshipRepositoryProvider.allOf` → `followRepositoryProvider.allOf`.
+- [ ] **3c.13 [RED]** `test/features/feed/presentation/friend_requests_inbox_screen_test.dart` — consume `pendingReceivedStreamProvider(myUid)` → `List<Follow>`, no `List<Friendship>`.
+- [ ] **3c.14 [GREEN]** `friend_requests_inbox_screen.dart` — swap de provider; pasa `follow: list[i]` a `FriendRequestInboxTile`.
+- [ ] **3c.15 [RED]** `test/.../friend_request_inbox_tile_test.dart` — `FriendRequestInboxTile` recibe `Follow follow` (no `Friendship friendship`); accept/reject llaman `acceptRequest`/`deleteEdge` de `FollowRepository`.
+- [ ] **3c.16 [GREEN]** `friend_request_inbox_tile.dart` — swap del campo + repo. Ruta a perfil usa `follow.followerUid` (ex `requesterId`).
+- [ ] **3c.17 [GATE]** `flutter analyze` 0 issues, `dart format .`, `flutter test` verde en los 7 archivos tocados.
+
+### PR 3c-3 — Composer del chat bloqueado (consecuencia de UX del chat direccional)
+
+Archivo: `lib/features/chat/presentation/chat_screen.dart` (widget `_Composer`, línea ~393; `enabled:` ya existe en la línea 445 para el estado de envío, y la pantalla ya observa al otro usuario en la línea 178). **No se toca `chat_detail_pane.dart`** (Coach hub): esos chats van por la rama `linkId`, que queda igual que hoy.
+
+> **Por qué esto no es opcional ni cosmético.** Desde 3a.20 hay usuarios que **no pueden enviar** en un chat que se ve normal. Sin esta UI el modo de falla es un `permission-denied` crudo después de escribir el mensaje — la peor forma posible de comunicar una decisión de producto. La build de M-06b se corta de la punta de la cadena, así que **contiene este slice** y la ventana de exposición es la de instalación, no la de la cadena de PRs.
+
+- [ ] **3c.18 [RED]** `test/features/chat/presentation/chat_screen_test.dart` — sin `follows/{otherUid}_{myUid}` `accepted`: campo de texto, botón de adjuntar y botón de enviar **deshabilitados**, aviso inline visible, y la lista de mensajes **igual renderizada**. *(REQ-FOLLOW-021, SCENARIO-843)*
+- [ ] **3c.19 [RED]** `chat_screen_test.dart` — con la arista entrante `accepted`: composer habilitado y aviso ausente. *(REQ-FOLLOW-021, SCENARIO-844)*
+- [ ] **3c.20 [GREEN]** `chat_screen.dart` — `canWrite` desde `followEdgeProvider('{otherUid}_{myUid}')`; `_Composer` recibe el flag y lo compone con el `enabled: !sending` que ya tiene; aviso inline **persistente** en lugar del composer (nunca snackbar: el estado dura hasta que la otra persona vuelva a seguir). El scroll del historial y el `lastRead` **no se tocan** (design §3.3.4/§6.1). Strings provisorias en el widget; pasan a l10n en 4.8b.
+- [ ] **3c.21 [GATE]** `flutter analyze` 0 issues + `dart format .` + `flutter test` verde en `test/features/chat/`.
+
+---
+
+## PR 3d — Retiro de `Friendship*` (código muerto tras el flip, M-08 cierre)
+
+Precondición: PR3b Y PR3c mergeadas — cero consumidores activos de `Friendship`.
+> **Excepción de tamaño declarada**: este PR es deletion-only (`friendship.dart`+`.freezed`/`.g`, `friendship_status.dart`, `friendship_repository.dart`, `friendship_providers.dart`, `friendship_repository_test.dart` — 33 tests). El diff crudo puede superar 400 líneas por el volumen de código generado y de tests borrados, pero no hay lógica nueva que revisar línea por línea — es puro borrado de código ya reemplazado y ya cubierto por `follow_repository_test.dart` (PR1). Se acepta como excepción, no se fragmenta artificialmente.
+
+- [ ] **3d.1 [GATE]** Confirmar (grep) cero referencias a `Friendship`/`friendshipRepositoryProvider`/`friendshipByPairProvider` fuera de los propios archivos a borrar.
+- [ ] **3d.2 [GREEN]** Borrar `lib/features/feed/domain/friendship.dart`, `friendship.freezed.dart`, `friendship.g.dart`, `friendship_status.dart`.
+- [ ] **3d.3 [GREEN]** Borrar `lib/features/feed/data/friendship_repository.dart`, `lib/features/feed/application/friendship_providers.dart`.
+- [ ] **3d.4 [GREEN]** Borrar `test/features/feed/data/friendship_repository_test.dart` (33 tests, ya reemplazados por `follow_repository_test.dart` de PR1).
+- [ ] **3d.5 [GATE]** `flutter analyze` 0 issues (sin errores de compilación por imports colgantes) + `dart format .` + `flutter test` verde (baseline ~4748 menos los 33 retirados, más los nuevos de `follow_repository_test.dart`/widgets).
+- [ ] **3d.6** — **movida a 3a.20b.** M-09 ya no corre acá. Dos razones, las dos bloqueantes:
+  1. **Llegaba tarde.** Acá las CFs ya están repuntadas a `follows` (3a.21), así que cada arista que el sweep escribiera dispara `notifyOnFollow` (push *"empezó a seguirte"* a testers reales por relaciones viejas) y `maintainFollowCounters` en carrera con el backfill. El único momento seguro es **entre 3a.20 y 3a.21** — la ventana muda (design §7.2).
+  2. **Ya no tiene nada que absorber.** Con el freeze adelantado a M-03b (ADR-FOLLOW-015), la ventana de escrituras sobre `friendships` es vacía por construcción; M-09 degradó a aserción `--dry-run`. Y el agujero que el sweep **nunca** cubrió — un **borrado** en `friendships` deja las dos aristas migradas vivas, o sea phantom access — se cierra con el freeze temprano, no con el sweep, porque el script sólo crea.
+
+---
+
+## PR 4 — UX: cancelar solicitud + `TreinoTappable` + copy "seguidor" + l10n
+
+Archivos: `lib/features/feed/presentation/widgets/public_profile_follow_button.dart` (líneas 89, 283), `lib/features/feed/presentation/widgets/unfriend_confirmation_sheet.dart` (líneas 55, 69, 79), `lib/l10n/intl_es.arb`, `intl_en.arb`, `intl_es_AR.arb`.
+
+- [ ] **4.1 [RED]** `public_profile_follow_button_test.dart` — tap en "SOLICITUD ENVIADA" invoca `deleteEdge(outgoing.id)`, estado vuelve a SEGUIR. *(REQ-FOLLOW-006, SCENARIO-807)*
+- [ ] **4.2 [GREEN]** `public_profile_follow_button.dart:89` — `onTap: null` → abre `UnfriendConfirmationSheet` (copy "cancelar solicitud") → `deleteEdge`.
+- [ ] **4.3 [RED]** `unfriend_confirmation_sheet_test.dart` — copy "dejar de seguir" vía l10n en vez de "eliminar amistad" hardcodeado. *(REQ-FOLLOW-007, SCENARIO-808)*
+- [ ] **4.4 [GREEN]** `unfriend_confirmation_sheet.dart:55,69,79` — strings hardcodeadas → keys l10n (reusa el mismo sheet para unfollow y cancelar).
+- [ ] **4.5 [RED]** `public_profile_follow_button_test.dart` — `TreinoTappable` (no `GestureDetector`) en los 4 estados, semantics label distinto por estado. *(REQ-FOLLOW-018, SCENARIO-823)*
+- [ ] **4.6 [GREEN]** `public_profile_follow_button.dart:283` — `GestureDetector` → `TreinoTappable`.
+- [ ] **4.7 [MANUAL] — decisión del dueño** Confirmar el label visible "SEGUIDORES" **y el copy del aviso de chat bloqueado** (la conducta ya está definida en design §6.1; acá se cierra sólo el texto) antes de cerrar los ARBs.
+- [ ] **4.8 [GREEN]** `intl_es.arb`, `intl_en.arb`, `intl_es_AR.arb` — agregar los pares `"key"`/`"@key"` nuevos (copy "seguidor", label confirmado en 4.7).
+- [ ] **4.8b [GREEN]** `chat_screen.dart` — las strings provisorias del aviso de composer bloqueado (3c.20) pasan a l10n, con sus keys en los 3 ARBs. *(REQ-FOLLOW-021)*
+- [ ] **4.9 [GREEN]** `flutter gen-l10n` explícito (`flutter analyze` NO lo regenera).
+- [ ] **4.10 [GATE]** Cero ocurrencias de "amistad" en strings visibles (grep en `lib/l10n/` y en los widgets tocados). `flutter analyze` 0 issues + `dart format .` + `flutter test` verde.
+
+---
+
+## PR 5 (opcional, fuera de la cadena obligatoria) — `chunkSize` 10→30
+
+Precondición: PR3a/3b/3c/3d ya en producción. ADR-FOLLOW-008: no se sube sin medir; no bloquea el resto del change.
+
+- [ ] **5.1 [RED]** Test de emulador dedicado — un query request con 30 `authorUid` distintos (cada uno evaluando `postFollowerAccepted`) no supera el presupuesto documentado de 10 llamadas de acceso. *(Riesgo A1 del design)*
+- [ ] **5.2 [GATE]** Si 5.1 pasa → **GREEN**: `lib/features/feed/data/post_repository.dart:141`, `chunkSize` 10→30. Si falla, se descarta este PR y el riesgo A1 queda documentado sin arreglar (no forma parte del Success Criteria de este change).
+- [ ] **5.3 [GATE]** `flutter test` verde.
+
+---
+
+**Explícitamente fuera de este `tasks.md`**: M-10 (borrado de la colección `friendships`) — change posterior, después de observar M-06 en producción (LD-03).
