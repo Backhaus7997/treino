@@ -1093,6 +1093,94 @@ service cloud.firestore {
                     && request.auth.uid in resource.data.members;
     }
 
+    // Grafo social DIRIGIDO — reemplaza a `friendships` (change `follow-model`).
+    //
+    // Doc id = '{followerUid}_{followeeUid}', SIN ordenar. Que el id sea
+    // determinístico a partir de la dirección es lo que permite que el gate de
+    // lectura de posts resuelva "¿el lector sigue al autor?" con un lookup
+    // directo por doc id — sin queries, sin índices y con un solo get().
+    //
+    // ADITIVO: en este punto de la migración (M-03) nada lo lee todavía. El
+    // flip del gate de posts ocurre en un PR posterior, y nunca se hace OR
+    // entre `friendships` y `follows`: un OR durante la transición significaría
+    // que dejar de seguir no revoca el acceso, porque el doc legacy `accepted`
+    // seguiría resolviendo true. Es la peor falla posible en un cambio de
+    // privacidad, así que se prohíbe por diseño.
+    match /follows/{followId} {
+      // `resource == null` permite preguntar "¿lo sigo?" y que la respuesta
+      // legítima "no" resuelva en vez de tirar permission-denied.
+      allow read: if request.auth != null
+                  && (resource == null
+                      || request.auth.uid in resource.data.members);
+
+      // Create: solo el follower crea su propia arista.
+      //
+      // El status puede ser 'accepted' SOLO si el destinatario tiene el perfil
+      // público (auto-accept estilo Instagram). Los perfiles anteriores a la
+      // feature de privacidad no tienen el campo: `.get(..., true)` los trata
+      // como públicos, porque tratarlos como privados le rompería el
+      // auto-accept a cuentas que nunca pidieron serlo.
+      //
+      // El get() apunta a un uid CONOCIDO (`followeeUid`). En `friendships`
+      // había que probar uidA y si no uidB: de ≤2 get() a exactamente 1.
+      allow create: if request.auth != null
+                    && request.auth.uid == request.resource.data.followerUid
+                    && followId == request.resource.data.followerUid + '_'
+                                   + request.resource.data.followeeUid
+                    && request.resource.data.followerUid
+                       != request.resource.data.followeeUid
+                    && request.resource.data.id == followId
+                    && request.resource.data.keys().hasOnly(
+                         ['id', 'followerUid', 'followeeUid', 'status',
+                          'members', 'createdAt'])
+                    && request.resource.data.members ==
+                         [request.resource.data.followerUid,
+                          request.resource.data.followeeUid]
+                    && request.resource.data.createdAt is timestamp
+                    && (
+                      request.resource.data.status == 'pending'
+                      || (request.resource.data.status == 'accepted'
+                          && get(/databases/$(database)/documents/userPublicProfiles/$(request.resource.data.followeeUid))
+                               .data.get('isProfilePublic', true) == true)
+                    );
+
+      // Update: SOLO el followee, y SOLO para aceptar (pending → accepted).
+      //
+      // El self-accept deja de ser un check que alguien puede borrar sin querer
+      // y pasa a ser estructural: solo el followee puede escribir, y el doc id
+      // fija quién es cada uno.
+      //
+      // Lleva la MISMA allowlist que el create y pinea `id`. No es simetría
+      // cosmética: el update es la única escritura que hace un usuario distinto
+      // del creador del doc. Sin hasOnly, aceptar una solicitud sería una vía
+      // para inyectar campos que las rules no validan; sin el pin de `id`, para
+      // desincronizar `id` del doc id. Los dos productos violan la verificación
+      // de la migración, o sea que la escritura legítima podría fabricar un
+      // documento que el propio change rechaza después.
+      allow update: if request.auth != null
+                    && request.auth.uid == resource.data.followeeUid
+                    && request.resource.data.keys().hasOnly(
+                         ['id', 'followerUid', 'followeeUid', 'status',
+                          'members', 'createdAt'])
+                    && request.resource.data.id == followId
+                    && resource.data.status == 'pending'
+                    && request.resource.data.status == 'accepted'
+                    && request.resource.data.followerUid
+                       == resource.data.followerUid
+                    && request.resource.data.followeeUid
+                       == resource.data.followeeUid
+                    && request.resource.data.members == resource.data.members
+                    && request.resource.data.createdAt
+                       == resource.data.createdAt;
+
+      // Delete: cualquiera de los dos miembros. Es la misma operación para
+      // dejar de seguir, cancelar una solicitud enviada y rechazar una
+      // recibida — y también lo que va a habilitar "quitar seguidor".
+      // Borra UNA dirección: la inversa es otro documento y no se toca.
+      allow delete: if request.auth != null
+                    && request.auth.uid in resource.data.members;
+    }
+
     // Chat 1-1 entre PF y athlete (Fase 5 Etapa 5).
     // Doc id determinístico: sortedUids.join('_'). Reglas:
     //   - read: solo members del chat (o doc inexistente para tolerar reads

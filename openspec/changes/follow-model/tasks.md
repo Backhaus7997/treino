@@ -83,45 +83,45 @@ Nota de convención: el proposal decía `scripts/migrations/follows/*`; sigo el 
 ## PR 1 — Modelo `Follow` inerte (dominio + data + providers + rules aditivas + índices, M-03)
 
 ### Dominio — `lib/features/feed/domain/`
-- [ ] **1.1 [RED]** `test/features/feed/domain/follow_status_test.dart` — round-trip `fromJson`/`toJson` `'pending'`/`'accepted'`. *(REQ-FOLLOW-002, SCENARIO-801)*
-- [ ] **1.2 [GREEN]** `follow_status.dart` — enum `FollowStatus`, `@JsonValue` + `_wireMap`, calcado de `friendship_status.dart`.
-- [ ] **1.3 [RED]** `test/features/feed/domain/follow_test.dart` — `Follow.edgeId('u1','u2')=='u1_u2'`, `members==[follower,followee]`. *(REQ-FOLLOW-001, SCENARIO-800)*
-- [ ] **1.4 [GREEN]** `follow.dart` — `@freezed Follow` (id, followerUid, followeeUid, status, members, `createdAt` `@TimestampConverter`) + `static String edgeId(follower, followee)`.
-- [ ] **1.5 [GREEN]** `dart run build_runner build --delete-conflicting-outputs` — genera `follow.freezed.dart`/`.g.dart`.
+- [x] **1.1 [RED]** `test/features/feed/domain/follow_status_test.dart` — round-trip `fromJson`/`toJson` `'pending'`/`'accepted'`. *(REQ-FOLLOW-002, SCENARIO-801)*
+- [x] **1.2 [GREEN]** `follow_status.dart` — enum `FollowStatus`, `@JsonValue` + `_wireMap`, calcado de `friendship_status.dart`.
+- [x] **1.3 [RED]** `test/features/feed/domain/follow_test.dart` — `Follow.edgeId('u1','u2')=='u1_u2'`, `members==[follower,followee]`. *(REQ-FOLLOW-001, SCENARIO-800)*
+- [x] **1.4 [GREEN]** `follow.dart` — `@freezed Follow` (id, followerUid, followeeUid, status, members, `createdAt` `@TimestampConverter`) + `static String edgeId(follower, followee)`.
+- [x] **1.5 [GREEN]** `dart run build_runner build --delete-conflicting-outputs` — genera `follow.freezed.dart`/`.g.dart`.
 
 ### Data — `lib/features/feed/data/follow_repository.dart`
-- [ ] **1.6 [RED]** `follow_repository_test.dart` — `follow('u1','u2', targetIsPublic:true)` escribe `follows/u1_u2` `accepted`. *(REQ-FOLLOW-001, REQ-FOLLOW-004, SCENARIO-800/804)*
-- [ ] **1.7 [GREEN]** `follow(myUid, targetUid, {required bool targetIsPublic})` — idempotente (`get`+`set`).
-- [ ] **1.8 [RED]** `follow_repository_test.dart` — `acceptRequest` solo si `myUid==followeeUid`. *(REQ-FOLLOW-005, SCENARIO-805)*
-- [ ] **1.9 [GREEN]** `acceptRequest(edgeId, myUid)`.
-- [ ] **1.10 [RED]** `follow_repository_test.dart` — `deleteEdge` borra el doc. *(REQ-FOLLOW-006, REQ-FOLLOW-007, SCENARIO-806/808)*
-- [ ] **1.11 [GREEN]** `deleteEdge(edgeId)`.
-- [ ] **1.12 [RED]** `follow_repository_test.dart` — `followingOf`/`watchFollowingOf` devuelven followees `accepted`. *(REQ-FOLLOW-011)*
-- [ ] **1.13 [GREEN]** `followingOf(uid)` / `watchFollowingOf(uid)`.
-- [ ] **1.14 [RED]** `follow_repository_test.dart` — `watchPendingReceivedFor`/`pendingReceivedFor` sin post-filtrado en memoria (filtro server-side por `followeeUid`). *(REQ-FOLLOW-005)*
-- [ ] **1.15 [GREEN]** `watchPendingReceivedFor(uid)` / `pendingReceivedFor(uid)`.
-- [ ] **1.16 [RED]** `follow_repository_test.dart` — `getEdge`/`watchEdge` por doc id. *(REQ-FOLLOW-003, SCENARIO-802)*
-- [ ] **1.17 [GREEN]** `getEdge(id)` / `watchEdge(id)`.
-- [ ] **1.18 [RED]** `follow_repository_test.dart` — `allOf(uid)` vía `members array-contains`. *(soporte de `sweepFollows`/exclusión en sugerencias)*
-- [ ] **1.19 [GREEN]** `allOf(uid)`.
+- [x] **1.6 [RED]** `follow_repository_test.dart` — `follow('u1','u2', targetIsPublic:true)` escribe `follows/u1_u2` `accepted`. *(REQ-FOLLOW-001, REQ-FOLLOW-004, SCENARIO-800/804)*
+- [x] **1.7 [GREEN]** `follow(myUid, targetUid, {required bool targetIsPublic})` — idempotente (`get`+`set`).
+- [x] **1.8 [RED]** `follow_repository_test.dart` — `acceptRequest` solo si `myUid==followeeUid`. *(REQ-FOLLOW-005, SCENARIO-805)*
+- [x] **1.9 [GREEN]** `acceptRequest(edgeId, myUid)`.
+- [x] **1.10 [RED]** `follow_repository_test.dart` — `deleteEdge` borra el doc. *(REQ-FOLLOW-006, REQ-FOLLOW-007, SCENARIO-806/808)*
+- [x] **1.11 [GREEN]** `deleteEdge(edgeId)`.
+- [x] **1.12 [RED]** `follow_repository_test.dart` — `followingOf`/`watchFollowingOf` devuelven followees `accepted`. *(REQ-FOLLOW-011)*
+- [x] **1.13 [GREEN]** `followingOf(uid)` / `watchFollowingOf(uid)`.
+- [x] **1.14 [RED]** `follow_repository_test.dart` — `watchPendingReceivedFor`/`pendingReceivedFor` sin post-filtrado en memoria (filtro server-side por `followeeUid`). *(REQ-FOLLOW-005)*
+- [x] **1.15 [GREEN]** `watchPendingReceivedFor(uid)` / `pendingReceivedFor(uid)`.
+- [x] **1.16 [RED]** `follow_repository_test.dart` — `getEdge`/`watchEdge` por doc id. *(REQ-FOLLOW-003, SCENARIO-802)*
+- [x] **1.17 [GREEN]** `getEdge(id)` / `watchEdge(id)`.
+- [x] **1.18 [RED]** `follow_repository_test.dart` — `allOf(uid)` vía `members array-contains`. *(soporte de `sweepFollows`/exclusión en sugerencias)*
+- [x] **1.19 [GREEN]** `allOf(uid)`.
   > No se implementa `followersOf`/`watchFollowersOf` — sin consumidor en este change (ADR-FOLLOW-009, diferido a `follow-lists`).
 
 ### Application — `lib/features/feed/application/follow_providers.dart`
-- [ ] **1.20 [GREEN]** `follow_providers.dart` — `followRepositoryProvider`, `followEdgeProvider` (family `String`), `followingProvider` (family `String`), `pendingReceivedStreamProvider` (family `String`), `pendingRequestCountProvider` (family `String`). Key SIEMPRE `String` (nunca record ni `List`).
+- [x] **1.20 [GREEN]** `follow_providers.dart` — `followRepositoryProvider`, `followEdgeProvider` (family `String`), `followingProvider` (family `String`), `pendingReceivedStreamProvider` (family `String`), `pendingRequestCountProvider` (family `String`). Key SIEMPRE `String` (nunca record ni `List`).
 
 ### Rules + índices (M-03, aditivo — nada lo lee todavía)
-- [ ] **1.21 [RED]** `functions/src/__tests__/follows-rules.test.ts` (NUEVO, `@firebase/rules-unit-testing` con enforcement real, seed vía `withSecurityRulesDisabled`) — crea arista con id determinístico. *(REQ-FOLLOW-001, SCENARIO-800, capa rules-jest)*
-- [ ] **1.22 [RED]** `follows-rules.test.ts` — auto-accept si `isProfilePublic==true`. *(REQ-FOLLOW-004, SCENARIO-804)*
-- [ ] **1.23 [RED]** `follows-rules.test.ts` — pending si `isProfilePublic==false`; self-accept denegado (equivalente a SCENARIO-132, ahora sí en CI). *(REQ-FOLLOW-005, SCENARIO-805)*
-- [ ] **1.24 [RED]** `follows-rules.test.ts` — `delete` de la propia arista `pending`. *(REQ-FOLLOW-006, SCENARIO-806)*
-- [ ] **1.25 [RED]** `follows-rules.test.ts` — `delete` de arista `accepted` por CUALQUIERA de los 2 miembros. *(REQ-FOLLOW-008, SCENARIO-809)*
-- [ ] **1.25b [RED]** `follows-rules.test.ts` — **allowlist cerrada también en el `update`**: el `followeeUid` acepta agregando un campo fuera de las 6 keys → **denegado**; y el `followeeUid` acepta cambiando `id` a un valor distinto del doc id → **denegado**. *(REQ-FOLLOW-005, design §3.1 — sin `hasOnly` y sin el pin de `id` en el `update`, la única escritura legítima puede fabricar un doc que **V5 de la verificación rechaza**)*
-- [ ] **1.26 [GREEN]** `firestore.rules` — bloque `match /follows/{followId}` completo (`create`/`update`/`delete`/`read`, design §3.1). El `update` lleva `keys().hasOnly([...6 keys])` **y** `id == followId`, además de los pines de `followerUid`/`followeeUid`/`members`/`createdAt` y la transición `pending → accepted`.
-- [ ] **1.27 [GATE]** 1.21–1.25b pasan contra la regla nueva.
-- [ ] **1.28 [GREEN]** `firestore.indexes.json` — 2 compuestos `{followerUid,status,createdAt DESC}` y `{followeeUid,status,createdAt DESC}`. NO tocar el índice huérfano `friendships{members,status}` (ADR-FOLLOW-003).
-- [ ] **1.29 [GREEN]** `functions/package.json` — agregar `follows-rules` al regex de `"test:rules"` (sin esto, LD-09 no se cumple: el archivo no corre en el job `functions-test`).
-- [ ] **1.30 [GATE]** `npm --prefix functions run test:rules:emulator` verde (incluye `follows-rules.test.ts`).
-- [ ] **1.31 [GATE]** `flutter analyze` 0 issues + `dart format .` + `flutter test` verde en `lib/features/feed/{domain,data,application}`.
+- [x] **1.21 [RED]** `functions/src/__tests__/follows-rules.test.ts` (NUEVO, `@firebase/rules-unit-testing` con enforcement real, seed vía `withSecurityRulesDisabled`) — crea arista con id determinístico. *(REQ-FOLLOW-001, SCENARIO-800, capa rules-jest)*
+- [x] **1.22 [RED]** `follows-rules.test.ts` — auto-accept si `isProfilePublic==true`. *(REQ-FOLLOW-004, SCENARIO-804)*
+- [x] **1.23 [RED]** `follows-rules.test.ts` — pending si `isProfilePublic==false`; self-accept denegado (equivalente a SCENARIO-132, ahora sí en CI). *(REQ-FOLLOW-005, SCENARIO-805)*
+- [x] **1.24 [RED]** `follows-rules.test.ts` — `delete` de la propia arista `pending`. *(REQ-FOLLOW-006, SCENARIO-806)*
+- [x] **1.25 [RED]** `follows-rules.test.ts` — `delete` de arista `accepted` por CUALQUIERA de los 2 miembros. *(REQ-FOLLOW-008, SCENARIO-809)*
+- [x] **1.25b [RED]** `follows-rules.test.ts` — **allowlist cerrada también en el `update`**: el `followeeUid` acepta agregando un campo fuera de las 6 keys → **denegado**; y el `followeeUid` acepta cambiando `id` a un valor distinto del doc id → **denegado**. *(REQ-FOLLOW-005, design §3.1 — sin `hasOnly` y sin el pin de `id` en el `update`, la única escritura legítima puede fabricar un doc que **V5 de la verificación rechaza**)*
+- [x] **1.26 [GREEN]** `firestore.rules` — bloque `match /follows/{followId}` completo (`create`/`update`/`delete`/`read`, design §3.1). El `update` lleva `keys().hasOnly([...6 keys])` **y** `id == followId`, además de los pines de `followerUid`/`followeeUid`/`members`/`createdAt` y la transición `pending → accepted`.
+- [x] **1.27 [GATE]** 1.21–1.25b pasan contra la regla nueva.
+- [x] **1.28 [GREEN]** `firestore.indexes.json` — 2 compuestos `{followerUid,status,createdAt DESC}` y `{followeeUid,status,createdAt DESC}`. NO tocar el índice huérfano `friendships{members,status}` (ADR-FOLLOW-003).
+- [x] **1.29 [GREEN]** `functions/package.json` — agregar `follows-rules` al regex de `"test:rules"` (sin esto, LD-09 no se cumple: el archivo no corre en el job `functions-test`).
+- [x] **1.30 [GATE]** `npm --prefix functions run test:rules:emulator` verde (incluye `follows-rules.test.ts`).
+- [x] **1.31 [GATE]** `flutter analyze` 0 issues + `dart format .` + `flutter test` verde en `lib/features/feed/{domain,data,application}`.
 - [ ] **1.32 [MANUAL]** `firebase deploy --only firestore:rules,firestore:indexes --project treino-dev` (M-03). Deploy seguro por construcción: aditivo, nada lo lee todavía (LD-10).
 
 ---
