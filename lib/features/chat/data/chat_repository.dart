@@ -7,6 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart'
         Query,
         Timestamp;
 
+import '../../../core/utils/firestore_write.dart';
 import '../domain/chat.dart';
 import '../domain/media_type.dart';
 import '../domain/message.dart';
@@ -77,7 +78,7 @@ class ChatRepository {
       'members': members,
       'createdAt': FieldValue.serverTimestamp(),
       if (linkId != null) 'linkId': linkId,
-    });
+    }).boundedWrite;
     final created = await ref.get();
     return _chatFromDocOrPending(created, membersFallback: members);
   }
@@ -92,7 +93,13 @@ class ChatRepository {
       final snap = await query.get();
       for (final doc in snap.docs) {
         final data = doc.data();
-        if (data['status'] != 'active') continue;
+        // QA H8: 'paused' cuenta como vínculo vigente para chatear. Pausar es
+        // un hold temporal, no un corte: el PF (o el alumno) debe poder
+        // mandar mensaje. Antes solo 'active' pasaba, así que MENSAJE con un
+        // alumno pausado sin chat previo fallaba con permission-denied en loop
+        // (la rule chatRelationshipOk exigía 'active'; ambos se ampliaron).
+        final status = data['status'];
+        if (status != 'active' && status != 'paused') continue;
         final trainerId = data['trainerId'] as String?;
         final athleteId = data['athleteId'] as String?;
         if ((trainerId == self && athleteId == other) ||
@@ -188,7 +195,7 @@ class ChatRepository {
   }) =>
       _chats
           .doc(chatId)
-          .update({'lastRead.$uid': FieldValue.serverTimestamp()});
+          .update({'lastRead.$uid': FieldValue.serverTimestamp()}).boundedWrite;
 
   // ─── watchChatsForUser ──────────────────────────────────────────────────
   //
