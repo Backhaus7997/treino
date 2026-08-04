@@ -30,7 +30,7 @@ locked_decisions: firmadas por el dueño (las 8 del proposal §4)
 
 fases_implementacion:
   F0:
-    estado: parcial
+    estado: COMPLETA
     hecho:
       - |
         VERIFICADO: las Security Rules se aplican a escrituras REST de
@@ -45,13 +45,33 @@ fases_implementacion:
         y la prueba se pudriria en silencio. Corre bajo `npm --prefix functions
         test`, que es lo que ejecuta el job functions-test.
       - docs/setup/watchos-target.md — prerequisito manual documentado
-    pendiente:
       - |
-        Target watchOS creado en Xcode. HUMANO con Mac, no automatizable.
-        Ver docs/setup/watchos-target.md.
-      - |
-        Handoff de credencial telefono -> reloj. Bloqueado por el target:
-        no hay donde recibirla hasta que exista.
+        Target watchOS creado y enganchado a Runner. El wizard de Xcode 26.3
+        lo dejo desconectado porque su desplegable de "companion app" no se
+        abre (probado varias veces, tampoco a mano). Completado editando el
+        pbxproj: PBXBuildFile, fase "Embed Watch Content",
+        PBXContainerItemProxy + PBXTargetDependency, y el enganche al target
+        Runner. VERIFICADO: xcodebuild -list lista los 3 targets; los
+        settings resueltos dan com.backhaus.treino.watchkitapp +
+        WKCompanionAppBundleIdentifier=com.backhaus.treino + team
+        J66AQRRM96 + SDK watchOS 26.2; y `xcodebuild -scheme Runner` da
+        BUILD SUCCEEDED compilando el target del reloj, que antes no pasaba.
+    pendiente: []
+
+  F1:
+    estado: siguiente
+    objetivo: |
+      Auth en el reloj + lectura de rutina + fixtures de conformidad.
+    notas: |
+      Google Sign-In no tiene SDK de watchOS: el telefono tiene que
+      entregar la credencial al reloj una vez (Locked Decision #2). Los
+      fixtures de conformidad Dart<->Swift van ACA y no como deuda: son la
+      mitigacion del riesgo estructural #1 (divergencia entre las dos
+      implementaciones de las mismas reglas).
+    pendiente_sin_verificar: |
+      Si WCSession requiere algun capability nuevo en Signing &
+      Capabilities. El ciclo viejo afirmaba que no, y sigue sin
+      comprobarse. Si aparece uno, es señal de volver a design.
 
 artifacts:
   explore: openspec/changes/watch-standalone-client/explore.md
