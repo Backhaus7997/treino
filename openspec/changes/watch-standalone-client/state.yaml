@@ -59,15 +59,40 @@ fases_implementacion:
     pendiente: []
 
   F1:
-    estado: siguiente
+    estado: en curso
     objetivo: |
       Auth en el reloj + lectura de rutina + fixtures de conformidad.
-    notas: |
-      Google Sign-In no tiene SDK de watchOS: el telefono tiene que
-      entregar la credencial al reloj una vez (Locked Decision #2). Los
-      fixtures de conformidad Dart<->Swift van ACA y no como deuda: son la
-      mitigacion del riesgo estructural #1 (divergencia entre las dos
-      implementaciones de las mismas reglas).
+    hecho:
+      - |
+        VERIFICADO: el reloj renueva su credencial SIN el SDK de Firebase.
+        El telefono le pasa el refresh token una vez y el reloj lo canjea
+        por ID tokens frescos contra securetoken.googleapis.com por HTTP
+        (expires_in 3600). El token renovado escribe en Firestore (200).
+        CONSECUENCIA: el target watchOS queda con CERO dependencias de
+        Firebase -> nueva Locked Decision #9, y el riesgo #5 del proposal
+        (Firebase watchOS community-supported) queda DISUELTO.
+      - |
+        VERIFICADO: lectura de rutinas por REST con las rules aplicandose.
+        Atleta asignado lee su rutina privada (200); tercero denegado
+        (403); sin token denegado (403); rutina publica legible por
+        cualquier autenticado (200); rutina inexistente da 404 y no 403,
+        que es el comportamiento deliberado del guard `resource == null`.
+      - |
+        Test permanente: functions/src/__tests__/watch-rest-auth-and-routine-reads-rules.test.ts
+        (8 casos, verde). Seed via `Authorization: Bearer owner`, el
+        superusuario del emulador, porque crear una rutina respetando las
+        rules exige el flujo de PF o el self-authored.
+    pendiente:
+      - |
+        Handoff del refresh token telefono -> reloj. Requiere sumar
+        `watch_connectivity` a pubspec.yaml: COORDINAR con la sesion
+        paralela (wizardly-dijkstra-a16063), que tambien mergea a main.
+      - Guardar el refresh token en el Keychain del reloj.
+      - UI minima en el reloj: mostrar el entreno de hoy.
+      - |
+        Fixtures de conformidad Dart<->Swift en CI. NO son deuda: son la
+        mitigacion del riesgo estructural #1 (las mismas reglas escritas
+        dos veces divergen, y el historial se corrompe en silencio).
     pendiente_sin_verificar: |
       Si WCSession requiere algun capability nuevo en Signing &
       Capabilities. El ciclo viejo afirmaba que no, y sigue sin

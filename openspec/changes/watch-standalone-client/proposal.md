@@ -49,13 +49,14 @@ Construir una app watchOS **autónoma** que permita iniciar un entrenamiento, ca
 | # | Decisión | Propuesto | Justificación |
 |---|---|---|---|
 | 1 | Transporte de datos del reloj | REST API de Firestore con `Authorization: Bearer <ID token>` | Verificado: Firestore no tiene SDK de watchOS; la REST API acepta ID tokens de Firebase Auth y **las Security Rules se aplican**, así que `firestore.rules` cubre al reloj sin modelo paralelo. |
-| 2 | Auth en el reloj | El teléfono entrega la credencial una vez vía WatchConnectivity; el reloj la guarda en su Keychain y refresca solo | Google Sign-In no tiene SDK de watchOS. Exigir login propio dejaría sin reloj a todos los usuarios de Google. El pairing pide el teléfono una vez; después el reloj es autónomo. |
+| 2 | Auth en el reloj | El teléfono entrega el **refresh token** una vez vía WatchConnectivity; el reloj lo guarda en su Keychain y renueva su credencial **por HTTP contra `securetoken.googleapis.com`, sin SDK de Firebase** | Google Sign-In no tiene SDK de watchOS. Exigir login propio dejaría sin reloj a todos los usuarios de Google. El pairing pide el teléfono una vez; después el reloj es autónomo. **Refinado en F1 tras verificarlo**: la renovación no necesita el SDK, así que el target watchOS queda con CERO dependencias de Firebase — ver Locked Decision #9. |
 | 3 | Iniciar entreno desde el reloj | SÍ, un botón "empezar el de hoy" | `todays_routine_provider.dart` ya resuelve el día que toca. No hace falta picker. Revierte la Locked Decision #3 del ciclo anterior, que se apoyaba en una premisa falsa. |
 | 4 | Finalizar entreno incompleto | El reloj replica el `StateError`: no finaliza si `isFullyCompleted` es false | Mantener una sola regla de negocio. Relajarla en el reloj crea sesiones que el teléfono considera inválidas. |
 | 5 | Alcance de la lógica portada en v1 | Rutinas de una semana, sin `addSet`/`removeSet` en vivo desde el reloj | `setCountOverride` y la resolución por semana son la parte más sutil del dominio. Portarlas de entrada multiplica la superficie de divergencia. El teléfono sigue pudiendo todo. |
 | 6 | Control de divergencia | Fixtures de conformidad compartidos en CI desde la fase 1 | Riesgo #1 del explore. Los mismos escenarios JSON corridos contra Dart y Swift; si una implementación cambia y la otra no, CI se pone rojo. Sin esto, el historial se corrompe en silencio. |
 | 7 | Conflicto reloj↔teléfono | Dedupe por `exerciseId + setNumber`, sin merge; last-write-wins a nivel sesión | Es la identidad lógica que `logSet` ya usa. Un merge real exige CRDTs o timestamps por campo — desproporcionado para v1. |
 | 8 | Rest timer en vivo | SÍ, el reloj cuenta localmente | Siendo autónomo, el reloj tiene el estado; no hay costo de tráfico. Revierte la Locked Decision #7 del ciclo anterior, cuyo problema (saturar `updateApplicationContext`) ya no aplica. |
+| 9 | Dependencias del target watchOS | **CERO dependencias de Firebase.** Solo HTTP. | Verificado en F1: el reloj renueva credencial contra `securetoken.googleapis.com` y habla con Firestore por su REST API, ambos con HTTP plano. No hace falta el SDK para nada. Elimina de raíz el riesgo #5 (Firebase en watchOS es community-supported, sin SLA) y toda la complejidad de sumar Firebase al target por CocoaPods/SPM. |
 
 ---
 
@@ -89,7 +90,7 @@ Construir una app watchOS **autónoma** que permita iniciar un entrenamiento, ca
 | 2 | `firestore.rules` nunca se probó contra escrituras REST | ALTA | F0 lo verifica primero. Ojo con el patrón conocido del repo: reglas testeadas pero no desplegadas, fallando mudas. |
 | 3 | Auth de usuarios Google en el reloj | MEDIA | Locked Decision #2 — handoff desde el teléfono. |
 | 4 | Sin persistencia offline de Firestore: cola y conflictos a mano | MEDIA | F3 dedicada. Dedupe por identidad lógica ya existente. |
-| 5 | Firebase watchOS es community-supported, sin SLA | MEDIA | Solo se usa Auth del SDK; los datos van por REST, que es API estable de Google. |
+| 5 | ~~Firebase watchOS es community-supported, sin SLA~~ | **DISUELTO** | Verificado en F1: el reloj no usa el SDK de Firebase para nada. Renovación de credencial y datos van los dos por HTTP contra APIs REST estables de Google (Locked Decision #9). |
 | 6 | Escala: es un segundo cliente | **ALTA** | Faseado con corte de riesgo. F0 puede matar el proyecto barato. |
 | 7 | Gamificación colándose en la superficie nueva | BAJA | REQ explícito en spec. |
 
