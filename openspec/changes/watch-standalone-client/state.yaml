@@ -82,17 +82,36 @@ fases_implementacion:
         (8 casos, verde). Seed via `Authorization: Bearer owner`, el
         superusuario del emulador, porque crear una rutina respetando las
         rules exige el flujo de PF o el self-authored.
-    pendiente:
       - |
-        Handoff del refresh token telefono -> reloj. Requiere sumar
-        `watch_connectivity` a pubspec.yaml: COORDINAR con la sesion
-        paralela (wizardly-dijkstra-a16063), que tambien mergea a main.
+        `watch_connectivity: ^0.2.8` agregado a pubspec.yaml, con comentario
+        que fija su alcance ACOTADO (solo el handoff de credencial, no el
+        puente de datos). Coordinado con la sesion paralela del worktree
+        wizardly-dijkstra-a16063, que tambien mergea a main.
+      - |
+        Fixtures de conformidad ARRANCADOS. conformance/plan_advance.json
+        (12 casos) + conformance/README.md + corredor Dart en
+        test/conformance/. Se extrajo la aritmetica de dia/semana de
+        todaysRoutineProvider a nextPlanPosition
+        (workout/domain/plan_advance.dart): estaba embebida en un
+        FutureProvider, sin ser testeable como funcion pura ni portable.
+        La extraccion no cambio comportamiento (23 tests previos verdes).
+        VERIFICADO que el mecanismo detecta divergencia y no solo pasa:
+        se rompio la logica a proposito dos veces y el test se puso rojo
+        con mensaje util. Ambas roturas revertidas.
+    pendiente:
+      - Handoff del refresh token telefono -> reloj (codigo Dart + Swift).
       - Guardar el refresh token en el Keychain del reloj.
       - UI minima en el reloj: mostrar el entreno de hoy.
       - |
-        Fixtures de conformidad Dart<->Swift en CI. NO son deuda: son la
-        mitigacion del riesgo estructural #1 (las mismas reglas escritas
-        dos veces divergen, y el historial se corrompe en silencio).
+        Mas fixtures a medida que se porte logica: idempotencia por
+        exerciseId + setNumber, isFullyCompleted, totalVolumeKg, durationMin.
+
+brecha_conocida: |
+  Los fixtures de conformidad hoy los corre UN SOLO lado (Dart). Eso fija
+  el contrato pero todavia NO detecta divergencia: hace falta el corredor
+  Swift, que llega en F2 cuando el target watchOS tenga logica que
+  verificar. Hasta entonces la mitigacion del riesgo #1 esta a medias.
+  Anotado tambien en conformance/README.md.
     pendiente_sin_verificar: |
       Si WCSession requiere algun capability nuevo en Signing &
       Capabilities. El ciclo viejo afirmaba que no, y sigue sin
