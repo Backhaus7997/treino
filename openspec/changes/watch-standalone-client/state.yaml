@@ -98,9 +98,23 @@ fases_implementacion:
         VERIFICADO que el mecanismo detecta divergencia y no solo pasa:
         se rompio la logica a proposito dos veces y el test se puso rojo
         con mensaje util. Ambas roturas revertidas.
+      - |
+        Cloud Function `mintWatchCredential` (functions/src/mint-watch-credential.ts,
+        exportada en index.ts). CORRIGE la Locked Decision #2: el diseño
+        original ("el telefono entrega SU refresh token") es IMPOSIBLE —
+        `User.refreshToken` de firebase_auth es vacio en nativo, documentado
+        textual en el platform interface. En su lugar el reloj obtiene
+        credencial PROPIA via custom token, revocable por separado.
+        Propiedad de seguridad load-bearing: mintea SOLO para
+        `request.auth.uid`, sin uid parametrizable. 7 tests, verde.
+        VERIFICADO que el test de seguridad DETECTA el agujero: se agrego a
+        proposito un uid inyectable y el test mostro al atacante minteando
+        la credencial de la victima. Revertido.
     pendiente:
-      - Handoff del refresh token telefono -> reloj (codigo Dart + Swift).
-      - Guardar el refresh token en el Keychain del reloj.
+      - |
+        Lado Dart: llamar a mintWatchCredential y enviar el custom token por
+        watch_connectivity.
+      - Lado Swift: recibir el token, canjearlo y guardar el refresh en Keychain.
       - UI minima en el reloj: mostrar el entreno de hoy.
       - |
         Mas fixtures a medida que se porte logica: idempotencia por

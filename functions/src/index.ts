@@ -47,3 +47,9 @@ export { syncSharedProfile } from "./profile/sync-shared-profile";
 // export + redeploy if the org later allows public functions — see
 // functions/src/places-search.ts header comment.
 // export { resolveGymPlace } from "./places-search";
+
+// Companion de Apple Watch (change watch-standalone-client, fase F1): entrega
+// al reloj una credencial PROPIA y renovable. Necesaria porque
+// `User.refreshToken` de firebase_auth es vacio en nativo, asi que el telefono
+// no puede compartir la suya.
+export { mintWatchCredential } from "./mint-watch-credential";
