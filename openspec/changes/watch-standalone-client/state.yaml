@@ -1,0 +1,82 @@
+change: watch-standalone-client
+fase: "Sin asignar — capability nueva, fuera del roadmap actual"
+branch: feat/workout-watch-connectivity
+artifact_store: openspec
+execution_mode: interactive
+delivery_strategy: chained-pr
+tdd: strict
+
+supersede:
+  change: watch-connectivity
+  path: openspec/changes/watch-connectivity/
+  motivo: |
+    Ese ciclo modela "el telefono manda, el reloj espeja". El dueño pidio un
+    cliente autonomo que funcione con el celular guardado. No le falta un
+    pedazo: parte de otra premisa. Se conserva INTACTO como registro de lo
+    descartado y por que.
+  estado: conservado sin modificar
+
+phases:
+  explore: done
+  propose: done
+  spec: pending
+  design: pending
+  tasks: pending
+  apply: pending
+  verify: pending
+  archive: pending
+
+locked_decisions: firmadas por el dueño (las 8 del proposal §4)
+
+fases_implementacion:
+  F0:
+    estado: parcial
+    hecho:
+      - |
+        VERIFICADO: las Security Rules se aplican a escrituras REST de
+        Firestore. Probado contra el emulador con ID token de Firebase Auth
+        como Bearer. Dueño escribe su sesion -> 200; dueño escribe setLogs
+        -> 200; tercero con token valido -> 403; sin token -> 403.
+        Es la premisa sobre la que descansa toda la arquitectura: sostiene.
+      - |
+        Test permanente en functions/src/__tests__/watch-rest-session-writes-rules.test.ts
+        (6 casos, verde). Va en functions/ y NO en scripts/rules_test/ porque
+        ese directorio NO corre en CI ("NOT part of CI" en scripts/test_rules.sh)
+        y la prueba se pudriria en silencio. Corre bajo `npm --prefix functions
+        test`, que es lo que ejecuta el job functions-test.
+      - docs/setup/watchos-target.md — prerequisito manual documentado
+    pendiente:
+      - |
+        Target watchOS creado en Xcode. HUMANO con Mac, no automatizable.
+        Ver docs/setup/watchos-target.md.
+      - |
+        Handoff de credencial telefono -> reloj. Bloqueado por el target:
+        no hay donde recibirla hasta que exista.
+
+artifacts:
+  explore: openspec/changes/watch-standalone-client/explore.md
+  proposal: openspec/changes/watch-standalone-client/proposal.md
+  f0_rules_proof: functions/src/__tests__/watch-rest-session-writes-rules.test.ts
+  f0_setup_doc: docs/setup/watchos-target.md
+
+blocked_on: |
+  F0 no cierra hasta que exista el target watchOS (paso humano con Xcode).
+  El resto de F0 esta hecho y verificado.
+
+coordinacion: |
+  Sesion paralela en worktree wizardly-dijkstra-a16063 (migracion a follow
+  asimetrico) toca functions/src/**. Este change AGREGA un archivo nuevo ahi
+  (watch-rest-session-writes-rules.test.ts) y NO modifica ninguno existente
+  — tampoco functions/package.json, porque `npm test` levanta los archivos
+  nuevos solo. Sin conflicto de contenido esperado.
+
+nota: |
+  Este ciclo se armo en el repo local con acceso al codigo, y cada
+  afirmacion de plataforma esta verificada contra la fuente:
+  - Firestore NO figura entre los productos Firebase soportados en watchOS
+    (watchOS es community-supported). Auth, Storage, Crashlytics y
+    Analytics si.
+  - La REST API de Firestore acepta ID tokens de Firebase Auth como Bearer
+    y las Security Rules SE APLICAN a esas requests.
+  - Google Sign-In no tiene SDK de watchOS; Sign in with Apple si.
+  Las correcciones al ciclo anterior estan tabuladas en explore.md.
