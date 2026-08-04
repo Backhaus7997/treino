@@ -110,11 +110,52 @@ fases_implementacion:
         VERIFICADO que el test de seguridad DETECTA el agujero: se agrego a
         proposito un uid inyectable y el test mostro al atacante minteando
         la credencial de la victima. Revertido.
+      - |
+        Lado Dart del handoff: lib/features/watch/ con el payload, el
+        envoltorio sobre WatchConnectivity y el servicio que mintea y
+        entrega. 9 tests verdes. API del paquete VERIFICADA contra la
+        version instalada: isPaired/isReachable son Future<bool>, no
+        streams como declaraba el diseño del ciclo viejo.
+      - |
+        Lado Swift del handoff: WatchCredential, FirebaseAuthREST,
+        CredentialStore (Keychain) y CredentialCoordinator, mas UI austera
+        de estado. COMPILA — `xcodebuild -target "TreinoWatch Watch App"
+        -sdk watchsimulator` da BUILD SUCCEEDED.
     pendiente:
       - |
-        Lado Dart: llamar a mintWatchCredential y enviar el custom token por
-        watch_connectivity.
-      - Lado Swift: recibir el token, canjearlo y guardar el refresh en Keychain.
+        Cablear la entrega en el arranque de la app (donde llamar a
+        deliverCredential cuando el usuario esta autenticado). NO se hizo:
+        toca el arranque de la app, que es camino critico, y el dueño no
+        estaba disponible para validarlo.
+      - |
+        SMOKE EN DISPOSITIVOS FISICOS. El runtime del handoff no se puede
+        verificar desde acá: pairing y entrega de contexto necesitan iPhone
+        + Apple Watch reales. El simulador no es confiable, mismo patron
+        "no emulable" que FCM.
+
+bloqueante_abierto:
+  que: |
+    `pod install` esta roto en esta rama. Crear el target watchOS en Xcode
+    26.3 subio el objectVersion del pbxproj de 54 a 70, y CocoaPods 1.16.2
+    no entiende ese formato ("[Xcodeproj] Unable to find compatibility
+    version string for object version `70`"). Al agregar watch_connectivity
+    el pod install paso a ser obligatorio y falla. Rompe `flutter run` y
+    cualquier build de iOS en la rama.
+  no_afecta: |
+    El CI, que solo corre analyze/test/functions y nunca pod install.
+    Tampoco el target del reloj aislado, que no depende de Pods y compila.
+  arreglo_propuesto: |
+    `brew upgrade cocoapods` (hay 1.17.0 estable vs 1.16.2 instalada). NO
+    se aplico porque CocoaPods es global —no hay Gemfile en el repo— y
+    actualizarlo afecta todos los proyectos del dueño, no solo TREINO.
+    Es decision suya.
+  trampa: |
+    Bajar el objectVersion a 54 parece el arreglo obvio y es peligroso: el
+    target del reloj usa `fileSystemSynchronizedGroups`, clave del formato
+    nuevo, y CocoaPods REESCRIBE el pbxproj durante el install. Una version
+    de Xcodeproj que no conoce esa clave puede descartarla al escribir,
+    dejando el target sin archivos, en silencio.
+  documentado_en: docs/setup/watchos-target.md (arriba de todo)
       - UI minima en el reloj: mostrar el entreno de hoy.
       - |
         Mas fixtures a medida que se porte logica: idempotencia por

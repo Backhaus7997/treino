@@ -1,5 +1,50 @@
 # Setup: target watchOS
 
+> ## 🚨 BLOQUEANTE ABIERTO — `pod install` roto en esta rama
+>
+> Crear el target watchOS en Xcode 26.3 **subió el `objectVersion` del
+> `project.pbxproj` de 54 a 70**. CocoaPods 1.16.2 no entiende ese formato:
+>
+> ```
+> [Xcodeproj] Unable to find compatibility version string for object version `70`.
+> ```
+>
+> Mientras los Pods estuvieran sincronizados no molestaba. Al agregar
+> `watch_connectivity` (que trae un pod nuevo), `pod install` pasó a ser
+> obligatorio — y falla. **Eso rompe `flutter run` y cualquier build de iOS en
+> esta rama.**
+>
+> **El CI no está afectado**: solo corre analyze/test/functions, nunca
+> `pod install`.
+>
+> ### Arreglo propuesto (necesita decisión: toca tu máquina, no el repo)
+>
+> ```bash
+> brew upgrade cocoapods
+> ```
+>
+> Hay 1.17.0 estable contra la 1.16.2 instalada. No se aplicó porque CocoaPods
+> es **global** (no hay Gemfile en el repo), así que la actualización afecta
+> todos tus proyectos, no solo TREINO.
+>
+> ### Por qué NO se bajó el `objectVersion` a 54 en su lugar
+>
+> Parece el arreglo obvio y es una trampa. El target del reloj usa
+> `fileSystemSynchronizedGroups`, una clave del formato nuevo. CocoaPods
+> **reescribe el `.pbxproj`** durante el install, y una versión de Xcodeproj que
+> no conoce esa clave puede descartarla al escribir — dejando el target sin sus
+> archivos, en silencio y sin error. El riesgo no compensa.
+>
+> ### Cómo verificar que quedó arreglado
+>
+> ```bash
+> cd ios && LANG=en_US.UTF-8 pod install
+> ```
+>
+> (El `LANG` no es opcional: sin UTF-8, CocoaPods aborta con
+> `Unicode Normalization not appropriate for ASCII-8BIT`.)
+
+
 Prerequisito manual del change `watch-standalone-client` (fase F0). Requiere
 Xcode y una Mac — **no es automatizable desde un agente ni desde CI**, mismo
 patrón que la APNs key de `push-notifications-fcm`.
