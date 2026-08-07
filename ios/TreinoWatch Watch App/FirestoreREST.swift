@@ -1,0 +1,142 @@
+//
+//  FirestoreREST.swift
+//  TreinoWatch Watch App
+//
+//  Change `watch-standalone-client`, fase F2.
+//
+
+import Foundation
+
+/// Cliente HTTP mínimo contra Firestore. **Sin SDK de Firebase.**
+///
+/// Firestore no figura entre los productos Firebase soportados en watchOS
+/// (Locked Decision #9), así que el reloj habla su REST API. Lo que se pierde
+/// respecto del SDK: persistencia offline y listeners en tiempo real. Ambos hay
+/// que construirlos acá si hacen falta.
+///
+/// Las Security Rules SE APLICAN a estas requests — verificado contra el
+/// emulador en `functions/src/__tests__/watch-rest-*.test.ts`.
+struct FirestoreREST {
+
+    let projectId: String
+    let idToken: String
+    /// Host alternativo para desarrollo local. Nil = producción.
+    let emulatorHost: String?
+
+    private var base: String {
+        let host = emulatorHost ?? "https://firestore.googleapis.com"
+        return "\(host)/v1/projects/\(projectId)/databases/(default)/documents"
+    }
+
+    enum FirestoreError: Error {
+        case http(status: Int, body: String)
+        case malformedResponse
+    }
+
+    // MARK: - Lecturas
+
+    /// Trae un documento por path (ej. `routines/abc123`).
+    ///
+    /// Devuelve nil ante un 404: en Firestore "no existe" es una respuesta
+    /// legítima, no un error. Ojo que las rules de TREINO distinguen 404 de 403
+    /// a propósito — un doc inexistente devuelve "no existe" y no "prohibido".
+    func document(
+        _ path: String,
+        session: URLSession = .shared
+    ) async throws -> [String: Any]? {
+        var request = URLRequest(url: URL(string: "\(base)/\(path)")!)
+        request.setValue("Bearer \(idToken)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await session.data(for: request)
+        if let http = response as? HTTPURLResponse {
+            if http.statusCode == 404 { return nil }
+            guard http.statusCode == 200 else {
+                throw FirestoreError.http(
+                    status: http.statusCode,
+                    body: String(data: data, encoding: .utf8) ?? ""
+                )
+            }
+        }
+
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { throw FirestoreError.malformedResponse }
+        return json["fields"] as? [String: Any]
+    }
+
+    /// Corre una structuredQuery y devuelve los `fields` de cada documento.
+    ///
+    /// Las filas sin `document` se descartan: la respuesta de `runQuery`
+    /// intercala entradas de solo-metadata (readTime) que no son resultados.
+    /// [parent] es el path del documento padre para consultar una
+    /// SUBCOLECCIÓN (ej. `users/abc` para `users/abc/sessions`). Sin él, la
+    /// query corre sobre la raíz — y una subcolección consultada desde la raíz
+    /// se convierte en collection-group, que las rules de TREINO rechazan con
+    /// 403. Verificado contra el emulador.
+    func runQuery(
+        _ structuredQuery: [String: Any],
+        parent: String? = nil,
+        session: URLSession = .shared
+    ) async throws -> [[String: Any]] {
+        let endpoint = parent.map { "\(base)/\($0):runQuery" } ?? "\(base):runQuery"
+        var request = URLRequest(url: URL(string: endpoint)!)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(idToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(
+            withJSONObject: ["structuredQuery": structuredQuery]
+        )
+
+        let (data, response) = try await session.data(for: request)
+        if let http = response as? HTTPURLResponse, http.statusCode != 200 {
+            throw FirestoreError.http(
+                status: http.statusCode,
+                body: String(data: data, encoding: .utf8) ?? ""
+            )
+        }
+
+        guard let rows = try JSONSerialization.jsonObject(with: data) as? [[String: Any]]
+        else { throw FirestoreError.malformedResponse }
+
+        return rows.compactMap {
+            ($0["document"] as? [String: Any])?["fields"] as? [String: Any]
+        }
+    }
+}
+
+// MARK: - Desempaquetado de los value-wrappers de Firestore
+
+/// Firestore envuelve cada valor en un objeto con el nombre del tipo
+/// (`{"stringValue": "x"}`). Estos helpers desarman eso.
+///
+/// Cuidado con los enteros: viajan como **string** dentro de `integerValue`,
+/// no como número. Leerlos como Int directo devuelve nil y el bug es
+/// silencioso — un dayNumber que no parsea se vuelve 0 y el reloj muestra
+/// cualquier cosa.
+enum FS {
+    static func string(_ field: Any?) -> String? {
+        (field as? [String: Any])?["stringValue"] as? String
+    }
+
+    static func int(_ field: Any?) -> Int? {
+        guard let wrapper = field as? [String: Any] else { return nil }
+        if let raw = wrapper["integerValue"] as? String { return Int(raw) }
+        if let raw = wrapper["integerValue"] as? Int { return raw }
+        return nil
+    }
+
+    static func array(_ field: Any?) -> [Any]? {
+        guard let wrapper = field as? [String: Any],
+              let arrayValue = wrapper["arrayValue"] as? [String: Any]
+        else { return nil }
+        // Un array vacío viene SIN la clave `values`, no con una lista vacía.
+        return arrayValue["values"] as? [Any] ?? []
+    }
+
+    /// Desarma un `mapValue` y devuelve sus campos.
+    static func mapFields(_ field: Any?) -> [String: Any]? {
+        guard let wrapper = field as? [String: Any],
+              let mapValue = wrapper["mapValue"] as? [String: Any]
+        else { return nil }
+        return mapValue["fields"] as? [String: Any]
+    }
+}

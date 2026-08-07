@@ -23,6 +23,7 @@ class WatchCredentialPayload {
     required this.apiKey,
     required this.projectId,
     this.authEmulatorHost,
+    this.firestoreEmulatorHost,
   });
 
   /// Discrimina este payload de cualquier otro que viaje por el mismo canal.
@@ -45,6 +46,14 @@ class WatchCredentialPayload {
   /// construcción, en vez de depender de que nadie lo mande.
   final String? authEmulatorHost;
 
+  /// Host del emulador de Firestore, SOLO desarrollo local (ej.
+  /// `http://localhost:8080`). Null en producción.
+  ///
+  /// Va SEPARADO de [authEmulatorHost] porque son puertos distintos: Auth en
+  /// 9099 y Firestore en 8080. Reusar uno para el otro da 404, y el error no
+  /// dice por qué — costó un ciclo de debug descubrirlo.
+  final String? firestoreEmulatorHost;
+
   Map<String, dynamic> toJson() => {
         'kind': kind,
         'customToken': customToken,
@@ -52,6 +61,8 @@ class WatchCredentialPayload {
         'apiKey': apiKey,
         'projectId': projectId,
         if (authEmulatorHost != null) 'authEmulatorHost': authEmulatorHost,
+        if (firestoreEmulatorHost != null)
+          'firestoreEmulatorHost': firestoreEmulatorHost,
       };
 
   /// Parsea un payload entrante.
@@ -71,13 +82,18 @@ class WatchCredentialPayload {
       return value;
     }
 
-    final host = json['authEmulatorHost'];
+    String? optionalHost(String key) {
+      final value = json[key];
+      return value is String && value.isNotEmpty ? value : null;
+    }
+
     return WatchCredentialPayload(
       customToken: required('customToken'),
       uid: required('uid'),
       apiKey: required('apiKey'),
       projectId: required('projectId'),
-      authEmulatorHost: host is String && host.isNotEmpty ? host : null,
+      authEmulatorHost: optionalHost('authEmulatorHost'),
+      firestoreEmulatorHost: optionalHost('firestoreEmulatorHost'),
     );
   }
 
@@ -89,9 +105,10 @@ class WatchCredentialPayload {
           other.uid == uid &&
           other.apiKey == apiKey &&
           other.projectId == projectId &&
-          other.authEmulatorHost == authEmulatorHost;
+          other.authEmulatorHost == authEmulatorHost &&
+          other.firestoreEmulatorHost == firestoreEmulatorHost;
 
   @override
-  int get hashCode =>
-      Object.hash(customToken, uid, apiKey, projectId, authEmulatorHost);
+  int get hashCode => Object.hash(customToken, uid, apiKey, projectId,
+      authEmulatorHost, firestoreEmulatorHost);
 }

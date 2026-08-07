@@ -41,6 +41,8 @@ final watchCredentialServiceProvider = Provider<WatchCredentialService>((ref) {
     apiKey: options.apiKey,
     projectId: options.projectId,
     authEmulatorHost: useEmulator ? 'http://localhost:9099' : null,
+    // Puerto DISTINTO al de Auth. Reusar uno para el otro da 404 mudo.
+    firestoreEmulatorHost: useEmulator ? 'http://localhost:8080' : null,
   );
 });
 

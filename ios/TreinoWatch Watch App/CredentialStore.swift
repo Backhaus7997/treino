@@ -42,6 +42,9 @@ enum CredentialStore {
         if let host = credential.authEmulatorHost {
             payload["authEmulatorHost"] = host
         }
+        if let host = credential.firestoreEmulatorHost {
+            payload["firestoreEmulatorHost"] = host
+        }
         let data = try JSONSerialization.data(withJSONObject: payload)
 
         // Se borra primero para que guardar sea idempotente: SecItemAdd falla
@@ -95,7 +98,8 @@ enum CredentialStore {
             uid: uid,
             apiKey: apiKey,
             projectId: projectId,
-            authEmulatorHost: json["authEmulatorHost"]
+            authEmulatorHost: json["authEmulatorHost"],
+            firestoreEmulatorHost: json["firestoreEmulatorHost"]
         )
     }
 

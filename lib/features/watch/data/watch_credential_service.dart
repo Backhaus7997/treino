@@ -52,11 +52,13 @@ class WatchCredentialService {
     required String apiKey,
     required String projectId,
     String? authEmulatorHost,
+    String? firestoreEmulatorHost,
   })  : _functions = functions,
         _bridge = bridge,
         _apiKey = apiKey,
         _projectId = projectId,
-        _authEmulatorHost = authEmulatorHost;
+        _authEmulatorHost = authEmulatorHost,
+        _firestoreEmulatorHost = firestoreEmulatorHost;
 
   final FirebaseFunctions _functions;
   final WatchBridge _bridge;
@@ -65,6 +67,9 @@ class WatchCredentialService {
 
   /// Solo se puebla corriendo contra el emulador. Ver [WatchCredentialPayload].
   final String? _authEmulatorHost;
+
+  /// Idem, pero para Firestore: vive en OTRO puerto que Auth.
+  final String? _firestoreEmulatorHost;
 
   /// Nombre del callable. Debe coincidir con el export de
   /// `functions/src/index.ts`.
@@ -106,6 +111,7 @@ class WatchCredentialService {
       apiKey: _apiKey,
       projectId: _projectId,
       authEmulatorHost: _authEmulatorHost,
+      firestoreEmulatorHost: _firestoreEmulatorHost,
     );
 
     try {

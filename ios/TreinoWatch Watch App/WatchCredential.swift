@@ -34,6 +34,10 @@ struct WatchCredentialPayload: Equatable {
     /// construcción en vez de depender de que nadie lo mande.
     let authEmulatorHost: String?
 
+    /// Host del emulador de Firestore. Puerto DISTINTO al de Auth; reusar uno
+    /// para el otro da 404. Mismo guard de release.
+    let firestoreEmulatorHost: String?
+
     /// Parsea el diccionario que llega por `didReceiveApplicationContext`.
     ///
     /// Devuelve nil ante cualquier campo faltante o vacío en vez de construir
@@ -62,10 +66,12 @@ struct WatchCredentialPayload: Equatable {
 
         #if DEBUG
         self.authEmulatorHost = nonEmpty("authEmulatorHost")
+        self.firestoreEmulatorHost = nonEmpty("firestoreEmulatorHost")
         #else
         // En release NUNCA se honra un host recibido por el canal: siempre
         // producción.
         self.authEmulatorHost = nil
+        self.firestoreEmulatorHost = nil
         #endif
     }
 
@@ -75,13 +81,15 @@ struct WatchCredentialPayload: Equatable {
         uid: String,
         apiKey: String,
         projectId: String,
-        authEmulatorHost: String? = nil
+        authEmulatorHost: String? = nil,
+        firestoreEmulatorHost: String? = nil
     ) {
         self.customToken = customToken
         self.uid = uid
         self.apiKey = apiKey
         self.projectId = projectId
         self.authEmulatorHost = authEmulatorHost
+        self.firestoreEmulatorHost = firestoreEmulatorHost
     }
 }
 
@@ -99,18 +107,21 @@ struct WatchCredential: Equatable {
     /// Se persiste junto con la credencial para que la renovación en arranques
     /// posteriores siga apuntando al mismo lado que el canje inicial.
     let authEmulatorHost: String?
+    let firestoreEmulatorHost: String?
 
     init(
         refreshToken: String,
         uid: String,
         apiKey: String,
         projectId: String,
-        authEmulatorHost: String? = nil
+        authEmulatorHost: String? = nil,
+        firestoreEmulatorHost: String? = nil
     ) {
         self.refreshToken = refreshToken
         self.uid = uid
         self.apiKey = apiKey
         self.projectId = projectId
         self.authEmulatorHost = authEmulatorHost
+        self.firestoreEmulatorHost = firestoreEmulatorHost
     }
 }

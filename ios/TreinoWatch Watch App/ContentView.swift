@@ -30,11 +30,20 @@ struct ContentView: View {
                     .font(.footnote)
 
             case .ready:
-                Image(systemName: "checkmark.circle")
-                    .imageScale(.large)
-                    .foregroundStyle(.green)
-                Text("Listo para entrenar")
-                    .font(.footnote)
+                if let workout = coordinator.todaysWorkout {
+                    TodaysWorkoutView(workout: workout)
+                } else if coordinator.workoutError != nil {
+                    Image(systemName: "arrow.clockwise")
+                        .imageScale(.large)
+                        .foregroundStyle(.orange)
+                    Text("No se pudo cargar tu rutina")
+                        .font(.footnote)
+                        .multilineTextAlignment(.center)
+                } else {
+                    ProgressView()
+                    Text("Cargando tu rutina…")
+                        .font(.footnote)
+                }
 
             case .failed:
                 Image(systemName: "exclamationmark.triangle")
@@ -46,6 +55,45 @@ struct ContentView: View {
             }
         }
         .padding()
+    }
+}
+
+/// El entreno de hoy, en una pantalla de 40mm.
+///
+/// Austera a propósito: el nombre del día es lo que el atleta necesita leer de
+/// un vistazo entre series. El resto es contexto secundario.
+struct TodaysWorkoutView: View {
+    let workout: TodaysWorkout
+
+    var body: some View {
+        VStack(spacing: 4) {
+            Text("HOY")
+                .font(.caption2)
+                .foregroundStyle(.green)
+
+            Text(workout.dayName)
+                .font(.headline)
+                .multilineTextAlignment(.center)
+                .minimumScaleFactor(0.7)
+
+            Text(workout.routineName)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
+            HStack(spacing: 6) {
+                Label("\(workout.exerciseCount)", systemImage: "dumbbell")
+                // La semana solo se muestra en planes periodizados: en uno de
+                // una sola semana el dato es ruido.
+                if workout.numWeeks > 1 {
+                    Text("Sem \(workout.weekNumber + 1)/\(workout.numWeeks)")
+                }
+            }
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .padding(.top, 2)
+        }
+        .padding(.horizontal, 4)
     }
 }
 

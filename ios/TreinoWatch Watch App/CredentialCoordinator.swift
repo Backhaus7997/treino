@@ -34,12 +34,20 @@ final class CredentialCoordinator: NSObject, ObservableObject {
 
     @Published private(set) var state: WatchAuthState = .waitingForPairing
 
+    /// Entreno de hoy, resuelto por el reloj contra Firestore. Nil mientras se
+    /// carga o si el atleta no tiene rutina.
+    @Published private(set) var todaysWorkout: TodaysWorkout?
+
+    /// Diagnóstico de la carga del entreno. No se le muestra al usuario.
+    @Published private(set) var workoutError: String?
+
     /// Arranca la sesión de WatchConnectivity y recupera lo que haya guardado.
     func start() {
         if let stored = CredentialStore.load() {
             // Ya emparejado en un arranque anterior: no hay que esperar al
             // teléfono.
             state = .ready(uid: stored.uid)
+            Task { await loadTodaysWorkout() }
         }
 
         guard WCSession.isSupported() else {
@@ -111,12 +119,37 @@ final class CredentialCoordinator: NSObject, ObservableObject {
                     uid: payload.uid,
                     apiKey: payload.apiKey,
                     projectId: payload.projectId,
-                    authEmulatorHost: payload.authEmulatorHost
+                    authEmulatorHost: payload.authEmulatorHost,
+                    firestoreEmulatorHost: payload.firestoreEmulatorHost
                 )
             )
             state = .ready(uid: payload.uid)
+            Task { await loadTodaysWorkout() }
         } catch {
             state = .failed(message: String(describing: error))
+        }
+    }
+
+    /// Carga el entreno de hoy con la credencial propia del reloj.
+    ///
+    /// Renueva el idToken en cada carga: dura una hora, y renovar es más barato
+    /// que manejar la expiración a mano y equivocarse.
+    func loadTodaysWorkout() async {
+        guard let credential = CredentialStore.load() else { return }
+        do {
+            let idToken = try await freshIdToken()
+            let client = FirestoreREST(
+                projectId: credential.projectId,
+                idToken: idToken,
+                emulatorHost: credential.firestoreEmulatorHost
+            )
+            todaysWorkout = try await TodaysWorkoutResolver.resolve(
+                client: client,
+                uid: credential.uid
+            )
+            workoutError = nil
+        } catch {
+            workoutError = String(describing: error)
         }
     }
 }
