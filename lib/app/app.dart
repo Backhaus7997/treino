@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../features/auth/application/auth_providers.dart';
 import '../features/notifications/application/notification_providers.dart';
 import '../features/notifications/application/notification_router.dart';
+import '../features/watch/application/watch_credential_providers.dart';
 import '../l10n/app_l10n.dart';
 import 'locale_resolver.dart';
 import 'root_scaffold_messenger.dart';
@@ -69,6 +70,12 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
     //     for the app lifetime. Without this, all of PR#2a is dead code —
     //     no tokens are ever registered. ADR-PN-003, REQ-PN-CLIENT-004.
     ref.read(fcmLifecycleProvider);
+
+    // (c2) Igual que arriba, para el companion de Apple Watch: sin este read
+    //      el handoff de credencial es código muerto — el servicio existe pero
+    //      nadie lo llama y el reloj se queda esperando para siempre.
+    //      Corta solo si no hay reloj emparejado. Change watch-standalone-client.
+    ref.read(watchCredentialLifecycleProvider);
 
     // (a) Attach foreground SnackBar listener. (ADR-PN-010, REQ-PN-HANDLER-001)
     final fcm = ref.read(fcmServiceProvider);

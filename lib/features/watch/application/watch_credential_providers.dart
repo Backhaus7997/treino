@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../firebase_options.dart';
+import '../../auth/application/auth_providers.dart';
 import '../data/watch_bridge.dart';
 import '../data/watch_credential_service.dart';
 
@@ -31,5 +35,38 @@ final watchCredentialServiceProvider = Provider<WatchCredentialService>((ref) {
     bridge: ref.watch(watchBridgeProvider),
     apiKey: options.apiKey,
     projectId: options.projectId,
+  );
+});
+
+/// Entrega credencial al reloj cada vez que hay un usuario autenticado.
+///
+/// Se lee de forma eager en `app.dart`, mismo patrón que `fcmLifecycleProvider`
+/// (ADR-PN-003). Sin ese `ref.read`, todo el handoff es código muerto: el
+/// servicio existe pero nadie lo llama, y el reloj se queda esperando para
+/// siempre.
+///
+/// Reenviar en cada arranque es intencional y barato: el servicio corta solo si
+/// no hay reloj emparejado, y el lado Swift no re-canjea si ya tiene credencial
+/// del mismo uid. Así se cubre el caso de emparejar el reloj DESPUÉS de haber
+/// iniciado sesión, que si no quedaría sin credencial hasta el próximo login.
+final watchCredentialLifecycleProvider = Provider<void>((ref) {
+  ref.listen<AsyncValue<User?>>(
+    authStateChangesProvider,
+    (prev, next) {
+      next.whenData((user) {
+        if (user == null) return;
+        final service = ref.read(watchCredentialServiceProvider);
+        // Fire-and-forget: esto corre en el camino crítico del arranque, así
+        // que no se lo hace esperar ni se le deja tirar. Quedarse sin
+        // credencial de reloj es una degradación aceptable; tumbar la app por
+        // eso, no.
+        unawaited(
+          service.deliverCredential(uid: user.uid).catchError(
+                (_) => WatchCredentialOutcome.deliveryFailed,
+              ),
+        );
+      });
+    },
+    fireImmediately: true,
   );
 });
