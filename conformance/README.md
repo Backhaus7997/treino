@@ -61,12 +61,27 @@ fuera de rango) son justo los que alguien va a querer "arreglar" sin entender.
 
 ## Quién los corre
 
-- **Dart**: `test/conformance/plan_advance_conformance_test.dart`, dentro de
-  `flutter test`.
-- **Swift**: pendiente — se suma cuando el target watchOS tenga lógica que
-  verificar (fase F2 de `watch-standalone-client`).
+Los **dos** lados, y los dos en CI. Ahí está el valor: con uno solo, esto sería
+una descripción del comportamiento actual, no una red.
 
-Mientras exista un solo lado corriéndolos, los fixtures todavía **no** protegen
-de la divergencia: solo fijan el contrato para cuando llegue el segundo. Esa
-brecha es conocida y está anotada en
-`openspec/changes/watch-standalone-client/state.yaml`.
+| Lado | Cómo | Dónde |
+|---|---|---|
+| Dart | `flutter test` | job *Analyze & Test* |
+| Swift | `bash conformance/run_swift.sh` | job *Conformance (Swift)* |
+
+El corredor Swift **compila el archivo real del reloj**
+(`ios/TreinoWatch Watch App/PlanAdvance.swift`), no una copia. Si alguien lo
+cambia sin tocar el contrato, se pone rojo — que es todo el punto. Corre en
+ubuntu porque el código bajo prueba solo importa Foundation, disponible en el
+Swift de Linux; un runner macOS costaría diez veces más sin aportar nada.
+
+### Verificado que detecta divergencia
+
+No alcanza con que pase. Se rompió a propósito cada implementación y se
+comprobó que el corredor del lado correspondiente se pone rojo nombrando los
+casos afectados, con esperado vs obtenido. Al romper el `>=` del rollover, los
+dos corredores señalaron **los mismos 2 casos de 12** — misma regla, mismo
+contrato, mismos modos de falla.
+
+Si agregás una regla nueva a los fixtures, hacé lo mismo: rompela a propósito y
+confirmá que salta. Un fixture que nunca se vio fallar no es una red.

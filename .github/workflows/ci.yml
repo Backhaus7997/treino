@@ -46,6 +46,34 @@ jobs:
       - name: Run tests
         run: flutter test
 
+  # Conformidad Dart <-> Swift (change watch-standalone-client).
+  #
+  # El cliente watchOS no puede usar el SDK de Firestore, asi que reimplementa
+  # en Swift logica que tambien vive en Dart. Esas dos copias VAN a divergir, y
+  # cuando pase el historial de entrenamiento del usuario se corrompe EN
+  # SILENCIO — nadie se entera hasta que los numeros no cierran.
+  #
+  # Los fixtures de conformance/*.json son el contrato. El lado Dart los corre
+  # dentro de `flutter test`; este job corre el lado Swift contra los MISMOS
+  # archivos. Sin este job los fixtures son decorativos, que es exactamente el
+  # patron de "reglas testeadas pero nunca ejecutadas" que ya costo bugs acá.
+  #
+  # Corre en ubuntu (mucho mas barato que un runner macOS): el codigo bajo
+  # prueba es una funcion pura que solo importa Foundation, disponible en el
+  # Swift de Linux. Compila el archivo REAL del reloj, no una copia.
+  conformance-swift:
+    name: Conformance (Swift)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Swift
+        uses: swift-actions/setup-swift@v2
+
+      - name: Run Swift conformance
+        run: bash conformance/run_swift.sh
+
   # Gate de compilación para las Cloud Functions (functions/, Node 20 + TS).
   # Antes NADIE compilaba functions en CI: flutter analyze/test no ven functions/,
   # así que un error de tipos o de compilación en functions/src podía entrar a
