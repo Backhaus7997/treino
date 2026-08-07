@@ -203,6 +203,38 @@ final class WorkoutCoordinator: ObservableObject {
                 session = current
                 WorkoutSessionStore.save(current)
             }
+            // Trae lo que se haya cargado desde el TELEFONO. Es la otra
+            // direccion de la sincronizacion: sin esto el reloj solo ve lo
+            // suyo y le vuelve a ofrecer series que el atleta ya marco en el
+            // celular.
+            //
+            // Solo se AGREGA lo que falta; nunca se borra una serie local. Una
+            // serie cargada en el reloj y todavia sin subir no debe
+            // desaparecer porque el remoto aun no la tiene.
+            if let remoteId = current.remoteId {
+                let remote = try await HistorySync.remoteSetLogs(
+                    client: client, uid: uid, sessionId: remoteId
+                )
+                var added = false
+                for set in remote where !current.isLogged(
+                    exerciseId: set.exerciseId, setNumber: set.setNumber
+                ) {
+                    current.loggedSets.append(set)
+                    added = true
+                }
+                if added {
+                    session = current
+                    WorkoutSessionStore.save(current)
+                    // Si el telefono completo el ejercicio actual, avanzar.
+                    if let exercise = currentExercise,
+                       current.loggedCount(exerciseId: exercise.exerciseId)
+                           >= exercise.sets.count,
+                       currentExerciseIndex + 1 < exercises.count {
+                        currentExerciseIndex += 1
+                    }
+                }
+            }
+
             syncError = nil
         } catch {
             syncError = String(describing: error)

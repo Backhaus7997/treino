@@ -55,6 +55,11 @@ struct TreinoWatch_Watch_AppApp: App {
                         // refrescar la rutina: cambiarle los ejercicios al
                         // atleta a mitad de serie seria peor.
                         if workoutCoordinator.session != nil {
+                            // Con entreno abierto se sincroniza en AMBAS
+                            // direcciones —sube lo pendiente y baja lo que se
+                            // cargo desde el celular— pero NO se re-resuelve la
+                            // rutina: cambiarle los ejercicios al atleta a
+                            // mitad de serie seria peor que un dato viejo.
                             await workoutCoordinator.sync(
                                 workout: coordinator.todaysWorkout
                             )

@@ -92,6 +92,17 @@ enum HistorySync {
         return nil
     }
 
+    /// Trae las series que hay en el historial para esta sesion.
+    ///
+    /// Es lo que permite ver en el reloj lo que se cargo desde el telefono.
+    static func remoteSetLogs(
+        client: FirestoreREST,
+        uid: String,
+        sessionId: String
+    ) async throws -> [LoggedSet] {
+        try await existingSetLogs(client: client, uid: uid, sessionId: sessionId)
+    }
+
     private static func existingSetLogs(
         client: FirestoreREST,
         uid: String,
