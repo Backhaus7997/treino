@@ -8,8 +8,8 @@ import '../../workout/application/user_routines_providers.dart';
 import '../../workout/domain/plan_advance.dart';
 import '../../workout/domain/routine.dart';
 import '../../workout/domain/routine_day.dart';
+import '../../workout/domain/routine_selection.dart';
 import '../../workout/domain/session.dart';
-import 'active_routine_provider.dart';
 
 /// Resolved "what to train today" snapshot for the home `EmpezarEntrenamientoCard`.
 ///
@@ -74,46 +74,37 @@ final todaysRoutineProvider = FutureProvider.autoDispose<TodaysRoutine?>(
     );
 
     final assigned = await ref.watch(assignedRoutinesProvider(uid).future);
+    // La lista de auto-creadas se resuelve siempre porque `resolveActiveRoutineId`
+    // la necesita para el marcador explícito y para los tiers 2/3. El provider
+    // está cacheado, así que no es una lectura extra costosa.
+    final selfCreated =
+        await ref.watch(userCreatedRoutinesProvider(uid).future);
+
+    // La prioridad vive en `resolveActiveRoutineId`
+    // (workout/domain/routine_selection.dart) porque el cliente watchOS la
+    // reimplementa en Swift y los fixtures de
+    // `conformance/routine_selection.json` son el contrato entre ambas. Acá
+    // solo se resuelven las entradas y se traduce el id de vuelta a Routine.
+    final resolvedId = resolveActiveRoutineId(
+      activeRoutineId: activeId,
+      assignedIds: [for (final r in assigned) r.id],
+      selfCreatedIds: [for (final r in selfCreated) r.id],
+    );
+
     Routine? routine;
-    if (activeId != null && activeId.isNotEmpty) {
+    if (resolvedId != null) {
       for (final r in assigned) {
-        if (r.id == activeId) {
+        if (r.id == resolvedId) {
           routine = r;
           break;
         }
       }
-      if (routine == null) {
-        final selfCreated =
-            await ref.watch(userCreatedRoutinesProvider(uid).future);
+      routine ??= () {
         for (final r in selfCreated) {
-          if (r.id == activeId) {
-            routine = r;
-            break;
-          }
+          if (r.id == resolvedId) return r;
         }
-      }
-    }
-
-    // Legacy chain — activeRoutineId null (pre-slice-1 users) or stale.
-    if (routine == null) {
-      // Tier 1: trainer-assigned plan wins.
-      if (assigned.isNotEmpty) {
-        routine = assigned.first;
-      } else {
-        final selfCreated =
-            await ref.watch(userCreatedRoutinesProvider(uid).future);
-        if (selfCreated.length == 1) {
-          // Tier 2: single self-created routine auto-activates — no manual
-          // marker needed when there's nothing to disambiguate.
-          routine = selfCreated.first;
-        } else if (selfCreated.length > 1) {
-          // Tier 3: multi self-created → require an explicit active marker
-          // (PR#2). [activeRoutineProvider] already validates the id against
-          // the live user-created list; a stale pointer (routine archived/
-          // deleted) resolves to null and the home falls back to the empty CTA.
-          routine = ref.watch(activeRoutineProvider);
-        }
-      }
+        return null;
+      }();
     }
 
     if (routine == null || routine.days.isEmpty) return null;

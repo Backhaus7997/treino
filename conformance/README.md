@@ -55,9 +55,10 @@ fuera de rango) son justo los que alguien va a querer "arreglar" sin entender.
 
 ## Archivos
 
-| Archivo | Regla | Implementación Dart |
-|---|---|---|
-| `plan_advance.json` | Qué día y semana tocan según la última sesión finalizada | `lib/features/workout/domain/plan_advance.dart` |
+| Archivo | Regla | Implementación Dart | Implementación Swift |
+|---|---|---|---|
+| `plan_advance.json` | Qué día y semana tocan según la última sesión finalizada | `lib/features/workout/domain/plan_advance.dart` | `ios/TreinoWatch Watch App/PlanAdvance.swift` |
+| `routine_selection.json` | Cuál rutina es la activa del atleta | `lib/features/workout/domain/routine_selection.dart` | `ios/TreinoWatch Watch App/RoutineSelection.swift` |
 
 ## Quién los corre
 

@@ -96,6 +96,47 @@ private func runPlanAdvance(fixtureURL: URL) {
     }
 }
 
+// MARK: - routine_selection
+
+private func runRoutineSelection(fixtureURL: URL) {
+    guard let data = try? Data(contentsOf: fixtureURL),
+          let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+          let cases = json["cases"] as? [[String: Any]], !cases.isEmpty
+    else {
+        fail("No se pudo leer \(fixtureURL.lastPathComponent) o no tiene casos.")
+        return
+    }
+
+    for testCase in cases {
+        totalCases += 1
+        let name = testCase["name"] as? String ?? "(sin nombre)"
+
+        guard let given = testCase["given"] as? [String: Any],
+              let expected = testCase["expect"] as? [String: Any],
+              let assigned = given["assignedIds"] as? [String],
+              let selfCreated = given["selfCreatedIds"] as? [String]
+        else {
+            fail("  · \"\(name)\": el caso no tiene la forma esperada.")
+            continue
+        }
+
+        let actual = resolveActiveRoutineId(
+            activeRoutineId: given["activeRoutineId"] as? String,
+            assignedIds: assigned,
+            selfCreatedIds: selfCreated
+        )
+        let expectedId = expected["routineId"] as? String
+
+        if actual != expectedId {
+            fail("""
+              · "\(name)"
+                  esperado: \(expectedId ?? "null")
+                  obtenido: \(actual ?? "null")
+            """)
+        }
+    }
+}
+
 // MARK: - main
 
 // El script pasa la raíz de `conformance/` como primer argumento.
@@ -105,6 +146,7 @@ let conformanceDir = CommandLine.arguments.count > 1
         .appendingPathComponent("conformance")
 
 runPlanAdvance(fixtureURL: conformanceDir.appendingPathComponent("plan_advance.json"))
+runRoutineSelection(fixtureURL: conformanceDir.appendingPathComponent("routine_selection.json"))
 
 if failures.isEmpty {
     print("✓ conformidad Swift: \(totalCases) casos, todos en verde")

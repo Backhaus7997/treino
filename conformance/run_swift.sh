@@ -23,6 +23,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 # tocar el contrato, este corredor se pone rojo — que es todo el punto.
 WATCH_SOURCES=(
   "${REPO_ROOT}/ios/TreinoWatch Watch App/PlanAdvance.swift"
+  "${REPO_ROOT}/ios/TreinoWatch Watch App/RoutineSelection.swift"
 )
 
 for src in "${WATCH_SOURCES[@]}"; do

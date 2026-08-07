@@ -19,22 +19,12 @@ struct TodaysWorkout: Equatable {
 
 /// Resuelve el entreno de hoy leyendo Firestore por REST.
 ///
-/// ⚠️ **DIVERGENCIA CONOCIDA — leer antes de tocar.**
+/// Las DOS reglas de negocio que usa están bajo contrato de conformidad y
+/// verificadas de los dos lados:
+///   * cuál rutina — `resolveActiveRoutineId` / `conformance/routine_selection.json`
+///   * qué día toca — `nextPlanPosition` / `conformance/plan_advance.json`
 ///
-/// La elección de CUÁL rutina usar es una simplificación de la cadena de 4
-/// niveles de `todaysRoutineProvider` (Dart), que además contempla el marcador
-/// `activeRoutineId` del perfil y el caso multi-rutina auto-creadas. Acá se
-/// implementa solo: rutina asignada por PF, y si no hay, la auto-creada más
-/// reciente.
-///
-/// Eso alcanza para v1 (Locked Decision #5) pero **todavía no está cubierto por
-/// fixtures de conformidad**, a diferencia del avance de día/semana. Es deuda
-/// consciente y anotada en el state.yaml del change: mientras esa elección no
-/// sea una función pura testeada de los dos lados, teléfono y reloj pueden
-/// elegir rutinas distintas para el mismo usuario.
-///
-/// El cálculo de qué día toca SÍ usa `nextPlanPosition`, que es puerto literal
-/// del Dart y está bajo contrato en `conformance/plan_advance.json`.
+/// Lo que queda acá es solo la traducción entre Firestore y esas funciones.
 enum TodaysWorkoutResolver {
 
     static func resolve(
@@ -76,23 +66,40 @@ enum TodaysWorkoutResolver {
         )
     }
 
-    /// Rutina asignada por un PF; si no hay, la auto-creada más reciente.
-    /// Ver la advertencia de divergencia del encabezado.
+    /// Aplica la MISMA prioridad que el teléfono, vía `resolveActiveRoutineId`.
+    ///
+    /// El marcador `activeRoutineId` vive en el doc del usuario, así que hay
+    /// que leerlo antes: sin él el reloj se saltearía el tier 0 y podría elegir
+    /// una rutina distinta a la que el atleta marcó.
     private static func findRoutine(
         client: FirestoreREST,
         uid: String
     ) async throws -> [String: Any]? {
+        let profile = try await client.document("users/\(uid)")
+        let activeRoutineId = FS.string(profile?["activeRoutineId"])
+
         let assigned = try await client.runQuery([
             "from": [["collectionId": "routines"]],
             "where": fieldEquals("assignedTo", uid),
         ])
-        if let first = assigned.first { return first }
-
         let selfCreated = try await client.runQuery([
             "from": [["collectionId": "routines"]],
             "where": fieldEquals("createdBy", uid),
         ])
-        return selfCreated.first
+
+        func ids(_ docs: [[String: Any]]) -> [String] {
+            docs.compactMap { FS.string($0["id"]) }
+        }
+
+        guard let resolvedId = resolveActiveRoutineId(
+            activeRoutineId: activeRoutineId,
+            assignedIds: ids(assigned),
+            selfCreatedIds: ids(selfCreated)
+        ) else { return nil }
+
+        return (assigned + selfCreated).first {
+            FS.string($0["id"]) == resolvedId
+        }
     }
 
     /// Última sesión FINALIZADA de esa rutina, que es la entrada de
