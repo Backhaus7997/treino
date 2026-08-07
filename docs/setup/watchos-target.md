@@ -60,6 +60,26 @@
 
 ---
 
+## ℹ️ Flutter baja el `objectVersion` del `.pbxproj` en cada build
+
+Xcode 26 escribe `objectVersion = 70` al crear el target del reloj. El paso de
+configuración de iOS de Flutter lo **reescribe a 54** en cada `flutter run` /
+`flutter build` (reproducido con `flutter build ios --config-only`).
+
+**Consecuencia práctica:** ese archivo va a aparecer modificado seguido, con un
+diff de una línea. Es ruido de la herramienta, no un cambio tuyo.
+
+**No es un problema funcional**, verificado con el archivo en 54:
+`fileSystemSynchronizedGroups` sobrevive, las 5 referencias a *Embed Watch
+Content* siguen, y `xcodebuild` del target da `BUILD SUCCEEDED`. El archivo
+queda técnicamente inconsistente (declara el formato viejo usando una clave del
+nuevo), pero ni Xcode ni CocoaPods se quejan.
+
+Ni `pod install` ni `xcodebuild` lo tocan — se comprobó cada uno por separado.
+Es Flutter.
+
+---
+
 ## ⚠️ Nunca pasar `-sdk` al buildear un workspace con target watchOS
 
 `-sdk iphonesimulator` (o `-sdk iphoneos`) **pisa el `SDKROOT` de TODOS los
