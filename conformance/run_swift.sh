@@ -24,6 +24,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 WATCH_SOURCES=(
   "${REPO_ROOT}/ios/TreinoWatch Watch App/PlanAdvance.swift"
   "${REPO_ROOT}/ios/TreinoWatch Watch App/RoutineSelection.swift"
+  "${REPO_ROOT}/ios/TreinoWatch Watch App/SetResolution.swift"
 )
 
 for src in "${WATCH_SOURCES[@]}"; do
