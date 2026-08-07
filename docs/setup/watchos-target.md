@@ -60,6 +60,34 @@
 
 ---
 
+## ⚠️ Nunca pasar `-sdk` al buildear un workspace con target watchOS
+
+`-sdk iphonesimulator` (o `-sdk iphoneos`) **pisa el `SDKROOT` de TODOS los
+targets**, incluido el del reloj. La app watchOS pasa a compilarse contra el SDK
+de iOS y aparecen errores que no tienen nada que ver con el código:
+
+```
+error: type 'CredentialCoordinator' does not conform to protocol 'WCSessionDelegate'
+error: 'foregroundStyle' is only available in iOS 15.0 or newer
+```
+
+El primero engaña especialmente: en iOS `WCSessionDelegate` exige
+`sessionDidBecomeInactive` y `sessionDidDeactivate`, que en watchOS **no
+existen**. El código está bien; el comando está mal.
+
+Usar `-destination` y dejar que cada target resuelva su SDK:
+
+```bash
+# MAL
+xcodebuild -workspace Runner.xcworkspace -scheme Runner -sdk iphonesimulator build
+
+# BIEN
+xcodebuild -workspace Runner.xcworkspace -scheme Runner \
+  -destination "platform=iOS Simulator,id=<UDID>" build
+```
+
+---
+
 ## Probar el reloj de punta a punta
 
 El código Dart y Swift compila y está testeado, pero **el runtime del
