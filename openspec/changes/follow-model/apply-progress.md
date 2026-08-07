@@ -315,6 +315,51 @@ completo verde, 4794 tests** (bajó de 4826 por los tests del módulo retirado).
 
 ---
 
+## PR 4 — UX: cancelar solicitud, a11y y copy ✅
+
+Tareas 4.1–4.10.
+
+**Cancelar una solicitud enviada** (REQ-FOLLOW-006). Hasta acá "SOLICITUD
+ENVIADA" tenía `onTap: null`: mandabas una solicitud a una cuenta privada y **no
+había ninguna forma de arrepentirte desde la app**. Ahora abre el mismo sheet
+con copy de cancelar. Test que ancla lo que no se puede romper: cancelar mi
+solicitud **nunca toca la arista inversa**.
+
+**`UnfriendConfirmationSheet`** gana un `mode` (`unfollow` / `cancelRequest`) y
+sale de strings hardcodeadas a l10n. El botón de descarte dice **VOLVER** en
+modo cancelar: si dijera "CANCELAR" quedarían dos botones que empiezan igual
+—"CANCELAR" y "CANCELAR SOLICITUD"— uno al lado del otro.
+
+**a11y**: el pill pasa de `GestureDetector` a `TreinoTappable` (AGENTS.md) y
+gana un semantics propio por estado — el label visible es una sola palabra y no
+dice qué pasa al tocar. **Verificado con mutación**: volver a `GestureDetector`
+pone el test en rojo.
+
+**Barrido de copy (gate 4.10)**: cero "amistad"/"amigos" en strings visibles.
+`AMIGOS` → `SEGUIDORES` en el tier y en el pill del feed, "Solicitudes de
+amistad" → "Solicitudes de seguidores", y `feedRequestAcceptedSuccess` ("Ahora
+son amigos") se **partió en dos**: seguir una cuenta pública y aceptar una
+solicitud son cosas distintas y el mensaje único era falso en uno de los dos
+casos.
+
+### Decisión 4.7 — el dueño partía de una premisa falsa
+
+Pidió *"que no pase nada, que se mande el mensaje; el problema va a estar en que
+la otra persona no lo va a ver"*. **Eso no es lo que ocurre**: `senderMayPost`
+(`firestore.rules:1345`) **deniega la escritura**, así que el mensaje no se
+guarda en ningún lado — el que escribe recibe un error y pierde lo que tipeó.
+No existe "se manda pero no lo ve"; existe "no se manda".
+
+Se le plantearon los dos caminos reales —conservar la regla y avisar antes, o
+cambiar el producto a **silenciar** (retirando la regla de PR3a)— y **eligió
+conservar la regla**. Copy elegido: **"Para escribirle, esta persona tiene que
+seguirte."**, la variante que explica de qué depende.
+
+**Evidencia**: `flutter analyze` 0 issues + `dart format .` + **`flutter test`
+completo verde, 4801 tests**.
+
+---
+
 ## Pendiente
 - **PR 3d** — retiro de `Friendship*`. **PR 4** — UX + l10n.
 - **Gate 3a.19 incompleto**: 3 suites (`post-photos-storage-rules`,

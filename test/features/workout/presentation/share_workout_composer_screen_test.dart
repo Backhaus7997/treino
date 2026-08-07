@@ -206,7 +206,8 @@ void main() {
       await tester.pumpWidget(_wrap(notifier: notifier));
       await tester.pumpAndSettle();
 
-      final semantics = tester.getSemantics(find.bySemanticsLabel('AMIGOS'));
+      final semantics =
+          tester.getSemantics(find.bySemanticsLabel('SEGUIDORES'));
       expect(semantics.flagsCollection.isSelected, Tristate.isTrue);
 
       await tester.tap(find.text('PUBLICAR'));

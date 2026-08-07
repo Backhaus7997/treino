@@ -7,7 +7,9 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/feed/domain/follow.dart';
 import 'package:treino/features/feed/domain/follow_status.dart';
+import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/features/feed/presentation/widgets/public_profile_follow_button.dart';
+import 'package:treino/features/feed/presentation/widgets/unfriend_confirmation_sheet.dart';
 import 'package:treino/features/profile/application/user_providers.dart'
     show firestoreProvider;
 import 'package:treino/l10n/app_l10n.dart';
@@ -294,6 +296,183 @@ void main() {
       final snap = await firestore.collection('follows').doc(outgoing.id).get();
       expect(snap.exists, isTrue);
       expect(snap.data()!['status'], equals('accepted'));
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // REQ-FOLLOW-006 / SCENARIO-807 — cancelar una solicitud enviada.
+  //
+  // Hasta acá "SOLICITUD ENVIADA" tenía `onTap: null`: mandabas una solicitud a
+  // una cuenta privada y NO HABÍA NINGUNA FORMA de arrepentirte desde la app.
+  // ─────────────────────────────────────────────────────────────────────────
+  group('PublicProfileFollowButton — cancelar solicitud enviada', () {
+    testWidgets('tap en SOLICITUD ENVIADA abre el sheet de confirmación',
+        (tester) async {
+      final firestore = FakeFirebaseFirestore();
+      final outgoing = _outgoing(FollowStatus.pending);
+      await _seed(firestore, outgoing);
+
+      await tester.pumpWidget(_wrap(
+        PublicProfileFollowButton(
+          outgoingFollow: outgoing,
+          incomingFollow: null,
+          viewerUid: 'viewer',
+          targetUid: 'target',
+        ),
+        firestore,
+      ));
+      await tester.pump();
+      await tester.tap(find.text('SOLICITUD ENVIADA'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(UnfriendConfirmationSheet), findsOneWidget);
+    });
+
+    testWidgets('confirmar borra la arista SALIENTE pendiente', (tester) async {
+      final firestore = FakeFirebaseFirestore();
+      final outgoing = _outgoing(FollowStatus.pending);
+      await _seed(firestore, outgoing);
+      // La inversa existe y NO se puede tocar: cancelar mi solicitud no puede
+      // sacarme de encima a alguien que ya me seguía.
+      final incoming = _incoming(FollowStatus.accepted);
+      await _seed(firestore, incoming);
+
+      await tester.pumpWidget(_wrap(
+        PublicProfileFollowButton(
+          outgoingFollow: outgoing,
+          incomingFollow: incoming,
+          viewerUid: 'viewer',
+          targetUid: 'target',
+        ),
+        firestore,
+      ));
+      await tester.pump();
+      await tester.tap(find.text('SOLICITUD ENVIADA'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('CANCELAR SOLICITUD'));
+      await tester.pumpAndSettle();
+
+      expect(
+        (await firestore.collection('follows').doc(outgoing.id).get()).exists,
+        isFalse,
+      );
+      expect(
+        (await firestore.collection('follows').doc(incoming.id).get()).exists,
+        isTrue,
+        reason: 'cancelar mi solicitud nunca toca la dirección inversa',
+      );
+    });
+
+    testWidgets('el copy del sheet habla de la solicitud, no de eliminar',
+        (tester) async {
+      final firestore = FakeFirebaseFirestore();
+      final outgoing = _outgoing(FollowStatus.pending);
+      await _seed(firestore, outgoing);
+
+      await tester.pumpWidget(_wrap(
+        PublicProfileFollowButton(
+          outgoingFollow: outgoing,
+          incomingFollow: null,
+          viewerUid: 'viewer',
+          targetUid: 'target',
+        ),
+        firestore,
+      ));
+      await tester.pump();
+      await tester.tap(find.text('SOLICITUD ENVIADA'));
+      await tester.pumpAndSettle();
+
+      // Reusa el mismo sheet que dejar de seguir, pero NO puede decir
+      // "eliminar": no hay nada aceptado que eliminar todavía.
+      expect(find.textContaining('solicitud'), findsWidgets);
+      expect(find.textContaining('Eliminar amistad'), findsNothing);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // AGENTS.md — TreinoTappable REEMPLAZA a GestureDetector, no lo envuelve.
+  // ─────────────────────────────────────────────────────────────────────────
+  group('PublicProfileFollowButton — a11y y tappable', () {
+    Future<void> pumpState(
+      WidgetTester tester, {
+      Follow? outgoing,
+      Follow? incoming,
+    }) async {
+      await tester.pumpWidget(_wrap(
+        PublicProfileFollowButton(
+          outgoingFollow: outgoing,
+          incomingFollow: incoming,
+          viewerUid: 'viewer',
+          targetUid: 'target',
+        ),
+        FakeFirebaseFirestore(),
+      ));
+      await tester.pump();
+    }
+
+    testWidgets('los 4 estados usan TreinoTappable y ningún GestureDetector',
+        (tester) async {
+      final estados = <String, List<Follow?>>{
+        'SEGUIR': [null, null],
+        'SIGUIENDO': [_outgoing(FollowStatus.accepted), null],
+        'SOLICITUD ENVIADA': [_outgoing(FollowStatus.pending), null],
+        'ACEPTAR': [null, _incoming(FollowStatus.pending)],
+      };
+
+      for (final entry in estados.entries) {
+        await pumpState(tester,
+            outgoing: entry.value[0], incoming: entry.value[1]);
+
+        expect(find.text(entry.key), findsOneWidget,
+            reason: 'precondición del estado ${entry.key}');
+        expect(find.byType(TreinoTappable), findsWidgets,
+            reason: '${entry.key} debe usar TreinoTappable');
+
+        // `TreinoTappable` usa un GestureDetector adentro, así que no se puede
+        // exigir cero: lo que AGENTS.md prohíbe es un GestureDetector PROPIO,
+        // fuera del tappable del sistema. Se afirma exactamente eso.
+        final propios = find
+            .byType(GestureDetector)
+            .evaluate()
+            .where((e) => find
+                .ancestor(
+                  of: find.byWidget(e.widget),
+                  matching: find.byType(TreinoTappable),
+                )
+                .evaluate()
+                .isEmpty)
+            .length;
+        expect(propios, equals(0),
+            reason: '${entry.key} no puede tener un GestureDetector propio');
+      }
+    });
+
+    testWidgets('cada estado expone un semantics de botón con su propio label',
+        (tester) async {
+      final vistos = <String>{};
+      final estados = <List<Follow?>>[
+        [null, null],
+        [_outgoing(FollowStatus.accepted), null],
+        [_outgoing(FollowStatus.pending), null],
+        [null, _incoming(FollowStatus.pending)],
+      ];
+
+      for (final e in estados) {
+        await pumpState(tester, outgoing: e[0], incoming: e[1]);
+        final semantics = tester.widget<Semantics>(
+          find
+              .byWidgetPredicate(
+                (w) => w is Semantics && w.properties.button == true,
+              )
+              .first,
+        );
+        final label = semantics.properties.label;
+        expect(label, isNotNull);
+        vistos.add(label!);
+      }
+
+      expect(vistos.length, equals(4),
+          reason: 'los 4 estados tienen que sonar distinto en el lector');
     });
   });
 }

@@ -2603,7 +2603,7 @@ abstract class AppL10n {
   /// No description provided for @profileCuentaSolicitudesTitle.
   ///
   /// In es_AR, this message translates to:
-  /// **'Solicitudes de amistad'**
+  /// **'Solicitudes de seguidores'**
   String get profileCuentaSolicitudesTitle;
 
   /// No description provided for @profileCuentaSolicitudesSubtitle.
@@ -3455,13 +3455,13 @@ abstract class AppL10n {
   /// Accessibility label for the icon-only friend-requests inbox action in the feed header bell icon (navigation finding: friend-requests inbox was unreachable from the feed/social surface).
   ///
   /// In es_AR, this message translates to:
-  /// **'Solicitudes de amistad'**
+  /// **'Solicitudes de seguidores'**
   String get feedFriendRequestsA11y;
 
   /// Accessibility label for the feed header friend-requests bell icon when there are pending requests; announces the badge count to screen readers.
   ///
   /// In es_AR, this message translates to:
-  /// **'Solicitudes de amistad, {count} pendientes'**
+  /// **'Solicitudes de seguidores, {count} pendientes'**
   String feedFriendRequestsWithCountA11y(int count);
 
   /// Semantics liveRegion/label for the create-post submit spinner state while a post is being published (finding 12 create_post_screen PUBLICAR spinner branch).
@@ -4397,7 +4397,7 @@ abstract class AppL10n {
   /// Success feedback when a friend request is accepted (finding 25). Used by the public profile accept action and optionally the inbox accept.
   ///
   /// In es_AR, this message translates to:
-  /// **'Ahora son amigos.'**
+  /// **'Solicitud aceptada.'**
   String get feedRequestAcceptedSuccess;
 
   /// Error snackbar for friendship mutations (accept/reject/request/unfriend) that currently swallow errors, in the inbox tile and public profile follow button (findings 11/26).
@@ -5760,7 +5760,7 @@ abstract class AppL10n {
   /// PostPrivacySelector pill for posts visible only to the author's friends. Doubles as the pill's Semantics label.
   ///
   /// In es_AR, this message translates to:
-  /// **'AMIGOS'**
+  /// **'SEGUIDORES'**
   String get postPrivacyFriends;
 
   /// PostPrivacySelector pill for posts visible to the author's gym. Disabled when the athlete has no gym.
@@ -5820,7 +5820,7 @@ abstract class AppL10n {
   /// Acceso compacto a solicitudes de amistad pendientes.
   ///
   /// In es_AR, this message translates to:
-  /// **'{count, plural, =1{1 solicitud de amistad pendiente} other{{count} solicitudes de amistad pendientes}}'**
+  /// **'{count, plural, =1{1 solicitud de seguidor pendiente} other{{count} solicitudes de seguidor pendientes}}'**
   String notificationPendingRequests(int count);
 
   /// Etiqueta accesible de la campanita de notificaciones del feed.
@@ -5846,6 +5846,96 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Este post ya no está disponible.'**
   String get postDetailUnavailable;
+
+  /// Título del sheet de confirmación para dejar de seguir.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Dejar de seguir a {name}?'**
+  String feedUnfollowConfirmTitle(String name);
+
+  /// Botón que confirma dejar de seguir.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DEJAR DE SEGUIR'**
+  String get feedUnfollowConfirmAction;
+
+  /// Botón que descarta el sheet de dejar de seguir.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CANCELAR'**
+  String get feedUnfollowDismiss;
+
+  /// Título del sheet para cancelar una solicitud enviada.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Cancelar la solicitud a {name}?'**
+  String feedCancelRequestConfirmTitle(String name);
+
+  /// Botón que confirma cancelar la solicitud enviada.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CANCELAR SOLICITUD'**
+  String get feedCancelRequestConfirmAction;
+
+  /// Botón que descarta el sheet de cancelar solicitud. Dice VOLVER y no CANCELAR para no chocar con el botón que SÍ cancela la solicitud.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VOLVER'**
+  String get feedCancelRequestDismiss;
+
+  /// Semantics del pill en estado SEGUIR.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Seguir a esta persona'**
+  String get feedFollowButtonFollowA11y;
+
+  /// Semantics del pill en estado SIGUIENDO.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Siguiendo. Tocá para dejar de seguir'**
+  String get feedFollowButtonFollowingA11y;
+
+  /// Semantics del pill en estado SOLICITUD ENVIADA.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Solicitud enviada. Tocá para cancelarla'**
+  String get feedFollowButtonRequestedA11y;
+
+  /// Semantics del pill en estado ACEPTAR.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Aceptar la solicitud de seguidor'**
+  String get feedFollowButtonAcceptA11y;
+
+  /// Confirmación al seguir a una cuenta pública (auto-aceptada).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ahora seguís a esta persona.'**
+  String get feedFollowStartedSuccess;
+
+  /// Pill del segmento del feed que muestra posts de a quienes seguís.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SEGUIDORES'**
+  String get feedSegmentFollowing;
+
+  /// Estado vacío del feed SEGUIDORES.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no hay posts de a quienes seguís'**
+  String get feedEmptyFollowing;
+
+  /// Aviso persistente sobre el composer cuando el destinatario no sigue al usuario y por lo tanto el servidor deniega el envío (REQ-FOLLOW-021).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Para escribirle, esta persona tiene que seguirte.'**
+  String get chatBlockedComposerNotice;
+
+  /// Semantics del composer deshabilitado por falta de permiso.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No podés escribir en este chat'**
+  String get chatBlockedComposerHintA11y;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

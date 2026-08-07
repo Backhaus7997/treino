@@ -522,8 +522,10 @@ class _Composer extends StatelessWidget {
 /// persona vuelva a seguirte, así que un aviso que se desvanece dejaría la
 /// pantalla mostrando un composer inexistente sin explicación.
 ///
-/// Strings provisorias — pasan a los 3 ARBs en PR4 (tarea 4.8b), junto con el
-/// resto del copy que el dueño todavía tiene que confirmar.
+/// Copy confirmado por el dueño en 4.7. Se eligió el que EXPLICA de qué depende
+/// —"esta persona tiene que seguirte"— por sobre las alternativas neutras: es
+/// el único que le dice al usuario qué destrabaría la situación. No expone nada
+/// que no se vea ya en el perfil de la otra persona.
 class _BlockedComposerNotice extends StatelessWidget {
   const _BlockedComposerNotice({required this.palette});
 
@@ -545,8 +547,7 @@ class _BlockedComposerNotice extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              // i18n: PR4 tarea 4.8b
-              'Esta persona no puede recibir tus mensajes.',
+              AppL10n.of(context).chatBlockedComposerNotice,
               style: GoogleFonts.barlow(
                 fontSize: 14,
                 color: palette.textMuted,

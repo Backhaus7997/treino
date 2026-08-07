@@ -5,10 +5,14 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/feed/application/feed_screen_providers.dart';
 import 'package:treino/features/feed/domain/feed_segment.dart';
 import 'package:treino/features/feed/presentation/widgets/feed_segment_pills.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 Widget _wrapProvider(Widget w, List<Override> overrides) => ProviderScope(
       overrides: overrides,
       child: MaterialApp(
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
         theme: AppTheme.dark(),
         home: Scaffold(body: w),
       ),
@@ -29,12 +33,12 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.text('AMIGOS'), findsOneWidget);
+      expect(find.text('SEGUIDORES'), findsOneWidget);
       expect(find.text('MI GYM'), findsOneWidget);
       expect(find.text('PÚBLICO'), findsOneWidget);
 
       // Verify left-to-right order via widget position
-      final amigosOffset = tester.getCenter(find.text('AMIGOS'));
+      final amigosOffset = tester.getCenter(find.text('SEGUIDORES'));
       final gymOffset = tester.getCenter(find.text('MI GYM'));
       final publicoOffset = tester.getCenter(find.text('PÚBLICO'));
       expect(amigosOffset.dx, lessThan(gymOffset.dx));
@@ -59,7 +63,7 @@ void main() {
       // distinction lives in BoxDecoration.color (accent vs bgCard).
       final amigosContainers = tester.widgetList<Container>(
         find.ancestor(
-          of: find.text('AMIGOS'),
+          of: find.text('SEGUIDORES'),
           matching: find.byType(Container),
         ),
       );
@@ -129,6 +133,9 @@ void main() {
         UncontrolledProviderScope(
           container: container,
           child: MaterialApp(
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('es', 'AR'),
             theme: AppTheme.dark(),
             home: const Scaffold(body: FeedSegmentPills()),
           ),
@@ -136,7 +143,7 @@ void main() {
       );
       await tester.pump();
 
-      await tester.tap(find.text('AMIGOS'));
+      await tester.tap(find.text('SEGUIDORES'));
       await tester.pumpAndSettle();
 
       expect(container.read(feedSegmentProvider), equals(FeedSegment.amigos));
@@ -157,6 +164,9 @@ void main() {
         UncontrolledProviderScope(
           container: container,
           child: MaterialApp(
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('es', 'AR'),
             theme: AppTheme.dark(),
             home: const Scaffold(body: FeedSegmentPills()),
           ),
@@ -185,6 +195,9 @@ void main() {
         UncontrolledProviderScope(
           container: container,
           child: MaterialApp(
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('es', 'AR'),
             theme: AppTheme.dark(),
             home: const Scaffold(body: FeedSegmentPills()),
           ),
@@ -221,7 +234,7 @@ void main() {
       // AMIGOS should be inactive (not accent)
       final amigosContainers = tester.widgetList<Container>(
         find.ancestor(
-          of: find.text('AMIGOS'),
+          of: find.text('SEGUIDORES'),
           matching: find.byType(Container),
         ),
       );

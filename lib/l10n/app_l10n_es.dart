@@ -1385,7 +1385,7 @@ class AppL10nEs extends AppL10n {
   String get profileCuentaTitle => 'CUENTA';
 
   @override
-  String get profileCuentaSolicitudesTitle => 'Solicitudes de amistad';
+  String get profileCuentaSolicitudesTitle => 'Solicitudes de seguidores';
 
   @override
   String profileCuentaSolicitudesSubtitle(int count) {
@@ -1865,11 +1865,11 @@ class AppL10nEs extends AppL10n {
   String get feedCreatePostA11y => 'Crear publicación';
 
   @override
-  String get feedFriendRequestsA11y => 'Solicitudes de amistad';
+  String get feedFriendRequestsA11y => 'Solicitudes de seguidores';
 
   @override
   String feedFriendRequestsWithCountA11y(int count) {
-    return 'Solicitudes de amistad, $count pendientes';
+    return 'Solicitudes de seguidores, $count pendientes';
   }
 
   @override
@@ -2408,7 +2408,7 @@ class AppL10nEs extends AppL10n {
   String get feedRequestSentSuccess => 'Solicitud enviada.';
 
   @override
-  String get feedRequestAcceptedSuccess => 'Ahora son amigos.';
+  String get feedRequestAcceptedSuccess => 'Solicitud aceptada.';
 
   @override
   String get feedFriendActionError =>
@@ -3228,7 +3228,7 @@ class AppL10nEs extends AppL10n {
   String get postPrivacySelectorTitle => 'VISIBILIDAD';
 
   @override
-  String get postPrivacyFriends => 'AMIGOS';
+  String get postPrivacyFriends => 'SEGUIDORES';
 
   @override
   String get postPrivacyGym => 'MI GYM';
@@ -3265,8 +3265,8 @@ class AppL10nEs extends AppL10n {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count solicitudes de amistad pendientes',
-      one: '1 solicitud de amistad pendiente',
+      other: '$count solicitudes de seguidor pendientes',
+      one: '1 solicitud de seguidor pendiente',
     );
     return '$_temp0';
   }
@@ -3284,6 +3284,58 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get postDetailUnavailable => 'Este post ya no está disponible.';
+
+  @override
+  String feedUnfollowConfirmTitle(String name) {
+    return '¿Dejar de seguir a $name?';
+  }
+
+  @override
+  String get feedUnfollowConfirmAction => 'DEJAR DE SEGUIR';
+
+  @override
+  String get feedUnfollowDismiss => 'CANCELAR';
+
+  @override
+  String feedCancelRequestConfirmTitle(String name) {
+    return '¿Cancelar la solicitud a $name?';
+  }
+
+  @override
+  String get feedCancelRequestConfirmAction => 'CANCELAR SOLICITUD';
+
+  @override
+  String get feedCancelRequestDismiss => 'VOLVER';
+
+  @override
+  String get feedFollowButtonFollowA11y => 'Seguir a esta persona';
+
+  @override
+  String get feedFollowButtonFollowingA11y =>
+      'Siguiendo. Tocá para dejar de seguir';
+
+  @override
+  String get feedFollowButtonRequestedA11y =>
+      'Solicitud enviada. Tocá para cancelarla';
+
+  @override
+  String get feedFollowButtonAcceptA11y => 'Aceptar la solicitud de seguidor';
+
+  @override
+  String get feedFollowStartedSuccess => 'Ahora seguís a esta persona.';
+
+  @override
+  String get feedSegmentFollowing => 'SEGUIDORES';
+
+  @override
+  String get feedEmptyFollowing => 'Aún no hay posts de a quienes seguís';
+
+  @override
+  String get chatBlockedComposerNotice =>
+      'Para escribirle, esta persona tiene que seguirte.';
+
+  @override
+  String get chatBlockedComposerHintA11y => 'No podés escribir en este chat';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -4667,7 +4719,7 @@ class AppL10nEsAr extends AppL10nEs {
   String get profileCuentaTitle => 'CUENTA';
 
   @override
-  String get profileCuentaSolicitudesTitle => 'Solicitudes de amistad';
+  String get profileCuentaSolicitudesTitle => 'Solicitudes de seguidores';
 
   @override
   String profileCuentaSolicitudesSubtitle(int count) {
@@ -5149,11 +5201,11 @@ class AppL10nEsAr extends AppL10nEs {
   String get feedCreatePostA11y => 'Crear publicación';
 
   @override
-  String get feedFriendRequestsA11y => 'Solicitudes de amistad';
+  String get feedFriendRequestsA11y => 'Solicitudes de seguidores';
 
   @override
   String feedFriendRequestsWithCountA11y(int count) {
-    return 'Solicitudes de amistad, $count pendientes';
+    return 'Solicitudes de seguidores, $count pendientes';
   }
 
   @override
@@ -5689,7 +5741,7 @@ class AppL10nEsAr extends AppL10nEs {
   String get feedRequestSentSuccess => 'Solicitud enviada.';
 
   @override
-  String get feedRequestAcceptedSuccess => 'Ahora son amigos.';
+  String get feedRequestAcceptedSuccess => 'Solicitud aceptada.';
 
   @override
   String get feedFriendActionError =>
@@ -6507,7 +6559,7 @@ class AppL10nEsAr extends AppL10nEs {
   String get postPrivacySelectorTitle => 'VISIBILIDAD';
 
   @override
-  String get postPrivacyFriends => 'AMIGOS';
+  String get postPrivacyFriends => 'SEGUIDORES';
 
   @override
   String get postPrivacyGym => 'MI GYM';
@@ -6544,8 +6596,8 @@ class AppL10nEsAr extends AppL10nEs {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count solicitudes de amistad pendientes',
-      one: '1 solicitud de amistad pendiente',
+      other: '$count solicitudes de seguidor pendientes',
+      one: '1 solicitud de seguidor pendiente',
     );
     return '$_temp0';
   }
@@ -6563,4 +6615,56 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get postDetailUnavailable => 'Este post ya no está disponible.';
+
+  @override
+  String feedUnfollowConfirmTitle(String name) {
+    return '¿Dejar de seguir a $name?';
+  }
+
+  @override
+  String get feedUnfollowConfirmAction => 'DEJAR DE SEGUIR';
+
+  @override
+  String get feedUnfollowDismiss => 'CANCELAR';
+
+  @override
+  String feedCancelRequestConfirmTitle(String name) {
+    return '¿Cancelar la solicitud a $name?';
+  }
+
+  @override
+  String get feedCancelRequestConfirmAction => 'CANCELAR SOLICITUD';
+
+  @override
+  String get feedCancelRequestDismiss => 'VOLVER';
+
+  @override
+  String get feedFollowButtonFollowA11y => 'Seguir a esta persona';
+
+  @override
+  String get feedFollowButtonFollowingA11y =>
+      'Siguiendo. Tocá para dejar de seguir';
+
+  @override
+  String get feedFollowButtonRequestedA11y =>
+      'Solicitud enviada. Tocá para cancelarla';
+
+  @override
+  String get feedFollowButtonAcceptA11y => 'Aceptar la solicitud de seguidor';
+
+  @override
+  String get feedFollowStartedSuccess => 'Ahora seguís a esta persona.';
+
+  @override
+  String get feedSegmentFollowing => 'SEGUIDORES';
+
+  @override
+  String get feedEmptyFollowing => 'Todavía no hay posts de a quienes seguís';
+
+  @override
+  String get chatBlockedComposerNotice =>
+      'Para escribirle, esta persona tiene que seguirte.';
+
+  @override
+  String get chatBlockedComposerHintA11y => 'No podés escribir en este chat';
 }

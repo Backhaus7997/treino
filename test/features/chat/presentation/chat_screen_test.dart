@@ -407,7 +407,7 @@ void main() {
       // vería rota sin explicación. El aviso dice por qué.
       expect(find.byType(TextField), findsOneWidget);
       expect(composerEnabled(tester), isFalse);
-      expect(find.textContaining('no puede recibir'), findsOneWidget);
+      expect(find.textContaining('tiene que seguirte'), findsOneWidget);
     });
 
     // SCENARIO-843 — la mitad que no se toca.
@@ -433,7 +433,7 @@ void main() {
           tester, await seed(incomingEdge: incoming(FollowStatus.accepted)));
 
       expect(composerEnabled(tester), isTrue);
-      expect(find.textContaining('no puede recibir'), findsNothing);
+      expect(find.textContaining('tiene que seguirte'), findsNothing);
     });
 
     // EL QUE PROTEGE AL COACH.
@@ -449,7 +449,7 @@ void main() {
       await pump(tester, await seed(linkId: 'link-1'));
 
       expect(composerEnabled(tester), isTrue);
-      expect(find.textContaining('no puede recibir'), findsNothing);
+      expect(find.textContaining('tiene que seguirte'), findsNothing);
     });
   });
 }

@@ -151,7 +151,8 @@ void main() {
       await tester.pumpAndSettle();
 
       // Feed cargado (vacío): una sola emisión del query.
-      expect(find.text('Aún no hay posts de tus amigos'), findsOneWidget);
+      expect(find.text('Todavía no hay posts de a quienes seguís'),
+          findsOneWidget);
       expect(repo.friendsQueryUids, hasLength(1));
 
       // Un amigo publica DESPUÉS de la carga — la key (u1+u2) no cambia.
@@ -160,7 +161,7 @@ void main() {
       );
 
       await tester.fling(
-        find.text('Aún no hay posts de tus amigos'),
+        find.text('Todavía no hay posts de a quienes seguís'),
         const Offset(0, 300),
         1000,
       );

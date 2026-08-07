@@ -119,7 +119,7 @@ void main() {
       expect(find.byType(UnfriendConfirmationSheet), findsOneWidget);
     });
 
-    // SCENARIO-471 wiring: tapping ELIMINAR in the sheet calls repo.deleteEdge
+    // SCENARIO-471 wiring: tapping DEJAR DE SEGUIR in the sheet calls repo.deleteEdge
     // on the OUTGOING edge (antes era repo.delete sobre el doc del par) so the
     // button can transition back to SEGUIR.
     //
@@ -129,7 +129,7 @@ void main() {
     // quedó bien sigue siendo la MISMA que probaba el test original: el
     // documento desaparece de Firestore.
     testWidgets(
-        'SCENARIO-471 wiring: tapping ELIMINAR calls repo.deleteEdge and the outgoing edge doc is removed',
+        'SCENARIO-471 wiring: tapping DEJAR DE SEGUIR calls repo.deleteEdge and the outgoing edge doc is removed',
         (tester) async {
       final firestore = FakeFirebaseFirestore();
       final outgoing = _acceptedOutgoing();
@@ -171,7 +171,7 @@ void main() {
       expect(find.byType(UnfriendConfirmationSheet), findsOneWidget);
 
       // Confirm the unfollow
-      await tester.tap(find.text('ELIMINAR'));
+      await tester.tap(find.text('DEJAR DE SEGUIR'));
       await tester.pumpAndSettle();
 
       // Sheet dismissed

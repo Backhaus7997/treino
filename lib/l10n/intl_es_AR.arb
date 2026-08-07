@@ -675,7 +675,7 @@
   "checkInError": "No pudimos registrar tu check-in. Probá de nuevo.",
   "profileCuentaTitle": "CUENTA",
   "@profileCuentaTitle": {},
-  "profileCuentaSolicitudesTitle": "Solicitudes de amistad",
+  "profileCuentaSolicitudesTitle": "Solicitudes de seguidores",
   "@profileCuentaSolicitudesTitle": {},
   "profileCuentaSolicitudesSubtitle": "{count} nuevas",
   "@profileCuentaSolicitudesSubtitle": {
@@ -1075,11 +1075,11 @@
   "@feedCreatePostA11y": {
     "description": "Accessibility label for the icon-only create-post '+' action in the feed header (finding 11 feed_screen create GestureDetector)."
   },
-  "feedFriendRequestsA11y": "Solicitudes de amistad",
+  "feedFriendRequestsA11y": "Solicitudes de seguidores",
   "@feedFriendRequestsA11y": {
     "description": "Accessibility label for the icon-only friend-requests inbox action in the feed header bell icon (navigation finding: friend-requests inbox was unreachable from the feed/social surface)."
   },
-  "feedFriendRequestsWithCountA11y": "Solicitudes de amistad, {count} pendientes",
+  "feedFriendRequestsWithCountA11y": "Solicitudes de seguidores, {count} pendientes",
   "@feedFriendRequestsWithCountA11y": {
     "description": "Accessibility label for the feed header friend-requests bell icon when there are pending requests; announces the badge count to screen readers.",
     "placeholders": {
@@ -1788,7 +1788,7 @@
   "@feedRequestSentSuccess": {
     "description": "Success feedback when a friend/follow request is sent from the public profile follow button (findings 25/26)."
   },
-  "feedRequestAcceptedSuccess": "Ahora son amigos.",
+  "feedRequestAcceptedSuccess": "Solicitud aceptada.",
   "@feedRequestAcceptedSuccess": {
     "description": "Success feedback when a friend request is accepted (finding 25). Used by the public profile accept action and optionally the inbox accept."
   },
@@ -2770,7 +2770,7 @@
   "@postPrivacySelectorTitle": {
     "description": "Section label above the privacy pills in the shared PostPrivacySelector, used by the manual post composer and the share-workout composer."
   },
-  "postPrivacyFriends": "AMIGOS",
+  "postPrivacyFriends": "SEGUIDORES",
   "@postPrivacyFriends": {
     "description": "PostPrivacySelector pill for posts visible only to the author's friends. Doubles as the pill's Semantics label."
   },
@@ -2809,7 +2809,7 @@
   "@notificationHistoryEmpty": {"description": "Estado vacío del historial de notificaciones."},
   "notificationHistoryError": "No pudimos cargar tus notificaciones.",
   "@notificationHistoryError": {"description": "Estado de error del historial de notificaciones."},
-  "notificationPendingRequests": "{count, plural, =1{1 solicitud de amistad pendiente} other{{count} solicitudes de amistad pendientes}}",
+  "notificationPendingRequests": "{count, plural, =1{1 solicitud de seguidor pendiente} other{{count} solicitudes de seguidor pendientes}}",
   "@notificationPendingRequests": {"description": "Acceso compacto a solicitudes de amistad pendientes.", "placeholders": {"count": {"type": "int"}}},
   "notificationBellA11y": "Abrir notificaciones",
   "@notificationBellA11y": {"description": "Etiqueta accesible de la campanita de notificaciones del feed."},
@@ -2818,5 +2818,35 @@
   "postDetailTitle": "PUBLICACIÓN",
   "@postDetailTitle": {"description": "Título de la pantalla de post individual del feed."},
   "postDetailUnavailable": "Este post ya no está disponible.",
-  "@postDetailUnavailable": {"description": "Estado seguro mostrado cuando el post no existe, fue borrado o no se puede leer."}
+  "@postDetailUnavailable": {"description": "Estado seguro mostrado cuando el post no existe, fue borrado o no se puede leer."},
+  "feedUnfollowConfirmTitle": "¿Dejar de seguir a {name}?",
+  "@feedUnfollowConfirmTitle": {"description": "Título del sheet de confirmación para dejar de seguir.", "placeholders": {"name": {"type": "String"}}},
+  "feedUnfollowConfirmAction": "DEJAR DE SEGUIR",
+  "@feedUnfollowConfirmAction": {"description": "Botón que confirma dejar de seguir."},
+  "feedUnfollowDismiss": "CANCELAR",
+  "@feedUnfollowDismiss": {"description": "Botón que descarta el sheet de dejar de seguir."},
+  "feedCancelRequestConfirmTitle": "¿Cancelar la solicitud a {name}?",
+  "@feedCancelRequestConfirmTitle": {"description": "Título del sheet para cancelar una solicitud enviada.", "placeholders": {"name": {"type": "String"}}},
+  "feedCancelRequestConfirmAction": "CANCELAR SOLICITUD",
+  "@feedCancelRequestConfirmAction": {"description": "Botón que confirma cancelar la solicitud enviada."},
+  "feedCancelRequestDismiss": "VOLVER",
+  "@feedCancelRequestDismiss": {"description": "Botón que descarta el sheet de cancelar solicitud. Dice VOLVER y no CANCELAR para no chocar con el botón que SÍ cancela la solicitud."},
+  "feedFollowButtonFollowA11y": "Seguir a esta persona",
+  "@feedFollowButtonFollowA11y": {"description": "Semantics del pill en estado SEGUIR."},
+  "feedFollowButtonFollowingA11y": "Siguiendo. Tocá para dejar de seguir",
+  "@feedFollowButtonFollowingA11y": {"description": "Semantics del pill en estado SIGUIENDO."},
+  "feedFollowButtonRequestedA11y": "Solicitud enviada. Tocá para cancelarla",
+  "@feedFollowButtonRequestedA11y": {"description": "Semantics del pill en estado SOLICITUD ENVIADA."},
+  "feedFollowButtonAcceptA11y": "Aceptar la solicitud de seguidor",
+  "@feedFollowButtonAcceptA11y": {"description": "Semantics del pill en estado ACEPTAR."},
+  "feedFollowStartedSuccess": "Ahora seguís a esta persona.",
+  "@feedFollowStartedSuccess": {"description": "Confirmación al seguir a una cuenta pública (auto-aceptada)."},
+  "feedSegmentFollowing": "SEGUIDORES",
+  "@feedSegmentFollowing": {"description": "Pill del segmento del feed que muestra posts de a quienes seguís."},
+  "feedEmptyFollowing": "Todavía no hay posts de a quienes seguís",
+  "@feedEmptyFollowing": {"description": "Estado vacío del feed SEGUIDORES."},
+  "chatBlockedComposerNotice": "Para escribirle, esta persona tiene que seguirte.",
+  "@chatBlockedComposerNotice": {"description": "Aviso persistente sobre el composer cuando el destinatario no sigue al usuario y por lo tanto el servidor deniega el envío (REQ-FOLLOW-021)."},
+  "chatBlockedComposerHintA11y": "No podés escribir en este chat",
+  "@chatBlockedComposerHintA11y": {"description": "Semantics del composer deshabilitado por falta de permiso."}
 }

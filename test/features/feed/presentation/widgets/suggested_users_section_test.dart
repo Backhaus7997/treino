@@ -10,7 +10,7 @@ import 'package:treino/features/gyms/domain/gym.dart' show kNoGymId;
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
-const _emptyMessage = 'Aún no hay posts de tus amigos';
+const _emptyMessage = 'Todavía no hay posts de a quienes seguís';
 
 UserPublicProfile profile({
   required String uid,

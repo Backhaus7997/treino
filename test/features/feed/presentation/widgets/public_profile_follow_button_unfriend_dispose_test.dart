@@ -120,7 +120,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(UnfriendConfirmationSheet), findsOneWidget);
 
-    await tester.tap(find.text('ELIMINAR'));
+    await tester.tap(find.text('DEJAR DE SEGUIR'));
     await tester.pump();
 
     // El usuario vuelve atrás con el delete todavía en vuelo.

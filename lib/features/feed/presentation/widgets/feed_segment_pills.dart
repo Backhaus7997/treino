@@ -4,12 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app/theme/app_palette.dart';
 import '../../application/feed_screen_providers.dart';
 import '../../domain/feed_segment.dart';
+import '../../../../l10n/app_l10n.dart';
 
 class FeedSegmentPills extends ConsumerWidget {
   const FeedSegmentPills({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppL10n.of(context);
     final segment = ref.watch(feedSegmentProvider);
 
     return SingleChildScrollView(
@@ -20,7 +22,7 @@ class FeedSegmentPills extends ConsumerWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           _Pill(
-            label: 'AMIGOS',
+            label: l10n.feedSegmentFollowing,
             isActive: segment == FeedSegment.amigos,
             onTap: () => ref.read(feedSegmentProvider.notifier).state =
                 FeedSegment.amigos,

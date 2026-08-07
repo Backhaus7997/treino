@@ -860,8 +860,8 @@ class _AmigosBody extends ConsumerWidget {
             Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const FeedEmptyState(
-                  message: 'Aún no hay posts de tus amigos',
+                FeedEmptyState(
+                  message: AppL10n.of(context).feedEmptyFollowing,
                 ),
                 SuggestedUsersSection(gymId: gymId),
               ],

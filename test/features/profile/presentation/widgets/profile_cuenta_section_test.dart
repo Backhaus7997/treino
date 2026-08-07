@@ -114,7 +114,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Solicitudes de amistad'), findsOneWidget);
+      expect(find.text('Solicitudes de seguidores'), findsOneWidget);
       expect(find.text('Datos personales'), findsOneWidget);
       expect(find.text('Gimnasio'), findsOneWidget);
       expect(find.text('Mis rutinas'), findsOneWidget);
@@ -234,7 +234,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Solicitudes de amistad'), findsOneWidget);
+      expect(find.text('Solicitudes de seguidores'), findsOneWidget);
       // When count == 0, subtitle should NOT show "0 nuevas"
       expect(find.text('0 nuevas'), findsNothing);
     });
@@ -254,7 +254,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Solicitudes de amistad'));
+      await tester.tap(find.text('Solicitudes de seguidores'));
       await tester.pumpAndSettle();
 
       expect(find.text('FRIEND_REQUESTS'), findsOneWidget);

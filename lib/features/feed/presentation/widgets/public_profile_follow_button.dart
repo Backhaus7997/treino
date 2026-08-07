@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../../profile/application/user_public_profile_providers.dart';
@@ -92,15 +93,25 @@ class _PublicProfileFollowButtonState
           label: 'SIGUIENDO',
           style: _FollowPillStyle.outlined,
           leadingIcon: TreinoIcon.check,
+          semanticsLabel: AppL10n.of(context).feedFollowButtonFollowingA11y,
           onTap: () => _showUnfriendSheet(outgoing),
         );
       }
       // pending → yo mandé la solicitud y todavía no me aceptaron.
-      // Cancelarla entra en PR4; por ahora es informativo.
-      return const _FollowPill(
+      //
+      // REQ-FOLLOW-006: hasta PR4 esto tenía `onTap: null`, o sea que mandabas
+      // una solicitud a una cuenta privada y NO HABÍA NINGUNA FORMA de
+      // arrepentirte desde la app. Ahora abre el mismo sheet, con copy de
+      // cancelar: se borra la MISMA arista saliente, pero para el usuario no es
+      // "eliminar" nada — todavía no hay vínculo que eliminar.
+      return _FollowPill(
         label: 'SOLICITUD ENVIADA',
         style: _FollowPillStyle.outlinedMuted,
-        onTap: null,
+        semanticsLabel: AppL10n.of(context).feedFollowButtonRequestedA11y,
+        onTap: () => _showUnfriendSheet(
+          outgoing,
+          mode: UnfollowSheetMode.cancelRequest,
+        ),
       );
     }
 
@@ -110,6 +121,7 @@ class _PublicProfileFollowButtonState
         label: 'ACEPTAR',
         style: _FollowPillStyle.mintFilled,
         busy: _busy,
+        semanticsLabel: AppL10n.of(context).feedFollowButtonAcceptA11y,
         onTap: _busy ? null : () => _onAccept(repo, incoming),
       );
     }
@@ -120,6 +132,7 @@ class _PublicProfileFollowButtonState
       label: 'SEGUIR',
       style: _FollowPillStyle.mintFilled,
       busy: _busy,
+      semanticsLabel: AppL10n.of(context).feedFollowButtonFollowA11y,
       onTap: _busy ? null : () => _onRequest(repo),
     );
   }
@@ -142,8 +155,12 @@ class _PublicProfileFollowButtonState
     // Auto-accept path (public target) surfaces the same "started following"
     // copy the accept flow uses. The pending path keeps the existing
     // "request sent" copy. i18n: Fase W2 — both strings already exist.
+    // Dos caminos, dos mensajes: sobre cuenta pública la arista nace aceptada
+    // (ya la seguís), sobre cuenta privada queda pendiente de aprobación.
+    // Antes los dos decían "Ahora son amigos", que con el modelo dirigido
+    // sería directamente falso en el caso pendiente.
     final successMessage = widget.targetIsPublic
-        ? l10n.feedRequestAcceptedSuccess
+        ? l10n.feedFollowStartedSuccess
         : l10n.feedRequestSentSuccess;
     final errorMessage = l10n.feedFriendActionError;
     try {
@@ -217,7 +234,10 @@ class _PublicProfileFollowButtonState
   /// corta un solo sentido, y si el otro me sigue eso queda intacto.
   /// Stream providers self-update — sólo [myFollowingFeedProvider] necesita
   /// invalidación explícita.
-  Future<void> _showUnfriendSheet(Follow outgoing) async {
+  Future<void> _showUnfriendSheet(
+    Follow outgoing, {
+    UnfollowSheetMode mode = UnfollowSheetMode.unfollow,
+  }) async {
     final palette = AppPalette.of(context);
     final profileAsync = ref.read(userPublicProfileProvider(widget.targetUid));
     final friendDisplayName =
@@ -245,6 +265,7 @@ class _PublicProfileFollowButtonState
       ),
       builder: (_) => UnfriendConfirmationSheet(
         friendDisplayName: friendDisplayName,
+        mode: mode,
         onConfirm: () async {
           try {
             await repo.deleteEdge(outgoing.id);
@@ -273,6 +294,7 @@ class _FollowPill extends StatelessWidget {
     required this.label,
     required this.style,
     required this.onTap,
+    required this.semanticsLabel,
     this.leadingIcon,
     this.busy = false,
   });
@@ -280,6 +302,11 @@ class _FollowPill extends StatelessWidget {
   final String label;
   final _FollowPillStyle style;
   final VoidCallback? onTap;
+
+  /// Lo que anuncia el lector de pantalla. Distinto por estado — el label
+  /// visible es una sola palabra y no dice qué pasa al tocar.
+  final String semanticsLabel;
+
   final IconData? leadingIcon;
 
   /// When true the pill shows an inline spinner in place of the leading icon,
@@ -312,9 +339,8 @@ class _FollowPill extends StatelessWidget {
         break;
     }
 
-    final pill = GestureDetector(
+    final pill = TreinoTappable(
       onTap: onTap,
-      behavior: HitTestBehavior.opaque,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
         decoration: BoxDecoration(
@@ -354,9 +380,19 @@ class _FollowPill extends StatelessWidget {
       ),
     );
 
+    // El label visible es una sola palabra en mayúsculas ("SEGUIR"); el lector
+    // de pantalla necesita saber QUÉ pasa al tocar, y los 4 estados tienen que
+    // sonar distinto entre sí.
+    final labelled = Semantics(
+      button: true,
+      enabled: onTap != null,
+      label: semanticsLabel,
+      child: ExcludeSemantics(child: pill),
+    );
+
     if (style == _FollowPillStyle.outlinedMuted) {
-      return Opacity(opacity: 0.6, child: pill);
+      return Opacity(opacity: 0.6, child: labelled);
     }
-    return pill;
+    return labelled;
   }
 }

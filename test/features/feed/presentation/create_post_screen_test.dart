@@ -173,7 +173,7 @@ void main() {
       expect(find.text('NUEVO POST'), findsOneWidget);
       expect(find.text('PUBLICAR'), findsOneWidget);
       expect(find.byType(TextField), findsOneWidget);
-      expect(find.text('AMIGOS'), findsOneWidget);
+      expect(find.text('SEGUIDORES'), findsOneWidget);
       expect(find.text('MI GYM'), findsOneWidget);
       expect(find.text('PÚBLICO'), findsOneWidget);
       expect(find.text('ETIQUETAR RUTINA'), findsOneWidget);
@@ -266,7 +266,7 @@ void main() {
       await tester.pumpWidget(_wrapWithRouter());
       await _openCreatePost(tester);
 
-      expect(find.text('AMIGOS'), findsOneWidget);
+      expect(find.text('SEGUIDORES'), findsOneWidget);
       expect(find.text('MI GYM'), findsOneWidget);
       expect(find.text('PÚBLICO'), findsOneWidget);
     });

@@ -326,17 +326,20 @@ Precondición: PR3b Y PR3c mergeadas — cero consumidores activos de `Friendshi
 
 Archivos: `lib/features/feed/presentation/widgets/public_profile_follow_button.dart` (líneas 89, 283), `lib/features/feed/presentation/widgets/unfriend_confirmation_sheet.dart` (líneas 55, 69, 79), `lib/l10n/intl_es.arb`, `intl_en.arb`, `intl_es_AR.arb`.
 
-- [ ] **4.1 [RED]** `public_profile_follow_button_test.dart` — tap en "SOLICITUD ENVIADA" invoca `deleteEdge(outgoing.id)`, estado vuelve a SEGUIR. *(REQ-FOLLOW-006, SCENARIO-807)*
-- [ ] **4.2 [GREEN]** `public_profile_follow_button.dart:89` — `onTap: null` → abre `UnfriendConfirmationSheet` (copy "cancelar solicitud") → `deleteEdge`.
-- [ ] **4.3 [RED]** `unfriend_confirmation_sheet_test.dart` — copy "dejar de seguir" vía l10n en vez de "eliminar amistad" hardcodeado. *(REQ-FOLLOW-007, SCENARIO-808)*
-- [ ] **4.4 [GREEN]** `unfriend_confirmation_sheet.dart:55,69,79` — strings hardcodeadas → keys l10n (reusa el mismo sheet para unfollow y cancelar).
-- [ ] **4.5 [RED]** `public_profile_follow_button_test.dart` — `TreinoTappable` (no `GestureDetector`) en los 4 estados, semantics label distinto por estado. *(REQ-FOLLOW-018, SCENARIO-823)*
-- [ ] **4.6 [GREEN]** `public_profile_follow_button.dart:283` — `GestureDetector` → `TreinoTappable`.
-- [ ] **4.7 [MANUAL] — decisión del dueño** Confirmar el label visible "SEGUIDORES" **y el copy del aviso de chat bloqueado** (la conducta ya está definida en design §6.1; acá se cierra sólo el texto) antes de cerrar los ARBs.
-- [ ] **4.8 [GREEN]** `intl_es.arb`, `intl_en.arb`, `intl_es_AR.arb` — agregar los pares `"key"`/`"@key"` nuevos (copy "seguidor", label confirmado en 4.7).
-- [ ] **4.8b [GREEN]** `chat_screen.dart` — las strings provisorias del aviso de composer bloqueado (3c.20) pasan a l10n, con sus keys en los 3 ARBs. *(REQ-FOLLOW-021)*
-- [ ] **4.9 [GREEN]** `flutter gen-l10n` explícito (`flutter analyze` NO lo regenera).
-- [ ] **4.10 [GATE]** Cero ocurrencias de "amistad" en strings visibles (grep en `lib/l10n/` y en los widgets tocados). `flutter analyze` 0 issues + `dart format .` + `flutter test` verde.
+- [x] **4.1 [RED]** `public_profile_follow_button_test.dart` — tap en "SOLICITUD ENVIADA" invoca `deleteEdge(outgoing.id)`, estado vuelve a SEGUIR. *(REQ-FOLLOW-006, SCENARIO-807)*
+- [x] **4.2 [GREEN]** `public_profile_follow_button.dart:89` — `onTap: null` → abre `UnfriendConfirmationSheet` (copy "cancelar solicitud") → `deleteEdge`.
+- [x] **4.3 [RED]** `unfriend_confirmation_sheet_test.dart` — copy "dejar de seguir" vía l10n en vez de "eliminar amistad" hardcodeado. *(REQ-FOLLOW-007, SCENARIO-808)*
+- [x] **4.4 [GREEN]** `unfriend_confirmation_sheet.dart:55,69,79` — strings hardcodeadas → keys l10n (reusa el mismo sheet para unfollow y cancelar).
+- [x] **4.5 [RED]** `public_profile_follow_button_test.dart` — `TreinoTappable` (no `GestureDetector`) en los 4 estados, semantics label distinto por estado. *(REQ-FOLLOW-018, SCENARIO-823)*
+- [x] **4.6 [GREEN]** `public_profile_follow_button.dart:283` — `GestureDetector` → `TreinoTappable`.
+- [x] **4.7 [MANUAL] — decisión del dueño: CERRADA.** Label visible **"SEGUIDORES"** y copy del aviso: **"Para escribirle, esta persona tiene que seguirte."**
+  > **La primera respuesta del dueño partía de una premisa falsa y hubo que corregirla antes de implementar.** Pidió *"que no pase nada, que se mande el mensaje; el problema va a estar en que la otra persona no lo va a ver"*. Eso **no es lo que ocurre**: `senderMayPost` (`firestore.rules:1345`) **deniega la escritura**, así que el mensaje no se guarda en ningún lado — el que escribe recibe un error y pierde lo que tipeó. No existe "se manda pero no lo ve"; existe "no se manda".
+  > Se le plantearon los dos caminos reales: **(A)** conservar la regla y avisar ANTES de que escriba, o **(B)** cambiar la decisión de producto a **silenciar** (el mensaje sí se entrega y el destinatario no lo ve destacado), lo que implicaría retirar la regla de PR3a y diseñar el silenciado de cero. **El dueño eligió A.**
+  > Entre las tres variantes de copy se tomó la que EXPLICA de qué depende, en vez de las neutras: es la única que le dice al usuario qué destrabaría la situación, y no expone nada que no se vea ya en el perfil de la otra persona.
+- [x] **4.8 [GREEN]** `intl_es.arb`, `intl_en.arb`, `intl_es_AR.arb` — agregar los pares `"key"`/`"@key"` nuevos (copy "seguidor", label confirmado en 4.7).
+- [x] **4.8b [GREEN]** `chat_screen.dart` — las strings provisorias del aviso de composer bloqueado (3c.20) pasan a l10n, con sus keys en los 3 ARBs. *(REQ-FOLLOW-021)*
+- [x] **4.9 [GREEN]** `flutter gen-l10n` explícito (`flutter analyze` NO lo regenera).
+- [x] **4.10 [GATE]** Cero ocurrencias de "amistad" en strings visibles (grep en `lib/l10n/` y en los widgets tocados). `flutter analyze` 0 issues + `dart format .` + `flutter test` verde.
 
 ---
 
