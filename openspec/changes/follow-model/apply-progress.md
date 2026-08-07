@@ -121,15 +121,90 @@ reconciliarlo.
 
 ---
 
+## PR 2 — Migración, verificación y freeze (M-02/M-03b/M-04/M-05/M-06) ⚠️ código listo, NADA corrido
+
+Commit `a57c6f79`. **Este PR no dejó entrada acá cuando se cerró** — se asienta
+ahora, en PR3a, con lo que consta en su commit. Es un hueco del registro, no de
+la ejecución.
+
+Entregó `migrate-friendships-to-follows.ts`, `verify-follows-migration.ts`,
+`backfill-follow-counters.ts` y el **freeze de `friendships`** en las rules
+(M-03b, adelantado desde PR3a por ADR-FOLLOW-015). 76 tests de scripts + 33 de
+rules.
+
+> **Ningún script se corrió contra datos reales todavía**, ni siquiera en
+> `--dry-run`. El freeze **tampoco está deployado**. La secuencia manual
+> (2.8–2.11) corre DESPUÉS de que exista PR3c, no antes — ver la nota de
+> ordenamiento en `tasks.md` 3a.19b.
+
+---
+
+## PR 3a — Flip servidor: rules direccionales + Cloud Functions (M-07) ✅ código
+
+Tareas 3a.1–3a.16 + **3a.7b** (nueva, ver abajo). Los pasos MANUALES
+(3a.19b–3a.22) siguen pendientes y **no se corrió nada contra `treino-dev`**.
+
+**Rules.** `postFriendAccepted` → `postFollowerAccepted`, apoyado en un
+`followAccepted(f, t)` nuevo a top scope (único domain helper ahí, porque lo
+consumen dos bloques `match` que no se contienen: `/posts` y `/chats`). Chat
+direccional en sus dos superficies: `chatCreateOk` reemplaza a
+`chatRelationshipOk` en `chats/create`, y **`senderMayPost` es un gate NUEVO en
+`messages/create`** — esa subcolección no tenía ningún control de relación.
+
+**Cloud Functions.** Las tres repuntadas a `follows`: `maintainFollowCounters`
+(`partiesOf` lee la dirección en vez de inferirla; `countAcceptedFor` pasa a 2
+queries direccionales), `notifyOnFriendship` → **`notifyOnFollow`** (copy
+intacto, sólo cambia de dónde sale la dirección), y `sweepFriendships` →
+**`sweepFollows`** sobre `follows`, con `deleteAccount` como consumidor.
+
+**Evidencia.** 54 suites / 608 tests verdes + `tsc` limpio + `flutter analyze` 0
+issues (el diff no toca ni un archivo Dart). Cada test se verificó **en ROJO**
+antes de implementar. Dos del chat fallaron con *"Expected request to fail, but
+it succeeded"*: la prueba concreta de que hoy eliminar una relación **no** corta
+un chat existente, tal como el design §3.3.1 anticipaba.
+
+### 🔴 Hallazgo de la revisión adversarial — sin esto el gate era decorativo
+
+Cuatro lentes independientes convergieron en el mismo bug y sobrevivió la
+refutación: **`senderMayPost` escapa por `'linkId' in chat` (mera presencia de
+la clave), y `linkId` lo escribe el cliente sin que nadie lo validara después
+del create.** Dos vías: el `||` de `chatCreateOk` cortocircuitaba en los chats
+sociales, y `chats/update` no tenía allowlist de claves. Cualquier miembro se
+plantaba un `linkId` inventado y se auto-otorgaba **escritura permanente que
+sobrevive al unfollow** — justo lo que REQ-FOLLOW-012 dice que MUST cortarse.
+
+Se cerró en la **escritura** del doc (ramas excluyentes en `chatCreateOk` + pin
+inmutable de `linkId` en `chats/update`), no en `senderMayPost`, para no subirle
+el costo al chat del Coach. Detalle completo en `tasks.md` 3a.7b. Los 4 tests
+del exploit se verificaron en ROJO contra la implementación anterior.
+
+### Correcciones al plan halladas acá
+
+- **3a.21 no era ejecutable**: pedía desplegar `functions:sweepFollows`, que
+  **no es una Cloud Function** (es interna de `cascade/friendships.ts`). Un
+  `--only` con un nombre inexistente **aborta el deploy entero**. Lo que hay que
+  desplegar es **`deleteAccount`**, que no estaba en ninguna lista del plan.
+- **`notifyOnFriendship` queda huérfana** tras el rename: un `--only` crea la
+  nueva y no poda la vieja. Hay que borrarla a mano.
+
+---
+
 ## Pendiente
 
-- **PR 2a** — `migrate-friendships-to-follows.ts` + su test. Base: PR1 (ya
-  deployada, M-03 hecho). Es la primera vez que se escribe en `follows`.
-- **PR 2b** — `verify-follows-migration.ts` + `backfill-follow-counters.ts` +
-  **el freeze de `friendships`**. El freeze se mergea último de los dos: su
-  deploy tiene que quedar pegado a M-04.
-- Copy del aviso de chat bloqueado (única decisión abierta del proposal, se
-  cierra con el resto de los ARBs en PR4).
+- **PR 3b** — flip cliente de posts y feed. Va pegado a 3a, mismo release.
+- **PR 3c** (en 3 slices) — perfil público, sugerencias + inbox, composer del
+  chat. **No puede preceder a PR3a.**
+- **PR 3d** — retiro de `Friendship*`. **PR 4** — UX + l10n.
+- **Gate 3a.19 incompleto**: 3 suites (`post-photos-storage-rules`,
+  `cascade/storage`, `delete-account.smoke`) necesitan el emulador de
+  **Storage**, que no estaba levantado. CI sí lo levanta. Falta una corrida
+  local con `--only firestore,auth,storage` para cerrar el gate.
+- **Decisión abierta nueva**: `chats/update` sigue siendo por membresía, así que
+  el lado sin permiso de escritura **igual puede empujar `lastMessageText`** al
+  preview del otro por SDK crudo (por la app no, porque el cliente manda mensaje
+  y preview en el mismo batch). Cerrar el agujero contradice el "no se toca" de
+  design §3.3.4 — va a decisión del dueño.
+- Copy del aviso de chat bloqueado (se cierra con el resto de los ARBs en PR4).
 
 > Recordatorio de la aserción que ya quedó fijada por M-00: con 4 `accepted` y
 > 2 `pending`, la migración tiene que producir **exactamente 10 aristas**.

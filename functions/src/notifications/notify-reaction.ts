@@ -139,7 +139,7 @@ export async function notifyOnReactionHandler(
     return;
   }
 
-  // Same source and fallback as notifyOnFriendship.
+  // Same source and fallback as notifyOnFollow.
   const profileSnap = await db
     .collection("userPublicProfiles")
     .doc(reactorUid)

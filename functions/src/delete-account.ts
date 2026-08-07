@@ -8,7 +8,7 @@
  *   1. Validate + anti-spoof (callable wrapper)
  *   2. Trainer role guard
  *   3. Audit log: started
- *   4. Sweep friendships
+ *   4. Sweep follows
  *   5. Delete posts
  *   6. Terminate trainer links
  *   7. Cancel future appointments
@@ -27,7 +27,7 @@ import * as admin from "firebase-admin";
 import * as functions from "firebase-functions/v2/https";
 import { HttpsError } from "firebase-functions/v2/https";
 import { writeStarted, writeFinal } from "./cascade/audit-log";
-import { sweepFriendships } from "./cascade/friendships";
+import { sweepFollows } from "./cascade/friendships";
 import { deletePosts } from "./cascade/posts";
 import { terminateTrainerLinks } from "./cascade/trainer-links";
 import { cancelFutureAppointments } from "./cascade/appointments";
@@ -87,12 +87,12 @@ export async function runDeleteAccount(
   const errors: string[] = [];
   const deletedCollections: string[] = [];
 
-  // ── Step 4: Sweep friendships ──────────────────────────────────────────
+  // ── Step 4: Sweep follows ──────────────────────────────────────────────
   try {
-    await sweepFriendships(app, uid);
-    deletedCollections.push("friendships");
+    await sweepFollows(app, uid);
+    deletedCollections.push("follows");
   } catch (err: unknown) {
-    errors.push(`friendships: ${(err as Error).message ?? String(err)}`);
+    errors.push(`follows: ${(err as Error).message ?? String(err)}`);
   }
 
   // ── Step 5: Delete posts ────────────────────────────────────────────────

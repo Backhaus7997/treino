@@ -1,10 +1,10 @@
 /**
  * maintainFollowCounters — Cloud Function for TREINO.
  *
- * Fires on writes to `friendships/{friendshipId}` and keeps the denormalized
+ * Fires on writes to `follows/{followId}` and keeps the denormalized
  * follow counters on `userPublicProfiles/{uid}` correct and consistent:
- *   - `followingCount` on the REQUESTER (the person who follows)
- *   - `followersCount` on the OTHER party (the person being followed)
+ *   - `followingCount` on the FOLLOWER (the person who follows)
+ *   - `followersCount` on the FOLLOWEE (the person being followed)
  *
  * ## Why this exists (bug W-SOCIAL-COUNTERS-01)
  *
@@ -18,14 +18,18 @@
  *   3. A malicious client could write arbitrary counter values.
  *
  * Moving this to a CF makes the counters authoritative and symmetric: both
- * sides always move together, server-side, driven by the friendship doc.
+ * sides always move together, server-side, driven by the edge doc.
  *
  * ## Follow model (asymmetric)
  *
- * A friendship doc is a directed follow: `requesterId` follows the OTHER
- * member. Counters only move when the follow is EFFECTIVE (status accepted):
+ * `follow-model` PR3a: la fuente de verdad pasó de `friendships` (un doc por
+ * par, id ordenado) a `follows` (un doc por ARISTA DIRIGIDA,
+ * `{followerUid}_{followeeUid}`). La dirección ya no se infiere de
+ * `requesterId` + `members`: viene explícita en el documento.
  *
- *   before → after           requester.followingCount  other.followersCount
+ * Counters only move when the follow is EFFECTIVE (status accepted):
+ *
+ *   before → after           follower.followingCount   followee.followersCount
  *   ─────────────────────    ────────────────────────  ────────────────────
  *   ∅ → accepted (auto)              +1                        +1
  *   pending → accepted               +1                        +1
@@ -52,7 +56,7 @@ function getApp(): admin.app.App {
   }
 }
 
-type FriendshipData = Record<string, unknown>;
+type FollowData = Record<string, unknown>;
 
 /** The counter mutation a write resolves to (or a no-op). */
 export type CounterDelta =
@@ -65,19 +69,30 @@ function isAccepted(status: unknown): boolean {
 }
 
 /**
- * Extracts (requesterUid, otherUid) from a friendship doc. Returns null when
- * the doc is malformed (missing requesterId or a members[] without exactly
- * two distinct entries).
+ * Extrae (follower, followee) de una arista. Devuelve null si el doc está
+ * malformado (le falta alguno de los dos uids, o es reflexivo).
+ *
+ * `follow-model` PR3a: acá ya no se INFIERE nada. El modelo dirigido lleva la
+ * dirección explícita en el propio documento, así que se lee — antes había que
+ * tomar `requesterId` y buscar dentro de `members` cuál de los dos era "el
+ * otro". `members` sigue existiendo, pero SÓLO para que el barrido del borrado
+ * de cuenta use una única query (LD-01); usarlo acá volvería a atar la
+ * dirección a un campo que no la define.
+ *
+ * La rama "malformed" se conserva como defensa contra documentos escritos por
+ * Admin SDK, que saltea las rules: sin ella, un doc torcido movería contadores.
+ *
+ * Los nombres del retorno (`requesterUid`/`otherUid`) se mantienen para no
+ * tocar `CounterDelta` ni sus consumidores; semánticamente son follower y
+ * followee.
  */
 function partiesOf(
-  data: FriendshipData,
+  data: FollowData,
 ): { requesterUid: string; otherUid: string } | null {
-  const requesterUid = data.requesterId as string | undefined;
-  const members = (data.members as string[] | undefined) ?? [];
-  if (!requesterUid || members.length !== 2) return null;
-  const otherUid = members.find((m) => m !== requesterUid);
-  if (!otherUid) return null;
-  return { requesterUid, otherUid };
+  const follower = data.followerUid as string | undefined;
+  const followee = data.followeeUid as string | undefined;
+  if (!follower || !followee || follower === followee) return null;
+  return { requesterUid: follower, otherUid: followee };
 }
 
 /**
@@ -89,8 +104,8 @@ function partiesOf(
  * no-op for counters.
  */
 export function resolveCounterDelta(
-  before: FriendshipData | undefined,
-  after: FriendshipData | undefined,
+  before: FollowData | undefined,
+  after: FollowData | undefined,
 ): CounterDelta {
   const beforeAccepted = before ? isAccepted(before.status) : false;
   const afterAccepted = after ? isAccepted(after.status) : false;
@@ -102,14 +117,14 @@ export function resolveCounterDelta(
 
   // Became effective (∅/pending → accepted): +1. Parties come from `after`.
   if (!beforeAccepted && afterAccepted) {
-    const parties = partiesOf(after as FriendshipData);
+    const parties = partiesOf(after as FollowData);
     if (!parties) return { kind: "noop", reason: "after: malformed parties" };
     return { kind: "apply", ...parties, delta: 1 };
   }
 
   // Stopped being effective (accepted → deleted/…): −1. Parties come from
   // `before` because `after` may be undefined (delete) or partial.
-  const parties = partiesOf(before as FriendshipData);
+  const parties = partiesOf(before as FollowData);
   if (!parties) return { kind: "noop", reason: "before: malformed parties" };
   return { kind: "apply", ...parties, delta: -1 };
 }
@@ -122,40 +137,47 @@ export function resolveCounterDelta(
  * than created here, to avoid resurrecting a deleted user's public profile.
  */
 /**
- * QA-507: cuenta los vínculos ACEPTADOS de [uid] desde la fuente de verdad.
+ * QA-507: cuenta las aristas ACEPTADAS de [uid] desde la fuente de verdad.
  *
- * `requesterId === uid` → uid sigue a alguien (following); si no, alguien sigue
- * a uid (followers). Una sola query por uid y se parte en memoria, porque
- * Firestore no combina `array-contains` con `!=` en la misma query.
+ * `follow-model` PR3a: DOS queries direccionales en vez de una con split en
+ * memoria. No es una preferencia de estilo — en `follows` no existe
+ * `requesterId`, así que un único `array-contains` devuelve las aristas de las
+ * dos direcciones mezcladas y sin ningún campo que permita separarlas por
+ * documento. El sentido lo da el CAMPO por el que se consulta.
+ *
+ * Costo: 4 queries por evento (2 uids × 2 direcciones) en vez de 2.
+ * Justificado en ADR-FOLLOW-007.
  */
 async function countAcceptedFor(
   tx: admin.firestore.Transaction,
   db: admin.firestore.Firestore,
   uid: string,
 ): Promise<{ followingCount: number; followersCount: number }> {
-  const snap = await tx.get(
-    db
-      .collection("friendships")
-      .where("members", "array-contains", uid)
-      .where("status", "==", "accepted"),
-  );
+  const [followingSnap, followersSnap] = await Promise.all([
+    tx.get(
+      db
+        .collection("follows")
+        .where("followerUid", "==", uid)
+        .where("status", "==", "accepted"),
+    ),
+    tx.get(
+      db
+        .collection("follows")
+        .where("followeeUid", "==", uid)
+        .where("status", "==", "accepted"),
+    ),
+  ]);
 
-  let followingCount = 0;
-  let followersCount = 0;
-  for (const doc of snap.docs) {
-    if (doc.data().requesterId === uid) {
-      followingCount++;
-    } else {
-      followersCount++;
-    }
-  }
-  return { followingCount, followersCount };
+  return {
+    followingCount: followingSnap.size,
+    followersCount: followersSnap.size,
+  };
 }
 
 export async function maintainFollowCountersHandler(
   app: admin.app.App,
-  before: FriendshipData | undefined,
-  after: FriendshipData | undefined,
+  before: FollowData | undefined,
+  after: FollowData | undefined,
 ): Promise<void> {
   const outcome = resolveCounterDelta(before, after);
   if (outcome.kind === "noop") {
@@ -207,12 +229,12 @@ export async function maintainFollowCountersHandler(
  */
 export const maintainFollowCounters = onDocumentWritten(
   {
-    document: "friendships/{friendshipId}",
+    document: "follows/{followId}",
     region: "southamerica-east1",
   },
   async (event) => {
-    const before = event.data?.before?.data() as FriendshipData | undefined;
-    const after = event.data?.after?.data() as FriendshipData | undefined;
+    const before = event.data?.before?.data() as FollowData | undefined;
+    const after = event.data?.after?.data() as FollowData | undefined;
     await maintainFollowCountersHandler(getApp(), before, after);
   },
 );

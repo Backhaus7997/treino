@@ -5,7 +5,7 @@ service cloud.firestore {
 
     // ── Shared value guards (QA #508) ────────────────────────────────────────
     // Generic optional-field validators, visible to every nested match. Unlike
-    // the domain helpers further down (postFriendAccepted, chatRelationshipOk,
+    // the domain helpers further down (postSameGym, reactionPostReadable,
     // …) these carry no collection knowledge, so they live at the top scope
     // instead of being duplicated per block.
     //
@@ -31,6 +31,26 @@ service cloud.firestore {
     // Optional string no longer than maxLen.
     function optStrMaxLen(v, maxLen) {
       return v == null || (v is string && v.size() <= maxLen);
+    }
+
+    // ── Grafo social dirigido (change `follow-model`) ─────────────────────────
+    // Domain helper a top scope A PROPÓSITO, y es la única excepción a la regla
+    // de arriba: lo consumen dos bloques `match` que no se contienen entre sí
+    // (`/posts` — con su subcolección `/reactions` — y `/chats` — con su
+    // subcolección `/messages`). Duplicarlo sería garantizar que en algún
+    // momento las dos copias digan cosas distintas sobre quién ve qué.
+    //
+    // `follows/{followerUid}_{followeeUid}` — el doc id NO se ordena. Ahí vive
+    // toda la asimetría del modelo: `{A}_{B}` y `{B}_{A}` son documentos
+    // DISTINTOS, así que "A sigue a B pero B no a A" se representa, y "¿f sigue
+    // a t?" se resuelve con un lookup directo por doc id — sin queries, sin
+    // índices, mismo costo que el `exists`+`get` sobre `friendships` que
+    // reemplaza. Si el id se ordenara, las dos direcciones colisionarían en el
+    // mismo doc y volveríamos exactamente al problema que este change arregla.
+    function followAccepted(f, t) {
+      let id = f + '_' + t;
+      return exists(/databases/$(database)/documents/follows/$(id))
+          && get(/databases/$(database)/documents/follows/$(id)).data.status == 'accepted';
     }
 
     match /users/{uid} {
@@ -528,17 +548,21 @@ service cloud.firestore {
       // QA-FEED-001: post privacy is enforced SERVER-SIDE (was client-side only,
       // REQ-PFM-009 — any authenticated user could read every post via the SDK).
       // A post is readable when it is public, is the caller's own, is a
-      // 'friends' post authored by an ACCEPTED friend, or is a 'gym' post whose
+      // 'friends' post whose author the CALLER FOLLOWS, or is a 'gym' post whose
       // authorGymId matches the caller's gym. The client feed queries are
-      // already scoped to match (feedForFriends by friend uids, feedForGym by
-      // gym, profile by privacy tier), so these per-doc get()s only fire for
+      // already scoped to match (feedForFollowing by followee uids, feedForGym
+      // by gym, profile by privacy tier), so these per-doc get()s only fire for
       // rows the query already narrowed to.
-      function postFriendAccepted(authorUid) {
-        let fid = request.auth.uid < authorUid
-          ? request.auth.uid + '_' + authorUid
-          : authorUid + '_' + request.auth.uid;
-        return exists(/databases/$(database)/documents/friendships/$(fid))
-            && get(/databases/$(database)/documents/friendships/$(fid)).data.status == 'accepted';
+      //
+      // REQ-FOLLOW-010: el tier dejó de preguntar "¿hay una amistad aceptada
+      // entre los dos?" y pregunta "¿el LECTOR sigue al AUTOR?". La dirección
+      // importa: que el autor me siga a mí no me da acceso a su contenido.
+      // El literal 'friends' de `privacy` NO se toca (LD-05) — el rename del
+      // tier es sólo del cliente y viaja por @JsonValue, así que los posts ya
+      // escritos siguen siendo válidos y las allowlists de create/update quedan
+      // byte-idénticas.
+      function postFollowerAccepted(authorUid) {
+        return followAccepted(request.auth.uid, authorUid);
       }
       function postSameGym(authorGymId) {
         return authorGymId != null
@@ -551,7 +575,7 @@ service cloud.firestore {
                     || resource.data.privacy == 'public'
                     || request.auth.uid == resource.data.authorUid
                     || (resource.data.privacy == 'friends'
-                        && postFriendAccepted(resource.data.authorUid))
+                        && postFollowerAccepted(resource.data.authorUid))
                     || (resource.data.privacy == 'gym'
                         && postSameGym(resource.data.get('authorGymId', null)))
                   );
@@ -645,7 +669,7 @@ service cloud.firestore {
           return post.privacy == 'public'
                  || request.auth.uid == post.authorUid
                  || (post.privacy == 'friends'
-                     && postFriendAccepted(post.authorUid))
+                     && postFollowerAccepted(post.authorUid))
                  || (post.privacy == 'gym'
                      && postSameGym(post.get('authorGymId', null)));
         }
@@ -748,7 +772,7 @@ service cloud.firestore {
                     // #563: Instagram-style privacy flag, flipped by
                     // UserPublicProfileRepository.setProfilePublic — bool
                     // when present. Docs without the field read as public
-                    // (`.get('isProfilePublic', true)` in friendships).
+                    // (`.get('isProfilePublic', true)` in follows).
                     && (!('isProfilePublic' in request.resource.data)
                         || request.resource.data.isProfilePublic is bool)
                     && (!('gymId' in request.resource.data)
@@ -1166,26 +1190,58 @@ service cloud.firestore {
     //   - delete: denied.
     match /chats/{chatId} {
       // QA-CHAT-004: a chat may only be opened between two users who have a real
-      // relationship — an ACCEPTED friendship (its doc id equals the chatId), or
-      // an active trainer_link named by a client-provided `linkId` whose
-      // trainerId+athleteId are exactly the two chat members. The link is
-      // verified here (not trusted): SEC-002 guarantees an active link is
-      // trainer-accepted, so neither party can forge one. Without this gate any
-      // authenticated user could open a chat with — and message — anyone.
-      function chatRelationshipOk(chatId, members, data) {
-        return (
-          exists(/databases/$(database)/documents/friendships/$(chatId))
-          && get(/databases/$(database)/documents/friendships/$(chatId)).data.status == 'accepted'
-        ) || (
-          'linkId' in data
-          && exists(/databases/$(database)/documents/trainer_links/$(data.linkId))
+      // relationship. Sin este gate cualquier autenticado podía abrir un chat
+      // con —y escribirle a— cualquiera.
+      //
+      // REQ-FOLLOW-012 / LD-08 / ADR-FOLLOW-005 — la rama social pasó a ser
+      // DIRECCIONAL: abrir un chat es poder mandar el primer mensaje, así que
+      // lo que habilita es que el DESTINATARIO siga a quien lo abre
+      // (`follows/{otro}_{yo}` aceptada). Reemplaza al `exists`+`get` sobre
+      // `friendships/{chatId}`, que era simétrico por construcción — el doc id
+      // de `friendships` es el par ordenado, o sea el MISMO documento para las
+      // dos direcciones.
+      //
+      // Costo sin cambios: un lookup direccional cuesta exactamente lo mismo
+      // (`exists`+`get` = 2) que el simétrico que reemplaza. El peor caso
+      // (social falla → se evalúa trainer) sigue en ≤6 sobre el techo de 10.
+      //
+      // `members[0] < members[1]` y `chatId == members[0]+'_'+members[1]` ya los
+      // garantiza el propio `allow create` de abajo, y `members` es inmutable en
+      // el `update`, así que derivar "el otro" del array es exacto y no hace
+      // falta partir el chatId ni agregar ningún dato.
+      //
+      // La rama trainer_link queda SIN CAMBIOS: el link se verifica acá (no se
+      // confía), y SEC-002 garantiza que un link activo fue aceptado por el
+      // trainer, así que ninguna de las dos partes puede fraguar uno.
+      //
+      // ⚠ LAS DOS RAMAS SON EXCLUYENTES, NO UN `||` — y eso es de SEGURIDAD, no
+      // de estilo. Con `followAccepted(...) || ('linkId' in data && ...)`, un
+      // chat social hacía true la primera rama y el `linkId` del payload
+      // **nunca se validaba**: quedaba persistido un linkId inventado. Como
+      // `senderMayPost` (abajo) escapa por la mera PRESENCIA de la clave, eso
+      // le regalaba al que lo plantó escritura permanente, sobreviviendo al
+      // unfollow. O sea: el gate direccional entero quedaba decorativo, que es
+      // exactamente lo que REQ-FOLLOW-012 dice que no puede pasar.
+      //
+      // Con el ternario, la INVARIANTE que sostiene a `senderMayPost` es:
+      // **un doc de chat sólo lleva `linkId` si nombra un link válido.** Se
+      // paga en la escritura (acá y en el pin del `update`), no en cada
+      // mensaje, así que el chat del Coach sigue costando 1 sola llamada.
+      //
+      // Efecto lateral bueno: el peor caso de `chats/create` baja de ≤6 a 4,
+      // porque ya no se evalúan las dos ramas en cadena.
+      function chatCreateOk(members, data) {
+        let me = request.auth.uid;
+        let other = members[0] == me ? members[1] : members[0];
+        return ('linkId' in data) ? (
+          exists(/databases/$(database)/documents/trainer_links/$(data.linkId))
           // QA H8: 'paused' cuenta como vínculo vigente para chatear (pausar es
           // un hold temporal, no un corte). Espeja el filtro cliente en
           // ChatRepository._activeLinkIdBetween.
           && get(/databases/$(database)/documents/trainer_links/$(data.linkId)).data.status in ['active', 'paused']
           && get(/databases/$(database)/documents/trainer_links/$(data.linkId)).data.trainerId in members
           && get(/databases/$(database)/documents/trainer_links/$(data.linkId)).data.athleteId in members
-        );
+        ) : followAccepted(other, me);
       }
 
       allow read: if request.auth != null
@@ -1197,18 +1253,29 @@ service cloud.firestore {
                     && request.auth.uid in request.resource.data.members
                     && request.resource.data.members[0] < request.resource.data.members[1]
                     && chatId == request.resource.data.members[0] + '_' + request.resource.data.members[1]
-                    && chatRelationshipOk(
-                        chatId, request.resource.data.members, request.resource.data);
+                    && chatCreateOk(
+                        request.resource.data.members, request.resource.data);
 
       // REQ-CHATUNREAD-008: members may update the chat (preview fields on
       // send) but a member may only touch THEIR OWN key inside lastRead — a
       // user cannot forge/clear another member's read state. members and
       // createdAt remain immutable. get('lastRead', {}) is null-safe for
       // legacy docs that predate the field.
+      //
+      // ⚠ `linkId` PINEADO: es la segunda mitad de la invariante que sostiene a
+      // `senderMayPost`. Sin este pin, esta regla —que no tiene allowlist de
+      // claves— dejaba que cualquier miembro le agregara `linkId` a un chat
+      // social con un update de una línea, y se auto-otorgara escritura
+      // permanente que sobrevive al unfollow. El idioma `get(...,null)` hace
+      // que "ausente en los dos lados" matchee, así que los chats sociales
+      // (que no tienen la clave) no se ven afectados, y además impide BORRAR
+      // el linkId de un chat de Coach.
       allow update: if request.auth != null
                     && request.auth.uid in resource.data.members
                     && request.resource.data.members == resource.data.members
                     && request.resource.data.createdAt == resource.data.createdAt
+                    && request.resource.data.get('linkId', null)
+                       == resource.data.get('linkId', null)
                     && (
                          !request.resource.data.keys().hasAny(['lastRead'])
                          || request.resource.data.get('lastRead', {})
@@ -1222,6 +1289,36 @@ service cloud.firestore {
       // Messages sub-collection. Mensajes inmutables en MVP — sin edit/delete.
       // read/create gated por members del chat parent.
       match /messages/{messageId} {
+        // REQ-FOLLOW-012 — GATE NUEVO. Hoy esta subcolección gateaba SÓLO por
+        // membresía, o sea que el permiso se evaluaba una única vez, al crear el
+        // chat: eliminar la relación NO cortaba un chat que ya existía. La
+        // asimetría que pide la decisión del dueño es DENTRO del mismo chat
+        // (uno escribe, el otro no), y una regla que corre una sola vez no puede
+        // producir dos permisos distintos para el mismo documento. Por eso el
+        // gate se evalúa por mensaje.
+        //
+        // ABSORBE el check de membresía en vez de sumarse a él: reusa el mismo
+        // `get(chats/{chatId})` que la regla vieja ya hacía para sacar
+        // `members`. Por eso el costo no se duplica.
+        //
+        // Orden de las ramas DELIBERADO: `'linkId' in chat` va PRIMERO para que
+        // un chat de Coach no pague ninguna llamada de acceso extra (1, igual
+        // que hoy) y quede exactamente como está —membresía, sin re-verificar
+        // que el link siga activo—, porque apretar el Coach no es parte de este
+        // change. Un chat social paga 3 sobre el techo de 10.
+        function senderMayPost(uid) {
+          let chat = get(/databases/$(database)/documents/chats/$(chatId)).data;
+          let other = chat.members[0] == uid ? chat.members[1] : chat.members[0];
+          return uid in chat.members
+              && (
+                   'linkId' in chat
+                   || followAccepted(other, uid)
+                 );
+        }
+
+        // Lectura: membresía, SIN CAMBIOS. El lado que perdió la escritura
+        // conserva la conversación entera — bloquear también la lectura sería
+        // borrarle historia que ya recibió.
         allow read: if request.auth != null
                     && request.auth.uid in
                         get(/databases/$(database)/documents/chats/$(chatId)).data.members;
@@ -1229,11 +1326,11 @@ service cloud.firestore {
         // REQ-CHATMEDIA-006: validity is OR-based — text OR (mediaUrl + mediaType).
         // A message is valid if it carries non-empty text OR a mediaUrl string
         // together with a mediaType string (e.g. 'image' / 'video').
-        // senderId, membership, and createdAt checks are unchanged.
+        // senderId y createdAt sin cambios; la membresía ahora vive adentro de
+        // senderMayPost.
         allow create: if request.auth != null
                       && request.auth.uid == request.resource.data.senderId
-                      && request.auth.uid in
-                          get(/databases/$(database)/documents/chats/$(chatId)).data.members
+                      && senderMayPost(request.auth.uid)
                       && (
                            (request.resource.data.text is string
                             && request.resource.data.text.size() > 0)
