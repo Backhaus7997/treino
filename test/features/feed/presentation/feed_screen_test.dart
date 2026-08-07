@@ -95,7 +95,7 @@ Post _makePost({
   String? authorGymId,
   String text = 'Buena sesión',
   RoutineTag? routineTag,
-  PostPrivacy privacy = PostPrivacy.friends,
+  PostPrivacy privacy = PostPrivacy.followers,
   DateTime? createdAt,
 }) =>
     Post(
@@ -168,7 +168,7 @@ void main() {
   group('REQ-FEED-SCREEN-001: composition', () {
     final baseOverrides = <Override>[
       feedSegmentProvider.overrideWith((ref) => FeedSegment.amigos),
-      myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+      myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
       myGymFeedProvider.overrideWith((ref) async => null),
       feedPublicProvider.overrideWith((ref) async => const <Post>[]),
     ];
@@ -292,7 +292,7 @@ void main() {
         await tester.pumpWidget(
           _wrapProvider(const FeedScreen(), [
             feedSegmentProvider.overrideWith((ref) => FeedSegment.gym),
-            myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+            myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
             myGymFeedProvider.overrideWith((ref) async => null),
             feedPublicProvider.overrideWith((ref) async => const <Post>[]),
           ]),
@@ -312,7 +312,7 @@ void main() {
         await tester.pumpWidget(
           _wrapProvider(const FeedScreen(), [
             feedSegmentProvider.overrideWith((ref) => FeedSegment.public),
-            myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+            myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
             myGymFeedProvider.overrideWith((ref) async => null),
             feedPublicProvider.overrideWith((ref) async => const <Post>[]),
           ]),
@@ -335,7 +335,7 @@ void main() {
 
     List<Override> makeOverrides(List<Post> posts) => [
           feedSegmentProvider.overrideWith((ref) => FeedSegment.amigos),
-          myFriendsFeedProvider.overrideWith((ref) async => posts),
+          myFollowingFeedProvider.overrideWith((ref) async => posts),
           myGymFeedProvider.overrideWith((ref) async => null),
           feedPublicProvider.overrideWith((ref) async => const <Post>[]),
         ];
@@ -408,7 +408,7 @@ void main() {
   group('REQ-FEED-SCREEN-003: amigos empty state', () {
     final emptyOverrides = <Override>[
       feedSegmentProvider.overrideWith((ref) => FeedSegment.amigos),
-      myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+      myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
       myGymFeedProvider.overrideWith((ref) async => null),
       feedPublicProvider.overrideWith((ref) async => const <Post>[]),
     ];
@@ -441,7 +441,7 @@ void main() {
   group('REQ-FEED-SCREEN-004: amigos loading state', () {
     List<Override> loadingOverrides() => [
           feedSegmentProvider.overrideWith((ref) => FeedSegment.amigos),
-          myFriendsFeedProvider.overrideWith((ref) async {
+          myFollowingFeedProvider.overrideWith((ref) async {
             // Never resolves → AsyncLoading
             await Completer<void>().future;
             return const <Post>[];
@@ -482,7 +482,7 @@ void main() {
   group('REQ-FEED-SCREEN-005: amigos error state', () {
     final errorOverrides = <Override>[
       feedSegmentProvider.overrideWith((ref) => FeedSegment.amigos),
-      myFriendsFeedProvider.overrideWith(
+      myFollowingFeedProvider.overrideWith(
         (ref) => Future<List<Post>>.error(Exception('net'), StackTrace.empty),
       ),
       myGymFeedProvider.overrideWith((ref) async => null),
@@ -526,7 +526,7 @@ void main() {
     }) =>
         [
           feedSegmentProvider.overrideWith((ref) => FeedSegment.gym),
-          myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
           myGymFeedProvider.overrideWith((ref) => gymFuture()),
           feedPublicProvider.overrideWith((ref) async => const <Post>[]),
           userProfileProvider.overrideWith(
@@ -539,7 +539,7 @@ void main() {
       await tester.pumpWidget(
         _wrapProvider(const FeedScreen(), [
           feedSegmentProvider.overrideWith((ref) => FeedSegment.gym),
-          myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
           myGymFeedProvider.overrideWith((ref) async {
             await Completer<void>().future;
             return null;
@@ -559,7 +559,7 @@ void main() {
       await tester.pumpWidget(
         _wrapProvider(const FeedScreen(), [
           feedSegmentProvider.overrideWith((ref) => FeedSegment.gym),
-          myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
           myGymFeedProvider.overrideWith(
             (ref) =>
                 Future<List<Post>?>.error(Exception('err'), StackTrace.empty),
@@ -658,7 +658,7 @@ void main() {
       await tester.pumpWidget(
         _wrapProvider(const FeedScreen(), [
           feedSegmentProvider.overrideWith((ref) => FeedSegment.public),
-          myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
           myGymFeedProvider.overrideWith((ref) async => null),
           feedPublicProvider.overrideWith((ref) async {
             await Completer<void>().future;
@@ -678,7 +678,7 @@ void main() {
       await tester.pumpWidget(
         _wrapProvider(const FeedScreen(), [
           feedSegmentProvider.overrideWith((ref) => FeedSegment.public),
-          myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
           myGymFeedProvider.overrideWith((ref) async => null),
           feedPublicProvider.overrideWith(
             (ref) =>
@@ -701,7 +701,7 @@ void main() {
       await tester.pumpWidget(
         _wrapProvider(const FeedScreen(), [
           feedSegmentProvider.overrideWith((ref) => FeedSegment.public),
-          myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
           myGymFeedProvider.overrideWith((ref) async => null),
           feedPublicProvider.overrideWith((ref) async => const <Post>[]),
         ]),
@@ -727,7 +727,7 @@ void main() {
       await tester.pumpWidget(
         _wrapProvider(const FeedScreen(), [
           feedSegmentProvider.overrideWith((ref) => FeedSegment.public),
-          myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
           myGymFeedProvider.overrideWith((ref) async => null),
           feedPublicProvider.overrideWith((ref) async => posts),
         ]),
@@ -753,7 +753,7 @@ void main() {
     List<Override> tabOverrides({bool rankingOptIn = true}) => [
           // Page 0 (feed) dependencies.
           feedSegmentProvider.overrideWith((ref) => FeedSegment.amigos),
-          myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
           myGymFeedProvider.overrideWith((ref) async => null),
           feedPublicProvider.overrideWith((ref) async => const <Post>[]),
           unreadFromFriendsProvider.overrideWith((_) => 0),
@@ -905,7 +905,7 @@ void main() {
       await tester.pumpWidget(
         _wrapProvider(const FeedScreen(), [
           ...tabOverrides(),
-          myFriendsFeedProvider.overrideWith((ref) async {
+          myFollowingFeedProvider.overrideWith((ref) async {
             buildCount++;
             return const <Post>[];
           }),
@@ -932,7 +932,7 @@ void main() {
   group('infinite-scroll footer', () {
     List<Override> publicOverrides(List<Post> posts) => [
           feedSegmentProvider.overrideWith((ref) => FeedSegment.public),
-          myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
           myGymFeedProvider.overrideWith((ref) async => null),
           feedPublicProvider.overrideWith((ref) async => posts),
         ];
@@ -996,7 +996,7 @@ void main() {
 
     List<Override> publicOverrides(List<Post> posts) => [
           feedSegmentProvider.overrideWith((ref) => FeedSegment.public),
-          myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
           myGymFeedProvider.overrideWith((ref) async => null),
           feedPublicProvider.overrideWith((ref) async => posts),
         ];
@@ -1188,7 +1188,7 @@ void main() {
       await tester.pumpWidget(
         _wrapProvider(const FeedScreen(), [
           feedSegmentProvider.overrideWith((ref) => FeedSegment.public),
-          myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
           myGymFeedProvider.overrideWith((ref) async => null),
           postRepositoryProvider.overrideWithValue(repository),
         ]),
@@ -1228,7 +1228,7 @@ void main() {
     }) =>
         [
           feedSegmentProvider.overrideWith((ref) => FeedSegment.public),
-          myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
           myGymFeedProvider.overrideWith((ref) async => null),
           feedPublicProvider.overrideWith((ref) async => manyPosts()),
           userProfileProvider.overrideWith(

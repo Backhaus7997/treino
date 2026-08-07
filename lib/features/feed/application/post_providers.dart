@@ -4,12 +4,11 @@ import '../../auth/application/auth_providers.dart';
 import '../../profile/application/user_providers.dart' show firestoreProvider;
 import '../../profile/application/user_public_profile_providers.dart';
 import '../data/post_repository.dart';
-import '../domain/friendship_status.dart';
 import '../domain/post.dart';
 import '../domain/post_page.dart';
 import '../domain/post_privacy.dart';
 import 'feed_pagination_notifier.dart';
-import 'public_profile_providers.dart';
+import 'follow_providers.dart';
 
 final postRepositoryProvider = Provider<PostRepository>(
   (ref) => PostRepository(firestore: ref.watch(firestoreProvider)),
@@ -120,7 +119,7 @@ final postsByAuthorProvider =
 /// Posts authored by [targetUid], visible to the current viewer per each
 /// post's [PostPrivacy] tier:
 /// - `public` → always visible
-/// - `friends` → visible if the viewer is an accepted friend OR is self
+/// - `friends` → visible si el VIEWER SIGUE al target, o es él mismo
 /// - `gym` → visible if viewer.gymId == target.gymId OR is self
 ///
 /// Returned newest-first. Empty list when the viewer is unauthenticated.
@@ -151,16 +150,18 @@ final visiblePostsByAuthorProvider =
       ...await repo.byAuthorAndPrivacy(targetUid, PostPrivacy.public),
     ];
 
-    // Friends tier — only queried when the viewer is an accepted friend, so
-    // the rule authorizes every returned row.
-    final friendship = await ref.watch(
-      friendshipByPairProvider(
-        (viewerUid: viewerUid, targetUid: targetUid),
-      ).future,
-    );
-    if (friendship?.status == FriendshipStatus.accepted) {
+    // Tier seguidores — REQ-FOLLOW-010: la pregunta es "¿YO sigo al autor?",
+    // no "¿existe una relación entre los dos?". Sólo la arista SALIENTE da
+    // acceso: que el autor me siga a mí no me deja ver su contenido.
+    //
+    // Espeja exactamente el gate de las rules (`postFollowerAccepted`), y eso
+    // no es opcional: la query se emite sólo cuando la relación que la autoriza
+    // se cumple, porque si el cliente pidiera filas que la regla deniega,
+    // Firestore rechaza el QUERY ENTERO, no las filas de más.
+    final following = await ref.watch(followingProvider(viewerUid).future);
+    if (following.contains(targetUid)) {
       visible.addAll(
-          await repo.byAuthorAndPrivacy(targetUid, PostPrivacy.friends));
+          await repo.byAuthorAndPrivacy(targetUid, PostPrivacy.followers));
     }
 
     // Gym tier — queried constrained to the viewer's own gym, so every returned

@@ -68,14 +68,14 @@ void main() {
   });
 
   test('feedForFriendsProvider initially exposes the first 20 posts', () async {
-    await seedPosts(privacy: PostPrivacy.friends);
+    await seedPosts(privacy: PostPrivacy.followers);
     final container = makeContainer();
 
     final result = await container.read(feedForFriendsProvider('u1').future);
 
     expect(result, hasLength(20));
-    expect(result.first.id, 'friends-25');
-    expect(result.last.id, 'friends-6');
+    expect(result.first.id, 'followers-25');
+    expect(result.last.id, 'followers-6');
   });
 
   test('feedForGymProvider initially exposes the first 20 posts', () async {

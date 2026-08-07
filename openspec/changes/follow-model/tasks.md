@@ -242,13 +242,15 @@ Precondición **de merge y de release**: PR3a mergeada y deployada. **No es prec
 El query nuevo del cliente es subconjunto estricto del viejo → legal bajo las 2 versiones de rules (ADR-FOLLOW-010), pero la ventana entre 3a y este release debe ser corta: el cliente viejo pide autores que no sigo → `permission-denied` sobre el query entero, feed SEGUIDORES en blanco.
 Archivos: `lib/features/feed/domain/post_privacy.dart`, `lib/features/feed/application/post_providers.dart`, `lib/features/feed/application/feed_screen_providers.dart`.
 
-- [ ] **3b.1 [RED]** `test/features/feed/domain/post_privacy_test.dart` — `PostPrivacy.followers.toJson()=='friends'`. *(REQ-FOLLOW-009, SCENARIO-810)*
-- [ ] **3b.2 [GREEN]** `post_privacy.dart` — rename `friends`→`followers`, `@JsonValue('friends')`/`_wireMap`/`toJson()` intactos.
-- [ ] **3b.3 [RED]** `test/features/feed/application/post_providers_test.dart` — gate del tier `followers` usa "¿yo sigo al autor?" (no "¿existe alguna relación?"). *(REQ-FOLLOW-010, SCENARIO-814)*
-- [ ] **3b.4 [GREEN]** `post_providers.dart` — el gate pasa a `followingProvider(viewerUid)` (`.contains(authorUid)`).
-- [ ] **3b.5 [RED]** `test/features/feed/application/feed_screen_providers_test.dart` — feed SEGUIDORES = posts de a quienes YO sigo; NO incluye a quien me sigue sin que yo lo siga. *(REQ-FOLLOW-011, SCENARIO-814)*
-- [ ] **3b.6 [GREEN]** `feed_screen_providers.dart` — `myFollowingFeedProvider` (ex `myFriendsFeedProvider`) usa `followingProvider`.
-- [ ] **3b.7 [GATE]** `flutter analyze` 0 issues + `flutter test` verde en los 3 archivos tocados.
+- [x] **3b.1 [RED]** `test/features/feed/domain/post_privacy_test.dart` — `PostPrivacy.followers.toJson()=='friends'`. *(REQ-FOLLOW-009, SCENARIO-810)*
+- [x] **3b.2 [GREEN]** `post_privacy.dart` — rename `friends`→`followers`, `@JsonValue('friends')`/`_wireMap`/`toJson()` intactos.
+- [x] **3b.3 [RED]** `test/features/feed/application/post_providers_test.dart` — gate del tier `followers` usa "¿yo sigo al autor?" (no "¿existe alguna relación?"). *(REQ-FOLLOW-010, SCENARIO-814)*
+- [x] **3b.4 [GREEN]** `post_providers.dart` — el gate pasa a `followingProvider(viewerUid)` (`.contains(authorUid)`).
+- [x] **3b.5 [RED]** `test/features/feed/application/feed_screen_providers_test.dart` — feed SEGUIDORES = posts de a quienes YO sigo; NO incluye a quien me sigue sin que yo lo siga. *(REQ-FOLLOW-011, SCENARIO-814)*
+- [x] **3b.6 [GREEN]** `feed_screen_providers.dart` — `myFollowingFeedProvider` (ex `myFriendsFeedProvider`) usa `followingProvider`.
+- [x] **3b.7 [GATE]** `flutter analyze` **0 issues** + `dart format .` + **`flutter test` COMPLETO verde: 4813 tests**. El alcance real fue mucho mayor que "los 3 archivos tocados" que decía el plan: el rename de `PostPrivacy.friends`→`followers` toca **25 archivos** (54 usos) y el de `myFriendsFeedProvider`→`myFollowingFeedProvider` otros ~18. Todo mecánico, pero conviene saberlo al revisar el diff.
+  > **El invariante que sostiene el rename del enum (LD-05)**: el símbolo Dart cambia, el **valor de wire NO** — `PostPrivacy.followers.toJson() == 'friends'`. Si el `@JsonValue` acompañara al rename, un cambio cosmético se volvería una migración silenciosa sobre TODOS los posts existentes y además rompería las rules, que matchean `resource.data.privacy == 'friends'`. Va anclado en dos tests (SCENARIO-810).
+  > **Codegen verificado**: `post.g.dart` se regeneró con `build_runner` y produjo exactamente el mismo cambio de una línea que el rename manual — o sea que el mapa generado y el enum no divergieron.
 - [ ] **3b.8 [MANUAL]** Release del build con 3b — coordinar con 3a.21 (deploy de CFs), mismo release, ventana mínima entre ambos.
 
 ---

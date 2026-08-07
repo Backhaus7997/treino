@@ -11,7 +11,7 @@ import 'package:treino/l10n/app_l10n.dart';
 const _locale = Locale('es', 'AR');
 
 Widget _wrap({
-  PostPrivacy selected = PostPrivacy.friends,
+  PostPrivacy selected = PostPrivacy.followers,
   bool hasGym = true,
   required ValueChanged<PostPrivacy> onSelect,
 }) =>

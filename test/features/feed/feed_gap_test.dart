@@ -45,7 +45,7 @@ Post _makePost({
   String authorDisplayName = 'Test User',
   String? authorGymId,
   String text = 'Test post',
-  PostPrivacy privacy = PostPrivacy.friends,
+  PostPrivacy privacy = PostPrivacy.followers,
   DateTime? createdAt,
 }) {
   return Post(
@@ -111,7 +111,7 @@ void main() {
         await repo.create(_makePost(
           id: 'post-$uid',
           authorUid: uid,
-          privacy: PostPrivacy.friends,
+          privacy: PostPrivacy.followers,
           createdAt: DateTime.utc(2026, 1, 1).add(Duration(days: i)),
         ));
       }
@@ -146,7 +146,7 @@ void main() {
       await repo.create(_makePost(
         id: 'should-not-appear',
         authorUid: 'someone',
-        privacy: PostPrivacy.friends,
+        privacy: PostPrivacy.followers,
       ));
 
       final result = await repo.feedForFriends(const <String>[]);

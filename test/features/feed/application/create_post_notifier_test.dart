@@ -57,7 +57,7 @@ Post _makePost({
   String id = 'p1',
   String authorUid = 'u1',
   String text = 'Original text',
-  PostPrivacy privacy = PostPrivacy.friends,
+  PostPrivacy privacy = PostPrivacy.followers,
 }) =>
     Post(
       id: id,
@@ -110,7 +110,7 @@ ProviderContainer _makeContainer({
         (ref) => Stream.value(profile),
       ),
       postRepositoryProvider.overrideWithValue(repo),
-      myFriendsFeedProvider.overrideWith((ref) async => const []),
+      myFollowingFeedProvider.overrideWith((ref) async => const []),
       feedPublicProvider.overrideWith((ref) async => const []),
       myGymFeedProvider.overrideWith((ref) async => null),
       if (mockActions != null)
@@ -133,7 +133,7 @@ void main() {
         authorGymId: null,
         text: 'fallback',
         routineTag: null,
-        privacy: PostPrivacy.friends,
+        privacy: PostPrivacy.followers,
         createdAt: DateTime.utc(2026),
       ),
     );
@@ -229,12 +229,12 @@ void main() {
     tearDown(() => container.dispose());
 
     // SCENARIO-224: default privacy is friends
-    test('SCENARIO-224: privacy defaults to PostPrivacy.friends', () async {
+    test('SCENARIO-224: privacy defaults to PostPrivacy.followers', () async {
       await container.read(createPostNotifierProvider(null).future);
 
       expect(
         container.read(createPostNotifierProvider(null)).valueOrNull?.privacy,
-        PostPrivacy.friends,
+        PostPrivacy.followers,
       );
     });
 
@@ -408,7 +408,7 @@ void main() {
             (ref) => Stream.value(_makeProfile()),
           ),
           postRepositoryProvider.overrideWithValue(mockRepo),
-          myFriendsFeedProvider.overrideWith((ref) async => const []),
+          myFollowingFeedProvider.overrideWith((ref) async => const []),
           feedPublicProvider.overrideWith((ref) async => const []),
           myGymFeedProvider.overrideWith((ref) async => null),
         ],

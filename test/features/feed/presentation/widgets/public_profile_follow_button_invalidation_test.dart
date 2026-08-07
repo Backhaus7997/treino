@@ -3,7 +3,7 @@
 /// Verifies that after the stream conversion:
 ///   - SEGUIR and ACEPTAR do NOT call ref.invalidate for friendshipByPairProvider
 ///     or acceptedFriendsProvider (streams self-update)
-///   - ACEPTAR / unfriend DOES preserve ref.invalidate(myFriendsFeedProvider)
+///   - ACEPTAR / unfriend DOES preserve ref.invalidate(myFollowingFeedProvider)
 library;
 
 import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
@@ -13,7 +13,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/feed/application/feed_screen_providers.dart'
-    show myFriendsFeedProvider;
+    show myFollowingFeedProvider;
 import 'package:treino/features/feed/application/friendship_providers.dart'
     show acceptedFriendsProvider;
 import 'package:treino/features/feed/application/public_profile_providers.dart'
@@ -118,9 +118,9 @@ void main() {
       // No crash occurred — the tap succeeded without the obsolete invalidation calls
     });
 
-    // SCENARIO-492: ACEPTAR onTap DOES call ref.invalidate(myFriendsFeedProvider)
+    // SCENARIO-492: ACEPTAR onTap DOES call ref.invalidate(myFollowingFeedProvider)
     testWidgets(
-        'SCENARIO-492: tap ACEPTAR calls repo.accept AND invalidates myFriendsFeedProvider',
+        'SCENARIO-492: tap ACEPTAR calls repo.accept AND invalidates myFollowingFeedProvider',
         (tester) async {
       final firestore = FakeFirebaseFirestore();
       final pending = _pending(requesterId: 'target');
@@ -131,11 +131,11 @@ void main() {
           .doc(pending.id)
           .set({...pending.toJson(), 'createdAt': Timestamp.now()});
 
-      // Track myFriendsFeedProvider rebuilds to detect invalidation.
+      // Track myFollowingFeedProvider rebuilds to detect invalidation.
       // Invalidation causes a rebuild only when there's an active listener.
-      // We create an active listener on myFriendsFeedProvider via ProviderScope
+      // We create an active listener on myFollowingFeedProvider via ProviderScope
       // + a Consumer widget, then check if it rebuilt after ACEPTAR.
-      var myFriendsFeedBuildCount = 0;
+      var myFollowingFeedBuildCount = 0;
 
       await tester.pumpWidget(
         ProviderScope(
@@ -147,8 +147,8 @@ void main() {
             acceptedFriendsProvider.overrideWith(
               (ref, uid) => Stream.value(const <String>[]),
             ),
-            myFriendsFeedProvider.overrideWith((ref) async {
-              myFriendsFeedBuildCount++;
+            myFollowingFeedProvider.overrideWith((ref) async {
+              myFollowingFeedBuildCount++;
               return const [];
             }),
           ],
@@ -160,11 +160,11 @@ void main() {
             home: Scaffold(
               body: Column(
                 children: [
-                  // Active consumer of myFriendsFeedProvider — ensures
+                  // Active consumer of myFollowingFeedProvider — ensures
                   // ref.invalidate triggers a rebuild
                   Consumer(
                     builder: (_, ref, __) {
-                      ref.watch(myFriendsFeedProvider);
+                      ref.watch(myFollowingFeedProvider);
                       return const SizedBox.shrink();
                     },
                   ),
@@ -180,20 +180,21 @@ void main() {
         ),
       );
 
-      // Wait for myFriendsFeedProvider to have an initial build
+      // Wait for myFollowingFeedProvider to have an initial build
       await tester.pump();
-      final countAfterInitialRender = myFriendsFeedBuildCount;
+      final countAfterInitialRender = myFollowingFeedBuildCount;
       expect(countAfterInitialRender, greaterThan(0),
-          reason: 'myFriendsFeedProvider should build at least once on render');
+          reason:
+              'myFollowingFeedProvider should build at least once on render');
 
       await tester.tap(find.text('ACEPTAR'));
       await tester.pumpAndSettle();
 
-      // myFriendsFeedProvider should have been invalidated and rebuilt
+      // myFollowingFeedProvider should have been invalidated and rebuilt
       expect(
-        myFriendsFeedBuildCount,
+        myFollowingFeedBuildCount,
         greaterThan(countAfterInitialRender),
-        reason: 'ACEPTAR must call ref.invalidate(myFriendsFeedProvider)',
+        reason: 'ACEPTAR must call ref.invalidate(myFollowingFeedProvider)',
       );
 
       // Friendship doc in Firestore should now be accepted

@@ -7,7 +7,7 @@ import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../../profile/application/user_public_profile_providers.dart';
 import '../../application/feed_screen_providers.dart'
-    show myFriendsFeedProvider;
+    show myFollowingFeedProvider;
 import '../../application/friendship_providers.dart'
     show friendshipRepositoryProvider;
 import '../../data/friendship_repository.dart' show FriendshipRepository;
@@ -27,7 +27,7 @@ import 'unfriend_confirmation_sheet.dart';
 /// `acceptedFriendsProvider` are now `StreamProvider.family.autoDispose` and
 /// self-update on Firestore mutations — manual `ref.invalidate` for those
 /// providers is no longer needed and has been removed. The
-/// `myFriendsFeedProvider` invalidation is preserved (still a FutureProvider
+/// `myFollowingFeedProvider` invalidation is preserved (still a FutureProvider
 /// that requires explicit refresh per ADR-FPS-006).
 class PublicProfileFollowButton extends ConsumerStatefulWidget {
   const PublicProfileFollowButton({
@@ -126,7 +126,7 @@ class _PublicProfileFollowButtonState
       );
       // Stream providers (friendshipByPairProvider, acceptedFriendsProvider)
       // self-update via .snapshots() — no manual invalidation needed.
-      // SEGUIR only creates a pending request, so myFriendsFeedProvider
+      // SEGUIR only creates a pending request, so myFollowingFeedProvider
       // (accepted friends list) is unaffected — no invalidation required.
       messenger
         ..hideCurrentSnackBar()
@@ -161,10 +161,10 @@ class _PublicProfileFollowButtonState
       await repo.accept(f.id, widget.viewerUid);
       // Stream providers self-update on Firestore mutation — no invalidation
       // needed for friendshipByPairProvider or acceptedFriendsProvider.
-      // myFriendsFeedProvider (still a FutureProvider) MUST be invalidated
+      // myFollowingFeedProvider (still a FutureProvider) MUST be invalidated
       // explicitly — Riverpod does NOT auto-cascade to providers with no
       // active listener at the moment (ADR-FPS-006).
-      container.invalidate(myFriendsFeedProvider);
+      container.invalidate(myFollowingFeedProvider);
       messenger
         ..hideCurrentSnackBar()
         ..showSnackBar(SnackBar(content: Text(successMessage)));
@@ -184,7 +184,7 @@ class _PublicProfileFollowButtonState
   /// Resolves the friend's display name from [userPublicProfileProvider] with
   /// a fallback of "Usuario anónimo". On ELIMINAR, calls
   /// [FriendshipRepository.delete]. Stream providers self-update — only
-  /// [myFriendsFeedProvider] requires explicit invalidation.
+  /// [myFollowingFeedProvider] requires explicit invalidation.
   Future<void> _showUnfriendSheet(Friendship f) async {
     final palette = AppPalette.of(context);
     final profileAsync = ref.read(userPublicProfileProvider(widget.targetUid));
@@ -217,10 +217,10 @@ class _PublicProfileFollowButtonState
           try {
             await repo.delete(f.id, widget.viewerUid);
             // Stream providers self-update on Firestore mutation.
-            // myFriendsFeedProvider (FutureProvider) MUST be invalidated
+            // myFollowingFeedProvider (FutureProvider) MUST be invalidated
             // explicitly — accepted friends list changed, Feed AMIGOS must
             // refresh.
-            container.invalidate(myFriendsFeedProvider);
+            container.invalidate(myFollowingFeedProvider);
           } catch (_) {
             // The friendship is still present (the delete did not commit);
             // surface the failure so the user can retry instead of swallowing.

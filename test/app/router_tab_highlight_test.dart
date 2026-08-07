@@ -78,7 +78,7 @@ List<Override> _overrides() => [
       pendingRequestsStreamProvider('').overrideWith((_) => Stream.value([])),
       // Feed tab root (origin of the Solicitudes push).
       feedSegmentProvider.overrideWith((ref) => FeedSegment.amigos),
-      myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+      myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
       myGymFeedProvider.overrideWith((ref) async => null),
       feedPublicProvider.overrideWith((ref) async => const <Post>[]),
       // Availability editor streams (trainerId travels as a query param).

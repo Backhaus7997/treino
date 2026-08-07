@@ -164,7 +164,7 @@ void main() {
           _makeSession(),
           text: '¡Terminé mi entreno! 💪',
           exerciseCount: 2,
-          privacy: PostPrivacy.friends,
+          privacy: PostPrivacy.followers,
           localPhotoPath: localPhotoPath,
         );
   }

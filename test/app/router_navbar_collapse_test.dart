@@ -74,7 +74,7 @@ List<Override> _overrides() => [
       pendingRequestCountProvider('').overrideWith((_) => 0),
       pendingRequestsStreamProvider('').overrideWith((_) => Stream.value([])),
       feedSegmentProvider.overrideWith((ref) => FeedSegment.public),
-      myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+      myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
       myGymFeedProvider.overrideWith((ref) async => null),
       feedPublicProvider.overrideWith((ref) async => _manyPosts()),
     ];

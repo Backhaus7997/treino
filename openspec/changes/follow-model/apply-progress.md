@@ -189,9 +189,49 @@ del exploit se verificaron en ROJO contra la implementación anterior.
 
 ---
 
+## PR 3b — Flip cliente: posts y feed ✅ código
+
+Tareas 3b.1–3b.7. Falta sólo 3b.8 (release del build, manual).
+
+**El enum.** `PostPrivacy.friends` → `PostPrivacy.followers`, **con el valor de
+wire intacto**: `toJson()` sigue devolviendo `'friends'` (LD-05). Ese es el
+invariante que hace que el rename sea cosmético en vez de una migración de datos
+sobre todos los posts existentes — y que las rules, que matchean
+`resource.data.privacy == 'friends'`, sigan funcionando. Dos tests lo anclan
+(SCENARIO-810). `post.g.dart` se regeneró con `build_runner` y produjo
+exactamente el mismo cambio de una línea que el rename manual.
+
+**El gate del perfil público.** `visiblePostsByAuthorProvider` deja
+`friendshipByPairProvider` y pasa a `followingProvider`: pregunta si el VIEWER
+sigue al target. Espeja el gate de las rules, y no es opcional — Firestore
+rechaza el **query entero** si pide filas que la regla deniega, no las filas de
+más, así que cliente y rules tienen que coincidir exactamente.
+
+**El feed.** `myFriendsFeedProvider` → `myFollowingFeedProvider`, alimentado por
+`followingProvider`. Es el cambio con efecto visible para el usuario:
+`acceptedFriendsProvider` devolvía los DOS lados de la relación, así que alguien
+que te seguía sin que vos lo siguieras te metía sus posts en el feed.
+
+**El test que discrimina** es justamente el que el modelo viejo no podía ni
+expresar: el target sigue al viewer, el viewer no al target, y el contenido
+queda oculto. Con un doc por par, esas dos cosas eran el mismo hecho.
+
+**Alcance real mayor que el planeado**: el plan listaba 3 archivos; el rename
+del enum toca **25** (54 usos) y el del provider otros **~18**. Todo mecánico.
+
+**Evidencia**: `flutter analyze` 0 issues + `dart format .` + **`flutter test`
+completo verde, 4813 tests**.
+
+> **Nota de higiene**: `dart format .` también reformateó
+> `lib/features/coach/presentation/widgets/new_session_sheet.dart`, que este
+> change **no toca**. Es drift previo entre el formateador local y el baseline
+> del repo. Se revirtió a propósito para no meter churn ajeno en el PR — pero
+> queda anotado: alguien va a chocar con eso de nuevo.
+
+---
+
 ## Pendiente
 
-- **PR 3b** — flip cliente de posts y feed. Va pegado a 3a, mismo release.
 - **PR 3c** (en 3 slices) — perfil público, sugerencias + inbox, composer del
   chat. **No puede preceder a PR3a.**
 - **PR 3d** — retiro de `Friendship*`. **PR 4** — UX + l10n.

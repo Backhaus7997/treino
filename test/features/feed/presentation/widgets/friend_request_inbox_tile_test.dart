@@ -7,7 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/feed/application/feed_screen_providers.dart'
-    show myFriendsFeedProvider;
+    show myFollowingFeedProvider;
 import 'package:treino/features/feed/application/friendship_providers.dart';
 import 'package:treino/features/feed/data/friendship_repository.dart';
 import 'package:treino/features/feed/domain/friendship.dart';
@@ -464,19 +464,19 @@ void main() {
   // SCENARIO-493: _onAceptar invalidation cleanup (T20 RED / T21 GREEN)
   // ---------------------------------------------------------------------------
   group('FriendRequestInboxTile._onAceptar invalidation (SCENARIO-493)', () {
-    // SCENARIO-493: _onAceptar DOES call container.invalidate(myFriendsFeedProvider)
+    // SCENARIO-493: _onAceptar DOES call container.invalidate(myFollowingFeedProvider)
     // AND does NOT call container.invalidate for the converted stream providers.
     testWidgets(
-        'SCENARIO-493: _onAceptar invalidates myFriendsFeedProvider but NOT acceptedFriendsProvider or friendshipByPairProvider',
+        'SCENARIO-493: _onAceptar invalidates myFollowingFeedProvider but NOT acceptedFriendsProvider or friendshipByPairProvider',
         (tester) async {
       final stub = _StubFriendshipRepository();
       final friendship = _makeFriendship(requesterId: 'bob');
-      var myFriendsFeedBuildCount = 0;
+      var myFollowingFeedBuildCount = 0;
 
-      // Build with an active listener on myFriendsFeedProvider.
+      // Build with an active listener on myFollowingFeedProvider.
       // The tile uses ProviderScope.containerOf(context) which resolves to
-      // the root ProviderScope — so myFriendsFeedProvider must be in the
-      // same scope for container.invalidate(myFriendsFeedProvider) to trigger a rebuild.
+      // the root ProviderScope — so myFollowingFeedProvider must be in the
+      // same scope for container.invalidate(myFollowingFeedProvider) to trigger a rebuild.
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -487,8 +487,8 @@ void main() {
                 displayName: 'Bob',
               )),
             ),
-            myFriendsFeedProvider.overrideWith((ref) async {
-              myFriendsFeedBuildCount++;
+            myFollowingFeedProvider.overrideWith((ref) async {
+              myFollowingFeedBuildCount++;
               return const [];
             }),
           ],
@@ -502,7 +502,7 @@ void main() {
                   // Active consumer ensures invalidation triggers rebuild
                   Consumer(
                     builder: (_, ref, __) {
-                      ref.watch(myFriendsFeedProvider);
+                      ref.watch(myFollowingFeedProvider);
                       return const SizedBox.shrink();
                     },
                   ),
@@ -518,7 +518,7 @@ void main() {
       );
 
       await tester.pump();
-      final countBeforeTap = myFriendsFeedBuildCount;
+      final countBeforeTap = myFollowingFeedBuildCount;
       expect(countBeforeTap, greaterThan(0),
           reason: 'Provider should build at least once on render');
 
@@ -528,12 +528,12 @@ void main() {
       // repo.accept was called
       expect(stub.acceptCallCount, equals(1));
 
-      // myFriendsFeedProvider should have been invalidated → rebuilt
+      // myFollowingFeedProvider should have been invalidated → rebuilt
       expect(
-        myFriendsFeedBuildCount,
+        myFollowingFeedBuildCount,
         greaterThan(countBeforeTap),
         reason:
-            '_onAceptar must call container.invalidate(myFriendsFeedProvider)',
+            '_onAceptar must call container.invalidate(myFollowingFeedProvider)',
       );
     });
   });

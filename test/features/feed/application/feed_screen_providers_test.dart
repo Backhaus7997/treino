@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/feed/application/feed_screen_providers.dart';
-import 'package:treino/features/feed/application/friendship_providers.dart';
+import 'package:treino/features/feed/application/follow_providers.dart';
 import 'package:treino/features/feed/application/post_providers.dart';
 import 'package:treino/features/feed/domain/feed_segment.dart';
 import 'package:treino/features/feed/domain/post.dart';
@@ -26,7 +26,7 @@ Post makePost({
   String? authorGymId,
   String text = 'Hola mundo',
   RoutineTag? routineTag,
-  PostPrivacy privacy = PostPrivacy.friends,
+  PostPrivacy privacy = PostPrivacy.followers,
   DateTime? createdAt,
 }) =>
     Post(
@@ -61,9 +61,9 @@ void main() {
     });
   });
 
-  group('myFriendsFeedProvider', () {
-    // SCENARIO-140: happy path — auth + friends + posts chain
-    test('SCENARIO-140: returns posts when user is authenticated with friends',
+  group('myFollowingFeedProvider', () {
+    // SCENARIO-140: happy path — auth + seguidos + posts chain
+    test('SCENARIO-140: returns posts when user is authenticated with follows',
         () async {
       final user = MockUser(uid: 'u1');
       final posts = [
@@ -79,14 +79,14 @@ void main() {
       final container = ProviderContainer(
         overrides: [
           authStateChangesProvider.overrideWith((ref) => Stream.value(user)),
-          acceptedFriendsProvider('u1')
+          followingProvider('u1')
               .overrideWith((ref) => Stream.value(['u2', 'u3'])),
           feedForFriendsProvider.overrideWith((ref, _) => Future.value(posts)),
         ],
       );
       addTearDown(container.dispose);
 
-      final result = await container.read(myFriendsFeedProvider.future);
+      final result = await container.read(myFollowingFeedProvider.future);
       expect(result, hasLength(5));
       expect(result, equals(posts));
     });
@@ -101,7 +101,7 @@ void main() {
       final container = ProviderContainer(
         overrides: [
           authStateChangesProvider.overrideWith((ref) => Stream.value(user)),
-          acceptedFriendsProvider('u1')
+          followingProvider('u1')
               .overrideWith((ref) => Stream.value(['u2', 'u3'])),
           feedForFriendsProvider.overrideWith((ref, key) {
             capturedKey = key;
@@ -111,7 +111,7 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      await container.read(myFriendsFeedProvider.future);
+      await container.read(myFollowingFeedProvider.future);
       expect(capturedKey, isNotNull);
       // friendUidsKey sorts+joins with spaces; the own uid must be present.
       expect(capturedKey!.split(' '), containsAll(<String>['u1', 'u2', 'u3']));
@@ -128,7 +128,7 @@ void main() {
       final container = ProviderContainer(
         overrides: [
           authStateChangesProvider.overrideWith((ref) => Stream.value(user)),
-          acceptedFriendsProvider('u1')
+          followingProvider('u1')
               .overrideWith((ref) => Stream.value(const <String>[])),
           feedForFriendsProvider
               .overrideWith((ref, _) => Future.value(ownPosts)),
@@ -136,8 +136,44 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      final result = await container.read(myFriendsFeedProvider.future);
+      final result = await container.read(myFollowingFeedProvider.future);
       expect(result, equals(ownPosts));
+    });
+
+    // SCENARIO-814 — EL FEED ES DIRIGIDO.
+    //
+    // La query se arma con a quiénes SIGO, no con "con quiénes tengo relación".
+    // Con `acceptedFriendsProvider` los dos lados de la relación entraban en el
+    // mismo conjunto, así que alguien que me sigue sin que yo lo siga aparecía
+    // en mi feed. Acá `u3` sigue a `u1`, pero `u1` sólo sigue a `u2`: la key
+    // NO puede contener a u3.
+    test('SCENARIO-814: la key son los que SIGO, no los que me siguen',
+        () async {
+      final user = MockUser(uid: 'u1');
+      String? capturedKey;
+
+      final container = ProviderContainer(
+        overrides: [
+          authStateChangesProvider.overrideWith((ref) => Stream.value(user)),
+          // u1 sigue solamente a u2.
+          followingProvider('u1')
+              .overrideWith((ref) => Stream.value(const ['u2'])),
+          // u3 sigue a u1 — no tiene que aportar nada al feed de u1.
+          followingProvider('u3')
+              .overrideWith((ref) => Stream.value(const ['u1'])),
+          feedForFriendsProvider.overrideWith((ref, key) {
+            capturedKey = key;
+            return Future.value(const <Post>[]);
+          }),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(myFollowingFeedProvider.future);
+      final uids = capturedKey!.split(' ');
+      expect(uids, containsAll(<String>['u1', 'u2']));
+      expect(uids, isNot(contains('u3')),
+          reason: 'que u3 me siga no mete sus posts en mi feed');
     });
 
     // SCENARIO-142: unauthenticated (auth == null) → empty list
@@ -151,15 +187,15 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      final result = await container.read(myFriendsFeedProvider.future);
+      final result = await container.read(myFollowingFeedProvider.future);
       expect(result, isEmpty);
     });
 
-    // SCENARIO-143: myFriendsFeedProvider is a plain FutureProvider (not a family)
+    // SCENARIO-143: myFollowingFeedProvider is a plain FutureProvider (not a family)
     test(
-        'SCENARIO-143: myFriendsFeedProvider is FutureProvider<List<Post>> — not a family',
+        'SCENARIO-143: myFollowingFeedProvider is FutureProvider<List<Post>> — not a family',
         () {
-      expect(myFriendsFeedProvider, isA<FutureProvider<List<Post>>>());
+      expect(myFollowingFeedProvider, isA<FutureProvider<List<Post>>>());
     });
   });
 }

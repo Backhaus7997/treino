@@ -117,7 +117,7 @@ Widget _wrapWithRouter({
       authStateChangesProvider.overrideWith((ref) => Stream.value(user)),
       userProfileProvider.overrideWith((ref) => Stream.value(profile)),
       postRepositoryProvider.overrideWithValue(repo),
-      myFriendsFeedProvider.overrideWith((ref) async => const []),
+      myFollowingFeedProvider.overrideWith((ref) async => const []),
       feedPublicProvider.overrideWith((ref) async => const []),
       myGymFeedProvider.overrideWith((ref) async => null),
       userCreatedRoutinesProvider
@@ -155,7 +155,7 @@ void main() {
         authorGymId: null,
         text: 'fallback',
         routineTag: null,
-        privacy: PostPrivacy.friends,
+        privacy: PostPrivacy.followers,
         createdAt: DateTime.utc(2026),
       ),
     );

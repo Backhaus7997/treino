@@ -834,25 +834,25 @@ class _AmigosBody extends ConsumerWidget {
 
     return _FeedAsyncBody<List<Post>>(
       showTitle: showTitle,
-      async: ref.watch(myFriendsFeedProvider),
+      async: ref.watch(myFollowingFeedProvider),
       onRetry: () {
         ref.invalidate(feedPaginationProvider);
         ref.invalidate(feedForFriendsProvider);
-        ref.invalidate(myFriendsFeedProvider);
+        ref.invalidate(myFollowingFeedProvider);
       },
       onRefresh: () async {
         final paginationKey =
-            ref.read(myFriendsFeedPaginationKeyProvider).valueOrNull;
+            ref.read(myFollowingFeedPaginationKeyProvider).valueOrNull;
         if (paginationKey == null) {
-          ref.invalidate(myFriendsFeedPaginationKeyProvider);
-          await ref.read(myFriendsFeedPaginationKeyProvider.future);
+          ref.invalidate(myFollowingFeedPaginationKeyProvider);
+          await ref.read(myFollowingFeedPaginationKeyProvider.future);
           return;
         }
         await ref
             .read(feedPaginationProvider(paginationKey).notifier)
             .refresh();
         ref.invalidate(feedForFriendsProvider);
-        ref.invalidate(myFriendsFeedProvider);
+        ref.invalidate(myFollowingFeedProvider);
       },
       dataBuilder: (context, posts) {
         if (posts.isEmpty) {
@@ -875,7 +875,7 @@ class _AmigosBody extends ConsumerWidget {
           isLoadingMore: pagination?.isLoadingMore ?? false,
           onLoadMore: () async {
             final paginationKey =
-                ref.read(myFriendsFeedPaginationKeyProvider).valueOrNull;
+                ref.read(myFollowingFeedPaginationKeyProvider).valueOrNull;
             if (paginationKey == null || !(pagination?.hasMore ?? false)) {
               return;
             }
@@ -883,7 +883,7 @@ class _AmigosBody extends ConsumerWidget {
                 .read(feedPaginationProvider(paginationKey).notifier)
                 .loadMore();
             ref.invalidate(feedForFriendsProvider);
-            ref.invalidate(myFriendsFeedProvider);
+            ref.invalidate(myFollowingFeedProvider);
           },
         );
       },

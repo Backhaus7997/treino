@@ -19,7 +19,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/feed/application/feed_screen_providers.dart'
-    show myFriendsFeedProvider;
+    show myFollowingFeedProvider;
 import 'package:treino/features/feed/application/friendship_providers.dart'
     show friendshipRepositoryProvider;
 import 'package:treino/features/feed/data/friendship_repository.dart';
@@ -57,7 +57,7 @@ void main() {
     final buttonMounted = ValueNotifier<bool>(true);
     addTearDown(buttonMounted.dispose);
 
-    var myFriendsFeedBuilds = 0;
+    var myFollowingFeedBuilds = 0;
 
     await tester.pumpWidget(
       ProviderScope(
@@ -68,8 +68,8 @@ void main() {
               const UserPublicProfile(uid: 'target', displayName: 'Vicente'),
             ),
           ),
-          myFriendsFeedProvider.overrideWith((ref) async {
-            myFriendsFeedBuilds++;
+          myFollowingFeedProvider.overrideWith((ref) async {
+            myFollowingFeedBuilds++;
             return const [];
           }),
         ],
@@ -85,7 +85,7 @@ void main() {
                 // dispara rebuild y el contador no serviría de sonda.
                 Consumer(
                   builder: (_, ref, __) {
-                    ref.watch(myFriendsFeedProvider);
+                    ref.watch(myFollowingFeedProvider);
                     return const SizedBox.shrink();
                   },
                 ),
@@ -107,7 +107,7 @@ void main() {
     );
     await tester.pump();
 
-    final buildsBeforeUnfriend = myFriendsFeedBuilds;
+    final buildsBeforeUnfriend = myFollowingFeedBuilds;
     expect(buildsBeforeUnfriend, greaterThan(0));
 
     await tester.tap(find.text('SIGUIENDO'));
@@ -127,7 +127,7 @@ void main() {
 
     verify(() => repo.delete(_accepted().id, 'viewer')).called(1);
     expect(
-      myFriendsFeedBuilds,
+      myFollowingFeedBuilds,
       greaterThan(buildsBeforeUnfriend),
       reason: 'El feed AMIGOS debe refrescarse o queda mostrando al ex-amigo',
     );
