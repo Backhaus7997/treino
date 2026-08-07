@@ -6,11 +6,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
+import 'package:treino/features/feed/application/follow_providers.dart';
 import 'package:treino/features/feed/application/friendship_providers.dart';
 import 'package:treino/features/feed/application/public_profile_providers.dart';
-import 'package:treino/features/feed/data/friendship_repository.dart';
-import 'package:treino/features/feed/domain/friendship.dart';
-import 'package:treino/features/feed/domain/friendship_status.dart';
+import 'package:treino/features/feed/data/follow_repository.dart';
+import 'package:treino/features/feed/domain/follow.dart';
+import 'package:treino/features/feed/domain/follow_status.dart';
 import 'package:treino/features/feed/domain/public_profile_view.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
@@ -26,24 +27,34 @@ class MockUser extends Mock implements User {
   String get uid => _uid;
 }
 
-/// Spy repository that records watchByPair subscription count and allows
+/// Spy repository that records `watchEdge` subscription count and allows
 /// controlling the emitted stream.
-class _SpyFriendshipRepository extends FriendshipRepository {
-  _SpyFriendshipRepository() : super(firestore: FakeFirebaseFirestore());
+///
+/// Migración: antes espiaba `FriendshipRepository.watchByPair(uidA, uidB)` —
+/// dos uids porque el documento era del PAR. Ahora la unidad es la ARISTA
+/// dirigida, así que el método espiado recibe un solo doc id
+/// (`'{follower}_{followee}'`, sin ordenar).
+class _SpyFollowRepository extends FollowRepository {
+  _SpyFollowRepository() : super(firestore: FakeFirebaseFirestore());
 
-  int watchByPairSubscribeCount = 0;
-  int watchByPairDisposeCount = 0;
-  final _watchByPairController = StreamController<Friendship?>.broadcast();
+  int watchEdgeSubscribeCount = 0;
+  int watchEdgeDisposeCount = 0;
+  final _watchEdgeController = StreamController<Follow?>.broadcast();
 
-  Stream<Friendship?> get controlledStream => _watchByPairController.stream;
+  /// Doc ids con los que se pidió una arista, en orden. Permite afirmar que se
+  /// consultó la dirección correcta y no la inversa.
+  final requestedEdgeIds = <String>[];
+
+  Stream<Follow?> get controlledStream => _watchEdgeController.stream;
 
   @override
-  Stream<Friendship?> watchByPair(String uidA, String uidB) {
-    watchByPairSubscribeCount++;
-    return _watchByPairController.stream.transform(
+  Stream<Follow?> watchEdge(String edgeId) {
+    watchEdgeSubscribeCount++;
+    requestedEdgeIds.add(edgeId);
+    return _watchEdgeController.stream.transform(
       StreamTransformer.fromHandlers(
         handleDone: (sink) {
-          watchByPairDisposeCount++;
+          watchEdgeDisposeCount++;
           sink.close();
         },
       ),
@@ -51,22 +62,26 @@ class _SpyFriendshipRepository extends FriendshipRepository {
   }
 
   void dispose() {
-    _watchByPairController.close();
+    _watchEdgeController.close();
   }
 }
 
 final _now = DateTime.utc(2026, 1, 1);
 
-Friendship _makeFriendship({
-  FriendshipStatus status = FriendshipStatus.pending,
+/// Arista dirigida `follower → followee`. El doc id NUNCA se ordena: si se
+/// ordenara, las dos direcciones colisionarían en el mismo documento y
+/// volveríamos al modelo simétrico de `friendships`.
+Follow _makeFollow({
+  String follower = 'viewer',
+  String followee = 'target',
+  FollowStatus status = FollowStatus.pending,
 }) =>
-    Friendship(
-      id: 'alice_bob',
-      uidA: 'alice',
-      uidB: 'bob',
+    Follow(
+      id: Follow.edgeId(follower, followee),
+      followerUid: follower,
+      followeeUid: followee,
       status: status,
-      requesterId: 'alice',
-      members: const ['alice', 'bob'],
+      members: [follower, followee],
       createdAt: _now,
     );
 
@@ -76,89 +91,87 @@ const _profileAlice = UserPublicProfile(
   displayNameLowercase: 'alice',
 );
 
+/// `follows/{viewer}_{target}` — "yo lo sigo". Es el equivalente por defecto de
+/// la vieja `friendship` del par cuando el caso no habla de una solicitud
+/// RECIBIDA.
+final _outgoingEdgeId = Follow.edgeId('viewer', 'target');
+
 // ---------------------------------------------------------------------------
-// T08 RED: SCENARIO-481..483 — friendshipByPairProvider as StreamProvider
+// T08 RED: SCENARIO-481..483 — followEdgeProvider as StreamProvider
+//
+// Mapeo del modelo viejo al nuevo: `friendshipByPairProvider(pair)` fue
+// eliminado; su reemplazo es `followEdgeProvider(Follow.edgeId(a, b))`, cuya
+// key de family es el DOC ID de la arista (un `String`), no un record.
 // ---------------------------------------------------------------------------
 
 void main() {
   // ──────────────────────────────────────────────────────────────────────────
-  // SCENARIO-481: friendshipByPairProvider exposes AsyncValue<Friendship?>
+  // SCENARIO-481: followEdgeProvider exposes AsyncValue<Follow?>
   // ──────────────────────────────────────────────────────────────────────────
   test(
-      'SCENARIO-481: friendshipByPairProvider consumer receives AsyncValue<Friendship?> and rebuilds on emit',
+      'SCENARIO-481: followEdgeProvider consumer receives AsyncValue<Follow?> and rebuilds on emit',
       () async {
     final user = MockUser(uid: 'viewer');
-    final friendship = _makeFriendship();
+    final edge = _makeFollow();
 
     final container = ProviderContainer(
       overrides: [
         authStateChangesProvider.overrideWith((ref) => Stream.value(user)),
-        friendshipByPairProvider.overrideWith(
-          (ref, pair) => Stream.value(friendship),
+        followEdgeProvider.overrideWith(
+          (ref, edgeId) => Stream.value(edge),
         ),
       ],
     );
     addTearDown(container.dispose);
 
-    // Reading gives AsyncValue<Friendship?> — same surface as former FutureProvider
+    // Reading gives AsyncValue<Follow?> — same surface as former FutureProvider
     final value = await container.read(
-      friendshipByPairProvider(
-        (viewerUid: 'viewer', targetUid: 'target'),
-      ).future,
+      followEdgeProvider(_outgoingEdgeId).future,
     );
-    expect(value, equals(friendship));
-    expect(value?.status, equals(FriendshipStatus.pending));
+    expect(value, equals(edge));
+    expect(value?.status, equals(FollowStatus.pending));
 
     // The provider itself (the family) is a StreamProvider.family.autoDispose
     // Calling the family with args produces an AutoDisposeStreamProvider
-    final provider = friendshipByPairProvider(
-      (viewerUid: 'viewer', targetUid: 'target'),
-    );
-    expect(provider, isA<AutoDisposeStreamProvider<Friendship?>>());
+    final provider = followEdgeProvider(_outgoingEdgeId);
+    expect(provider, isA<AutoDisposeStreamProvider<Follow?>>());
   });
 
   // ──────────────────────────────────────────────────────────────────────────
   // SCENARIO-482: autoDispose — subscription cancelled when container disposed
   // ──────────────────────────────────────────────────────────────────────────
   test(
-      'SCENARIO-482: friendshipByPairProvider drops Firestore listener when container is disposed',
+      'SCENARIO-482: followEdgeProvider drops Firestore listener when container is disposed',
       () async {
-    final spyRepo = _SpyFriendshipRepository();
+    final spyRepo = _SpyFollowRepository();
     final user = MockUser(uid: 'alice');
 
     final container = ProviderContainer(
       overrides: [
         authStateChangesProvider.overrideWith((ref) => Stream.value(user)),
-        // Override the private _friendshipRepositoryProvider via the public-
-        // facing one via the firestore, but since it's private we must use
-        // overrideWith on the family provider itself.
-        friendshipByPairProvider.overrideWith(
-          (ref, pair) async* {
-            final auth = await ref.watch(authStateChangesProvider.future);
-            if (auth == null) {
-              yield null;
-              return;
-            }
-            yield* spyRepo.watchByPair(pair.viewerUid, pair.targetUid);
-          },
-        ),
+        // Antes había que sustituir el cuerpo de la family entera porque el
+        // repositorio vivía en un provider PRIVADO. `followRepositoryProvider`
+        // es público, así que ahora se inyecta el spy y se ejercita el cuerpo
+        // REAL de `followEdgeProvider` — el listener que se cuenta es el que
+        // abre producción, no uno de mentira.
+        followRepositoryProvider.overrideWithValue(spyRepo),
       ],
     );
 
     // Subscribe to the provider (simulates a widget listening)
     final sub = container.listen(
-      friendshipByPairProvider(
-        (viewerUid: 'alice', targetUid: 'bob'),
-      ),
+      followEdgeProvider(Follow.edgeId('alice', 'bob')),
       (_, __) {},
     );
 
     // Wait for the subscription to establish
     await Future<void>.delayed(const Duration(milliseconds: 50));
-    expect(spyRepo.watchByPairSubscribeCount, equals(1));
+    expect(spyRepo.watchEdgeSubscribeCount, equals(1));
+    // La dirección pedida es la de la key, sin ordenar los uids.
+    expect(spyRepo.requestedEdgeIds, equals(['alice_bob']));
 
     // Emit one value to make sure the stream is live
-    spyRepo._watchByPairController.add(null);
+    spyRepo._watchEdgeController.add(null);
     await Future<void>.delayed(const Duration(milliseconds: 10));
 
     // Dispose the listener (simulates widget unmount)
@@ -170,13 +183,18 @@ void main() {
 
     // The stream was subscribed exactly once and the provider was auto-disposed
     // (autoDispose cancels the stream when the last listener is removed)
-    expect(spyRepo.watchByPairSubscribeCount, equals(1));
+    expect(spyRepo.watchEdgeSubscribeCount, equals(1));
 
     spyRepo.dispose();
   });
 
   // ──────────────────────────────────────────────────────────────────────────
   // SCENARIO-483: acceptedFriendsProvider drop-in — AsyncValue<List<String>>
+  //
+  // Sin cambios: `acceptedFriendsProvider` sigue existiendo en `lib/` y este
+  // archivo es su ÚNICA cobertura. Su sucesor direccional es
+  // `followingProvider`, pero migrarlo acá borraría la única prueba del
+  // provider que todavía se exporta.
   // ──────────────────────────────────────────────────────────────────────────
   test(
       'SCENARIO-483: acceptedFriendsProvider is StreamProvider.family.autoDispose returning AsyncValue<List<String>>',
@@ -223,7 +241,8 @@ void main() {
         'SCENARIO-485: emits AsyncData(PublicProfileView) when both upstreams have data',
         () async {
       final user = MockUser(uid: 'viewer');
-      final friendship = _makeFriendship(status: FriendshipStatus.accepted);
+      // "friendship accepted entre viewer y target" → arista SALIENTE aceptada.
+      final outgoing = _makeFollow(status: FollowStatus.accepted);
 
       final container = ProviderContainer(
         overrides: [
@@ -231,8 +250,10 @@ void main() {
           userPublicProfileProvider('target').overrideWith(
             (ref) => Stream.value(_profileAlice),
           ),
-          friendshipByPairProvider.overrideWith(
-            (ref, pair) => Stream.value(friendship),
+          followEdgeProvider.overrideWith(
+            (ref, edgeId) => Stream.value(
+              edgeId == _outgoingEdgeId ? outgoing : null,
+            ),
           ),
         ],
       );
@@ -242,7 +263,9 @@ void main() {
           await container.read(publicProfileViewProvider('target').future);
       expect(view, isA<PublicProfileView>());
       expect(view.authorDisplayName, equals('Alice'));
-      expect(view.friendship, equals(friendship));
+      expect(view.outgoingFollow, equals(outgoing));
+      // La entrante NO se contagia de la saliente: son dos documentos.
+      expect(view.incomingFollow, isNull);
       expect(view.isSelf, isFalse);
     });
 
@@ -260,8 +283,8 @@ void main() {
           userPublicProfileProvider('target').overrideWith(
             (ref) => profileController.stream,
           ),
-          friendshipByPairProvider.overrideWith(
-            (ref, pair) => Stream.value(null),
+          followEdgeProvider.overrideWith(
+            (ref, edgeId) => Stream.value(null),
           ),
         ],
       );
@@ -295,12 +318,14 @@ void main() {
       );
     });
 
-    // SCENARIO-487: re-emits when friendshipByPairProvider upstream changes
+    // SCENARIO-487: re-emits when the outgoing follow edge upstream changes
+    // (era `friendshipByPairProvider`; el equivalente por defecto del par es la
+    // arista SALIENTE `follows/{viewer}_{target}`).
     test(
-        'SCENARIO-487: re-emits updated view-model when friendship upstream changes',
+        'SCENARIO-487: re-emits updated view-model when la arista saliente cambia',
         () async {
       final user = MockUser(uid: 'viewer');
-      final friendshipController = StreamController<Friendship?>.broadcast();
+      final outgoingController = StreamController<Follow?>.broadcast();
 
       final container = ProviderContainer(
         overrides: [
@@ -308,13 +333,15 @@ void main() {
           userPublicProfileProvider('target').overrideWith(
             (ref) => Stream.value(_profileAlice),
           ),
-          friendshipByPairProvider.overrideWith(
-            (ref, pair) => friendshipController.stream,
+          followEdgeProvider.overrideWith(
+            (ref, edgeId) => edgeId == _outgoingEdgeId
+                ? outgoingController.stream
+                : Stream.value(null),
           ),
         ],
       );
       addTearDown(container.dispose);
-      addTearDown(friendshipController.close);
+      addTearDown(outgoingController.close);
 
       final emissions = <AsyncValue<PublicProfileView>>[];
       container.listen(
@@ -323,22 +350,20 @@ void main() {
         fireImmediately: true,
       );
 
-      // Emit pending friendship
-      friendshipController
-          .add(_makeFriendship(status: FriendshipStatus.pending));
+      // Emit pending edge
+      outgoingController.add(_makeFollow(status: FollowStatus.pending));
       await Future<void>.delayed(const Duration(milliseconds: 50));
 
-      // Emit accepted friendship
-      friendshipController
-          .add(_makeFriendship(status: FriendshipStatus.accepted));
+      // Emit accepted edge
+      outgoingController.add(_makeFollow(status: FollowStatus.accepted));
       await Future<void>.delayed(const Duration(milliseconds: 50));
 
       final dataEmissions =
           emissions.whereType<AsyncData<PublicProfileView>>().toList();
       expect(dataEmissions, isNotEmpty);
       expect(
-        dataEmissions.last.value.friendship?.status,
-        equals(FriendshipStatus.accepted),
+        dataEmissions.last.value.outgoingFollow?.status,
+        equals(FollowStatus.accepted),
       );
     });
 
@@ -356,8 +381,8 @@ void main() {
           userPublicProfileProvider('target').overrideWith(
             (ref) => neverController.stream,
           ),
-          friendshipByPairProvider.overrideWith(
-            (ref, pair) => Stream.value(null),
+          followEdgeProvider.overrideWith(
+            (ref, edgeId) => Stream.value(null),
           ),
         ],
       );
@@ -381,8 +406,8 @@ void main() {
           userPublicProfileProvider('target').overrideWith(
             (ref) => Stream.error(error),
           ),
-          friendshipByPairProvider.overrideWith(
-            (ref, pair) => Stream.value(null),
+          followEdgeProvider.overrideWith(
+            (ref, edgeId) => Stream.value(null),
           ),
         ],
       );
@@ -395,12 +420,14 @@ void main() {
       );
     });
 
-    // SCENARIO-490: isSelf branch — friendshipByPairProvider NOT subscribed
+    // SCENARIO-490: isSelf branch — followEdgeProvider NOT subscribed, en
+    // NINGUNA de las dos direcciones (antes era un solo listener; ahora son dos
+    // y la rama isSelf tiene que saltearse los dos).
     test(
-        'SCENARIO-490: isSelf — friendshipByPairProvider is NOT subscribed when viewerUid == targetUid',
+        'SCENARIO-490: isSelf — followEdgeProvider is NOT subscribed (ni saliente ni entrante) when viewerUid == targetUid',
         () async {
       final user = MockUser(uid: 'alice');
-      int friendshipSubscribeCount = 0;
+      int followEdgeSubscribeCount = 0;
 
       final container = ProviderContainer(
         overrides: [
@@ -408,12 +435,12 @@ void main() {
           userPublicProfileProvider('alice').overrideWith(
             (ref) => Stream.value(_profileAlice),
           ),
-          friendshipByPairProvider.overrideWith((ref, pair) {
-            friendshipSubscribeCount++;
+          followEdgeProvider.overrideWith((ref, edgeId) {
+            followEdgeSubscribeCount++;
             return Stream.fromFuture(
               Future.error(
                 StateError(
-                    'isSelf branch should NOT subscribe to friendshipByPairProvider'),
+                    'isSelf branch should NOT subscribe to followEdgeProvider'),
               ),
             );
           }),
@@ -425,10 +452,12 @@ void main() {
       final view =
           await container.read(publicProfileViewProvider('alice').future);
 
-      // friendshipByPairProvider must NOT have been called
-      expect(friendshipSubscribeCount, equals(0));
-      // And the view has null friendship
-      expect(view.friendship, isNull);
+      // followEdgeProvider must NOT have been called — ni para 'alice_alice'
+      // ni para ninguna otra key.
+      expect(followEdgeSubscribeCount, equals(0));
+      // And the view has both edges null
+      expect(view.outgoingFollow, isNull);
+      expect(view.incomingFollow, isNull);
       expect(view.isSelf, isTrue);
     });
   });

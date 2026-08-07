@@ -34,6 +34,11 @@ Widget _wrap(Widget w, {List<Override> overrides = const []}) => ProviderScope(
       ),
     );
 
+/// El `friendship: null` de antes (un solo doc simétrico por par) se mapea a
+/// las DOS aristas dirigidas en null: nadie sigue a nadie. El hero no lee el
+/// estado de seguimiento — solo avatar, nombre y gimnasio —, así que el valor
+/// es irrelevante para estos casos y se deja en el equivalente exacto del
+/// modelo viejo.
 PublicProfileView _view({
   String authorDisplayName = 'Tincho',
   String? authorAvatarUrl,
@@ -43,7 +48,8 @@ PublicProfileView _view({
       authorDisplayName: authorDisplayName,
       authorAvatarUrl: authorAvatarUrl,
       authorGymId: authorGymId,
-      friendship: null,
+      outgoingFollow: null,
+      incomingFollow: null,
       isSelf: false,
     );
 

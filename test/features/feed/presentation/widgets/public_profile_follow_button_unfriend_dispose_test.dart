@@ -1,11 +1,11 @@
-/// Regression #500: eliminar amistad debe sobrevivir al dispose de la pantalla.
+/// Regresión #500: dejar de seguir debe sobrevivir al dispose de la pantalla.
 ///
 /// `_showUnfriendSheet` corre su `onConfirm` desde un route root que sigue vivo
 /// aunque el perfil ya se haya popeado. Usar el `ref` del ConsumerState tras el
 /// await lanza `StateError('Cannot use "ref" after the widget was disposed')`
 /// (flutter_riverpod 2.6.1, `_assertNotDisposed`), y el catch del onConfirm lo
-/// reporta como falla aunque el delete YA se haya commiteado — dejando además
-/// el feed AMIGOS con el ex-amigo adentro.
+/// reporta como falla aunque el borrado de la arista YA se haya commiteado —
+/// dejando además el feed de SEGUIDOS con el ex-seguido adentro.
 ///
 /// El fix captura `ProviderScope.containerOf` ANTES del await, igual que
 /// `_onAccept` en el mismo archivo (ADR-FPS-006).
@@ -20,37 +20,40 @@ import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/feed/application/feed_screen_providers.dart'
     show myFollowingFeedProvider;
-import 'package:treino/features/feed/application/friendship_providers.dart'
-    show friendshipRepositoryProvider;
-import 'package:treino/features/feed/data/friendship_repository.dart';
-import 'package:treino/features/feed/domain/friendship.dart';
-import 'package:treino/features/feed/domain/friendship_status.dart';
+import 'package:treino/features/feed/application/follow_providers.dart'
+    show followRepositoryProvider;
+import 'package:treino/features/feed/data/follow_repository.dart';
+import 'package:treino/features/feed/domain/follow.dart';
+import 'package:treino/features/feed/domain/follow_status.dart';
 import 'package:treino/features/feed/presentation/widgets/public_profile_follow_button.dart';
 import 'package:treino/features/feed/presentation/widgets/unfriend_confirmation_sheet.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
-class _MockFriendshipRepository extends Mock implements FriendshipRepository {}
+class _MockFollowRepository extends Mock implements FollowRepository {}
 
-Friendship _accepted() => Friendship(
-      id: Friendship.sortedDocId('viewer', 'target'),
-      uidA: 'target',
-      uidB: 'viewer',
-      status: FriendshipStatus.accepted,
-      requesterId: 'viewer',
-      members: const ['target', 'viewer'],
+/// El caso original partía de una `Friendship` aceptada entre viewer y target.
+/// En el grafo dirigido el equivalente es la arista SALIENTE
+/// `follows/viewer_target` aceptada: es la única que pinta SIGUIENDO y la única
+/// que el sheet borra (la inversa nunca se toca). El doc id NO se ordena.
+Follow _acceptedOutgoing() => Follow(
+      id: Follow.edgeId('viewer', 'target'),
+      followerUid: 'viewer',
+      followeeUid: 'target',
+      status: FollowStatus.accepted,
+      members: const ['viewer', 'target'],
       createdAt: DateTime.utc(2026, 1, 1),
     );
 
 void main() {
   testWidgets(
-      'unfriend: el invalidate del feed AMIGOS sobrevive al pop del perfil '
-      'mid-delete y no reporta error [dispose-race-regression]',
+      'dejar de seguir: el invalidate del feed de SEGUIDOS sobrevive al pop '
+      'del perfil mid-delete y no reporta error [dispose-race-regression]',
       (tester) async {
-    final repo = _MockFriendshipRepository();
+    final repo = _MockFollowRepository();
     final deleteGate = Completer<void>();
-    when(() => repo.delete(any(), any())).thenAnswer((_) => deleteGate.future);
+    when(() => repo.deleteEdge(any())).thenAnswer((_) => deleteGate.future);
 
     // El botón vive detrás de este flag: apagarlo desmonta el ConsumerState,
     // que es lo que pasa cuando el usuario toca back mientras el delete vuela.
@@ -62,7 +65,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          friendshipRepositoryProvider.overrideWithValue(repo),
+          followRepositoryProvider.overrideWithValue(repo),
           userPublicProfileProvider('target').overrideWith(
             (_) => Stream.value(
               const UserPublicProfile(uid: 'target', displayName: 'Vicente'),
@@ -81,7 +84,7 @@ void main() {
           home: Scaffold(
             body: Column(
               children: [
-                // Listener activo del feed AMIGOS: sin él, invalidate no
+                // Listener activo del feed de SEGUIDOS: sin él, invalidate no
                 // dispara rebuild y el contador no serviría de sonda.
                 Consumer(
                   builder: (_, ref, __) {
@@ -93,7 +96,10 @@ void main() {
                   valueListenable: buttonMounted,
                   builder: (_, mounted, __) => mounted
                       ? PublicProfileFollowButton(
-                          friendship: _accepted(),
+                          outgoingFollow: _acceptedOutgoing(),
+                          // Sin arista entrante: el caso es "yo lo sigo", que
+                          // es lo que la amistad aceptada representaba acá.
+                          incomingFollow: null,
                           viewerUid: 'viewer',
                           targetUid: 'target',
                         )
@@ -107,8 +113,8 @@ void main() {
     );
     await tester.pump();
 
-    final buildsBeforeUnfriend = myFollowingFeedBuilds;
-    expect(buildsBeforeUnfriend, greaterThan(0));
+    final buildsBeforeUnfollow = myFollowingFeedBuilds;
+    expect(buildsBeforeUnfollow, greaterThan(0));
 
     await tester.tap(find.text('SIGUIENDO'));
     await tester.pumpAndSettle();
@@ -125,11 +131,12 @@ void main() {
     deleteGate.complete();
     await tester.pumpAndSettle();
 
-    verify(() => repo.delete(_accepted().id, 'viewer')).called(1);
+    verify(() => repo.deleteEdge(_acceptedOutgoing().id)).called(1);
     expect(
       myFollowingFeedBuilds,
-      greaterThan(buildsBeforeUnfriend),
-      reason: 'El feed AMIGOS debe refrescarse o queda mostrando al ex-amigo',
+      greaterThan(buildsBeforeUnfollow),
+      reason: 'El feed de SEGUIDOS debe refrescarse o queda mostrando al '
+          'ex-seguido',
     );
     expect(
       find.byType(SnackBar),

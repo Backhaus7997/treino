@@ -230,10 +230,48 @@ completo verde, 4813 tests**.
 
 ---
 
-## Pendiente
+## PR 3c — Flip cliente: perfil público, sugerencias, inbox y chat ✅ código
 
-- **PR 3c** (en 3 slices) — perfil público, sugerencias + inbox, composer del
-  chat. **No puede preceder a PR3a.**
+Tareas 3c.1–3c.21 + **3c.22** (nueva). Sale de acá el binario de TestFlight
+(2.8a / M-06b): es la punta de la cadena.
+
+**Perfil público.** `PublicProfileView` cambió `Friendship? friendship` por
+**dos** campos, `outgoingFollow` e `incomingFollow`, y el notifier pasó de 1 a 2
+listeners de documento. El pill de SEGUIR gobierna por la **saliente**, con
+precedencia explícita; el botón MENSAJE por la **entrante**.
+
+**El bug de producto que esto arregla**: antes, que alguien te siguiera te
+mostraba **SIGUIENDO** en su perfil, como si vos lo siguieras a él. Era el mismo
+documento. Hay test dedicado.
+
+**MENSAJE.** `_isAcceptedFriend` (que miraba UN doc y habilitaba a los dos)
+pasó a `_chatEligible => incomingFollow.accepted`: le puedo escribir a alguien
+sólo si esa persona me sigue. Espejo literal de `chatCreateOk`. **Verificado con
+mutación**: cablear la arista equivocada pone 2 tests en rojo.
+
+**Sugerencias e inbox.** `allOf` sobre `follows`; el inbox consume
+`pendingReceivedStreamProvider`, cuyo filtro de "recibidas" ahora es
+**server-side** (`followeeUid == yo && status == pending`) en vez de traer todo
+y descartar en el cliente.
+
+### 🔴 Segunda premisa del plan que resultó falsa — 3c.22
+
+3c-3 daba por sentado que los chats de Coach **no** pasan por `ChatScreen`.
+**Sí pasan**: `athlete_coach_view.dart:593` y `athlete_detail_screen.dart:309`
+empujan `/coach/chat/:chatId`, que renderiza esa pantalla (`router.dart:461`).
+Gatear el composer sólo por la arista entrante le habría tapado el chat al
+entrenador **aunque el servidor se lo permita**.
+
+Se cerró exponiendo `linkId` al cliente (`Chat.linkId`, `watchById`,
+`chatByIdProvider`) y evaluando la rama del Coach PRIMERO, igual que las rules.
+Test dedicado: *"chat de Coach con linkId y CERO aristas → HABILITADO"*.
+
+**Evidencia**: `flutter analyze` 0 issues + `dart format .` + **`flutter test`
+completo verde, 4826 tests**.
+
+---
+
+## Pendiente
 - **PR 3d** — retiro de `Friendship*`. **PR 4** — UX + l10n.
 - **Gate 3a.19 incompleto**: 3 suites (`post-photos-storage-rules`,
   `cascade/storage`, `delete-account.smoke`) necesitan el emulador de

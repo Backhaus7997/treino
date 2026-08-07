@@ -8,10 +8,10 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/feed/application/feed_screen_providers.dart'
     show myFollowingFeedProvider;
-import 'package:treino/features/feed/application/friendship_providers.dart';
-import 'package:treino/features/feed/data/friendship_repository.dart';
-import 'package:treino/features/feed/domain/friendship.dart';
-import 'package:treino/features/feed/domain/friendship_status.dart';
+import 'package:treino/features/feed/application/follow_providers.dart';
+import 'package:treino/features/feed/data/follow_repository.dart';
+import 'package:treino/features/feed/domain/follow.dart';
+import 'package:treino/features/feed/domain/follow_status.dart';
 import 'package:treino/features/feed/presentation/widgets/friend_request_inbox_tile.dart';
 import 'package:treino/features/feed/presentation/widgets/post_avatar.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
@@ -23,25 +23,24 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 // Helpers
 // ---------------------------------------------------------------------------
 
-final _now = DateTime.utc(2026, 1, 1);
-
-Friendship _makeFriendship({
-  String id = 'alice_bob',
+/// La solicitud RECIBIDA por alice es la arista ENTRANTE: `{quien pide}_alice`.
+/// El doc id NO se ordena — la dirección ES el documento.
+Follow _makeFollow({
+  String id = 'bob_alice',
   String requesterId = 'bob',
 }) =>
-    Friendship(
+    Follow(
       id: id,
-      uidA: 'alice',
-      uidB: requesterId,
-      status: FriendshipStatus.pending,
-      requesterId: requesterId,
-      members: ['alice', requesterId],
-      createdAt: _now,
+      followerUid: requesterId,
+      followeeUid: 'alice',
+      status: FollowStatus.pending,
+      members: [requesterId, 'alice'],
+      createdAt: DateTime.utc(2026, 1, 1),
     );
 
 /// Stub repository that records calls without touching Firestore.
-class _StubFriendshipRepository extends FriendshipRepository {
-  _StubFriendshipRepository() : super(firestore: FakeFirebaseFirestore());
+class _StubFollowRepository extends FollowRepository {
+  _StubFollowRepository() : super(firestore: FakeFirebaseFirestore());
 
   int acceptCallCount = 0;
   int deleteCallCount = 0;
@@ -49,38 +48,38 @@ class _StubFriendshipRepository extends FriendshipRepository {
   String? lastDeletedId;
 
   @override
-  Future<void> accept(String friendshipId, String myUid) async {
+  Future<void> acceptRequest(String edgeId, String myUid) async {
     acceptCallCount++;
-    lastAcceptedId = friendshipId;
+    lastAcceptedId = edgeId;
   }
 
   @override
-  Future<void> delete(String friendshipId, String myUid) async {
+  Future<void> deleteEdge(String edgeId) async {
     deleteCallCount++;
-    lastDeletedId = friendshipId;
+    lastDeletedId = edgeId;
   }
 }
 
 /// Stub whose accept() completes only when completer fires (simulates in-flight).
-class _SlowFriendshipRepository extends FriendshipRepository {
-  _SlowFriendshipRepository({required this.completer})
+class _SlowFollowRepository extends FollowRepository {
+  _SlowFollowRepository({required this.completer})
       : super(firestore: FakeFirebaseFirestore());
 
   final Completer<void> completer;
   int acceptCallCount = 0;
 
   @override
-  Future<void> accept(String friendshipId, String myUid) async {
+  Future<void> acceptRequest(String edgeId, String myUid) async {
     acceptCallCount++;
     await completer.future;
   }
 
   @override
-  Future<void> delete(String friendshipId, String myUid) async {}
+  Future<void> deleteEdge(String edgeId) async {}
 }
 
 Widget _buildTile({
-  required Friendship friendship,
+  required Follow follow,
   required String viewerUid,
   required List<Override> overrides,
 }) {
@@ -92,7 +91,7 @@ Widget _buildTile({
       supportedLocales: AppL10n.supportedLocales,
       home: Scaffold(
         body: FriendRequestInboxTile(
-          friendship: friendship,
+          follow: follow,
           viewerUid: viewerUid,
         ),
       ),
@@ -107,19 +106,19 @@ Widget _buildTile({
 void main() {
   // T10 RED: SCENARIO-465 (clamp regression) and SCENARIO-467 (double-tap guard)
   group('FriendRequestInboxTile double-tap and clamp', () {
-    // SCENARIO-465: RECHAZAR on never-accepted friendship → followingCount does not go below 0
+    // SCENARIO-465: RECHAZAR on never-accepted edge → followingCount does not go below 0
     testWidgets(
-        'SCENARIO-465: RECHAZAR does not push followingCount below 0 on never-accepted friendship',
+        'SCENARIO-465: RECHAZAR does not push followingCount below 0 on never-accepted edge',
         (tester) async {
-      final stub = _StubFriendshipRepository();
-      final friendship = _makeFriendship(requesterId: 'bob');
+      final stub = _StubFollowRepository();
+      final follow = _makeFollow(requesterId: 'bob');
 
       await tester.pumpWidget(
         _buildTile(
-          friendship: friendship,
+          follow: follow,
           viewerUid: 'alice',
           overrides: [
-            friendshipRepositoryProvider.overrideWithValue(stub),
+            followRepositoryProvider.overrideWithValue(stub),
             userPublicProfileProvider('bob').overrideWith(
               (_) => Stream.value(
                   const UserPublicProfile(uid: 'bob', displayName: 'Bob')),
@@ -145,15 +144,15 @@ void main() {
         (tester) async {
       // Slow stub: accept takes 200ms to resolve
       final completer = Completer<void>();
-      final slowStub = _SlowFriendshipRepository(completer: completer);
-      final friendship = _makeFriendship(requesterId: 'bob');
+      final slowStub = _SlowFollowRepository(completer: completer);
+      final follow = _makeFollow(requesterId: 'bob');
 
       await tester.pumpWidget(
         _buildTile(
-          friendship: friendship,
+          follow: follow,
           viewerUid: 'alice',
           overrides: [
-            friendshipRepositoryProvider.overrideWithValue(slowStub),
+            followRepositoryProvider.overrideWithValue(slowStub),
             userPublicProfileProvider('bob').overrideWith(
               (_) => Stream.value(
                   const UserPublicProfile(uid: 'bob', displayName: 'Bob')),
@@ -190,11 +189,11 @@ void main() {
         gymName: 'SmartFit - Palermo',
       );
 
-      final friendship = _makeFriendship(requesterId: 'bob');
+      final follow = _makeFollow(requesterId: 'bob');
 
       await tester.pumpWidget(
         _buildTile(
-          friendship: friendship,
+          follow: follow,
           viewerUid: 'alice',
           overrides: [
             userPublicProfileProvider('bob').overrideWith(
@@ -218,11 +217,11 @@ void main() {
     testWidgets(
         'SCENARIO-462: null profile shows "Usuario anónimo" and default avatar',
         (tester) async {
-      final friendship = _makeFriendship(requesterId: 'bob');
+      final follow = _makeFollow(requesterId: 'bob');
 
       await tester.pumpWidget(
         _buildTile(
-          friendship: friendship,
+          follow: follow,
           viewerUid: 'alice',
           overrides: [
             userPublicProfileProvider('bob').overrideWith(
@@ -244,15 +243,15 @@ void main() {
     testWidgets(
         'SCENARIO-463: tapping ACEPTAR calls repo.accept with correct args',
         (tester) async {
-      final stub = _StubFriendshipRepository();
-      final friendship = _makeFriendship(requesterId: 'bob');
+      final stub = _StubFollowRepository();
+      final follow = _makeFollow(requesterId: 'bob');
 
       await tester.pumpWidget(
         _buildTile(
-          friendship: friendship,
+          follow: follow,
           viewerUid: 'alice',
           overrides: [
-            friendshipRepositoryProvider.overrideWithValue(stub),
+            followRepositoryProvider.overrideWithValue(stub),
             userPublicProfileProvider('bob').overrideWith(
               (_) => Stream.value(const UserPublicProfile(
                 uid: 'bob',
@@ -269,22 +268,26 @@ void main() {
       await tester.pump();
 
       expect(stub.acceptCallCount, equals(1));
-      expect(stub.lastAcceptedId, equals('alice_bob'));
+      // 'bob_alice', NO 'alice_bob': el doc id de `follows` NO se ordena. Bob
+      // sigue a alice, así que la arista es {bob}_{alice}. El id ordenado del
+      // modelo viejo apuntaría al documento equivocado — o, peor, al de la
+      // dirección contraria.
+      expect(stub.lastAcceptedId, equals('bob_alice'));
     });
 
     // SCENARIO-464: RECHAZAR tap → no dialog shown + repo.delete(F.id, myUid) called immediately
     testWidgets(
         'SCENARIO-464: tapping RECHAZAR calls repo.delete immediately with no dialog',
         (tester) async {
-      final stub = _StubFriendshipRepository();
-      final friendship = _makeFriendship(requesterId: 'bob');
+      final stub = _StubFollowRepository();
+      final follow = _makeFollow(requesterId: 'bob');
 
       await tester.pumpWidget(
         _buildTile(
-          friendship: friendship,
+          follow: follow,
           viewerUid: 'alice',
           overrides: [
-            friendshipRepositoryProvider.overrideWithValue(stub),
+            followRepositoryProvider.overrideWithValue(stub),
             userPublicProfileProvider('bob').overrideWith(
               (_) => Stream.value(const UserPublicProfile(
                 uid: 'bob',
@@ -305,7 +308,9 @@ void main() {
       expect(find.byType(Dialog), findsNothing);
       // delete was called immediately
       expect(stub.deleteCallCount, equals(1));
-      expect(stub.lastDeletedId, equals('alice_bob'));
+      // Rechazar borra la MISMA arista entrante que se habría aceptado, y
+      // nunca la inversa: si alice sigue a bob, eso queda intacto.
+      expect(stub.lastDeletedId, equals('bob_alice'));
     });
   });
 
@@ -316,7 +321,7 @@ void main() {
   group('FriendRequestInboxTile tappable requester zone (SCENARIO-472)', () {
     // Builds the tile inside a GoRouter so we can detect navigation
     Widget buildTileWithRouter({
-      required Friendship friendship,
+      required Follow follow,
       required String viewerUid,
       required List<Override> overrides,
       required List<String> navigatedRoutes,
@@ -328,7 +333,7 @@ void main() {
             path: '/',
             builder: (context, state) => Scaffold(
               body: FriendRequestInboxTile(
-                friendship: friendship,
+                follow: follow,
                 viewerUid: viewerUid,
               ),
             ),
@@ -360,11 +365,11 @@ void main() {
         'SCENARIO-472: tapping avatar/name zone navigates to /feed/profile/requesterUid',
         (tester) async {
       final navigatedRoutes = <String>[];
-      final friendship = _makeFriendship(requesterId: 'vicente-uid');
+      final follow = _makeFollow(requesterId: 'vicente-uid');
 
       await tester.pumpWidget(
         buildTileWithRouter(
-          friendship: friendship,
+          follow: follow,
           viewerUid: 'alice',
           overrides: [
             userPublicProfileProvider('vicente-uid').overrideWith(
@@ -392,15 +397,15 @@ void main() {
         'SCENARIO-472: tapping ACEPTAR does NOT navigate to the public profile route',
         (tester) async {
       final navigatedRoutes = <String>[];
-      final stub = _StubFriendshipRepository();
-      final friendship = _makeFriendship(requesterId: 'vicente-uid');
+      final stub = _StubFollowRepository();
+      final follow = _makeFollow(requesterId: 'vicente-uid');
 
       await tester.pumpWidget(
         buildTileWithRouter(
-          friendship: friendship,
+          follow: follow,
           viewerUid: 'alice',
           overrides: [
-            friendshipRepositoryProvider.overrideWithValue(stub),
+            followRepositoryProvider.overrideWithValue(stub),
             userPublicProfileProvider('vicente-uid').overrideWith(
               (_) => Stream.value(const UserPublicProfile(
                 uid: 'vicente-uid',
@@ -428,15 +433,15 @@ void main() {
         'SCENARIO-472: tapping RECHAZAR does NOT navigate to the public profile route',
         (tester) async {
       final navigatedRoutes = <String>[];
-      final stub = _StubFriendshipRepository();
-      final friendship = _makeFriendship(requesterId: 'vicente-uid');
+      final stub = _StubFollowRepository();
+      final follow = _makeFollow(requesterId: 'vicente-uid');
 
       await tester.pumpWidget(
         buildTileWithRouter(
-          friendship: friendship,
+          follow: follow,
           viewerUid: 'alice',
           overrides: [
-            friendshipRepositoryProvider.overrideWithValue(stub),
+            followRepositoryProvider.overrideWithValue(stub),
             userPublicProfileProvider('vicente-uid').overrideWith(
               (_) => Stream.value(const UserPublicProfile(
                 uid: 'vicente-uid',
@@ -467,10 +472,10 @@ void main() {
     // SCENARIO-493: _onAceptar DOES call container.invalidate(myFollowingFeedProvider)
     // AND does NOT call container.invalidate for the converted stream providers.
     testWidgets(
-        'SCENARIO-493: _onAceptar invalidates myFollowingFeedProvider but NOT acceptedFriendsProvider or friendshipByPairProvider',
+        'SCENARIO-493: _onAceptar invalidates myFollowingFeedProvider but NOT followingProvider or followEdgeProvider',
         (tester) async {
-      final stub = _StubFriendshipRepository();
-      final friendship = _makeFriendship(requesterId: 'bob');
+      final stub = _StubFollowRepository();
+      final follow = _makeFollow(requesterId: 'bob');
       var myFollowingFeedBuildCount = 0;
 
       // Build with an active listener on myFollowingFeedProvider.
@@ -480,7 +485,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            friendshipRepositoryProvider.overrideWithValue(stub),
+            followRepositoryProvider.overrideWithValue(stub),
             userPublicProfileProvider('bob').overrideWith(
               (_) => Stream.value(const UserPublicProfile(
                 uid: 'bob',
@@ -507,7 +512,7 @@ void main() {
                     },
                   ),
                   FriendRequestInboxTile(
-                    friendship: friendship,
+                    follow: follow,
                     viewerUid: 'alice',
                   ),
                 ],

@@ -214,6 +214,14 @@ class ChatRepository {
     });
   }
 
+  // ─── watchById ──────────────────────────────────────────────────────────
+  //
+  // Un chat puntual, en vivo. Lo consume el gate de escritura de ChatScreen,
+  // que necesita saber si el doc lleva `linkId` (chat de Coach) para no
+  // bloquearle el composer al entrenador.
+  Stream<Chat?> watchById(String chatId) =>
+      _chats.doc(chatId).snapshots().map(_chatFromDoc);
+
   // ─── Private helpers ────────────────────────────────────────────────────
 
   Chat? _chatFromDoc(DocumentSnapshot<Map<String, Object?>> snap) {

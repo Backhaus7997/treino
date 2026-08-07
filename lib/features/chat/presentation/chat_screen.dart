@@ -12,6 +12,9 @@ import '../../../core/analytics/analytics_service.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
+import '../../feed/application/follow_providers.dart';
+import '../../feed/domain/follow.dart';
+import '../../feed/domain/follow_status.dart';
 import '../../feed/presentation/widgets/post_avatar.dart';
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../workout/application/session_providers.dart'
@@ -175,6 +178,36 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final l10n = AppL10n.of(context);
     final messagesAsync = ref.watch(messagesProvider(widget.chatId));
     final currentUid = ref.watch(currentUidProvider);
+
+    // REQ-FOLLOW-012 — ESPEJO EXACTO de `senderMayPost` en las rules.
+    //
+    // Escribir lo habilita la arista ENTRANTE: el otro tiene que seguirme a
+    // mí. Es al revés de lo que sugiere la intuición, y es la decisión de
+    // producto: dejar de seguir a alguien le saca a ESA persona la escritura
+    // hacia vos, con una sola acción.
+    //
+    // La rama del Coach va PRIMERO, igual que en las rules. Y no es
+    // decorativa: `athlete_coach_view.dart` y `athlete_detail_screen.dart`
+    // empujan `/coach/chat/...`, que renderiza ESTA pantalla, así que sin este
+    // escape el entrenador perdería el composer aunque el servidor se lo
+    // permita.
+    //
+    // `valueOrNull` en vez de bloquear con el AsyncValue: mientras carga se
+    // asume que SÍ puede escribir. Un falso positivo momentáneo termina en un
+    // `permission-denied` recuperable; un falso negativo le tapa el composer a
+    // alguien que sí puede, en cada apertura de chat.
+    final chat = ref.watch(chatByIdProvider(widget.chatId)).valueOrNull;
+    final isCoachChat = chat?.linkId != null;
+    final incomingEdge = currentUid == null
+        ? null
+        : ref
+            .watch(followEdgeProvider(
+              Follow.edgeId(widget.otherUid, currentUid),
+            ))
+            .valueOrNull;
+    final canWrite = isCoachChat ||
+        incomingEdge?.status == FollowStatus.accepted ||
+        currentUid == null;
     final pubAsync = ref.watch(userPublicProfileProvider(widget.otherUid));
     final mediaSend = ref.watch(chatMediaSendControllerProvider(widget.chatId));
 
@@ -299,9 +332,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 color: palette.accent,
                 backgroundColor: palette.bgCard,
               ),
+            // El aviso va ARRIBA del composer, no en su lugar: dejar el campo
+            // visible pero apagado explica POR QUÉ no se puede escribir. Si el
+            // composer desapareciera, la pantalla se vería rota sin motivo.
+            if (!canWrite) _BlockedComposerNotice(palette: palette),
             _Composer(
               controller: _textController,
               sending: _sending || mediaSend.uploading,
+              canWrite: canWrite,
               onSend: _onSend,
               onAttach: _onAttach,
               palette: palette,
@@ -394,6 +432,7 @@ class _Composer extends StatelessWidget {
   const _Composer({
     required this.controller,
     required this.sending,
+    required this.canWrite,
     required this.onSend,
     required this.onAttach,
     required this.palette,
@@ -401,6 +440,10 @@ class _Composer extends StatelessWidget {
 
   final TextEditingController controller;
   final bool sending;
+
+  /// Espejo de `senderMayPost` en las rules. Se compone con [sending]: el
+  /// composer se apaga si hay un envío en vuelo O si no hay permiso.
+  final bool canWrite;
   final VoidCallback onSend;
   final VoidCallback onAttach;
   final AppPalette palette;
@@ -408,6 +451,7 @@ class _Composer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
+    final disabled = sending || !canWrite;
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
       child: Row(
@@ -415,12 +459,9 @@ class _Composer extends StatelessWidget {
         children: [
           // Attach button.
           IconButton(
-            onPressed: sending ? null : onAttach,
+            onPressed: disabled ? null : onAttach,
             tooltip: l10n.chatAttachMediaLabel,
-            icon: Icon(
-              TreinoIcon.attach,
-              color: sending ? palette.textMuted : palette.textMuted,
-            ),
+            icon: Icon(TreinoIcon.attach, color: palette.textMuted),
           ),
           Expanded(
             child: Container(
@@ -442,13 +483,13 @@ class _Composer extends StatelessWidget {
                   border: InputBorder.none,
                   isCollapsed: true,
                 ),
-                enabled: !sending,
+                enabled: !disabled,
               ),
             ),
           ),
           const SizedBox(width: 8),
           IconButton(
-            onPressed: sending ? null : onSend,
+            onPressed: disabled ? null : onSend,
             // Swap instantáneo (sin TreinoStateSwitcher): enviar es la acción
             // más frecuente del chat — 240ms de cross-fade para una
             // micro-acción rutinaria es más lento que el escalón que le
@@ -468,6 +509,49 @@ class _Composer extends StatelessWidget {
                   )
                 : Icon(TreinoIcon.send, color: palette.accent),
             tooltip: sending ? l10n.chatSendingA11y : l10n.chatScreenSendLabel,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Aviso PERSISTENTE que reemplaza al composer cuando no se puede escribir.
+///
+/// Persistente y no un snackbar a propósito: el estado dura hasta que la otra
+/// persona vuelva a seguirte, así que un aviso que se desvanece dejaría la
+/// pantalla mostrando un composer inexistente sin explicación.
+///
+/// Strings provisorias — pasan a los 3 ARBs en PR4 (tarea 4.8b), junto con el
+/// resto del copy que el dueño todavía tiene que confirmar.
+class _BlockedComposerNotice extends StatelessWidget {
+  const _BlockedComposerNotice({required this.palette});
+
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        border: Border(top: BorderSide(color: palette.border)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(TreinoIcon.infoCircle, size: 18, color: palette.textMuted),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              // i18n: PR4 tarea 4.8b
+              'Esta persona no puede recibir tus mensajes.',
+              style: GoogleFonts.barlow(
+                fontSize: 14,
+                color: palette.textMuted,
+              ),
+            ),
           ),
         ],
       ),

@@ -3,38 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../profile/application/user_providers.dart' show firestoreProvider;
 import '../../profile/application/user_public_profile_providers.dart';
-import '../data/friendship_repository.dart';
-import '../domain/friendship.dart';
+import '../domain/follow.dart';
 import '../domain/post.dart';
 import '../domain/public_profile_view.dart';
-
-/// Stable record key for the `friendshipByPairProvider.family`. Riverpod
-/// requires the family parameter to be hashable; named records satisfy this.
-typedef FriendshipPair = ({String viewerUid, String targetUid});
-
-final _friendshipRepositoryProvider = Provider<FriendshipRepository>(
-  (ref) => FriendshipRepository(firestore: ref.watch(firestoreProvider)),
-);
-
-/// Live stream of the friendship doc (if any) between two uids. Auth-gated:
-/// emits null when the viewer isn't signed in. Subscribes via `.snapshots()`
-/// so cross-device mutations propagate automatically.
-///
-/// `autoDispose` bounds the Firestore listener to consumer lifetime — no
-/// persistent listener remains for orphaned `(viewerUid, targetUid)` pairs.
-final friendshipByPairProvider =
-    StreamProvider.family.autoDispose<Friendship?, FriendshipPair>(
-  (ref, pair) async* {
-    final auth = await ref.watch(authStateChangesProvider.future);
-    if (auth == null) {
-      yield null;
-      return;
-    }
-    yield* ref
-        .watch(_friendshipRepositoryProvider)
-        .watchByPair(pair.viewerUid, pair.targetUid);
-  },
-);
+import 'follow_providers.dart';
 
 /// Returns the most-recent `Post` authored by [targetUid], or null if the
 /// target has never posted. Used to extract denormalized author fields
@@ -63,13 +35,19 @@ final firstPostByAuthorProvider =
   return Post.fromJson({...doc.data(), 'id': doc.id});
 });
 
-/// AsyncNotifier that composes [userPublicProfileProvider] and
-/// [friendshipByPairProvider] into a single view-model that the
-/// `PublicProfileScreen` watches. Re-runs `build` on every upstream
-/// stream emission — live propagation with zero rxdart.
+/// AsyncNotifier that composes [userPublicProfileProvider] with las DOS
+/// aristas del par en un solo view-model que `PublicProfileScreen` observa.
+/// Re-corre `build` en cada emisión upstream — propagación en vivo sin rxdart.
+///
+/// **Dos listeners, no uno.** Antes acá había un solo `friendshipByPairProvider`
+/// porque `friendships` tenía UN documento por par: "yo lo sigo" y "él me
+/// sigue" eran el mismo hecho y no se podían distinguir. Con el grafo dirigido
+/// son dos documentos con doc id distinto, y cada botón de la pantalla mira el
+/// que le corresponde (design §6): el pill de SEGUIR mira la saliente, el botón
+/// MENSAJE mira la entrante.
 ///
 /// Sources author identity from `userPublicProfileProvider(targetUid)`.
-/// `isSelf` branch skips [friendshipByPairProvider] entirely.
+/// La rama `isSelf` saltea las dos aristas.
 /// REQ-FPS-007, ADR-FPS-002, ADR-FPS-003.
 class PublicProfileViewNotifier
     extends AutoDisposeFamilyAsyncNotifier<PublicProfileView, String> {
@@ -81,7 +59,8 @@ class PublicProfileViewNotifier
         authorDisplayName: 'Anónimo',
         authorAvatarUrl: null,
         authorGymId: null,
-        friendship: null,
+        outgoingFollow: null,
+        incomingFollow: null,
         isSelf: false,
       );
     }
@@ -93,19 +72,27 @@ class PublicProfileViewNotifier
     // emission — no ref.listen plumbing needed (ADR-FPS-003).
     final profile =
         await ref.watch(userPublicProfileProvider(targetUid).future);
-    final friendship = isSelf
+    // Las dos direcciones se consultan por SEPARADO, por doc id directo. No
+    // hay un provider "de la relación" que devuelva un solo objeto: eso
+    // volvería a colapsar los dos sentidos, que es justo el bug del modelo
+    // viejo.
+    final outgoingFollow = isSelf
         ? null
         : await ref.watch(
-            friendshipByPairProvider(
-              (viewerUid: viewerUid, targetUid: targetUid),
-            ).future,
+            followEdgeProvider(Follow.edgeId(viewerUid, targetUid)).future,
+          );
+    final incomingFollow = isSelf
+        ? null
+        : await ref.watch(
+            followEdgeProvider(Follow.edgeId(targetUid, viewerUid)).future,
           );
 
     return PublicProfileView(
       authorDisplayName: profile?.displayName ?? 'Anónimo',
       authorAvatarUrl: profile?.avatarUrl,
       authorGymId: profile?.gymId,
-      friendship: friendship,
+      outgoingFollow: outgoingFollow,
+      incomingFollow: incomingFollow,
       isSelf: isSelf,
       workoutsCount: profile?.workoutsCount,
       racha: profile?.racha,
