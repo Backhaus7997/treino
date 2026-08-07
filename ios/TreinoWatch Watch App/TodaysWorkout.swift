@@ -7,14 +7,25 @@
 
 import Foundation
 
+/// Un ejercicio del entreno, con sus series ya resueltas para la semana.
+struct WatchExercise: Equatable {
+    let exerciseId: String
+    let exerciseName: String
+    let sets: [SetSpec]
+    let restSeconds: Int
+}
+
 /// El entreno que le toca al atleta hoy, resuelto por el reloj.
 struct TodaysWorkout: Equatable {
+    let routineId: String
     let routineName: String
     let dayName: String
     let dayNumber: Int
     let weekNumber: Int
     let numWeeks: Int
-    let exerciseCount: Int
+    let exercises: [WatchExercise]
+
+    var exerciseCount: Int { exercises.count }
 }
 
 /// Resuelve el entreno de hoy leyendo Firestore por REST.
@@ -57,13 +68,70 @@ enum TodaysWorkoutResolver {
             ?? FS.mapFields(days[0])
 
         return TodaysWorkout(
+            routineId: routineId,
             routineName: FS.string(routine["name"]) ?? "Rutina",
             dayName: FS.string(dayFields?["name"]) ?? "Día \(position.dayNumber)",
             dayNumber: position.dayNumber,
             weekNumber: position.weekNumber,
             numWeeks: FS.int(routine["numWeeks"]) ?? 1,
-            exerciseCount: (FS.array(dayFields?["slots"]) ?? []).count
+            exercises: exercises(
+                from: FS.array(dayFields?["slots"]) ?? [],
+                week: position.weekNumber
+            )
         )
+    }
+
+    /// Traduce los slots de Firestore a ejercicios con series resueltas.
+    ///
+    /// Filtra por `isPresentInWeek`: un ejercicio con máscara de semanas que no
+    /// incluye la actual NO va en el entreno de hoy. Mostrarlo igual sería
+    /// hacerle hacer al atleta algo que el plan no pide esta semana.
+    private static func exercises(from slots: [Any], week: Int) -> [WatchExercise] {
+        var result: [WatchExercise] = []
+        for slot in slots {
+            guard let f = FS.mapFields(slot) else { continue }
+
+            let prescription = SlotPrescription(
+                targetSets: FS.int(f["targetSets"]) ?? 0,
+                durationSeconds: FS.int(f["durationSeconds"]),
+                targetReps: (FS.array(f["targetReps"]) ?? []).compactMap { FS.int($0) },
+                targetRepsMin: FS.int(f["targetRepsMin"]) ?? 0,
+                targetRepsMax: FS.int(f["targetRepsMax"]) ?? 0,
+                targetWeightKg: FS.double(f["targetWeightKg"]),
+                sets: setSpecs(FS.array(f["sets"])),
+                weeklySets: (FS.array(f["weeklySets"]) ?? []).map { week in
+                    // Firestore rechaza arrays anidados, asi que cada semana
+                    // viaja envuelta en un map con la clave `sets`.
+                    setSpecs(FS.array(FS.mapFields(week)?["sets"]))
+                },
+                activeWeeks: (FS.array(f["activeWeeks"]) ?? []).compactMap { FS.int($0) }
+            )
+
+            guard SetResolution.isPresentInWeek(prescription, week: week) else { continue }
+
+            result.append(
+                WatchExercise(
+                    exerciseId: FS.string(f["exerciseId"]) ?? "",
+                    exerciseName: FS.string(f["exerciseName"]) ?? "Ejercicio",
+                    sets: SetResolution.effectiveSets(prescription, week: week),
+                    restSeconds: FS.int(f["restSeconds"]) ?? 90
+                )
+            )
+        }
+        return result
+    }
+
+    private static func setSpecs(_ raw: [Any]?) -> [SetSpec] {
+        (raw ?? []).compactMap { item in
+            guard let f = FS.mapFields(item) else { return nil }
+            return SetSpec(
+                reps: FS.int(f["reps"]),
+                repsMin: FS.int(f["repsMin"]),
+                repsMax: FS.int(f["repsMax"]),
+                weightKg: FS.double(f["weightKg"]),
+                durationSeconds: FS.int(f["durationSeconds"])
+            )
+        }
     }
 
     /// Aplica la MISMA prioridad que el teléfono, vía `resolveActiveRoutineId`.

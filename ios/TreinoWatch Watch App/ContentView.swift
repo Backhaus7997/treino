@@ -13,6 +13,7 @@ import SwiftUI
 /// entreno llega en F2, cuando el reloj pueda leer la rutina.
 struct ContentView: View {
     @EnvironmentObject private var coordinator: CredentialCoordinator
+    @EnvironmentObject private var workoutCoordinator: WorkoutCoordinator
 
     var body: some View {
         VStack(spacing: 8) {
@@ -30,7 +31,10 @@ struct ContentView: View {
                     .font(.footnote)
 
             case .ready:
-                if let workout = coordinator.todaysWorkout {
+                if workoutCoordinator.session != nil {
+                    // Hay un entreno en curso: gana sobre la pantalla de "hoy".
+                    WorkoutView()
+                } else if let workout = coordinator.todaysWorkout {
                     TodaysWorkoutView(workout: workout)
                 } else if coordinator.workoutError != nil {
                     Image(systemName: "arrow.clockwise")
@@ -63,6 +67,7 @@ struct ContentView: View {
 /// Austera a propósito: el nombre del día es lo que el atleta necesita leer de
 /// un vistazo entre series. El resto es contexto secundario.
 struct TodaysWorkoutView: View {
+    @EnvironmentObject private var workoutCoordinator: WorkoutCoordinator
     let workout: TodaysWorkout
 
     var body: some View {
@@ -92,6 +97,20 @@ struct TodaysWorkoutView: View {
             .font(.caption2)
             .foregroundStyle(.secondary)
             .padding(.top, 2)
+
+            // Sin ejercicios no hay nada que empezar: puede pasar si el plan
+            // no tiene ninguno activo en esta semana.
+            if workout.exercises.isEmpty {
+                Text("Sin ejercicios esta semana")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 6)
+            } else {
+                Button("Empezar") { workoutCoordinator.start(workout: workout) }
+                    .font(.caption)
+                    .tint(.green)
+                    .padding(.top, 6)
+            }
         }
         .padding(.horizontal, 4)
     }
@@ -100,4 +119,5 @@ struct TodaysWorkoutView: View {
 #Preview {
     ContentView()
         .environmentObject(CredentialCoordinator())
+        .environmentObject(WorkoutCoordinator())
 }

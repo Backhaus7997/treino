@@ -124,6 +124,17 @@ enum FS {
         return nil
     }
 
+    static func double(_ field: Any?) -> Double? {
+        guard let wrapper = field as? [String: Any] else { return nil }
+        if let raw = wrapper["doubleValue"] as? Double { return raw }
+        // Un entero redondo puede llegar como integerValue aunque el campo sea
+        // numerico: Firestore no preserva "era double" si el valor no tiene
+        // decimales.
+        if let raw = wrapper["integerValue"] as? String { return Double(raw) }
+        if let raw = wrapper["integerValue"] as? Int { return Double(raw) }
+        return nil
+    }
+
     static func array(_ field: Any?) -> [Any]? {
         guard let wrapper = field as? [String: Any],
               let arrayValue = wrapper["arrayValue"] as? [String: Any]
