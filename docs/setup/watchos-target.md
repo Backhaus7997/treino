@@ -1,6 +1,18 @@
 # Setup: target watchOS
 
-> ## 🚨 BLOQUEANTE ABIERTO — `pod install` roto en esta rama
+> ## ✅ RESUELTO (2026-08-04) — `pod install` estuvo roto en esta rama
+>
+> Se resolvió con `brew upgrade cocoapods` (1.16.2 → 1.17.0). Verificado
+> después: `pod install` completa, la reescritura del `.pbxproj` **no** se comió
+> el enganche del reloj (`fileSystemSynchronizedGroups`, la fase *Embed Watch
+> Content* y la `PBXTargetDependency` siguen ahí), y `xcodebuild` del scheme
+> Runner da `BUILD SUCCEEDED`.
+>
+> Se conserva el detalle abajo porque el mismo problema vuelve en cualquier
+> máquina con CocoaPods viejo, y porque la trampa del `objectVersion` sigue
+> siendo una trampa.
+>
+> <details><summary>Detalle del problema original</summary>
 >
 > Crear el target watchOS en Xcode 26.3 **subió el `objectVersion` del
 > `project.pbxproj` de 54 a 70**. CocoaPods 1.16.2 no entiende ese formato:
@@ -43,6 +55,62 @@
 >
 > (El `LANG` no es opcional: sin UTF-8, CocoaPods aborta con
 > `Unicode Normalization not appropriate for ASCII-8BIT`.)
+>
+> </details>
+
+---
+
+## Probar el reloj de punta a punta
+
+El código Dart y Swift compila y está testeado, pero **el runtime del
+emparejamiento no se puede verificar sin hardware**: el simulador no es
+confiable para pairing ni reachability, mismo patrón "no emulable" que FCM.
+
+### Qué hace falta
+
+1. iPhone y Apple Watch **físicos**, emparejados entre sí.
+2. Los dos con sesión iniciada en la misma cuenta de Apple ID.
+
+### Cómo correrlo
+
+```bash
+flutter run -d <UDID-del-iPhone>
+```
+
+Al instalarse la app de iPhone, la del reloj viaja adentro y se instala sola
+(eso es lo que hace la fase *Embed Watch Content*). Puede tardar unos minutos
+en aparecer en la muñeca; si no aparece, en el iPhone: **app Watch → TREINO →
+Mostrar app en Apple Watch**.
+
+### Qué deberías ver
+
+| Momento | Reloj |
+|---|---|
+| Antes de abrir TREINO en el teléfono | "Abrí TREINO en el teléfono para vincular el reloj" |
+| Al abrir TREINO estando logueado | "Vinculando…" y enseguida "Listo para entrenar" |
+| Reabriendo la app del reloj después | "Listo para entrenar" directo, sin el teléfono cerca |
+
+Ese último punto es **la prueba de que funciona**: el reloj ya tiene credencial
+propia y no depende más del teléfono.
+
+### Si se queda en "Abrí TREINO en el teléfono"
+
+Quiere decir que el contexto no llegó. En orden:
+
+1. ¿La app del teléfono estaba abierta y con sesión iniciada? La entrega se
+   dispara con el cambio de estado de auth.
+2. ¿El reloj figura como emparejado? El servicio corta sin hacer nada si
+   `isPaired` es false, a propósito.
+3. Mirá el log del teléfono: `deliverCredential` devuelve un enum que dice
+   exactamente cuál de las cuatro cosas falló (`notSupported`,
+   `noWatchPaired`, `mintFailed`, `deliveryFailed`).
+
+### Prerequisito que sigue sin verificarse
+
+**Si Xcode pide algún *capability* nuevo para `WCSession`.** El ciclo viejo
+afirmaba que no hace falta ninguno y nadie lo comprobó. Si al firmar para
+dispositivo aparece uno, anotalo acá — es señal de volver al design, no de
+aprobarlo y seguir.
 
 
 Prerequisito manual del change `watch-standalone-client` (fase F0). Requiere
