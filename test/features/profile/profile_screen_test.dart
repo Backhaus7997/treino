@@ -9,7 +9,7 @@ import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
-import 'package:treino/features/feed/application/friendship_providers.dart';
+import 'package:treino/features/feed/application/follow_providers.dart';
 import 'package:treino/features/profile/application/profile_stats_providers.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
@@ -88,8 +88,8 @@ List<Override> _baseOverrides() => [
       authNotifierProvider.overrideWith(_StubAuthNotifier.new),
       authStateChangesProvider.overrideWith((_) => Stream.value(null)),
       userProfileProvider.overrideWith((_) => Stream.value(_testProfile())),
-      pendingRequestCountProvider('').overrideWith((_) => 0),
-      pendingRequestsStreamProvider('').overrideWith((_) => Stream.value([])),
+      pendingFollowRequestCountProvider('').overrideWith((_) => 0),
+      pendingReceivedStreamProvider('').overrideWith((_) => Stream.value([])),
     ];
 
 void main() {

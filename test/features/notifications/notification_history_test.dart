@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
-import 'package:treino/features/feed/application/friendship_providers.dart';
+import 'package:treino/features/feed/application/follow_providers.dart';
 import 'package:treino/features/notifications/application/notification_history_providers.dart';
 import 'package:treino/features/notifications/data/notification_history_repository.dart';
 import 'package:treino/features/notifications/domain/notification_history_item.dart';
@@ -75,7 +75,7 @@ Widget _app({
       notificationLastSeenAtProvider.overrideWith(
         (ref) => lastSeen ?? Stream.value(null),
       ),
-      pendingRequestCountProvider.overrideWith((ref, uid) => pending),
+      pendingFollowRequestCountProvider.overrideWith((ref, uid) => pending),
     ],
     child: MaterialApp.router(
       theme: AppTheme.dark(),
@@ -128,7 +128,7 @@ void main() {
         notificationLastSeenAtProvider.overrideWith(
           (ref) => Stream.value(null),
         ),
-        pendingRequestCountProvider.overrideWith((ref, uid) => 3),
+        pendingFollowRequestCountProvider.overrideWith((ref, uid) => 3),
       ],
     );
     addTearDown(container.dispose);

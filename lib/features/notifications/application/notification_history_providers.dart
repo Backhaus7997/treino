@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../feed/application/friendship_providers.dart';
+import '../../feed/application/follow_providers.dart';
 import '../../profile/application/user_providers.dart' show firestoreProvider;
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
@@ -46,5 +46,5 @@ final unreadNotificationCountProvider = Provider.autoDispose<int>((ref) {
 final notificationHeaderBadgeProvider =
     Provider.family.autoDispose<int, String>((ref, uid) {
   return ref.watch(unreadNotificationCountProvider) +
-      ref.watch(pendingRequestCountProvider(uid));
+      ref.watch(pendingFollowRequestCountProvider(uid));
 });

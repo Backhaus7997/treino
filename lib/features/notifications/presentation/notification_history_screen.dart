@@ -7,7 +7,7 @@ import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
-import '../../feed/application/friendship_providers.dart';
+import '../../feed/application/follow_providers.dart';
 import '../../feed/presentation/widgets/feed_empty_state.dart';
 import '../../feed/presentation/widgets/post_avatar.dart';
 import '../../profile/application/user_public_profile_providers.dart';
@@ -47,7 +47,7 @@ class _NotificationHistoryScreenState
     final notifications = ref.watch(notificationHistoryProvider);
     final lastSeenAt = ref.watch(notificationLastSeenAtProvider).valueOrNull;
     final pending =
-        uid == null ? 0 : ref.watch(pendingRequestCountProvider(uid));
+        uid == null ? 0 : ref.watch(pendingFollowRequestCountProvider(uid));
 
     return Scaffold(
       backgroundColor: Colors.transparent,

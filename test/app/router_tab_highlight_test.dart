@@ -30,7 +30,7 @@ import 'package:treino/features/coach/domain/availability_override.dart';
 import 'package:treino/features/coach/domain/availability_rule.dart';
 import 'package:treino/features/coach/presentation/availability_editor_screen.dart';
 import 'package:treino/features/feed/application/feed_screen_providers.dart';
-import 'package:treino/features/feed/application/friendship_providers.dart';
+import 'package:treino/features/feed/application/follow_providers.dart';
 import 'package:treino/features/feed/application/post_providers.dart';
 import 'package:treino/features/feed/domain/feed_segment.dart';
 import 'package:treino/features/feed/domain/post.dart';
@@ -74,8 +74,8 @@ List<Override> _overrides() => [
         (_) async => const UserSessionStats(
             totalSessions: 0, totalVolumeKg: 0, streak: 0),
       ),
-      pendingRequestCountProvider('').overrideWith((_) => 0),
-      pendingRequestsStreamProvider('').overrideWith((_) => Stream.value([])),
+      pendingFollowRequestCountProvider('').overrideWith((_) => 0),
+      pendingReceivedStreamProvider('').overrideWith((_) => Stream.value([])),
       // Feed tab root (origin of the Solicitudes push).
       feedSegmentProvider.overrideWith((ref) => FeedSegment.amigos),
       myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),

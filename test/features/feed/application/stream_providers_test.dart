@@ -7,7 +7,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/feed/application/follow_providers.dart';
-import 'package:treino/features/feed/application/friendship_providers.dart';
 import 'package:treino/features/feed/application/public_profile_providers.dart';
 import 'package:treino/features/feed/data/follow_repository.dart';
 import 'package:treino/features/feed/domain/follow.dart';
@@ -189,18 +188,19 @@ void main() {
   });
 
   // ──────────────────────────────────────────────────────────────────────────
-  // SCENARIO-483: acceptedFriendsProvider drop-in — AsyncValue<List<String>>
+  // SCENARIO-483: followingProvider drop-in — AsyncValue<List<String>>
   //
-  // Sin cambios: `acceptedFriendsProvider` sigue existiendo en `lib/` y este
-  // archivo es su ÚNICA cobertura. Su sucesor direccional es
-  // `followingProvider`, pero migrarlo acá borraría la única prueba del
-  // provider que todavía se exporta.
+  // Migrado desde `followingProvider`, retirado en PR3d. El contrato de
+  // FORMA es idéntico (StreamProvider.family.autoDispose sobre List<String>),
+  // así que el caso conserva su intención completa; lo que cambió es la
+  // semántica del contenido, que se cubre en `feed_screen_providers_test.dart`
+  // (SCENARIO-814: son los que YO sigo, no los dos lados de la relación).
   // ──────────────────────────────────────────────────────────────────────────
   test(
-      'SCENARIO-483: acceptedFriendsProvider is StreamProvider.family.autoDispose returning AsyncValue<List<String>>',
+      'SCENARIO-483: followingProvider is StreamProvider.family.autoDispose returning AsyncValue<List<String>>',
       () {
     // Calling the family with args produces an AutoDisposeStreamProvider
-    final provider = acceptedFriendsProvider('u1');
+    final provider = followingProvider('u1');
     expect(provider, isA<AutoDisposeStreamProvider<List<String>>>());
   });
 
@@ -463,31 +463,31 @@ void main() {
   });
 
   // ──────────────────────────────────────────────────────────────────────────
-  // T10 RED: SCENARIO-483 extended — acceptedFriendsProvider shape tests
+  // T10 RED: SCENARIO-483 extended — followingProvider shape tests
   // ──────────────────────────────────────────────────────────────────────────
-  group('acceptedFriendsProvider StreamProvider contract', () {
+  group('followingProvider StreamProvider contract', () {
     test(
-        'SCENARIO-483 (container): acceptedFriendsProvider emits AsyncValue<List<String>> from stream',
+        'SCENARIO-483 (container): followingProvider emits AsyncValue<List<String>> from stream',
         () async {
       final container = ProviderContainer(
         overrides: [
-          acceptedFriendsProvider('u1').overrideWith(
+          followingProvider('u1').overrideWith(
             (ref) => Stream.value(const ['u2', 'u3']),
           ),
         ],
       );
       addTearDown(container.dispose);
 
-      final value = await container.read(acceptedFriendsProvider('u1').future);
+      final value = await container.read(followingProvider('u1').future);
       expect(value, isA<List<String>>());
       expect(value, equals(['u2', 'u3']));
     });
 
     test(
-        'acceptedFriendsProvider autoDispose: provider type is AutoDisposeStreamProvider',
+        'followingProvider autoDispose: provider type is AutoDisposeStreamProvider',
         () {
       expect(
-        acceptedFriendsProvider('u1'),
+        followingProvider('u1'),
         isA<AutoDisposeStreamProvider<List<String>>>(),
       );
     });

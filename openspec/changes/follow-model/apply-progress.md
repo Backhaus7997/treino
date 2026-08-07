@@ -271,6 +271,50 @@ completo verde, 4826 tests**.
 
 ---
 
+## PR 3d — Retiro de `Friendship*` ✅
+
+Tareas 3d.1–3d.5. **1601 líneas borradas**: `friendship.dart` (+ `.freezed` +
+`.g`), `friendship_status.dart`, `friendship_repository.dart`,
+`friendship_providers.dart` y sus 5 archivos de test.
+
+### 🔴 El gate 3d.1 falló y destapó un bug que PR3c se había comido
+
+Quedaban **tres consumidores vivos** de `pendingRequestCountProvider` (la
+versión `friendships`): `profile_cuenta_section.dart:34`,
+`notification_history_screen.dart:50` y
+`notification_history_providers.dart:49` — o sea **el badge de solicitudes
+pendientes**, en dos superficies.
+
+El inbox ya se había migrado a `follows` en 3c.14, pero el badge seguía
+contando la colección vieja. Después del flip `friendships` queda congelada y
+las solicitudes nuevas viven en `follows`, así que **el badge habría marcado 0
+para siempre mientras el inbox mostraba pedidos reales**. El usuario nunca se
+entera de que tiene solicitudes.
+
+Se repuntaron a `pendingFollowRequestCountProvider` (ya existía desde PR1), con
+**tres tests que siembran Firestore de verdad** en vez de overridear el
+provider — con el provider mockeado, contar una colección u otra da idéntico y
+el test no probaría nada.
+
+> **Lección del método, otra vez**: el gate era un `grep` mecánico y de rutina.
+> Lo que lo hizo valioso fue **mirar qué eran esas referencias** en vez de
+> borrarlas para que compilara.
+
+### Dos suites migradas en vez de borradas
+
+Probaban contratos que el sucesor conserva, así que borrarlas habría perdido
+cobertura real:
+- el grupo de forma de `acceptedFriendsProvider` (`stream_providers_test.dart`)
+  → `followingProvider`, misma forma exacta.
+- `feed-42` (`feed_gap_test.dart`): `acceptedFriendsOf` → `followingOf`, y se
+  **agregó** el caso que el modelo viejo no podía expresar — u5 sigue a u1 sin
+  que u1 lo siga, y no aparece entre los seguidos de u1.
+
+**Evidencia**: `flutter analyze` 0 issues + `dart format .` + **`flutter test`
+completo verde, 4794 tests** (bajó de 4826 por los tests del módulo retirado).
+
+---
+
 ## Pendiente
 - **PR 3d** — retiro de `Friendship*`. **PR 4** — UX + l10n.
 - **Gate 3a.19 incompleto**: 3 suites (`post-photos-storage-rules`,

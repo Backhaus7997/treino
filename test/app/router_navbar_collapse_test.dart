@@ -19,7 +19,7 @@ import 'package:treino/core/widgets/treino_bottom_bar.dart';
 import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/feed/application/feed_screen_providers.dart';
-import 'package:treino/features/feed/application/friendship_providers.dart';
+import 'package:treino/features/feed/application/follow_providers.dart';
 import 'package:treino/features/feed/application/post_providers.dart';
 import 'package:treino/features/feed/domain/feed_segment.dart';
 import 'package:treino/features/feed/domain/post.dart';
@@ -71,8 +71,8 @@ List<Override> _overrides() => [
           streak: 0,
         ),
       ),
-      pendingRequestCountProvider('').overrideWith((_) => 0),
-      pendingRequestsStreamProvider('').overrideWith((_) => Stream.value([])),
+      pendingFollowRequestCountProvider('').overrideWith((_) => 0),
+      pendingReceivedStreamProvider('').overrideWith((_) => Stream.value([])),
       feedSegmentProvider.overrideWith((ref) => FeedSegment.public),
       myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
       myGymFeedProvider.overrideWith((ref) async => null),

@@ -15,7 +15,7 @@ import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/feed/application/feed_pagination_notifier.dart';
 import 'package:treino/features/feed/application/feed_screen_providers.dart';
-import 'package:treino/features/feed/application/friendship_providers.dart';
+import 'package:treino/features/feed/application/follow_providers.dart';
 import 'package:treino/features/feed/application/post_providers.dart';
 import 'package:treino/features/feed/application/suggested_users_providers.dart';
 import 'package:treino/features/feed/data/post_repository.dart';
@@ -758,7 +758,7 @@ void main() {
           feedPublicProvider.overrideWith((ref) async => const <Post>[]),
           unreadFromFriendsProvider.overrideWith((_) => 0),
           unreadNotificationCountProvider.overrideWith((_) => 0),
-          pendingRequestCountProvider(uid).overrideWith((_) => 0),
+          pendingFollowRequestCountProvider(uid).overrideWith((_) => 0),
           // Page 1 (rankings) dependencies — mirrors the override set the
           // Entrenar tab used while it hosted rankings.
           currentUidProvider.overrideWithValue(uid),

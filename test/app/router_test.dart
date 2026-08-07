@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/router.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
-import 'package:treino/features/feed/application/friendship_providers.dart';
+import 'package:treino/features/feed/application/follow_providers.dart';
 import 'package:treino/features/feed/application/post_providers.dart';
 import 'package:treino/features/feed/presentation/friend_requests_inbox_screen.dart';
 import 'package:treino/features/feed/presentation/post_detail_screen.dart';
@@ -40,8 +40,8 @@ List<Override> _baseOverrides() => [
         (_) async => const UserSessionStats(
             totalSessions: 0, totalVolumeKg: 0, streak: 0),
       ),
-      pendingRequestCountProvider('').overrideWith((_) => 0),
-      pendingRequestsStreamProvider('').overrideWith((_) => Stream.value([])),
+      pendingFollowRequestCountProvider('').overrideWith((_) => 0),
+      pendingReceivedStreamProvider('').overrideWith((_) => Stream.value([])),
       userProfileProvider.overrideWith((_) => Stream.value(_testProfile())),
     ];
 
@@ -107,8 +107,8 @@ void main() {
             (_) async => const UserSessionStats(
                 totalSessions: 0, totalVolumeKg: 0, streak: 0),
           ),
-          pendingRequestCountProvider('').overrideWith((_) => 0),
-          pendingRequestsStreamProvider('').overrideWith(
+          pendingFollowRequestCountProvider('').overrideWith((_) => 0),
+          pendingReceivedStreamProvider('').overrideWith(
             (_) => Stream.value([]),
           ),
         ],
