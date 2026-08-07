@@ -27,9 +27,19 @@ struct WorkoutView: View {
 
                     setsList(exercise: exercise, session: session)
 
-                    Button("Terminar", role: .destructive) { workout.finish() }
-                        .font(.caption2)
-                        .padding(.top, 4)
+                    if !session.pendingSets.isEmpty {
+                        Label("\(session.pendingSets.count) sin subir",
+                              systemImage: "arrow.up.circle")
+                            .font(.caption2)
+                            .foregroundStyle(.orange)
+                            .padding(.top, 2)
+                    }
+
+                    Button("Terminar", role: .destructive) {
+                        Task { await workout.finish() }
+                    }
+                    .font(.caption2)
+                    .padding(.top, 4)
                 }
                 .padding(.horizontal, 2)
             }

@@ -20,6 +20,12 @@ struct LoggedSet: Codable, Equatable {
     let reps: Int?
     let weightKg: Double?
     let completedAt: Date
+
+    /// Si ya llego al historial. Las que quedan en false son LA COLA: se
+    /// reintentan en cada sync hasta que entran. Por eso la serie se registra
+    /// primero local y se sube despues — si se hiciera al reves, una escritura
+    /// fallida perderia la serie que el atleta ya hizo.
+    var synced: Bool = false
 }
 
 /// La sesión de entrenamiento que el reloj mantiene por su cuenta.
@@ -35,6 +41,12 @@ struct WorkoutSession: Codable, Equatable {
     let weekNumber: Int
     let startedAt: Date
     var loggedSets: [LoggedSet]
+
+    /// Id de la sesion en Firestore. Nil mientras no se pudo crear/adoptar
+    /// (sin red al empezar): se resuelve en el proximo sync.
+    var remoteId: String?
+
+    var pendingSets: [LoggedSet] { loggedSets.filter { !$0.synced } }
 
     /// Si esa serie de ese ejercicio ya está cargada.
     ///

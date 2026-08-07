@@ -113,6 +113,57 @@ struct FirestoreREST {
             )
         }
     }
+
+    // MARK: - Escrituras
+
+    /// Crea un documento con id autogenerado y devuelve ese id.
+    func createDocument(
+        collectionPath: String,
+        fields: [String: Any],
+        session: URLSession = .shared
+    ) async throws -> String {
+        var request = URLRequest(url: URL(string: "\(base)/\(collectionPath)")!)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(idToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["fields": fields])
+
+        let (data, response) = try await session.data(for: request)
+        if let http = response as? HTTPURLResponse, http.statusCode != 200 {
+            throw FirestoreError.http(
+                status: http.statusCode,
+                body: String(data: data, encoding: .utf8) ?? ""
+            )
+        }
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let name = json["name"] as? String
+        else { throw FirestoreError.malformedResponse }
+        return name.split(separator: "/").last.map(String.init) ?? ""
+    }
+
+    /// Crea o PISA un documento en un path conocido.
+    ///
+    /// Es la operacion que hace idempotentes las escrituras del reloj: con un
+    /// id deterministico, reintentar no duplica.
+    func setDocument(
+        path: String,
+        fields: [String: Any],
+        session: URLSession = .shared
+    ) async throws {
+        var request = URLRequest(url: URL(string: "\(base)/\(path)")!)
+        request.httpMethod = "PATCH"
+        request.setValue("Bearer \(idToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["fields": fields])
+
+        let (data, response) = try await session.data(for: request)
+        if let http = response as? HTTPURLResponse, http.statusCode != 200 {
+            throw FirestoreError.http(
+                status: http.statusCode,
+                body: String(data: data, encoding: .utf8) ?? ""
+            )
+        }
+    }
 }
 
 /// Un documento de Firestore con su ID resuelto desde el path.

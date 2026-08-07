@@ -130,6 +130,20 @@ final class CredentialCoordinator: NSObject, ObservableObject {
         }
     }
 
+    /// Un cliente de Firestore autenticado y su uid, con token fresco.
+    func firestoreClient() async throws -> (FirestoreREST, String) {
+        guard let credential = CredentialStore.load() else {
+            throw FirebaseAuthREST.AuthError.malformedResponse
+        }
+        let idToken = try await freshIdToken()
+        let client = FirestoreREST(
+            projectId: credential.projectId,
+            idToken: idToken,
+            emulatorHost: credential.firestoreEmulatorHost
+        )
+        return (client, credential.uid)
+    }
+
     /// Carga el entreno de hoy con la credencial propia del reloj.
     ///
     /// Renueva el idToken en cada carga: dura una hora, y renovar es más barato

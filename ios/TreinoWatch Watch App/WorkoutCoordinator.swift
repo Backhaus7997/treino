@@ -23,7 +23,15 @@ final class WorkoutCoordinator: ObservableObject {
     /// Segundos que faltan del descanso, o nil si no hay descanso corriendo.
     @Published private(set) var restRemaining: Int?
 
+    /// Ultima falla de sincronizacion, para diagnostico. La UI solo muestra que
+    /// hay pendientes, no el detalle.
+    @Published private(set) var syncError: String?
+
     private var restTimer: Timer?
+
+    /// Como conseguir un cliente de Firestore autenticado. Lo inyecta la app
+    /// para no acoplar este coordinator al de credenciales.
+    var makeClient: (() async throws -> (FirestoreREST, String))?
 
     var currentExercise: WatchExercise? {
         guard currentExerciseIndex >= 0, currentExerciseIndex < exercises.count
@@ -68,6 +76,11 @@ final class WorkoutCoordinator: ObservableObject {
         exercises = workout.exercises
         currentExerciseIndex = 0
         WorkoutSessionStore.save(new)
+
+        // Se adopta o crea la sesion remota en segundo plano: el atleta empieza
+        // a entrenar YA, sin esperar a la red. Si falla, el proximo sync lo
+        // reintenta.
+        Task { await sync(workout: workout) }
     }
 
     /// Carga una serie. Idempotente por `exerciseId + setNumber`, igual que el
@@ -92,14 +105,85 @@ final class WorkoutCoordinator: ObservableObject {
 
         startRest(seconds: restSeconds)
         advanceIfExerciseDone(exerciseId: exerciseId)
+
+        Task { await sync(workout: nil) }
     }
 
-    func finish() {
+    /// Cierra el entreno. Intenta subir lo que falte ANTES de descartar el
+    /// estado local: si se borrara primero, una serie que nunca llego al
+    /// historial se perderia sin dejar rastro.
+    func finish() async {
         stopRest()
+        await sync(workout: nil)
+
+        // Si quedan pendientes, el entreno NO se descarta: se conserva para
+        // reintentar. Perder series que el atleta hizo es peor que dejarle la
+        // pantalla abierta.
+        if let current = session, !current.pendingSets.isEmpty { return }
+
         session = nil
         exercises = []
         currentExerciseIndex = 0
         WorkoutSessionStore.clear()
+    }
+
+    /// Sube al historial lo que falte: primero resuelve la sesion remota, y
+    /// despues las series pendientes una por una.
+    ///
+    /// Cada serie se marca como subida SOLO si su escritura salio bien, asi que
+    /// una falla parcial deja el resto en la cola en vez de darlas por hechas.
+    func sync(workout: TodaysWorkout?) async {
+        guard var current = session, let makeClient else { return }
+        do {
+            let (client, uid) = try await makeClient()
+
+            if current.remoteId == nil {
+                guard let workout else {
+                    // Sin la rutina no se puede adoptar/crear: queda para el
+                    // proximo sync, que si la tiene.
+                    return
+                }
+                let adopted = try await HistorySync.adoptOrCreateSession(
+                    client: client, uid: uid, workout: workout,
+                    startedAt: current.startedAt
+                )
+                current.remoteId = adopted.sessionId
+                // Series que ya estaban en esa sesion (cargadas desde el
+                // telefono, o por un intento anterior): se marcan como hechas
+                // para no volver a ofrecerlas ni re-escribirlas.
+                for existing in adopted.alreadyLogged
+                where !current.isLogged(
+                    exerciseId: existing.exerciseId, setNumber: existing.setNumber
+                ) {
+                    current.loggedSets.append(existing)
+                }
+                session = current
+                WorkoutSessionStore.save(current)
+            }
+
+            guard let remoteId = current.remoteId else { return }
+
+            for pending in current.pendingSets {
+                let name = exercises
+                    .first { $0.exerciseId == pending.exerciseId }?
+                    .exerciseName ?? pending.exerciseId
+                try await HistorySync.writeSetLog(
+                    client: client, uid: uid, sessionId: remoteId,
+                    exerciseName: name, set: pending
+                )
+                if let index = current.loggedSets.firstIndex(where: {
+                    $0.exerciseId == pending.exerciseId
+                        && $0.setNumber == pending.setNumber
+                }) {
+                    current.loggedSets[index].synced = true
+                }
+                session = current
+                WorkoutSessionStore.save(current)
+            }
+            syncError = nil
+        } catch {
+            syncError = String(describing: error)
+        }
     }
 
     func skipRest() { stopRest() }

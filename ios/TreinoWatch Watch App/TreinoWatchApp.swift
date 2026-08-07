@@ -23,6 +23,12 @@ struct TreinoWatch_Watch_AppApp: App {
                 // Va acá y no en el init del coordinator para que el trabajo
                 // arranque con la escena viva, no durante la construcción.
                 .task {
+                    // El coordinator del entreno pide su cliente al de
+                    // credenciales, en vez de que uno conozca al otro.
+                    workoutCoordinator.makeClient = {
+                        let credential = try await coordinator.firestoreClient()
+                        return credential
+                    }
                     coordinator.start()
                     // Recupera un entreno a medias. Espera a que la rutina
                     // este resuelta: los ejercicios no se persisten, se
@@ -43,9 +49,19 @@ struct TreinoWatch_Watch_AppApp: App {
                 // ejercicios abajo del atleta a mitad de serie seria peor que
                 // mostrar un dato viejo.
                 .onChange(of: scenePhase) { _, phase in
-                    guard phase == .active, workoutCoordinator.session == nil
-                    else { return }
-                    Task { await coordinator.loadTodaysWorkout() }
+                    guard phase == .active else { return }
+                    Task {
+                        // Con un entreno abierto se reintenta la cola en vez de
+                        // refrescar la rutina: cambiarle los ejercicios al
+                        // atleta a mitad de serie seria peor.
+                        if workoutCoordinator.session != nil {
+                            await workoutCoordinator.sync(
+                                workout: coordinator.todaysWorkout
+                            )
+                        } else {
+                            await coordinator.loadTodaysWorkout()
+                        }
+                    }
                 }
         }
     }
