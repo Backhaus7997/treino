@@ -12,6 +12,7 @@ import SwiftUI
 struct TreinoWatch_Watch_AppApp: App {
     @StateObject private var coordinator = CredentialCoordinator()
     @StateObject private var workoutCoordinator = WorkoutCoordinator()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
@@ -32,6 +33,19 @@ struct TreinoWatch_Watch_AppApp: App {
                             break
                         }
                     }
+                }
+                // Relee la rutina al volver a primer plano. Sin esto el reloj
+                // solo la leia al arrancar la app: si el atleta cambiaba su
+                // rutina activa desde el telefono, el reloj seguia mostrando la
+                // anterior hasta que alguien lo relanzaba.
+                //
+                // No se refresca durante un entreno en curso: cambiar los
+                // ejercicios abajo del atleta a mitad de serie seria peor que
+                // mostrar un dato viejo.
+                .onChange(of: scenePhase) { _, phase in
+                    guard phase == .active, workoutCoordinator.session == nil
+                    else { return }
+                    Task { await coordinator.loadTodaysWorkout() }
                 }
         }
     }

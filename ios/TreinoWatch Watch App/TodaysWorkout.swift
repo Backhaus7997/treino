@@ -42,11 +42,14 @@ enum TodaysWorkoutResolver {
         client: FirestoreREST,
         uid: String
     ) async throws -> TodaysWorkout? {
-        guard let routine = try await findRoutine(client: client, uid: uid) else {
+        guard let doc = try await findRoutine(client: client, uid: uid) else {
             return nil
         }
 
-        let routineId = FS.string(routine["id"]) ?? ""
+        // El ID sale del PATH, no de un campo: los docs creados por la app no
+        // guardan `id` adentro.
+        let routineId = doc.id
+        let routine = doc.fields
         let days = FS.array(routine["days"]) ?? []
         guard !days.isEmpty else { return nil }
 
@@ -142,7 +145,7 @@ enum TodaysWorkoutResolver {
     private static func findRoutine(
         client: FirestoreREST,
         uid: String
-    ) async throws -> [String: Any]? {
+    ) async throws -> FirestoreDocument? {
         let profile = try await client.document("users/\(uid)")
         let activeRoutineId = FS.string(profile?["activeRoutineId"])
 
@@ -155,19 +158,13 @@ enum TodaysWorkoutResolver {
             "where": fieldEquals("createdBy", uid),
         ])
 
-        func ids(_ docs: [[String: Any]]) -> [String] {
-            docs.compactMap { FS.string($0["id"]) }
-        }
-
         guard let resolvedId = resolveActiveRoutineId(
             activeRoutineId: activeRoutineId,
-            assignedIds: ids(assigned),
-            selfCreatedIds: ids(selfCreated)
+            assignedIds: assigned.map(\.id),
+            selfCreatedIds: selfCreated.map(\.id)
         ) else { return nil }
 
-        return (assigned + selfCreated).first {
-            FS.string($0["id"]) == resolvedId
-        }
+        return (assigned + selfCreated).first { $0.id == resolvedId }
     }
 
     /// Última sesión FINALIZADA de esa rutina, que es la entrada de
@@ -192,7 +189,8 @@ enum TodaysWorkoutResolver {
             "limit": 20,
         ], parent: "users/\(uid)")
 
-        for fields in sessions {
+        for doc in sessions {
+            let fields = doc.fields
             guard fields["finishedAt"] != nil,
                   let day = FS.int(fields["dayNumber"]),
                   let week = FS.int(fields["weekNumber"])

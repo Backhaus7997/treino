@@ -63,7 +63,13 @@ struct FirestoreREST {
         return json["fields"] as? [String: Any]
     }
 
-    /// Corre una structuredQuery y devuelve los `fields` de cada documento.
+    /// Corre una structuredQuery y devuelve cada documento con su ID.
+    ///
+    /// El ID sale del PATH del documento, no de un campo: los docs creados por
+    /// la app NO guardan `id` adentro — solo los sembrados por el script de
+    /// seed lo tienen. Leerlo de los campos hacia que las rutinas reales
+    /// quedaran con id vacio y no matchearan nunca contra el marcador de
+    /// rutina activa.
     ///
     /// Las filas sin `document` se descartan: la respuesta de `runQuery`
     /// intercala entradas de solo-metadata (readTime) que no son resultados.
@@ -76,7 +82,7 @@ struct FirestoreREST {
         _ structuredQuery: [String: Any],
         parent: String? = nil,
         session: URLSession = .shared
-    ) async throws -> [[String: Any]] {
+    ) async throws -> [FirestoreDocument] {
         let endpoint = parent.map { "\(base)/\($0):runQuery" } ?? "\(base):runQuery"
         var request = URLRequest(url: URL(string: endpoint)!)
         request.httpMethod = "POST"
@@ -97,10 +103,22 @@ struct FirestoreREST {
         guard let rows = try JSONSerialization.jsonObject(with: data) as? [[String: Any]]
         else { throw FirestoreError.malformedResponse }
 
-        return rows.compactMap {
-            ($0["document"] as? [String: Any])?["fields"] as? [String: Any]
+        return rows.compactMap { row -> FirestoreDocument? in
+            guard let doc = row["document"] as? [String: Any],
+                  let name = doc["name"] as? String
+            else { return nil }
+            return FirestoreDocument(
+                id: name.split(separator: "/").last.map(String.init) ?? "",
+                fields: doc["fields"] as? [String: Any] ?? [:]
+            )
         }
     }
+}
+
+/// Un documento de Firestore con su ID resuelto desde el path.
+struct FirestoreDocument {
+    let id: String
+    let fields: [String: Any]
 }
 
 // MARK: - Desempaquetado de los value-wrappers de Firestore
