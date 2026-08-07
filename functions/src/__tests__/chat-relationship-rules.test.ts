@@ -223,6 +223,23 @@ function readMessage(self: string, a: string, b: string, msgId = "seeded") {
     .get();
 }
 
+/**
+ * `chats/update` con los campos de preview — lo que el cliente escribe en el
+ * MISMO batch que el mensaje (`chat_repository.dart:163-167`).
+ */
+function updatePreview(self: string, a: string, b: string, text = "hola") {
+  return testEnv
+    .authenticatedContext(self)
+    .firestore()
+    .collection("chats")
+    .doc(chatIdOf(a, b))
+    .update({
+      lastMessageAt: AT,
+      lastMessageText: text,
+      lastMessageSenderId: self,
+    });
+}
+
 /** `chats/update` con `lastRead` — el camino de "marcar como leído". */
 function markRead(self: string, a: string, b: string) {
   return testEnv
@@ -477,6 +494,72 @@ describe("chats — `linkId` no se puede fraguar (REQ-FOLLOW-012)", () => {
     await seedChat(U1, U2);
     await assertSucceeds(markRead(U1, U1, U2));
     await assertSucceeds(markRead(U2, U1, U2));
+  });
+});
+
+// ── El preview del chat sigue al mismo permiso que el mensaje ───────────────
+// Sin esto, el gate de `messages/create` se puede rodear por el costado: el
+// lado bloqueado no logra escribir el mensaje, pero SÍ escribe
+// `lastMessageText` en el doc del chat, que es el texto que la otra persona ve
+// en su lista de chats — con badge de no-leído incluido. O sea que "no te puede
+// escribir" era falso: no te puede escribir EN LA CONVERSACIÓN, pero te hace
+// aparecer texto arbitrario en la pantalla que mirás primero.
+//
+// Por la app no pasa (el cliente manda mensaje y preview en el mismo batch, y
+// si el mensaje se deniega cae el batch entero), pero por SDK crudo sí, que es
+// justo el modelo de amenaza que las rules existen para cubrir.
+//
+// DESVÍO DELIBERADO de design §3.3.4, que decía "`chats/update`: membresía, SIN
+// CAMBIOS". El motivo que da esa sección —que el lado bloqueado tiene que poder
+// marcar como leído— se conserva intacto y va anclado en un test: lo único que
+// se restringe es cambiar CUALQUIER cosa que no sea `lastRead`.
+describe("chats/update — el preview sigue al permiso de escritura", () => {
+  beforeEach(async () => {
+    await seedChat(U1, U2);
+    // U1 sigue a U2. U2 NO sigue a U1 → sólo U2 puede escribir.
+    await seedEdge(U1, U2, "accepted");
+  });
+
+  it("DENIEGA al lado bloqueado empujar texto al preview del otro", async () => {
+    await assertFails(updatePreview(U1, U1, U2, "texto no deseado"));
+  });
+
+  it("permite al lado habilitado actualizar el preview", async () => {
+    await assertSucceeds(updatePreview(U2, U1, U2));
+  });
+
+  it("el lado bloqueado CONSERVA marcar como leído", async () => {
+    // Es la razón por la que design §3.3.4 pedía no tocar esta regla. Se
+    // respeta: `lastRead` sigue siendo libre para cualquier miembro.
+    await assertSucceeds(markRead(U1, U1, U2));
+  });
+
+  it("DENIEGA al lado bloqueado agregar cualquier otro campo", async () => {
+    // La restricción es una allowlist (`hasOnly(['lastRead'])`), no una lista
+    // de campos de preview enumerados: si mañana se agrega otro campo al doc,
+    // queda denegado por defecto en vez de colarse.
+    await assertFails(
+      testEnv
+        .authenticatedContext(U1)
+        .firestore()
+        .collection("chats")
+        .doc(chatIdOf(U1, U2))
+        .update({ campoNuevo: "x" }),
+    );
+  });
+
+  it("en un chat de Coach los dos actualizan el preview sin ninguna arista", async () => {
+    await seedLink("link-1", TRAINER, ATHLETE, "active");
+    await seedChat(ATHLETE, TRAINER, { linkId: "link-1" });
+
+    await assertSucceeds(updatePreview(ATHLETE, ATHLETE, TRAINER));
+    await assertSucceeds(updatePreview(TRAINER, ATHLETE, TRAINER));
+  });
+
+  it("un chat mutuo deja actualizar el preview a los dos", async () => {
+    await seedEdge(U2, U1, "accepted"); // ahora es mutuo
+    await assertSucceeds(updatePreview(U1, U1, U2));
+    await assertSucceeds(updatePreview(U2, U1, U2));
   });
 });
 

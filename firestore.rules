@@ -1244,6 +1244,22 @@ service cloud.firestore {
         ) : followAccepted(other, me);
       }
 
+      // Mismo permiso que `senderMayPost`, pero sobre un chat que YA existe, así
+      // que sale de `resource.data` y NO paga el `get()` del chat. Igual que
+      // allá, `'linkId' in resource.data` va primero para que el Coach no pague
+      // ninguna llamada de acceso — y acá esa clave ya es confiable, porque
+      // `chatCreateOk` la valida al crear y el `update` la tiene pineada.
+      //
+      // Costo: 0 llamadas en un chat de Coach, 2 en uno social, y sólo cuando el
+      // update toca algo más que `lastRead`.
+      function chatWriterOk(uid) {
+        let other = resource.data.members[0] == uid
+          ? resource.data.members[1]
+          : resource.data.members[0];
+        return 'linkId' in resource.data
+            || followAccepted(other, uid);
+      }
+
       allow read: if request.auth != null
                   && (resource == null
                       || request.auth.uid in resource.data.members);
@@ -1282,6 +1298,26 @@ service cloud.firestore {
                               .diff(resource.data.get('lastRead', {}))
                               .affectedKeys()
                               .hasOnly([request.auth.uid])
+                       )
+                    // REQ-FOLLOW-012 — el PREVIEW sigue al mismo permiso que el
+                    // mensaje. Sin esto el gate de `messages/create` se rodea
+                    // por el costado: el lado bloqueado no logra escribir el
+                    // mensaje, pero sí `lastMessageText`, que es el texto que la
+                    // otra persona ve en su lista de chats, con badge de
+                    // no-leído. "No te puede escribir" sería falso.
+                    //
+                    // Es una ALLOWLIST, no una lista de campos de preview
+                    // enumerados: cualquier campo que se agregue mañana al doc
+                    // queda denegado por defecto en vez de colarse.
+                    //
+                    // `lastRead` queda AFUERA de la restricción a propósito
+                    // (design §3.3.4): el lado sin escritura tiene que poder
+                    // marcar como leído, o el badge de no-leídos se le clava
+                    // para siempre. Ese caso no paga ninguna llamada de acceso.
+                    && (
+                         request.resource.data.diff(resource.data)
+                           .affectedKeys().hasOnly(['lastRead'])
+                         || chatWriterOk(request.auth.uid)
                        );
 
       allow delete: if false;

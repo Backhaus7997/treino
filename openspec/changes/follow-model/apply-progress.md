@@ -199,11 +199,7 @@ del exploit se verificaron en ROJO contra la implementación anterior.
   `cascade/storage`, `delete-account.smoke`) necesitan el emulador de
   **Storage**, que no estaba levantado. CI sí lo levanta. Falta una corrida
   local con `--only firestore,auth,storage` para cerrar el gate.
-- **Decisión abierta nueva**: `chats/update` sigue siendo por membresía, así que
-  el lado sin permiso de escritura **igual puede empujar `lastMessageText`** al
-  preview del otro por SDK crudo (por la app no, porque el cliente manda mensaje
-  y preview en el mismo batch). Cerrar el agujero contradice el "no se toca" de
-  design §3.3.4 — va a decisión del dueño.
+- ~~Decisión abierta: el preview del chat~~ → **CERRADA por el dueño, ver 3a.7c.**
 - Copy del aviso de chat bloqueado (se cierra con el resto de los ARBs en PR4).
 
 > Recordatorio de la aserción que ya quedó fijada por M-00: con 4 `accepted` y
