@@ -1031,6 +1031,28 @@ service cloud.firestore {
     }
 
     match /friendships/{friendshipId} {
+      // FREEZE (M-03b, ADR-FOLLOW-015, REQ-FOLLOW-017) — change `follow-model`.
+      //
+      // `friendships` migra a `follows` (arista dirigida). El script de
+      // migración SOLO crea (`batch.create()`, nunca pisa ni borra), así que
+      // un borrado de una friendship ya migrada, ocurrido con una build vieja
+      // DESPUÉS de la migración, no se propagaba: las dos aristas migradas
+      // sobrevivían al origen y el usuario creía haber revocado el acceso sin
+      // haberlo hecho — phantom access (LD-04), la peor falla posible en un
+      // cambio de privacidad.
+      //
+      // El freeze se adelanta a ANTES de la migración (M-03b, antes de M-04)
+      // en vez de ir pegado al flip del gate de lectura (M-07, la versión
+      // anterior de este plan): cerrar la ventana de raíz, en vez de
+      // detectarla con reconciliación de borrados. Deploy de este bloque es
+      // manual — 2.8b — y tiene que preceder al primer `--apply` de la
+      // migración.
+      //
+      // `create`/`update`/`delete` pasan a `if false`. `read` se CONSERVA sin
+      // tocar (ADR-FOLLOW-012): hace falta para el rollback — la
+      // reversibilidad la da el dato intacto, no el código — y para que una
+      // build vieja que solo lee su lista de amigos no se rompa.
+      //
       // Read: only members of the friendship — OR doc does not exist (returns
       // empty snapshot without leaking data). The `resource == null` branch is
       // required for `getByPair()` to gracefully resolve "no friendship yet"
@@ -1041,56 +1063,9 @@ service cloud.firestore {
                   && (resource == null
                       || request.auth.uid in resource.data.members);
 
-      // Create: only by the requester, requester in members. Status may be:
-      //   - 'pending' (default flow; owner of the target profile must accept)
-      //   - 'accepted' ONLY IF the target user's public profile has
-      //     `isProfilePublic` truthy at write time (Instagram-style public
-      //     account: no approval required). Enforced via a get() lookup on
-      //     `userPublicProfiles/{otherUid}`.
-      //
-      // IMPORTANT: pre-existing profile docs written before the privacy
-      // feature landed do NOT have the `isProfilePublic` field. We treat a
-      // missing field as `true` (public by default — matches
-      // `UserPublicProfile.isProfilePublic` freezed default) via
-      // `.get('isProfilePublic', true)`. Without this fallback every legacy
-      // account would fail auto-accept even though its owner never opted out.
-      //
-      // NOTE on rule cost: the `get()` in the accepted branch runs only when
-      // the client tries to auto-accept. The pending branch (majority path)
-      // stays free of extra reads.
-      allow create: if request.auth != null
-                    && request.auth.uid == request.resource.data.requesterId
-                    && request.auth.uid in request.resource.data.members
-                    && (
-                      request.resource.data.status == 'pending'
-                      ||
-                      (request.resource.data.status == 'accepted'
-                        // The "other" member is whichever of uidA/uidB
-                        // isn't the requester. Instead of computing it,
-                        // just check that ONE of the two members has a
-                        // public profile AND isn't the requester itself.
-                        && (
-                          (request.resource.data.uidA != request.auth.uid
-                            && get(/databases/$(database)/documents/userPublicProfiles/$(request.resource.data.uidA)).data.get('isProfilePublic', true) == true)
-                          ||
-                          (request.resource.data.uidB != request.auth.uid
-                            && get(/databases/$(database)/documents/userPublicProfiles/$(request.resource.data.uidB)).data.get('isProfilePublic', true) == true)
-                        )
-                      )
-                    );
-
-      // Update: only the non-requester member may update (accept transition only).
-      // SCENARIO-132: requester self-accept blocked.
-      allow update: if request.auth != null
-                    && request.auth.uid in resource.data.members
-                    && request.auth.uid != resource.data.requesterId
-                    && request.resource.data.status == 'accepted'
-                    && request.resource.data.requesterId == resource.data.requesterId
-                    && request.resource.data.members == resource.data.members;
-
-      // Delete: either member may remove the friendship.
-      allow delete: if request.auth != null
-                    && request.auth.uid in resource.data.members;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     // Grafo social DIRIGIDO — reemplaza a `friendships` (change `follow-model`).
