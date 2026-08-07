@@ -29,12 +29,19 @@ enum CredentialStore {
 
     /// Guarda (o pisa) la credencial.
     static func save(_ credential: WatchCredential) throws {
-        let payload: [String: String] = [
+        var payload: [String: String] = [
             "refreshToken": credential.refreshToken,
             "uid": credential.uid,
             "apiKey": credential.apiKey,
             "projectId": credential.projectId,
         ]
+        // Se persiste para que las renovaciones de arranques posteriores
+        // apunten al mismo host que el canje inicial. Sin esto, tras reabrir la
+        // app el reloj renovaría contra producción con un refresh token del
+        // emulador.
+        if let host = credential.authEmulatorHost {
+            payload["authEmulatorHost"] = host
+        }
         let data = try JSONSerialization.data(withJSONObject: payload)
 
         // Se borra primero para que guardar sea idempotente: SecItemAdd falla
@@ -87,7 +94,8 @@ enum CredentialStore {
             refreshToken: refreshToken,
             uid: uid,
             apiKey: apiKey,
-            projectId: projectId
+            projectId: projectId,
+            authEmulatorHost: json["authEmulatorHost"]
         )
     }
 

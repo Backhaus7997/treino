@@ -158,6 +158,30 @@ void main() {
       expect(WatchCredentialPayload.fromJson(original.toJson()), original);
     });
 
+    test('el host de emulador viaja cuando esta, y se omite cuando no', () {
+      const conEmulador = WatchCredentialPayload(
+        customToken: 'tok',
+        uid: 'u1',
+        apiKey: 'k',
+        projectId: 'p',
+        authEmulatorHost: 'http://localhost:9099',
+      );
+      expect(
+        WatchCredentialPayload.fromJson(conEmulador.toJson()).authEmulatorHost,
+        'http://localhost:9099',
+      );
+
+      const sinEmulador = WatchCredentialPayload(
+        customToken: 'tok',
+        uid: 'u1',
+        apiKey: 'k',
+        projectId: 'p',
+      );
+      // Se OMITE la clave, no se manda null: el lado Swift trata ausente y
+      // vacío igual, pero un JSON sin ruido es un contrato mas claro.
+      expect(sinEmulador.toJson().containsKey('authEmulatorHost'), isFalse);
+    });
+
     test('un payload sin customToken se rechaza', () {
       expect(
         () => WatchCredentialPayload.fromJson(const {'uid': 'u1'}),

@@ -70,7 +70,9 @@ final class CredentialCoordinator: NSObject, ObservableObject {
         }
         return try await FirebaseAuthREST.refreshIdToken(
             refreshToken: credential.refreshToken,
-            apiKey: credential.apiKey
+            apiKey: credential.apiKey,
+            host: credential.authEmulatorHost.map { "\($0)/securetoken.googleapis.com" }
+                ?? "https://securetoken.googleapis.com"
         )
     }
 
@@ -94,16 +96,22 @@ final class CredentialCoordinator: NSObject, ObservableObject {
 
     private func exchange(_ payload: WatchCredentialPayload) async {
         do {
+            // El emulador expone los servicios bajo su propio host con el
+            // nombre del servicio real como prefijo de path.
             let exchanged = try await FirebaseAuthREST.exchangeCustomToken(
                 payload.customToken,
-                apiKey: payload.apiKey
+                apiKey: payload.apiKey,
+                host: payload.authEmulatorHost
+                    .map { "\($0)/identitytoolkit.googleapis.com" }
+                    ?? "https://identitytoolkit.googleapis.com"
             )
             try CredentialStore.save(
                 WatchCredential(
                     refreshToken: exchanged.refreshToken,
                     uid: payload.uid,
                     apiKey: payload.apiKey,
-                    projectId: payload.projectId
+                    projectId: payload.projectId,
+                    authEmulatorHost: payload.authEmulatorHost
                 )
             )
             state = .ready(uid: payload.uid)

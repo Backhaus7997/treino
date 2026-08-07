@@ -51,15 +51,20 @@ class WatchCredentialService {
     required WatchBridge bridge,
     required String apiKey,
     required String projectId,
+    String? authEmulatorHost,
   })  : _functions = functions,
         _bridge = bridge,
         _apiKey = apiKey,
-        _projectId = projectId;
+        _projectId = projectId,
+        _authEmulatorHost = authEmulatorHost;
 
   final FirebaseFunctions _functions;
   final WatchBridge _bridge;
   final String _apiKey;
   final String _projectId;
+
+  /// Solo se puebla corriendo contra el emulador. Ver [WatchCredentialPayload].
+  final String? _authEmulatorHost;
 
   /// Nombre del callable. Debe coincidir con el export de
   /// `functions/src/index.ts`.
@@ -100,6 +105,7 @@ class WatchCredentialService {
       uid: uid,
       apiKey: _apiKey,
       projectId: _projectId,
+      authEmulatorHost: _authEmulatorHost,
     );
 
     try {

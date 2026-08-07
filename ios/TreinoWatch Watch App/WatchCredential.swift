@@ -26,6 +26,14 @@ struct WatchCredentialPayload: Equatable {
     let apiKey: String
     let projectId: String
 
+    /// Host del emulador de Auth, SOLO desarrollo local. Nil en producción.
+    ///
+    /// Se ignora por completo en builds de release (ver el init de abajo): sin
+    /// ese guard, un payload malicioso podría redirigir la autenticación del
+    /// reloj a un host cualquiera. Con el guard, el campo es inofensivo por
+    /// construcción en vez de depender de que nadie lo mande.
+    let authEmulatorHost: String?
+
     /// Parsea el diccionario que llega por `didReceiveApplicationContext`.
     ///
     /// Devuelve nil ante cualquier campo faltante o vacío en vez de construir
@@ -51,14 +59,29 @@ struct WatchCredentialPayload: Equatable {
         self.uid = uid
         self.apiKey = apiKey
         self.projectId = projectId
+
+        #if DEBUG
+        self.authEmulatorHost = nonEmpty("authEmulatorHost")
+        #else
+        // En release NUNCA se honra un host recibido por el canal: siempre
+        // producción.
+        self.authEmulatorHost = nil
+        #endif
     }
 
     /// Init directo, para tests y para reconstruir desde almacenamiento.
-    init(customToken: String, uid: String, apiKey: String, projectId: String) {
+    init(
+        customToken: String,
+        uid: String,
+        apiKey: String,
+        projectId: String,
+        authEmulatorHost: String? = nil
+    ) {
         self.customToken = customToken
         self.uid = uid
         self.apiKey = apiKey
         self.projectId = projectId
+        self.authEmulatorHost = authEmulatorHost
     }
 }
 
@@ -72,4 +95,22 @@ struct WatchCredential: Equatable {
     let uid: String
     let apiKey: String
     let projectId: String
+
+    /// Se persiste junto con la credencial para que la renovación en arranques
+    /// posteriores siga apuntando al mismo lado que el canje inicial.
+    let authEmulatorHost: String?
+
+    init(
+        refreshToken: String,
+        uid: String,
+        apiKey: String,
+        projectId: String,
+        authEmulatorHost: String? = nil
+    ) {
+        self.refreshToken = refreshToken
+        self.uid = uid
+        self.apiKey = apiKey
+        self.projectId = projectId
+        self.authEmulatorHost = authEmulatorHost
+    }
 }

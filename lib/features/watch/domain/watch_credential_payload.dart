@@ -22,6 +22,7 @@ class WatchCredentialPayload {
     required this.uid,
     required this.apiKey,
     required this.projectId,
+    this.authEmulatorHost,
   });
 
   /// Discrimina este payload de cualquier otro que viaje por el mismo canal.
@@ -32,12 +33,25 @@ class WatchCredentialPayload {
   final String apiKey;
   final String projectId;
 
+  /// Host del emulador de Auth, SOLO para desarrollo local (ej.
+  /// `http://localhost:9099`). Null en producción.
+  ///
+  /// Existe porque sin esto el reloj no se puede probar contra el emulador: le
+  /// pide el canje a la Firebase real con un token minteado localmente y
+  /// vuelve un 400. Verificado en el simulador antes de agregarlo.
+  ///
+  /// El lado Swift lo acepta **solo en builds de debug** — en release ignora
+  /// este campo y siempre habla con producción. Así el campo es inofensivo por
+  /// construcción, en vez de depender de que nadie lo mande.
+  final String? authEmulatorHost;
+
   Map<String, dynamic> toJson() => {
         'kind': kind,
         'customToken': customToken,
         'uid': uid,
         'apiKey': apiKey,
         'projectId': projectId,
+        if (authEmulatorHost != null) 'authEmulatorHost': authEmulatorHost,
       };
 
   /// Parsea un payload entrante.
@@ -57,11 +71,13 @@ class WatchCredentialPayload {
       return value;
     }
 
+    final host = json['authEmulatorHost'];
     return WatchCredentialPayload(
       customToken: required('customToken'),
       uid: required('uid'),
       apiKey: required('apiKey'),
       projectId: required('projectId'),
+      authEmulatorHost: host is String && host.isNotEmpty ? host : null,
     );
   }
 
@@ -72,8 +88,10 @@ class WatchCredentialPayload {
           other.customToken == customToken &&
           other.uid == uid &&
           other.apiKey == apiKey &&
-          other.projectId == projectId;
+          other.projectId == projectId &&
+          other.authEmulatorHost == authEmulatorHost;
 
   @override
-  int get hashCode => Object.hash(customToken, uid, apiKey, projectId);
+  int get hashCode =>
+      Object.hash(customToken, uid, apiKey, projectId, authEmulatorHost);
 }

@@ -30,11 +30,17 @@ final watchCloudFunctionsProvider = Provider<FirebaseFunctions>(
 /// públicos del proyecto; la seguridad la dan las Security Rules y App Check.
 final watchCredentialServiceProvider = Provider<WatchCredentialService>((ref) {
   final options = DefaultFirebaseOptions.currentPlatform;
+  // Corriendo contra el emulador hay que decirle al reloj dónde autenticarse:
+  // por defecto le habla a la Firebase real, y un custom token minteado
+  // localmente vuelve 400 desde producción. El lado Swift solo honra este host
+  // en builds de debug.
+  const useEmulator = bool.fromEnvironment('USE_EMULATOR');
   return WatchCredentialService(
     functions: ref.watch(watchCloudFunctionsProvider),
     bridge: ref.watch(watchBridgeProvider),
     apiKey: options.apiKey,
     projectId: options.projectId,
+    authEmulatorHost: useEmulator ? 'http://localhost:9099' : null,
   );
 });
 
