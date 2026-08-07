@@ -141,6 +141,34 @@ struct FirestoreREST {
         return name.split(separator: "/").last.map(String.init) ?? ""
     }
 
+    /// Actualiza SOLO los campos dados, sin tocar el resto del documento.
+    ///
+    /// A diferencia de `setDocument`, que pisa el doc entero: aca hace falta
+    /// preservar lo que ya estaba (routineId, startedAt, dayNumber...) y
+    /// cambiar unos pocos campos. Se logra con `updateMask.fieldPaths`.
+    func patchFields(
+        path: String,
+        fields: [String: Any],
+        session: URLSession = .shared
+    ) async throws {
+        let mask = fields.keys
+            .map { "updateMask.fieldPaths=\($0)" }
+            .joined(separator: "&")
+        var request = URLRequest(url: URL(string: "\(base)/\(path)?\(mask)")!)
+        request.httpMethod = "PATCH"
+        request.setValue("Bearer \(idToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["fields": fields])
+
+        let (data, response) = try await session.data(for: request)
+        if let http = response as? HTTPURLResponse, http.statusCode != 200 {
+            throw FirestoreError.http(
+                status: http.statusCode,
+                body: String(data: data, encoding: .utf8) ?? ""
+            )
+        }
+    }
+
     /// Crea o PISA un documento en un path conocido.
     ///
     /// Es la operacion que hace idempotentes las escrituras del reloj: con un

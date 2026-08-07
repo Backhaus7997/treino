@@ -167,6 +167,36 @@ enum HistorySync {
         )
     }
 
+    /// Marca la sesion como FINALIZADA en el historial.
+    ///
+    /// Sin esto el reloj borraba su estado local pero la sesion quedaba
+    /// `active` en Firestore, asi que la app del telefono la seguia viendo
+    /// pendiente y ofrecia retomarla — el bug que reporto el dueño.
+    ///
+    /// Escribe los mismos campos que `SessionRepository.finish` del telefono.
+    /// `timestampValue` produce un Timestamp real de Firestore, que es lo que
+    /// el @TimestampConverter del lado Dart espera al leer.
+    static func finishSession(
+        client: FirestoreREST,
+        uid: String,
+        sessionId: String,
+        finishedAt: Date,
+        totalVolumeKg: Double,
+        durationMin: Int,
+        wasFullyCompleted: Bool
+    ) async throws {
+        try await client.patchFields(
+            path: "users/\(uid)/sessions/\(sessionId)",
+            fields: [
+                "status": ["stringValue": "finished"],
+                "finishedAt": ["timestampValue": iso(finishedAt)],
+                "totalVolumeKg": ["doubleValue": totalVolumeKg],
+                "durationMin": ["integerValue": String(durationMin)],
+                "wasFullyCompleted": ["booleanValue": wasFullyCompleted],
+            ]
+        )
+    }
+
     private static func iso(_ date: Date) -> String {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]

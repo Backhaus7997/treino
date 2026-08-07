@@ -121,6 +121,29 @@ final class WorkoutCoordinator: ObservableObject {
         // pantalla abierta.
         if let current = session, !current.pendingSets.isEmpty { return }
 
+        // Marca la sesion FINALIZADA en el historial. Sin esto el reloj borraba
+        // su estado local pero la sesion quedaba `active` en Firestore, y la app
+        // del telefono la seguia ofreciendo para retomar.
+        //
+        // Si esto falla, el entreno NO se descarta: quedaria una sesion
+        // colgada como activa y el atleta sin forma de cerrarla.
+        if let current = session, let remoteId = current.remoteId,
+           let makeClient {
+            do {
+                let (client, uid) = try await makeClient()
+                try await HistorySync.finishSession(
+                    client: client, uid: uid, sessionId: remoteId,
+                    finishedAt: Date(),
+                    totalVolumeKg: totalVolume(of: current),
+                    durationMin: durationMinutes(since: current.startedAt),
+                    wasFullyCompleted: isFullyCompleted(current)
+                )
+            } catch {
+                syncError = String(describing: error)
+                return
+            }
+        }
+
         session = nil
         exercises = []
         currentExerciseIndex = 0
@@ -187,6 +210,32 @@ final class WorkoutCoordinator: ObservableObject {
     }
 
     func skipRest() { stopRest() }
+
+    // MARK: - Metricas del entreno
+
+    /// Volumen total: suma de reps x kilos de cada serie cargada.
+    ///
+    /// Una serie sin peso (peso corporal, o un plan sin kilos cargados) suma
+    /// cero. No se inventa un peso: mentir el volumen es peor que subestimarlo.
+    func totalVolume(of session: WorkoutSession) -> Double {
+        session.loggedSets.reduce(0) { total, set in
+            total + Double(set.reps ?? 0) * (set.weightKg ?? 0)
+        }
+    }
+
+    /// Duracion en minutos, con piso de 1: un entreno relampago igual duro algo,
+    /// y un 0 se lee como "no se registro".
+    func durationMinutes(since start: Date) -> Int {
+        max(Int(Date().timeIntervalSince(start) / 60), 1)
+    }
+
+    /// Si se cargaron TODAS las series de TODOS los ejercicios.
+    func isFullyCompleted(_ session: WorkoutSession) -> Bool {
+        guard !exercises.isEmpty else { return false }
+        return exercises.allSatisfy {
+            session.loggedCount(exerciseId: $0.exerciseId) >= $0.sets.count
+        }
+    }
 
     // MARK: - Internos
 
