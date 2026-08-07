@@ -161,12 +161,23 @@ bloqueante_abierto:
         Mas fixtures a medida que se porte logica: idempotencia por
         exerciseId + setNumber, isFullyCompleted, totalVolumeKg, durationMin.
 
-brecha_conocida: |
-  Los fixtures de conformidad hoy los corre UN SOLO lado (Dart). Eso fija
-  el contrato pero todavia NO detecta divergencia: hace falta el corredor
-  Swift, que llega en F2 cuando el target watchOS tenga logica que
-  verificar. Hasta entonces la mitigacion del riesgo #1 esta a medias.
-  Anotado tambien en conformance/README.md.
+  F2:
+    estado: en curso
+    hecho:
+      - |
+        CERRADA la brecha de divergencia. El corredor Swift de conformidad
+        existe (conformance/run_swift.sh) y corre en CI en un job propio
+        sobre ubuntu. Compila el archivo REAL del reloj
+        (ios/TreinoWatch Watch App/PlanAdvance.swift), no una copia.
+        VERIFICADO que detecta divergencia: roto a proposito el `>=` del
+        rollover, señalo 2 de 12 casos con exit 1 — LOS MISMOS 2 que habia
+        señalado el corredor Dart al romper su equivalente. Revertido.
+    pendiente:
+      - Lectura de la rutina en el reloj (cliente Firestore REST en Swift).
+      - Pantalla del entreno de hoy en el reloj.
+      - |
+        Mas fixtures a medida que se porte logica: idempotencia por
+        exerciseId + setNumber, isFullyCompleted, totalVolumeKg, durationMin.
     pendiente_sin_verificar: |
       Si WCSession requiere algun capability nuevo en Signing &
       Capabilities. El ciclo viejo afirmaba que no, y sigue sin
