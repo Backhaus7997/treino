@@ -70,6 +70,21 @@ class FeedScreen extends ConsumerWidget {
   }
 }
 
+/// Área tapeable mínima de cada acción del header.
+///
+/// 44 y no menos: es el piso de la HIG de Apple y queda apenas por debajo de
+/// los 48 de Material. La fila llegó a bajarlo a 36 en pantallas angostas y
+/// era plata tirada — con las acciones pegadas al margen derecho sobra lugar
+/// incluso en un iPhone de 393pt.
+const double _kFeedActionTapTarget = 44;
+
+/// Ancho a partir del cual la fila del header entra holgada: el toggle en su
+/// tope (176) + la separación mínima (8) + las cuatro acciones con su aire
+/// (4 × 44 + 3 × 4). Por debajo de esto los íconos se juntan, pero conservan
+/// su área tapeable completa.
+const double _kFeedHeaderRoomyWidth =
+    176 + 8 + (4 * _kFeedActionTapTarget + 3 * 4);
+
 /// Athlete Feed — segmented pill + swipeable [TabBarView].
 class _AthleteFeed extends StatelessWidget {
   const _AthleteFeed({this.initialTab});
@@ -94,9 +109,17 @@ class _AthleteFeed extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final compactActions = constraints.maxWidth < 360;
+                // Con menos que esto los íconos pierden su separación, pero
+                // NO su área tapeable: ver [_FeedActions.compact].
+                final compactActions =
+                    constraints.maxWidth < _kFeedHeaderRoomyWidth;
                 return Row(
                   key: const ValueKey('feed-fixed-navigation-row'),
+                  // Las acciones tienen que morir contra el margen derecho.
+                  // Sin esto el `Row` alinea al inicio y todo el sobrante
+                  // —25pt en un iPhone de 393— quedaba como un hueco muerto
+                  // entre el botón `+` y el borde de la pantalla.
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Flexible(
                       child: ConstrainedBox(
@@ -141,8 +164,13 @@ class _AthleteFeed extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    _FeedActions(compact: compactActions),
+                    // La separación mínima va como padding de las acciones y
+                    // no como un `SizedBox` suelto: con `spaceBetween`, un
+                    // tercer hijo invisible se comería uno de los dos huecos.
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: _FeedActions(compact: compactActions),
+                    ),
                   ],
                 );
               },
@@ -295,6 +323,8 @@ class _FeedHeader extends StatelessWidget {
 class _FeedActions extends ConsumerWidget {
   const _FeedActions({this.compact = false});
 
+  /// Cuando es `true` los íconos pierden la separación entre sí, y solo eso.
+  /// El área tapeable NO se toca: se queda en [_kFeedActionTapTarget] siempre.
   final bool compact;
 
   @override
@@ -309,8 +339,10 @@ class _FeedActions extends ConsumerWidget {
     // athlete's coach live under the COACH tab badge. See
     // `unreadFromCoachProvider` / `unreadFromFriendsProvider`.
     final unreadChats = ref.watch(unreadFromFriendsProvider);
+    // `compact` junta los íconos, y NADA más. El área tapeable se queda
+    // siempre en el mínimo de la HIG: achicarla a 36 en pantallas angostas
+    // era una regresión de accesibilidad, y encima innecesaria.
     final spacing = compact ? 0.0 : 4.0;
-    final tapTarget = compact ? 36.0 : 44.0;
 
     return Row(
       key: const ValueKey('feed-header-actions'),
@@ -324,9 +356,9 @@ class _FeedActions extends ConsumerWidget {
           child: TreinoTappable(
             onTap: () => context.push('/feed/notifications'),
             child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minWidth: tapTarget,
-                minHeight: 44,
+              constraints: const BoxConstraints(
+                minWidth: _kFeedActionTapTarget,
+                minHeight: _kFeedActionTapTarget,
               ),
               child: Center(
                 child: Stack(
@@ -374,9 +406,9 @@ class _FeedActions extends ConsumerWidget {
           child: TreinoTappable(
             onTap: () => context.push('/feed/messages'),
             child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minWidth: tapTarget,
-                minHeight: 44,
+              constraints: const BoxConstraints(
+                minWidth: _kFeedActionTapTarget,
+                minHeight: _kFeedActionTapTarget,
               ),
               child: Center(
                 child: Stack(
@@ -422,9 +454,9 @@ class _FeedActions extends ConsumerWidget {
           child: TreinoTappable(
             onTap: () => context.push('/feed/search'),
             child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minWidth: tapTarget,
-                minHeight: 44,
+              constraints: const BoxConstraints(
+                minWidth: _kFeedActionTapTarget,
+                minHeight: _kFeedActionTapTarget,
               ),
               child: const Center(
                 child: _FeedIconBubble(icon: TreinoIcon.search),
@@ -439,9 +471,9 @@ class _FeedActions extends ConsumerWidget {
           child: TreinoTappable(
             onTap: () => context.push('/feed/create'),
             child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minWidth: tapTarget,
-                minHeight: 44,
+              constraints: const BoxConstraints(
+                minWidth: _kFeedActionTapTarget,
+                minHeight: _kFeedActionTapTarget,
               ),
               child: Center(
                 child: Container(

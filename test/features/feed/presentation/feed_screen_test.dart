@@ -1062,6 +1062,53 @@ void main() {
       );
     });
 
+    // Regresión: en un iPhone de 393pt la fila disparaba el modo `compact`
+    // (353 < 360), que achicaba las acciones de 44 a 36. Con eso la fila
+    // medía 328 sobre 353 disponibles y el `Row`, alineado al inicio, dejaba
+    // los 25pt sobrantes como un hueco muerto: el botón `+` moría a 45pt del
+    // borde en vez de a los 20 del margen.
+    testWidgets('las acciones del header mueren contra el margen derecho', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(393, 850);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), publicOverrides(longPosts())),
+      );
+      await tester.pumpAndSettle();
+
+      final actionsRect = tester.getRect(
+        find.byKey(const ValueKey('feed-header-actions')),
+      );
+      // 393 - 20 de margen. La tolerancia es por el `Padding` de separación
+      // mínima, que no mueve el borde derecho.
+      expect(actionsRect.right, closeTo(373, 1));
+    });
+
+    testWidgets('las acciones conservan sus 44pt tapeables en pantalla chica', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), publicOverrides(longPosts())),
+      );
+      await tester.pumpAndSettle();
+
+      // Cuatro acciones de 44 como piso de la HIG. Cuando bajaban a 36 esto
+      // daba 144 — por debajo del mínimo, y encima sin necesidad.
+      final actionsRect = tester.getRect(
+        find.byKey(const ValueKey('feed-header-actions')),
+      );
+      expect(actionsRect.width, greaterThanOrEqualTo(4 * 44));
+    });
+
     testWidgets('fixed merged header remains visible when scrolling down', (
       tester,
     ) async {

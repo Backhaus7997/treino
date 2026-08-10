@@ -267,5 +267,63 @@ void main() {
       expect(gymOpacity, findsNothing);
       expect(publicoOpacity, findsNothing);
     });
+
+    // Regresión: el `Row` medía solo su contenido y quedaba apoyado contra el
+    // margen izquierdo. En un iPhone de 393pt los pills terminaban a los 321 y
+    // sobraban 72pt de aire muerto a la derecha, contra 20 del lado izquierdo.
+    //
+    // El ancho es 600 y no los 393 del teléfono a propósito: el proyecto usa
+    // google_fonts sin bundlear las tipografías y flutter_test mockea HTTP
+    // devolviendo 400, así que en test la fuente real nunca carga y los pills
+    // se miden con una fallback bastante más ancha — a 393 se desbordan por
+    // la fuente equivocada y el test mediría eso en vez del reparto. Con
+    // lugar de sobra, lo que se verifica es lo que importa: que el sobrante
+    // se reparta en vez de amontonarse contra el margen izquierdo.
+    testWidgets('los pills se reparten de margen a margen, sin aire muerto',
+        (tester) async {
+      const screenWidth = 600.0;
+      tester.view.physicalSize = const Size(screenWidth, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        _wrapProvider(
+          const FeedSegmentPills(),
+          [feedSegmentProvider.overrideWith((ref) => FeedSegment.amigos)],
+        ),
+      );
+      await tester.pump();
+
+      final first = tester.getRect(find.text('SEGUIDORES'));
+      final last = tester.getRect(find.text('PÚBLICO'));
+
+      // El primero arranca contra el margen izquierdo y el último muere contra
+      // el derecho. Se mide sobre el texto, así que hay que sumarle el padding
+      // horizontal de 18 del pill que lo envuelve.
+      expect(first.left - 18, closeTo(20, 1));
+      expect(last.right + 18, closeTo(screenWidth - 20, 1));
+    });
+
+    testWidgets('si no entran, el scroll horizontal sigue siendo la salida',
+        (tester) async {
+      // Pantalla muy angosta: el `minWidth` no puede achicar los pills, así
+      // que el Row se pasa y el SingleChildScrollView tiene que seguir ahí.
+      tester.view.physicalSize = const Size(240, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        _wrapProvider(
+          const FeedSegmentPills(),
+          [feedSegmentProvider.overrideWith((ref) => FeedSegment.amigos)],
+        ),
+      );
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byType(SingleChildScrollView), findsOneWidget);
+    });
   });
 }

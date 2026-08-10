@@ -6,6 +6,10 @@ import '../../application/feed_screen_providers.dart';
 import '../../domain/feed_segment.dart';
 import '../../../../l10n/app_l10n.dart';
 
+/// Margen lateral de la fila de segmentos. Es el mismo 20 que usan el header
+/// del feed y el resto del shell: los pills tienen que alinearse con ellos.
+const double _kSideMargin = 20;
+
 class FeedSegmentPills extends ConsumerWidget {
   const FeedSegmentPills({super.key});
 
@@ -14,35 +18,58 @@ class FeedSegmentPills extends ConsumerWidget {
     final l10n = AppL10n.of(context);
     final segment = ref.watch(feedSegmentProvider);
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      physics: const ClampingScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _Pill(
-            label: l10n.feedSegmentFollowing,
-            isActive: segment == FeedSegment.amigos,
-            onTap: () => ref.read(feedSegmentProvider.notifier).state =
-                FeedSegment.amigos,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // El scroll horizontal se queda como red de seguridad —textScale
+        // grande, pantallas muy angostas—, pero deja de ser el caso normal:
+        // mientras los pills entren, el `minWidth` estira el Row hasta el
+        // ancho útil y `spaceBetween` los reparte de borde a borde.
+        //
+        // Antes el Row medía solo su contenido y quedaba apoyado contra el
+        // margen izquierdo: en un iPhone de 393pt los pills terminaban a los
+        // 321 y sobraban 72pt de aire muerto a la derecha. Ahora el primero
+        // muere contra el margen izquierdo y el último contra el derecho,
+        // igual que el toggle y el botón `+` de la fila de arriba.
+        //
+        // Los `SizedBox` de 12 quedan como separación MÍNIMA. Con
+        // `spaceBetween` los cuatro huecos son iguales, así que las dos
+        // separaciones visibles entre pills salen iguales igual: 12 + 2·hueco.
+        final innerWidth = constraints.maxWidth - 2 * _kSideMargin;
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const ClampingScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: _kSideMargin),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minWidth: innerWidth),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _Pill(
+                  label: l10n.feedSegmentFollowing,
+                  isActive: segment == FeedSegment.amigos,
+                  onTap: () => ref.read(feedSegmentProvider.notifier).state =
+                      FeedSegment.amigos,
+                ),
+                const SizedBox(width: 12),
+                _Pill(
+                  label: 'MI GYM',
+                  isActive: segment == FeedSegment.gym,
+                  onTap: () => ref.read(feedSegmentProvider.notifier).state =
+                      FeedSegment.gym,
+                ),
+                const SizedBox(width: 12),
+                _Pill(
+                  label: 'PÚBLICO',
+                  isActive: segment == FeedSegment.public,
+                  onTap: () => ref.read(feedSegmentProvider.notifier).state =
+                      FeedSegment.public,
+                ),
+              ],
+            ),
           ),
-          const SizedBox(width: 12),
-          _Pill(
-            label: 'MI GYM',
-            isActive: segment == FeedSegment.gym,
-            onTap: () =>
-                ref.read(feedSegmentProvider.notifier).state = FeedSegment.gym,
-          ),
-          const SizedBox(width: 12),
-          _Pill(
-            label: 'PÚBLICO',
-            isActive: segment == FeedSegment.public,
-            onTap: () => ref.read(feedSegmentProvider.notifier).state =
-                FeedSegment.public,
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
