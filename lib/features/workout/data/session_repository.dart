@@ -161,6 +161,34 @@ class SessionRepository {
     return snap.docs.map(_sessionFromDoc).whereType<Session>().toList();
   }
 
+  // ─── watchRevision ──────────────────────────────────────────────────────
+
+  /// Emite un número distinto cada vez que cambia ALGO en las sesiones de
+  /// [uid]: se crea una, se termina, se le carga una serie.
+  ///
+  /// Existe porque el historial se lee con `listByUid` de una sola vez, y desde
+  /// que el RELOJ también escribe sesiones el teléfono no tiene forma de
+  /// enterarse: terminabas el entreno en la muñeca y la app seguía mostrando lo
+  /// de antes hasta que la cerrabas.
+  ///
+  /// Devuelve una REVISIÓN y no las sesiones a propósito. Convertir
+  /// `sessionsByUidProvider` en stream cambiaría su tipo, y de él cuelgan el
+  /// historial, Home, cuatro pantallas de Insights, el panel del PF y 30
+  /// archivos de test. Una señal barata que dispara el refetch da lo mismo
+  /// —datos frescos sin reiniciar— sin tocar nada de eso.
+  ///
+  /// El primer valor llega apenas se suscribe (Firestore entrega el snapshot
+  /// inicial), así que quien lo escuche no queda colgado esperando un cambio.
+  Stream<int> watchRevision(String uid, {int? limit}) {
+    if (uid.isEmpty) return Stream.value(0);
+    var query = _sessions(uid).orderBy('startedAt', descending: true);
+    if (limit != null) query = query.limit(limit);
+    // El contador vive por suscripción: cada listener arranca en 0 y sube con
+    // cada snapshot. No importa el valor, importa que CAMBIE.
+    var revision = 0;
+    return query.snapshots().map((_) => revision++);
+  }
+
   // ─── listRecentCompletedByUid ───────────────────────────────────────────
 
   /// Returns the athlete's most recently STARTED completed sessions, bounded

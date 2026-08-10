@@ -33,14 +33,43 @@ final sessionRepositoryProvider = Provider<SessionRepository>(
 /// behind a cursor is a follow-up.
 const int kSessionHistoryFetchLimit = 365;
 
+/// Señal de "algo cambió en las sesiones de [uid]".
+///
+/// Es UN listener de Firestore por atleta. No entrega las sesiones: entrega un
+/// número que cambia. Quien lo mire se recalcula solo.
+///
+/// Existe porque desde que el RELOJ escribe sesiones el teléfono se quedaba
+/// mudo: terminabas el entreno en la muñeca y el historial seguía mostrando lo
+/// de antes hasta cerrar la app. Terminar DESDE el teléfono sí refrescaba,
+/// porque `SessionNotifier` invalida a mano — pero nadie invalida por el reloj.
+///
+/// NO es autoDispose a propósito: [activeSessionProvider] tampoco lo es, y en
+/// Riverpod un provider que no se auto-descarta no puede mirar a uno que sí.
+/// El costo es un listener vivo por atleta mientras la app corre, que es
+/// exactamente lo que una app con sincronía en vivo quiere tener.
+final sessionsRevisionProvider = StreamProvider.family<int, String>((ref, uid) {
+  if (uid.isEmpty) return Stream.value(0);
+  return ref
+      .watch(sessionRepositoryProvider)
+      .watchRevision(uid, limit: kSessionHistoryFetchLimit);
+});
+
 /// Fetches [uid]'s most recent sessions (up to [kSessionHistoryFetchLimit]),
 /// ordered by startedAt descending. Returns an empty list when [uid] is
 /// empty/invalid.
-/// autoDispose: refresca al re-mountear (volver al tab Workout tras un
-/// nuevo entreno) sin necesidad de invalidate manual desde el player.
+///
+/// autoDispose: refresca al re-mountear (volver al tab Workout tras un nuevo
+/// entreno) sin necesidad de invalidate manual desde el player. Y mira
+/// [sessionsRevisionProvider], que lo refresca ADEMÁS cuando la escritura vino
+/// de afuera — o sea, del reloj.
 final sessionsByUidProvider =
     FutureProvider.autoDispose.family<List<Session>, String>((ref, uid) async {
   if (uid.isEmpty) return const [];
+  // Mirar la revisión hace que esto se rehaga cuando Firestore reporta un
+  // cambio — venga del teléfono o del reloj. Se lee el VALOR y no se espera al
+  // future: mientras el listener no haya emitido todavía, igual hay que
+  // devolver el historial en vez de quedarse cargando.
+  ref.watch(sessionsRevisionProvider(uid));
   return ref
       .watch(sessionRepositoryProvider)
       .listByUid(uid, limit: kSessionHistoryFetchLimit);
@@ -82,9 +111,14 @@ final finishedInWindowByUidProvider = FutureProvider.autoDispose
 });
 
 /// Returns the currently active session for [uid], or null if none.
+///
+/// Sin autoDispose: cachea mientras viva la app. Por eso mira la revisión —
+/// sin ella, una sesión que el RELOJ empezó o terminó no aparecía ni se
+/// limpiaba hasta reiniciar, y la app ofrecía retomar un entreno ya cerrado.
 final activeSessionProvider =
     FutureProvider.family<Session?, String>((ref, uid) async {
   if (uid.isEmpty) return null;
+  ref.watch(sessionsRevisionProvider(uid));
   return ref.watch(sessionRepositoryProvider).getActive(uid);
 });
 
