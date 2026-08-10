@@ -196,7 +196,7 @@ fases_implementacion:
       limpiaron, asi que la prueba se puede repetir.
 
   F5:
-    estado: IMPLEMENTADA, sin probar a mano
+    estado: COMPLETA y verificada a mano
     objetivo: |
       Navegacion por deslizamiento + activar una rutina desde el reloj +
       empezar cualquier rutina sin cambiar la activa. Pedido del dueño.
@@ -234,12 +234,34 @@ fases_implementacion:
         y detecta errores — comprobado inyectando uno a proposito. Da
         feedback en segundos donde xcodebuild tarda mas de 20 minutos
         porque arrastra el Runner entero con todos los Pods.
-    pendiente:
       - |
-        PRUEBA A MANO EN EL SIMULADOR. Es lo unico que falta: recorrer las
-        tres paginas, activar un plan, y empezar una plantilla comprobando
-        que activeRoutineId NO cambia. El build se corto para liberar Xcode
-        al dueño.
+        VERIFICADA A MANO EN EL SIMULADOR, con Firestore como testigo en cada
+        paso (Apple Watch Series 11 42mm, watchOS 26.2):
+          * las tres paginas navegan y HOY arranca en el medio;
+          * deslizar abajo muestra los ejercicios del dia en orden;
+          * PLANTILLAS lista la publicada por PF (con chapita) y la del
+            catalogo del sistema;
+          * MIS PLANES lista el plan del PF y la propia, y NO lista el plan
+            asignado a otro atleta — el filtro por assignedTo sostiene;
+          * Activar escribio activeRoutineId en Firestore y HOY reflejo el
+            cambio al instante, sin relanzar la app;
+          * la hoja de una PLANTILLA muestra solo "Empezar", sin "Activar";
+          * empezar una plantilla creo la sesion con el routineId de LA
+            PLANTILLA y dejo activeRoutineId INTACTO — el requisito del
+            dueño, comprobado y no supuesto;
+          * la serie se escribio con el id deterministico
+            `sentadilla-goblet__1`;
+          * matar y reabrir la app devolvio el entreno intacto con la serie
+            tildada. Eso es el arreglo de restore(): antes se comparaba
+            contra la rutina ACTIVA y una sesion de plantilla se descartaba
+            entera al reabrir;
+          * Terminar dejo la sesion finished, 192 kg de volumen, 1 min, y
+            wasFullyCompleted en false — honesto, se hizo 1 de 10 series.
+      - |
+        Corregidos dos singulares que aparecieron en la prueba ("1 dias",
+        "1 series"). El target del reloj no tiene l10n propia: no lee los
+        ARB de Flutter, asi que van a mano.
+    pendiente: []
     fuera_de_alcance_detectado:
       - |
         Hacer PROPIA una plantilla (copiarla a las rutinas del atleta) se
