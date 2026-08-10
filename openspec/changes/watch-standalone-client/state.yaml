@@ -133,34 +133,6 @@ fases_implementacion:
         + Apple Watch reales. El simulador no es confiable, mismo patron
         "no emulable" que FCM.
 
-bloqueante_abierto:
-  que: |
-    `pod install` esta roto en esta rama. Crear el target watchOS en Xcode
-    26.3 subio el objectVersion del pbxproj de 54 a 70, y CocoaPods 1.16.2
-    no entiende ese formato ("[Xcodeproj] Unable to find compatibility
-    version string for object version `70`"). Al agregar watch_connectivity
-    el pod install paso a ser obligatorio y falla. Rompe `flutter run` y
-    cualquier build de iOS en la rama.
-  no_afecta: |
-    El CI, que solo corre analyze/test/functions y nunca pod install.
-    Tampoco el target del reloj aislado, que no depende de Pods y compila.
-  arreglo_propuesto: |
-    `brew upgrade cocoapods` (hay 1.17.0 estable vs 1.16.2 instalada). NO
-    se aplico porque CocoaPods es global —no hay Gemfile en el repo— y
-    actualizarlo afecta todos los proyectos del dueño, no solo TREINO.
-    Es decision suya.
-  trampa: |
-    Bajar el objectVersion a 54 parece el arreglo obvio y es peligroso: el
-    target del reloj usa `fileSystemSynchronizedGroups`, clave del formato
-    nuevo, y CocoaPods REESCRIBE el pbxproj durante el install. Una version
-    de Xcodeproj que no conoce esa clave puede descartarla al escribir,
-    dejando el target sin archivos, en silencio.
-  documentado_en: docs/setup/watchos-target.md (arriba de todo)
-      - UI minima en el reloj: mostrar el entreno de hoy.
-      - |
-        Mas fixtures a medida que se porte logica: idempotencia por
-        exerciseId + setNumber, isFullyCompleted, totalVolumeKg, durationMin.
-
   F2:
     estado: en curso
     hecho:
@@ -183,6 +155,143 @@ bloqueante_abierto:
       Capabilities. El ciclo viejo afirmaba que no, y sigue sin
       comprobarse. Si aparece uno, es señal de volver a design.
 
+  F3_F4:
+    estado: COMPLETAS con una brecha de verificacion
+    objetivo: |
+      Entreno en el reloj (empezar, cargar series, terminar) y escritura al
+      historial compartida con el telefono.
+    hecho:
+      - |
+        VERIFICADO end-to-end contra el emulador: el reloj empieza un
+        entreno, carga series y las escribe al historial. Idempotencia por
+        id deterministico `exerciseId__setNumber`, misma identidad logica
+        que usa SessionNotifier.logSet en el telefono, asi que reintentar
+        una escritura fallida pisa en vez de duplicar.
+      - |
+        UNA SOLA SESION COMPARTIDA: si el telefono ya tiene una sesion
+        activa del mismo dia, el reloj se suma a ESA en vez de crear la
+        suya. Un entreno = un registro, venga de donde venga.
+      - |
+        CORREGIDO el bug que reporto el dueño: terminar en el reloj dejaba
+        la sesion `active` en Firestore, asi que la app la seguia ofreciendo
+        como pendiente. Ahora HistorySync.finishSession escribe los mismos
+        campos que SessionRepository.finish del telefono.
+        VERIFICADO: queda finished con volumen (480 kg), duracion y
+        wasFullyCompleted.
+      - |
+        VERIFICADO con captura: el telefono entra al entreno arrancado en el
+        reloj y muestra las series ya tildadas ("SESION ACTIVA · 480 kg
+        vol." + "PRESS DE BANCA, serie 1: 6 reps · 80 kg").
+      - |
+        CORREGIDO un bug que el contrato de conformidad NO podia detectar:
+        el id del documento se leia de un CAMPO `id` en vez del path. Los
+        docs creados por la app no guardan ese campo — solo los del script
+        de seed — asi que las rutinas reales quedaban con id vacio y jamas
+        matcheaban contra el marcador de rutina activa. El contrato cubre
+        la DECISION, no la recoleccion de datos.
+    pendiente_sin_verificar: |
+      La direccion telefono -> reloj (que el reloj BAJE lo que se cargo en
+      el celular) esta implementada y compila, pero NO se probo end-to-end.
+      Las sesiones activas huerfanas acumuladas en el emulador ya se
+      limpiaron, asi que la prueba se puede repetir.
+
+  F5:
+    estado: IMPLEMENTADA, sin probar a mano
+    objetivo: |
+      Navegacion por deslizamiento + activar una rutina desde el reloj +
+      empezar cualquier rutina sin cambiar la activa. Pedido del dueño.
+    commits:
+      - be57d4ef fix(watch) — las queries del reloj igualan a las del telefono
+      - 4bbf7997 feat(watch) — navegacion, activar y empezar ad hoc
+    hecho:
+      - |
+        HOY en el medio (pantalla de arranque), ejercicios del dia al
+        deslizar abajo, planes a la izquierda, plantillas a la derecha.
+        Detalle en HOJA y no en navegacion: el "volver" del reloj es un
+        deslizar horizontal, el mismo gesto que cambia de pagina.
+      - |
+        FRENADO antes de shippear: "Activar" sobre una PLANTILLA habria
+        sido un no-op silencioso. resolveActiveRoutineId busca el marcador
+        dentro de las listas de asignadas y auto-creadas, y una plantilla
+        no esta en ninguna: la escritura devuelve 200 y HOY sigue mostrando
+        la rutina anterior. El caso ya estaba en
+        conformance/routine_selection.json. Ahora "Activar" solo aparece
+        sobre planes, igual que en el telefono.
+      - |
+        CORREGIDA una divergencia real entre reloj y telefono: las queries
+        del reloj no filtraban por source/status ni ordenaban. Detalle
+        completo en el mensaje del commit be57d4ef.
+      - |
+        VERIFICADO contra el emulador con ID TOKEN DE ATLETA (no con el
+        bypass `Bearer owner`): las cuatro queries pasan las Security Rules
+        y devuelven lo esperado, y la escritura de activeRoutineId pasa las
+        seis guardas de campos inmutables del doc de usuario usando
+        updateMask.
+      - |
+        VERIFICADO que el typecheck rapido sirve de reja: todo el target
+        del reloj typechequea contra el SDK de watchOS 26.2 con
+        `xcrun swiftc -typecheck -sdk <watchos> -target arm64_32-apple-watchos26.2`,
+        y detecta errores — comprobado inyectando uno a proposito. Da
+        feedback en segundos donde xcodebuild tarda mas de 20 minutos
+        porque arrastra el Runner entero con todos los Pods.
+    pendiente:
+      - |
+        PRUEBA A MANO EN EL SIMULADOR. Es lo unico que falta: recorrer las
+        tres paginas, activar un plan, y empezar una plantilla comprobando
+        que activeRoutineId NO cambia. El build se corto para liberar Xcode
+        al dueño.
+    fuera_de_alcance_detectado:
+      - |
+        Hacer PROPIA una plantilla (copiarla a las rutinas del atleta) se
+        hace desde el telefono: implica escribir la rutina entera con dias
+        y series. Si se quiere desde el reloj, es otra funcionalidad.
+
+bloqueante_resuelto:
+  que: |
+    `pod install` estaba roto en esta rama. Crear el target watchOS en Xcode
+    26.3 subio el objectVersion del pbxproj de 54 a 70, y CocoaPods 1.16.2
+    no entiende ese formato ("[Xcodeproj] Unable to find compatibility
+    version string for object version `70`"). Al agregar watch_connectivity
+    el pod install paso a ser obligatorio y fallaba, rompiendo `flutter run`
+    y cualquier build de iOS en la rama.
+  como_se_resolvio: |
+    El dueño corrio `brew upgrade cocoapods` (1.16.2 -> 1.17.0). No se
+    aplico sin preguntar porque CocoaPods es global —no hay Gemfile en el
+    repo— y actualizarlo afecta todos sus proyectos, no solo TREINO.
+    Confirmado resuelto: `xcodebuild` sobre el esquema del reloj vuelve a
+    compilar Runner y los Pods.
+  trampa_que_se_evito: |
+    Bajar el objectVersion a 54 parecia el arreglo obvio y era peligroso: el
+    target del reloj usa `fileSystemSynchronizedGroups`, clave del formato
+    nuevo, y CocoaPods REESCRIBE el pbxproj durante el install. Una version
+    de Xcodeproj que no conoce esa clave puede descartarla al escribir,
+    dejando el target sin archivos, en silencio.
+  documentado_en: docs/setup/watchos-target.md (arriba de todo)
+  efecto_lateral_vivo: |
+    Xcode reescribe project.pbxproj en cada build (objectVersion 54 -> 70,
+    el grupo sincronizado colapsado a una linea, inputPaths/outputPaths
+    vacios que agrega CocoaPods). Aparece como modificado sin que nadie lo
+    haya editado. NO se commiteo con los cambios del reloj: es un artefacto
+    de build y el formato afecta a todo el equipo, asi que es decision del
+    dueño cuando fijarlo.
+
+deuda_detectada:
+  sesiones_huerfanas: |
+    Las sesiones abandonadas se acumulan para siempre. `getActive` devuelve
+    la mas nueva por startedAt y nada cierra las viejas, asi que la app
+    ofrece retomar cualquiera. Aparecio solo durante las pruebas (tres
+    acumuladas en el emulador) pero pasa igual en produccion. NO es de este
+    change; es la causa de fondo del "me marca el entreno como pendiente".
+  racha_y_workouts_count: |
+    Los escribe el cliente del telefono en SessionRepository.finish, asi que
+    terminar desde el reloj los deja desactualizados. Las metricas de
+    ranking SI se actualizan, porque van por la Cloud Function
+    rankingAggregateOnSession. Candidato natural: mover racha/workoutsCount
+    a esa misma CF.
+  reintento_de_entrega: |
+    La falla WCErrorCodeWatchAppNotInstalled al entregar la credencial no
+    tiene reintento.
+
 artifacts:
   explore: openspec/changes/watch-standalone-client/explore.md
   proposal: openspec/changes/watch-standalone-client/proposal.md
@@ -190,8 +299,11 @@ artifacts:
   f0_setup_doc: docs/setup/watchos-target.md
 
 blocked_on: |
-  F0 no cierra hasta que exista el target watchOS (paso humano con Xcode).
-  El resto de F0 esta hecho y verificado.
+  Nada bloquea el avance. Lo unico pendiente es una PRUEBA A MANO en el
+  simulador de la navegacion de F5 — recorrer las tres paginas, activar un
+  plan y empezar una plantilla comprobando que activeRoutineId no cambia.
+  Requiere un build de Xcode, que se corto a pedido del dueño para dejarle
+  la maquina libre y generar el IPA.
 
 coordinacion: |
   Sesion paralela en worktree wizardly-dijkstra-a16063 (migracion a follow
