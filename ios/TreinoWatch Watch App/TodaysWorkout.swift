@@ -45,11 +45,36 @@ enum TodaysWorkoutResolver {
         guard let doc = try await findRoutine(client: client, uid: uid) else {
             return nil
         }
+        return try await workout(
+            client: client, uid: uid, routineId: doc.id, routine: doc.fields
+        )
+    }
 
-        // El ID sale del PATH, no de un campo: los docs creados por la app no
-        // guardan `id` adentro.
-        let routineId = doc.id
-        let routine = doc.fields
+    /// Resuelve el entreno de una rutina CUALQUIERA, sin mirar cuál es la
+    /// activa.
+    ///
+    /// Es lo que permite arrancar una plantilla desde el reloj sin pisarle al
+    /// atleta su rutina activa. El día y la semana se calculan igual —contra las
+    /// sesiones terminadas de ESA rutina— así que una plantilla ya empezada
+    /// retoma donde iba en vez de volver al día 1.
+    static func resolve(
+        client: FirestoreREST,
+        uid: String,
+        routineId: String
+    ) async throws -> TodaysWorkout? {
+        guard let fields = try await client.document("routines/\(routineId)")
+        else { return nil }
+        return try await workout(
+            client: client, uid: uid, routineId: routineId, routine: fields
+        )
+    }
+
+    private static func workout(
+        client: FirestoreREST,
+        uid: String,
+        routineId: String,
+        routine: [String: Any]
+    ) async throws -> TodaysWorkout? {
         let days = FS.array(routine["days"]) ?? []
         guard !days.isEmpty else { return nil }
 
@@ -149,14 +174,15 @@ enum TodaysWorkoutResolver {
         let profile = try await client.document("users/\(uid)")
         let activeRoutineId = FS.string(profile?["activeRoutineId"])
 
-        let assigned = try await client.runQuery([
-            "from": [["collectionId": "routines"]],
-            "where": fieldEquals("assignedTo", uid),
-        ])
-        let selfCreated = try await client.runQuery([
-            "from": [["collectionId": "routines"]],
-            "where": fieldEquals("createdBy", uid),
-        ])
+        // Las queries viven en `RoutineCatalog` para que las listas del reloj y
+        // esta resolución miren EXACTAMENTE el mismo conjunto. Antes se filtraba
+        // solo por `assignedTo`/`createdBy`, sin `source`, `status` ni orden: eso
+        // metía rutinas archivadas en la cuenta de auto-creadas y dejaba el
+        // orden de las asignadas librado al azar, así que el tier 1 de
+        // `resolveActiveRoutineId` podía elegir un plan distinto al del
+        // teléfono.
+        let assigned = try await RoutineCatalog.assignedPlans(client: client, uid: uid)
+        let selfCreated = try await RoutineCatalog.selfCreatedPlans(client: client, uid: uid)
 
         guard let resolvedId = resolveActiveRoutineId(
             activeRoutineId: activeRoutineId,
