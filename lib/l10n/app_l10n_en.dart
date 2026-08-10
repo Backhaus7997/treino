@@ -2286,6 +2286,10 @@ class AppL10nEn extends AppL10n {
   String get sessionDetailNoSets => 'This session has no logged sets.';
 
   @override
+  String get sessionFinishedOnWatch =>
+      'You finished this workout on your watch.';
+
+  @override
   String get sessionLogSetError =>
       'We couldn\'t save the set. Please try again.';
 

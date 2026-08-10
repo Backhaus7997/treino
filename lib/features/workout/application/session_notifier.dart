@@ -51,6 +51,26 @@ class SessionNotifier
   /// La UI llama esto al mostrar el feedback para no re-emitir el mismo error.
   void clearLogSetError() => _logSetError.value = null;
 
+  /// Suscripciones vivas a la sesión mientras el player está abierto.
+  ///
+  /// El RELOJ escribe en la MISMA sesión: series nuevas y el cierre del
+  /// entreno. Sin escuchar, el teléfono se quedaba con la foto que sacó al
+  /// abrir — el atleta marcaba en la muñeca y la pantalla del celular no se
+  /// movía.
+  StreamSubscription<List<SetLog>>? _setLogsSub;
+  StreamSubscription<bool>? _finishedSub;
+
+  /// Se dispara cuando el entreno se cerró DESDE OTRO LADO (el reloj).
+  ///
+  /// Canal aparte del estado por el mismo motivo que [_logSetError]: mutar el
+  /// AsyncValue tiraría abajo toda la pantalla. La UI lo escucha para salir del
+  /// player, que es lo correcto — la sesión ya está en el historial.
+  final ValueNotifier<bool> _finishedElsewhere = ValueNotifier<bool>(false);
+
+  /// La UI escucha esto para cerrar el player cuando el reloj terminó el
+  /// entreno.
+  ValueListenable<bool> get finishedElsewhere => _finishedElsewhere;
+
   @override
   Future<SessionState> build(SessionInit arg) async {
     final state = switch (arg) {
@@ -66,13 +86,69 @@ class SessionNotifier
     // El timer empieza DESPUÉS de armar el estado para que ambos paths
     // compartan el mismo punto de inicio. Diseño §7.
     _timer = Timer.periodic(const Duration(seconds: 1), _onTick);
+    _watchRemoteChanges(state.session.id);
     ref.onDispose(() {
       _timer?.cancel();
       _timer = null;
+      _setLogsSub?.cancel();
+      _finishedSub?.cancel();
       _logSetError.dispose();
+      _finishedElsewhere.dispose();
     });
 
     return state;
+  }
+
+  /// Engancha el estado a lo que pase con la sesión en Firestore.
+  ///
+  /// Es lo que vuelve al reloj un complemento de verdad: lo que se marca en la
+  /// muñeca aparece en el teléfono sin que el atleta toque nada, y terminar en
+  /// un lado termina en los dos.
+  void _watchRemoteChanges(String sessionId) {
+    final uid = ref.read(currentUidProvider);
+    if (uid == null || uid.isEmpty) return;
+    final repo = ref.read(sessionRepositoryProvider);
+
+    _setLogsSub = repo
+        .watchSetLogs(uid: uid, sessionId: sessionId)
+        .listen(_applyRemoteSetLogs, onError: (_) {
+      // Un stream caído no puede tumbar el entreno: se sigue con lo local,
+      // que es exactamente el comportamiento que había antes de esto.
+    });
+
+    _finishedSub = repo
+        .watchSessionFinished(uid: uid, sessionId: sessionId)
+        .listen((finished) {
+      if (!finished || _finalized) return;
+      // Lo cerró el reloj. Se marca finalizado ANTES de avisar para que un
+      // `finishSession`/`abandonSession` que llegue después sea no-op: escribir
+      // encima pisaría el volumen y la duración que ya calculó el reloj.
+      _finalized = true;
+      _timer?.cancel();
+      _timer = null;
+      _finishedElsewhere.value = true;
+      final currentUid = ref.read(currentUidProvider);
+      if (currentUid != null) ref.invalidate(sessionsByUidProvider(currentUid));
+    }, onError: (_) {});
+  }
+
+  /// Reemplaza las series con lo que dice Firestore.
+  ///
+  /// Se pisa entero en vez de mezclar porque el remoto YA es la fuente de
+  /// verdad: `logSet`, `updateSetLog` y `deleteSetLog` escriben primero y
+  /// recién después tocan el estado, así que lo local nunca tiene nada que el
+  /// remoto no tenga. Mezclar solo agregaría la chance de resucitar una serie
+  /// borrada.
+  void _applyRemoteSetLogs(List<SetLog> remote) {
+    final current = state.valueOrNull;
+    if (current == null) return;
+    // Sin cambios reales no se emite: cada emisión reconstruye la pantalla del
+    // entreno, y Firestore repite el snapshot ante cualquier escritura de la
+    // sesión.
+    if (listEquals(current.setLogs, remote)) return;
+    state = AsyncData(
+      current.copyWith(setLogs: List<SetLog>.unmodifiable(remote)),
+    );
   }
 
   // ── Path A — Sesión nueva ─────────────────────────────────────────────────

@@ -229,13 +229,39 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
       if (!mounted) return;
       _notifier = ref.read(sessionNotifierProvider(widget.init).notifier);
       _notifier!.logSetError.addListener(_onLogSetError);
+      _notifier!.finishedElsewhere.addListener(_onFinishedElsewhere);
     });
   }
 
   @override
   void dispose() {
     _notifier?.logSetError.removeListener(_onLogSetError);
+    _notifier?.finishedElsewhere.removeListener(_onFinishedElsewhere);
     super.dispose();
+  }
+
+  /// El entreno se cerró desde el RELOJ. Se sale del player.
+  ///
+  /// Quedarse acá sería peor que salir: la sesión ya está terminada en el
+  /// historial, con su volumen y su duración calculados, y cualquier cosa que
+  /// el atleta marcara desde esta pantalla escribiría sobre un entreno cerrado.
+  void _onFinishedElsewhere() {
+    final notifier = _notifier;
+    if (notifier == null || !notifier.finishedElsewhere.value) return;
+    if (!mounted) return;
+    final l10n = AppL10n.of(context);
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(l10n.sessionFinishedOnWatch),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    // `canPop` para no explotar si el player ya no es la ruta de arriba (el
+    // atleta pudo navegar a un ejercicio mientras el reloj cerraba).
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) navigator.pop();
   }
 
   /// Reacciona a un fallo de log/update de set: muestra un SnackBar con

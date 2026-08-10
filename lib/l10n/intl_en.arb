@@ -849,6 +849,7 @@
   "profileLoadError": "We couldn't load your profile. Please try again.",
   "sessionDetailNoSets": "This session has no logged sets.",
   "sessionLogSetError": "We couldn't save the set. Please try again.",
+  "sessionFinishedOnWatch": "You finished this workout on your watch.",
   "sessionFinishError": "We couldn't finish the session. Please try again.",
   "routineEditorMissingName": "Give your routine a name.",
   "routineEditorMissingExercise": "Add at least one exercise to Day {dayNumber}.",

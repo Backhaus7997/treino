@@ -352,6 +352,53 @@ class SessionRepository {
     return snap.docs.map(_setLogFromDoc).whereType<SetLog>().toList();
   }
 
+  // ─── watchSetLogs ───────────────────────────────────────────────────────
+
+  /// Stream vivo de las series de una sesión, ordenadas por `setNumber`.
+  ///
+  /// Existe porque el RELOJ escribe series en la misma sesión que el teléfono
+  /// tiene abierta, y `listSetLogs` es una lectura única: el atleta marcaba en
+  /// la muñeca y la pantalla del celular seguía mostrando la serie sin tildar.
+  ///
+  /// Ordenado igual que [listSetLogs] para que el estado no dé un salto de
+  /// orden cuando el stream reemplaza a la carga inicial.
+  Stream<List<SetLog>> watchSetLogs({
+    required String uid,
+    required String sessionId,
+  }) {
+    if (uid.isEmpty || sessionId.isEmpty) {
+      return Stream.value(const <SetLog>[]);
+    }
+    return _setLogs(uid, sessionId)
+        .orderBy('setNumber', descending: false)
+        .snapshots()
+        .map((s) => s.docs.map(_setLogFromDoc).whereType<SetLog>().toList());
+  }
+
+  // ─── watchSessionFinished ───────────────────────────────────────────────
+
+  /// Emite `true` cuando la sesión pasa a terminada, o deja de existir.
+  ///
+  /// El reloj puede cerrar el entreno mientras el teléfono lo tiene abierto.
+  /// Sin esto la app se quedaba con el player vivo sobre una sesión cerrada, y
+  /// lo que se marcara ahí se escribía sobre un entreno que ya estaba en el
+  /// historial.
+  Stream<bool> watchSessionFinished({
+    required String uid,
+    required String sessionId,
+  }) {
+    if (uid.isEmpty || sessionId.isEmpty) return Stream.value(false);
+    return _sessions(uid).doc(sessionId).snapshots().map((snap) {
+      if (!snap.exists) return true;
+      final data = snap.data();
+      // `finishedAt` viaja SIEMPRE como clave (json_serializable la incluye
+      // con null), así que preguntar por la presencia de la clave no alcanza:
+      // hay que mirar el valor. Es la misma trampa que rompió el lado del
+      // reloj — ver `FS.isEmpty` en FirestoreREST.swift.
+      return data != null && data['finishedAt'] != null;
+    });
+  }
+
   // ─── Private helpers ────────────────────────────────────────────────────
 
   Session? _sessionFromDoc(DocumentSnapshot<Map<String, Object?>> snap) {

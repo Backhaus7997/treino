@@ -452,6 +452,7 @@
   "profileLoadError": "No pudimos cargar tu perfil. Inténtalo de nuevo.",
   "sessionDetailNoSets": "Esta sesión no tiene sets registrados.",
   "sessionLogSetError": "No pudimos guardar la serie. Inténtalo de nuevo.",
+  "sessionFinishedOnWatch": "Finalizaste este entrenamiento desde el reloj.",
   "sessionFinishError": "No pudimos finalizar la sesión. Inténtalo de nuevo.",
   "routineEditorMissingName": "Ponle un nombre a la rutina.",
   "routineEditorMissingExercise": "Agrega al menos un ejercicio al Día {dayNumber}.",

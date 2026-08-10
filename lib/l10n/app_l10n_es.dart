@@ -2338,6 +2338,10 @@ class AppL10nEs extends AppL10n {
   String get sessionDetailNoSets => 'Esta sesión no tiene sets registrados.';
 
   @override
+  String get sessionFinishedOnWatch =>
+      'Finalizaste este entrenamiento desde el reloj.';
+
+  @override
   String get sessionLogSetError =>
       'No pudimos guardar la serie. Inténtalo de nuevo.';
 
@@ -5618,6 +5622,10 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get sessionDetailNoSets => 'Esta sesión no tiene sets registrados.';
+
+  @override
+  String get sessionFinishedOnWatch =>
+      'Terminaste este entrenamiento desde el reloj.';
 
   @override
   String get sessionLogSetError => 'No pudimos guardar la serie. Reintentá.';
