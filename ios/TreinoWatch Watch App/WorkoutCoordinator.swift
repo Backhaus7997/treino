@@ -43,10 +43,13 @@ final class WorkoutCoordinator: ObservableObject {
     /// para no acoplar este coordinator al de credenciales.
     var makeClient: (() async throws -> (FirestoreREST, String))?
 
-    /// Cómo resolver el entreno de una rutina dada por id. También lo inyecta la
-    /// app: se usa para recuperar una sesión a medias de CUALQUIER rutina, no
-    /// solo de la activa.
-    var makeWorkout: ((String) async throws -> TodaysWorkout?)?
+    /// Cómo resolver el entreno de una rutina en una POSICIÓN dada del plan.
+    ///
+    /// Toma día y semana explícitos —no los calcula— porque se usa sobre
+    /// sesiones que YA existen: la posición la manda el historial, no lo que
+    /// tocaría hoy. Resolverla de nuevo hacía que el reloj mostrara los
+    /// ejercicios de otro día que el que decía la sesión.
+    var makeWorkout: ((String, Int, Int) async throws -> TodaysWorkout?)?
 
     var currentExercise: WatchExercise? {
         guard currentExerciseIndex >= 0, currentExerciseIndex < exercises.count
@@ -81,10 +84,14 @@ final class WorkoutCoordinator: ObservableObject {
                 client: client, uid: uid
             ) else { return }
 
-            // Los ejercicios se re-resuelven desde LA RUTINA DE ESA SESIÓN, que
-            // puede no ser la activa: el atleta pudo arrancar una plantilla
-            // desde el teléfono.
-            guard let workout = try await makeWorkout(remote.routineId) else { return }
+            // Los ejercicios salen de LA RUTINA Y LA POSICIÓN DE ESA SESIÓN.
+            // La rutina puede no ser la activa (el atleta arrancó una plantilla
+            // desde el teléfono), y el día NO se recalcula: lo manda el
+            // historial. Recalcularlo mostraba los ejercicios de un día
+            // distinto al que decía la sesión.
+            guard let workout = try await makeWorkout(
+                remote.routineId, remote.dayNumber, remote.weekNumber
+            ) else { return }
 
             let logged = try await HistorySync.remoteSetLogs(
                 client: client, uid: uid, sessionId: remote.id
@@ -126,7 +133,13 @@ final class WorkoutCoordinator: ObservableObject {
 
         let resolved: TodaysWorkout?
         do {
-            resolved = try await makeWorkout(stored.routineId)
+            // La posición la manda LA SESIÓN GUARDADA, no lo que tocaría hoy.
+            // Antes se recalculaba y después se comparaba: si el plan había
+            // avanzado, el entreno a medias se descartaba entero — y si no, se
+            // corría el riesgo de mostrar los ejercicios de otro día.
+            resolved = try await makeWorkout(
+                stored.routineId, stored.dayNumber, stored.weekNumber
+            )
         } catch {
             // Sin red no se puede re-resolver. NO se descarta: la sesión queda
             // en disco y se reintenta al próximo arranque. Borrarla acá sería
@@ -135,13 +148,8 @@ final class WorkoutCoordinator: ObservableObject {
             return
         }
 
-        // Sin rutina (la borraron) o en otra posición del plan (avanzó porque se
-        // terminó otra sesión), la guardada quedó huérfana: mostrarla sería
-        // mostrar un entreno que ya no corresponde.
-        guard let workout = resolved,
-              stored.dayNumber == workout.dayNumber,
-              stored.weekNumber == workout.weekNumber
-        else {
+        // Sin rutina (la borraron) no hay nada que mostrar.
+        guard let workout = resolved else {
             WorkoutSessionStore.clear()
             return
         }

@@ -28,10 +28,17 @@ struct TreinoWatch_Watch_AppApp: App {
                     workoutCoordinator.makeClient = {
                         try await coordinator.firestoreClient()
                     }
-                    workoutCoordinator.makeWorkout = { routineId in
+                    workoutCoordinator.makeWorkout = { routineId, day, week in
                         let (client, uid) = try await coordinator.firestoreClient()
+                        // Posición EXPLÍCITA: la sesión ya existe y su día lo
+                        // manda el historial. Recalcularlo hacía que el reloj
+                        // mostrara los ejercicios de otro día.
                         return try await TodaysWorkoutResolver.resolve(
-                            client: client, uid: uid, routineId: routineId
+                            client: client,
+                            uid: uid,
+                            routineId: routineId,
+                            dayNumber: day,
+                            weekNumber: week
                         )
                     }
                     coordinator.start()

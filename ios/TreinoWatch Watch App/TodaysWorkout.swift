@@ -69,24 +69,61 @@ enum TodaysWorkoutResolver {
         )
     }
 
+    /// Arma el entreno de una posición EXACTA del plan, sin calcular cuál toca.
+    ///
+    /// ⚠️ Es lo que hay que usar para una sesión que YA existe. `resolve` calcula
+    /// el día con `nextPlanPosition` —o sea, el que TOCARÍA hoy— y eso no tiene
+    /// por qué coincidir con el día de una sesión abierta.
+    ///
+    /// El bug que arregla: el reloj adoptaba el entreno del teléfono, guardaba
+    /// el día de la sesión, pero mostraba los EJERCICIOS del día calculado. La
+    /// sesión decía "día 1, Press de Banca" y la muñeca mostraba "Lower A,
+    /// Sentadilla". Las series que se marcaban en el reloj se escribían con
+    /// ejercicios de otro día, así que en el teléfono no aparecían por ningún
+    /// lado — parecía que la sincronización no andaba.
+    static func resolve(
+        client: FirestoreREST,
+        uid: String,
+        routineId: String,
+        dayNumber: Int,
+        weekNumber: Int
+    ) async throws -> TodaysWorkout? {
+        guard let fields = try await client.document("routines/\(routineId)")
+        else { return nil }
+        return try await workout(
+            client: client,
+            uid: uid,
+            routineId: routineId,
+            routine: fields,
+            position: PlanPosition(dayNumber: dayNumber, weekNumber: weekNumber)
+        )
+    }
+
     private static func workout(
         client: FirestoreREST,
         uid: String,
         routineId: String,
-        routine: [String: Any]
+        routine: [String: Any],
+        position forced: PlanPosition? = nil
     ) async throws -> TodaysWorkout? {
         let days = FS.array(routine["days"]) ?? []
         guard !days.isEmpty else { return nil }
 
-        let lastFinished = try await findLastFinishedSession(
-            client: client, uid: uid, routineId: routineId
-        )
-
-        let position = nextPlanPosition(
-            lastFinished: lastFinished,
-            numDays: days.count,
-            numWeeks: FS.int(routine["numWeeks"]) ?? 1
-        )
+        let position: PlanPosition
+        if let forced {
+            // Posición impuesta por una sesión que ya existe: no se calcula
+            // nada, se respeta lo que dice el historial.
+            position = forced
+        } else {
+            let lastFinished = try await findLastFinishedSession(
+                client: client, uid: uid, routineId: routineId
+            )
+            position = nextPlanPosition(
+                lastFinished: lastFinished,
+                numDays: days.count,
+                numWeeks: FS.int(routine["numWeeks"]) ?? 1
+            )
+        }
 
         // Defensivo contra dayNumbers no contiguos, igual que el lado Dart:
         // si no aparece el día buscado, se cae al primero.
