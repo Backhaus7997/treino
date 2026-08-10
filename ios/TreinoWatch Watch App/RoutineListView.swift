@@ -164,7 +164,9 @@ struct RoutineRow: View {
     }
 
     private var subtitle: String {
-        let days = "\(routine.dayCount) días"
+        // Singular a mano: el reloj no tiene l10n propia, y "1 días" se lee
+        // descuidado en una pantalla donde entran cuatro palabras.
+        let days = routine.dayCount == 1 ? "1 día" : "\(routine.dayCount) días"
         guard routine.numWeeks > 1 else { return days }
         return "\(days) · \(routine.numWeeks) sem"
     }

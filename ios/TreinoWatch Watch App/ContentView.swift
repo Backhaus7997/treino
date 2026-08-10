@@ -182,7 +182,7 @@ struct DayExerciseList: View {
                         Text(exercise.exerciseName)
                             .font(.system(size: 12))
                             .lineLimit(2)
-                        Text("\(exercise.sets.count) series")
+                        Text(exercise.sets.count == 1 ? "1 serie" : "\(exercise.sets.count) series")
                             .font(.system(size: 10))
                             .foregroundStyle(.secondary)
                     }
