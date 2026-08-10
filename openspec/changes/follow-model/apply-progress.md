@@ -360,6 +360,33 @@ completo verde, 4801 tests**.
 
 ---
 
+## M-02 — dry-run de la migración ✅ (2026-08-10)
+
+Corrido contra **`treino-dev` real** con la service account. Read-only: no se
+escribió nada.
+
+```
+=== migrate-friendships-to-follows (DRY RUN) ===
+Leídas 6 friendship(s).
+De 10 arista(s) esperada(s), ya existen 0.
+6 friendship(s): 4 accepted + 2 pending bien formadas (+ 0 malformada/s).
+Aristas esperadas = 2 × 4 + 2 = 10.
+A crear ahora: 10.
+```
+
+**Coincide exactamente con la aserción que fijó M-00** (PR0, 2026-08-04): 6
+friendships, 4 accepted + 2 pending, 0 malformados. El plan produce **10
+aristas**, que es el número que la verificación de M-06 tiene que confirmar.
+
+Que "ya existen 0" es la otra mitad de la señal: `follows` sigue **vacía**, o
+sea que nadie escribió el grafo nuevo todavía y la migración arranca de cero.
+
+> **Se frenó acá a propósito.** El paso siguiente (2.8b, freeze) es un deploy, y
+> el que le sigue (2.9, `--apply`) es irreversible. Los dos esperan a que el
+> dueño confirme que los testers actualizaron a la build `0.1.0+14` (3a.19b).
+
+---
+
 ## Pendiente
 - **PR 3d** — retiro de `Friendship*`. **PR 4** — UX + l10n.
 - **Gate 3a.19 incompleto**: 3 suites (`post-photos-storage-rules`,
