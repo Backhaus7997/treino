@@ -289,11 +289,17 @@ final planProgressProvider = FutureProvider.autoDispose
 /// Chequeo de sesión activa al abrir /home (Decision 12).
 /// Retorna el record (session + setLogs) si hay una sesión activa, o null.
 /// autoDispose: se re-evalúa en cada mount de HomeScreen.
+///
+/// Y también cuando cambian las sesiones, vía [sessionsRevisionProvider]. Sin
+/// eso solo corría al montar Home: si el atleta arrancaba el entreno DESDE EL
+/// RELOJ mientras miraba el teléfono, la app no se enteraba y le seguía
+/// ofreciendo empezar uno nuevo — sobre uno que ya estaba abierto.
 final activeSessionForUidProvider =
     FutureProvider.autoDispose<({Session session, List<SetLog> setLogs})?>(
   (ref) async {
     final uid = ref.watch(currentUidProvider);
     if (uid == null) return null;
+    ref.watch(sessionsRevisionProvider(uid));
     final repo = ref.read(sessionRepositoryProvider);
     // Adaptación al contrato real de Etapa 1: getActive + listSetLogs.
     final session = await repo.getActive(uid);

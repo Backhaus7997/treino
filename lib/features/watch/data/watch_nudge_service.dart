@@ -45,6 +45,15 @@ class WatchNudgeService {
   /// entreno en vez de quedarse sobre una sesión que ya no existe.
   static const String reasonWorkoutFinished = 'workoutFinished';
 
+  /// Se marcó (o se borró) una serie en el teléfono.
+  ///
+  /// Cierra la ventana en la que el reloj todavía no sabe que esa serie existe:
+  /// mientras no lo sepa, marcarla en la muñeca escribe un SEGUNDO documento de
+  /// la misma serie y el atleta la ve dos veces. Los dos clientes generan ids
+  /// distintos —el teléfono autogenerado, el reloj determinístico—, así que el
+  /// que llega tarde no puede deduplicar por id.
+  static const String reasonSetLogged = 'setLogged';
+
   /// Manda el aviso. Nunca tira: devuelve si se pudo entregar.
   Future<bool> nudge({String reason = reasonActiveRoutine}) async {
     try {

@@ -350,6 +350,11 @@ class SessionNotifier
         setLogs: newLogs,
         currentExerciseIndex: newIndex,
       ));
+      // El reloj no tiene listeners: hasta que no se entere de esta serie,
+      // marcarla en la muñeca escribiría un SEGUNDO documento de la misma
+      // serie (los dos clientes generan ids distintos) y el atleta la vería
+      // marcada dos veces.
+      _nudgeWatch(WatchNudgeService.reasonSetLogged);
     } catch (e) {
       // El write a Firestore falló (red caída, permisos, offline). NO mutamos
       // `state` a AsyncError: eso flipearía `when()` al branch `error:` y volaría

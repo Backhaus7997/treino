@@ -26,6 +26,19 @@ struct LoggedSet: Codable, Equatable {
     /// primero local y se sube despues — si se hiciera al reves, una escritura
     /// fallida perderia la serie que el atleta ya hizo.
     var synced: Bool = false
+
+    /// Id del documento en Firestore, cuando la serie ya existe alla.
+    ///
+    /// ⚠️ Los dos clientes generan ids DISTINTOS para la misma serie logica: el
+    /// telefono usa uno autogenerado (`.doc()`) y el reloj uno deterministico
+    /// (`exerciseId__setNumber`). Si el reloj escribiera siempre con el suyo
+    /// sobre una serie que ya cargo el telefono, quedarian DOS documentos de la
+    /// misma serie y el atleta la veria marcada dos veces.
+    ///
+    /// Guardando el id que vino del historial, el reloj actualiza ESE documento
+    /// en vez de crear uno paralelo. Nil = la serie todavia no esta en
+    /// Firestore, asi que se crea con el id deterministico.
+    var remoteDocId: String?
 }
 
 /// La sesión de entrenamiento que el reloj mantiene por su cuenta.

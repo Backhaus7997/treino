@@ -210,7 +210,12 @@ enum HistorySync {
                 reps: FS.int(f["reps"]),
                 weightKg: FS.double(f["weightKg"]),
                 completedAt: Date(),
-                synced: true
+                synced: true,
+                // Se conserva el id REAL del documento: si lo escribio el
+                // telefono es autogenerado, y volver a escribir con el id
+                // deterministico del reloj crearia un segundo doc de la misma
+                // serie.
+                remoteDocId: doc.id
             )
         }
     }
@@ -249,7 +254,12 @@ enum HistorySync {
         exerciseName: String,
         set: LoggedSet
     ) async throws {
-        let docId = setLogId(exerciseId: set.exerciseId, setNumber: set.setNumber)
+        // Si la serie YA existe en el historial se actualiza ESE documento. El
+        // telefono la habria escrito con id autogenerado, y usar el
+        // deterministico del reloj dejaria dos docs de la misma serie — el
+        // atleta la veria marcada dos veces en el celular.
+        let docId = set.remoteDocId
+            ?? setLogId(exerciseId: set.exerciseId, setNumber: set.setNumber)
         let fields: [String: Any] = [
             "id": ["stringValue": docId],
             "exerciseId": ["stringValue": set.exerciseId],
