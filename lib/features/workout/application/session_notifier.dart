@@ -132,6 +132,31 @@ class SessionNotifier
     }, onError: (_) {});
   }
 
+  /// Deja UNA sola serie por `exerciseId + setNumber`, quedándose con la
+  /// primera.
+  ///
+  /// Es un INVARIANTE, no un parche puntual. Dos series con la misma identidad
+  /// lógica no existen: el teléfono las contaba doble, inflaba el volumen, daba
+  /// un ejercicio por terminado antes de tiempo y bloqueaba la serie siguiente.
+  ///
+  /// Se aplica en el único punto donde el estado recibe una lista MEZCLADA —
+  /// local + lo que llega del stream— en vez de confiar en que cada camino
+  /// chequee. Perseguir camino por camino ya falló una vez: se arregló `logSet`
+  /// y el estado volvió a duplicar por otra ventana de carrera que no pude
+  /// aislar. Un invariante en un solo lugar no depende de haberlos encontrado
+  /// a todos.
+  ///
+  /// Devuelve la MISMA lista si no había nada que sacar, para no crear objetos
+  /// nuevos en el camino caliente.
+  static List<SetLog> _dedupedLogs(List<SetLog> logs) {
+    final seen = <String>{};
+    final out = <SetLog>[];
+    for (final l in logs) {
+      if (seen.add('${l.exerciseId}__${l.setNumber}')) out.add(l);
+    }
+    return out.length == logs.length ? logs : List<SetLog>.unmodifiable(out);
+  }
+
   /// Reemplaza las series con lo que dice Firestore.
   ///
   /// Se pisa entero en vez de mezclar porque el remoto YA es la fuente de
@@ -145,9 +170,10 @@ class SessionNotifier
     // Sin cambios reales no se emite: cada emisión reconstruye la pantalla del
     // entreno, y Firestore repite el snapshot ante cualquier escritura de la
     // sesión.
-    if (listEquals(current.setLogs, remote)) return;
+    final clean = _dedupedLogs(remote);
+    if (listEquals(current.setLogs, clean)) return;
     state = AsyncData(
-      current.copyWith(setLogs: List<SetLog>.unmodifiable(remote)),
+      current.copyWith(setLogs: List<SetLog>.unmodifiable(clean)),
     );
   }
 
@@ -354,8 +380,9 @@ class SessionNotifier
             (l.exerciseId == persisted.exerciseId &&
                 l.setNumber == persisted.setNumber),
       );
-      final newLogs =
-          alreadyInState ? latest.setLogs : [...latest.setLogs, persisted];
+      final newLogs = _dedupedLogs(
+        alreadyInState ? latest.setLogs : [...latest.setLogs, persisted],
+      );
       final newIndex = _nextIncompleteIndex(
         latest.day,
         newLogs,

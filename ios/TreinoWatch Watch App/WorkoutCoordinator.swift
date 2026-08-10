@@ -325,16 +325,34 @@ final class WorkoutCoordinator: ObservableObject {
                 let remote = try await HistorySync.remoteSetLogs(
                     client: client, uid: uid, sessionId: remoteId
                 )
-                var added = false
+                // Las series que el reloj NO tenia: sirven para saber si hay
+                // que arrancar el descanso, no solo para contar.
+                var nuevas: [LoggedSet] = []
                 for set in remote where !current.isLogged(
                     exerciseId: set.exerciseId, setNumber: set.setNumber
                 ) {
                     current.loggedSets.append(set)
-                    added = true
+                    nuevas.append(set)
                 }
+                let added = !nuevas.isEmpty
                 if added {
                     session = current
                     WorkoutSessionStore.save(current)
+
+                    // El descanso arranca TAMBIEN cuando la serie se marco en
+                    // el telefono. Antes solo lo disparaba `logSet`, o sea
+                    // marcar en la muñeca: el atleta marcaba en el celular y el
+                    // reloj —que es donde mira el descanso— se quedaba mudo.
+                    //
+                    // Solo si la serie nueva es del ejercicio EN CURSO: una que
+                    // llega de un ejercicio ya pasado (una correccion tardia)
+                    // no tiene por que poner a contar nada.
+                    if let exercise = currentExercise,
+                       restRemaining == nil,
+                       nuevas.contains(where: { $0.exerciseId == exercise.exerciseId }) {
+                        startRest(seconds: exercise.restSeconds)
+                    }
+
                     // Si el telefono completo el ejercicio actual, avanzar.
                     if let exercise = currentExercise,
                        current.loggedCount(exerciseId: exercise.exerciseId)
