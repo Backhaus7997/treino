@@ -217,7 +217,11 @@ enum TodaysWorkoutResolver {
 
         for doc in sessions {
             let fields = doc.fields
-            guard fields["finishedAt"] != nil,
+            // `FS.isPresent` y no `!= nil`: el telefono escribe finishedAt con
+            // nullValue explicito. Comparando contra nil, una sesion EN CURSO
+            // contaba como "ultima terminada" y el reloj le adelantaba el dia
+            // del plan al atleta mientras todavia estaba entrenando.
+            guard FS.isPresent(fields["finishedAt"]),
                   let day = FS.int(fields["dayNumber"]),
                   let week = FS.int(fields["weekNumber"])
             else { continue }

@@ -247,4 +247,33 @@ enum FS {
         else { return nil }
         return mapValue["fields"] as? [String: Any]
     }
+
+    /// Si el campo está VACÍO: ausente del documento, o presente con
+    /// `nullValue`.
+    ///
+    /// ⚠️ **Los dos clientes de TREINO escriben el nulo distinto, y confundirlos
+    /// rompe cosas silenciosamente.**
+    ///
+    /// El reloj OMITE el campo cuando no hay valor. El teléfono lo escribe con
+    /// `nullValue` explícito: `json_serializable` incluye la clave siempre. Por
+    /// eso preguntar `campo == nil` solo detecta el caso del reloj — un
+    /// documento del teléfono devuelve el envoltorio `["nullValue": ...]`, que
+    /// NO es nil, y la comparación da lo contrario de lo que uno quiere.
+    ///
+    /// Lo que rompía: una sesión ACTIVA creada en el teléfono se leía como
+    /// terminada. El reloj no la adoptaba —mostraba "Empezar" mientras el
+    /// atleta ya estaba entrenando—, creaba una sesión DUPLICADA al empezar el
+    /// mismo día, y contaba esa sesión en curso como "última terminada", con lo
+    /// que adelantaba el día del plan a mitad de entreno.
+    ///
+    /// Las mismas rules ya documentan esta trampa del lado servidor:
+    /// `assignedTo == null` se compara contra null y no con un default, porque
+    /// la clave EXISTE.
+    static func isEmpty(_ field: Any?) -> Bool {
+        guard let wrapper = field as? [String: Any] else { return true }
+        return wrapper.keys.contains("nullValue") || wrapper.isEmpty
+    }
+
+    /// Lo contrario de [isEmpty]: el campo trae un valor de verdad.
+    static func isPresent(_ field: Any?) -> Bool { !isEmpty(field) }
 }

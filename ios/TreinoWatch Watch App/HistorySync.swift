@@ -96,7 +96,11 @@ enum HistorySync {
             let f = doc.fields
             // El filtro va en el cliente: sumar `status` a la query exigiria un
             // indice compuesto, y son diez filas.
-            guard f["finishedAt"] == nil,
+            //
+            // `FS.isEmpty` y NO `== nil`: el telefono escribe finishedAt con
+            // nullValue explicito, asi que el campo EXISTE aunque no haya
+            // valor. Ver la nota en FS.isEmpty.
+            guard FS.isEmpty(f["finishedAt"]),
                   let routineId = FS.string(f["routineId"])
             else { continue }
             return ActiveSession(
@@ -125,7 +129,7 @@ enum HistorySync {
         // Un doc que ya no está se trata como terminado: seguir mostrándolo
         // sería peor que cerrarlo.
         guard let doc else { return true }
-        return doc["finishedAt"] != nil
+        return FS.isPresent(doc["finishedAt"])
     }
 
     private static func parseTimestamp(_ field: Any?) -> Date? {
@@ -163,7 +167,10 @@ enum HistorySync {
         // pocas filas.
         for doc in rows {
             let f = doc.fields
-            guard f["finishedAt"] == nil,
+            // `FS.isEmpty` y no `== nil`: sin esto una sesion ABIERTA creada en
+            // el telefono se leia como terminada, el reloj no la adoptaba y
+            // creaba una SEGUNDA sesion del mismo entreno.
+            guard FS.isEmpty(f["finishedAt"]),
                   FS.int(f["dayNumber"]) == workout.dayNumber,
                   FS.int(f["weekNumber"]) == workout.weekNumber
             else { continue }
