@@ -35,11 +35,24 @@ struct WorkoutView: View {
                             .padding(.top, 2)
                     }
 
-                    Button("Terminar", role: .destructive) {
-                        Task { await workout.finish() }
+                    // Terminar aparece SOLO con todas las series de todos los
+                    // ejercicios cargadas. Pedido del dueño: tenerlo siempre a
+                    // la vista invita a cerrar el entreno de más, sobre todo
+                    // con la muñeca mojada y el boton a un toque del ultimo
+                    // circulo que se marco.
+                    if workout.isFullyCompleted(session) {
+                        Button("Terminar", role: .destructive) {
+                            Task { await workout.finish() }
+                        }
+                        .font(.caption2)
+                        .padding(.top, 4)
+                    } else {
+                        Text("Marcá todas las series para terminar")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.top, 4)
                     }
-                    .font(.caption2)
-                    .padding(.top, 4)
                 }
                 .padding(.horizontal, 2)
             }

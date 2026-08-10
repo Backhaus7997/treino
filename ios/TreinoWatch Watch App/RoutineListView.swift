@@ -45,22 +45,25 @@ final class RoutineListModel: ObservableObject {
     /// Rutina que el atleta está mirando en el detalle, o nil.
     @Published var selected: RoutineSummary?
 
-    /// Se recarga solo la primera vez: volver a pasar por la página no debería
-    /// disparar cuatro queries cada vez que el atleta desliza.
-    private var loadedOnce = false
+    /// Evita que dos recargas se pisen si el atleta desliza rápido de ida y
+    /// vuelta: la segunda saldría igual y solo gastaría radio.
+    private var loading = false
 
-    func loadIfNeeded(
-        kind: RoutineListKind,
-        makeClient: @escaping () async throws -> (FirestoreREST, String)
-    ) async {
-        guard !loadedOnce else { return }
-        await reload(kind: kind, makeClient: makeClient)
-    }
-
+    /// Relee la lista.
+    ///
+    /// Se llama cada vez que la página aparece, no una sola vez: el reloj no
+    /// tiene listeners de Firestore, así que si el atleta creó una rutina en
+    /// el teléfono, esta es la única forma de que aparezca sin reiniciar.
+    ///
+    /// Lo que ya se mostraba NO se borra mientras carga: cambiar la lista por
+    /// un spinner cada vez que el atleta pasa por la página parpadearía sin
+    /// darle nada a cambio.
     func reload(
         kind: RoutineListKind,
         makeClient: @escaping () async throws -> (FirestoreREST, String)
     ) async {
+        guard !loading else { return }
+        loading = true
         isLoading = true
         failed = false
         do {
@@ -71,11 +74,14 @@ final class RoutineListModel: ObservableObject {
             case .templates:
                 routines = try await RoutineCatalog.templates(client: client)
             }
-            loadedOnce = true
         } catch {
-            failed = true
+            // Solo se marca el error si no hay nada que mostrar. Una recarga
+            // fallida con datos viejos en pantalla es mejor que un cartel de
+            // error tapando la lista que el atleta estaba mirando.
+            failed = routines.isEmpty
         }
         isLoading = false
+        loading = false
     }
 }
 
@@ -86,6 +92,10 @@ struct RoutineListView: View {
 
     @EnvironmentObject private var coordinator: CredentialCoordinator
     @StateObject private var model = RoutineListModel()
+
+    /// Contador de apariciones. Sube en cada `onAppear` y es la `id` de la
+    /// tarea de carga, que es lo que la hace volver a correr.
+    @State private var appeared = 0
 
     var body: some View {
         ScrollView {
@@ -115,9 +125,14 @@ struct RoutineListView: View {
             }
             .padding(.horizontal, 2)
         }
-        .task {
-            await model.loadIfNeeded(kind: kind, makeClient: makeClient)
+        // `id: appeared` fuerza que la tarea vuelva a correr cada vez que la
+        // página se muestra. Un `.task` pelado corre una sola vez por vida de
+        // la vista, y en un TabView paginado las páginas quedan vivas: la
+        // lista se congelaba en lo que hubiera al arrancar la app.
+        .task(id: appeared) {
+            await model.reload(kind: kind, makeClient: makeClient)
         }
+        .onAppear { appeared += 1 }
         // Hoja y no navegación: en el reloj el push se cierra con un deslizar
         // horizontal, que es el MISMO gesto que cambia de página. La hoja se
         // cierra hacia abajo y no pelea con el paginado.

@@ -57,6 +57,7 @@ struct WatchHome: View {
     private enum Page: Hashable { case plans, today, templates }
 
     @State private var page: Page = .today
+    @EnvironmentObject private var coordinator: CredentialCoordinator
 
     var body: some View {
         TabView(selection: $page) {
@@ -68,6 +69,20 @@ struct WatchHome: View {
                 .tag(Page.templates)
         }
         .tabViewStyle(.page)
+        // Cambiar de pagina RELEE. El reloj habla Firestore por REST y no
+        // tiene listeners —es el costo de que Firestore no exista en
+        // watchOS—, asi que nadie le avisa que el atleta cambio su rutina
+        // activa desde el telefono. Sin esto habia que reiniciar la app para
+        // ver el cambio.
+        //
+        // Se engancha al cambio de pagina y no a un temporizador: el atleta
+        // desliza cuando quiere mirar algo, que es exactamente cuando el dato
+        // tiene que estar fresco. Pollear cada N segundos gastaria bateria y
+        // radio para refrescar una pantalla que nadie esta mirando.
+        .onChange(of: page) { _, current in
+            guard current == .today else { return }
+            Task { await coordinator.loadTodaysWorkout() }
+        }
     }
 }
 
