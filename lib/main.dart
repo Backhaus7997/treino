@@ -9,6 +9,7 @@ import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -22,6 +23,21 @@ Future<void> main() async {
   // FlutterError.onError + PlatformDispatcher.instance.onError.
   await runZonedGuarded<Future<void>>(() async {
     WidgetsFlutterBinding.ensureInitialized();
+
+    // Las tipografías se sirven desde `assets/fonts/` y NUNCA por red.
+    //
+    // Sin esto, google_fonts baja Barlow / Barlow Condensed / Space Grotesk de
+    // fonts.gstatic.com en el primer arranque. Hasta que llegan, todo se mide
+    // con la fallback del sistema, y en Android esa fallback es Roboto — que
+    // no es condensada. "ENTRENAR" pasa de 44,36pt a 56,78 y la barra de
+    // navegación, que decide si los labels entran midiendo el texto, se queda
+    // en modo íconos hasta los 389,5pt de ancho de pantalla: o sea, en la
+    // práctica siempre.
+    //
+    // En `false` google_fonts usa lo bundleado y, si le faltara una variante,
+    // lo reporta en consola en vez de taparlo con una descarga silenciosa.
+    GoogleFonts.config.allowRuntimeFetching = false;
+
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
