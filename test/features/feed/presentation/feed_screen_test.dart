@@ -1185,7 +1185,45 @@ void main() {
       );
     });
 
-    testWidgets('segment pills remain visible after scrolling', (tester) async {
+    // Cambio de comportamiento deliberado: las pills DEJARON de estar fijas.
+    //
+    // Antes eran un `SliverPersistentHeader(pinned: true)`, y quedar fijas las
+    // obligaba a pintarse un fondo opaco `palette.bg` para tapar los posts que
+    // les pasaban por detrás. Ese fondo es solo la base sólida de
+    // AppBackground, sin sus dos glows radiales, así que la franja se recortaba
+    // contra el resto de la pantalla — y encima justo donde el glow del accent
+    // está más presente. Scrollean con el contenido, no se superponen con
+    // nada, y por eso ya no necesitan fondo.
+    testWidgets('las pills scrollean con el feed y se van de pantalla', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), publicOverrides(longPosts())),
+      );
+      await tester.pumpAndSettle();
+
+      final scrollView = feedScrollView();
+      final viewportRect = tester.getRect(scrollView);
+
+      // Arrancan a la vista.
+      expect(find.byType(FeedSegmentPills), findsOneWidget);
+      expect(
+        tester.getRect(find.text('PÚBLICO')).bottom,
+        greaterThan(viewportRect.top),
+      );
+
+      await tester.drag(scrollView, const Offset(0, -700));
+      await tester.pumpAndSettle();
+
+      // Y se fueron: o se desmontaron, o quedaron por encima del viewport.
+      final gone = find.text('PÚBLICO').evaluate().isEmpty ||
+          tester.getRect(find.text('PÚBLICO')).bottom <= viewportRect.top;
+      expect(gone, isTrue, reason: 'las pills deberían haberse ido');
+    });
+
+    testWidgets('las pills vuelven al scrollear de nuevo hasta arriba', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         _wrapProvider(const FeedScreen(), publicOverrides(longPosts())),
       );
@@ -1194,10 +1232,12 @@ void main() {
       final scrollView = feedScrollView();
       await tester.drag(scrollView, const Offset(0, -700));
       await tester.pumpAndSettle();
+      await tester.drag(scrollView, const Offset(0, 900));
+      await tester.pumpAndSettle();
 
+      final viewportRect = tester.getRect(scrollView);
       expect(find.byType(FeedSegmentPills), findsOneWidget);
       final pillsRect = tester.getRect(find.text('PÚBLICO'));
-      final viewportRect = tester.getRect(scrollView);
       expect(pillsRect.bottom, greaterThan(viewportRect.top));
       expect(pillsRect.top, lessThan(viewportRect.bottom));
     });

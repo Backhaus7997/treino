@@ -245,35 +245,32 @@ SliverAppBar _feedAppBar(
   );
 }
 
-class _FeedSegmentHeaderDelegate extends SliverPersistentHeaderDelegate {
-  const _FeedSegmentHeaderDelegate({required this.backgroundColor});
-
-  final Color backgroundColor;
+/// La fila de segmentos, como un sliver común que scrollea con el feed.
+///
+/// Era un [SliverPersistentHeader] con `pinned: true`, y eso lo obligaba a
+/// pintarse un `ColoredBox(palette.bg)` opaco: al quedar fijo, tapaba los
+/// posts que le pasaban por detrás. El problema es que `palette.bg` es solo la
+/// base sólida de [AppBackground] — le faltan los dos glows radiales. El
+/// header quedaba entonces como una franja plana recortada contra el fondo, y
+/// justo ahí arriba a la izquierda es donde el glow del accent está más
+/// presente, así que el corte saltaba a la vista.
+///
+/// Scrolleando con el contenido no se superpone con nada, así que no necesita
+/// fondo: se ve el [AppBackground] real, glow incluido. Tampoco es `floating`
+/// a propósito — floating lo haría reaparecer ENCIMA del contenido al
+/// scrollear hacia arriba, y volveríamos a necesitar el fondo opaco.
+class _FeedSegmentSliver extends StatelessWidget {
+  const _FeedSegmentSliver();
 
   @override
-  double get minExtent => 62;
-
-  @override
-  double get maxExtent => 62;
-
-  @override
-  Widget build(
-    BuildContext context,
-    double shrinkOffset,
-    bool overlapsContent,
-  ) {
-    return ColoredBox(
-      color: backgroundColor,
-      child: const Padding(
+  Widget build(BuildContext context) {
+    return const SliverToBoxAdapter(
+      child: Padding(
         padding: EdgeInsets.symmetric(vertical: 14),
         child: FeedSegmentPills(),
       ),
     );
   }
-
-  @override
-  bool shouldRebuild(_FeedSegmentHeaderDelegate oldDelegate) =>
-      backgroundColor != oldDelegate.backgroundColor;
 }
 
 /// Page 1 — thin host for the self-contained rankings surface. The shared
@@ -637,12 +634,7 @@ class _FeedScrollViewState extends State<_FeedScrollView> {
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
         if (widget.showTitle) _feedAppBar(context, showTitle: true),
-        SliverPersistentHeader(
-          pinned: true,
-          delegate: _FeedSegmentHeaderDelegate(
-            backgroundColor: palette.bg,
-          ),
-        ),
+        const _FeedSegmentSliver(),
         if (widget.content.posts case final posts?)
           SliverPadding(
             padding: EdgeInsets.fromLTRB(20, 14, 20, bottomInset),
@@ -740,15 +732,11 @@ class _FeedStaticScrollView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
     return CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
         if (showTitle) _feedAppBar(context, showTitle: true),
-        SliverPersistentHeader(
-          pinned: true,
-          delegate: _FeedSegmentHeaderDelegate(backgroundColor: palette.bg),
-        ),
+        const _FeedSegmentSliver(),
         SliverFillRemaining(hasScrollBody: false, child: child),
       ],
     );

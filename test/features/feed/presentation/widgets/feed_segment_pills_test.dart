@@ -268,20 +268,15 @@ void main() {
       expect(publicoOpacity, findsNothing);
     });
 
-    // Regresión: el `Row` medía solo su contenido y quedaba apoyado contra el
-    // margen izquierdo. En un iPhone de 393pt los pills terminaban a los 321 y
-    // sobraban 72pt de aire muerto a la derecha, contra 20 del lado izquierdo.
-    //
-    // El ancho es 600 y no los 393 del teléfono a propósito: el proyecto usa
-    // google_fonts sin bundlear las tipografías y flutter_test mockea HTTP
-    // devolviendo 400, así que en test la fuente real nunca carga y los pills
-    // se miden con una fallback bastante más ancha — a 393 se desbordan por
-    // la fuente equivocada y el test mediría eso en vez del reparto. Con
-    // lugar de sobra, lo que se verifica es lo que importa: que el sobrante
-    // se reparta en vez de amontonarse contra el margen izquierdo.
-    testWidgets('los pills se reparten de margen a margen, sin aire muerto',
+    // Regresión doble. Primero el `Row` medía solo su contenido y quedaba
+    // apoyado contra el margen izquierdo: en un iPhone de 393pt los pills
+    // terminaban a los 321 y sobraban 72pt de aire muerto a la derecha. El
+    // arreglo siguiente estiró el Row con `spaceBetween` y quedó peor: la
+    // separación entre pills saltaba de 12 a ~37. Partes iguales cubre las
+    // dos cosas, y esto lo fija.
+    testWidgets('los tres pills miden lo mismo y la fila llena el ancho',
         (tester) async {
-      const screenWidth = 600.0;
+      const screenWidth = 393.0;
       tester.view.physicalSize = const Size(screenWidth, 800);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
@@ -295,20 +290,36 @@ void main() {
       );
       await tester.pump();
 
-      final first = tester.getRect(find.text('SEGUIDORES'));
-      final last = tester.getRect(find.text('PÚBLICO'));
+      Rect pillOf(String label) => tester.getRect(
+            find
+                .ancestor(
+                  of: find.text(label),
+                  matching: find.byType(Container),
+                )
+                .first,
+          );
 
-      // El primero arranca contra el margen izquierdo y el último muere contra
-      // el derecho. Se mide sobre el texto, así que hay que sumarle el padding
-      // horizontal de 18 del pill que lo envuelve.
-      expect(first.left - 18, closeTo(20, 1));
-      expect(last.right + 18, closeTo(screenWidth - 20, 1));
+      final first = pillOf('SEGUIDORES');
+      final middle = pillOf('MI GYM');
+      final last = pillOf('PÚBLICO');
+
+      // Partes iguales: (393 - 40 de márgenes - 24 de gaps) / 3.
+      const expected = (screenWidth - 2 * 20 - 2 * 12) / 3;
+      expect(first.width, closeTo(expected, 0.5));
+      expect(middle.width, closeTo(expected, 0.5));
+      expect(last.width, closeTo(expected, 0.5));
+
+      // La fila muere contra los dos márgenes, alineada con el header.
+      expect(first.left, closeTo(20, 0.5));
+      expect(last.right, closeTo(screenWidth - 20, 0.5));
+
+      // Y la separación se queda en los 12 del diseño, no repartida.
+      expect(middle.left - first.right, closeTo(12, 0.5));
+      expect(last.left - middle.right, closeTo(12, 0.5));
     });
 
-    testWidgets('si no entran, el scroll horizontal sigue siendo la salida',
+    testWidgets('en pantalla angosta el label se achica en vez de desbordar',
         (tester) async {
-      // Pantalla muy angosta: el `minWidth` no puede achicar los pills, así
-      // que el Row se pasa y el SingleChildScrollView tiene que seguir ahí.
       tester.view.physicalSize = const Size(240, 800);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
@@ -322,8 +333,12 @@ void main() {
       );
       await tester.pump();
 
+      // Sin overflow y con los tres destinos todavía a la vista: el pill ya no
+      // crece con el texto, así que el que se adapta es el label.
       expect(tester.takeException(), isNull);
-      expect(find.byType(SingleChildScrollView), findsOneWidget);
+      expect(find.text('SEGUIDORES'), findsOneWidget);
+      expect(find.text('MI GYM'), findsOneWidget);
+      expect(find.text('PÚBLICO'), findsOneWidget);
     });
   });
 }
