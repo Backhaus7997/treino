@@ -4,6 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/analytics/analytics_service.dart';
+import '../../watch/application/watch_credential_providers.dart'
+    show watchNudgeServiceProvider;
+import '../../watch/data/watch_nudge_service.dart';
 import '../domain/routine_day.dart';
 import '../domain/routine_slot.dart';
 import '../domain/set_log.dart';
@@ -111,6 +114,7 @@ class SessionNotifier
       weekNumber: clampedWeek,
     );
     _resetElapsedBaseline(elapsedSeconds: 0, at: session.startedAt);
+    _nudgeWatch(WatchNudgeService.reasonWorkoutStarted);
 
     // REQ-WPRES-021 (ADR-WPRES-09): filter slots by presence BEFORE building
     // session state so buildBlocks, isFullyCompleted, _nextIncompleteIndex,
@@ -130,6 +134,26 @@ class SessionNotifier
       currentExerciseIndex: 0,
       elapsedSeconds: 0,
     );
+  }
+
+  /// Le avisa al reloj que el estado del entreno cambió.
+  ///
+  /// El reloj habla Firestore por REST y no tiene listeners, así que sin este
+  /// aviso solo se entera cuando el atleta lo mira. La idea es la contraria:
+  /// que si empezaste a entrenar en el celular la muñeca se ponga en modo
+  /// entreno sola.
+  ///
+  /// Fire-and-forget y sin `await`: corre en el camino de empezar y terminar un
+  /// entreno, que es lo más caliente de la app. Un reloj que no está a mano no
+  /// puede demorar ni romper eso — se pone al día cuando el atleta lo mire.
+  void _nudgeWatch(String reason) {
+    try {
+      unawaited(ref.read(watchNudgeServiceProvider).nudge(reason: reason));
+    } catch (_) {
+      // `ref.read` tira si el notifier ya se descartó (la ruta del player puede
+      // salir mientras la escritura está en vuelo — ver la nota de #497 más
+      // abajo). Un aviso perdido no justifica tumbar el cierre del entreno.
+    }
   }
 
   // ── Path B — Retomar sesión existente ────────────────────────────────────
@@ -480,6 +504,7 @@ class SessionNotifier
     // (and the no-longer-active session clears) without an app restart.
     // Same audited post-dispose contract as finishSession (#497) — see there.
     ref.invalidate(sessionsByUidProvider(uid));
+    _nudgeWatch(WatchNudgeService.reasonWorkoutFinished);
     state = AsyncData(current.copyWith(
       session: current.session.copyWith(wasFullyCompleted: false),
     ));
@@ -536,6 +561,7 @@ class SessionNotifier
     // (todaysRoutineProvider, the Insights aggregators, historial) watches this
     // provider, so a single invalidate cascades.
     ref.invalidate(sessionsByUidProvider(uid));
+    _nudgeWatch(WatchNudgeService.reasonWorkoutFinished);
     // Solo en el path "finished fully completed" — los abandonos no cuentan
     // como "routine_finished" para producto. Si más adelante producto pide
     // ver abandons, se agrega `routine_abandoned` aparte.

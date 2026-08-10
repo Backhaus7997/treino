@@ -94,6 +94,11 @@ struct WatchHome: View {
             guard current == .today else { return }
             Task { await coordinator.loadTodaysWorkout() }
         }
+        // El teléfono avisó que cambió algo. HOY ya lo relee el coordinator;
+        // acá se empujan las listas laterales.
+        .onChange(of: coordinator.externalRefresh) { _, _ in
+            refreshToken += 1
+        }
     }
 }
 

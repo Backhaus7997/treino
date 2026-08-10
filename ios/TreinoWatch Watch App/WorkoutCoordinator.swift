@@ -63,7 +63,65 @@ final class WorkoutCoordinator: ObservableObject {
     /// Se re-resuelve LA RUTINA DE LA SESIÓN, no la activa: si el atleta arrancó
     /// una plantilla sin activarla, compararla contra la activa daba distinto y
     /// el entreno se descartaba entero al reabrir la app.
+    /// Adopta un entreno que YA está abierto en el historial, aunque no lo haya
+    /// empezado el reloj.
+    ///
+    /// Es lo que hace que el reloj sea un complemento de verdad: si el atleta
+    /// arrancó desde el teléfono, la muñeca se pone en modo entreno sola en vez
+    /// de mostrarle "Empezar" para algo que ya empezó.
+    ///
+    /// No pisa un entreno local en curso: si el reloj ya tiene el suyo, manda
+    /// ese. La reconciliación de los dos la hace `sync`, que adopta la sesión
+    /// remota del mismo día en vez de crear otra.
+    func adoptRemoteSessionIfAny() async {
+        guard session == nil, let makeClient, let makeWorkout else { return }
+        do {
+            let (client, uid) = try await makeClient()
+            guard let remote = try await HistorySync.findAnyActiveSession(
+                client: client, uid: uid
+            ) else { return }
+
+            // Los ejercicios se re-resuelven desde LA RUTINA DE ESA SESIÓN, que
+            // puede no ser la activa: el atleta pudo arrancar una plantilla
+            // desde el teléfono.
+            guard let workout = try await makeWorkout(remote.routineId) else { return }
+
+            let logged = try await HistorySync.remoteSetLogs(
+                client: client, uid: uid, sessionId: remote.id
+            )
+
+            var adopted = WorkoutSession(
+                localId: UUID().uuidString,
+                routineId: remote.routineId,
+                routineName: remote.routineName,
+                dayName: workout.dayName,
+                dayNumber: remote.dayNumber,
+                weekNumber: remote.weekNumber,
+                startedAt: remote.startedAt,
+                loggedSets: logged
+            )
+            adopted.remoteId = remote.id
+
+            session = adopted
+            self.workout = workout
+            currentExerciseIndex = firstUnfinishedIndex(
+                in: workout.exercises, session: adopted
+            )
+            WorkoutSessionStore.save(adopted)
+            syncError = nil
+        } catch {
+            syncError = String(describing: error)
+        }
+    }
+
     func restore() async {
+        // Sin nada guardado localmente, puede haber un entreno abierto que
+        // empezó el teléfono. Antes se volvía sin mirar, y el reloj mostraba
+        // "Empezar" mientras el atleta ya estaba entrenando.
+        guard WorkoutSessionStore.load() != nil else {
+            await adoptRemoteSessionIfAny()
+            return
+        }
         guard let stored = WorkoutSessionStore.load(), let makeWorkout else { return }
 
         let resolved: TodaysWorkout?
@@ -191,6 +249,26 @@ final class WorkoutCoordinator: ObservableObject {
         guard var current = session, let makeClient else { return }
         do {
             let (client, uid) = try await makeClient()
+
+            // ¿Lo terminaron desde el teléfono? Entonces el reloj se cierra
+            // solo. Sin esto quedaba con la pantalla de entreno abierta sobre
+            // una sesión que ya no existe, y cualquier serie que se marcara ahí
+            // se escribía sobre un entreno cerrado.
+            //
+            // Va ANTES de subir lo pendiente a propósito: no tiene sentido
+            // escribir series nuevas en algo que ya se cerró.
+            if let remoteId = current.remoteId,
+               try await HistorySync.isFinished(
+                   client: client, uid: uid, sessionId: remoteId
+               ) {
+                stopRest()
+                session = nil
+                workout = nil
+                currentExerciseIndex = 0
+                WorkoutSessionStore.clear()
+                syncError = nil
+                return
+            }
 
             if current.remoteId == nil {
                 guard let workout else {

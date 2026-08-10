@@ -63,7 +63,27 @@ struct TreinoWatch_Watch_AppApp: App {
                             // mitad de serie seria peor que un dato viejo.
                             await workoutCoordinator.sync()
                         } else {
-                            await coordinator.loadTodaysWorkout()
+                            // Sin entreno local, puede haber uno abierto que
+                            // arranco el telefono. Se busca ANTES de recargar
+                            // la rutina: si lo hay, el reloj tiene que entrar
+                            // en modo entreno, no mostrar "Empezar".
+                            await workoutCoordinator.adoptRemoteSessionIfAny()
+                            if workoutCoordinator.session == nil {
+                                await coordinator.loadTodaysWorkout()
+                            }
+                        }
+                    }
+                }
+                // El telefono aviso que algo cambio. Es el camino RAPIDO: sin
+                // esto el reloj se entera recien cuando el atleta lo mira, y la
+                // idea es que si empezaste a entrenar en el celular la muñeca
+                // se ponga en modo entreno sola.
+                .onChange(of: coordinator.externalRefresh) { _, _ in
+                    Task {
+                        if workoutCoordinator.session != nil {
+                            await workoutCoordinator.sync()
+                        } else {
+                            await workoutCoordinator.adoptRemoteSessionIfAny()
                         }
                     }
                 }

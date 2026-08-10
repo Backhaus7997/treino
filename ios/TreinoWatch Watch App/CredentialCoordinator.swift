@@ -41,6 +41,14 @@ final class CredentialCoordinator: NSObject, ObservableObject {
     /// Diagnóstico de la carga del entreno. No se le muestra al usuario.
     @Published private(set) var workoutError: String?
 
+    /// Sube cada vez que el TELÉFONO avisa que algo cambió.
+    ///
+    /// Las listas de planes y plantillas lo miran para releer. El reloj no
+    /// tiene listeners de Firestore —no existe en watchOS—, así que este aviso
+    /// es la única forma de que un cambio hecho en el celular se vea sin que el
+    /// atleta toque nada.
+    @Published private(set) var externalRefresh = 0
+
     /// Arranca la sesión de WatchConnectivity y recupera lo que haya guardado.
     func start() {
         if let stored = CredentialStore.load() {
@@ -190,5 +198,35 @@ extension CredentialCoordinator: WCSessionDelegate {
         Task { @MainActor in
             self.handle(applicationContext: applicationContext)
         }
+    }
+
+    /// Mensaje puntual desde el teléfono.
+    ///
+    /// Hoy solo se usa para el aviso de "relee": el teléfono lo manda cuando el
+    /// atleta cambia su rutina activa. Va por MENSAJE y no por contexto de
+    /// aplicación a propósito — el contexto es uno solo y se pisa entero, y ahí
+    /// vive la credencial.
+    nonisolated func session(
+        _ session: WCSession,
+        didReceiveMessage message: [String: Any]
+    ) {
+        guard message["kind"] as? String == "watchRefresh" else { return }
+        Task { @MainActor in
+            self.refreshFromPhone()
+        }
+    }
+}
+
+extension CredentialCoordinator {
+
+    /// Relee todo lo que el teléfono pudo haber cambiado.
+    ///
+    /// No corre durante un entreno en curso para la parte de la rutina: los
+    /// ejercicios NO se cambian abajo del atleta a mitad de serie. La señal
+    /// para las listas se emite igual, porque esas no están en pantalla
+    /// mientras entrena.
+    fileprivate func refreshFromPhone() {
+        externalRefresh += 1
+        Task { await loadTodaysWorkout() }
     }
 }

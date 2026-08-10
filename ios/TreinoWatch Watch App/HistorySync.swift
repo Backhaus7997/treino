@@ -59,6 +59,86 @@ enum HistorySync {
         return (sessionId, [])
     }
 
+    /// Una sesión activa que ya existe en el historial, venga de donde venga.
+    struct ActiveSession {
+        let id: String
+        let routineId: String
+        let routineName: String
+        let dayNumber: Int
+        let weekNumber: Int
+        let startedAt: Date
+    }
+
+    /// Busca CUALQUIER sesión sin terminar del atleta, sin importar la rutina.
+    ///
+    /// Es lo que permite que el reloj adopte solo un entreno que empezó el
+    /// teléfono. `findActiveSession` no sirve para esto: filtra por la rutina
+    /// del entreno de hoy, así que un entreno arrancado desde una plantilla —o
+    /// desde cualquier rutina que no sea la activa— quedaba invisible.
+    ///
+    /// Devuelve la más reciente por `startedAt`. Si hubiera varias abiertas
+    /// (sesiones abandonadas que nadie cerró), la más nueva es la que el atleta
+    /// está haciendo ahora.
+    static func findAnyActiveSession(
+        client: FirestoreREST,
+        uid: String
+    ) async throws -> ActiveSession? {
+        let rows = try await client.runQuery([
+            "from": [["collectionId": "sessions"]],
+            "orderBy": [[
+                "field": ["fieldPath": "startedAt"],
+                "direction": "DESCENDING",
+            ]],
+            "limit": 10,
+        ], parent: "users/\(uid)")
+
+        for doc in rows {
+            let f = doc.fields
+            // El filtro va en el cliente: sumar `status` a la query exigiria un
+            // indice compuesto, y son diez filas.
+            guard f["finishedAt"] == nil,
+                  let routineId = FS.string(f["routineId"])
+            else { continue }
+            return ActiveSession(
+                id: doc.id,
+                routineId: routineId,
+                routineName: FS.string(f["routineName"]) ?? "Rutina",
+                dayNumber: FS.int(f["dayNumber"]) ?? 1,
+                weekNumber: FS.int(f["weekNumber"]) ?? 0,
+                startedAt: parseTimestamp(f["startedAt"]) ?? Date()
+            )
+        }
+        return nil
+    }
+
+    /// Si la sesión ya está TERMINADA en el historial.
+    ///
+    /// El reloj lo consulta para cerrarse solo cuando el atleta terminó el
+    /// entreno desde el teléfono. Sin esto el reloj se quedaba con la pantalla
+    /// de entreno abierta sobre una sesión que ya no existe.
+    static func isFinished(
+        client: FirestoreREST,
+        uid: String,
+        sessionId: String
+    ) async throws -> Bool {
+        let doc = try await client.document("users/\(uid)/sessions/\(sessionId)")
+        // Un doc que ya no está se trata como terminado: seguir mostrándolo
+        // sería peor que cerrarlo.
+        guard let doc else { return true }
+        return doc["finishedAt"] != nil
+    }
+
+    private static func parseTimestamp(_ field: Any?) -> Date? {
+        guard let raw = (field as? [String: Any])?["timestampValue"] as? String
+        else { return nil }
+        let formatter = ISO8601DateFormatter()
+        // Firestore devuelve fracciones de segundo; sin esta opción el parseo
+        // falla en silencio y la duración del entreno sale mal.
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.date(from: raw)
+            ?? ISO8601DateFormatter().date(from: raw)
+    }
+
     private static func findActiveSession(
         client: FirestoreREST,
         uid: String,

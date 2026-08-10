@@ -77,6 +77,13 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
     //      Corta solo si no hay reloj emparejado. Change watch-standalone-client.
     ref.read(watchCredentialLifecycleProvider);
 
+    // (c3) Le avisa al reloj cuando cambia la rutina activa. El reloj habla
+    //      Firestore por REST y no tiene listeners, así que sin este aviso un
+    //      cambio hecho en el teléfono recién se veía al cambiar de página en
+    //      la muñeca. Best-effort: si el reloj no está alcanzable el aviso se
+    //      pierde y el reloj se pone al día solo, como antes.
+    ref.read(watchActiveRoutineNudgeProvider);
+
     // (a) Attach foreground SnackBar listener. (ADR-PN-010, REQ-PN-HANDLER-001)
     final fcm = ref.read(fcmServiceProvider);
     _fgSub = fcm.onForegroundMessage.listen(_onForeground);

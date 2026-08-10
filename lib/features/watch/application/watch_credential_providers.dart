@@ -6,8 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../firebase_options.dart';
 import '../../auth/application/auth_providers.dart';
+import '../../profile/application/user_providers.dart' show userProfileProvider;
 import '../data/watch_bridge.dart';
 import '../data/watch_credential_service.dart';
+import '../data/watch_nudge_service.dart';
 
 /// Envoltorio sobre `WatchConnectivity`. Se sobreescribe en tests vía
 /// `ProviderScope.overrides`.
@@ -57,6 +59,38 @@ final watchCredentialServiceProvider = Provider<WatchCredentialService>((ref) {
 /// no hay reloj emparejado, y el lado Swift no re-canjea si ya tiene credencial
 /// del mismo uid. Así se cubre el caso de emparejar el reloj DESPUÉS de haber
 /// iniciado sesión, que si no quedaría sin credencial hasta el próximo login.
+/// Servicio que le avisa al reloj que relea.
+final watchNudgeServiceProvider = Provider<WatchNudgeService>(
+  (ref) => WatchNudgeService(bridge: ref.watch(watchBridgeProvider)),
+);
+
+/// Avisa al reloj cada vez que cambia la rutina activa del atleta.
+///
+/// El reloj no tiene listeners de Firestore, así que sin esto un cambio hecho
+/// desde el teléfono recién se veía al cambiar de página en la muñeca. El
+/// dueño lo notó probando: activar DESDE el reloj era instantáneo y desde el
+/// celular no.
+///
+/// Se engancha al perfil y no a cada botón a propósito: la rutina activa se
+/// cambia desde la sección RUTINAS, desde el editor al crear una, y desde la
+/// adopción perezosa de `unifiedRoutinesProvider`. Escuchar el campo cubre las
+/// tres sin repetir la llamada en cada lugar ni olvidarse de una nueva.
+///
+/// Se lee de forma eager en `app.dart`, igual que el lifecycle de credencial.
+final watchActiveRoutineNudgeProvider = Provider<void>((ref) {
+  ref.listen<String?>(
+    userProfileProvider.select((a) => a.valueOrNull?.activeRoutineId),
+    (previous, next) {
+      // La PRIMERA emisión no es un cambio: es el valor que ya estaba cuando
+      // se abrió la app. Avisarle al reloj ahí sería un mensaje por arranque
+      // sin nada nuevo que contar.
+      if (previous == null || previous == next) return;
+      if (next == null || next.isEmpty) return;
+      unawaited(ref.read(watchNudgeServiceProvider).nudge());
+    },
+  );
+});
+
 final watchCredentialLifecycleProvider = Provider<void>((ref) {
   ref.listen<AsyncValue<User?>>(
     authStateChangesProvider,
