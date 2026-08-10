@@ -45,10 +45,6 @@ final class RoutineListModel: ObservableObject {
     /// Rutina que el atleta está mirando en el detalle, o nil.
     @Published var selected: RoutineSummary?
 
-    /// Evita que dos recargas se pisen si el atleta desliza rápido de ida y
-    /// vuelta: la segunda saldría igual y solo gastaría radio.
-    private var loading = false
-
     /// Relee la lista.
     ///
     /// Se llama cada vez que la página aparece, no una sola vez: el reloj no
@@ -62,8 +58,6 @@ final class RoutineListModel: ObservableObject {
         kind: RoutineListKind,
         makeClient: @escaping () async throws -> (FirestoreREST, String)
     ) async {
-        guard !loading else { return }
-        loading = true
         isLoading = true
         failed = false
         do {
@@ -75,13 +69,18 @@ final class RoutineListModel: ObservableObject {
                 routines = try await RoutineCatalog.templates(client: client)
             }
         } catch {
-            // Solo se marca el error si no hay nada que mostrar. Una recarga
+            // ⚠️ Una recarga CANCELADA no es un fallo. `.task(id:)` cancela la
+            // anterior cada vez que cambia el disparador, y la cancelada
+            // despierta acá con error. Contarla como fallo dejaba el cartel de
+            // "No se pudo cargar" tapando una lista que estaba por llegar —
+            // que es exactamente el bug que rompió las plantillas.
+            guard !Task.isCancelled else { return }
+            // Del resto solo se avisa si no hay nada que mostrar: una recarga
             // fallida con datos viejos en pantalla es mejor que un cartel de
             // error tapando la lista que el atleta estaba mirando.
             failed = routines.isEmpty
         }
         isLoading = false
-        loading = false
     }
 }
 
@@ -90,12 +89,18 @@ struct RoutineListView: View {
 
     let kind: RoutineListKind
 
+    /// Cambia cada vez que el atleta pasa de página. Es la `id` de la tarea de
+    /// carga: cambiarlo la hace volver a correr.
+    ///
+    /// Lo maneja `WatchHome` y NO esta vista. Antes se llevaba un contador
+    /// propio que subía en `onAppear`, y eso se pisaba solo: la primera tarea
+    /// arrancaba, `onAppear` cambiaba el id, SwiftUI la cancelaba, y la segunda
+    /// se encontraba con el candado que había dejado la primera. Ninguna de las
+    /// dos cargaba y la lista quedaba en "No se pudo cargar".
+    let refreshToken: Int
+
     @EnvironmentObject private var coordinator: CredentialCoordinator
     @StateObject private var model = RoutineListModel()
-
-    /// Contador de apariciones. Sube en cada `onAppear` y es la `id` de la
-    /// tarea de carga, que es lo que la hace volver a correr.
-    @State private var appeared = 0
 
     var body: some View {
         ScrollView {
@@ -125,14 +130,13 @@ struct RoutineListView: View {
             }
             .padding(.horizontal, 2)
         }
-        // `id: appeared` fuerza que la tarea vuelva a correr cada vez que la
-        // página se muestra. Un `.task` pelado corre una sola vez por vida de
-        // la vista, y en un TabView paginado las páginas quedan vivas: la
-        // lista se congelaba en lo que hubiera al arrancar la app.
-        .task(id: appeared) {
+        // Corre al aparecer (token 0) y cada vez que el token cambia. Un
+        // `.task` pelado corre UNA sola vez por vida de la vista, y en un
+        // TabView paginado las páginas quedan vivas: la lista se congelaba en
+        // lo que hubiera al arrancar la app.
+        .task(id: refreshToken) {
             await model.reload(kind: kind, makeClient: makeClient)
         }
-        .onAppear { appeared += 1 }
         // Hoja y no navegación: en el reloj el push se cierra con un deslizar
         // horizontal, que es el MISMO gesto que cambia de página. La hoja se
         // cierra hacia abajo y no pelea con el paginado.

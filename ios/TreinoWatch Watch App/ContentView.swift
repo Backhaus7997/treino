@@ -57,15 +57,24 @@ struct WatchHome: View {
     private enum Page: Hashable { case plans, today, templates }
 
     @State private var page: Page = .today
+
+    /// Sube en cada cambio de página. Las listas laterales lo usan como `id` de
+    /// su tarea de carga, así que cambiarlo las relee.
+    ///
+    /// Vive acá y no dentro de cada lista a propósito: cuando cada una llevaba
+    /// su propio contador atado a `onAppear`, la vista se pisaba sola —
+    /// cancelaba su primera carga con la segunda y ninguna terminaba.
+    @State private var refreshToken = 0
+
     @EnvironmentObject private var coordinator: CredentialCoordinator
 
     var body: some View {
         TabView(selection: $page) {
-            RoutineListView(kind: .plans)
+            RoutineListView(kind: .plans, refreshToken: refreshToken)
                 .tag(Page.plans)
             TodayPage()
                 .tag(Page.today)
-            RoutineListView(kind: .templates)
+            RoutineListView(kind: .templates, refreshToken: refreshToken)
                 .tag(Page.templates)
         }
         .tabViewStyle(.page)
@@ -80,6 +89,8 @@ struct WatchHome: View {
         // tiene que estar fresco. Pollear cada N segundos gastaria bateria y
         // radio para refrescar una pantalla que nadie esta mirando.
         .onChange(of: page) { _, current in
+            // Las listas laterales releen solas al cambiar el token.
+            refreshToken += 1
             guard current == .today else { return }
             Task { await coordinator.loadTodaysWorkout() }
         }
