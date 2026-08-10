@@ -17,8 +17,18 @@ import Foundation
 final class WorkoutCoordinator: ObservableObject {
 
     @Published private(set) var session: WorkoutSession?
-    @Published private(set) var exercises: [WatchExercise] = []
+
+    /// El entreno que se está haciendo, con sus ejercicios ya resueltos.
+    ///
+    /// Se guarda acá y no se pasa por parámetro en cada llamada porque puede NO
+    /// ser el entreno de la rutina activa: si el atleta arrancó una plantilla
+    /// sin activarla, quien llame no tiene forma de saber cuál era. Pasarlo por
+    /// parámetro hacía que un `sync` recibiera el entreno equivocado.
+    @Published private(set) var workout: TodaysWorkout?
+
     @Published var currentExerciseIndex: Int = 0
+
+    var exercises: [WatchExercise] { workout?.exercises ?? [] }
 
     /// Segundos que faltan del descanso, o nil si no hay descanso corriendo.
     @Published private(set) var restRemaining: Int?
@@ -33,6 +43,11 @@ final class WorkoutCoordinator: ObservableObject {
     /// para no acoplar este coordinator al de credenciales.
     var makeClient: (() async throws -> (FirestoreREST, String))?
 
+    /// Cómo resolver el entreno de una rutina dada por id. También lo inyecta la
+    /// app: se usa para recuperar una sesión a medias de CUALQUIER rutina, no
+    /// solo de la activa.
+    var makeWorkout: ((String) async throws -> TodaysWorkout?)?
+
     var currentExercise: WatchExercise? {
         guard currentExerciseIndex >= 0, currentExerciseIndex < exercises.count
         else { return nil }
@@ -41,23 +56,40 @@ final class WorkoutCoordinator: ObservableObject {
 
     /// Recupera una sesión que haya quedado a medias.
     ///
-    /// [workout] se necesita porque los ejercicios NO se persisten: se
-    /// re-resuelven desde la rutina. Guardar la prescripción entera dejaría al
-    /// reloj mostrando series viejas si el PF la cambia a mitad de plan.
-    func restore(workout: TodaysWorkout?) {
-        guard let stored = WorkoutSessionStore.load(), let workout else { return }
-        // Una sesión guardada de OTRA rutina o de otro día quedó huérfana: el
-        // atleta ya avanzó de plan. Descartarla es mejor que mostrar un entreno
-        // que no corresponde.
-        guard stored.routineId == workout.routineId,
+    /// Los ejercicios NO se persisten: se re-resuelven desde la rutina. Guardar
+    /// la prescripción entera dejaría al reloj mostrando series viejas si el PF
+    /// la cambia a mitad de plan.
+    ///
+    /// Se re-resuelve LA RUTINA DE LA SESIÓN, no la activa: si el atleta arrancó
+    /// una plantilla sin activarla, compararla contra la activa daba distinto y
+    /// el entreno se descartaba entero al reabrir la app.
+    func restore() async {
+        guard let stored = WorkoutSessionStore.load(), let makeWorkout else { return }
+
+        let resolved: TodaysWorkout?
+        do {
+            resolved = try await makeWorkout(stored.routineId)
+        } catch {
+            // Sin red no se puede re-resolver. NO se descarta: la sesión queda
+            // en disco y se reintenta al próximo arranque. Borrarla acá sería
+            // perder un entreno hecho por un problema de conectividad.
+            syncError = String(describing: error)
+            return
+        }
+
+        // Sin rutina (la borraron) o en otra posición del plan (avanzó porque se
+        // terminó otra sesión), la guardada quedó huérfana: mostrarla sería
+        // mostrar un entreno que ya no corresponde.
+        guard let workout = resolved,
               stored.dayNumber == workout.dayNumber,
               stored.weekNumber == workout.weekNumber
         else {
             WorkoutSessionStore.clear()
             return
         }
+
         session = stored
-        exercises = workout.exercises
+        self.workout = workout
         currentExerciseIndex = firstUnfinishedIndex(in: workout.exercises, session: stored)
     }
 
@@ -73,14 +105,14 @@ final class WorkoutCoordinator: ObservableObject {
             loggedSets: []
         )
         session = new
-        exercises = workout.exercises
+        self.workout = workout
         currentExerciseIndex = 0
         WorkoutSessionStore.save(new)
 
         // Se adopta o crea la sesion remota en segundo plano: el atleta empieza
         // a entrenar YA, sin esperar a la red. Si falla, el proximo sync lo
         // reintenta.
-        Task { await sync(workout: workout) }
+        Task { await sync() }
     }
 
     /// Carga una serie. Idempotente por `exerciseId + setNumber`, igual que el
@@ -106,7 +138,7 @@ final class WorkoutCoordinator: ObservableObject {
         startRest(seconds: restSeconds)
         advanceIfExerciseDone(exerciseId: exerciseId)
 
-        Task { await sync(workout: nil) }
+        Task { await sync() }
     }
 
     /// Cierra el entreno. Intenta subir lo que falte ANTES de descartar el
@@ -114,7 +146,7 @@ final class WorkoutCoordinator: ObservableObject {
     /// historial se perderia sin dejar rastro.
     func finish() async {
         stopRest()
-        await sync(workout: nil)
+        await sync()
 
         // Si quedan pendientes, el entreno NO se descarta: se conserva para
         // reintentar. Perder series que el atleta hizo es peor que dejarle la
@@ -145,7 +177,7 @@ final class WorkoutCoordinator: ObservableObject {
         }
 
         session = nil
-        exercises = []
+        workout = nil
         currentExerciseIndex = 0
         WorkoutSessionStore.clear()
     }
@@ -155,7 +187,7 @@ final class WorkoutCoordinator: ObservableObject {
     ///
     /// Cada serie se marca como subida SOLO si su escritura salio bien, asi que
     /// una falla parcial deja el resto en la cola en vez de darlas por hechas.
-    func sync(workout: TodaysWorkout?) async {
+    func sync() async {
         guard var current = session, let makeClient else { return }
         do {
             let (client, uid) = try await makeClient()

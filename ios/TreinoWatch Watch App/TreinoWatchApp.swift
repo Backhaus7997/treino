@@ -26,19 +26,20 @@ struct TreinoWatch_Watch_AppApp: App {
                     // El coordinator del entreno pide su cliente al de
                     // credenciales, en vez de que uno conozca al otro.
                     workoutCoordinator.makeClient = {
-                        let credential = try await coordinator.firestoreClient()
-                        return credential
+                        try await coordinator.firestoreClient()
+                    }
+                    workoutCoordinator.makeWorkout = { routineId in
+                        let (client, uid) = try await coordinator.firestoreClient()
+                        return try await TodaysWorkoutResolver.resolve(
+                            client: client, uid: uid, routineId: routineId
+                        )
                     }
                     coordinator.start()
-                    // Recupera un entreno a medias. Espera a que la rutina
-                    // este resuelta: los ejercicios no se persisten, se
-                    // re-resuelven desde el plan vigente.
-                    for await workout in coordinator.$todaysWorkout.values {
-                        if workout != nil {
-                            workoutCoordinator.restore(workout: workout)
-                            break
-                        }
-                    }
+                    // Recupera un entreno a medias. Ya no espera a que se
+                    // resuelva la rutina ACTIVA: la sesión guardada sabe de qué
+                    // rutina es y se re-resuelve sola, así que un entreno
+                    // arrancado desde una plantilla también sobrevive.
+                    await workoutCoordinator.restore()
                 }
                 // Relee la rutina al volver a primer plano. Sin esto el reloj
                 // solo la leia al arrancar la app: si el atleta cambiaba su
@@ -60,9 +61,7 @@ struct TreinoWatch_Watch_AppApp: App {
                             // cargo desde el celular— pero NO se re-resuelve la
                             // rutina: cambiarle los ejercicios al atleta a
                             // mitad de serie seria peor que un dato viejo.
-                            await workoutCoordinator.sync(
-                                workout: coordinator.todaysWorkout
-                            )
+                            await workoutCoordinator.sync()
                         } else {
                             await coordinator.loadTodaysWorkout()
                         }
