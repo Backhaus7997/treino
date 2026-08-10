@@ -338,7 +338,24 @@ class SessionNotifier
 
       // Re-leemos el estado: pudo cambiar durante el await.
       final latest = state.value ?? current;
-      final newLogs = [...latest.setLogs, persisted];
+      // ⚠️ Y ahora puede cambiar por el STREAM, no solo por otra operación
+      // local. La escritura de arriba dispara su propio snapshot de Firestore,
+      // y si ese snapshot llega ANTES que este append, la serie entra dos veces
+      // en el estado local. Se veía como un ejercicio "4/4" con solo 3 series
+      // cargadas y el volumen inflado — Firestore estaba bien, el que contaba
+      // de más era el teléfono.
+      //
+      // Se compara TAMBIÉN por identidad lógica y no solo por id: si esa serie
+      // la escribió el reloj, su documento tiene otro id (determinístico) y por
+      // id no matchearía.
+      final alreadyInState = latest.setLogs.any(
+        (l) =>
+            l.id == persisted.id ||
+            (l.exerciseId == persisted.exerciseId &&
+                l.setNumber == persisted.setNumber),
+      );
+      final newLogs =
+          alreadyInState ? latest.setLogs : [...latest.setLogs, persisted];
       final newIndex = _nextIncompleteIndex(
         latest.day,
         newLogs,

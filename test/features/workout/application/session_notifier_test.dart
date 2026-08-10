@@ -37,12 +37,16 @@ class MockSessionRepository extends Mock implements SessionRepository {
   // ejercitan queda EXACTAMENTE igual que antes de que existieran.
   //
   // La sincronia con el reloj se cubre en session_remote_sync_test.dart.
+  /// Lo que emite `watchSetLogs`. Vacío por defecto — un test que quiera
+  /// ejercitar la carrera contra el reloj lo reemplaza.
+  Stream<List<SetLog>> setLogsStream = const Stream<List<SetLog>>.empty();
+
   @override
   Stream<List<SetLog>> watchSetLogs({
     required String uid,
     required String sessionId,
   }) =>
-      const Stream<List<SetLog>>.empty();
+      setLogsStream;
 
   @override
   Stream<bool> watchSessionFinished({
@@ -1621,6 +1625,74 @@ void main() {
           )).called(2);
       final state = container.read(sessionNotifierProvider(init)).value!;
       expect(state.setLogs.any((l) => l.id == target.id), isFalse);
+    });
+  });
+
+  // ── Carrera contra el stream de Firestore ─────────────────────────────────
+
+  group('logSet vs. el stream de sesión', () {
+    /// El teléfono contaba series de MÁS.
+    ///
+    /// `logSet` escribe y después hace `[...setLogs, persisted]`. Esa escritura
+    /// dispara su PROPIO snapshot de Firestore, y desde que el player escucha
+    /// la subcolección —para ver lo que marca el reloj— ese snapshot puede
+    /// llegar ANTES del append. La serie entra dos veces en el estado local.
+    ///
+    /// Se veía como un ejercicio "4/4" con solo 3 series cargadas y el volumen
+    /// inflado al doble. Firestore estaba BIEN; el que contaba mal era el
+    /// teléfono. Detectado por el dueño probando con una rutina de 3
+    /// ejercicios, y confirmado leyendo los documentos reales del emulador.
+    test('el snapshot que llega durante el await NO duplica la serie',
+        () async {
+      final repo = MockSessionRepository();
+      final routine = makeRoutine();
+      final session = makeSession(id: 's42');
+
+      when(() => repo.getActive('u1')).thenAnswer((_) async => session);
+      when(() => repo.listSetLogs(uid: 'u1', sessionId: 's42'))
+          .thenAnswer((_) async => <SetLog>[]);
+
+      final nueva = makeSetLog(exerciseId: 'e1', setNumber: 1, id: 'remoto-1');
+
+      // El stream emite la serie que se está por escribir: es exactamente lo
+      // que hace Firestore cuando el propio `addSetLog` dispara su snapshot.
+      final controller = StreamController<List<SetLog>>.broadcast();
+      repo.setLogsStream = controller.stream;
+
+      when(() => repo.addSetLog(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            setLog: any(named: 'setLog'),
+          )).thenAnswer((_) async {
+        controller.add([nueva]);
+        // Deja correr el listener del stream ANTES de que logSet siga.
+        await Future<void>.delayed(Duration.zero);
+        return nueva;
+      });
+
+      final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
+      addTearDown(container.dispose);
+      addTearDown(controller.close);
+
+      const init = ResumeSession(sessionId: 's42');
+      // Suscripción viva: el provider es autoDispose y sin listener se
+      // descarta entre lecturas, así que `logSet` correría sobre una instancia
+      // recién creada y todavía en loading.
+      final sub = container.listen(sessionNotifierProvider(init), (_, __) {});
+      addTearDown(sub.close);
+      await container.read(sessionNotifierProvider(init).future);
+
+      await container
+          .read(sessionNotifierProvider(init).notifier)
+          .logSet(nueva);
+
+      final state = container.read(sessionNotifierProvider(init)).value!;
+      expect(
+        state.setLogs.length,
+        1,
+        reason:
+            'la serie entró por el stream Y por el append: se contaba doble',
+      );
     });
   });
 }
