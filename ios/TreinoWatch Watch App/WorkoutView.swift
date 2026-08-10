@@ -92,13 +92,25 @@ struct WorkoutView: View {
     }
 
     private func setsList(exercise: WatchExercise, session: WorkoutSession) -> some View {
+        // La ÚNICA serie que se puede marcar es la primera sin marcar.
+        //
+        // Sin esto se podía tocar la 3 sin haber hecho la 2, y quedaba un
+        // hueco: el historial mostraba series salteadas, el conteo de completado
+        // mentía, y en el teléfono —que sí ordena— el ejercicio se veía
+        // inconsistente. En la muñeca es fácil de hacer sin querer, porque los
+        // círculos están a milímetros.
+        let nextSet = (1...max(exercise.sets.count, 1)).first {
+            !session.isLogged(exerciseId: exercise.exerciseId, setNumber: $0)
+        }
         // `enumerated` da el índice 0-based; el setNumber es 1-based para que
         // coincida con la identidad lógica que usa el teléfono.
-        ForEach(Array(exercise.sets.enumerated()), id: \.offset) { index, spec in
+        return ForEach(Array(exercise.sets.enumerated()), id: \.offset) { index, spec in
             let setNumber = index + 1
             let done = session.isLogged(
                 exerciseId: exercise.exerciseId, setNumber: setNumber
             )
+            // Ni las hechas ni las que están más adelante que la próxima.
+            let tappable = !done && setNumber == nextSet
             Button {
                 workout.logSet(
                     exerciseId: exercise.exerciseId,
@@ -122,9 +134,10 @@ struct WorkoutView: View {
             .buttonStyle(.plain)
             .padding(.vertical, 2)
             // Una serie ya cargada no se re-toca: cargarla de nuevo es un
-            // no-op idempotente, pero dejarla apagada lo hace evidente.
-            .disabled(done)
-            .opacity(done ? 0.5 : 1)
+            // no-op idempotente, pero dejarla apagada lo hace evidente. Y una
+            // que todavía no toca queda apagada para no dejar huecos.
+            .disabled(!tappable)
+            .opacity(tappable ? 1 : 0.5)
         }
     }
 

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -16,6 +18,9 @@ import '../workout/application/session_duration.dart';
 import '../workout/application/session_providers.dart';
 import '../workout/application/user_routines_providers.dart';
 import '../workout/domain/session.dart';
+import '../watch/application/watch_credential_providers.dart'
+    show watchNudgeServiceProvider;
+import '../watch/data/watch_nudge_service.dart';
 import '../workout/domain/set_log.dart';
 import '../workout/presentation/widgets/resume_session_modal.dart';
 import 'widgets/empezar_entrenamiento_card.dart';
@@ -235,6 +240,19 @@ void _maybeShowResumePrompt(
 
   WidgetsBinding.instance.addPostFrameCallback((_) {
     if (!context.mounted) return;
+    // ⚠️ Solo si HOME es la pantalla visible.
+    //
+    // Home queda MONTADA abajo del player. Desde que
+    // `activeSessionForUidProvider` es reactivo —para enterarse de un entreno
+    // que arrancó el reloj— empezar uno DESDE EL TELÉFONO también lo hace
+    // re-emitir, y este aviso saltaba encima del entreno en el que el atleta
+    // acababa de entrar, ofreciéndole "continuar o descartar" lo que estaba
+    // haciendo. Peor: descartar ahí lo cerraba de verdad.
+    //
+    // `isCurrent` es false mientras haya cualquier ruta encima, que es
+    // exactamente la condición que queremos.
+    final route = ModalRoute.of(context);
+    if (route != null && !route.isCurrent) return;
     showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -290,6 +308,16 @@ void _maybeShowResumePrompt(
             Navigator.of(dialogCtx, rootNavigator: true).pop();
           }
           ref.invalidate(activeSessionForUidProvider);
+          // El reloj no tiene listeners: sin este aviso descartar acá cerraba
+          // la sesión en Firestore y en el teléfono, pero la muñeca se quedaba
+          // con la pantalla de entreno abierta sobre algo que ya no existe.
+          // El aviso desde `SessionNotifier` no cubre este camino: acá el
+          // notifier ni siquiera está vivo.
+          unawaited(
+            ref.read(watchNudgeServiceProvider).nudge(
+                  reason: WatchNudgeService.reasonWorkoutFinished,
+                ),
+          );
         },
       ),
     );
