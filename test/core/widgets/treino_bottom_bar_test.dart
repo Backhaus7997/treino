@@ -193,19 +193,30 @@ void main() {
       expect(metrics(availableWidth: 350).tabWidth, 70);
     });
 
+    // La caja CRUDA del pill a 350 de ancho útil y 5 tabs: `tabWidth - 2 *
+    // inset` = 70 - 12. El inset es 6 (era 8, y esos 4px de más eran justo los
+    // que dejaban a un Android de 360dp sin labels).
+    const pillWidth = 58.0;
+
     test('la caja del label descuenta la CURVA del pill, no solo su caja', () {
-      // Este es el bug que se arregló. El pill mide `tabWidth - 16` = 54, pero
-      // el label se apoya abajo, donde el redondeo ya se metió ~3.3px por lado.
-      // Medir contra 54 daba por bueno un label que la curva igual recortaba.
+      // Este es el bug que se arregló. El pill mide 58, pero el label se apoya
+      // abajo, donde el redondeo ya se metió ~2.1px por lado. Medir contra 58
+      // daba por bueno un label que la curva igual recortaba.
       final m = metrics(availableWidth: 350);
-      expect(m.labelBoxWidth, lessThan(54));
-      expect(m.labelBoxWidth, closeTo(47.41, 0.01));
+      expect(m.labelBoxWidth, lessThan(pillWidth));
+      expect(m.labelBoxWidth, closeTo(53.72, 0.01));
     });
 
     test('un label que entra en la caja pero NO en la curva no entra', () {
-      // 50 < 54 (la caja del pill) pero > 47.41 (lo que deja la curva).
-      // Con la lógica vieja esto daba `true` y la palabra salía recortada.
-      expect(metrics(maxLabelWidth: 50).labelsFit, isFalse);
+      // Un ancho en la franja de entre medio: menor que la caja del pill, pero
+      // mayor que lo que la curva deja libre. Con la lógica vieja esto daba
+      // `true` y la palabra salía recortada. Se deriva en vez de hardcodearse
+      // para que siga probando la franja si las constantes se vuelven a tocar.
+      final box = metrics().labelBoxWidth;
+      final between = (box + pillWidth) / 2;
+      expect(between, greaterThan(box));
+      expect(between, lessThan(pillWidth));
+      expect(metrics(maxLabelWidth: between).labelsFit, isFalse);
     });
 
     test('el label entra cuando mide menos que su caja útil', () {
@@ -230,6 +241,62 @@ void main() {
     test('el alto nunca baja de minHeight', () {
       expect(metrics(maxLabelHeight: 12).barHeight, TreinoBottomBar.minHeight);
       expect(metrics(maxLabelHeight: 40).barHeight, 90);
+    });
+  });
+
+  // Anchos de "ENTRENAR" —el label más largo— medidos con la fuente REAL ya
+  // cargada, corriendo el mismo TextPainter del widget contra Barlow Condensed
+  // 10/w700/letterSpacing 0.8. No se pueden obtener desde acá: en test la
+  // fuente nunca baja (ver la nota del grupo de arriba), así que van fijos.
+  const entrenarAt1x = 44.36;
+  const entrenarAt115x = 50.05;
+
+  group('resolveBarLayout — la barra no se compacta en pantallas reales', () {
+    TreinoBarLayout layoutFor(double screenWidth, double maxLabelWidth) =>
+        resolveBarLayout(
+          totalWidth: screenWidth,
+          itemCount: 5,
+          maxLabelWidth: maxLabelWidth,
+          maxLabelHeight: maxLabelWidth == entrenarAt115x ? 14 : 12,
+        );
+
+    // La regresión que motivó todo esto: la barra se quedaba en íconos PARA
+    // SIEMPRE en Android. No era "un bug de Android" — era el ancho: 360dp es
+    // el más común del parque y la caja del label daba 41,41 contra 44,36 que
+    // mide la palabra. En un iPhone de 393 entraba por 3,65 y no se veía.
+    test('360dp —el ancho más común de Android— muestra los labels', () {
+      final l = layoutFor(360, entrenarAt1x);
+      expect(l.metrics.labelsFit, isTrue);
+      expect(l.metrics.labelBoxWidth, greaterThan(entrenarAt1x));
+    });
+
+    test('ningún teléfono actual se compacta a escala normal', () {
+      for (final width in [360.0, 375.0, 384.0, 393.0, 412.0, 440.0]) {
+        expect(
+          layoutFor(width, entrenarAt1x).metrics.labelsFit,
+          isTrue,
+          reason: '$width debería mostrar los labels',
+        );
+      }
+    });
+
+    test('el margen ideal se respeta mientras los labels entren', () {
+      // 360dp entra sin apretar: sería un error cobrarle los 8pt de aire.
+      expect(layoutFor(360, entrenarAt1x).sideMargin, 20);
+    });
+
+    test('aprieta el margen SOLO cuando con el ideal no entrarían', () {
+      // A textScale 1.15 un iPhone SE no entra con margen 20, pero sí con 12.
+      final se = layoutFor(375, entrenarAt115x);
+      expect(se.sideMargin, 12);
+      expect(se.metrics.labelsFit, isTrue);
+    });
+
+    test('si ni apretando entran, vuelve al margen ideal y va a íconos', () {
+      // Nada entra: que al menos no le cobre el aire a cambio de nada.
+      final l = layoutFor(360, 200);
+      expect(l.metrics.labelsFit, isFalse);
+      expect(l.sideMargin, 20);
     });
   });
 
