@@ -1,0 +1,114 @@
+change: watch-workout-session
+fase: "Sin asignar — capability nueva, fuera del roadmap actual"
+branch_sugerida: feat/watch-workout-session
+artifact_store: openspec
+tdd: strict
+
+depende_de:
+  change: watch-standalone-client
+  motivo: |
+    El companion watchOS ya existe y funciona: lee la rutina por REST, carga
+    series, sincroniza con el telefono en las dos direcciones y termina el
+    entreno. Este ciclo NO lo reemplaza — le agrega la capa que le falta para
+    que watchOS lo trate como app de entrenamiento.
+
+phases:
+  explore: done
+  propose: done
+  spec: pending
+  design: pending
+  tasks: pending
+  apply: pending
+  verify: pending
+  archive: pending
+
+decisiones_firmadas:
+  D1:
+    que: Donde vive el ritmo cardiaco
+    opciones: [solo en pantalla y en Salud, tambien resumen en Firestore, solo en pantalla]
+    recomendada: solo en pantalla y en Salud
+    por_que: |
+      La opcion de Firestore arrastra esquema, Security Rules, UI en el
+      telefono y una decision de privacidad sobre si el PF ve la frecuencia
+      cardiaca de sus atletas. Eso ultimo merece su propio ciclo, no ir de
+      arrastre.
+    estado: FIRMADA — el dueño aprobo el proposal tal como estaba, o sea la opcion recomendada
+  D2:
+    que: Que pasa si el atleta niega el permiso de HealthKit
+    recomendada: el entreno funciona igual, sin pulsaciones
+    a_verificar_en_F0: |
+      Si la sesion de entrenamiento —y con ella la ejecucion en segundo
+      plano— se puede abrir SIN permiso de lectura de ritmo cardiaco. Si no
+      se puede, hay que decidir si se insiste con el permiso o se acepta que
+      ese usuario pierde el descanso en segundo plano.
+    estado: FIRMADA — el dueño aprobo el proposal tal como estaba, o sea la opcion recomendada
+  D3:
+    que: Si el entreno se escribe en la app Salud
+    recomendada: si
+    por_que: |
+      Es lo que espera un usuario de Apple Watch. Sin eso, el entreno de
+      TREINO no cuenta para sus anillos ni su historial.
+    estado: FIRMADA — el dueño aprobo el proposal tal como estaba, o sea la opcion recomendada
+  D4:
+    que: De donde sale la duracion
+    recomendada: |
+      La sesion de entrenamiento pasa a ser la fuente de verdad cuando existe;
+      el calculo actual queda como respaldo. `durationMin` no cambia de forma
+      en Firestore, cambia de donde sale el numero.
+    estado: FIRMADA — el dueño aprobo el proposal tal como estaba, o sea la opcion recomendada
+
+hallazgos_medidos:
+  descanso_muere_en_segundo_plano: |
+    `restTimer` es un Timer.scheduledTimer comun
+    (WorkoutCoordinator.swift:444) y el target del reloj NO declara ningun
+    background mode — el pbxproj solo tiene WKCompanionAppBundleIdentifier
+    (lineas 560, 607, 651). watchOS suspende la app al bajar la muñeca, que en
+    el gimnasio es el caso NORMAL. Es el bug mas grave que queda del ciclo
+    anterior, y no se arregla con mas codigo Swift.
+  duracion_es_estimacion: |
+    Los dos lados restan timestamps: el reloj con
+    `Date().timeIntervalSince(start)` (WorkoutCoordinator.swift:396) y el
+    telefono con `_durationMin(elapsedSeconds)` acotado por
+    `maxWorkoutDuration` (session_notifier.dart:747). Ese clamp existe porque
+    sesiones dejadas abiertas toda la noche persistian duraciones absurdas —
+    sintoma de que nadie mide de verdad.
+  cero_healthkit: |
+    Ni una referencia en lib/ ni en el target del reloj. Entitlements actuales:
+    solo aps-environment y applesignin. El proposal del ciclo anterior lo dejo
+    explicitamente fuera de alcance (watch-standalone-client/proposal.md:38).
+
+riesgo_que_define_el_ciclo: |
+  EL SIMULADOR NO GENERA RITMO CARDIACO.
+
+  Todo el ciclo anterior se verifico en simulador y funciono. Aca eso se
+  termina: hace falta un Apple Watch REAL en la muñeca.
+
+  Por eso las fases estan ordenadas por VERIFICABILIDAD y no por dependencia
+  tecnica: F1 entrega el arreglo importante —que el descanso sobreviva— y se
+  puede probar sin pulsaciones. F2 y F3 se agrupan para un unico smoke en
+  hardware en vez de quedar bloqueadas de a una.
+
+preguntas_abiertas_para_F0:  # lo unico realmente abierto
+  - Si el entitlement de HealthKit exige regenerar el provisioning profile.
+  - Si HKWorkoutSession corre en el simulador (aunque sea sin datos de HR) —
+    determina cuanto se puede probar sin hardware.
+  - Si la sesion se puede abrir sin permiso de lectura de HR (ver D2).
+  - Que declaraciones de privacidad pide Apple en la review por usar HealthKit.
+
+artifacts:
+  explore: openspec/changes/watch-workout-session/explore.md
+  proposal: openspec/changes/watch-workout-session/proposal.md
+
+blocked_on: |
+  Nada. Las cuatro decisiones quedaron firmadas con la opcion recomendada al
+  aprobar el dueño el proposal tal como estaba.
+
+  CONSECUENCIA DE D1: este ciclo NO TOCA FIRESTORE. El ritmo cardiaco vive en
+  pantalla y en la app Salud. Si en algun momento se quiere que el PF vea la
+  frecuencia cardiaca de sus atletas, eso es otro ciclo y arranca por una
+  decision de privacidad, no por codigo.
+
+nota_de_metodo: |
+  El ciclo anterior dejo una leccion que aplica directo: cada vez que se
+  declaro algo listo sin verlo correr, estaba mal. Y aca el simulador deja de
+  alcanzar, asi que la disciplina tiene que ser mas estricta, no menos.
