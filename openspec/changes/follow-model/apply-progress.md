@@ -387,7 +387,7 @@ sea que nadie escribió el grafo nuevo todavía y la migración arranca de cero.
 
 ---
 
-## 🚀 CUTOVER EJECUTADO — 2026-08-11 ✅ (parcial: faltan las Cloud Functions)
+## 🚀 CUTOVER COMPLETO — 2026-08-11 ✅
 
 Contra **`treino-dev` real**. Todos los pasos verificados contra el estado en
 vivo, no contra el mensaje de la herramienta.
@@ -402,8 +402,9 @@ vivo, no contra el mensaje de la herramienta.
 | 2.11 | **Verificación `--cutover`** | ✅ **exit 0**, 10 aristas |
 | 3a.20 | **Flip de rules desplegado** | ✅ ruleset `d7f10acd` |
 | 3a.20b | Aserción del sweep (ventana muda) | ✅ `toCreate` vacío — nadie escribió salteando rules |
-| 3a.21 | Deploy de las 3 Cloud Functions | ❌ **BLOQUEADO** — ver abajo |
-| 3a.22 | Backfill post-CF | ⏸ depende de 3a.21 |
+| 3a.21 | **Deploy de las 3 Cloud Functions** | ✅ tras `firebase login --reauth` del dueño |
+| 3a.22 | **Backfill post-CF (V6b)** | ✅ **0 fuera de sync** |
+| — | Borrado de `notifyOnFriendship` huérfana | ✅ |
 
 ### El deploy de rules NO se pudo hacer con el CLI
 
@@ -414,8 +415,15 @@ con la service account (`firebaserules.googleapis.com`), que sí acepta el token
 crear ruleset (`POST /rulesets`) + publicar release (`PATCH /releases/cloud.firestore`).
 
 **Para funciones ese camino no sirve** — el deploy de Cloud Functions es mucho
-más que una llamada REST. Queda pendiente de `firebase login --reauth`, que
-necesita el navegador del dueño.
+más que una llamada REST. Se destrabó con `firebase login --reauth` del dueño;
+las tres subieron sin problema (`notifyOnFollow` como *create*, las otras dos
+como *update*).
+
+**La huérfana existía, como estaba previsto**: `notifyOnFriendship` seguía
+desplegada escuchando `friendships`. Inerte (la colección está congelada y ya
+nada la escribe: `deleteAccount` se repuntó a `follows`), pero se borró con
+`firebase functions:delete`. Estado final de funciones sociales en producción:
+`deleteAccount`, `maintainFollowCounters`, `notifyOnFollow`.
 
 ### Ordenamiento que hubo que resolver sobre la marcha
 
