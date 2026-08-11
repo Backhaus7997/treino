@@ -387,6 +387,55 @@ sea que nadie escribió el grafo nuevo todavía y la migración arranca de cero.
 
 ---
 
+## 🚀 CUTOVER EJECUTADO — 2026-08-11 ✅ (parcial: faltan las Cloud Functions)
+
+Contra **`treino-dev` real**. Todos los pasos verificados contra el estado en
+vivo, no contra el mensaje de la herramienta.
+
+| # | Paso | Resultado |
+|---|---|---|
+| 3a.19b | Testers actualizados a `0.1.0+14` | ✅ todos menos uno (decisión del dueño: se sigue) |
+| 2.8 | Dry-run | ✅ 10 aristas planificadas |
+| 2.8b | **Freeze desplegado** | ✅ ruleset `84f61756` |
+| 2.9 | **Migración `--apply`** | ✅ **10 aristas creadas** · manifiesto `apply-2026-08-11T12-40-52-349Z.json` |
+| 2.10 | Backfill de contadores | ✅ 6 perfiles corregidos → re-corrida **0 fuera de sync** |
+| 2.11 | **Verificación `--cutover`** | ✅ **exit 0**, 10 aristas |
+| 3a.20 | **Flip de rules desplegado** | ✅ ruleset `d7f10acd` |
+| 3a.20b | Aserción del sweep (ventana muda) | ✅ `toCreate` vacío — nadie escribió salteando rules |
+| 3a.21 | Deploy de las 3 Cloud Functions | ❌ **BLOQUEADO** — ver abajo |
+| 3a.22 | Backfill post-CF | ⏸ depende de 3a.21 |
+
+### El deploy de rules NO se pudo hacer con el CLI
+
+`firebase deploy` falla con `Your credentials are no longer valid` y **ignora
+`GOOGLE_APPLICATION_CREDENTIALS`** — el CLI prioriza su login guardado, tal como
+advertía el plan. Las rules se desplegaron por la **API REST de Firebase Rules**
+con la service account (`firebaserules.googleapis.com`), que sí acepta el token:
+crear ruleset (`POST /rulesets`) + publicar release (`PATCH /releases/cloud.firestore`).
+
+**Para funciones ese camino no sirve** — el deploy de Cloud Functions es mucho
+más que una llamada REST. Queda pendiente de `firebase login --reauth`, que
+necesita el navegador del dueño.
+
+### Ordenamiento que hubo que resolver sobre la marcha
+
+El `firestore.rules` de `main` contiene el freeze **y** el flip juntos.
+Desplegarlo de una habría movido el gate de lectura a `follows` **estando
+vacía**, dejando a todos sin acceso a los posts hasta terminar la migración.
+
+Se resolvió desplegando en dos tiempos desde git: primero
+`git show a57c6f79:firestore.rules` (freeze + gate viejo), y al final el archivo
+de `main`. **Antes del primer deploy se verificó contra el ruleset en vivo que
+las 50 líneas que desaparecían estuvieran TODAS dentro del bloque
+`friendships`** — cero pérdidas fuera de él.
+
+### Daño del modelo viejo que el backfill dejó a la vista
+
+Un perfil tenía `followingCount = -1`. Es exactamente la deriva que motivó
+mover los contadores a una Cloud Function (bug W-SOCIAL-COUNTERS-01).
+
+---
+
 ## Pendiente
 - **PR 3d** — retiro de `Friendship*`. **PR 4** — UX + l10n.
 - **Gate 3a.19 incompleto**: 3 suites (`post-photos-storage-rules`,
