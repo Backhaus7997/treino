@@ -28,6 +28,43 @@ import '../../../../profile/application/user_public_profile_providers.dart';
 import '../../../../workout/application/session_providers.dart'
     show currentUidProvider;
 
+// ─── Ventana del date picker ──────────────────────────────────────────────────
+
+/// Bounds de `showDatePicker` para [date], normalizados a FECHA en el marco
+/// LOCAL contra [now].
+///
+/// ADR-7: la fecha preseleccionada puede llegar como wall-clock UTC — la grilla
+/// semanal arma sus columnas con `DateTime.utc(y, m, d)` — mientras que "hoy"
+/// sale de `DateTime.now()`, que es local. Compararlas como INSTANTES es un
+/// bug: entre las 21:00 y las 24:00 ART la medianoche UTC de MAÑANA es
+/// anterior a "ahora" local, así que el picker descartaba la columna tocada y
+/// devolvía el día de HOY. El guard de "sesión en el pasado" no lo atrapa
+/// (la hora elegida sigue siendo futura), así que la sesión se creaba en el
+/// día equivocado, en silencio.
+///
+/// [DateUtils.dateOnly] reconstruye y/m/d en el marco local, así que la
+/// comparación pasa a ser fecha contra fecha y el flag `isUtc` deja de pesar.
+///
+/// El clamp por ARRIBA tampoco es decorativo: `showDatePicker` assertea
+/// `!initialDate.isAfter(lastDate)` y una fecha preseleccionada más allá de la
+/// ventana mataría el handler del tap.
+///
+/// Función pura y de nivel superior a propósito: la aritmética de fechas es
+/// donde vive el bug y así se testea con `test()` plano, sin WidgetTester y sin
+/// depender de la hora a la que corra la suite.
+({DateTime initial, DateTime first, DateTime last}) datePickerWindow({
+  required DateTime date,
+  required DateTime now,
+}) {
+  final first = DateUtils.dateOnly(now);
+  final last = DateUtils.addDaysToDate(first, 365);
+  final dateOnly = DateUtils.dateOnly(date);
+  final initial = dateOnly.isBefore(first)
+      ? first
+      : (dateOnly.isAfter(last) ? last : dateOnly);
+  return (initial: initial, first: first, last: last);
+}
+
 // ─── NewSessionDialog ─────────────────────────────────────────────────────────
 
 /// Dialog de creación de sesión — idioma web (AlertDialog, ADR-AGW-3).
@@ -37,16 +74,24 @@ import '../../../../workout/application/session_providers.dart'
 /// date picker, time picker, duration free-text 5..480 + preset chips.
 /// Al confirmar llama [appointmentRepositoryProvider.createByTrainer].
 ///
+/// [initialDate] e [initialTime] permiten preseleccionar la celda que el
+/// entrenador tocó en la grilla semanal (mismo par de opcionales que expone
+/// [NewSessionSheet] en mobile).
+///
 /// Retorna `true` vía [Navigator.pop] cuando la sesión fue registrada,
 /// `null`/`false` cuando el usuario canceló.
 class NewSessionDialog extends ConsumerStatefulWidget {
   const NewSessionDialog({
     super.key,
     this.initialDate,
+    this.initialTime,
   });
 
   /// Fecha inicial del date picker (por defecto hoy).
   final DateTime? initialDate;
+
+  /// Hora inicial del time picker (por defecto la próxima hora en punto).
+  final TimeOfDay? initialTime;
 
   @override
   ConsumerState<NewSessionDialog> createState() => _NewSessionDialogState();
@@ -69,7 +114,8 @@ class _NewSessionDialogState extends ConsumerState<NewSessionDialog> {
     final now = DateTime.now();
     _date = widget.initialDate ?? DateTime(now.year, now.month, now.day);
     // Evitar que initialDate sea en el pasado (queda abierto el guard en _submit).
-    _time = TimeOfDay(hour: now.hour + 1 > 23 ? 23 : now.hour + 1, minute: 0);
+    _time = widget.initialTime ??
+        TimeOfDay(hour: now.hour + 1 > 23 ? 23 : now.hour + 1, minute: 0);
   }
 
   @override
@@ -94,12 +140,14 @@ class _NewSessionDialogState extends ConsumerState<NewSessionDialog> {
   }
 
   Future<void> _pickDate() async {
-    final today = DateTime.now();
+    // Ver [datePickerWindow]: comparar `_date` (posible wall-clock UTC) contra
+    // `DateTime.now()` como instantes reseteaba la fecha elegida.
+    final window = datePickerWindow(date: _date, now: DateTime.now());
     final picked = await showDatePicker(
       context: context,
-      initialDate: _date.isBefore(today) ? today : _date,
-      firstDate: today,
-      lastDate: today.add(const Duration(days: 365)),
+      initialDate: window.initial,
+      firstDate: window.first,
+      lastDate: window.last,
     );
     if (picked != null && mounted) {
       setState(() {

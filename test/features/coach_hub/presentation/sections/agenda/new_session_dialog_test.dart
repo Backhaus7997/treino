@@ -589,4 +589,203 @@ void main() {
       );
     });
   });
+
+  // initialTime — prefill de la celda tocada en la grilla semanal.
+  // Espeja la API ya existente de NewSessionSheet (mobile), que acepta
+  // initialDate + initialTime.
+  group('initialTime — prefill desde la grilla semanal', () {
+    /// Abre el dialog directamente (sin AgendaWebScreen) para poder pasarle
+    /// initialDate/initialTime, igual que hará la grilla semanal.
+    Future<void> openDialog(
+      WidgetTester tester, {
+      DateTime? initialDate,
+      TimeOfDay? initialTime,
+    }) async {
+      await tester.pumpWidget(
+        _wrap(
+          Builder(
+            builder: (context) => TextButton(
+              onPressed: () => showDialog<bool>(
+                context: context,
+                builder: (_) => NewSessionDialog(
+                  initialDate: initialDate,
+                  initialTime: initialTime,
+                ),
+              ),
+              child: const Text('abrir'),
+            ),
+          ),
+          overrides: _overrides(
+            links: [_activeLink(_kAthleteId1)],
+            profiles: {_kAthleteId1: _pub(_kAthleteId1, 'Carlos Pérez')},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('abrir'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('initialTime 14:30 se refleja en el campo HORA',
+        (tester) async {
+      await openDialog(
+        tester,
+        initialTime: const TimeOfDay(hour: 14, minute: 30),
+      );
+
+      // El label se compara vía TimeOfDay.format(context) para no atarse al
+      // locale que resuelva MaterialApp en el harness de tests.
+      final ctx = tester.element(find.byType(NewSessionDialog));
+      final expected = const TimeOfDay(hour: 14, minute: 30).format(ctx);
+
+      expect(find.text(expected), findsOneWidget,
+          reason:
+              'el campo HORA debe mostrar la hora recibida por initialTime');
+    });
+
+    testWidgets('sin initialTime conserva el default now+1h en punto',
+        (tester) async {
+      final beforeHour = DateTime.now().hour;
+      await openDialog(tester);
+      final afterHour = DateTime.now().hour;
+
+      final ctx = tester.element(find.byType(NewSessionDialog));
+      String labelFor(int h) =>
+          TimeOfDay(hour: h + 1 > 23 ? 23 : h + 1, minute: 0).format(ctx);
+
+      // Tolerancia de una hora SOLO si el reloj cruzó la hora en punto entre
+      // el cálculo del test y el initState del dialog.
+      final candidates = <String>{labelFor(beforeHour), labelFor(afterHour)};
+      final matches =
+          candidates.where((l) => find.text(l).evaluate().length == 1);
+
+      expect(matches, isNotEmpty,
+          reason: 'omitir initialTime no debe cambiar el default now+1h '
+              '(esperado uno de $candidates)');
+    });
+
+    testWidgets(
+        'initialDate se respeta y sobrevive al date picker pese al frame mixing',
+        (tester) async {
+      final now = DateTime.now();
+      // La grilla semanal arma los días como DateTime.utc(y, m, d)
+      // (wall-clock flotante, sin componente horaria), mientras que _pickDate
+      // compara contra DateTime.now(), que SÍ la tiene. Este test fija que esa
+      // mezcla de frames no descarta la columna tocada para el día de hoy.
+      final todayUtc = DateTime.utc(now.year, now.month, now.day);
+
+      await openDialog(tester, initialDate: todayUtc);
+
+      final dd = now.day.toString().padLeft(2, '0');
+      final mm = now.month.toString().padLeft(2, '0');
+      final expectedDate = '$dd/$mm/${now.year}';
+
+      expect(find.text(expectedDate), findsOneWidget,
+          reason:
+              'el campo FECHA debe mostrar el día recibido por initialDate');
+
+      // Abrir el date picker no debe violar su assert initialDate >= firstDate.
+      await tester.tap(find.text(expectedDate));
+      await tester.pumpAndSettle();
+
+      final ctx = tester.element(find.byType(NewSessionDialog));
+      final okLabel = MaterialLocalizations.of(ctx).okButtonLabel;
+      expect(find.text(okLabel), findsOneWidget,
+          reason: 'el date picker debe haberse abierto');
+
+      await tester.tap(find.text(okLabel));
+      await tester.pumpAndSettle();
+
+      // Confirmar sin mover nada devuelve el MISMO día.
+      expect(find.text(expectedDate), findsOneWidget);
+    });
+
+    testWidgets(
+        'initialDate de MAÑANA sobrevive al date picker (el caso que el test '
+        'de hoy no cubre)', (tester) async {
+      final tomorrow = DateTime.now().add(const Duration(days: 1));
+      final tomorrowUtc =
+          DateTime.utc(tomorrow.year, tomorrow.month, tomorrow.day);
+
+      await openDialog(tester, initialDate: tomorrowUtc);
+
+      final dd = tomorrow.day.toString().padLeft(2, '0');
+      final mm = tomorrow.month.toString().padLeft(2, '0');
+      final expectedDate = '$dd/$mm/${tomorrow.year}';
+
+      expect(find.text(expectedDate), findsOneWidget);
+
+      await tester.tap(find.text(expectedDate));
+      await tester.pumpAndSettle();
+
+      final ctx = tester.element(find.byType(NewSessionDialog));
+      final okLabel = MaterialLocalizations.of(ctx).okButtonLabel;
+      await tester.tap(find.text(okLabel));
+      await tester.pumpAndSettle();
+
+      // El bug: entre las 21:00 y las 24:00 ART, `DateTime.utc(mañana)` es un
+      // instante ANTERIOR a `DateTime.now()` local, así que el picker se abría
+      // en HOY y confirmar devolvía HOY. La sesión se creaba en el día
+      // equivocado sin que el guard de "sesión en el pasado" lo notara.
+      expect(find.text(expectedDate), findsOneWidget,
+          reason: 'confirmar sin mover nada no puede cambiar el día');
+    });
+  });
+
+  // ─── datePickerWindow — la aritmética, sin depender de la hora del reloj ────
+
+  group('datePickerWindow', () {
+    // El widget test de arriba sólo reproduce el bug si la suite corre entre
+    // las 21:00 y las 24:00 ART. Estos casos fijan `now` a mano, así que
+    // fallan siempre que la regresión vuelva — y son independientes del huso
+    // del runner (`DateUtils.dateOnly` reconstruye y/m/d, no convierte).
+    test('una fecha UTC de MAÑANA a las 22:00 NO se descarta como pasada', () {
+      final window = datePickerWindow(
+        date: DateTime.utc(2026, 8, 5),
+        now: DateTime(2026, 8, 4, 22, 0),
+      );
+      expect(window.initial, equals(DateTime(2026, 8, 5)));
+      expect(window.first, equals(DateTime(2026, 8, 4)));
+    });
+
+    test('una fecha UTC de HOY a las 22:00 se conserva como hoy', () {
+      final window = datePickerWindow(
+        date: DateTime.utc(2026, 8, 4),
+        now: DateTime(2026, 8, 4, 22, 0),
+      );
+      expect(window.initial, equals(DateTime(2026, 8, 4)));
+    });
+
+    test('una fecha realmente pasada se sube al piso de hoy', () {
+      final window = datePickerWindow(
+        date: DateTime.utc(2026, 7, 30),
+        now: DateTime(2026, 8, 4, 9, 0),
+      );
+      expect(window.initial, equals(DateTime(2026, 8, 4)));
+    });
+
+    test(
+        'una fecha más allá de la ventana se baja a lastDate (si no, '
+        'showDatePicker assertea y se come el tap)', () {
+      final now = DateTime(2026, 8, 4, 9, 0);
+      final window = datePickerWindow(
+        date: DateTime.utc(2030, 1, 1),
+        now: now,
+      );
+      expect(window.last, equals(DateTime(2027, 8, 4)));
+      expect(window.initial, equals(window.last));
+    });
+
+    test('los tres bounds son fechas locales sin componente horaria', () {
+      final window = datePickerWindow(
+        date: DateTime.utc(2026, 8, 5, 13, 45),
+        now: DateTime(2026, 8, 4, 22, 17),
+      );
+      for (final d in [window.initial, window.first, window.last]) {
+        expect(d.isUtc, isFalse);
+        expect(d.hour, 0);
+        expect(d.minute, 0);
+      }
+    });
+  });
 }

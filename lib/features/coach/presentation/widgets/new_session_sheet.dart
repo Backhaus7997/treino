@@ -317,8 +317,7 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed:
-                            (_saving ||
+                        onPressed: (_saving ||
                                 activeLinks.isEmpty ||
                                 _selectedAthleteId == null)
                             ? null
@@ -651,9 +650,7 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
 
       final note = _noteController.text.trim();
 
-      await ref
-          .read(appointmentRepositoryProvider)
-          .createByTrainer(
+      await ref.read(appointmentRepositoryProvider).createByTrainer(
             trainerId: trainerId,
             athleteId: athleteId,
             athleteDisplayName: athleteDisplayName,

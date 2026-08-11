@@ -571,6 +571,29 @@ Deleting an override MUST call `availabilityRepository.deleteOverride(trainerId,
 
 ---
 
+### ADR-AGW-10 — Week view is an hour-grid; the DÍA view stays a card list
+
+**Status**: Accepted. **Supersedes ADR-AGW-4 for the WEEK view only.**
+
+ADR-AGW-4 (`openspec/changes/archive/2026-07-01-coach-hub-agenda-web/design.md`, "Locked #3") rejected an hour-grid timeline in favour of a vertical card list. That archived record is history and is not edited; this entry states where it no longer applies.
+
+The AGW-4 argument holds for a **single day** and is NOT reversed: one day is a totally ordered sequence, a sorted card list expresses it exactly, and the card list is what carries the batch-billing multi-select flow.
+
+It does not hold for a **week**. Seven days is a 2-D problem (day × time-of-day). "Is Wednesday at 10:00 free?" and "where is the gap on Thursday afternoon?" are answered by looking at a spatial encoding, not by scanning seven concatenated lists. That is the only thing the grid buys, and it is why the reversal is scoped to the week view.
+
+Scope of the reversal — deliberately narrow:
+
+- The DÍA view is untouched: still `AgendaWebDayList`, still a card list.
+- The week grid is **opt-in** (`AgendaViewMode.week`); DÍA remains the default view.
+- The grid exists **only in the wide (≥ 900px) branch**. The narrow branch never builds it, and dropping to the narrow branch resets the mode to DÍA.
+- No drag-to-reschedule: `firestore.rules` pins `startsAt` immutable on the only trainer update path and denies delete, and `AppointmentRepository` exposes no reschedule method.
+- No availability bands in V1.
+- Batch multi-select billing stays **day-view-only**: it lives in `AgendaWebDayList`, which week mode unmounts. Accepted trade-off, not a regression — the flow is reachable by returning to DÍA.
+
+*Rejected*: replacing the day card list with the grid (discards AGW-4's still-valid argument and the batch-billing surface). *Rejected*: making the week grid the default (unproven preference; the product decision is opt-in). *Rejected*: porting mobile `DayTimeline` (ADR-AGW-1 still stands — it depends on AppL10n, bottom sheets and safe-area; the web grid is a re-skin that shares only the pure geometry and the `computeSessionLayout` overlap packer).
+
+---
+
 ### Cross-cutting constraints (coach-hub-agenda-web)
 
 | # | Constraint |
@@ -585,6 +608,7 @@ Deleting an override MUST call `availabilityRepository.deleteOverride(trainerId,
 | C-AGW-8 | MUST NOT modify mobile files; SCENARIO-510 time-bomb is untouched |
 | C-AGW-9 | `dart analyze` must return 0 errors; `dart format` applied; all tests green before merge |
 | C-AGW-10 | Each PR MUST be independently shippable (PR1 closes placeholder; PR2/PR3a/PR3b build on it) |
+| C-AGW-11 | The week hour-grid MUST be opt-in and wide-branch-only; the DÍA view MUST stay a card list (ADR-AGW-10) |
 
 ---
 

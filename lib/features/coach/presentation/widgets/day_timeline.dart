@@ -9,6 +9,7 @@ import '../../../profile/application/user_public_profile_providers.dart';
 import '../../application/agenda_providers.dart';
 import '../../domain/appointment.dart';
 import '../agenda_formatters.dart';
+import '../session_layout.dart';
 import 'new_session_sheet.dart';
 import 'session_detail_sheet.dart';
 
@@ -19,16 +20,6 @@ const double _kPxPerMin = _kHourHeight / 60.0;
 const double _kGutter = 52.0;
 const double _kMinBlockH = 30.0;
 const double _kRightPad = 8.0;
-
-// ── Internal data classes ─────────────────────────────────────────────────────
-
-class _SessionLayout {
-  _SessionLayout({required this.appointment});
-
-  final Appointment appointment;
-  int columnIndex = 0;
-  int columnCount = 1;
-}
 
 // ── DayTimeline ───────────────────────────────────────────────────────────────
 
@@ -144,7 +135,7 @@ class _DayTimelineState extends ConsumerState<DayTimeline> {
         DateTime.utc(now.year, now.month, now.day, now.hour, now.minute);
 
     // ── Overlap layout ────────────────────────────────────────────────────────
-    final layouts = _computeLayout(sessions);
+    final layouts = computeSessionLayout(sessions);
 
     // ── Auto-scroll to "now" (today) or the first session, once data lands ──
     // Runs once per displayed day. We wait for hasValue so the hour range is
@@ -296,7 +287,7 @@ class _DayTimelineState extends ConsumerState<DayTimeline> {
   List<Widget> _buildBlocks({
     required BuildContext context,
     required WidgetRef ref,
-    required List<_SessionLayout> layouts,
+    required List<SessionLayout> layouts,
     required int startHour,
     required double totalWidth,
     required AppPalette palette,
@@ -492,75 +483,4 @@ class _DayTimelineState extends ConsumerState<DayTimeline> {
       ),
     );
   }
-}
-
-// ── Overlap layout algorithm ──────────────────────────────────────────────────
-
-List<_SessionLayout> _computeLayout(List<Appointment> sessions) {
-  if (sessions.isEmpty) return [];
-
-  // Sort: earlier start first; ties broken by longer duration first.
-  final sorted = sessions.map((a) => _SessionLayout(appointment: a)).toList()
-    ..sort((a, b) {
-      final aStart =
-          a.appointment.startsAt.hour * 60 + a.appointment.startsAt.minute;
-      final bStart =
-          b.appointment.startsAt.hour * 60 + b.appointment.startsAt.minute;
-      if (aStart != bStart) return aStart.compareTo(bStart);
-      return b.appointment.durationMin.compareTo(a.appointment.durationMin);
-    });
-
-  // Build clusters of transitively-overlapping sessions.
-  final clusters = <List<_SessionLayout>>[];
-  final clusterMaxEnd = <int>[];
-
-  for (final layout in sorted) {
-    final appt = layout.appointment;
-    final startMin = appt.startsAt.hour * 60 + appt.startsAt.minute;
-    final endMin = startMin + appt.durationMin;
-
-    if (clusters.isNotEmpty && startMin < clusterMaxEnd.last) {
-      clusters.last.add(layout);
-      clusterMaxEnd[clusterMaxEnd.length - 1] =
-          math.max(clusterMaxEnd.last, endMin);
-    } else {
-      clusters.add([layout]);
-      clusterMaxEnd.add(endMin);
-    }
-  }
-
-  // For each cluster assign columns greedily.
-  for (final cluster in clusters) {
-    // Each entry: last end minute of the column.
-    final columnEnds = <int>[];
-
-    for (final layout in cluster) {
-      final appt = layout.appointment;
-      final startMin = appt.startsAt.hour * 60 + appt.startsAt.minute;
-      final endMin = startMin + appt.durationMin;
-
-      int assignedCol = -1;
-      for (int ci = 0; ci < columnEnds.length; ci++) {
-        if (columnEnds[ci] <= startMin) {
-          assignedCol = ci;
-          columnEnds[ci] = endMin;
-          break;
-        }
-      }
-      if (assignedCol == -1) {
-        assignedCol = columnEnds.length;
-        columnEnds.add(endMin);
-      }
-
-      layout.columnIndex = assignedCol;
-    }
-
-    // All sessions in cluster share the same column count.
-    final colCount = columnEnds.length;
-    for (final layout in cluster) {
-      layout.columnCount = colCount;
-    }
-  }
-
-  return sorted;
 }

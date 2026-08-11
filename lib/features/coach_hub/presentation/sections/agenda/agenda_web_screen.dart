@@ -4,6 +4,7 @@
 // PR1 — Ver turnos (read-only agenda viewer).
 // PR2 — Nueva Sesión (create).
 // PR3a — Mis horarios (availability rules editor).
+// PR-D — Vista SEMANA (grilla horaria), opt-in y sólo en el layout ancho.
 // Todas las strings están en español hardcodeado + comentario // i18n.
 // NO se usa AppL10n en este archivo (constraint C-6).
 import 'package:flutter/material.dart';
@@ -13,13 +14,26 @@ import 'package:table_calendar/table_calendar.dart';
 
 import '../../../../../app/theme/app_palette.dart';
 import '../../../../../core/utils/appointment_window.dart';
+import '../../../../../core/widgets/treino_icon.dart';
 import '../../../../workout/application/session_providers.dart'
     show currentUidProvider;
 import 'agenda_web_calendar.dart';
 import 'agenda_web_day_list.dart';
 import 'agenda_web_helpers.dart';
+import 'agenda_web_week_grid.dart';
 import 'availability_editor_panel.dart';
 import 'new_session_dialog.dart';
+import 'week_grid_geometry.dart';
+
+// ─── Modo de vista ────────────────────────────────────────────────────────────
+
+/// Vista activa del panel de turnos.
+///
+/// Es un enum PROPIO y no el `CalendarFormat` de table_calendar: ese enum es
+/// del calendario mensual/semanal de la izquierda, su `availableCalendarFormats`
+/// está clavado en `{month: 'Mes', week: 'Semana'}` y hay tests que asertan esas
+/// etiquetas exactas. Son dos ejes independientes.
+enum AgendaViewMode { day, week }
 
 // ─── AgendaWebScreen ──────────────────────────────────────────────────────────
 
@@ -46,6 +60,15 @@ class _AgendaWebScreenState extends ConsumerState<AgendaWebScreen> {
   // semanal (el PF puede togglear a Semana). // i18n
   CalendarFormat _calendarFormat = CalendarFormat.month;
 
+  // Vista del panel de turnos. DÍA es el default; SEMANA es opt-in y sólo
+  // existe en el layout ancho.
+  //
+  // El cobro por LOTE (selección múltiple + BatchCobrarDialog) vive dentro de
+  // AgendaWebDayList: la vista SEMANA la desmonta, así que en semana no hay
+  // cobro por lote. Es una decisión tomada, no una regresión — el flujo sigue
+  // disponible volviendo a DÍA.
+  AgendaViewMode _viewMode = AgendaViewMode.day;
+
   // Ventana deslizante: 1 mes antes → 1 año después (UTC, ADR-7).
   late final DateTime _rangeFrom;
   late final DateTime _rangeTo;
@@ -66,6 +89,31 @@ class _AgendaWebScreenState extends ConsumerState<AgendaWebScreen> {
         initialDate: _selectedDay,
       ),
     );
+  }
+
+  /// Corre la semana visible [deltaDays] días, moviendo AMBOS `_selectedDay` y
+  /// `_focusedDay`.
+  ///
+  /// El clamp a `[_rangeFrom, _rangeTo]` no es cosmético: fuera de esa ventana
+  /// el stream de turnos no trae nada, así que el PF vería una grilla vacía
+  /// indistinguible de una semana sin sesiones.
+  void _shiftWeek(int deltaDays) {
+    var next = (_selectedDay ?? DateTime.now()).add(Duration(days: deltaDays));
+    if (next.isBefore(_rangeFrom)) next = _rangeFrom;
+    if (next.isAfter(_rangeTo)) next = _rangeTo;
+    setState(() {
+      _selectedDay = next;
+      _focusedDay = next;
+    });
+  }
+
+  void _selectDayFromWeek(DateTime day) {
+    setState(() {
+      _selectedDay = day;
+      _focusedDay = day;
+      // Tocar el encabezado de una columna es "volver al día".
+      _viewMode = AgendaViewMode.day;
+    });
   }
 
   Future<void> _openAvailabilityEditor(
@@ -105,6 +153,55 @@ class _AgendaWebScreenState extends ConsumerState<AgendaWebScreen> {
         final wide =
             constraints.maxWidth >= 900 && constraints.maxHeight.isFinite;
 
+        // Achicar la ventana tira la vista SEMANA (no existe en el layout
+        // angosto). Sin este reset el modo quedaría latente y al ensanchar de
+        // nuevo aparecería una grilla que el PF no volvió a pedir.
+        if (!wide && _viewMode != AgendaViewMode.day) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted || _viewMode == AgendaViewMode.day) return;
+            setState(() => _viewMode = AgendaViewMode.day);
+          });
+        }
+
+        if (wide && _viewMode == AgendaViewMode.week) {
+          // Desktop + SEMANA: un solo panel a todo el ancho con la grilla.
+          // El mini-calendario de 420px se esconde: dejarlo daría columnas de
+          // ~86px a 1440px de viewport.
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+            child: SizedBox.expand(
+              child: _Panel(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _DayPanelHeader(
+                      day: selectedDay,
+                      title: weekRangeLabel(selectedDay),
+                      onPrev: () => _shiftWeek(-7),
+                      onNext: () => _shiftWeek(7),
+                      viewMode: _viewMode,
+                      onViewModeChanged: (m) => setState(() => _viewMode = m),
+                      onNewSession: () => _openNewSessionDialog(context),
+                      onMisHorarios: () =>
+                          _openAvailabilityEditor(context, trainerId),
+                    ),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: AgendaWebWeekGrid(
+                        trainerId: trainerId,
+                        anchorDay: selectedDay,
+                        rangeFrom: _rangeFrom,
+                        rangeTo: _rangeTo,
+                        onDaySelected: _selectDayFromWeek,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
         if (wide) {
           // Desktop: calendario (izq) + turnos del día (der, llena el alto).
           return Padding(
@@ -131,6 +228,9 @@ class _AgendaWebScreenState extends ConsumerState<AgendaWebScreen> {
                               children: [
                                 _DayPanelHeader(
                                   day: selectedDay,
+                                  viewMode: _viewMode,
+                                  onViewModeChanged: (m) =>
+                                      setState(() => _viewMode = m),
                                   onNewSession: () =>
                                       _openNewSessionDialog(context),
                                   onMisHorarios: () => _openAvailabilityEditor(
@@ -221,79 +321,305 @@ class _Panel extends StatelessWidget {
   }
 }
 
+/// "Semana del 4 al 10 de agosto" — rótulo del rango semanal que contiene
+/// [anchor]. // i18n
+///
+/// Reusa `spanishWeekdays`/`spanishMonths` (agenda_web_helpers.dart) en vez de
+/// `DateFormat`: `intl` pediría `initializeDateFormatting` en los tests.
+String weekRangeLabel(DateTime anchor) {
+  final start = weekStartFor(anchor);
+  final end = start.add(const Duration(days: 6));
+  final endMonth = spanishMonths[end.month - 1];
+  if (start.month == end.month) {
+    return 'Semana del ${start.day} al ${end.day} de $endMonth'; // i18n
+  }
+  final startMonth = spanishMonths[start.month - 1];
+  return 'Semana del ${start.day} de $startMonth '
+      'al ${end.day} de $endMonth'; // i18n
+}
+
 /// Encabezado del panel de turnos: fecha en español + botón NUEVA SESIÓN +
 /// botón MIS HORARIOS (PR3a).
 ///
 /// PR2: agrega el botón que abre [NewSessionDialog] (ADR-AGW-3).
 /// PR3a: agrega el botón que abre [AvailabilityEditorPanel] (ADR-AGW-3).
+/// PR-D: agrega, TODOS opcionales, [title] / [onPrev] / [onNext] /
+/// [viewMode] + [onViewModeChanged]. Sólo los pasa el branch ancho: en null
+/// el encabezado renderiza exactamente el de siempre.
 class _DayPanelHeader extends StatelessWidget {
   const _DayPanelHeader({
     required this.day,
     required this.onNewSession,
     required this.onMisHorarios,
+    this.title,
+    this.onPrev,
+    this.onNext,
+    this.viewMode,
+    this.onViewModeChanged,
   });
 
   final DateTime day;
   final VoidCallback onNewSession;
   final VoidCallback onMisHorarios;
 
+  /// Título alternativo (el rango semanal). Null ⇒ la fecha de [day].
+  final String? title;
+
+  /// Navegación ‹ › de semana. Null ⇒ no se dibujan los chevrones.
+  final VoidCallback? onPrev;
+  final VoidCallback? onNext;
+
+  /// Toggle DÍA / SEMANA. Null (cualquiera de los dos) ⇒ no se dibuja.
+  final AgendaViewMode? viewMode;
+  final ValueChanged<AgendaViewMode>? onViewModeChanged;
+
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    return Row(
+    final mode = viewMode;
+    final onModeChanged = onViewModeChanged;
+    final prev = onPrev;
+    final next = onNext;
+    final showsToggle = mode != null && onModeChanged != null;
+    final showsNav = prev != null || next != null;
+
+    final titleText = Text(
+      (title ?? spanishDayLabel(day)).toUpperCase(), // i18n
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: GoogleFonts.barlowCondensed(
+        fontWeight: FontWeight.w700,
+        fontSize: 14,
+        letterSpacing: 0.8,
+        color: palette.textMuted,
+      ),
+    );
+
+    final misHorariosButton = OutlinedButton(
+      onPressed: onMisHorarios,
+      style: OutlinedButton.styleFrom(
+        side: BorderSide(color: palette.accent),
+        minimumSize: const Size(0, 36),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+        shape: const StadiumBorder(),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      child: Text(
+        'MIS HORARIOS', // i18n
+        style: GoogleFonts.barlowCondensed(
+          fontWeight: FontWeight.w700,
+          fontSize: 13,
+          letterSpacing: 0.8,
+          color: palette.accent,
+        ),
+      ),
+    );
+
+    final nuevaSesionButton = ElevatedButton.icon(
+      onPressed: onNewSession,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: palette.accent,
+        foregroundColor: palette.bg,
+        minimumSize: const Size(0, 36),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+        shape: const StadiumBorder(),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      icon: const Icon(TreinoIcon.plus, size: 16),
+      label: Text(
+        'NUEVA SESIÓN', // i18n
+        style: GoogleFonts.barlowCondensed(
+          fontWeight: FontWeight.w700,
+          fontSize: 13,
+          letterSpacing: 0.8,
+        ),
+      ),
+    );
+
+    // Sin toggle ni navegación (branch angosto): EXACTAMENTE el encabezado de
+    // siempre, un Row con el título flexible.
+    if (!showsToggle && !showsNav) {
+      return Row(
+        children: [
+          Expanded(child: titleText),
+          misHorariosButton,
+          const SizedBox(width: 8),
+          nuevaSesionButton,
+        ],
+      );
+    }
+
+    // Branch ancho: `Wrap` y no `Row`. Con el toggle sumado, en el umbral de
+    // 900px el panel del día deja ~378px y los controles no entran — un Row
+    // desborda (ya lo hacía por 37px sin el toggle). `Wrap` los baja de renglón
+    // en vez de recortarlos, y a anchos de escritorio queda en un solo renglón,
+    // visualmente idéntico al Row.
+    return Wrap(
+      alignment: WrapAlignment.spaceBetween,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 8,
+      runSpacing: 8,
       children: [
-        Expanded(
-          child: Text(
-            spanishDayLabel(day).toUpperCase(), // i18n
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 14,
-              letterSpacing: 0.8,
-              color: palette.textMuted,
-            ),
-          ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (prev != null)
+              _NavChevron(
+                icon: TreinoIcon.back,
+                tooltip: 'Semana anterior', // i18n
+                onPressed: prev,
+              ),
+            if (next != null)
+              _NavChevron(
+                icon: TreinoIcon.forward,
+                tooltip: 'Semana siguiente', // i18n
+                onPressed: next,
+              ),
+            if (showsNav) const SizedBox(width: 8),
+            Flexible(child: titleText),
+          ],
         ),
-        OutlinedButton(
-          onPressed: onMisHorarios,
-          style: OutlinedButton.styleFrom(
-            side: BorderSide(color: palette.accent),
-            minimumSize: const Size(0, 36),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-            shape: const StadiumBorder(),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-          child: Text(
-            'MIS HORARIOS', // i18n
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-              letterSpacing: 0.8,
-              color: palette.accent,
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        ElevatedButton.icon(
-          onPressed: onNewSession,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: palette.accent,
-            foregroundColor: palette.bg,
-            minimumSize: const Size(0, 36),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
-            shape: const StadiumBorder(),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-          icon: const Icon(Icons.add, size: 16),
-          label: Text(
-            'NUEVA SESIÓN', // i18n
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-              letterSpacing: 0.8,
-            ),
-          ),
+        Wrap(
+          alignment: WrapAlignment.end,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            if (showsToggle)
+              _ViewModeToggle(mode: mode, onChanged: onModeChanged),
+            misHorariosButton,
+            nuevaSesionButton,
+          ],
         ),
       ],
+    );
+  }
+}
+
+// ─── Navegación de semana ─────────────────────────────────────────────────────
+
+/// Chevron ‹ / › de la navegación semanal.
+///
+/// `IconButton` y no un `GestureDetector` a mano: trae solo el target de 48pt
+/// y el nodo de semántica (botón + etiqueta del tooltip).
+class _NavChevron extends StatelessWidget {
+  const _NavChevron({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return IconButton(
+      onPressed: onPressed,
+      tooltip: tooltip,
+      iconSize: 18,
+      color: palette.textPrimary,
+      icon: Icon(icon),
+    );
+  }
+}
+
+// ─── Toggle DÍA / SEMANA ──────────────────────────────────────────────────────
+
+/// Selector segmentado de la vista del panel de turnos.
+class _ViewModeToggle extends StatelessWidget {
+  const _ViewModeToggle({required this.mode, required this.onChanged});
+
+  final AgendaViewMode mode;
+  final ValueChanged<AgendaViewMode> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: palette.border),
+        borderRadius: BorderRadius.circular(9999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _ViewModeChip(
+            label: 'DÍA', // i18n
+            semanticsLabel: 'Vista día', // i18n
+            selected: mode == AgendaViewMode.day,
+            onTap: () => onChanged(AgendaViewMode.day),
+          ),
+          _ViewModeChip(
+            label: 'SEMANA', // i18n
+            semanticsLabel: 'Vista semana', // i18n
+            selected: mode == AgendaViewMode.week,
+            onTap: () => onChanged(AgendaViewMode.week),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Un segmento del toggle.
+///
+/// `container: true` evita que el nodo se funda con el vecino; el `onTap` de la
+/// semántica es lo que hace `hasTapAction` true (la regresión del issue #618),
+/// y `selected` es lo que le dice al lector de pantalla cuál vista está activa.
+/// El alto fijo de 44 es el target mínimo.
+class _ViewModeChip extends StatelessWidget {
+  const _ViewModeChip({
+    required this.label,
+    required this.semanticsLabel,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final String semanticsLabel;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Semantics(
+      container: true,
+      button: true,
+      selected: selected,
+      label: semanticsLabel,
+      onTap: onTap,
+      child: ExcludeSemantics(
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onTap,
+            child: Container(
+              height: 44,
+              constraints: const BoxConstraints(minWidth: 44),
+              alignment: Alignment.center,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: selected ? palette.accent.withAlpha(38) : null,
+                borderRadius: BorderRadius.circular(9999),
+              ),
+              child: Text(
+                label,
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  letterSpacing: 0.8,
+                  color: selected ? palette.accent : palette.textMuted,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
