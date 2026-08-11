@@ -38,8 +38,11 @@ import '../../workout/application/assigned_routine_providers.dart';
 import '../../workout/application/exercise_frequency_providers.dart';
 import '../../workout/application/routine_providers.dart'
     show routineRepositoryProvider;
+import '../../workout/application/exercise_feedback_providers.dart'
+    show coachSessionFeedbackProvider;
 import '../../workout/application/session_providers.dart'
     show currentUidProvider, sessionsByUidProvider, coachSessionSetLogsProvider;
+import '../../workout/domain/exercise_feedback.dart';
 import '../../workout/domain/routine.dart';
 import '../../workout/domain/session.dart';
 import '../../workout/domain/session_status.dart';
@@ -2354,6 +2357,14 @@ class _SessionSetLogsExpansion extends ConsumerWidget {
           for (final log in logs) {
             groups.putIfAbsent(log.exerciseId, () => <SetLog>[]).add(log);
           }
+          // Athlete feedback for this session (issue #628). Read separately so
+          // a feedback read failure degrades to "no feedback" instead of
+          // blanking the set logs the trainer came here for.
+          final feedback = ref
+                  .watch(coachSessionFeedbackProvider(
+                      (athleteUid: athleteId, sessionId: sessionId)))
+                  .valueOrNull ??
+              const <ExerciseFeedback>[];
           return Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Column(
@@ -2363,6 +2374,9 @@ class _SessionSetLogsExpansion extends ConsumerWidget {
                   SessionExerciseBlock(
                     exerciseName: entry.value.first.exerciseName,
                     sets: entry.value,
+                    feedback: feedback
+                        .where((f) => f.exerciseId == entry.key)
+                        .toList(),
                   ),
               ],
             ),

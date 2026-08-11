@@ -16,12 +16,15 @@ import '../../../l10n/app_l10n.dart';
 import '../../profile/application/user_providers.dart';
 import '../../gyms/application/gym_providers.dart';
 import '../../gyms/domain/gym_display_name.dart';
+import '../application/exercise_feedback_providers.dart';
 import '../application/exercise_providers.dart';
 import '../application/routine_providers.dart';
 import '../application/session_init.dart';
 import '../application/session_notifier.dart';
 import '../application/session_providers.dart';
 import '../application/session_state.dart';
+import '../domain/exercise_feedback.dart';
+import '../domain/exercise_feedback_kind.dart';
 import '../domain/routine.dart';
 import '../domain/routine_slot.dart';
 import '../domain/set_enums.dart';
@@ -30,7 +33,9 @@ import '../domain/set_log.dart';
 import '../domain/set_spec.dart';
 import 'exercise_detail_screen.dart';
 import 'widgets/bounded_number_formatter.dart';
+import 'widgets/athlete_feedback_note.dart';
 import 'widgets/coach_note.dart';
+import 'widgets/exercise_feedback_sheet.dart';
 import 'widgets/set_entry_sheet.dart';
 
 // ── Helpers de formato ────────────────────────────────────────────────────────
@@ -383,6 +388,117 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
     ref.read(sessionNotifierProvider(widget.init).notifier).updateSet(updated);
   }
 
+  // ─── Athlete → trainer exercise feedback (issue #628) ───────────────────
+
+  /// The athlete's feedback entries anchored to one slot, oldest first.
+  ///
+  /// Filters on exerciseId AND slotIndex: the same exercise may legitimately
+  /// appear twice in a day (device feedback 2026-06-12), and matching on
+  /// exerciseId alone would surface a comment left on the second bench-press
+  /// block under the first one too.
+  List<ExerciseFeedback> _feedbackFor(
+    String sessionId,
+    String exerciseId,
+    int slotIndex,
+  ) {
+    final uid = ref.read(currentUidProvider);
+    if (uid == null) return const <ExerciseFeedback>[];
+    final all = ref
+            .watch(sessionFeedbackProvider(
+                (athleteUid: uid, sessionId: sessionId)))
+            .valueOrNull ??
+        const <ExerciseFeedback>[];
+    return all.where((f) => f.matchesSlot(exerciseId, slotIndex)).toList();
+  }
+
+  /// Opens the feedback composer for one slot.
+  ///
+  /// [slotIndex] is the slot's position in `state.day.slots`, not the block
+  /// index: a superset packs several slots into one block, so the two diverge
+  /// as soon as a day has one.
+  ///
+  /// The session keeps running underneath — the rest timer and the in-flight
+  /// set live in the notifier, untouched by a modal sheet.
+  Future<void> _openFeedbackSheet(
+    RoutineSlot slot,
+    int slotIndex, {
+    int? setNumber,
+  }) async {
+    final uid = ref.read(currentUidProvider);
+    final sessionId =
+        ref.read(sessionNotifierProvider(widget.init)).value?.session.id;
+    if (uid == null || sessionId == null) return;
+
+    final submission = await showExerciseFeedbackSheet(
+      context: context,
+      uid: uid,
+      sessionId: sessionId,
+      exerciseId: slot.exerciseId,
+      exerciseName: slot.exerciseName,
+      slotIndex: slotIndex,
+      setNumber: setNumber,
+    );
+    if (submission == null || !mounted) return;
+
+    final l10n = AppL10n.of(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        // A discomfort report pushes to the trainer; a plain comment does not,
+        // so the copy must not promise a notification that never fires.
+        content: Text(submission.kind.notifiesTrainer
+            ? l10n.exerciseFeedbackSentDiscomfort
+            : l10n.exerciseFeedbackSent),
+      ),
+    );
+  }
+
+  /// Deletes one of the athlete's own entries, after confirming.
+  ///
+  /// Delete-then-rewrite is the only amend path (the rules deny `update` so
+  /// photoUrl can never drift from photoPath), so the confirm matters: there is
+  /// no undo and no edit.
+  Future<void> _deleteFeedback(ExerciseFeedback feedback) async {
+    final l10n = AppL10n.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        content: Text(l10n.exerciseFeedbackDeleteConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.commonCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l10n.exerciseFeedbackDelete),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final uid = ref.read(currentUidProvider);
+    final sessionId =
+        ref.read(sessionNotifierProvider(widget.init)).value?.session.id;
+    if (uid == null || sessionId == null) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    final deletedMsg = l10n.exerciseFeedbackDeleted;
+    final errorMsg = l10n.exerciseFeedbackSendError;
+    try {
+      await ref.read(exerciseFeedbackRepositoryProvider).delete(
+            uid: uid,
+            sessionId: sessionId,
+            feedbackId: feedback.id,
+          );
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(content: Text(deletedMsg)));
+    } catch (_) {
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(content: Text(errorMsg)));
+    }
+  }
+
   /// Gathers everything a section needs for one slot: its logs (sorted ASC)
   /// plus the async-resolved technique + video.
   _SupersetEntry _entryFor(SessionState state, RoutineSlot slot) {
@@ -440,6 +556,9 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
         ));
       } else {
         final entry = _entryFor(state, block.slots.first);
+        // Slot position within the day, NOT blockIdx: a superset packs several
+        // slots into one block, so the two diverge as soon as a day has one.
+        final slotIndex = state.day.slots.indexOf(entry.slot);
         out.add(Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: _StandaloneBlock(
@@ -455,6 +574,17 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
             onAddSet: () => _addSet(entry.slot),
             onRemoveSet: (log) => _onRemoveSetTapped(entry.slot, log),
             onOpenDetail: () => _openExerciseDetail(entry.slot),
+            feedback: _feedbackFor(
+              state.session.id,
+              entry.slot.exerciseId,
+              slotIndex,
+            ),
+            onOpenFeedback: ({int? setNumber}) => _openFeedbackSheet(
+              entry.slot,
+              slotIndex,
+              setNumber: setNumber,
+            ),
+            onDeleteFeedback: _deleteFeedback,
           ),
         ));
       }
@@ -924,6 +1054,9 @@ class _StandaloneBlock extends StatelessWidget {
     this.onAddSet,
     this.onRemoveSet,
     this.onOpenDetail,
+    this.feedback = const <ExerciseFeedback>[],
+    this.onOpenFeedback,
+    this.onDeleteFeedback,
   });
 
   final _SupersetEntry entry;
@@ -955,6 +1088,12 @@ class _StandaloneBlock extends StatelessWidget {
   /// En bloques `future` NO se wirea: ahí el tap ya significa "adelantar
   /// este bloque" y superponer destinos confunde.
   final VoidCallback? onOpenDetail;
+
+  /// Athlete feedback for this slot (issue #628). Only the interactive section
+  /// renders it — completed summaries and future previews never do.
+  final List<ExerciseFeedback> feedback;
+  final void Function({int? setNumber})? onOpenFeedback;
+  final void Function(ExerciseFeedback)? onDeleteFeedback;
 
   @override
   Widget build(BuildContext context) {
@@ -988,6 +1127,9 @@ class _StandaloneBlock extends StatelessWidget {
       onAddSet: onAddSet,
       onRemoveSet: onRemoveSet,
       onOpenDetail: onOpenDetail,
+      feedback: feedback,
+      onOpenFeedback: onOpenFeedback,
+      onDeleteFeedback: onDeleteFeedback,
     );
   }
 }
@@ -1488,6 +1630,9 @@ class _ExerciseSection extends StatefulWidget {
     this.onAddSet,
     this.onRemoveSet,
     this.onOpenDetail,
+    this.feedback = const <ExerciseFeedback>[],
+    this.onOpenFeedback,
+    this.onDeleteFeedback,
   });
 
   final RoutineSlot slot;
@@ -1524,6 +1669,19 @@ class _ExerciseSection extends StatefulWidget {
   /// Tap en el NOMBRE del ejercicio → detalle completo. Acceso ADICIONAL al
   /// ⓘ de técnica (que sigue abriendo la TechniqueSheet in-place).
   final VoidCallback? onOpenDetail;
+
+  /// Athlete-authored feedback already written for THIS slot (issue #628),
+  /// oldest first. Rendered read-only under the coach's note so the athlete
+  /// sees what they already reported and does not duplicate it.
+  final List<ExerciseFeedback> feedback;
+
+  /// Opens the feedback composer. `setNumber` null ⇒ exercise-level entry.
+  /// Null ⇒ affordance hidden.
+  final void Function({int? setNumber})? onOpenFeedback;
+
+  /// Deletes one of the athlete's own entries. Amending is delete + rewrite:
+  /// the rules deny `update` so photoUrl can never drift from photoPath.
+  final void Function(ExerciseFeedback)? onDeleteFeedback;
 
   @override
   State<_ExerciseSection> createState() => _ExerciseSectionState();
@@ -1795,13 +1953,91 @@ class _ExerciseSectionState extends State<_ExerciseSection> {
           const SizedBox(height: 10),
           CoachNote(text: widget.slot.notes!),
         ],
+        // The athlete's own feedback for this slot — the mirror of the coach's
+        // note right above it. Read-only here; the composer is the button below.
+        if (widget.feedback.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          ...widget.feedback.map(
+            (f) => AthleteFeedbackNote(
+              feedback: f,
+              onDelete: widget.onDeleteFeedback == null
+                  ? null
+                  : () => widget.onDeleteFeedback!(f),
+            ),
+          ),
+        ],
         const SizedBox(height: 12),
         ...rowWidgets,
         if (widget.onAddSet != null) ...[
           const SizedBox(height: 8),
           _AddSetButton(onTap: widget.onAddSet!),
         ],
+        if (widget.onOpenFeedback != null) ...[
+          const SizedBox(height: 8),
+          _FeedbackButton(
+            exerciseName: widget.slot.exerciseName,
+            // Anchors to the set the athlete is on — "third set of bench press"
+            // is exactly what the chat cannot express. Falls back to an
+            // exercise-level entry once every set is logged.
+            onTap: () =>
+                widget.onOpenFeedback!(setNumber: widget.currentSetNumber),
+          ),
+        ],
       ],
+    );
+  }
+}
+
+// ── _FeedbackButton ───────────────────────────────────────────────────────────
+
+/// "Comentar / Reportar" (issue #628). Sits at the foot of the interactive
+/// exercise block, under "+ agregar serie", and opens the composer that sends a
+/// comment or a discomfort report to the athlete's trainer.
+///
+/// Deliberately quieter than [_AddSetButton]: logging a set is the primary
+/// action of this screen, reporting is the exception. Same 44pt floor so it
+/// stays reachable (a11y baseline).
+class _FeedbackButton extends StatelessWidget {
+  const _FeedbackButton({required this.exerciseName, required this.onTap});
+
+  final String exerciseName;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    return Semantics(
+      button: true,
+      label: l10n.exerciseFeedbackActionA11y(exerciseName),
+      child: TreinoTappable(
+        onTap: onTap,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 44),
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(9999),
+            border: Border.all(color: palette.border),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(TreinoIcon.chat, size: 14, color: palette.textMuted),
+              const SizedBox(width: 8),
+              Text(
+                l10n.exerciseFeedbackAction,
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                  letterSpacing: 0.8,
+                  color: palette.textMuted,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

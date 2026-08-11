@@ -3301,4 +3301,84 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get followListOpenFollowingA11y => 'View following';
+
+  @override
+  String get exerciseFeedbackAction => 'Comment / Report';
+
+  @override
+  String exerciseFeedbackActionA11y(String exerciseName) {
+    return 'Comment or report discomfort on $exerciseName';
+  }
+
+  @override
+  String get exerciseFeedbackSheetTitle => 'How is this exercise going?';
+
+  @override
+  String exerciseFeedbackSheetSubtitleSet(String exerciseName, int setNumber) {
+    return '$exerciseName · set $setNumber';
+  }
+
+  @override
+  String exerciseFeedbackSheetSubtitleExercise(String exerciseName) {
+    return '$exerciseName';
+  }
+
+  @override
+  String get exerciseFeedbackKindComment => 'Comment';
+
+  @override
+  String get exerciseFeedbackKindDiscomfort => 'Discomfort / pain';
+
+  @override
+  String get exerciseFeedbackTextHint => 'Tell your coach what happened';
+
+  @override
+  String get exerciseFeedbackSend => 'SEND';
+
+  @override
+  String get exerciseFeedbackEmptyError => 'Write a comment before sending.';
+
+  @override
+  String get exerciseFeedbackSent => 'Your coach will see this comment.';
+
+  @override
+  String get exerciseFeedbackSentDiscomfort => 'We notified your coach.';
+
+  @override
+  String get exerciseFeedbackSendError =>
+      'We couldn\'t send your comment. Try again.';
+
+  @override
+  String get exerciseFeedbackNoTrainerTitle => 'Share your training';
+
+  @override
+  String get exerciseFeedbackNoTrainerBody =>
+      'For your coach to read this, you first need to share your training with them.';
+
+  @override
+  String get exerciseFeedbackNoTrainerCta => 'SHARE AND SEND';
+
+  @override
+  String get exerciseFeedbackNoTrainerUnlinked =>
+      'You don\'t have a linked coach yet.';
+
+  @override
+  String get exerciseFeedbackFromAthleteTag => 'FROM ATHLETE';
+
+  @override
+  String get exerciseFeedbackDiscomfortTag => 'DISCOMFORT';
+
+  @override
+  String exerciseFeedbackSetLabel(int setNumber) {
+    return 'Set $setNumber';
+  }
+
+  @override
+  String get exerciseFeedbackDelete => 'Delete';
+
+  @override
+  String get exerciseFeedbackDeleteConfirm => 'Delete this comment?';
+
+  @override
+  String get exerciseFeedbackDeleted => 'Comment deleted.';
 }

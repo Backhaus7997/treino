@@ -10,7 +10,10 @@ import '../../../core/utils/kg_format.dart';
 import '../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../application/exercise_feedback_providers.dart'
+    show coachSessionFeedbackProvider;
 import '../application/session_providers.dart';
+import '../domain/exercise_feedback.dart';
 import '../domain/session.dart';
 import '../domain/set_log.dart';
 import 'utils/date_helpers.dart';
@@ -55,6 +58,11 @@ class SessionDetailScreen extends ConsumerWidget {
                 return _DetailLoaded(
                   session: session,
                   setLogs: data.setLogs,
+                  feedback: ref
+                          .watch(coachSessionFeedbackProvider(
+                              (athleteUid: uid, sessionId: sessionId)))
+                          .valueOrNull ??
+                      const <ExerciseFeedback>[],
                 );
               },
             ),
@@ -68,10 +76,18 @@ class SessionDetailScreen extends ConsumerWidget {
 // ── Loaded body ───────────────────────────────────────────────────────────────
 
 class _DetailLoaded extends StatelessWidget {
-  const _DetailLoaded({required this.session, required this.setLogs});
+  const _DetailLoaded({
+    required this.session,
+    required this.setLogs,
+    this.feedback = const <ExerciseFeedback>[],
+  });
 
   final Session session;
   final List<SetLog> setLogs;
+
+  /// The athlete's own per-exercise feedback for this session (issue #628),
+  /// shown back to them so a report they left mid-session is not write-only.
+  final List<ExerciseFeedback> feedback;
 
   @override
   Widget build(BuildContext context) {
@@ -198,6 +214,12 @@ class _DetailLoaded extends StatelessWidget {
                     child: SessionExerciseBlock(
                       exerciseName: indexed.value.key,
                       sets: indexed.value.value,
+                      // The athlete's own report, shown back to them (#628).
+                      // Grouping here is by exerciseName (that is what the
+                      // grouped list is keyed on), so match on the same field.
+                      feedback: feedback
+                          .where((f) => f.exerciseName == indexed.value.key)
+                          .toList(),
                     ),
                   ),
                 ),

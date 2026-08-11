@@ -5990,6 +5990,144 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Ver seguidos'**
   String get followListOpenFollowingA11y;
+
+  /// Botón al pie del bloque de ejercicio en el player que abre el sheet de feedback del alumno hacia su PF (issue #628).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Comentar / Reportar'**
+  String get exerciseFeedbackAction;
+
+  /// Semantics del botón de feedback por ejercicio.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Comentar o reportar una molestia en {exerciseName}'**
+  String exerciseFeedbackActionA11y(String exerciseName);
+
+  /// Título del bottom sheet de feedback por ejercicio.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Cómo va este ejercicio?'**
+  String get exerciseFeedbackSheetTitle;
+
+  /// Subtítulo del sheet cuando el feedback está anclado a una serie concreta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{exerciseName} · serie {setNumber}'**
+  String exerciseFeedbackSheetSubtitleSet(String exerciseName, int setNumber);
+
+  /// Subtítulo del sheet cuando el feedback es a nivel ejercicio, sin serie.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{exerciseName}'**
+  String exerciseFeedbackSheetSubtitleExercise(String exerciseName);
+
+  /// Chip de tipo de feedback: comentario neutro para el PF.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Comentario'**
+  String get exerciseFeedbackKindComment;
+
+  /// Chip de tipo de feedback: molestia o dolor. Es el único que notifica al PF.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Molestia / dolor'**
+  String get exerciseFeedbackKindDiscomfort;
+
+  /// Placeholder del campo de texto libre del sheet de feedback.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Contale a tu PF qué pasó'**
+  String get exerciseFeedbackTextHint;
+
+  /// Botón primario del sheet de feedback.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ENVIAR'**
+  String get exerciseFeedbackSend;
+
+  /// Error cuando el alumno intenta enviar el feedback sin texto.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Escribí un comentario antes de enviar.'**
+  String get exerciseFeedbackEmptyError;
+
+  /// SnackBar de confirmación después de enviar feedback de tipo comentario.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu PF va a ver este comentario.'**
+  String get exerciseFeedbackSent;
+
+  /// SnackBar de confirmación después de enviar feedback de tipo molestia — el PF recibe notificación.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Le avisamos a tu PF.'**
+  String get exerciseFeedbackSentDiscomfort;
+
+  /// Error genérico cuando falla la escritura del feedback.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos enviar tu comentario. Probá de nuevo.'**
+  String get exerciseFeedbackSendError;
+
+  /// Título del gate de consentimiento cuando el alumno no tiene session_shares activo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Compartí tu entrenamiento'**
+  String get exerciseFeedbackNoTrainerTitle;
+
+  /// Cuerpo del gate de consentimiento — explica por qué el feedback no tiene destinatario todavía.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Para que tu PF pueda leer esto, primero tenés que compartir tu entrenamiento con él.'**
+  String get exerciseFeedbackNoTrainerBody;
+
+  /// Botón que otorga session_shares y envía el feedback en un solo paso.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'COMPARTIR Y ENVIAR'**
+  String get exerciseFeedbackNoTrainerCta;
+
+  /// Mensaje cuando el alumno no tiene ningún vínculo con un entrenador, así que el feedback no tiene a quién ir.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no tenés un PF vinculado.'**
+  String get exerciseFeedbackNoTrainerUnlinked;
+
+  /// Badge del feedback en la vista del PF. Contraparte de exerciseNoteFromCoachTag.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DEL ALUMNO'**
+  String get exerciseFeedbackFromAthleteTag;
+
+  /// Badge distintivo para feedback de tipo molestia en la vista del PF.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MOLESTIA'**
+  String get exerciseFeedbackDiscomfortTag;
+
+  /// Etiqueta que ancla el feedback a una serie en la vista del PF.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Serie {setNumber}'**
+  String exerciseFeedbackSetLabel(int setNumber);
+
+  /// Acción para borrar un feedback propio (no se puede editar, sólo borrar y rehacer).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Borrar'**
+  String get exerciseFeedbackDelete;
+
+  /// Confirmación antes de borrar un feedback.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Borrar este comentario?'**
+  String get exerciseFeedbackDeleteConfirm;
+
+  /// SnackBar tras borrar un feedback.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Comentario borrado.'**
+  String get exerciseFeedbackDeleted;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

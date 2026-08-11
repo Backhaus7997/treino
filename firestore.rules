@@ -1480,6 +1480,75 @@ service cloud.firestore {
                             && get(/databases/$(database)/documents/session_shares/$(uid)).data.trainerId == request.auth.uid));
         allow write: if request.auth != null && request.auth.uid == uid;
       }
+
+      // exerciseFeedback sub-collection (issue #628).
+      // Athlete-authored comment / discomfort report anchored to one exercise
+      // (and optionally one set) of the session. The read predicate is the
+      // SAME owner-OR-granted-trainer test as setLogs above, which is the
+      // whole reason this lives under users/{uid}/sessions/** instead of a
+      // top-level collection: the grant already exists and is already tested.
+      //
+      // Writes are owner-only, and `update` is denied OUTRIGHT (stricter than
+      // setLogs). Rationale mirrors athlete_files: the doc carries both
+      // `photoUrl` and `photoPath`, and an update could leave the URL pointing
+      // at an object the path no longer names. To amend an entry the athlete
+      // deletes it and writes a new one.
+      //
+      // Field validation is explicit (see #508 / #447 — rules that only check
+      // auth let malformed and out-of-range docs through, and this collection
+      // carries health data, so a garbage `kind` must never reach the trainer's
+      // screen):
+      //   - exerciseId / exerciseName: non-empty strings
+      //   - slotIndex: int >= 0  (disambiguates a repeated exercise in one day)
+      //   - setNumber: absent/null, or int >= 1
+      //   - kind: exactly 'comment' or 'discomfort'
+      //   - text: absent/null, or a string <= 2000 chars
+      //   - photoUrl/photoPath: absent/null, or non-empty strings, and both
+      //     present together (never one without the other)
+      //   - at least one of text / photoUrl must carry content — no empty
+      //     reports
+      //   - createdAt: timestamp
+      //
+      // Emulator scenarios mirror setLogs E1-E8, plus the validation cases:
+      // E9 empty report (no text, no photo) → denied;
+      // E10 unknown kind → denied; E11 negative slotIndex → denied;
+      // E12 setNumber 0 → denied; E13 photoUrl without photoPath → denied;
+      // E14 update by owner → denied (delete-and-recreate only);
+      // E15 delete by owner → allowed; E16 delete by linked trainer → denied.
+      match /exerciseFeedback/{feedbackId} {
+        function feedbackValid(d) {
+          return d.exerciseId is string && d.exerciseId.size() > 0
+                 && d.exerciseName is string && d.exerciseName.size() > 0
+                 && d.slotIndex is int && d.slotIndex >= 0
+                 && (!('setNumber' in d) || d.setNumber == null
+                     || (d.setNumber is int && d.setNumber >= 1))
+                 && d.kind in ['comment', 'discomfort']
+                 && (!('text' in d) || d.text == null
+                     || (d.text is string && d.text.size() <= 2000))
+                 && (!('photoUrl' in d) || d.photoUrl == null
+                     || (d.photoUrl is string && d.photoUrl.size() > 0))
+                 && (!('photoPath' in d) || d.photoPath == null
+                     || (d.photoPath is string && d.photoPath.size() > 0))
+                 // photoUrl and photoPath travel together or not at all.
+                 && ((d.get('photoUrl', null) == null)
+                     == (d.get('photoPath', null) == null))
+                 // No empty reports: text or photo, at least one.
+                 && ((d.get('text', null) != null && d.text.size() > 0)
+                     || d.get('photoUrl', null) != null)
+                 && d.createdAt is timestamp;
+        }
+
+        allow read: if request.auth != null
+                    && (request.auth.uid == uid
+                        || (exists(/databases/$(database)/documents/session_shares/$(uid))
+                            && get(/databases/$(database)/documents/session_shares/$(uid)).data.trainerId == request.auth.uid));
+        allow create: if request.auth != null
+                      && request.auth.uid == uid
+                      && feedbackValid(request.resource.data);
+        // Immutable once written — amend by delete + create.
+        allow update: if false;
+        allow delete: if request.auth != null && request.auth.uid == uid;
+      }
     }
 
     // Daily check-in sub-collection (Fase 4 Etapa 6, REQ-WRC-004).

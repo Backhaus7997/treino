@@ -857,5 +857,62 @@
   "followListOpenFollowersA11y": "Ver seguidores",
   "@followListOpenFollowersA11y": {"description": "Semantics del contador de SEGUIDORES del perfil, que abre la lista."},
   "followListOpenFollowingA11y": "Ver seguidos",
-  "@followListOpenFollowingA11y": {"description": "Semantics del contador de SIGUIENDO del perfil, que abre la lista."}
+  "@followListOpenFollowingA11y": {"description": "Semantics del contador de SIGUIENDO del perfil, que abre la lista."},
+  "exerciseFeedbackAction": "Comentar / Reportar",
+  "@exerciseFeedbackAction": {},
+  "exerciseFeedbackActionA11y": "Comentar o reportar una molestia en {exerciseName}",
+  "@exerciseFeedbackActionA11y": {
+    "placeholders": {"exerciseName": {"type": "String"}}
+  },
+  "exerciseFeedbackSheetTitle": "¿Cómo va este ejercicio?",
+  "@exerciseFeedbackSheetTitle": {},
+  "exerciseFeedbackSheetSubtitleSet": "{exerciseName} · serie {setNumber}",
+  "@exerciseFeedbackSheetSubtitleSet": {
+    "placeholders": {
+      "exerciseName": {"type": "String"},
+      "setNumber": {"type": "int"}
+    }
+  },
+  "exerciseFeedbackSheetSubtitleExercise": "{exerciseName}",
+  "@exerciseFeedbackSheetSubtitleExercise": {
+    "placeholders": {"exerciseName": {"type": "String"}}
+  },
+  "exerciseFeedbackKindComment": "Comentario",
+  "@exerciseFeedbackKindComment": {},
+  "exerciseFeedbackKindDiscomfort": "Molestia / dolor",
+  "@exerciseFeedbackKindDiscomfort": {},
+  "exerciseFeedbackTextHint": "Contale a tu PF qué pasó",
+  "@exerciseFeedbackTextHint": {},
+  "exerciseFeedbackSend": "ENVIAR",
+  "@exerciseFeedbackSend": {},
+  "exerciseFeedbackEmptyError": "Escribí un comentario antes de enviar.",
+  "@exerciseFeedbackEmptyError": {},
+  "exerciseFeedbackSent": "Tu PF va a ver este comentario.",
+  "@exerciseFeedbackSent": {},
+  "exerciseFeedbackSentDiscomfort": "Le avisamos a tu PF.",
+  "@exerciseFeedbackSentDiscomfort": {},
+  "exerciseFeedbackSendError": "No pudimos enviar tu comentario. Probá de nuevo.",
+  "@exerciseFeedbackSendError": {},
+  "exerciseFeedbackNoTrainerTitle": "Compartí tu entrenamiento",
+  "@exerciseFeedbackNoTrainerTitle": {},
+  "exerciseFeedbackNoTrainerBody": "Para que tu PF pueda leer esto, primero tenés que compartir tu entrenamiento con él.",
+  "@exerciseFeedbackNoTrainerBody": {},
+  "exerciseFeedbackNoTrainerCta": "COMPARTIR Y ENVIAR",
+  "@exerciseFeedbackNoTrainerCta": {},
+  "exerciseFeedbackNoTrainerUnlinked": "Todavía no tenés un PF vinculado.",
+  "@exerciseFeedbackNoTrainerUnlinked": {},
+  "exerciseFeedbackFromAthleteTag": "DEL ALUMNO",
+  "@exerciseFeedbackFromAthleteTag": {},
+  "exerciseFeedbackDiscomfortTag": "MOLESTIA",
+  "@exerciseFeedbackDiscomfortTag": {},
+  "exerciseFeedbackSetLabel": "Serie {setNumber}",
+  "@exerciseFeedbackSetLabel": {
+    "placeholders": {"setNumber": {"type": "int"}}
+  },
+  "exerciseFeedbackDelete": "Borrar",
+  "@exerciseFeedbackDelete": {},
+  "exerciseFeedbackDeleteConfirm": "¿Borrar este comentario?",
+  "@exerciseFeedbackDeleteConfirm": {},
+  "exerciseFeedbackDeleted": "Comentario borrado.",
+  "@exerciseFeedbackDeleted": {}
 }

@@ -8,7 +8,9 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/utils/kg_format.dart';
+import '../../domain/exercise_feedback.dart';
 import '../../domain/set_log.dart';
+import 'athlete_feedback_note.dart';
 
 /// Displays one exercise group: name heading followed by a row per [SetLog].
 /// API matches the old private `_ExerciseBlock` in session_detail_screen.dart.
@@ -17,10 +19,21 @@ class SessionExerciseBlock extends StatelessWidget {
     super.key,
     required this.exerciseName,
     required this.sets,
+    this.feedback = const <ExerciseFeedback>[],
   });
 
   final String exerciseName;
   final List<SetLog> sets;
+
+  /// Athlete-authored feedback for this exercise (issue #628), oldest first.
+  ///
+  /// Rendered under the set rows so the trainer reads the numbers first and then
+  /// what the athlete said about them — "chat = palabras, set-logs = números",
+  /// and this is the missing third thing: words anchored to the numbers.
+  ///
+  /// Defaults to empty so the athlete's own history screen keeps working
+  /// unchanged; every surface that has the data passes it.
+  final List<ExerciseFeedback> feedback;
 
   @override
   Widget build(BuildContext context) {
@@ -41,6 +54,12 @@ class SessionExerciseBlock extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           ...sets.map((log) => _SetRow(log: log)),
+          if (feedback.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            // Read-only on every surface: onDelete stays null because only the
+            // athlete who wrote an entry may remove it, and never from here.
+            ...feedback.map((f) => AthleteFeedbackNote(feedback: f)),
+          ],
         ],
       ),
     );

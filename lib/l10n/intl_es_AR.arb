@@ -2866,5 +2866,66 @@
   "followListOpenFollowersA11y": "Ver seguidores",
   "@followListOpenFollowersA11y": {"description": "Semantics del contador de SEGUIDORES del perfil, que abre la lista."},
   "followListOpenFollowingA11y": "Ver seguidos",
-  "@followListOpenFollowingA11y": {"description": "Semantics del contador de SIGUIENDO del perfil, que abre la lista."}
+  "@followListOpenFollowingA11y": {"description": "Semantics del contador de SIGUIENDO del perfil, que abre la lista."},
+  "exerciseFeedbackAction": "Comentar / Reportar",
+  "@exerciseFeedbackAction": {"description": "Botón al pie del bloque de ejercicio en el player que abre el sheet de feedback del alumno hacia su PF (issue #628)."},
+  "exerciseFeedbackActionA11y": "Comentar o reportar una molestia en {exerciseName}",
+  "@exerciseFeedbackActionA11y": {
+    "description": "Semantics del botón de feedback por ejercicio.",
+    "placeholders": {"exerciseName": {"type": "String"}}
+  },
+  "exerciseFeedbackSheetTitle": "¿Cómo va este ejercicio?",
+  "@exerciseFeedbackSheetTitle": {"description": "Título del bottom sheet de feedback por ejercicio."},
+  "exerciseFeedbackSheetSubtitleSet": "{exerciseName} · serie {setNumber}",
+  "@exerciseFeedbackSheetSubtitleSet": {
+    "description": "Subtítulo del sheet cuando el feedback está anclado a una serie concreta.",
+    "placeholders": {
+      "exerciseName": {"type": "String"},
+      "setNumber": {"type": "int"}
+    }
+  },
+  "exerciseFeedbackSheetSubtitleExercise": "{exerciseName}",
+  "@exerciseFeedbackSheetSubtitleExercise": {
+    "description": "Subtítulo del sheet cuando el feedback es a nivel ejercicio, sin serie.",
+    "placeholders": {"exerciseName": {"type": "String"}}
+  },
+  "exerciseFeedbackKindComment": "Comentario",
+  "@exerciseFeedbackKindComment": {"description": "Chip de tipo de feedback: comentario neutro para el PF."},
+  "exerciseFeedbackKindDiscomfort": "Molestia / dolor",
+  "@exerciseFeedbackKindDiscomfort": {"description": "Chip de tipo de feedback: molestia o dolor. Es el único que notifica al PF."},
+  "exerciseFeedbackTextHint": "Contale a tu PF qué pasó",
+  "@exerciseFeedbackTextHint": {"description": "Placeholder del campo de texto libre del sheet de feedback."},
+  "exerciseFeedbackSend": "ENVIAR",
+  "@exerciseFeedbackSend": {"description": "Botón primario del sheet de feedback."},
+  "exerciseFeedbackEmptyError": "Escribí un comentario antes de enviar.",
+  "@exerciseFeedbackEmptyError": {"description": "Error cuando el alumno intenta enviar el feedback sin texto."},
+  "exerciseFeedbackSent": "Tu PF va a ver este comentario.",
+  "@exerciseFeedbackSent": {"description": "SnackBar de confirmación después de enviar feedback de tipo comentario."},
+  "exerciseFeedbackSentDiscomfort": "Le avisamos a tu PF.",
+  "@exerciseFeedbackSentDiscomfort": {"description": "SnackBar de confirmación después de enviar feedback de tipo molestia — el PF recibe notificación."},
+  "exerciseFeedbackSendError": "No pudimos enviar tu comentario. Probá de nuevo.",
+  "@exerciseFeedbackSendError": {"description": "Error genérico cuando falla la escritura del feedback."},
+  "exerciseFeedbackNoTrainerTitle": "Compartí tu entrenamiento",
+  "@exerciseFeedbackNoTrainerTitle": {"description": "Título del gate de consentimiento cuando el alumno no tiene session_shares activo."},
+  "exerciseFeedbackNoTrainerBody": "Para que tu PF pueda leer esto, primero tenés que compartir tu entrenamiento con él.",
+  "@exerciseFeedbackNoTrainerBody": {"description": "Cuerpo del gate de consentimiento — explica por qué el feedback no tiene destinatario todavía."},
+  "exerciseFeedbackNoTrainerCta": "COMPARTIR Y ENVIAR",
+  "@exerciseFeedbackNoTrainerCta": {"description": "Botón que otorga session_shares y envía el feedback en un solo paso."},
+  "exerciseFeedbackNoTrainerUnlinked": "Todavía no tenés un PF vinculado.",
+  "@exerciseFeedbackNoTrainerUnlinked": {"description": "Mensaje cuando el alumno no tiene ningún vínculo con un entrenador, así que el feedback no tiene a quién ir."},
+  "exerciseFeedbackFromAthleteTag": "DEL ALUMNO",
+  "@exerciseFeedbackFromAthleteTag": {"description": "Badge del feedback en la vista del PF. Contraparte de exerciseNoteFromCoachTag."},
+  "exerciseFeedbackDiscomfortTag": "MOLESTIA",
+  "@exerciseFeedbackDiscomfortTag": {"description": "Badge distintivo para feedback de tipo molestia en la vista del PF."},
+  "exerciseFeedbackSetLabel": "Serie {setNumber}",
+  "@exerciseFeedbackSetLabel": {
+    "description": "Etiqueta que ancla el feedback a una serie en la vista del PF.",
+    "placeholders": {"setNumber": {"type": "int"}}
+  },
+  "exerciseFeedbackDelete": "Borrar",
+  "@exerciseFeedbackDelete": {"description": "Acción para borrar un feedback propio (no se puede editar, sólo borrar y rehacer)."},
+  "exerciseFeedbackDeleteConfirm": "¿Borrar este comentario?",
+  "@exerciseFeedbackDeleteConfirm": {"description": "Confirmación antes de borrar un feedback."},
+  "exerciseFeedbackDeleted": "Comentario borrado.",
+  "@exerciseFeedbackDeleted": {"description": "SnackBar tras borrar un feedback."}
 }

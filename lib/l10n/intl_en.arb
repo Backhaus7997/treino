@@ -1253,5 +1253,62 @@
   "followListOpenFollowersA11y": "View followers",
   "@followListOpenFollowersA11y": {"description": "Semantics for the profile FOLLOWERS counter, which opens the list."},
   "followListOpenFollowingA11y": "View following",
-  "@followListOpenFollowingA11y": {"description": "Semantics for the profile FOLLOWING counter, which opens the list."}
+  "@followListOpenFollowingA11y": {"description": "Semantics for the profile FOLLOWING counter, which opens the list."},
+  "exerciseFeedbackAction": "Comment / Report",
+  "@exerciseFeedbackAction": {},
+  "exerciseFeedbackActionA11y": "Comment or report discomfort on {exerciseName}",
+  "@exerciseFeedbackActionA11y": {
+    "placeholders": {"exerciseName": {"type": "String"}}
+  },
+  "exerciseFeedbackSheetTitle": "How is this exercise going?",
+  "@exerciseFeedbackSheetTitle": {},
+  "exerciseFeedbackSheetSubtitleSet": "{exerciseName} · set {setNumber}",
+  "@exerciseFeedbackSheetSubtitleSet": {
+    "placeholders": {
+      "exerciseName": {"type": "String"},
+      "setNumber": {"type": "int"}
+    }
+  },
+  "exerciseFeedbackSheetSubtitleExercise": "{exerciseName}",
+  "@exerciseFeedbackSheetSubtitleExercise": {
+    "placeholders": {"exerciseName": {"type": "String"}}
+  },
+  "exerciseFeedbackKindComment": "Comment",
+  "@exerciseFeedbackKindComment": {},
+  "exerciseFeedbackKindDiscomfort": "Discomfort / pain",
+  "@exerciseFeedbackKindDiscomfort": {},
+  "exerciseFeedbackTextHint": "Tell your coach what happened",
+  "@exerciseFeedbackTextHint": {},
+  "exerciseFeedbackSend": "SEND",
+  "@exerciseFeedbackSend": {},
+  "exerciseFeedbackEmptyError": "Write a comment before sending.",
+  "@exerciseFeedbackEmptyError": {},
+  "exerciseFeedbackSent": "Your coach will see this comment.",
+  "@exerciseFeedbackSent": {},
+  "exerciseFeedbackSentDiscomfort": "We notified your coach.",
+  "@exerciseFeedbackSentDiscomfort": {},
+  "exerciseFeedbackSendError": "We couldn't send your comment. Try again.",
+  "@exerciseFeedbackSendError": {},
+  "exerciseFeedbackNoTrainerTitle": "Share your training",
+  "@exerciseFeedbackNoTrainerTitle": {},
+  "exerciseFeedbackNoTrainerBody": "For your coach to read this, you first need to share your training with them.",
+  "@exerciseFeedbackNoTrainerBody": {},
+  "exerciseFeedbackNoTrainerCta": "SHARE AND SEND",
+  "@exerciseFeedbackNoTrainerCta": {},
+  "exerciseFeedbackNoTrainerUnlinked": "You don't have a linked coach yet.",
+  "@exerciseFeedbackNoTrainerUnlinked": {},
+  "exerciseFeedbackFromAthleteTag": "FROM ATHLETE",
+  "@exerciseFeedbackFromAthleteTag": {},
+  "exerciseFeedbackDiscomfortTag": "DISCOMFORT",
+  "@exerciseFeedbackDiscomfortTag": {},
+  "exerciseFeedbackSetLabel": "Set {setNumber}",
+  "@exerciseFeedbackSetLabel": {
+    "placeholders": {"setNumber": {"type": "int"}}
+  },
+  "exerciseFeedbackDelete": "Delete",
+  "@exerciseFeedbackDelete": {},
+  "exerciseFeedbackDeleteConfirm": "Delete this comment?",
+  "@exerciseFeedbackDeleteConfirm": {},
+  "exerciseFeedbackDeleted": "Comment deleted.",
+  "@exerciseFeedbackDeleted": {}
 }

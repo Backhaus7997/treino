@@ -3364,6 +3364,87 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get followListOpenFollowingA11y => 'Ver seguidos';
+
+  @override
+  String get exerciseFeedbackAction => 'Comentar / Reportar';
+
+  @override
+  String exerciseFeedbackActionA11y(String exerciseName) {
+    return 'Comentar o reportar una molestia en $exerciseName';
+  }
+
+  @override
+  String get exerciseFeedbackSheetTitle => '¿Cómo va este ejercicio?';
+
+  @override
+  String exerciseFeedbackSheetSubtitleSet(String exerciseName, int setNumber) {
+    return '$exerciseName · serie $setNumber';
+  }
+
+  @override
+  String exerciseFeedbackSheetSubtitleExercise(String exerciseName) {
+    return '$exerciseName';
+  }
+
+  @override
+  String get exerciseFeedbackKindComment => 'Comentario';
+
+  @override
+  String get exerciseFeedbackKindDiscomfort => 'Molestia / dolor';
+
+  @override
+  String get exerciseFeedbackTextHint => 'Contale a tu PF qué pasó';
+
+  @override
+  String get exerciseFeedbackSend => 'ENVIAR';
+
+  @override
+  String get exerciseFeedbackEmptyError =>
+      'Escribí un comentario antes de enviar.';
+
+  @override
+  String get exerciseFeedbackSent => 'Tu PF va a ver este comentario.';
+
+  @override
+  String get exerciseFeedbackSentDiscomfort => 'Le avisamos a tu PF.';
+
+  @override
+  String get exerciseFeedbackSendError =>
+      'No pudimos enviar tu comentario. Probá de nuevo.';
+
+  @override
+  String get exerciseFeedbackNoTrainerTitle => 'Compartí tu entrenamiento';
+
+  @override
+  String get exerciseFeedbackNoTrainerBody =>
+      'Para que tu PF pueda leer esto, primero tenés que compartir tu entrenamiento con él.';
+
+  @override
+  String get exerciseFeedbackNoTrainerCta => 'COMPARTIR Y ENVIAR';
+
+  @override
+  String get exerciseFeedbackNoTrainerUnlinked =>
+      'Todavía no tenés un PF vinculado.';
+
+  @override
+  String get exerciseFeedbackFromAthleteTag => 'DEL ALUMNO';
+
+  @override
+  String get exerciseFeedbackDiscomfortTag => 'MOLESTIA';
+
+  @override
+  String exerciseFeedbackSetLabel(int setNumber) {
+    return 'Serie $setNumber';
+  }
+
+  @override
+  String get exerciseFeedbackDelete => 'Borrar';
+
+  @override
+  String get exerciseFeedbackDeleteConfirm => '¿Borrar este comentario?';
+
+  @override
+  String get exerciseFeedbackDeleted => 'Comentario borrado.';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -6723,4 +6804,85 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get followListOpenFollowingA11y => 'Ver seguidos';
+
+  @override
+  String get exerciseFeedbackAction => 'Comentar / Reportar';
+
+  @override
+  String exerciseFeedbackActionA11y(String exerciseName) {
+    return 'Comentar o reportar una molestia en $exerciseName';
+  }
+
+  @override
+  String get exerciseFeedbackSheetTitle => '¿Cómo va este ejercicio?';
+
+  @override
+  String exerciseFeedbackSheetSubtitleSet(String exerciseName, int setNumber) {
+    return '$exerciseName · serie $setNumber';
+  }
+
+  @override
+  String exerciseFeedbackSheetSubtitleExercise(String exerciseName) {
+    return '$exerciseName';
+  }
+
+  @override
+  String get exerciseFeedbackKindComment => 'Comentario';
+
+  @override
+  String get exerciseFeedbackKindDiscomfort => 'Molestia / dolor';
+
+  @override
+  String get exerciseFeedbackTextHint => 'Contale a tu PF qué pasó';
+
+  @override
+  String get exerciseFeedbackSend => 'ENVIAR';
+
+  @override
+  String get exerciseFeedbackEmptyError =>
+      'Escribí un comentario antes de enviar.';
+
+  @override
+  String get exerciseFeedbackSent => 'Tu PF va a ver este comentario.';
+
+  @override
+  String get exerciseFeedbackSentDiscomfort => 'Le avisamos a tu PF.';
+
+  @override
+  String get exerciseFeedbackSendError =>
+      'No pudimos enviar tu comentario. Probá de nuevo.';
+
+  @override
+  String get exerciseFeedbackNoTrainerTitle => 'Compartí tu entrenamiento';
+
+  @override
+  String get exerciseFeedbackNoTrainerBody =>
+      'Para que tu PF pueda leer esto, primero tenés que compartir tu entrenamiento con él.';
+
+  @override
+  String get exerciseFeedbackNoTrainerCta => 'COMPARTIR Y ENVIAR';
+
+  @override
+  String get exerciseFeedbackNoTrainerUnlinked =>
+      'Todavía no tenés un PF vinculado.';
+
+  @override
+  String get exerciseFeedbackFromAthleteTag => 'DEL ALUMNO';
+
+  @override
+  String get exerciseFeedbackDiscomfortTag => 'MOLESTIA';
+
+  @override
+  String exerciseFeedbackSetLabel(int setNumber) {
+    return 'Serie $setNumber';
+  }
+
+  @override
+  String get exerciseFeedbackDelete => 'Borrar';
+
+  @override
+  String get exerciseFeedbackDeleteConfirm => '¿Borrar este comentario?';
+
+  @override
+  String get exerciseFeedbackDeleted => 'Comentario borrado.';
 }

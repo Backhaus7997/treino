@@ -29,4 +29,19 @@ class SessionShareRepository {
   Future<void> revoke(String athleteId) {
     return _firestore.collection('session_shares').doc(athleteId).delete();
   }
+
+  /// The trainer currently granted read access to [athleteId], or null when no
+  /// grant exists.
+  ///
+  /// Read by the exercise-feedback composer: feedback the trainer cannot read
+  /// has no recipient, so the composer asks for consent before writing instead
+  /// of letting the athlete report pain into a void.
+  Future<String?> grantedTrainerId(String athleteId) async {
+    final snap =
+        await _firestore.collection('session_shares').doc(athleteId).get();
+    final data = snap.data();
+    if (!snap.exists || data == null) return null;
+    final trainerId = data['trainerId'];
+    return trainerId is String && trainerId.isNotEmpty ? trainerId : null;
+  }
 }

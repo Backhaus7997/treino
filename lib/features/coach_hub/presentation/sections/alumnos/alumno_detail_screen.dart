@@ -50,11 +50,14 @@ import 'package:treino/features/profile/application/user_public_profile_provider
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
 import 'package:treino/features/workout/application/exercise_frequency_providers.dart';
+import 'package:treino/features/workout/application/exercise_feedback_providers.dart'
+    show coachSessionFeedbackProvider;
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_status.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
+import 'package:treino/features/workout/domain/exercise_feedback.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/presentation/widgets/exercise_progression_chart.dart'
     show ExerciseProgressionChartLabels;
@@ -2346,6 +2349,14 @@ class _SetLogsExpansion extends ConsumerWidget {
             for (final log in logs) {
               groups.putIfAbsent(log.exerciseId, () => <SetLog>[]).add(log);
             }
+            // Athlete feedback for this session (issue #628). Read separately
+            // so a feedback failure degrades to "no feedback" instead of
+            // blanking the set logs the trainer came here for.
+            final feedback = ref
+                    .watch(coachSessionFeedbackProvider(
+                        (athleteUid: athleteId, sessionId: sessionId)))
+                    .valueOrNull ??
+                const <ExerciseFeedback>[];
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -2353,6 +2364,9 @@ class _SetLogsExpansion extends ConsumerWidget {
                   SessionExerciseBlock(
                     exerciseName: entry.value.first.exerciseName,
                     sets: entry.value,
+                    feedback: feedback
+                        .where((f) => f.exerciseId == entry.key)
+                        .toList(),
                   ),
               ],
             );
