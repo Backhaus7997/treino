@@ -419,8 +419,27 @@ describe("follows — read", () => {
     );
   });
 
-  it("un tercero no lee una arista ajena", async () => {
+  // REQ-FOLLOWLIST-001
+  //
+  // Las listas de SEGUIDORES/SEGUIDOS de cualquier usuario son públicas para
+  // usuarios autenticados, así que un tercero SÍ lee una arista `accepted`
+  // ajena. Antes de `follow-lists` esto estaba denegado: la lista propia se
+  // podía listar y la ajena no.
+  it("un tercero lee una arista accepted ajena", async () => {
     await seedEdge("alice", "bob", "accepted");
+
+    await assertSucceeds(
+      asUser("mallory")
+        .collection(COL_FOLLOWS)
+        .doc(edgeId("alice", "bob"))
+        .get(),
+    );
+  });
+
+  // La apertura llega hasta `accepted` y ni un paso más: una solicitud sin
+  // resolver sigue siendo asunto de los dos involucrados.
+  it("un tercero NO lee una arista pending ajena", async () => {
+    await seedEdge("alice", "bob", "pending");
 
     await assertFails(
       asUser("mallory")
@@ -451,6 +470,191 @@ describe("follows — read", () => {
         .firestore()
         .collection(COL_FOLLOWS)
         .doc(edgeId("alice", "bob"))
+        .get(),
+    );
+  });
+});
+
+// ── listas de seguidores / seguidos ─────────────────────────────────────────
+//
+// Firestore evalúa la regla documento por documento y **no ve las cláusulas
+// `where`**: no hay forma de que la regla sepa de quién es la lista pedida. Y
+// si una sola fila del resultado no pasa, rechaza la QUERY ENTERA en vez de
+// filtrarla. Los dos hechos juntos son los que fuerzan la forma de la regla:
+// el permiso tiene que depender sólo de campos del documento evaluado
+// (`status == 'accepted'`), y el filtro del cliente tiene que alinearse con él
+// o la lista se cae completa.
+//
+// REQ-FOLLOWLIST-001 / REQ-FOLLOWLIST-002
+describe("follows — listas de seguidores/seguidos", () => {
+  /** alice y carol siguen a bob; bob sigue a dave; erin le mandó pending a bob. */
+  async function seedGraph() {
+    await seedEdge("alice", "bob", "accepted");
+    await seedEdge("carol", "bob", "accepted");
+    await seedEdge("bob", "dave", "accepted");
+    await seedEdge("erin", "bob", "pending");
+  }
+
+  it("un tercero lista los SEGUIDORES de otro", async () => {
+    await seedGraph();
+
+    const snap = await assertSucceeds(
+      asUser("mallory")
+        .collection(COL_FOLLOWS)
+        .where("followeeUid", "==", "bob")
+        .where("status", "==", "accepted")
+        .get(),
+    );
+    expect(
+      snap.docs.map((d: { id: string }) => d.id).sort(),
+    ).toEqual(["alice_bob", "carol_bob"]);
+  });
+
+  it("un tercero lista los SEGUIDOS de otro", async () => {
+    await seedGraph();
+
+    const snap = await assertSucceeds(
+      asUser("mallory")
+        .collection(COL_FOLLOWS)
+        .where("followerUid", "==", "bob")
+        .where("status", "==", "accepted")
+        .get(),
+    );
+    expect(snap.docs.map((d: { id: string }) => d.id)).toEqual(["bob_dave"]);
+  });
+
+  // El filtro `status == 'accepted'` NO es cosmético ni una optimización: es
+  // lo único que impide enumerar las solicitudes pendientes de cualquiera.
+  // Sin él la query devolvería la arista de erin y se cae entera — que es
+  // exactamente el comportamiento que queremos.
+  it("sin el filtro de status, la query de SEGUIDORES se cae entera", async () => {
+    await seedGraph();
+
+    await assertFails(
+      asUser("mallory")
+        .collection(COL_FOLLOWS)
+        .where("followeeUid", "==", "bob")
+        .get(),
+    );
+  });
+
+  it("un tercero no puede enumerar las solicitudes pendientes de otro", async () => {
+    await seedGraph();
+
+    await assertFails(
+      asUser("mallory")
+        .collection(COL_FOLLOWS)
+        .where("followeeUid", "==", "bob")
+        .where("status", "==", "pending")
+        .get(),
+    );
+  });
+
+  it("el dueño lista sus propios seguidos", async () => {
+    await seedGraph();
+
+    const snap = await assertSucceeds(
+      asUser("bob")
+        .collection(COL_FOLLOWS)
+        .where("followerUid", "==", "bob")
+        .where("status", "==", "accepted")
+        .get(),
+    );
+    expect(snap.docs.map((d: { id: string }) => d.id)).toEqual(["bob_dave"]);
+  });
+
+  it("un anónimo no lista nada", async () => {
+    await seedGraph();
+
+    await assertFails(
+      testEnv
+        .unauthenticatedContext()
+        .firestore()
+        .collection(COL_FOLLOWS)
+        .where("followeeUid", "==", "bob")
+        .where("status", "==", "accepted")
+        .get(),
+    );
+  });
+});
+
+// ── queries que la app ya hacía (regresión) ─────────────────────────────────
+//
+// Las tres queries de `FollowRepository` que NO son por doc id. Hasta
+// `follow-lists` la regla de `read` sólo nombraba `members`, así que dos de
+// las tres estaban denegadas en producción: el planner no puede probar
+// `uid in resource.data.members` desde un `where` sobre `followerUid` o
+// `followeeUid`. El `describe("follows — read")` no lo agarró porque cubría
+// únicamente lecturas por doc id.
+describe("follows — queries de FollowRepository", () => {
+  it("allOf: members array-contains — la única que ya funcionaba", async () => {
+    await seedEdge("alice", "bob", "accepted");
+    await seedEdge("bob", "dave", "accepted");
+    await seedEdge("erin", "bob", "pending");
+
+    const snap = await assertSucceeds(
+      asUser("bob")
+        .collection(COL_FOLLOWS)
+        .where("members", "array-contains", "bob")
+        .get(),
+    );
+    expect(snap.docs.map((d: { id: string }) => d.id).sort()).toEqual([
+      "alice_bob",
+      "bob_dave",
+      "erin_bob",
+    ]);
+  });
+
+  it("followingOf: followerUid == uid && status == accepted", async () => {
+    await seedEdge("bob", "dave", "accepted");
+
+    const snap = await assertSucceeds(
+      asUser("bob")
+        .collection(COL_FOLLOWS)
+        .where("followerUid", "==", "bob")
+        .where("status", "==", "accepted")
+        .get(),
+    );
+    expect(snap.docs.map((d: { id: string }) => d.id)).toEqual(["bob_dave"]);
+  });
+
+  it("pendingReceivedFor: followeeUid == uid && status == pending", async () => {
+    await seedEdge("erin", "bob", "pending");
+    await seedEdge("alice", "bob", "accepted");
+
+    const snap = await assertSucceeds(
+      asUser("bob")
+        .collection(COL_FOLLOWS)
+        .where("followeeUid", "==", "bob")
+        .where("status", "==", "pending")
+        .get(),
+    );
+    expect(snap.docs.map((d: { id: string }) => d.id)).toEqual(["erin_bob"]);
+  });
+
+  // La contracara del arreglo: que `followeeUid == uid` sea probable NO le da
+  // a nadie las solicitudes de OTRO. La disyunción se prueba contra
+  // `request.auth.uid`, no contra el valor del filtro.
+  it("nadie lista las solicitudes pendientes de otro", async () => {
+    await seedEdge("erin", "bob", "pending");
+
+    await assertFails(
+      asUser("mallory")
+        .collection(COL_FOLLOWS)
+        .where("followeeUid", "==", "bob")
+        .where("status", "==", "pending")
+        .get(),
+    );
+  });
+
+  it("nadie lista las solicitudes que OTRO envió", async () => {
+    await seedEdge("bob", "erin", "pending");
+
+    await assertFails(
+      asUser("mallory")
+        .collection(COL_FOLLOWS)
+        .where("followerUid", "==", "bob")
+        .where("status", "==", "pending")
         .get(),
     );
   });

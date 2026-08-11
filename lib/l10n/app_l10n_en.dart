@@ -3274,4 +3274,31 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get chatBlockedComposerHintA11y => 'You can\'t write in this chat';
+
+  @override
+  String get followListTabFollowers => 'FOLLOWERS';
+
+  @override
+  String get followListTabFollowing => 'FOLLOWING';
+
+  @override
+  String get followListEmptyFollowers => 'No followers yet';
+
+  @override
+  String get followListEmptyFollowersSelf => 'You have no followers yet';
+
+  @override
+  String get followListEmptyFollowing => 'Not following anyone yet';
+
+  @override
+  String get followListEmptyFollowingSelf => 'You\'re not following anyone yet';
+
+  @override
+  String get followListLoadError => 'We couldn\'t load the list. Try again.';
+
+  @override
+  String get followListOpenFollowersA11y => 'View followers';
+
+  @override
+  String get followListOpenFollowingA11y => 'View following';
 }

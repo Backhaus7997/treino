@@ -13,9 +13,10 @@ import '../domain/follow_status.dart';
 /// son la misma operación pero sobre la arista que corresponde, y nunca tocan
 /// la inversa.
 ///
-/// **No existe `followersOf`**: no tiene consumidor en este change
-/// (ADR-FOLLOW-009). La pantalla de seguidores/seguidos vive en `follow-lists`,
-/// y agregar el método ahora sería código muerto con un índice que lo sostenga.
+/// [followersOf] se sumó en `follow-lists`, que es cuando apareció el primer
+/// consumidor: la pantalla de seguidores. Hasta entonces no existía a
+/// propósito (ADR-FOLLOW-009) — habría sido código muerto sosteniendo un
+/// índice.
 class FollowRepository {
   FollowRepository({required FirebaseFirestore firestore})
       : _firestore = firestore;
@@ -101,6 +102,32 @@ class FollowRepository {
                 s.docs.map((d) => d.data()['followeeUid']! as String).toList(),
           );
 
+  /// UIDs que siguen a [uid] con la relación ya aceptada.
+  ///
+  /// La inversa exacta de [followingOf]: misma forma, el otro extremo de la
+  /// arista. Preguntar una sola dirección es justo lo que el modelo viejo no
+  /// podía hacer.
+  ///
+  /// **Sin `orderBy`, igual que [followingOf]** — y es deliberado. Hay un
+  /// índice compuesto desplegado (`followeeUid + status + createdAt DESC`) que
+  /// permitiría ordenar por más reciente, pero Firestore **excluye
+  /// silenciosamente los documentos a los que les falta el campo del
+  /// `orderBy`**, y las aristas que entraron por el script de migración se
+  /// escribieron con Admin SDK, o sea sin pasar por la allowlist de las rules
+  /// que exige `createdAt`. Ordenar sin auditar antes esos documentos
+  /// cambiaría "la lista está desordenada" por "a la lista le faltan
+  /// personas", que es mucho peor y además invisible.
+  Future<List<String>> followersOf(String uid) async {
+    final snap = await _followersQuery(uid).get();
+    return snap.docs.map((d) => d.data()['followerUid']! as String).toList();
+  }
+
+  Stream<List<String>> watchFollowersOf(String uid) =>
+      _followersQuery(uid).snapshots().map(
+            (s) =>
+                s.docs.map((d) => d.data()['followerUid']! as String).toList(),
+          );
+
   /// Solicitudes que [uid] RECIBIÓ y todavía no resolvió.
   ///
   /// El filtro por `followeeUid` es server-side a propósito: filtrar en memoria
@@ -138,6 +165,10 @@ class FollowRepository {
 
   Query<Map<String, Object?>> _followingQuery(String uid) => _follows
       .where('followerUid', isEqualTo: uid)
+      .where('status', isEqualTo: FollowStatus.accepted.toJson());
+
+  Query<Map<String, Object?>> _followersQuery(String uid) => _follows
+      .where('followeeUid', isEqualTo: uid)
       .where('status', isEqualTo: FollowStatus.accepted.toJson());
 
   Query<Map<String, Object?>> _pendingReceivedQuery(String uid) => _follows

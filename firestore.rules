@@ -1108,9 +1108,50 @@ service cloud.firestore {
     match /follows/{followId} {
       // `resource == null` permite preguntar "¿lo sigo?" y que la respuesta
       // legítima "no" resuelva en vez de tirar permission-denied.
+      //
+      // ⚠️ LAS RULES NO SE EVALÚAN DOCUMENTO POR DOCUMENTO EN UNA QUERY.
+      //
+      // Firestore analiza la query contra la regla y exige poder PROBAR que la
+      // regla se cumple usando SOLO las cláusulas `where`, sin leer un solo
+      // documento. Un campo que el `where` no menciona queda indefinido, y
+      // referenciarlo tira `Property X is undefined on object. for 'list'` —
+      // la query se rechaza entera aunque todos los documentos reales
+      // cumplieran la regla.
+      //
+      // Por eso hay cuatro disyunciones que a nivel de documento son
+      // redundantes entre sí (`members == [followerUid, followeeUid]` está
+      // garantizado por el `create` de abajo): existen para que el planner
+      // pueda probar la regla desde el `where` de CADA query que la app hace.
+      //
+      //   query                                    disyunción que la prueba
+      //   ─────────────────────────────────────    ────────────────────────
+      //   doc id (`getEdge`/`watchEdge`)           members
+      //   members array-contains uid (`allOf`)     members
+      //   followerUid == uid  (`followingOf`)      followerUid
+      //   followeeUid == uid  (`pendingReceivedFor`) followeeUid
+      //   status == 'accepted' de un tercero       status  ← listas ajenas
+      //
+      // Las tres primeras NO son nuevas funcionalmente: sin ellas
+      // `followingOf` y `pendingReceivedFor` quedaban denegadas —el feed
+      // SEGUIDORES y el inbox de solicitudes rotos— porque la regla vieja
+      // sólo nombraba `members`. El test de `read` cubría únicamente lecturas
+      // por doc id, así que el agujero pasó verde.
+      //
+      // `error || true == true` en el lenguaje de rules: las disyunciones que
+      // el planner no puede resolver dan error y NO envenenan el OR mientras
+      // alguna otra sea probablemente verdadera.
+      //
+      // La última disyunción (`status == 'accepted'`) es la que abre las
+      // listas de SEGUIDORES/SEGUIDOS de cualquiera a cualquier autenticado.
+      // Llega hasta ahí y ni un paso más: una solicitud `pending` sigue
+      // siendo asunto de los dos involucrados, y una query sin el filtro de
+      // status no se puede probar, así que se cae entera en vez de filtrar.
       allow read: if request.auth != null
                   && (resource == null
-                      || request.auth.uid in resource.data.members);
+                      || request.auth.uid in resource.data.members
+                      || request.auth.uid == resource.data.followerUid
+                      || request.auth.uid == resource.data.followeeUid
+                      || resource.data.status == 'accepted');
 
       // Create: solo el follower crea su propia arista.
       //
