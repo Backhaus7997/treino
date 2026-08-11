@@ -234,9 +234,11 @@ enum TodaysWorkoutResolver {
     /// `nextPlanPosition`.
     ///
     /// Se ordena por `startedAt` descendente y se filtra en el cliente por
-    /// `finishedAt` presente: agregar ese filtro a la query exigiría un índice
+    /// `countsAsWorkout`: agregar ese filtro a la query exigiría un índice
     /// compuesto en Firestore, y no vale la pena para el puñado de sesiones que
     /// se traen.
+    ///
+    /// ⚠️ "Terminada" acá significa **hecha**, no "cerrada". Ver el guard.
     private static func findLastFinishedSession(
         client: FirestoreREST,
         uid: String,
@@ -254,11 +256,32 @@ enum TodaysWorkoutResolver {
 
         for doc in sessions {
             let fields = doc.fields
-            // `FS.isPresent` y no `!= nil`: el telefono escribe finishedAt con
-            // nullValue explicito. Comparando contra nil, una sesion EN CURSO
-            // contaba como "ultima terminada" y el reloj le adelantaba el dia
-            // del plan al atleta mientras todavia estaba entrenando.
-            guard FS.isPresent(fields["finishedAt"]),
+            // PUERTO LITERAL de `Session.countsAsWorkout`
+            // (`lib/features/workout/domain/session.dart`):
+            //
+            //     status == SessionStatus.finished && wasFullyCompleted
+            //
+            // Tiene que ser la MISMA condicion, no una parecida. Antes se
+            // preguntaba solo por `finishedAt` presente, y eso NO es lo mismo:
+            // abandonar un entreno guarda `status=finished` con
+            // `wasFullyCompleted=false`, asi que una sesion abandonada contaba
+            // como "ultima terminada" para el reloj y no para el telefono.
+            //
+            // Los dos avanzaban el plan desde sesiones DISTINTAS. Se veia como
+            // el reloj clavado en otro dia: con la ultima abandonada en dia 3,
+            // el reloj rotaba a dia 1 y se llevaba la semana puesta (Sem 3/3 ->
+            // Sem 1/3) mientras el telefono seguia en dia 3.
+            //
+            // `wasFullyCompleted` ausente cuenta como false, igual que el
+            // `@Default(false)` del lado Dart: `FS.bool` devuelve nil y el
+            // `== true` lo descarta.
+            //
+            // Ojo: los otros usos de `finishedAt` en el reloj NO se tocan.
+            // Buscar la sesion activa y detectar que el telefono cerro el
+            // entreno SI deben contar una abandonada — esa sesion esta cerrada
+            // igual. La distincion es "cerrada" vs "hecha".
+            guard FS.string(fields["status"]) == "finished",
+                  FS.bool(fields["wasFullyCompleted"]) == true,
                   let day = FS.int(fields["dayNumber"]),
                   let week = FS.int(fields["weekNumber"])
             else { continue }

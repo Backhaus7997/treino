@@ -232,6 +232,10 @@ enum FS {
         return nil
     }
 
+    static func bool(_ field: Any?) -> Bool? {
+        (field as? [String: Any])?["booleanValue"] as? Bool
+    }
+
     static func array(_ field: Any?) -> [Any]? {
         guard let wrapper = field as? [String: Any],
               let arrayValue = wrapper["arrayValue"] as? [String: Any]
