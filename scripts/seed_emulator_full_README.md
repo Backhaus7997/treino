@@ -90,10 +90,10 @@ npm run seed:emulator:clear
 
 | Email | Password | Name | Gym | Experience |
 |---|---|---|---|---|
-| `martin@emulator.treino` | `Emulator1234!` | Martín López | Megatlon Palermo | intermediate |
-| `sofia@emulator.treino` | `Emulator1234!` | Sofía Ramírez | Megatlon Palermo | beginner |
-| `mateo@emulator.treino` | `Emulator1234!` | Mateo Quiroga | SmartFit Caballito | advanced |
-| `valentina@emulator.treino` | `Emulator1234!` | Valentina Peralta | SmartFit Caballito | intermediate |
+| `martin@emulator.treino` | `Emulator1234!` | Martín López | Iron House Palermo | intermediate |
+| `sofia@emulator.treino` | `Emulator1234!` | Sofía Ramírez | Iron House Palermo | beginner |
+| `mateo@emulator.treino` | `Emulator1234!` | Mateo Quiroga | Vector Fit Caballito | advanced |
+| `valentina@emulator.treino` | `Emulator1234!` | Valentina Peralta | Vector Fit Caballito | intermediate |
 | `nicolas@emulator.treino` | `Emulator1234!` | Nicolás Fernández | — | beginner |
 
 ---
@@ -101,7 +101,12 @@ npm run seed:emulator:clear
 ## What gets seeded
 
 ### Gyms (`gyms/`)
-3 gyms in Buenos Aires (Megatlon Palermo, SmartFit Caballito, Megatlon Nueva Córdoba).
+3 gyms (Iron House Palermo, Vector Fit Caballito, Iron House Nueva Córdoba).
+
+All gym names here are **fictional on purpose**. This seed feeds the store
+screenshots (`store/README.md`), and a store listing is public permanently —
+naming a real gym chain there is a problem we cannot take back. Keep any gym
+you add fictional too.
 
 ### Users + public profiles
 - `users/{uid}` — full `UserProfile` including trainer fields for coaches.

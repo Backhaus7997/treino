@@ -1,0 +1,18 @@
+TREINO is your gym training app. Log your sets while you train, watch your numbers move, and train with your coach — all in one place.
+
+LOG YOUR TRAINING
+Record weight and reps set by set without leaving the screen. TREINO handles your rest timer, remembers what you lifted last time, and shows you whether you are actually improving.
+
+ROUTINES THAT FIT
+Build your own routines or follow the one your trainer assigned. Weeks, days and exercises, organized. No more spreadsheets.
+
+REAL PROGRESS, NOT GUESSWORK
+Per-exercise progression, volume by muscle group, training frequency and body measurements. Concrete numbers, not vibes.
+
+TRAIN WITH A COACH
+Find trainers near you or at your gym. Your coach builds your plan, sees the sets you log, and follows your progress closely. Chat and appointment scheduling included.
+
+YOUR GYM, YOUR PEOPLE
+Share workouts with friends and compete on your gym's leaderboards: streak, volume and main lifts. Opt in only if you want to.
+
+TREINO is for people who train seriously and want to see the progress, not just feel it.
