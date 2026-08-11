@@ -175,6 +175,56 @@ void main() {
     });
   });
 
+  // ── followersOf / watchFollowersOf ────────────────────────────────────────
+  //
+  // La inversa exacta de `followingOf`. Que los dos existan y sean simétricos
+  // es el punto del modelo dirigido: en `friendships` no había forma de
+  // preguntar una dirección sola.
+  group('FollowRepository.followersOf', () {
+    // REQ-FOLLOWLIST-002
+    test('devuelve los followers accepted, no los pending', () async {
+      await seed('a', 'u1');
+      await seed('b', 'u1');
+      await seed('c', 'u1', status: FollowStatus.pending);
+
+      expect((await repo.followersOf('u1'))..sort(), ['a', 'b']);
+    });
+
+    // El espejo del test que motivó todo el cambio de modelo: seguir y ser
+    // seguido son conjuntos distintos, y confundirlos es el bug viejo.
+    test('NO devuelve a quienes él sigue', () async {
+      await seed('me-sigue-este', 'u1');
+      await seed('u1', 'sigo-a-este');
+
+      expect(await repo.followersOf('u1'), ['me-sigue-este']);
+    });
+
+    test('devuelve vacío cuando nadie lo sigue', () async {
+      await seed('u1', 'sigo-a-este');
+
+      expect(await repo.followersOf('u1'), isEmpty);
+    });
+
+    test('watchFollowersOf emite la misma lista', () async {
+      await seed('a', 'u1');
+
+      expect(await repo.watchFollowersOf('u1').first, ['a']);
+    });
+
+    test('watchFollowersOf re-emite cuando aparece un seguidor nuevo',
+        () async {
+      await seed('a', 'u1');
+      final emissions = repo.watchFollowersOf('u1');
+
+      await seed('b', 'u1');
+
+      expect(
+          await emissions.first
+            ..sort(),
+          ['a', 'b']);
+    });
+  });
+
   // ── pendingReceivedFor ────────────────────────────────────────────────────
   group('FollowRepository.pendingReceivedFor', () {
     // REQ-FOLLOW-005
