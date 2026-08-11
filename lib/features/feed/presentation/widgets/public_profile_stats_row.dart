@@ -17,12 +17,27 @@ class PublicProfileStatsRow extends StatelessWidget {
     this.racha,
     this.followersCount,
     this.followingCount,
+    this.onFollowersTap,
+    this.onFollowingTap,
+    this.followersSemanticsLabel,
+    this.followingSemanticsLabel,
   });
 
   final int? workoutsCount;
   final int? racha;
   final int? followersCount;
   final int? followingCount;
+
+  /// Abre la lista de SEGUIDORES. `null` (default) → el contador no es
+  /// tappable, que es como se comportó siempre. WORKOUTS y RACHA nunca lo son:
+  /// no llevan a ninguna parte.
+  final VoidCallback? onFollowersTap;
+
+  /// Abre la lista de SEGUIDOS.
+  final VoidCallback? onFollowingTap;
+
+  final String? followersSemanticsLabel;
+  final String? followingSemanticsLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -40,10 +55,14 @@ class PublicProfileStatsRow extends StatelessWidget {
         StatTile(
           label: 'SEGUIDORES',
           value: kFormat(followersCount ?? 0),
+          onTap: onFollowersTap,
+          semanticsLabel: followersSemanticsLabel,
         ),
         StatTile(
           label: 'SIGUIENDO',
           value: kFormat(followingCount ?? 0),
+          onTap: onFollowingTap,
+          semanticsLabel: followingSemanticsLabel,
         ),
       ],
     );

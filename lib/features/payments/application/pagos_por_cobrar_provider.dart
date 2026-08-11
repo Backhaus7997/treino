@@ -115,10 +115,18 @@ final pagosPorCobrarProvider =
 
   final links = linksAsync.valueOrNull ?? const [];
 
-  final activeLinks =
-      links.where((l) => l.status == TrainerLinkStatus.active).toList();
+  // QA H9: incluir 'paused'. Pausar es un hold temporal, no un corte: la deuda
+  // pendiente del alumno sigue siendo deuda. Antes se filtraba solo 'active',
+  // así que un cobro pendiente de un alumno pausado desaparecía de POR COBRAR
+  // y el card mostraba "Sin cobros pendientes" mintiendo, aunque el doc Payment
+  // seguía `pending` en Firestore.
+  final billableLinks = links
+      .where((l) =>
+          l.status == TrainerLinkStatus.active ||
+          l.status == TrainerLinkStatus.paused)
+      .toList();
 
-  if (activeLinks.isEmpty) {
+  if (billableLinks.isEmpty) {
     return const AsyncValue.data([]);
   }
 
@@ -140,7 +148,7 @@ final pagosPorCobrarProvider =
   // ── 3. Per-athlete: aggregate real pending Payment docs ───────────────────
   final results = <CobroPendiente>[];
 
-  for (final link in activeLinks) {
+  for (final link in billableLinks) {
     final athleteId = link.athleteId;
 
     final pendingForAthlete = allPayments

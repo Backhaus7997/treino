@@ -1,5 +1,5 @@
 // Regresión del pull-to-refresh del feed (2026-07-28): _AmigosBody y
-// _MiGymBody refrescaban SOLO el wrapper (myFriendsFeedProvider /
+// _MiGymBody refrescaban SOLO el wrapper (myFollowingFeedProvider /
 // myGymFeedProvider), pero las families subyacentes (feedForFriendsProvider /
 // feedForGymProvider) NO son autoDispose y cachean el query por key —
 // y ref.refresh/invalidate no cascada a dependencias. Con la misma key
@@ -19,7 +19,7 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/feed/application/feed_screen_providers.dart';
-import 'package:treino/features/feed/application/friendship_providers.dart';
+import 'package:treino/features/feed/application/follow_providers.dart';
 import 'package:treino/features/feed/application/post_providers.dart';
 import 'package:treino/features/feed/data/post_repository.dart';
 import 'package:treino/features/feed/domain/feed_segment.dart';
@@ -63,7 +63,7 @@ class _CountingPostRepository extends Fake implements PostRepository {
     final posts = store
         .where(
           (p) =>
-              p.privacy == PostPrivacy.friends &&
+              p.privacy == PostPrivacy.followers &&
               friendUids.contains(p.authorUid),
         )
         .toList();
@@ -86,7 +86,7 @@ Post _makePost({
   String id = 'p1',
   String authorUid = 'u2',
   String text = 'Hola mundo',
-  PostPrivacy privacy = PostPrivacy.friends,
+  PostPrivacy privacy = PostPrivacy.followers,
 }) =>
     Post(
       id: id,
@@ -120,8 +120,7 @@ List<Override> _overrides(
       authStateChangesProvider.overrideWith(
         (ref) => Stream.value(_MockUser(uid: 'u1')),
       ),
-      acceptedFriendsProvider('u1')
-          .overrideWith((ref) => Stream.value(const ['u2'])),
+      followingProvider('u1').overrideWith((ref) => Stream.value(const ['u2'])),
       userProfileProvider.overrideWith(
         (ref) => Stream.value(_makeProfile(gymId: gymId)),
       ),
@@ -152,7 +151,8 @@ void main() {
       await tester.pumpAndSettle();
 
       // Feed cargado (vacío): una sola emisión del query.
-      expect(find.text('Aún no hay posts de tus amigos'), findsOneWidget);
+      expect(find.text('Todavía no hay posts de a quienes seguís'),
+          findsOneWidget);
       expect(repo.friendsQueryUids, hasLength(1));
 
       // Un amigo publica DESPUÉS de la carga — la key (u1+u2) no cambia.
@@ -161,7 +161,7 @@ void main() {
       );
 
       await tester.fling(
-        find.text('Aún no hay posts de tus amigos'),
+        find.text('Todavía no hay posts de a quienes seguís'),
         const Offset(0, 300),
         1000,
       );

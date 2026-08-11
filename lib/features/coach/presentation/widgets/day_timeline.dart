@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../l10n/app_l10n.dart';
 import '../../../profile/application/user_public_profile_providers.dart';
 import '../../application/agenda_providers.dart';
 import '../../domain/appointment.dart';
@@ -91,15 +92,22 @@ class _DayTimelineState extends ConsumerState<DayTimeline> {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
 
-    final apptAsync = ref.watch(
-      trainerAppointmentsStreamProvider(
-        TrainerAppointmentsKey(
-          trainerId: widget.trainerId,
-          fromDate: widget.rangeFrom,
-          toDate: widget.rangeTo,
-        ),
-      ),
+    final key = TrainerAppointmentsKey(
+      trainerId: widget.trainerId,
+      fromDate: widget.rangeFrom,
+      toDate: widget.rangeTo,
     );
+    final apptAsync = ref.watch(trainerAppointmentsStreamProvider(key));
+
+    // A real stream failure must not read as an empty day: the grid is
+    // tap-to-create, so rendering it on error invites booking over an agenda we
+    // failed to load. Surface a retry instead. (Loading still shows the grid.)
+    if (apptAsync.hasError && !apptAsync.hasValue) {
+      return _TimelineErrorState(
+        palette: palette,
+        onRetry: () => ref.invalidate(trainerAppointmentsStreamProvider(key)),
+      );
+    }
 
     // Gracefully degrade while loading — still show the empty grid.
     final allAppointments = apptAsync.valueOrNull ?? const <Appointment>[];
@@ -563,4 +571,57 @@ List<_SessionLayout> _computeLayout(List<Appointment> sessions) {
   }
 
   return sorted;
+}
+
+// ── Error state ─────────────────────────────────────────────────────────────
+
+/// Shown in place of the hour grid when the appointments stream fails outright
+/// (error with no cached value). Mirrors the availability editor's error state:
+/// a message plus a Reintentar button that re-subscribes the stream. Without
+/// this the failed day rendered as an empty, tap-to-book grid — indistinguishable
+/// from a genuinely free day.
+class _TimelineErrorState extends StatelessWidget {
+  const _TimelineErrorState({required this.palette, required this.onRetry});
+
+  final AppPalette palette;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              l10n.agendaGenericError,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton(
+              onPressed: onRetry,
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: palette.accent),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(9999),
+                ),
+              ),
+              child: Text(
+                l10n.coachRetryLabel,
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  letterSpacing: 0.8,
+                  color: palette.accent,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

@@ -4,35 +4,42 @@ import '../../auth/application/auth_providers.dart';
 import '../../profile/application/user_providers.dart';
 import '../domain/feed_segment.dart';
 import '../domain/post.dart';
-import 'friendship_providers.dart';
+import 'follow_providers.dart';
 import 'post_providers.dart';
 
 final feedSegmentProvider = StateProvider<FeedSegment>(
   (ref) => FeedSegment.amigos,
 );
 
-/// Stable pagination key for the authenticated user's AMIGOS segment.
+/// Stable pagination key for the authenticated user's SEGUIDORES segment.
 ///
 /// `null` means unauthenticated. The current UID is intentionally part of the
-/// serialized key so the author's own friends-privacy posts remain visible.
-final myFriendsFeedPaginationKeyProvider = FutureProvider<String?>((ref) async {
+/// serialized key so the author's own followers-privacy posts remain visible.
+///
+/// REQ-FOLLOW-011 — el conjunto sale de [followingProvider], o sea de a quiénes
+/// SIGO. El viejo `acceptedFriendsProvider` devolvía los DOS lados de la
+/// relación, así que alguien que me seguía sin que yo lo siguiera aportaba sus
+/// posts a mi feed. Con el grafo dirigido eso deja de pasar, y es la mitad
+/// visible del cambio de modelo.
+final myFollowingFeedPaginationKeyProvider =
+    FutureProvider<String?>((ref) async {
   final auth = await ref.watch(authStateChangesProvider.future);
   if (auth == null) return null;
 
-  final friendUids = await ref.watch(acceptedFriendsProvider(auth.uid).future);
-  // QA-FEED-003: incluir el propio uid para que los posts AMIGOS del autor
-  // aparezcan en su feed AMIGOS (consistente con MI GYM / PÚBLICO, donde los
-  // propios sí se ven). Sin esto, el autor publica y no ve nada. No hay
-  // early-return por amigos vacíos: un usuario sin amigos igual debe ver sus
-  // propios posts privacy=friends. La regla de posts ya permite leer los
-  // propios (request.auth.uid == authorUid), así que la query no falla.
+  final friendUids = await ref.watch(followingProvider(auth.uid).future);
+  // QA-FEED-003: incluir el propio uid para que los posts del tier SEGUIDORES
+  // del autor aparezcan en su propio feed (consistente con MI GYM / PÚBLICO,
+  // donde los propios sí se ven). Sin esto, el autor publica y no ve nada. No
+  // hay early-return por conjunto vacío: alguien que no sigue a nadie igual
+  // debe ver sus propios posts. La regla de posts ya permite leer los propios
+  // (request.auth.uid == authorUid), así que la query no falla.
   final authorUids = <String>{...friendUids, auth.uid}.toList();
   return friendsFeedPaginationKey(friendUidsKey(authorUids));
 });
 
-final myFriendsFeedProvider = FutureProvider<List<Post>>((ref) async {
+final myFollowingFeedProvider = FutureProvider<List<Post>>((ref) async {
   final paginationKey =
-      await ref.watch(myFriendsFeedPaginationKeyProvider.future);
+      await ref.watch(myFollowingFeedPaginationKeyProvider.future);
   if (paginationKey == null) return const <Post>[];
   final friendKey = paginationKey.substring('friends:'.length);
   return ref.watch(feedForFriendsProvider(friendKey).future);
@@ -53,7 +60,7 @@ final myGymFeedPaginationKeyProvider = FutureProvider<String?>((ref) async {
 /// - `[]`    = user belongs to a gym but it has no posts yet
 /// - `[...]` = gym posts, newest first
 ///
-/// Mirrors [myFriendsFeedProvider] in semantics.
+/// Mirrors [myFollowingFeedProvider] in semantics.
 final myGymFeedProvider = FutureProvider<List<Post>?>((ref) async {
   final paginationKey = await ref.watch(myGymFeedPaginationKeyProvider.future);
   if (paginationKey == null) return null;
@@ -65,7 +72,7 @@ final myGymFeedProvider = FutureProvider<List<Post>?>((ref) async {
 /// (create/update/delete) — wrappers Y families subyacentes.
 ///
 /// `ref.invalidate` NO cascada a las dependencias (QA-498, #497): invalidar
-/// sólo el wrapper ([myFriendsFeedProvider] / [myGymFeedProvider]) re-corre su
+/// sólo el wrapper ([myFollowingFeedProvider] / [myGymFeedProvider]) re-corre su
 /// body, pero su `ref.watch` de la family subyacente ([feedForFriendsProvider]
 /// / [feedForGymProvider], no autoDispose) devuelve la instancia cacheada
 /// mientras la key no cambie — el query a Firestore no se re-emite y el post
@@ -86,9 +93,9 @@ void invalidateAllFeedProviders(Ref ref) {
   ref.invalidate(feedPublicProvider);
   // Wrappers — recomputan solos vía las families, pero invalidarlos cubre el
   // caso en que quedaron en error antes de llegar a watchear la family.
-  ref.invalidate(myFriendsFeedPaginationKeyProvider);
+  ref.invalidate(myFollowingFeedPaginationKeyProvider);
   ref.invalidate(myGymFeedPaginationKeyProvider);
-  ref.invalidate(myFriendsFeedProvider);
+  ref.invalidate(myFollowingFeedProvider);
   ref.invalidate(myGymFeedProvider);
   // Read models por autor (ACTIVIDAD del perfil) — autoDispose; se invalidan
   // por si un perfil abierto los está renderizando en este momento.

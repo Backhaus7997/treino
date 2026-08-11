@@ -5,6 +5,8 @@
 library;
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -15,6 +17,8 @@ import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/chat/domain/media_type.dart';
 import 'package:treino/features/chat/domain/message.dart';
 import 'package:treino/features/chat/presentation/chat_screen.dart';
+import 'package:treino/features/profile/application/user_providers.dart'
+    show firestoreProvider;
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
@@ -178,9 +182,22 @@ void main() {
 
     testWidgets('tap attach button opens bottom sheet with Foto/Video options',
         (tester) async {
+      // REQ-FOLLOW-021: adjuntar es enviar, así que necesita el mismo permiso
+      // que el resto del composer — la arista ENTRANTE `follows/bbb_aaa`.
+      final firestore = FakeFirebaseFirestore();
+      await firestore.collection('follows').doc('bbb_aaa').set({
+        'id': 'bbb_aaa',
+        'followerUid': 'bbb',
+        'followeeUid': 'aaa',
+        'status': 'accepted',
+        'members': ['bbb', 'aaa'],
+        'createdAt': Timestamp.now(),
+      });
+
       await tester.pumpWidget(_wrap(
         const ChatScreen(chatId: 'aaa_bbb', otherUid: 'bbb'),
         overrides: [
+          firestoreProvider.overrideWithValue(firestore),
           currentUidProvider.overrideWith((_) => 'aaa'),
           messagesProvider('aaa_bbb').overrideWith(
             (_) => Stream.value(const <Message>[]),

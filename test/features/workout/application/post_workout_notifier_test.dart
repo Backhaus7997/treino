@@ -98,7 +98,7 @@ void main() {
 
       final notifier = container.read(postWorkoutNotifierProvider.notifier);
       await notifier.shareWorkout(_makeSession(),
-          text: _sharedText, exerciseCount: 3, privacy: PostPrivacy.friends);
+          text: _sharedText, exerciseCount: 3, privacy: PostPrivacy.followers);
 
       expect(fakeRepo.capturedPost, isNotNull);
       expect(fakeRepo.capturedPost!.authorDisplayName, equals('Ana'));
@@ -114,7 +114,7 @@ void main() {
 
       final notifier = container.read(postWorkoutNotifierProvider.notifier);
       await notifier.shareWorkout(_makeSession(),
-          text: _sharedText, exerciseCount: 3, privacy: PostPrivacy.friends);
+          text: _sharedText, exerciseCount: 3, privacy: PostPrivacy.followers);
 
       expect(fakeRepo.capturedPost, isNotNull);
       expect(fakeRepo.capturedPost!.authorDisplayName, equals(''));
@@ -160,7 +160,7 @@ void main() {
 
       final notifier = container.read(postWorkoutNotifierProvider.notifier);
       await notifier.shareWorkout(_makeSession(),
-          text: _sharedText, exerciseCount: 3, privacy: PostPrivacy.friends);
+          text: _sharedText, exerciseCount: 3, privacy: PostPrivacy.followers);
 
       expect(fakeRepo.capturedPost, isNotNull);
       expect(fakeRepo.capturedPost!.text, equals(_sharedText));
@@ -176,7 +176,7 @@ void main() {
       const englishText = 'Finished my workout! 💪';
       final notifier = container.read(postWorkoutNotifierProvider.notifier);
       await notifier.shareWorkout(_makeSession(),
-          text: englishText, exerciseCount: 3, privacy: PostPrivacy.friends);
+          text: englishText, exerciseCount: 3, privacy: PostPrivacy.followers);
 
       expect(fakeRepo.capturedPost, isNotNull);
       expect(fakeRepo.capturedPost!.text, equals(englishText));
@@ -195,7 +195,9 @@ void main() {
 
       await expectLater(
         () => notifier.shareWorkout(_makeSession(),
-            text: _sharedText, exerciseCount: 3, privacy: PostPrivacy.friends),
+            text: _sharedText,
+            exerciseCount: 3,
+            privacy: PostPrivacy.followers),
         throwsException,
       );
 

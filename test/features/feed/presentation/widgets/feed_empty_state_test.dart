@@ -14,12 +14,13 @@ void main() {
     // SCENARIO-185: correct copy is rendered (updated to use message param)
     testWidgets('SCENARIO-185: renders correct copy', (tester) async {
       await tester.pumpWidget(
-        _wrap(const FeedEmptyState(message: 'Aún no hay posts de tus amigos')),
+        _wrap(const FeedEmptyState(
+            message: 'Todavía no hay posts de a quienes seguís')),
       );
       await tester.pump();
 
       expect(
-        find.text('Aún no hay posts de tus amigos'),
+        find.text('Todavía no hay posts de a quienes seguís'),
         findsOneWidget,
       );
     });

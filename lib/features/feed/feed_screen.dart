@@ -9,17 +9,21 @@ import '../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../core/widgets/motion/treino_state_switcher.dart';
 import '../../core/widgets/motion/treino_tappable.dart';
 import '../../core/widgets/treino_bottom_bar.dart';
+import '../../core/widgets/treino_glass_surface.dart';
 import '../../core/widgets/treino_icon.dart';
 import '../../l10n/app_l10n.dart';
 import '../chat/application/chat_providers.dart';
 import '../gym_rankings/presentation/rankings_screen.dart' show RankingsBody;
+import '../gyms/domain/gym.dart' show kNoGymId;
 import '../notifications/application/notification_history_providers.dart';
 import '../profile/application/user_providers.dart';
+import '../profile/domain/user_public_profile.dart';
 import '../profile/domain/user_role.dart';
 import '../workout/application/session_providers.dart' show currentUidProvider;
 import 'application/feed_screen_providers.dart';
 import 'application/feed_pagination_notifier.dart';
 import 'application/post_providers.dart';
+import 'application/suggested_users_providers.dart';
 import 'domain/feed_segment.dart';
 import 'domain/post.dart';
 import 'presentation/widgets/feed_empty_state.dart';
@@ -66,6 +70,21 @@ class FeedScreen extends ConsumerWidget {
   }
 }
 
+/// Área tapeable mínima de cada acción del header.
+///
+/// 44 y no menos: es el piso de la HIG de Apple y queda apenas por debajo de
+/// los 48 de Material. La fila llegó a bajarlo a 36 en pantallas angostas y
+/// era plata tirada — con las acciones pegadas al margen derecho sobra lugar
+/// incluso en un iPhone de 393pt.
+const double _kFeedActionTapTarget = 44;
+
+/// Ancho a partir del cual la fila del header entra holgada: el toggle en su
+/// tope (176) + la separación mínima (8) + las cuatro acciones con su aire
+/// (4 × 44 + 3 × 4). Por debajo de esto los íconos se juntan, pero conservan
+/// su área tapeable completa.
+const double _kFeedHeaderRoomyWidth =
+    176 + 8 + (4 * _kFeedActionTapTarget + 3 * 4);
+
 /// Athlete Feed — segmented pill + swipeable [TabBarView].
 class _AthleteFeed extends StatelessWidget {
   const _AthleteFeed({this.initialTab});
@@ -90,9 +109,17 @@ class _AthleteFeed extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final compactActions = constraints.maxWidth < 360;
+                // Con menos que esto los íconos pierden su separación, pero
+                // NO su área tapeable: ver [_FeedActions.compact].
+                final compactActions =
+                    constraints.maxWidth < _kFeedHeaderRoomyWidth;
                 return Row(
                   key: const ValueKey('feed-fixed-navigation-row'),
+                  // Las acciones tienen que morir contra el margen derecho.
+                  // Sin esto el `Row` alinea al inicio y todo el sobrante
+                  // —25pt en un iPhone de 393— quedaba como un hueco muerto
+                  // entre el botón `+` y el borde de la pantalla.
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Flexible(
                       child: ConstrainedBox(
@@ -137,8 +164,13 @@ class _AthleteFeed extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    _FeedActions(compact: compactActions),
+                    // La separación mínima va como padding de las acciones y
+                    // no como un `SizedBox` suelto: con `spaceBetween`, un
+                    // tercer hijo invisible se comería uno de los dos huecos.
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: _FeedActions(compact: compactActions),
+                    ),
                   ],
                 );
               },
@@ -213,35 +245,32 @@ SliverAppBar _feedAppBar(
   );
 }
 
-class _FeedSegmentHeaderDelegate extends SliverPersistentHeaderDelegate {
-  const _FeedSegmentHeaderDelegate({required this.backgroundColor});
-
-  final Color backgroundColor;
+/// La fila de segmentos, como un sliver común que scrollea con el feed.
+///
+/// Era un [SliverPersistentHeader] con `pinned: true`, y eso lo obligaba a
+/// pintarse un `ColoredBox(palette.bg)` opaco: al quedar fijo, tapaba los
+/// posts que le pasaban por detrás. El problema es que `palette.bg` es solo la
+/// base sólida de [AppBackground] — le faltan los dos glows radiales. El
+/// header quedaba entonces como una franja plana recortada contra el fondo, y
+/// justo ahí arriba a la izquierda es donde el glow del accent está más
+/// presente, así que el corte saltaba a la vista.
+///
+/// Scrolleando con el contenido no se superpone con nada, así que no necesita
+/// fondo: se ve el [AppBackground] real, glow incluido. Tampoco es `floating`
+/// a propósito — floating lo haría reaparecer ENCIMA del contenido al
+/// scrollear hacia arriba, y volveríamos a necesitar el fondo opaco.
+class _FeedSegmentSliver extends StatelessWidget {
+  const _FeedSegmentSliver();
 
   @override
-  double get minExtent => 62;
-
-  @override
-  double get maxExtent => 62;
-
-  @override
-  Widget build(
-    BuildContext context,
-    double shrinkOffset,
-    bool overlapsContent,
-  ) {
-    return ColoredBox(
-      color: backgroundColor,
-      child: const Padding(
+  Widget build(BuildContext context) {
+    return const SliverToBoxAdapter(
+      child: Padding(
         padding: EdgeInsets.symmetric(vertical: 14),
         child: FeedSegmentPills(),
       ),
     );
   }
-
-  @override
-  bool shouldRebuild(_FeedSegmentHeaderDelegate oldDelegate) =>
-      backgroundColor != oldDelegate.backgroundColor;
 }
 
 /// Page 1 — thin host for the self-contained rankings surface. The shared
@@ -291,6 +320,8 @@ class _FeedHeader extends StatelessWidget {
 class _FeedActions extends ConsumerWidget {
   const _FeedActions({this.compact = false});
 
+  /// Cuando es `true` los íconos pierden la separación entre sí, y solo eso.
+  /// El área tapeable NO se toca: se queda en [_kFeedActionTapTarget] siempre.
   final bool compact;
 
   @override
@@ -305,8 +336,10 @@ class _FeedActions extends ConsumerWidget {
     // athlete's coach live under the COACH tab badge. See
     // `unreadFromCoachProvider` / `unreadFromFriendsProvider`.
     final unreadChats = ref.watch(unreadFromFriendsProvider);
+    // `compact` junta los íconos, y NADA más. El área tapeable se queda
+    // siempre en el mínimo de la HIG: achicarla a 36 en pantallas angostas
+    // era una regresión de accesibilidad, y encima innecesaria.
     final spacing = compact ? 0.0 : 4.0;
-    final tapTarget = compact ? 36.0 : 44.0;
 
     return Row(
       key: const ValueKey('feed-header-actions'),
@@ -320,9 +353,9 @@ class _FeedActions extends ConsumerWidget {
           child: TreinoTappable(
             onTap: () => context.push('/feed/notifications'),
             child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minWidth: tapTarget,
-                minHeight: 44,
+              constraints: const BoxConstraints(
+                minWidth: _kFeedActionTapTarget,
+                minHeight: _kFeedActionTapTarget,
               ),
               child: Center(
                 child: Stack(
@@ -370,9 +403,9 @@ class _FeedActions extends ConsumerWidget {
           child: TreinoTappable(
             onTap: () => context.push('/feed/messages'),
             child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minWidth: tapTarget,
-                minHeight: 44,
+              constraints: const BoxConstraints(
+                minWidth: _kFeedActionTapTarget,
+                minHeight: _kFeedActionTapTarget,
               ),
               child: Center(
                 child: Stack(
@@ -418,9 +451,9 @@ class _FeedActions extends ConsumerWidget {
           child: TreinoTappable(
             onTap: () => context.push('/feed/search'),
             child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minWidth: tapTarget,
-                minHeight: 44,
+              constraints: const BoxConstraints(
+                minWidth: _kFeedActionTapTarget,
+                minHeight: _kFeedActionTapTarget,
               ),
               child: const Center(
                 child: _FeedIconBubble(icon: TreinoIcon.search),
@@ -435,9 +468,9 @@ class _FeedActions extends ConsumerWidget {
           child: TreinoTappable(
             onTap: () => context.push('/feed/create'),
             child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minWidth: tapTarget,
-                minHeight: 44,
+              constraints: const BoxConstraints(
+                minWidth: _kFeedActionTapTarget,
+                minHeight: _kFeedActionTapTarget,
               ),
               child: Center(
                 child: Container(
@@ -458,6 +491,12 @@ class _FeedActions extends ConsumerWidget {
   }
 }
 
+/// Burbuja de vidrio de los accesos del header (campana, chat, búsqueda).
+///
+/// Mismo acabado que la barra de navegación —relleno translúcido + reflejo
+/// especular, ver [TreinoGlassSurface]— para que las dos superficies flotantes
+/// de la app hablen el mismo idioma. El botón de crear post NO lo usa a
+/// propósito: es el CTA primario y va lleno de accent, sin competencia.
 class _FeedIconBubble extends StatelessWidget {
   const _FeedIconBubble({required this.icon});
 
@@ -466,17 +505,15 @@ class _FeedIconBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    return Container(
+    return SizedBox(
       width: 36,
       height: 36,
-      decoration: BoxDecoration(
-        color: palette.bgCard,
+      child: TreinoGlassSurface(
         shape: BoxShape.circle,
-        border: Border.all(
-          color: palette.textMuted.withValues(alpha: 0.12),
-        ),
+        fillOpacity: TreinoGlassSurface.bubbleFillOpacity,
+        borderColor: palette.textMuted.withValues(alpha: 0.12),
+        child: Icon(icon, size: 20, color: palette.textMuted),
       ),
-      child: Icon(icon, size: 20, color: palette.textMuted),
     );
   }
 }
@@ -486,17 +523,45 @@ class _FeedContent {
     required this.posts,
     required this.isLoadingMore,
     required this.onLoadMore,
+    this.suggestions = const [],
   }) : emptyState = null;
 
   const _FeedContent.empty(this.emptyState)
       : posts = null,
         isLoadingMore = false,
-        onLoadMore = null;
+        onLoadMore = null,
+        suggestions = const [];
 
   final List<Post>? posts;
   final bool isLoadingMore;
   final VoidCallback? onLoadMore;
   final Widget? emptyState;
+  final List<UserPublicProfile> suggestions;
+}
+
+sealed class _FeedSlot {
+  const _FeedSlot();
+}
+
+class _PostSlot extends _FeedSlot {
+  const _PostSlot(this.post, this.postIndex);
+
+  final Post post;
+  final int postIndex;
+}
+
+class _SuggestionsSlot extends _FeedSlot {
+  const _SuggestionsSlot(this.profiles);
+
+  final List<UserPublicProfile> profiles;
+}
+
+class _LoaderSlot extends _FeedSlot {
+  const _LoaderSlot();
+}
+
+class _SeparatorSlot extends _FeedSlot {
+  const _SeparatorSlot();
 }
 
 /// The feed's single vertical scroll surface: collapsible app bar, pinned
@@ -569,12 +634,7 @@ class _FeedScrollViewState extends State<_FeedScrollView> {
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
         if (widget.showTitle) _feedAppBar(context, showTitle: true),
-        SliverPersistentHeader(
-          pinned: true,
-          delegate: _FeedSegmentHeaderDelegate(
-            backgroundColor: palette.bg,
-          ),
-        ),
+        const _FeedSegmentSliver(),
         if (widget.content.posts case final posts?)
           SliverPadding(
             padding: EdgeInsets.fromLTRB(20, 14, 20, bottomInset),
@@ -593,51 +653,70 @@ class _FeedScrollViewState extends State<_FeedScrollView> {
   }
 
   Widget _buildPostList(AppPalette palette, List<Post> posts) {
-    final childCount = posts.isEmpty
-        ? 0
-        : posts.length * 2 - 1 + (widget.content.isLoadingMore ? 2 : 0);
+    final contentSlots = <_FeedSlot>[];
+    for (var postIndex = 0; postIndex < posts.length; postIndex++) {
+      contentSlots.add(_PostSlot(posts[postIndex], postIndex));
+      final page = suggestedUsersAfterPost(
+        widget.content.suggestions,
+        postIndex,
+      );
+      if (page.isNotEmpty) contentSlots.add(_SuggestionsSlot(page));
+    }
+    if (widget.content.isLoadingMore) {
+      contentSlots.add(const _LoaderSlot());
+    }
+
+    final slots = <_FeedSlot>[];
+    for (final slot in contentSlots) {
+      if (slots.isNotEmpty) slots.add(const _SeparatorSlot());
+      slots.add(slot);
+    }
 
     return SliverList(
       delegate: SliverChildBuilderDelegate(
         (context, index) {
-          if (index.isOdd) return const SizedBox(height: 14);
-
-          final postIndex = index ~/ 2;
-          if (postIndex == posts.length) {
-            return Padding(
-              key: const ValueKey('feed-loading-more-indicator'),
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              child: Center(
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    color: palette.accent,
-                    strokeWidth: 2,
+          final slot = slots[index];
+          return switch (slot) {
+            _SeparatorSlot() => const SizedBox(height: 14),
+            _SuggestionsSlot(:final profiles) =>
+              SuggestedUsersSection.profiles(profiles: profiles),
+            _LoaderSlot() => Padding(
+                key: const ValueKey('feed-loading-more-indicator'),
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                child: Center(
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      color: palette.accent,
+                      strokeWidth: 2,
+                    ),
                   ),
                 ),
               ),
-            );
-          }
-
-          final post = posts[postIndex];
-          void onAuthorTap() => context.go('/feed/profile/${post.authorUid}');
-          final card = PostCard(
-            key: ValueKey(post.id),
-            post: post,
-            onAuthorTap: onAuthorTap,
-          );
-
-          final alreadyAnimated = !_animatedIds.add(post.id);
-          if (postIndex >= 8 || alreadyAnimated) return card;
-          return TreinoFadeSlideIn(
-            key: ValueKey(post.id),
-            delay: AppMotion.stagger(postIndex),
-            child: card,
-          );
+            _PostSlot(:final post, :final postIndex) =>
+              _buildPost(context, post, postIndex),
+          };
         },
-        childCount: childCount,
+        childCount: slots.length,
       ),
+    );
+  }
+
+  Widget _buildPost(BuildContext context, Post post, int postIndex) {
+    void onAuthorTap() => context.go('/feed/profile/${post.authorUid}');
+    final card = PostCard(
+      key: ValueKey(post.id),
+      post: post,
+      onAuthorTap: onAuthorTap,
+    );
+
+    final alreadyAnimated = !_animatedIds.add(post.id);
+    if (postIndex >= 8 || alreadyAnimated) return card;
+    return TreinoFadeSlideIn(
+      key: ValueKey(post.id),
+      delay: AppMotion.stagger(postIndex),
+      child: card,
     );
   }
 }
@@ -653,15 +732,11 @@ class _FeedStaticScrollView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
     return CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
         if (showTitle) _feedAppBar(context, showTitle: true),
-        SliverPersistentHeader(
-          pinned: true,
-          delegate: _FeedSegmentHeaderDelegate(backgroundColor: palette.bg),
-        ),
+        const _FeedSegmentSliver(),
         SliverFillRemaining(hasScrollBody: false, child: child),
       ],
     );
@@ -770,41 +845,43 @@ class _AmigosBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final gymId = ref.watch(
+      userProfileProvider.select((p) => p.valueOrNull?.gymId),
+    );
+    final suggestions = (gymId == null || gymId.isEmpty || gymId == kNoGymId)
+        ? const <UserPublicProfile>[]
+        : ref.watch(suggestedUsersProvider(gymId)).valueOrNull ?? const [];
+
     return _FeedAsyncBody<List<Post>>(
       showTitle: showTitle,
-      async: ref.watch(myFriendsFeedProvider),
+      async: ref.watch(myFollowingFeedProvider),
       onRetry: () {
         ref.invalidate(feedPaginationProvider);
         ref.invalidate(feedForFriendsProvider);
-        ref.invalidate(myFriendsFeedProvider);
+        ref.invalidate(myFollowingFeedProvider);
       },
       onRefresh: () async {
         final paginationKey =
-            ref.read(myFriendsFeedPaginationKeyProvider).valueOrNull;
+            ref.read(myFollowingFeedPaginationKeyProvider).valueOrNull;
         if (paginationKey == null) {
-          ref.invalidate(myFriendsFeedPaginationKeyProvider);
-          await ref.read(myFriendsFeedPaginationKeyProvider.future);
+          ref.invalidate(myFollowingFeedPaginationKeyProvider);
+          await ref.read(myFollowingFeedPaginationKeyProvider.future);
           return;
         }
         await ref
             .read(feedPaginationProvider(paginationKey).notifier)
             .refresh();
         ref.invalidate(feedForFriendsProvider);
-        ref.invalidate(myFriendsFeedProvider);
+        ref.invalidate(myFollowingFeedProvider);
       },
       dataBuilder: (context, posts) {
         if (posts.isEmpty) {
-          final gymId = ref.watch(
-            userProfileProvider.select(
-              (profile) => profile.valueOrNull?.gymId,
-            ),
-          );
           return _FeedContent.empty(
             Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const FeedEmptyState(
-                  message: 'Aún no hay posts de tus amigos',
+                FeedEmptyState(
+                  message: AppL10n.of(context).feedEmptyFollowing,
                 ),
                 SuggestedUsersSection(gymId: gymId),
               ],
@@ -814,10 +891,11 @@ class _AmigosBody extends ConsumerWidget {
         final pagination = posts is PaginatedPostList ? posts : null;
         return _FeedContent.posts(
           posts: posts,
+          suggestions: suggestions,
           isLoadingMore: pagination?.isLoadingMore ?? false,
           onLoadMore: () async {
             final paginationKey =
-                ref.read(myFriendsFeedPaginationKeyProvider).valueOrNull;
+                ref.read(myFollowingFeedPaginationKeyProvider).valueOrNull;
             if (paginationKey == null || !(pagination?.hasMore ?? false)) {
               return;
             }
@@ -825,7 +903,7 @@ class _AmigosBody extends ConsumerWidget {
                 .read(feedPaginationProvider(paginationKey).notifier)
                 .loadMore();
             ref.invalidate(feedForFriendsProvider);
-            ref.invalidate(myFriendsFeedProvider);
+            ref.invalidate(myFollowingFeedProvider);
           },
         );
       },
@@ -840,6 +918,13 @@ class _MiGymBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final gymId = ref.watch(
+      userProfileProvider.select((p) => p.valueOrNull?.gymId),
+    );
+    final suggestions = (gymId == null || gymId.isEmpty || gymId == kNoGymId)
+        ? const <UserPublicProfile>[]
+        : ref.watch(suggestedUsersProvider(gymId)).valueOrNull ?? const [];
+
     return _FeedAsyncBody<List<Post>?>(
       showTitle: showTitle,
       async: ref.watch(myGymFeedProvider),
@@ -876,6 +961,7 @@ class _MiGymBody extends ConsumerWidget {
         final pagination = posts is PaginatedPostList ? posts : null;
         return _FeedContent.posts(
           posts: posts,
+          suggestions: suggestions,
           isLoadingMore: pagination?.isLoadingMore ?? false,
           onLoadMore: () async {
             final paginationKey =
@@ -903,6 +989,12 @@ class _PublicoBody extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final provider = feedPaginationProvider(publicFeedPaginationKey);
+    final gymId = ref.watch(
+      userProfileProvider.select((p) => p.valueOrNull?.gymId),
+    );
+    final suggestions = (gymId == null || gymId.isEmpty || gymId == kNoGymId)
+        ? const <UserPublicProfile>[]
+        : ref.watch(suggestedUsersProvider(gymId)).valueOrNull ?? const [];
     return _FeedAsyncBody<List<Post>>(
       showTitle: showTitle,
       async: ref.watch(feedPublicProvider),
@@ -923,6 +1015,7 @@ class _PublicoBody extends ConsumerWidget {
         final pagination = posts is PaginatedPostList ? posts : null;
         return _FeedContent.posts(
           posts: posts,
+          suggestions: suggestions,
           isLoadingMore: pagination?.isLoadingMore ?? false,
           onLoadMore: () async {
             if (!(pagination?.hasMore ?? false)) return;

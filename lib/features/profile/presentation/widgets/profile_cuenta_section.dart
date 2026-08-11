@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../../auth/application/auth_providers.dart';
-import '../../../feed/application/friendship_providers.dart';
+import '../../../feed/application/follow_providers.dart';
 import '../../../gyms/application/gym_providers.dart';
 import '../../../gyms/domain/gym_display_name.dart';
 import '../../application/assigned_routines_providers.dart';
@@ -31,7 +31,8 @@ class ProfileCuentaSection extends ConsumerWidget {
     final l10n = AppL10n.of(context);
     final myUid = ref.watch(authStateChangesProvider).valueOrNull?.uid;
     final profileAsync = ref.watch(userProfileProvider);
-    final requestCount = ref.watch(pendingRequestCountProvider(myUid ?? ''));
+    final requestCount =
+        ref.watch(pendingFollowRequestCountProvider(myUid ?? ''));
 
     final gymId = profileAsync.valueOrNull?.gymId;
 

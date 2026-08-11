@@ -3,49 +3,68 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../../profile/application/user_public_profile_providers.dart';
 import '../../application/feed_screen_providers.dart'
-    show myFriendsFeedProvider;
-import '../../application/friendship_providers.dart'
-    show friendshipRepositoryProvider;
-import '../../data/friendship_repository.dart' show FriendshipRepository;
-import '../../domain/friendship.dart';
-import '../../domain/friendship_status.dart';
+    show myFollowingFeedProvider;
+import '../../application/follow_providers.dart' show followRepositoryProvider;
+import '../../data/follow_repository.dart' show FollowRepository;
+import '../../domain/follow.dart';
+import '../../domain/follow_status.dart';
 import 'unfriend_confirmation_sheet.dart';
 
-/// 4-state SEGUIR pill for the public profile screen.
+/// Pill de 4 estados del perfil público.
 ///
-/// State resolution (per design §7):
-/// - `friendship == null`                                → SEGUIR (mint active)
-/// - status accepted                                     → SIGUIENDO (outlined + check, no-op)
-/// - status pending && requesterId == viewerUid          → SOLICITUD ENVIADA (muted, opacity 0.6, no-op)
-/// - status pending && requesterId == targetUid          → ACEPTAR (mint active)
+/// **Lee DOS aristas, no una relación** (design §6). Antes tomaba un solo
+/// `Friendship?` y desambiguaba con `requesterId`; eso funcionaba sólo porque
+/// el documento era el par. Con el grafo dirigido "yo lo sigo" y "él me sigue"
+/// son documentos distintos, y este botón habla exclusivamente de la primera.
 ///
-/// Stream conversion (REQ-FPS-008): `friendshipByPairProvider` and
-/// `acceptedFriendsProvider` are now `StreamProvider.family.autoDispose` and
-/// self-update on Firestore mutations — manual `ref.invalidate` for those
-/// providers is no longer needed and has been removed. The
-/// `myFriendsFeedProvider` invalidation is preserved (still a FutureProvider
-/// that requires explicit refresh per ADR-FPS-006).
+/// | Estado | Condición | onTap |
+/// |---|---|---|
+/// | SEGUIR | `outgoing == null` (y no hay entrante pendiente) | `follow(...)` |
+/// | SIGUIENDO | `outgoing.status == accepted` | sheet → `deleteEdge(outgoing.id)` |
+/// | SOLICITUD ENVIADA | `outgoing.status == pending` | `null` (cancelar entra en PR4) |
+/// | ACEPTAR | `outgoing == null && incoming.status == pending` | `acceptRequest(incoming.id)` |
+///
+/// **Precedencia: la arista saliente manda.** Si yo lo sigo y además él me
+/// mandó solicitud, el pill muestra mi estado saliente y la solicitud entrante
+/// se resuelve desde el inbox. Sin esa regla los dos estados compiten por el
+/// mismo control.
+///
+/// Corolario que arregla un bug de producto: que alguien te siga **no** te
+/// muestra SIGUIENDO en su perfil. Antes sí, porque era el mismo documento.
+///
+/// Stream conversion (REQ-FPS-008): `followEdgeProvider` es
+/// `StreamProvider.family.autoDispose` y se auto-actualiza ante mutaciones de
+/// Firestore — no hace falta invalidarlo a mano. La invalidación de
+/// `myFollowingFeedProvider` se conserva (sigue siendo un FutureProvider que
+/// requiere refresh explícito, ADR-FPS-006).
 class PublicProfileFollowButton extends ConsumerStatefulWidget {
   const PublicProfileFollowButton({
     super.key,
-    required this.friendship,
+    required this.outgoingFollow,
+    required this.incomingFollow,
     required this.viewerUid,
     required this.targetUid,
     this.targetIsPublic = false,
   });
 
-  final Friendship? friendship;
+  /// `follows/{viewer}_{target}` — ¿yo lo sigo? Es la que gobierna este pill.
+  final Follow? outgoingFollow;
+
+  /// `follows/{target}_{viewer}` — ¿él me sigue? Sólo se mira para ofrecer
+  /// ACEPTAR cuando llegó una solicitud y yo todavía no lo sigo.
+  final Follow? incomingFollow;
+
   final String viewerUid;
   final String targetUid;
 
-  /// When `true`, tapping SEGUIR auto-accepts the friendship (Instagram-style
-  /// public profile). When `false` (default — preserves the pre-privacy
-  /// behavior), the friendship is created as `pending` and the target must
-  /// approve. See [FriendshipRepository.request].
+  /// When `true`, tapping SEGUIR auto-accepts (Instagram-style public profile).
+  /// When `false` (default) the edge is created as `pending` and the target
+  /// must approve. See [FollowRepository.follow].
   final bool targetIsPublic;
 
   @override
@@ -56,45 +75,65 @@ class PublicProfileFollowButton extends ConsumerStatefulWidget {
 class _PublicProfileFollowButtonState
     extends ConsumerState<PublicProfileFollowButton> {
   /// In-flight guard for the SEGUIR / ACEPTAR writes. Mirrors the `_busy`
-  /// pattern on [FriendRequestInboxTile]: while a friendship mutation is
+  /// pattern on [FriendRequestInboxTile]: while an edge mutation is
   /// pending the pill is disabled and shows a spinner so the user can't
   /// double-fire and isn't left staring at an unchanged, silent control.
   bool _busy = false;
 
   @override
   Widget build(BuildContext context) {
-    final repo = ref.watch(friendshipRepositoryProvider);
-    final friendship = widget.friendship;
+    final repo = ref.watch(followRepositoryProvider);
+    final outgoing = widget.outgoingFollow;
+    final incoming = widget.incomingFollow;
 
-    if (friendship == null) {
+    // La saliente manda: se evalúa entera antes de mirar la entrante.
+    if (outgoing != null) {
+      if (outgoing.status == FollowStatus.accepted) {
+        return _FollowPill(
+          label: 'SIGUIENDO',
+          style: _FollowPillStyle.outlined,
+          leadingIcon: TreinoIcon.check,
+          semanticsLabel: AppL10n.of(context).feedFollowButtonFollowingA11y,
+          onTap: () => _showUnfriendSheet(outgoing),
+        );
+      }
+      // pending → yo mandé la solicitud y todavía no me aceptaron.
+      //
+      // REQ-FOLLOW-006: hasta PR4 esto tenía `onTap: null`, o sea que mandabas
+      // una solicitud a una cuenta privada y NO HABÍA NINGUNA FORMA de
+      // arrepentirte desde la app. Ahora abre el mismo sheet, con copy de
+      // cancelar: se borra la MISMA arista saliente, pero para el usuario no es
+      // "eliminar" nada — todavía no hay vínculo que eliminar.
       return _FollowPill(
-        label: 'SEGUIR',
-        style: _FollowPillStyle.mintFilled,
-        busy: _busy,
-        onTap: _busy ? null : () => _onRequest(repo),
-      );
-    }
-    if (friendship.status == FriendshipStatus.accepted) {
-      return _FollowPill(
-        label: 'SIGUIENDO',
-        style: _FollowPillStyle.outlined,
-        leadingIcon: TreinoIcon.check,
-        onTap: () => _showUnfriendSheet(friendship),
-      );
-    }
-    if (friendship.requesterId == widget.viewerUid) {
-      return const _FollowPill(
         label: 'SOLICITUD ENVIADA',
         style: _FollowPillStyle.outlinedMuted,
-        onTap: null,
+        semanticsLabel: AppL10n.of(context).feedFollowButtonRequestedA11y,
+        onTap: () => _showUnfriendSheet(
+          outgoing,
+          mode: UnfollowSheetMode.cancelRequest,
+        ),
       );
     }
-    // pending && requesterId == targetUid → received → ACEPTAR
+
+    // Sin arista saliente. Sólo acá tiene sentido mirar la entrante.
+    if (incoming != null && incoming.status == FollowStatus.pending) {
+      return _FollowPill(
+        label: 'ACEPTAR',
+        style: _FollowPillStyle.mintFilled,
+        busy: _busy,
+        semanticsLabel: AppL10n.of(context).feedFollowButtonAcceptA11y,
+        onTap: _busy ? null : () => _onAccept(repo, incoming),
+      );
+    }
+
+    // Incluye el caso "me sigue pero yo no a él": la entrante aceptada no me
+    // convierte en seguidor suyo, así que el pill ofrece SEGUIR.
     return _FollowPill(
-      label: 'ACEPTAR',
+      label: 'SEGUIR',
       style: _FollowPillStyle.mintFilled,
       busy: _busy,
-      onTap: _busy ? null : () => _onAccept(repo, friendship),
+      semanticsLabel: AppL10n.of(context).feedFollowButtonFollowA11y,
+      onTap: _busy ? null : () => _onRequest(repo),
     );
   }
 
@@ -103,31 +142,40 @@ class _PublicProfileFollowButtonState
   /// Previously this was a fire-and-forget `catch (_)` that left the SEGUIR
   /// pill unchanged on failure (the user assumed success). It now reports both
   /// outcomes via the root [ScaffoldMessenger] and gates re-taps with [_busy].
-  Future<void> _onRequest(FriendshipRepository repo) async {
+  Future<void> _onRequest(FollowRepository repo) async {
     if (_busy) return;
     setState(() => _busy = true);
-    // Capture messenger + copy BEFORE the await: the profile route may be
-    // popped during the write, after which `context` is unmounted. The root
-    // messenger survives disposal, so the SnackBar is always delivered.
+    // Capture container + messenger + copy BEFORE the await: the profile route
+    // may be popped during the write, after which `context` is unmounted. The
+    // root container and messenger survive disposal (ADR-FPS-006), so the
+    // invalidation y el SnackBar llegan igual.
+    final container = ProviderScope.containerOf(context, listen: false);
     final messenger = ScaffoldMessenger.of(context);
     final l10n = AppL10n.of(context);
     // Auto-accept path (public target) surfaces the same "started following"
     // copy the accept flow uses. The pending path keeps the existing
     // "request sent" copy. i18n: Fase W2 — both strings already exist.
+    // Dos caminos, dos mensajes: sobre cuenta pública la arista nace aceptada
+    // (ya la seguís), sobre cuenta privada queda pendiente de aprobación.
+    // Antes los dos decían "Ahora son amigos", que con el modelo dirigido
+    // sería directamente falso en el caso pendiente.
     final successMessage = widget.targetIsPublic
-        ? l10n.feedRequestAcceptedSuccess
+        ? l10n.feedFollowStartedSuccess
         : l10n.feedRequestSentSuccess;
     final errorMessage = l10n.feedFriendActionError;
     try {
-      await repo.request(
+      await repo.follow(
         widget.viewerUid,
         widget.targetUid,
-        otherIsPublic: widget.targetIsPublic,
+        targetIsPublic: widget.targetIsPublic,
       );
-      // Stream providers (friendshipByPairProvider, acceptedFriendsProvider)
-      // self-update via .snapshots() — no manual invalidation needed.
-      // SEGUIR only creates a pending request, so myFriendsFeedProvider
-      // (accepted friends list) is unaffected — no invalidation required.
+      // followEdgeProvider se auto-actualiza vía .snapshots() — no hace falta
+      // invalidarlo. Sobre cuenta privada SEGUIR sólo crea una arista pending,
+      // que no entra en myFollowingFeedProvider; sobre cuenta pública nace
+      // accepted, así que ahí sí hay que refrescar el feed.
+      if (widget.targetIsPublic) {
+        container.invalidate(myFollowingFeedProvider);
+      }
       messenger
         ..hideCurrentSnackBar()
         ..showSnackBar(SnackBar(content: Text(successMessage)));
@@ -144,7 +192,7 @@ class _PublicProfileFollowButtonState
   }
 
   /// Accepts a received request, surfacing success/failure to the user.
-  Future<void> _onAccept(FriendshipRepository repo, Friendship f) async {
+  Future<void> _onAccept(FollowRepository repo, Follow incoming) async {
     if (_busy) return;
     setState(() => _busy = true);
     // Capture the root container + messenger BEFORE the await: accepting
@@ -158,13 +206,12 @@ class _PublicProfileFollowButtonState
     final successMessage = l10n.feedRequestAcceptedSuccess;
     final errorMessage = l10n.feedFriendActionError;
     try {
-      await repo.accept(f.id, widget.viewerUid);
-      // Stream providers self-update on Firestore mutation — no invalidation
-      // needed for friendshipByPairProvider or acceptedFriendsProvider.
-      // myFriendsFeedProvider (still a FutureProvider) MUST be invalidated
+      await repo.acceptRequest(incoming.id, widget.viewerUid);
+      // followEdgeProvider se auto-actualiza ante la mutación de Firestore.
+      // myFollowingFeedProvider (still a FutureProvider) MUST be invalidated
       // explicitly — Riverpod does NOT auto-cascade to providers with no
       // active listener at the moment (ADR-FPS-006).
-      container.invalidate(myFriendsFeedProvider);
+      container.invalidate(myFollowingFeedProvider);
       messenger
         ..hideCurrentSnackBar()
         ..showSnackBar(SnackBar(content: Text(successMessage)));
@@ -181,17 +228,22 @@ class _PublicProfileFollowButtonState
 
   /// Opens the unfriend confirmation bottom sheet.
   ///
-  /// Resolves the friend's display name from [userPublicProfileProvider] with
-  /// a fallback of "Usuario anónimo". On ELIMINAR, calls
-  /// [FriendshipRepository.delete]. Stream providers self-update — only
-  /// [myFriendsFeedProvider] requires explicit invalidation.
-  Future<void> _showUnfriendSheet(Friendship f) async {
+  /// Resolves the display name from [userPublicProfileProvider] with a fallback
+  /// of "Usuario anónimo". On ELIMINAR, calls [FollowRepository.deleteEdge]
+  /// sobre la arista SALIENTE — **nunca toca la inversa**: dejar de seguir
+  /// corta un solo sentido, y si el otro me sigue eso queda intacto.
+  /// Stream providers self-update — sólo [myFollowingFeedProvider] necesita
+  /// invalidación explícita.
+  Future<void> _showUnfriendSheet(
+    Follow outgoing, {
+    UnfollowSheetMode mode = UnfollowSheetMode.unfollow,
+  }) async {
     final palette = AppPalette.of(context);
     final profileAsync = ref.read(userPublicProfileProvider(widget.targetUid));
     final friendDisplayName =
         profileAsync.valueOrNull?.displayName ?? 'Usuario anónimo';
 
-    final repo = ref.read(friendshipRepositoryProvider);
+    final repo = ref.read(followRepositoryProvider);
     // Capture the root container + messenger + copy BEFORE awaiting the sheet:
     // the delete runs from the sheet's onConfirm (a root route that outlives
     // this profile) and the profile may already be popped by then. This
@@ -213,16 +265,17 @@ class _PublicProfileFollowButtonState
       ),
       builder: (_) => UnfriendConfirmationSheet(
         friendDisplayName: friendDisplayName,
+        mode: mode,
         onConfirm: () async {
           try {
-            await repo.delete(f.id, widget.viewerUid);
+            await repo.deleteEdge(outgoing.id);
             // Stream providers self-update on Firestore mutation.
-            // myFriendsFeedProvider (FutureProvider) MUST be invalidated
+            // myFollowingFeedProvider (FutureProvider) MUST be invalidated
             // explicitly — accepted friends list changed, Feed AMIGOS must
             // refresh.
-            container.invalidate(myFriendsFeedProvider);
+            container.invalidate(myFollowingFeedProvider);
           } catch (_) {
-            // The friendship is still present (the delete did not commit);
+            // La arista sigue viva (el delete no commiteó);
             // surface the failure so the user can retry instead of swallowing.
             messenger
               ..hideCurrentSnackBar()
@@ -241,6 +294,7 @@ class _FollowPill extends StatelessWidget {
     required this.label,
     required this.style,
     required this.onTap,
+    required this.semanticsLabel,
     this.leadingIcon,
     this.busy = false,
   });
@@ -248,10 +302,15 @@ class _FollowPill extends StatelessWidget {
   final String label;
   final _FollowPillStyle style;
   final VoidCallback? onTap;
+
+  /// Lo que anuncia el lector de pantalla. Distinto por estado — el label
+  /// visible es una sola palabra y no dice qué pasa al tocar.
+  final String semanticsLabel;
+
   final IconData? leadingIcon;
 
   /// When true the pill shows an inline spinner in place of the leading icon,
-  /// signalling the friendship write is in flight (the caller also nulls
+  /// signalling the edge write is in flight (the caller also nulls
   /// [onTap] to block re-taps).
   final bool busy;
 
@@ -280,9 +339,8 @@ class _FollowPill extends StatelessWidget {
         break;
     }
 
-    final pill = GestureDetector(
+    final pill = TreinoTappable(
       onTap: onTap,
-      behavior: HitTestBehavior.opaque,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
         decoration: BoxDecoration(
@@ -322,9 +380,19 @@ class _FollowPill extends StatelessWidget {
       ),
     );
 
+    // El label visible es una sola palabra en mayúsculas ("SEGUIR"); el lector
+    // de pantalla necesita saber QUÉ pasa al tocar, y los 4 estados tienen que
+    // sonar distinto entre sí.
+    final labelled = Semantics(
+      button: true,
+      enabled: onTap != null,
+      label: semanticsLabel,
+      child: ExcludeSemantics(child: pill),
+    );
+
     if (style == _FollowPillStyle.outlinedMuted) {
-      return Opacity(opacity: 0.6, child: pill);
+      return Opacity(opacity: 0.6, child: labelled);
     }
-    return pill;
+    return labelled;
   }
 }

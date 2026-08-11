@@ -43,6 +43,8 @@ import '../features/feed/presentation/post_detail_screen.dart';
 import '../features/notifications/presentation/notification_history_screen.dart';
 import '../features/profile/application/account_deletion_notifier.dart';
 import '../features/feed/presentation/public_profile_screen.dart';
+import '../features/feed/application/follow_list_providers.dart';
+import '../features/feed/presentation/follow_list_screen.dart';
 import '../features/feed/presentation/search_users_screen.dart';
 import '../features/home/home_screen.dart';
 import 'not_found_screen.dart';
@@ -630,6 +632,7 @@ GoRouter buildRouter({
                   final uid = state.pathParameters['uid']!;
                   return _withBg(PublicProfileScreen(targetUid: uid));
                 },
+                routes: [_followListRoute],
               ),
               GoRoute(
                 path: 'search',
@@ -672,6 +675,7 @@ GoRouter buildRouter({
                   final uid = state.pathParameters['uid']!;
                   return _withBg(PublicProfileScreen(targetUid: uid));
                 },
+                routes: [_followListRoute],
               ),
             ],
           ),
@@ -856,6 +860,27 @@ class _ReportPageRoute extends CupertinoPageRoute<void> {
 /// routes (outside the shell) own their own Scaffold + background.
 Widget _withBg(Widget child) => AppBackground(child: child);
 
+/// Listas de SEGUIDORES / SEGUIDOS, colgada de `profile/:uid`.
+///
+/// Se registra bajo las DOS ramas donde vive el perfil público —`/feed` y
+/// `/home`— porque `_ShellScaffold` deriva la tab resaltada del prefijo de la
+/// ruta: registrarla sólo bajo `/feed` haría saltar la tab a FEED al abrir la
+/// lista desde INICIO, y el pop volvería al lugar equivocado. Mismo patrón de
+/// espejo que `friend-requests` y las rutas de plan/ejercicio de Coach
+/// (issue #387).
+///
+/// Colgarla del perfil en vez de ponerla al lado (`/feed/follows/:uid`) hace
+/// que volver atrás caiga en el perfil del que se salió, sin ruta especial.
+final GoRoute _followListRoute = GoRoute(
+  path: 'follows',
+  builder: (_, state) => _withBg(
+    FollowListScreen(
+      targetUid: state.pathParameters['uid']!,
+      initialKind: followListKindFromTab(state.uri.queryParameters['tab']),
+    ),
+  ),
+);
+
 /// Full-screen immersive wrapper for routes OUTSIDE the ShellRoute whose
 /// screen does NOT own a Scaffold (e.g. MyExercisesScreen / the custom
 /// exercise editor are bare Columns). Provides a transparent Scaffold +
@@ -1014,9 +1039,73 @@ class _ShellScaffold extends ConsumerStatefulWidget {
 }
 
 class _ShellScaffoldState extends ConsumerState<_ShellScaffold> {
+  /// Cuánto scroll vertical acumulado hace falta para cambiar de estado.
+  /// Chico dispara con el temblor del dedo; grande se siente trabado.
+  static const double _collapseThreshold = 20;
+  static const double _expandThreshold = 12;
+
+  /// Zona muerta arriba de todo: dentro de ella la barra siempre está
+  /// expandida, sin importar el gesto. Evita que un micro-scroll al tope deje
+  /// la barra compactada con la lista sin empezar.
+  static const double _topRevealZone = 20;
+
+  /// El estado vive en un [ValueNotifier] y no en `setState` a propósito: solo
+  /// se reconstruye la barra. Con `setState` se reconstruiría también el body
+  /// —o sea la pantalla entera— en medio de un scroll, que es exactamente el
+  /// momento en el que menos se puede pagar (`docs/performance.md`).
+  final ValueNotifier<bool> _navCollapsed = ValueNotifier(false);
+
+  @override
+  void dispose() {
+    _navCollapsed.dispose();
+    super.dispose();
+  }
+
   int get _currentIndex {
     final i = _kTabs.indexWhere((t) => widget.location.startsWith(t));
     return i < 0 ? 2 : i;
+  }
+
+  double _dragAccumulator = 0;
+
+  /// Escucha el scroll de CUALQUIER pantalla del shell.
+  ///
+  /// Las `ScrollNotification` burbujean por el árbol de widgets, así que el
+  /// shell se entera del scroll de sus hijos sin que ninguna pantalla tenga
+  /// que avisarle. Por eso no hay ni un provider ni un callback cableado en
+  /// Entrenar / Feed / Inicio / Coach / Perfil: el efecto es de la barra, y la
+  /// barra es del shell.
+  ///
+  /// Filtra por eje VERTICAL. Sin eso, el swipe horizontal entre Feed y
+  /// Rankings (el `TabBarView`) y los carruseles horizontales colapsarían la
+  /// barra, que es justo lo que nadie pidió.
+  bool _handleScroll(ScrollNotification notification) {
+    if (notification.metrics.axis != Axis.vertical) return false;
+    if (notification is! ScrollUpdateNotification) return false;
+
+    final delta = notification.scrollDelta;
+    if (delta == null || delta == 0) return false;
+
+    final metrics = notification.metrics;
+    if (metrics.pixels <= metrics.minScrollExtent + _topRevealZone) {
+      _dragAccumulator = 0;
+      _navCollapsed.value = false;
+      return false;
+    }
+
+    // Cambiar de dirección resetea: la intención nueva no arrastra el saldo
+    // de la anterior.
+    if (delta.isNegative != _dragAccumulator.isNegative) _dragAccumulator = 0;
+    _dragAccumulator += delta;
+
+    if (_dragAccumulator >= _collapseThreshold) {
+      _dragAccumulator = 0;
+      _navCollapsed.value = true;
+    } else if (_dragAccumulator <= -_expandThreshold) {
+      _dragAccumulator = 0;
+      _navCollapsed.value = false;
+    }
+    return false;
   }
 
   @override
@@ -1033,29 +1122,40 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold> {
       // (WhatsApp-style). Scaffold still publishes the bar's height through
       // MediaQuery.padding.bottom, so scrollables without an explicit
       // padding inset their last items above the bar automatically.
-      body: AppBackground(
-        child: SafeArea(bottom: false, child: widget.child),
+      body: NotificationListener<ScrollNotification>(
+        onNotification: _handleScroll,
+        child: AppBackground(
+          child: SafeArea(bottom: false, child: widget.child),
+        ),
       ),
-      bottomNavigationBar: TreinoBottomBar(
-        currentIndex: _currentIndex,
-        coachUnreadCount: coachUnreadCount,
-        feedUnreadCount: feedUnreadCount,
-        onTap: (i) {
-          // Pop any open popup (modal bottom sheet, dialog) on the SHELL
-          // navigator so it animates closed when the user switches tabs —
-          // mirrors the auto-dismiss behavior the user expects from the
-          // athlete agenda. We MUST use the shell navigator key here:
-          // showModalBottomSheet defaults to useRootNavigator: false, so
-          // the modal lives on the shell nav, which is BELOW _ShellScaffold
-          // in the tree — unreachable via Navigator.of(context).
-          _shellNavigatorKey.currentState
-              ?.popUntil((route) => route is! PopupRoute);
-          // Defensive: also pop popups on the root navigator (dialogs that
-          // explicitly opted into useRootNavigator: true).
-          Navigator.of(context, rootNavigator: true)
-              .popUntil((route) => route is! PopupRoute);
-          context.go(_kTabs[i]);
-        },
+      bottomNavigationBar: ValueListenableBuilder<bool>(
+        valueListenable: _navCollapsed,
+        builder: (context, collapsed, _) => TreinoBottomBar(
+          currentIndex: _currentIndex,
+          coachUnreadCount: coachUnreadCount,
+          feedUnreadCount: feedUnreadCount,
+          collapsed: collapsed,
+          onTap: (i) {
+            // Pop any open popup (modal bottom sheet, dialog) on the SHELL
+            // navigator so it animates closed when the user switches tabs —
+            // mirrors the auto-dismiss behavior the user expects from the
+            // athlete agenda. We MUST use the shell navigator key here:
+            // showModalBottomSheet defaults to useRootNavigator: false, so
+            // the modal lives on the shell nav, which is BELOW _ShellScaffold
+            // in the tree — unreachable via Navigator.of(context).
+            _shellNavigatorKey.currentState
+                ?.popUntil((route) => route is! PopupRoute);
+            // Defensive: also pop popups on the root navigator (dialogs that
+            // explicitly opted into useRootNavigator: true).
+            Navigator.of(context, rootNavigator: true)
+                .popUntil((route) => route is! PopupRoute);
+            // Cambiar de tab arranca de cero: la pantalla nueva se ve desde
+            // arriba, así que la barra tiene que estar entera.
+            _dragAccumulator = 0;
+            _navCollapsed.value = false;
+            context.go(_kTabs[i]);
+          },
+        ),
       ),
     );
   }

@@ -117,7 +117,7 @@ Widget _wrapWithRouter({
       authStateChangesProvider.overrideWith((ref) => Stream.value(user)),
       userProfileProvider.overrideWith((ref) => Stream.value(profile)),
       postRepositoryProvider.overrideWithValue(repo),
-      myFriendsFeedProvider.overrideWith((ref) async => const []),
+      myFollowingFeedProvider.overrideWith((ref) async => const []),
       feedPublicProvider.overrideWith((ref) async => const []),
       myGymFeedProvider.overrideWith((ref) async => null),
       userCreatedRoutinesProvider
@@ -155,7 +155,7 @@ void main() {
         authorGymId: null,
         text: 'fallback',
         routineTag: null,
-        privacy: PostPrivacy.friends,
+        privacy: PostPrivacy.followers,
         createdAt: DateTime.utc(2026),
       ),
     );
@@ -173,7 +173,7 @@ void main() {
       expect(find.text('NUEVO POST'), findsOneWidget);
       expect(find.text('PUBLICAR'), findsOneWidget);
       expect(find.byType(TextField), findsOneWidget);
-      expect(find.text('AMIGOS'), findsOneWidget);
+      expect(find.text('SEGUIDORES'), findsOneWidget);
       expect(find.text('MI GYM'), findsOneWidget);
       expect(find.text('PÚBLICO'), findsOneWidget);
       expect(find.text('ETIQUETAR RUTINA'), findsOneWidget);
@@ -266,7 +266,7 @@ void main() {
       await tester.pumpWidget(_wrapWithRouter());
       await _openCreatePost(tester);
 
-      expect(find.text('AMIGOS'), findsOneWidget);
+      expect(find.text('SEGUIDORES'), findsOneWidget);
       expect(find.text('MI GYM'), findsOneWidget);
       expect(find.text('PÚBLICO'), findsOneWidget);
     });

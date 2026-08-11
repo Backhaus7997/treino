@@ -22,7 +22,7 @@ const int kMaxPostChars = 280;
 class CreatePostState {
   const CreatePostState({
     this.text = '',
-    this.privacy = PostPrivacy.friends,
+    this.privacy = PostPrivacy.followers,
     this.isSubmitting = false,
     this.errorMessage,
     this.editingPost,

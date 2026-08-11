@@ -206,13 +206,14 @@ void main() {
       await tester.pumpWidget(_wrap(notifier: notifier));
       await tester.pumpAndSettle();
 
-      final semantics = tester.getSemantics(find.bySemanticsLabel('AMIGOS'));
+      final semantics =
+          tester.getSemantics(find.bySemanticsLabel('SEGUIDORES'));
       expect(semantics.flagsCollection.isSelected, Tristate.isTrue);
 
       await tester.tap(find.text('PUBLICAR'));
       await tester.pumpAndSettle();
 
-      expect(notifier.capturedPrivacy, PostPrivacy.friends);
+      expect(notifier.capturedPrivacy, PostPrivacy.followers);
     });
 
     testWidgets('permite elegir PÚBLICO y lo pasa al notifier', (tester) async {

@@ -12,8 +12,8 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/feed/application/public_profile_providers.dart';
-import 'package:treino/features/feed/domain/friendship.dart';
-import 'package:treino/features/feed/domain/friendship_status.dart';
+import 'package:treino/features/feed/domain/follow.dart';
+import 'package:treino/features/feed/domain/follow_status.dart';
 import 'package:treino/features/feed/domain/public_profile_view.dart';
 import 'package:treino/features/feed/presentation/public_profile_screen.dart';
 import 'package:treino/features/feed/presentation/widgets/public_profile_follow_button.dart';
@@ -51,19 +51,38 @@ User _userWithUid(String uid) {
   return u;
 }
 
+Follow _edge(String follower, String followee, FollowStatus status) => Follow(
+      id: Follow.edgeId(follower, followee),
+      followerUid: follower,
+      followeeUid: followee,
+      status: status,
+      members: [follower, followee],
+      createdAt: DateTime.utc(2026, 1, 1),
+    );
+
+/// `follows/viewer_target` — el que mira sigue al del perfil.
+Follow outgoing([FollowStatus status = FollowStatus.accepted]) =>
+    _edge('viewer', 'target', status);
+
+/// `follows/target_viewer` — el del perfil sigue al que mira.
+Follow incoming([FollowStatus status = FollowStatus.accepted]) =>
+    _edge('target', 'viewer', status);
+
 PublicProfileView _view({
   String authorDisplayName = 'Tincho',
   String? authorAvatarUrl,
   String? authorGymId,
   bool isSelf = false,
   bool isPublic = true,
-  dynamic friendship,
+  Follow? outgoingFollow,
+  Follow? incomingFollow,
 }) =>
     PublicProfileView(
       authorDisplayName: authorDisplayName,
       authorAvatarUrl: authorAvatarUrl,
       authorGymId: authorGymId,
-      friendship: friendship,
+      outgoingFollow: outgoingFollow,
+      incomingFollow: incomingFollow,
       isSelf: isSelf,
       isPublic: isPublic,
     );
@@ -210,22 +229,12 @@ void main() {
   // detailed content (stats numbers, tabs) is gated to accepted followers.
   // ---------------------------------------------------------------------------
   group('PublicProfileScreen — privacy gate', () {
-    Friendship acceptedFriendship() => Friendship(
-          id: 'target_viewer',
-          uidA: 'target',
-          uidB: 'viewer',
-          status: FriendshipStatus.accepted,
-          requesterId: 'viewer',
-          members: const ['target', 'viewer'],
-          createdAt: DateTime.utc(2026, 1, 1),
-        );
-
     testWidgets(
         'private + non-follower → hides tabs and shows "Perfil privado" notice',
         (tester) async {
       await tester.pumpWidget(_wrap(
         child: const PublicProfileScreen(targetUid: 'target'),
-        view: AsyncData(_view(isPublic: false, friendship: null)),
+        view: AsyncData(_view(isPublic: false)),
       ));
       await tester.pumpAndSettle();
 
@@ -243,7 +252,7 @@ void main() {
       await tester.pumpWidget(_wrap(
         child: const PublicProfileScreen(targetUid: 'target'),
         view: AsyncData(
-          _view(isPublic: false, friendship: acceptedFriendship()),
+          _view(isPublic: false, outgoingFollow: outgoing()),
         ),
       ));
       await tester.pumpAndSettle();
@@ -268,7 +277,7 @@ void main() {
     testWidgets('public + non-follower → shows tabs (no gate)', (tester) async {
       await tester.pumpWidget(_wrap(
         child: const PublicProfileScreen(targetUid: 'target'),
-        view: AsyncData(_view(isPublic: true, friendship: null)),
+        view: AsyncData(_view(isPublic: true)),
       ));
       await tester.pumpAndSettle();
 
@@ -278,32 +287,22 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
-  // MENSAJE button — gated by friendship.status == accepted (Option B).
+  // MENSAJE — REQ-FOLLOW-012 / SCENARIO-845.
+  //
+  // La elegibilidad es la arista ENTRANTE: le puedo escribir a alguien sólo si
+  // esa persona ME SIGUE. Es el espejo literal de `chatCreateOk` en las rules —
+  // abrir un chat es poder mandar el primer mensaje.
+  //
+  // NO es el OR de las dos direcciones. El OR era el espejo de la regla vieja,
+  // cuando `friendships` tenía un doc por par y las dos direcciones eran el
+  // mismo hecho. Si el cliente y las rules no coinciden exactamente, el UX
+  // miente en una dirección o en la otra: o el botón está habilitado y el envío
+  // rebota con permission-denied, o está gris cuando el servidor sí lo permite.
   // ---------------------------------------------------------------------------
-  group('PublicProfileScreen — MENSAJE button gate', () {
-    Friendship acceptedFriendship() => Friendship(
-          id: 'target_viewer',
-          uidA: 'target',
-          uidB: 'viewer',
-          status: FriendshipStatus.accepted,
-          requesterId: 'viewer',
-          members: const ['target', 'viewer'],
-          createdAt: DateTime.utc(2026, 1, 1),
-        );
-
-    Friendship pendingFriendship() => Friendship(
-          id: 'target_viewer',
-          uidA: 'target',
-          uidB: 'viewer',
-          status: FriendshipStatus.pending,
-          requesterId: 'viewer',
-          members: const ['target', 'viewer'],
-          createdAt: DateTime.utc(2026, 1, 1),
-        );
-
-    /// Reads the semantic node of the MENSAJE button — we match by label
-    /// rather than by widget type since the button is a private widget.
-    /// `enabled` semantic flag mirrors the widget's own `enabled` state.
+  group('PublicProfileScreen — gate del botón MENSAJE', () {
+    /// Lee el nodo semántico del pill MENSAJE. Se afirma sobre `enabled`,
+    /// NUNCA sobre anchos de texto: en este repo `google_fonts` no carga en
+    /// tests y todo se mide con una fallback más ancha.
     bool messageButtonSemanticEnabled(WidgetTester tester) {
       final finder = find.bySemanticsLabel('Mensaje');
       if (finder.evaluate().isEmpty) return false;
@@ -311,28 +310,10 @@ void main() {
       return node.flagsCollection.isEnabled == Tristate.isTrue;
     }
 
-    testWidgets(
-        'no friendship → MENSAJE is disabled (a11y label announces disabled)',
-        (tester) async {
+    testWidgets('sin ninguna arista → MENSAJE deshabilitado', (tester) async {
       await tester.pumpWidget(_wrap(
         child: const PublicProfileScreen(targetUid: 'target'),
-        view: AsyncData(_view(friendship: null)),
-      ));
-      await tester.pumpAndSettle();
-
-      expect(find.text('MENSAJE'), findsOneWidget);
-      // The a11y label used by the disabled path exists in l10n; asserting
-      // its presence is the tightest a11y-safe check we can do without
-      // pulling the l10n key here.
-      expect(messageButtonSemanticEnabled(tester), isFalse);
-    });
-
-    testWidgets(
-        'pending friendship → MENSAJE stays disabled (not accepted yet)',
-        (tester) async {
-      await tester.pumpWidget(_wrap(
-        child: const PublicProfileScreen(targetUid: 'target'),
-        view: AsyncData(_view(friendship: pendingFriendship())),
+        view: AsyncData(_view()),
       ));
       await tester.pumpAndSettle();
 
@@ -340,14 +321,64 @@ void main() {
       expect(messageButtonSemanticEnabled(tester), isFalse);
     });
 
-    testWidgets('accepted friendship → MENSAJE is enabled', (tester) async {
+    testWidgets('entrante pending → MENSAJE deshabilitado (todavía no aceptó)',
+        (tester) async {
       await tester.pumpWidget(_wrap(
         child: const PublicProfileScreen(targetUid: 'target'),
-        view: AsyncData(_view(friendship: acceptedFriendship())),
+        view: AsyncData(
+          _view(incomingFollow: incoming(FollowStatus.pending)),
+        ),
       ));
       await tester.pumpAndSettle();
 
-      expect(find.text('MENSAJE'), findsOneWidget);
+      expect(messageButtonSemanticEnabled(tester), isFalse);
+    });
+
+    // SCENARIO-845 — EL DISCRIMINADOR.
+    testWidgets('lo sigo pero NO me sigue → MENSAJE DESHABILITADO',
+        (tester) async {
+      // Si esto se implementara con la arista saliente (o con el OR de las
+      // dos), este test se pone rojo. Es el caso donde el servidor deniega:
+      // `chatCreateOk` exige `followAccepted(otro, yo)`, y acá `otro` no me
+      // sigue.
+      await tester.pumpWidget(_wrap(
+        child: const PublicProfileScreen(targetUid: 'target'),
+        view: AsyncData(
+          _view(outgoingFollow: outgoing(), incomingFollow: null),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(messageButtonSemanticEnabled(tester), isFalse,
+          reason:
+              'seguirlo no me habilita a escribirle: él tiene que seguirme');
+    });
+
+    // SCENARIO-845 — el espejo.
+    testWidgets('me sigue aunque yo no lo siga → MENSAJE HABILITADO',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        child: const PublicProfileScreen(targetUid: 'target'),
+        view: AsyncData(
+          _view(outgoingFollow: null, incomingFollow: incoming()),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(messageButtonSemanticEnabled(tester), isTrue,
+          reason:
+              'su arista entrante alcanza: puedo mandarle el primer mensaje');
+    });
+
+    testWidgets('par mutuo → MENSAJE habilitado', (tester) async {
+      await tester.pumpWidget(_wrap(
+        child: const PublicProfileScreen(targetUid: 'target'),
+        view: AsyncData(
+          _view(outgoingFollow: outgoing(), incomingFollow: incoming()),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
       expect(messageButtonSemanticEnabled(tester), isTrue);
     });
 

@@ -121,6 +121,9 @@ class _DashboardHeader extends ConsumerWidget {
     final pendingCount = (linksAsync.valueOrNull ?? const [])
         .where((l) => l.status == TrainerLinkStatus.pending)
         .length;
+    // A failed links read must not silently hide the badge: flag it so the bell
+    // shows an error dot (and its sheet a retry) instead of a false empty "0".
+    final linksHasError = linksAsync.hasError && !linksAsync.hasValue;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -155,6 +158,7 @@ class _DashboardHeader extends ConsumerWidget {
             ),
             _BellWithBadge(
               badgeCount: pendingCount,
+              showError: linksHasError,
               palette: palette,
               onTap: () => _showPendingRequestsSheet(context),
             ),
@@ -182,11 +186,6 @@ class _DashboardHeader extends ConsumerWidget {
               // the whole header — date, greeting, bell label and this one —
               // is announced as a single blob.
               container: true,
-              // excludeSemantics: the initials render as a Text that would
-              // otherwise merge into the label and be read out as
-              // "Ver tu perfil MP". They are decorative — derived from the
-              // display name the trainer already knows is theirs.
-              excludeSemantics: true,
               label: AppL10n.of(context).a11yDashboardAvatarButton,
               child: GestureDetector(
                 onTap: () => context.push('/profile/edit-trainer'),
@@ -199,9 +198,23 @@ class _DashboardHeader extends ConsumerWidget {
                     minHeight: 44,
                   ),
                   child: Center(
-                    child: _AvatarInitials(
-                      initials: initials.isEmpty ? '·' : initials,
-                      palette: palette,
+                    // The initials render as a Text that would otherwise merge
+                    // into the label and be read out as "Editar tu perfil
+                    // profesional MP". They are decorative — derived from the
+                    // display name the trainer already knows is theirs.
+                    //
+                    // Excluded HERE, wrapping only the decorative subtree, and
+                    // NOT via `excludeSemantics: true` on the Semantics above:
+                    // that flag drops the semantics of EVERY descendant,
+                    // including the tap action the GestureDetector contributes.
+                    // The node was still announced as a button but VoiceOver's
+                    // double-tap had no action to fire. Same shape as
+                    // _BellWithBadge.
+                    child: ExcludeSemantics(
+                      child: _AvatarInitials(
+                        initials: initials.isEmpty ? '·' : initials,
+                        palette: palette,
+                      ),
                     ),
                   ),
                 ),
@@ -219,6 +232,7 @@ class _BellWithBadge extends StatelessWidget {
     required this.badgeCount,
     required this.palette,
     required this.onTap,
+    this.showError = false,
   });
   final int badgeCount;
   final AppPalette palette;
@@ -226,6 +240,10 @@ class _BellWithBadge extends StatelessWidget {
   /// Fires when tapped. Only wired when [badgeCount] > 0 — a zero badge has no
   /// pending requests to show, so the bell stays inert (#393).
   final VoidCallback onTap;
+
+  /// The links stream failed: show an amber dot (not a count) so the trainer
+  /// knows to tap, instead of a badge silently hidden as if there were none.
+  final bool showError;
 
   @override
   Widget build(BuildContext context) {
@@ -238,7 +256,9 @@ class _BellWithBadge extends StatelessWidget {
     // happened, with no way to tell that from a bug. It is always tappable
     // now; the sheet owns the empty state.
     return Semantics(
-      label: l10n.homePendingRequestsA11y(badgeCount),
+      label: showError
+          ? l10n.agendaGenericError
+          : l10n.homePendingRequestsA11y(badgeCount),
       button: true,
       // Without `container: true` this annotation merged into the enclosing
       // header node, so the pending count was announced glued to the date and
@@ -253,7 +273,23 @@ class _BellWithBadge extends StatelessWidget {
             clipBehavior: Clip.none,
             children: [
               Icon(TreinoIcon.bell, size: 22, color: palette.textPrimary),
-              if (badgeCount > 0)
+              if (showError)
+                // Amber dot: the count is unknown (read failed), so show an
+                // attention marker that invites a tap rather than a false count.
+                Positioned(
+                  right: -3,
+                  top: -3,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: palette.warning,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: palette.bg, width: 1),
+                    ),
+                  ),
+                )
+              else if (badgeCount > 0)
                 Positioned(
                   right: -4,
                   top: -4,
@@ -295,14 +331,17 @@ class BellWithBadgeTestHarness extends StatelessWidget {
     super.key,
     required this.badgeCount,
     required this.onTap,
+    this.showError = false,
   });
 
   final int badgeCount;
   final VoidCallback onTap;
+  final bool showError;
 
   @override
   Widget build(BuildContext context) => _BellWithBadge(
         badgeCount: badgeCount,
+        showError: showError,
         palette: AppPalette.of(context),
         onTap: onTap,
       );
@@ -875,6 +914,49 @@ class _PendingRequestsSheetState extends ConsumerState<_PendingRequestsSheet> {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     final linksAsync = ref.watch(trainerLinksStreamProvider);
+
+    // A failed read must not read as "no requests": show a retry, not the empty
+    // state (nor a "(0)" title) that would hide a pending request behind a lie.
+    // Early return keeps it clear of the had-some-then-none auto-close below.
+    if (linksAsync.hasError && !linksAsync.hasValue) {
+      return Padding(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: 20 + MediaQuery.paddingOf(context).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l10n.agendaGenericError,
+              style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+            ),
+            const SizedBox(height: 10),
+            TextButton(
+              onPressed: () => ref.invalidate(trainerLinksStreamProvider),
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(0, 36),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: Text(
+                l10n.coachRetryLabel,
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  letterSpacing: 0.8,
+                  color: palette.accent,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     final pending = (linksAsync.valueOrNull ?? const <TrainerLink>[])
         .where((l) => l.status == TrainerLinkStatus.pending)
         .toList();

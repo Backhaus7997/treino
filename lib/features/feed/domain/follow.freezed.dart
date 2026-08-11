@@ -3,7 +3,7 @@
 // ignore_for_file: type=lint
 // ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
 
-part of 'friendship.dart';
+part of 'follow.dart';
 
 // **************************************************************************
 // FreezedGenerator
@@ -14,67 +14,62 @@ T _$identity<T>(T value) => value;
 final _privateConstructorUsedError = UnsupportedError(
     'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models');
 
-Friendship _$FriendshipFromJson(Map<String, dynamic> json) {
-  return _Friendship.fromJson(json);
+Follow _$FollowFromJson(Map<String, dynamic> json) {
+  return _Follow.fromJson(json);
 }
 
 /// @nodoc
-mixin _$Friendship {
+mixin _$Follow {
   String get id => throw _privateConstructorUsedError;
-  String get uidA => throw _privateConstructorUsedError;
-  String get uidB => throw _privateConstructorUsedError;
-  FriendshipStatus get status => throw _privateConstructorUsedError;
-  String get requesterId => throw _privateConstructorUsedError;
+  String get followerUid => throw _privateConstructorUsedError;
+  String get followeeUid => throw _privateConstructorUsedError;
+  FollowStatus get status => throw _privateConstructorUsedError;
   List<String> get members => throw _privateConstructorUsedError;
   @TimestampConverter()
   DateTime get createdAt => throw _privateConstructorUsedError;
 
-  /// Serializes this Friendship to a JSON map.
+  /// Serializes this Follow to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
 
-  /// Create a copy of Friendship
+  /// Create a copy of Follow
   /// with the given fields replaced by the non-null parameter values.
   @JsonKey(includeFromJson: false, includeToJson: false)
-  $FriendshipCopyWith<Friendship> get copyWith =>
-      throw _privateConstructorUsedError;
+  $FollowCopyWith<Follow> get copyWith => throw _privateConstructorUsedError;
 }
 
 /// @nodoc
-abstract class $FriendshipCopyWith<$Res> {
-  factory $FriendshipCopyWith(
-          Friendship value, $Res Function(Friendship) then) =
-      _$FriendshipCopyWithImpl<$Res, Friendship>;
+abstract class $FollowCopyWith<$Res> {
+  factory $FollowCopyWith(Follow value, $Res Function(Follow) then) =
+      _$FollowCopyWithImpl<$Res, Follow>;
   @useResult
   $Res call(
       {String id,
-      String uidA,
-      String uidB,
-      FriendshipStatus status,
-      String requesterId,
+      String followerUid,
+      String followeeUid,
+      FollowStatus status,
       List<String> members,
       @TimestampConverter() DateTime createdAt});
 }
 
 /// @nodoc
-class _$FriendshipCopyWithImpl<$Res, $Val extends Friendship>
-    implements $FriendshipCopyWith<$Res> {
-  _$FriendshipCopyWithImpl(this._value, this._then);
+class _$FollowCopyWithImpl<$Res, $Val extends Follow>
+    implements $FollowCopyWith<$Res> {
+  _$FollowCopyWithImpl(this._value, this._then);
 
   // ignore: unused_field
   final $Val _value;
   // ignore: unused_field
   final $Res Function($Val) _then;
 
-  /// Create a copy of Friendship
+  /// Create a copy of Follow
   /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
     Object? id = null,
-    Object? uidA = null,
-    Object? uidB = null,
+    Object? followerUid = null,
+    Object? followeeUid = null,
     Object? status = null,
-    Object? requesterId = null,
     Object? members = null,
     Object? createdAt = null,
   }) {
@@ -83,22 +78,18 @@ class _$FriendshipCopyWithImpl<$Res, $Val extends Friendship>
           ? _value.id
           : id // ignore: cast_nullable_to_non_nullable
               as String,
-      uidA: null == uidA
-          ? _value.uidA
-          : uidA // ignore: cast_nullable_to_non_nullable
+      followerUid: null == followerUid
+          ? _value.followerUid
+          : followerUid // ignore: cast_nullable_to_non_nullable
               as String,
-      uidB: null == uidB
-          ? _value.uidB
-          : uidB // ignore: cast_nullable_to_non_nullable
+      followeeUid: null == followeeUid
+          ? _value.followeeUid
+          : followeeUid // ignore: cast_nullable_to_non_nullable
               as String,
       status: null == status
           ? _value.status
           : status // ignore: cast_nullable_to_non_nullable
-              as FriendshipStatus,
-      requesterId: null == requesterId
-          ? _value.requesterId
-          : requesterId // ignore: cast_nullable_to_non_nullable
-              as String,
+              as FollowStatus,
       members: null == members
           ? _value.members
           : members // ignore: cast_nullable_to_non_nullable
@@ -112,65 +103,58 @@ class _$FriendshipCopyWithImpl<$Res, $Val extends Friendship>
 }
 
 /// @nodoc
-abstract class _$$FriendshipImplCopyWith<$Res>
-    implements $FriendshipCopyWith<$Res> {
-  factory _$$FriendshipImplCopyWith(
-          _$FriendshipImpl value, $Res Function(_$FriendshipImpl) then) =
-      __$$FriendshipImplCopyWithImpl<$Res>;
+abstract class _$$FollowImplCopyWith<$Res> implements $FollowCopyWith<$Res> {
+  factory _$$FollowImplCopyWith(
+          _$FollowImpl value, $Res Function(_$FollowImpl) then) =
+      __$$FollowImplCopyWithImpl<$Res>;
   @override
   @useResult
   $Res call(
       {String id,
-      String uidA,
-      String uidB,
-      FriendshipStatus status,
-      String requesterId,
+      String followerUid,
+      String followeeUid,
+      FollowStatus status,
       List<String> members,
       @TimestampConverter() DateTime createdAt});
 }
 
 /// @nodoc
-class __$$FriendshipImplCopyWithImpl<$Res>
-    extends _$FriendshipCopyWithImpl<$Res, _$FriendshipImpl>
-    implements _$$FriendshipImplCopyWith<$Res> {
-  __$$FriendshipImplCopyWithImpl(
-      _$FriendshipImpl _value, $Res Function(_$FriendshipImpl) _then)
+class __$$FollowImplCopyWithImpl<$Res>
+    extends _$FollowCopyWithImpl<$Res, _$FollowImpl>
+    implements _$$FollowImplCopyWith<$Res> {
+  __$$FollowImplCopyWithImpl(
+      _$FollowImpl _value, $Res Function(_$FollowImpl) _then)
       : super(_value, _then);
 
-  /// Create a copy of Friendship
+  /// Create a copy of Follow
   /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
     Object? id = null,
-    Object? uidA = null,
-    Object? uidB = null,
+    Object? followerUid = null,
+    Object? followeeUid = null,
     Object? status = null,
-    Object? requesterId = null,
     Object? members = null,
     Object? createdAt = null,
   }) {
-    return _then(_$FriendshipImpl(
+    return _then(_$FollowImpl(
       id: null == id
           ? _value.id
           : id // ignore: cast_nullable_to_non_nullable
               as String,
-      uidA: null == uidA
-          ? _value.uidA
-          : uidA // ignore: cast_nullable_to_non_nullable
+      followerUid: null == followerUid
+          ? _value.followerUid
+          : followerUid // ignore: cast_nullable_to_non_nullable
               as String,
-      uidB: null == uidB
-          ? _value.uidB
-          : uidB // ignore: cast_nullable_to_non_nullable
+      followeeUid: null == followeeUid
+          ? _value.followeeUid
+          : followeeUid // ignore: cast_nullable_to_non_nullable
               as String,
       status: null == status
           ? _value.status
           : status // ignore: cast_nullable_to_non_nullable
-              as FriendshipStatus,
-      requesterId: null == requesterId
-          ? _value.requesterId
-          : requesterId // ignore: cast_nullable_to_non_nullable
-              as String,
+              as FollowStatus,
       members: null == members
           ? _value._members
           : members // ignore: cast_nullable_to_non_nullable
@@ -185,31 +169,28 @@ class __$$FriendshipImplCopyWithImpl<$Res>
 
 /// @nodoc
 @JsonSerializable()
-class _$FriendshipImpl extends _Friendship {
-  const _$FriendshipImpl(
+class _$FollowImpl extends _Follow {
+  const _$FollowImpl(
       {required this.id,
-      required this.uidA,
-      required this.uidB,
+      required this.followerUid,
+      required this.followeeUid,
       required this.status,
-      required this.requesterId,
       required final List<String> members,
       @TimestampConverter() required this.createdAt})
       : _members = members,
         super._();
 
-  factory _$FriendshipImpl.fromJson(Map<String, dynamic> json) =>
-      _$$FriendshipImplFromJson(json);
+  factory _$FollowImpl.fromJson(Map<String, dynamic> json) =>
+      _$$FollowImplFromJson(json);
 
   @override
   final String id;
   @override
-  final String uidA;
+  final String followerUid;
   @override
-  final String uidB;
+  final String followeeUid;
   @override
-  final FriendshipStatus status;
-  @override
-  final String requesterId;
+  final FollowStatus status;
   final List<String> _members;
   @override
   List<String> get members {
@@ -224,20 +205,20 @@ class _$FriendshipImpl extends _Friendship {
 
   @override
   String toString() {
-    return 'Friendship(id: $id, uidA: $uidA, uidB: $uidB, status: $status, requesterId: $requesterId, members: $members, createdAt: $createdAt)';
+    return 'Follow(id: $id, followerUid: $followerUid, followeeUid: $followeeUid, status: $status, members: $members, createdAt: $createdAt)';
   }
 
   @override
   bool operator ==(Object other) {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
-            other is _$FriendshipImpl &&
+            other is _$FollowImpl &&
             (identical(other.id, id) || other.id == id) &&
-            (identical(other.uidA, uidA) || other.uidA == uidA) &&
-            (identical(other.uidB, uidB) || other.uidB == uidB) &&
+            (identical(other.followerUid, followerUid) ||
+                other.followerUid == followerUid) &&
+            (identical(other.followeeUid, followeeUid) ||
+                other.followeeUid == followeeUid) &&
             (identical(other.status, status) || other.status == status) &&
-            (identical(other.requesterId, requesterId) ||
-                other.requesterId == requesterId) &&
             const DeepCollectionEquality().equals(other._members, _members) &&
             (identical(other.createdAt, createdAt) ||
                 other.createdAt == createdAt));
@@ -245,60 +226,55 @@ class _$FriendshipImpl extends _Friendship {
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(runtimeType, id, uidA, uidB, status,
-      requesterId, const DeepCollectionEquality().hash(_members), createdAt);
+  int get hashCode => Object.hash(runtimeType, id, followerUid, followeeUid,
+      status, const DeepCollectionEquality().hash(_members), createdAt);
 
-  /// Create a copy of Friendship
+  /// Create a copy of Follow
   /// with the given fields replaced by the non-null parameter values.
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   @pragma('vm:prefer-inline')
-  _$$FriendshipImplCopyWith<_$FriendshipImpl> get copyWith =>
-      __$$FriendshipImplCopyWithImpl<_$FriendshipImpl>(this, _$identity);
+  _$$FollowImplCopyWith<_$FollowImpl> get copyWith =>
+      __$$FollowImplCopyWithImpl<_$FollowImpl>(this, _$identity);
 
   @override
   Map<String, dynamic> toJson() {
-    return _$$FriendshipImplToJson(
+    return _$$FollowImplToJson(
       this,
     );
   }
 }
 
-abstract class _Friendship extends Friendship {
-  const factory _Friendship(
-          {required final String id,
-          required final String uidA,
-          required final String uidB,
-          required final FriendshipStatus status,
-          required final String requesterId,
-          required final List<String> members,
-          @TimestampConverter() required final DateTime createdAt}) =
-      _$FriendshipImpl;
-  const _Friendship._() : super._();
+abstract class _Follow extends Follow {
+  const factory _Follow(
+      {required final String id,
+      required final String followerUid,
+      required final String followeeUid,
+      required final FollowStatus status,
+      required final List<String> members,
+      @TimestampConverter() required final DateTime createdAt}) = _$FollowImpl;
+  const _Follow._() : super._();
 
-  factory _Friendship.fromJson(Map<String, dynamic> json) =
-      _$FriendshipImpl.fromJson;
+  factory _Follow.fromJson(Map<String, dynamic> json) = _$FollowImpl.fromJson;
 
   @override
   String get id;
   @override
-  String get uidA;
+  String get followerUid;
   @override
-  String get uidB;
+  String get followeeUid;
   @override
-  FriendshipStatus get status;
-  @override
-  String get requesterId;
+  FollowStatus get status;
   @override
   List<String> get members;
   @override
   @TimestampConverter()
   DateTime get createdAt;
 
-  /// Create a copy of Friendship
+  /// Create a copy of Follow
   /// with the given fields replaced by the non-null parameter values.
   @override
   @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$FriendshipImplCopyWith<_$FriendshipImpl> get copyWith =>
+  _$$FollowImplCopyWith<_$FollowImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }

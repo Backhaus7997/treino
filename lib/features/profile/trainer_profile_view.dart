@@ -52,6 +52,7 @@ class TrainerProfileView extends ConsumerWidget {
 
     final displayName = profileAsync.valueOrNull?.displayName ?? '';
     final initials = _initials(displayName);
+    final linksHasError = linksAsync.hasError && !linksAsync.hasValue;
     final links = linksAsync.valueOrNull ?? const [];
     final activeAlumnos =
         links.where((l) => l.status == TrainerLinkStatus.active).length;
@@ -90,7 +91,8 @@ class TrainerProfileView extends ConsumerWidget {
         _IdentityCard(
           initials: initials.isEmpty ? '·' : initials,
           displayName: displayName.isEmpty ? 'Coach' : displayName,
-          activeAlumnos: activeAlumnos,
+          // A failed links read shows "—" (unknown), not a false "0 alumnos".
+          activeAlumnos: linksHasError ? null : activeAlumnos,
           palette: palette,
         ),
         const SizedBox(height: 14),
@@ -184,7 +186,10 @@ class _IdentityCard extends StatelessWidget {
 
   final String initials;
   final String displayName;
-  final int activeAlumnos;
+
+  /// Active-athlete count, or null when the links read failed → renders "—"
+  /// (unknown) instead of a misleading "0".
+  final int? activeAlumnos;
   final AppPalette palette;
 
   @override
@@ -256,7 +261,7 @@ class _IdentityCard extends StatelessWidget {
                 Row(
                   children: [
                     _IdentityStat(
-                      value: '$activeAlumnos',
+                      value: activeAlumnos == null ? '—' : '$activeAlumnos',
                       label: 'ALUMNOS',
                       color: palette.accent,
                       palette: palette,

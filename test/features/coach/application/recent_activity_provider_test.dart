@@ -6,6 +6,7 @@
 // permission-denied and are skipped. The feed is newest-first, capped at 8.
 import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseException;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/coach/application/recent_activity_provider.dart';
@@ -51,12 +52,19 @@ ProviderContainer _buildContainer({
   required List<TrainerLink> links,
   required Map<String, List<Session>> sessionsByAthleteId,
   Set<String> denied = const {},
+  Set<String> failed = const {},
 }) {
   return ProviderContainer(overrides: [
     trainerLinksStreamProvider.overrideWith((ref) => Stream.value(links)),
+    // denied → session_shares permission-denied (expected opt-out).
+    // failed → a real backend error (e.g. missing index, unavailable).
     finishedInWindowByUidProvider.overrideWith((ref, key) async {
       if (denied.contains(key.athleteId)) {
-        throw Exception('permission-denied');
+        throw FirebaseException(
+            plugin: 'cloud_firestore', code: 'permission-denied');
+      }
+      if (failed.contains(key.athleteId)) {
+        throw FirebaseException(plugin: 'cloud_firestore', code: 'unavailable');
       }
       return sessionsByAthleteId[key.athleteId] ?? const <Session>[];
     }),
@@ -153,6 +161,53 @@ void main() {
       final container = _buildContainer(
         links: const [],
         sessionsByAthleteId: const {},
+      );
+      addTearDown(container.dispose);
+
+      final entries = await _read(container);
+
+      expect(entries, isEmpty);
+    });
+
+    // ── M1: don't render a total read failure as false "no recent activity" ──
+
+    test('all reads fail with a backend error → provider surfaces error',
+        () async {
+      final container = _buildContainer(
+        links: [_link('a1'), _link('a2')],
+        sessionsByAthleteId: const {},
+        failed: {'a1', 'a2'},
+      );
+      addTearDown(container.dispose);
+
+      await expectLater(
+        _read(container),
+        throwsA(isA<FirebaseException>()
+            .having((e) => e.code, 'code', 'unavailable')),
+      );
+    });
+
+    test('backend error on one athlete but another has data → data (partial)',
+        () async {
+      final container = _buildContainer(
+        links: [_link('a1'), _link('a2')],
+        sessionsByAthleteId: {
+          'a1': [_session('s1', finishedAt: DateTime.utc(2026, 6, 10))],
+        },
+        failed: {'a2'},
+      );
+      addTearDown(container.dispose);
+
+      final entries = await _read(container);
+
+      expect(entries.map((e) => e.athleteId), ['a1']);
+    });
+
+    test('all reads denied (opt-out) → empty data, not an error', () async {
+      final container = _buildContainer(
+        links: [_link('a1'), _link('a2')],
+        sessionsByAthleteId: const {},
+        denied: {'a1', 'a2'},
       );
       addTearDown(container.dispose);
 

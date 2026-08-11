@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/motion/treino_count_up.dart';
+import '../../../../core/widgets/motion/treino_tappable.dart';
 
 /// Reusable stat tile — label above, value below.
 /// Used in both [RoutineDetailScreen] and [ExerciseDetailScreen].
@@ -16,10 +17,23 @@ class StatTile extends StatelessWidget {
     this.countUpFormatter,
     this.icon,
     this.isAccent = false,
+    this.onTap,
+    this.semanticsLabel,
   });
 
   final String label;
   final String? value;
+
+  /// Si no-null, el tile se vuelve tappable — para las métricas que son la
+  /// puerta a otra pantalla, como los contadores de seguidores del perfil.
+  ///
+  /// `null` (default) → comportamiento sin cambios: los otros seis usos de
+  /// [StatTile] en la app son números y nada más, y no tienen que ganar una
+  /// zona tappable ni un nodo de semantics por esto.
+  final VoidCallback? onTap;
+
+  /// Etiqueta de accesibilidad del tile tappable. Ignorada si [onTap] es null.
+  final String? semanticsLabel;
 
   /// Ícono opcional de la métrica, a la izquierda del número.
   ///
@@ -72,7 +86,7 @@ class StatTile extends StatelessWidget {
         color: palette.textMuted,
       ),
     );
-    return Column(
+    final column = Column(
       crossAxisAlignment:
           icon == null ? CrossAxisAlignment.center : CrossAxisAlignment.start,
       children: [
@@ -108,6 +122,17 @@ class StatTile extends StatelessWidget {
             child: labelWidget,
           ),
       ],
+    );
+
+    final onTap = this.onTap;
+    if (onTap == null) return column;
+
+    // `HitTestBehavior.opaque` vía TreinoTappable: el Column deja huecos entre
+    // el número y el label, y sin esto el tap se cuela por el medio del tile.
+    return Semantics(
+      button: true,
+      label: semanticsLabel,
+      child: TreinoTappable(onTap: onTap, child: column),
     );
   }
 }

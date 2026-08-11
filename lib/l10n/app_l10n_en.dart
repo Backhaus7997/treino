@@ -1351,7 +1351,7 @@ class AppL10nEn extends AppL10n {
   String get profileCuentaTitle => 'CUENTA';
 
   @override
-  String get profileCuentaSolicitudesTitle => 'Solicitudes de amistad';
+  String get profileCuentaSolicitudesTitle => 'Solicitudes de seguidores';
 
   @override
   String profileCuentaSolicitudesSubtitle(int count) {
@@ -1814,11 +1814,11 @@ class AppL10nEn extends AppL10n {
   String get feedCreatePostA11y => 'Create post';
 
   @override
-  String get feedFriendRequestsA11y => 'Friend requests';
+  String get feedFriendRequestsA11y => 'Follower requests';
 
   @override
   String feedFriendRequestsWithCountA11y(int count) {
-    return 'Friend requests, $count pending';
+    return 'Follower requests, $count pending';
   }
 
   @override
@@ -2360,7 +2360,7 @@ class AppL10nEn extends AppL10n {
   String get feedRequestSentSuccess => 'Request sent.';
 
   @override
-  String get feedRequestAcceptedSuccess => 'You\'re now friends.';
+  String get feedRequestAcceptedSuccess => 'Request accepted.';
 
   @override
   String get feedFriendActionError =>
@@ -3171,7 +3171,7 @@ class AppL10nEn extends AppL10n {
   String get postPrivacySelectorTitle => 'VISIBILITY';
 
   @override
-  String get postPrivacyFriends => 'FRIENDS';
+  String get postPrivacyFriends => 'FOLLOWERS';
 
   @override
   String get postPrivacyGym => 'MY GYM';
@@ -3209,8 +3209,8 @@ class AppL10nEn extends AppL10n {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count pending friend requests',
-      one: '1 pending friend request',
+      other: '$count pending follower requests',
+      one: '1 pending follower request',
     );
     return '$_temp0';
   }
@@ -3228,4 +3228,81 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get postDetailUnavailable => 'This post is no longer available.';
+
+  @override
+  String feedUnfollowConfirmTitle(String name) {
+    return 'Unfollow $name?';
+  }
+
+  @override
+  String get feedUnfollowConfirmAction => 'UNFOLLOW';
+
+  @override
+  String get feedUnfollowDismiss => 'CANCEL';
+
+  @override
+  String feedCancelRequestConfirmTitle(String name) {
+    return 'Cancel your request to $name?';
+  }
+
+  @override
+  String get feedCancelRequestConfirmAction => 'CANCEL REQUEST';
+
+  @override
+  String get feedCancelRequestDismiss => 'BACK';
+
+  @override
+  String get feedFollowButtonFollowA11y => 'Follow this person';
+
+  @override
+  String get feedFollowButtonFollowingA11y => 'Following. Tap to unfollow';
+
+  @override
+  String get feedFollowButtonRequestedA11y => 'Request sent. Tap to cancel it';
+
+  @override
+  String get feedFollowButtonAcceptA11y => 'Accept follower request';
+
+  @override
+  String get feedFollowStartedSuccess => 'You\'re now following this person.';
+
+  @override
+  String get feedSegmentFollowing => 'FOLLOWERS';
+
+  @override
+  String get feedEmptyFollowing => 'No posts yet from people you follow';
+
+  @override
+  String get chatBlockedComposerNotice =>
+      'To message them, this person needs to follow you.';
+
+  @override
+  String get chatBlockedComposerHintA11y => 'You can\'t write in this chat';
+
+  @override
+  String get followListTabFollowers => 'FOLLOWERS';
+
+  @override
+  String get followListTabFollowing => 'FOLLOWING';
+
+  @override
+  String get followListEmptyFollowers => 'No followers yet';
+
+  @override
+  String get followListEmptyFollowersSelf => 'You have no followers yet';
+
+  @override
+  String get followListEmptyFollowing => 'Not following anyone yet';
+
+  @override
+  String get followListEmptyFollowingSelf => 'You\'re not following anyone yet';
+
+  @override
+  String get followListLoadError => 'We couldn\'t load the list. Try again.';
+
+  @override
+  String get followListOpenFollowersA11y => 'View followers';
+
+  @override
+  String get followListOpenFollowingA11y => 'View following';
 }

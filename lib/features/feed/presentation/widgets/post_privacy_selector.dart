@@ -41,7 +41,7 @@ class PostPrivacySelector extends StatelessWidget {
           children: [
             _PrivacyPill(
               label: l10n.postPrivacyFriends,
-              privacy: PostPrivacy.friends,
+              privacy: PostPrivacy.followers,
               selected: selected,
               isEnabled: true,
               onSelect: onSelect,

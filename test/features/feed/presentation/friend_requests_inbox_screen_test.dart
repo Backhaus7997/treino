@@ -3,9 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
-import 'package:treino/features/feed/application/friendship_providers.dart';
-import 'package:treino/features/feed/domain/friendship.dart';
-import 'package:treino/features/feed/domain/friendship_status.dart';
+import 'package:treino/features/feed/application/follow_providers.dart';
+import 'package:treino/features/feed/domain/follow.dart';
+import 'package:treino/features/feed/domain/follow_status.dart';
 import 'package:treino/features/feed/presentation/friend_requests_inbox_screen.dart';
 import 'package:treino/features/feed/presentation/widgets/friend_request_inbox_tile.dart';
 import 'package:treino/l10n/app_l10n.dart';
@@ -14,16 +14,14 @@ import 'package:treino/l10n/app_l10n.dart';
 // Helpers
 // ---------------------------------------------------------------------------
 
-final _now = DateTime.utc(2026, 1, 1);
-
-Friendship _makeFriendship(String id, String requesterId) => Friendship(
-      id: id,
-      uidA: 'alice',
-      uidB: requesterId,
-      status: FriendshipStatus.pending,
-      requesterId: requesterId,
-      members: ['alice', requesterId],
-      createdAt: _now,
+/// Solicitud RECIBIDA = arista ENTRANTE `{quien pide}_alice`, sin ordenar.
+Follow _makeFollow(String requesterId) => Follow(
+      id: Follow.edgeId(requesterId, 'alice'),
+      followerUid: requesterId,
+      followeeUid: 'alice',
+      status: FollowStatus.pending,
+      members: [requesterId, 'alice'],
+      createdAt: DateTime.utc(2026, 1, 1),
     );
 
 Widget _buildScreen({required List<Override> overrides}) {
@@ -54,7 +52,7 @@ void main() {
             authStateChangesProvider.overrideWith(
               (_) => Stream.value(null),
             ),
-            pendingRequestsStreamProvider('').overrideWith(
+            pendingReceivedStreamProvider('').overrideWith(
               (_) => const Stream.empty(),
             ),
           ],
@@ -77,8 +75,8 @@ void main() {
             authStateChangesProvider.overrideWith(
               (_) => Stream.value(null),
             ),
-            pendingRequestsStreamProvider('').overrideWith(
-              (_) => Stream.value(<Friendship>[]),
+            pendingReceivedStreamProvider('').overrideWith(
+              (_) => Stream.value(<Follow>[]),
             ),
           ],
         ),
@@ -95,10 +93,10 @@ void main() {
 
     // SCENARIO-459: data with 2 items → exactly 2 FriendRequestInboxTile widgets
     testWidgets(
-        'SCENARIO-459: data with 2 friendships renders exactly 2 FriendRequestInboxTile widgets',
+        'SCENARIO-459: data con 2 solicitudes renderiza exactly 2 FriendRequestInboxTile widgets',
         (tester) async {
-      final f1 = _makeFriendship('alice_bob', 'bob');
-      final f2 = _makeFriendship('alice_charlie', 'charlie');
+      final f1 = _makeFollow('bob');
+      final f2 = _makeFollow('charlie');
 
       await tester.pumpWidget(
         _buildScreen(
@@ -106,7 +104,7 @@ void main() {
             authStateChangesProvider.overrideWith(
               (_) => Stream.value(null),
             ),
-            pendingRequestsStreamProvider('').overrideWith(
+            pendingReceivedStreamProvider('').overrideWith(
               (_) => Stream.value([f1, f2]),
             ),
           ],
@@ -131,9 +129,8 @@ void main() {
             authStateChangesProvider.overrideWith(
               (_) => Stream.value(null),
             ),
-            pendingRequestsStreamProvider('').overrideWith(
-              (_) =>
-                  Stream<List<Friendship>>.error(Exception('Firestore error')),
+            pendingReceivedStreamProvider('').overrideWith(
+              (_) => Stream<List<Follow>>.error(Exception('Firestore error')),
             ),
           ],
         ),

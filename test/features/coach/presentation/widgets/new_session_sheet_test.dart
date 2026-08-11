@@ -18,11 +18,14 @@
 //     watchOverrides errors → creation still proceeds WITHOUT the warning
 //     dialog. This test MUST fail if either try/catch is removed.
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/utils/firestore_write.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/data/appointment_repository.dart';
@@ -75,6 +78,27 @@ class _FakeAvailabilityRepository extends Fake
       return Stream.error(Exception('permission-denied'));
     }
     return Stream.value(overrides);
+  }
+}
+
+/// Availability repo whose `watchOverrides` stays PENDING until [gate]
+/// completes. Lets a test hold the submit inside the blocked-day async read —
+/// the window that M7 left unguarded — while it fires a second tap.
+class _GatedAvailabilityRepository extends Fake
+    implements AvailabilityRepository {
+  _GatedAvailabilityRepository({required this.gate});
+
+  final Completer<void> gate;
+
+  @override
+  Stream<List<AvailabilityOverride>> watchOverrides(
+    String trainerId,
+    DateTime fromDate,
+    DateTime toDate,
+  ) {
+    return Stream.fromFuture(
+      gate.future.then((_) => const <AvailabilityOverride>[]),
+    );
   }
 }
 
@@ -148,11 +172,16 @@ List<Override> _overrides({
   List<TrainerLink> links = const [],
   Map<String, UserPublicProfile> profiles = const {},
   _MockAppointmentRepository? appointmentRepo,
-  _FakeAvailabilityRepository? availabilityRepo,
+  AvailabilityRepository? availabilityRepo,
+  bool errorLinks = false,
 }) {
   return [
     currentUidProvider.overrideWithValue(_kTrainerId),
-    trainerLinksStreamProvider.overrideWith((ref) => Stream.value(links)),
+    trainerLinksStreamProvider.overrideWith(
+      (ref) => errorLinks
+          ? Stream<List<TrainerLink>>.error(Exception('links failed'))
+          : Stream.value(links),
+    ),
     if (appointmentRepo != null)
       appointmentRepositoryProvider.overrideWithValue(appointmentRepo),
     availabilityRepositoryProvider.overrideWithValue(
@@ -401,6 +430,55 @@ void main() {
     });
   });
 
+  // ── H4: a write that never acks (offline) must not hang the spinner ──────
+  //
+  // The repo bounds its Firestore write with `.boundedWrite`; here the stub
+  // stands in for that bound (a real offline stall never acks). Before the fix
+  // the button's spinner sat forever; now the write times out and the SAME
+  // catch that already handled a thrown write clears the spinner + shows the
+  // error.
+  group('H4 — a stalled write times out instead of hanging the spinner', () {
+    testWidgets('single: stalled createByTrainer → error shown, spinner gone',
+        (tester) async {
+      when(
+        () => mockAppointmentRepo.createByTrainer(
+          trainerId: any(named: 'trainerId'),
+          athleteId: any(named: 'athleteId'),
+          athleteDisplayName: any(named: 'athleteDisplayName'),
+          startsAt: any(named: 'startsAt'),
+          durationMin: any(named: 'durationMin'),
+          noteBefore: any(named: 'noteBefore'),
+        ),
+      ).thenAnswer((_) => Completer<Appointment>().future.boundedWrite);
+
+      _useTallViewport(tester);
+      await tester.pumpWidget(_wrap(
+        initialDate: targetDateOnly,
+        overrides: _overrides(
+          links: [_activeLink(_kAthleteId1)],
+          profiles: {_kAthleteId1: _pub(_kAthleteId1, 'Carlos Pérez')},
+          appointmentRepo: mockAppointmentRepo,
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      await _selectAthlete(tester, 'Carlos Pérez');
+      await tester.tap(find.text('REGISTRAR SESIÓN'));
+      // Let the blocked-day check resolve and the (stalled) write begin.
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+      // Advance past the 15s write bound → the timeout reaches the catch.
+      await tester.pump(const Duration(seconds: 16));
+
+      expect(
+        find.text('No pudimos registrar la sesión. Probá de nuevo.'),
+        findsOneWidget,
+      );
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+    });
+  });
+
   // ── SCENARIO 3: recurring with some blocked dates ───────────────────────
   //
   // Toggle "Se repite", pick a single weekday, and block the FIRST future
@@ -585,6 +663,149 @@ void main() {
           noteBefore: any(named: 'noteBefore'),
         ),
       ).called(1);
+    });
+  });
+
+  // ── M7: doble tap no duplica ─────────────────────────────────────────────
+  //
+  // #607 insertó el chequeo async de días bloqueados ARRIBA del
+  // `setState(_saving=true)`, dejando una ventana en la que un segundo tap
+  // corría el submit de nuevo → sesión/serie duplicada en Firestore. El fake
+  // gateado sostiene el submit dentro de esa ventana mientras se dispara el
+  // segundo tap.
+  group('Doble tap (M7)', () {
+    testWidgets('single: dos taps rápidos crean la sesión UNA sola vez',
+        (tester) async {
+      _useTallViewport(tester);
+      final gate = Completer<void>();
+
+      await tester.pumpWidget(_wrap(
+        initialDate: targetDateOnly,
+        overrides: _overrides(
+          links: [_activeLink(_kAthleteId1)],
+          profiles: {_kAthleteId1: _pub(_kAthleteId1, 'Carlos Pérez')},
+          appointmentRepo: mockAppointmentRepo,
+          availabilityRepo: _GatedAvailabilityRepository(gate: gate),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      await _selectAthlete(tester, 'Carlos Pérez');
+
+      // Tap 1: entra a _submitSingle, setea _saving=true y queda esperando el
+      // chequeo de días bloqueados (gateado).
+      await tester.tap(find.text('REGISTRAR SESIÓN'));
+      await tester.pump();
+      // Tap 2 en la ventana que M7 dejaba sin proteger.
+      await tester.tap(find.text('REGISTRAR SESIÓN'), warnIfMissed: false);
+      await tester.pump();
+
+      // Liberar el gate → el único submit vivo continúa hasta createByTrainer.
+      gate.complete();
+      await tester.pumpAndSettle();
+
+      verify(
+        () => mockAppointmentRepo.createByTrainer(
+          trainerId: any(named: 'trainerId'),
+          athleteId: any(named: 'athleteId'),
+          athleteDisplayName: any(named: 'athleteDisplayName'),
+          startsAt: any(named: 'startsAt'),
+          durationMin: any(named: 'durationMin'),
+          noteBefore: any(named: 'noteBefore'),
+        ),
+      ).called(1);
+    });
+  });
+
+  // ── H13: accesibilidad del toggle y los chips ────────────────────────────
+  group('Accesibilidad (H13)', () {
+    Future<void> pumpSheet(WidgetTester tester) async {
+      _useTallViewport(tester);
+      await tester.pumpWidget(_wrap(
+        overrides: _overrides(
+          links: [_activeLink(_kAthleteId1)],
+          profiles: {_kAthleteId1: _pub(_kAthleteId1, 'Carlos Pérez')},
+          appointmentRepo: mockAppointmentRepo,
+        ),
+      ));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('los pills del toggle exponen rol de botón y estado',
+        (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpSheet(tester);
+
+      // 'Una vez' arranca seleccionado; 'Se repite' no.
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('Una vez')),
+        isSemantics(isButton: true, isSelected: true, label: 'Una vez'),
+      );
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('Se repite')),
+        isSemantics(isButton: true, isSelected: false),
+      );
+      handle.dispose();
+    });
+
+    testWidgets(
+        'los chips de día anuncian el nombre COMPLETO (las dos "M" dejan de '
+        'ser ambiguas) con rol y estado', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpSheet(tester);
+
+      // Pasar a modo recurrente para revelar los chips.
+      await tester.tap(find.text('Se repite'));
+      await tester.pumpAndSettle();
+
+      // Antes solo se anunciaba 'L'/'M'/'M'/... — con dos 'M' indistinguibles.
+      for (final name in [
+        'Lunes',
+        'Martes',
+        'Miércoles',
+        'Jueves',
+        'Viernes',
+        'Sábado',
+        'Domingo'
+      ]) {
+        expect(find.bySemanticsLabel(name), findsOneWidget,
+            reason: 'el chip debe anunciar "$name"');
+      }
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('Lunes')),
+        isSemantics(isButton: true, isSelected: false),
+      );
+      handle.dispose();
+    });
+
+    testWidgets('los chips de día cumplen el área tocable mínima de 44pt',
+        (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpSheet(tester);
+      await tester.tap(find.text('Se repite'));
+      await tester.pumpAndSettle();
+
+      final size = tester.getSize(find.bySemanticsLabel('Lunes'));
+      expect(size.width, greaterThanOrEqualTo(44));
+      expect(size.height, greaterThanOrEqualTo(44));
+      handle.dispose();
+    });
+  });
+
+  // ── H3: a failed links read must not read as "no athletes" ─────────────────
+  group('H3 — links error surfaces a retry, not a false "no athletes"', () {
+    testWidgets(
+        'links stream error → shows retry, hides the "no active athletes" copy',
+        (tester) async {
+      _useTallViewport(tester);
+      await tester.pumpWidget(_wrap(overrides: _overrides(errorLinks: true)));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      // The honest error + Reintentar replace the misleading empty copy...
+      expect(find.text('Hubo un problema. Intentá de nuevo.'), findsOneWidget);
+      expect(find.text('Reintentar'), findsOneWidget);
+      // ...so a transient failure never claims the trainer has no athletes.
+      expect(find.text('No tenés alumnos activos.'), findsNothing);
     });
   });
 }

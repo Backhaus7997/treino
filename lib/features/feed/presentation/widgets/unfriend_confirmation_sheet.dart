@@ -4,29 +4,55 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../../core/widgets/motion/treino_tappable.dart';
+import '../../../../l10n/app_l10n.dart';
 
-/// Bottom sheet that asks the user to confirm removing a friendship.
+/// Qué acción confirma el sheet. Las dos borran UNA arista saliente, pero le
+/// significan cosas distintas al usuario: una corta un vínculo vigente, la otra
+/// retira un pedido que todavía nadie contestó. Mezclar el copy haría que
+/// cancelar una solicitud se lea como "eliminar" algo que nunca existió.
+enum UnfollowSheetMode {
+  /// Arista saliente `accepted` — dejar de seguir.
+  unfollow,
+
+  /// Arista saliente `pending` — cancelar la solicitud enviada.
+  cancelRequest,
+}
+
+/// Bottom sheet que pide confirmación antes de borrar la arista SALIENTE.
 ///
-/// Used by [PublicProfileFollowButton] when the viewer taps SIGUIENDO.
-/// The [friendDisplayName] is interpolated into the title copy.
-/// [onConfirm] is called only when the user taps ELIMINAR — CANCELAR dismisses
-/// without firing the callback (ADR-FRI-011).
+/// Lo usa [PublicProfileFollowButton] tanto en SIGUIENDO como en SOLICITUD
+/// ENVIADA; [mode] decide el copy. [onConfirm] se invoca sólo al confirmar —
+/// el botón de descarte cierra sin disparar nada (ADR-FRI-011).
 class UnfriendConfirmationSheet extends StatelessWidget {
   const UnfriendConfirmationSheet({
     super.key,
     required this.friendDisplayName,
     required this.onConfirm,
+    this.mode = UnfollowSheetMode.unfollow,
   });
 
   /// The friend's display name to interpolate into the confirmation copy.
   final String friendDisplayName;
 
-  /// Callback invoked when the user confirms the unfriend action.
+  /// Callback invoked when the user confirms the action.
   final VoidCallback onConfirm;
+
+  /// Qué acción se está confirmando. Default: dejar de seguir.
+  final UnfollowSheetMode mode;
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    final isCancel = mode == UnfollowSheetMode.cancelRequest;
+    final title = isCancel
+        ? l10n.feedCancelRequestConfirmTitle(friendDisplayName)
+        : l10n.feedUnfollowConfirmTitle(friendDisplayName);
+    final dismissLabel =
+        isCancel ? l10n.feedCancelRequestDismiss : l10n.feedUnfollowDismiss;
+    final confirmLabel = isCancel
+        ? l10n.feedCancelRequestConfirmAction
+        : l10n.feedUnfollowConfirmAction;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
@@ -52,7 +78,7 @@ class UnfriendConfirmationSheet extends StatelessWidget {
             const SizedBox(height: 18),
             // Title
             Text(
-              '¿Eliminar amistad con $friendDisplayName?',
+              title,
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
                 fontSize: 18,
@@ -66,7 +92,7 @@ class UnfriendConfirmationSheet extends StatelessWidget {
               children: [
                 Expanded(
                   child: _SheetButton(
-                    label: 'CANCELAR',
+                    label: dismissLabel,
                     bg: Colors.transparent,
                     borderColor: palette.border,
                     textColor: palette.textPrimary,
@@ -76,7 +102,7 @@ class UnfriendConfirmationSheet extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: _SheetButton(
-                    label: 'ELIMINAR',
+                    label: confirmLabel,
                     bg: palette.danger,
                     borderColor: palette.danger,
                     textColor: palette.onDanger,

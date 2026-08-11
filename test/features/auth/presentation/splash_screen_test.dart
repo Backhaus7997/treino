@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -124,5 +126,52 @@ void main() {
     await tester.pump(); // reflect the navigation frame
 
     expect(find.text('HOME'), findsOneWidget);
+  });
+
+  // ---------------------------------------------------------------------------
+  // QA H6: perfil cuyo stream NUNCA emite (snapshot cache-only filtrado + sin
+  // red). Sin el `.timeout` el await no completaba nunca y el splash quedaba
+  // con spinner para siempre. Ahora, a los 8s, muestra Reintentar y NO navega.
+  // ---------------------------------------------------------------------------
+  testWidgets(
+      'perfil que nunca resuelve → a los 8s muestra Reintentar, no HOME',
+      (tester) async {
+    final mockUser = MockUser();
+    when(() => mockUser.emailVerified).thenReturn(true);
+    final notifier = _TestAuthNotifier(initialUser: mockUser);
+
+    // Stream que queda abierto y nunca emite → userProfileProvider.future
+    // nunca completa → dispara el timeout.
+    final controller = StreamController<UserProfile?>();
+    addTearDown(controller.close);
+
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        authNotifierProvider.overrideWith(() => notifier),
+        userProfileProvider.overrideWith((ref) => controller.stream),
+      ],
+      child: MaterialApp.router(
+        routerConfig: _makeRouter(const SplashScreen()),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
+      ),
+    ));
+    await tester.pump(); // primer frame
+    await tester.pump(const Duration(milliseconds: 100)); // auth resuelve
+
+    // Antes del timeout: sigue en el splash con spinner, sin Reintentar.
+    expect(find.text('HOME'), findsNothing);
+    expect(find.text('Reintentar'), findsNothing);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    // Avanzar más allá de los 8s del timeout.
+    await tester.pump(const Duration(seconds: 9));
+    await tester.pump();
+
+    expect(find.text('Reintentar'), findsOneWidget);
+    expect(find.text('HOME'), findsNothing,
+        reason: 'un perfil que nunca emite no debe caer en /home con el gate '
+            'en loading perpetuo');
   });
 }
