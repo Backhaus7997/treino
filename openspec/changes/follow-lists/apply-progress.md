@@ -174,7 +174,37 @@ local.
 
 ---
 
-## 5. Deuda que este change deja anotada, sin tocar
+## 5. Revisión adversarial
+
+Con la suite entera en verde (4836 tests) se corrió una revisión adversarial
+del diff: cinco lentes independientes, y cada hallazgo juzgado por tres
+escépticos con la consigna de refutarlo. Sobrevivieron cinco defectos reales.
+
+Tres eran del código de este change y están arreglados en `835a6fa6`, cada uno
+con su test verificado en rojo antes del fix:
+
+1. **La fila de la lista hardcodeaba `/feed/profile/{uid}`.** O sea que SALIR
+   de la lista reintroducía el mismo issue #387 que ENTRAR evita a propósito.
+   El harness del test no lo veía porque montaba la pantalla en una ruta
+   plana; ahora usa la forma real (`{rama}/profile/{uid}/follows`), sin la
+   cual `matchedLocation` no se parece a producción y el defecto es invisible.
+2. **Faltaba `skipLoadingOnReload`.** El provider watchea un stream de
+   Firestore, que re-emite al abrir (snapshot de cache y después de servidor) y
+   con cada follow/unfollow en vivo. Con el default, cada re-emisión tiraba la
+   lista abajo, ponía el spinner de pantalla completa y mandaba el scroll a
+   cero aunque el contenido fuera idéntico. El test lo agarra en el frame 1.
+3. **El header quedaba en blanco** sin `displayName`, mientras la fila de esa
+   misma pantalla dice "Anónimo".
+
+Los otros dos son propiedades de las rules, consecuencia de la decisión de
+visibilidad de §1, y **no se tocaron**: son una decisión de producto, no del
+implementador. Están documentados con la evidencia completa en un **security
+advisory privado**, no acá: este archivo se mergea a un repositorio público y
+el detalle serviría de receta.
+
+→ `GHSA-98rm-h7jw-vv2x` (borrador, visible sólo para el equipo).
+
+## 6. Deuda que este change deja anotada, sin tocar
 
 - **`scripts/seed_emulator_full.js` todavía siembra `friendships`, no
   `follows`.** Quedó desactualizado tras el cutover: el emulador arranca sin
