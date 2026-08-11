@@ -548,6 +548,7 @@
 				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CODE_SIGN_ENTITLEMENTS = "TreinoWatch Watch App/TreinoWatch Watch App.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = J66AQRRM96;
@@ -556,6 +557,8 @@
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = TreinoWatch;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "TREINO usa tu ritmo cardíaco para mostrarte el esfuerzo en vivo mientras entrenás.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "TREINO guarda tus entrenamientos en Salud para que cuenten en tus anillos y en tu historial.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.backhaus.treino;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -595,6 +598,7 @@
 				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CODE_SIGN_ENTITLEMENTS = "TreinoWatch Watch App/TreinoWatch Watch App.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = J66AQRRM96;
@@ -603,6 +607,8 @@
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = TreinoWatch;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "TREINO usa tu ritmo cardíaco para mostrarte el esfuerzo en vivo mientras entrenás.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "TREINO guarda tus entrenamientos en Salud para que cuenten en tus anillos y en tu historial.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.backhaus.treino;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -639,6 +645,7 @@
 				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CODE_SIGN_ENTITLEMENTS = "TreinoWatch Watch App/TreinoWatch Watch App.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = J66AQRRM96;
@@ -647,6 +654,8 @@
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = TreinoWatch;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "TREINO usa tu ritmo cardíaco para mostrarte el esfuerzo en vivo mientras entrenás.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "TREINO guarda tus entrenamientos en Salud para que cuenten en tus anillos y en tu historial.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.backhaus.treino;
 				LD_RUNPATH_SEARCH_PATHS = (

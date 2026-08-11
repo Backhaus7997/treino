@@ -74,6 +74,34 @@ jobs:
       - name: Run Swift conformance
         run: bash conformance/run_swift.sh
 
+  # Capabilities y permisos del reloj (change watch-workout-session, F0).
+  #
+  # Una capability que se pierde de project.pbxproj NO rompe la compilacion: la
+  # app sigue compilando, se instala y arranca, y el unico sintoma es HealthKit
+  # negando todo en silencio en la muñeca del atleta. Y ese archivo lo
+  # reescriben las herramientas —CocoaPods entero en cada `pod install`, el
+  # paso de iOS de Flutter en cada build— no solo las personas. Este job
+  # convierte esa perdida silenciosa en CI rojo.
+  #
+  # Corre en ubuntu igual que conformance-swift, y por la misma razon: lo que
+  # se testea son archivos de texto commiteados y logica que solo importa
+  # Foundation. Un runner macOS acá seria diez veces mas caro sin dar nada.
+  watch-capabilities:
+    name: Watch capabilities y permisos
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Swift
+        uses: swift-actions/setup-swift@v2
+
+      # Que el entitlement de HealthKit, su enganche a las TRES configuraciones
+      # del target y los textos de permiso sigan en su lugar.
+      - name: Capabilities del target watchOS
+        run: bash scripts/test_watch_capabilities.sh
+
+
   # Gate de compilación para las Cloud Functions (functions/, Node 20 + TS).
   # Antes NADIE compilaba functions en CI: flutter analyze/test no ven functions/,
   # así que un error de tipos o de compilación en functions/src podía entrar a
