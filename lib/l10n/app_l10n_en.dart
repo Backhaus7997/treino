@@ -3381,4 +3381,20 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get exerciseFeedbackDeleted => 'Comment deleted.';
+
+  @override
+  String get exerciseFeedbackPhotoGallery => 'Gallery';
+
+  @override
+  String get exerciseFeedbackPhotoCamera => 'Camera';
+
+  @override
+  String get exerciseFeedbackPhotoAttached => 'Photo attached';
+
+  @override
+  String get exerciseFeedbackPhotoRemove => 'Remove photo';
+
+  @override
+  String get exerciseFeedbackPhotoError =>
+      'We couldn\'t open that photo. Try another one.';
 }

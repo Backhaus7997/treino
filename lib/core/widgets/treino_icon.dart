@@ -136,6 +136,9 @@ class TreinoIcon {
   static const IconData attach = PhosphorIconsRegular.paperclip;
   static const IconData image = PhosphorIconsRegular.image;
   static const IconData video = PhosphorIconsRegular.videoCamera;
+  // Taking a photo, as opposed to picking one — the exercise feedback composer
+  // offers both (issue #628).
+  static const IconData camera = PhosphorIconsRegular.camera;
 
   // Profile settings constant REMOVED 2026-05-28 — gear icon was removed from
   // ProfileHeader as part of the PR#4 pivot. Zero remaining usages.

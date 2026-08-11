@@ -145,6 +145,21 @@ describe("QA-CMP-002: deleteAthleteStorage removes the athlete's objects", () =>
     expect(await exists(`athleteFiles/trainer-x_${uid}/plan.pdf`)).toBe(false);
     expect(await exists(`temp/uploads/${other}/keep.jpg`)).toBe(true);
   });
+
+  it("deletes the athlete's exercise feedback photos (issue #628)", async () => {
+    // Health data: an orphaned object after account deletion is the worst kind
+    // of leftover, so this is asserted on its own rather than folded above.
+    await save(`sessionFeedback/${uid}/session-1/fb-1.jpg`);
+    await save(`sessionFeedback/${uid}/session-2/fb-2.jpg`);
+    await save(`sessionFeedback/${other}/session-9/keep.jpg`);
+
+    await deleteAthleteStorage(testApp, uid);
+
+    expect(await exists(`sessionFeedback/${uid}/session-1/fb-1.jpg`)).toBe(false);
+    expect(await exists(`sessionFeedback/${uid}/session-2/fb-2.jpg`)).toBe(false);
+    // Another athlete's photo must survive.
+    expect(await exists(`sessionFeedback/${other}/session-9/keep.jpg`)).toBe(true);
+  });
 });
 
 const db = () => admin.firestore(testApp);

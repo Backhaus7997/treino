@@ -914,5 +914,15 @@
   "exerciseFeedbackDeleteConfirm": "¿Borrar este comentario?",
   "@exerciseFeedbackDeleteConfirm": {},
   "exerciseFeedbackDeleted": "Comentario borrado.",
-  "@exerciseFeedbackDeleted": {}
+  "@exerciseFeedbackDeleted": {},
+  "exerciseFeedbackPhotoGallery": "Galería",
+  "@exerciseFeedbackPhotoGallery": {},
+  "exerciseFeedbackPhotoCamera": "Cámara",
+  "@exerciseFeedbackPhotoCamera": {},
+  "exerciseFeedbackPhotoAttached": "Foto adjunta",
+  "@exerciseFeedbackPhotoAttached": {},
+  "exerciseFeedbackPhotoRemove": "Quitar foto",
+  "@exerciseFeedbackPhotoRemove": {},
+  "exerciseFeedbackPhotoError": "No pudimos abrir esa foto. Probá con otra.",
+  "@exerciseFeedbackPhotoError": {}
 }

@@ -32,6 +32,16 @@ class ExerciseFeedbackRepository {
           .doc(sessionId)
           .collection('exerciseFeedback');
 
+  // ─── id allocation ──────────────────────────────────────────────────────
+
+  /// Allocates a doc id without writing anything.
+  ///
+  /// Callers that attach a photo need the id first, so the Storage object can be
+  /// named after the document it belongs to before a single byte is uploaded —
+  /// the same ordering `PostPhotoUploadService` relies on.
+  String newFeedbackId({required String uid, required String sessionId}) =>
+      _feedback(uid, sessionId).doc().id;
+
   // ─── create ─────────────────────────────────────────────────────────────
 
   /// Persists one feedback entry and returns it with the generated doc id.
@@ -55,6 +65,32 @@ class ExerciseFeedbackRepository {
     final withId = feedback.copyWith(id: ref.id);
     await ref.set(withId.toJson());
     return withId;
+  }
+
+  /// Writes an entry whose id was allocated earlier via [newFeedbackId].
+  ///
+  /// Used by the photo path: the id has to exist before the upload, so the
+  /// caller owns it and this method must not mint a new one.
+  Future<void> createWithId({
+    required String uid,
+    required String sessionId,
+    required ExerciseFeedback feedback,
+  }) async {
+    if (feedback.id.isEmpty) {
+      throw ArgumentError.value(
+        feedback.id,
+        'feedback.id',
+        'createWithId requires an id — use create() to have one generated',
+      );
+    }
+    if (!feedback.hasContent) {
+      throw ArgumentError.value(
+        feedback,
+        'feedback',
+        'ExerciseFeedback requires text or a photo',
+      );
+    }
+    await _feedback(uid, sessionId).doc(feedback.id).set(feedback.toJson());
   }
 
   // ─── delete ─────────────────────────────────────────────────────────────

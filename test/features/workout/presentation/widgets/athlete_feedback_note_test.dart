@@ -119,6 +119,45 @@ void main() {
       expect(deleted, isTrue);
     });
 
+    testWidgets('a photo-only entry still renders', (tester) async {
+      // Text is optional when a photo carries the report.
+      await tester.pumpWidget(_wrap(AthleteFeedbackNote(
+        feedback: _feedback(
+          text: null,
+          photoUrl: 'https://example.test/p.jpg',
+        ),
+      )));
+      await tester.pump();
+
+      expect(find.text('DEL ALUMNO'), findsOneWidget);
+    });
+
+    testWidgets('announces the attached photo to screen readers',
+        (tester) async {
+      // A screen-reader user must know a photo is there even though its content
+      // cannot be read out.
+      await tester.pumpWidget(_wrap(AthleteFeedbackNote(
+        feedback: _feedback(photoUrl: 'https://example.test/p.jpg'),
+      )));
+      await tester.pump();
+
+      final semantics = tester.getSemantics(
+        find.byType(AthleteFeedbackNote),
+      );
+      expect(semantics.label, contains('Foto adjunta'));
+    });
+
+    testWidgets('a text-only entry does not announce a photo', (tester) async {
+      await tester
+          .pumpWidget(_wrap(AthleteFeedbackNote(feedback: _feedback())));
+      await tester.pump();
+
+      final semantics = tester.getSemantics(
+        find.byType(AthleteFeedbackNote),
+      );
+      expect(semantics.label, isNot(contains('Foto adjunta')));
+    });
+
     testWidgets('delete target meets the 44pt a11y floor', (tester) async {
       await tester.pumpWidget(_wrap(AthleteFeedbackNote(
         feedback: _feedback(),

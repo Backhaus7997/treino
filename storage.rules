@@ -135,6 +135,43 @@ service firebase.storage {
       allow delete: if request.auth != null && request.auth.uid == userId;
     }
 
+    // Exercise feedback photos (issue #628).
+    // `sessionFeedback/{uid}/{sessionId}/{feedbackId}.{ext}`
+    //
+    // This is HEALTH DATA — the photo may show where it hurts. So `get` is NOT
+    // `request.auth != null` like postPhotos above: it is gated on the same
+    // `session_shares/{uid}` grant the Firestore rules use for the feedback doc
+    // itself. Owner, or the one trainer the athlete granted. Nobody else.
+    //
+    // Storage rules CAN call firestore.get() cross-service (see the chatMedia
+    // block above), and the database id must be the literal `(default)` — there
+    // is no `$(database)` wildcard here.
+    //
+    // uid is the FIRST path segment on purpose: the account-deletion cascade
+    // deletes by prefix, and chatMedia/{chatId}/{uid}/… already showed the cost
+    // of burying the uid deeper (the cascade has to walk every chat).
+    match /sessionFeedback/{userId}/{sessionId}/{fileName} {
+      allow get: if request.auth != null
+                 && (request.auth.uid == userId
+                     || request.auth.uid ==
+                        firestore.get(/databases/(default)/documents/session_shares/$(userId)).data.trainerId);
+
+      // Never expose the folder listing — not even to the owner's trainer.
+      allow list: if false;
+
+      // Owner-only write, images only, 15 MB — mirrors the client-side guard in
+      // SessionFeedbackPhotoUploadService.guardSize.
+      allow write: if request.auth != null
+                  && request.auth.uid == userId
+                  && request.resource.size < 15 * 1024 * 1024
+                  && request.resource.contentType.matches('image/.*');
+
+      // Owner-only delete: cleanup when the Firestore write fails after the
+      // upload, and when the athlete removes their own entry. A trainer may
+      // never delete the athlete's data.
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
     // Default: deny all other access.
     match /{allPaths=**} {
       allow read, write: if false;

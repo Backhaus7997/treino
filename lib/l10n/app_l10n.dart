@@ -6128,6 +6128,36 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Comentario borrado.'**
   String get exerciseFeedbackDeleted;
+
+  /// Botón del sheet de feedback para elegir una foto de la galería.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Galería'**
+  String get exerciseFeedbackPhotoGallery;
+
+  /// Botón del sheet de feedback para sacar una foto con la cámara.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cámara'**
+  String get exerciseFeedbackPhotoCamera;
+
+  /// Texto junto al thumbnail de la foto elegida en el sheet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Foto adjunta'**
+  String get exerciseFeedbackPhotoAttached;
+
+  /// Semantics del botón que quita la foto adjunta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Quitar foto'**
+  String get exerciseFeedbackPhotoRemove;
+
+  /// Error cuando falla el picker de imagen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos abrir esa foto. Probá con otra.'**
+  String get exerciseFeedbackPhotoError;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

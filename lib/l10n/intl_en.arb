@@ -1310,5 +1310,15 @@
   "exerciseFeedbackDeleteConfirm": "Delete this comment?",
   "@exerciseFeedbackDeleteConfirm": {},
   "exerciseFeedbackDeleted": "Comment deleted.",
-  "@exerciseFeedbackDeleted": {}
+  "@exerciseFeedbackDeleted": {},
+  "exerciseFeedbackPhotoGallery": "Gallery",
+  "@exerciseFeedbackPhotoGallery": {},
+  "exerciseFeedbackPhotoCamera": "Camera",
+  "@exerciseFeedbackPhotoCamera": {},
+  "exerciseFeedbackPhotoAttached": "Photo attached",
+  "@exerciseFeedbackPhotoAttached": {},
+  "exerciseFeedbackPhotoRemove": "Remove photo",
+  "@exerciseFeedbackPhotoRemove": {},
+  "exerciseFeedbackPhotoError": "We couldn't open that photo. Try another one.",
+  "@exerciseFeedbackPhotoError": {}
 }

@@ -2927,5 +2927,15 @@
   "exerciseFeedbackDeleteConfirm": "¿Borrar este comentario?",
   "@exerciseFeedbackDeleteConfirm": {"description": "Confirmación antes de borrar un feedback."},
   "exerciseFeedbackDeleted": "Comentario borrado.",
-  "@exerciseFeedbackDeleted": {"description": "SnackBar tras borrar un feedback."}
+  "@exerciseFeedbackDeleted": {"description": "SnackBar tras borrar un feedback."},
+  "exerciseFeedbackPhotoGallery": "Galería",
+  "@exerciseFeedbackPhotoGallery": {"description": "Botón del sheet de feedback para elegir una foto de la galería."},
+  "exerciseFeedbackPhotoCamera": "Cámara",
+  "@exerciseFeedbackPhotoCamera": {"description": "Botón del sheet de feedback para sacar una foto con la cámara."},
+  "exerciseFeedbackPhotoAttached": "Foto adjunta",
+  "@exerciseFeedbackPhotoAttached": {"description": "Texto junto al thumbnail de la foto elegida en el sheet."},
+  "exerciseFeedbackPhotoRemove": "Quitar foto",
+  "@exerciseFeedbackPhotoRemove": {"description": "Semantics del botón que quita la foto adjunta."},
+  "exerciseFeedbackPhotoError": "No pudimos abrir esa foto. Probá con otra.",
+  "@exerciseFeedbackPhotoError": {"description": "Error cuando falla el picker de imagen."}
 }

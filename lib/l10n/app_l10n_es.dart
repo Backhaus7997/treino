@@ -3445,6 +3445,22 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get exerciseFeedbackDeleted => 'Comentario borrado.';
+
+  @override
+  String get exerciseFeedbackPhotoGallery => 'Galería';
+
+  @override
+  String get exerciseFeedbackPhotoCamera => 'Cámara';
+
+  @override
+  String get exerciseFeedbackPhotoAttached => 'Foto adjunta';
+
+  @override
+  String get exerciseFeedbackPhotoRemove => 'Quitar foto';
+
+  @override
+  String get exerciseFeedbackPhotoError =>
+      'No pudimos abrir esa foto. Probá con otra.';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -6885,4 +6901,20 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get exerciseFeedbackDeleted => 'Comentario borrado.';
+
+  @override
+  String get exerciseFeedbackPhotoGallery => 'Galería';
+
+  @override
+  String get exerciseFeedbackPhotoCamera => 'Cámara';
+
+  @override
+  String get exerciseFeedbackPhotoAttached => 'Foto adjunta';
+
+  @override
+  String get exerciseFeedbackPhotoRemove => 'Quitar foto';
+
+  @override
+  String get exerciseFeedbackPhotoError =>
+      'No pudimos abrir esa foto. Probá con otra.';
 }

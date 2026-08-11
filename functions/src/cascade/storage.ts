@@ -36,6 +36,7 @@ export async function deleteAvatar(
  * Deletes the athlete's non-avatar Storage objects (QA-CMP-002):
  *  - temp/uploads/{uid}/**            (uid-prefixed tree)
  *  - customExerciseVideos/{uid}/**    (uid-prefixed tree)
+ *  - sessionFeedback/{uid}/**         (uid-prefixed tree — issue #628)
  *  - chatMedia/{chatId}/{uid}/**      (uid is the 2nd segment — scoped to the
  *    athlete's chats, resolved from Firestore)
  *  - athleteFiles/{trainerId}_{uid}/** (trainer-authored files about the
@@ -58,6 +59,11 @@ export async function deleteAthleteStorage(
 
   await deleteByPrefix(`temp/uploads/${uid}/`);
   await deleteByPrefix(`customExerciseVideos/${uid}/`);
+  // Exercise feedback photos (issue #628). NOT optional: these are health data
+  // (they may show where it hurts), so an orphaned object after account
+  // deletion is the worst kind of leftover. Cheap to wipe because the path is
+  // uid-first by design.
+  await deleteByPrefix(`sessionFeedback/${uid}/`);
 
   // chatMedia is keyed chatMedia/{chatId}/{uid}/… — the uid is the SECOND
   // segment, so there is no single prefix. Scope by the athlete's chats.

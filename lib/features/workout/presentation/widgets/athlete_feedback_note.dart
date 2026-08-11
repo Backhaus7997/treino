@@ -1,7 +1,9 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../domain/exercise_feedback.dart';
 import '../../domain/exercise_feedback_kind.dart';
@@ -43,10 +45,17 @@ class AthleteFeedbackNote extends StatelessWidget {
         ? l10n.exerciseFeedbackDiscomfortTag
         : l10n.exerciseFeedbackFromAthleteTag;
     final text = feedback.text?.trim() ?? '';
+    final photoUrl = feedback.photoUrl;
 
     return Semantics(
       container: true,
-      label: '$tag. $text',
+      // The photo is announced too — a screen-reader user must know the report
+      // carries one, even though its content cannot be read out.
+      label: [
+        tag,
+        if (text.isNotEmpty) text,
+        if (photoUrl != null) l10n.exerciseFeedbackPhotoAttached,
+      ].join('. '),
       child: Container(
         width: double.infinity,
         margin: const EdgeInsets.only(bottom: 8),
@@ -101,6 +110,37 @@ class AthleteFeedbackNote extends StatelessWidget {
                   fontWeight: FontWeight.w400,
                   fontSize: 13,
                   color: palette.textPrimary,
+                ),
+              ),
+            ],
+            if (photoUrl != null) ...[
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: CachedNetworkImage(
+                  imageUrl: photoUrl,
+                  height: 160,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  // Bounded decode: these are inline in a scrolling session
+                  // view, so full-resolution decodes would be wasted memory.
+                  memCacheHeight: 480,
+                  placeholder: (_, __) => Container(
+                    height: 160,
+                    color: palette.bg,
+                  ),
+                  // A photo that fails to load must not blank the report text
+                  // above it — the words are the part that matters clinically.
+                  errorWidget: (_, __, ___) => Container(
+                    height: 160,
+                    color: palette.bg,
+                    alignment: Alignment.center,
+                    child: Icon(
+                      TreinoIcon.image,
+                      size: 20,
+                      color: palette.textMuted,
+                    ),
+                  ),
                 ),
               ),
             ],

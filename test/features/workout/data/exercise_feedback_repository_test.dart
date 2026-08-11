@@ -104,6 +104,78 @@ void main() {
     });
   });
 
+  group('newFeedbackId + createWithId (photo path)', () {
+    test('newFeedbackId returns an id without writing anything', () async {
+      final id = repo.newFeedbackId(uid: _uid, sessionId: _sessionId);
+
+      expect(id, isNotEmpty);
+      // The id has to exist BEFORE the upload so the Storage object can be
+      // named after its document — but nothing may be persisted yet.
+      expect(await repo.list(uid: _uid, sessionId: _sessionId), isEmpty);
+    });
+
+    test('newFeedbackId returns a distinct id each call', () {
+      final a = repo.newFeedbackId(uid: _uid, sessionId: _sessionId);
+      final b = repo.newFeedbackId(uid: _uid, sessionId: _sessionId);
+      expect(a, isNot(b));
+    });
+
+    test('createWithId writes at the pre-allocated id', () async {
+      final id = repo.newFeedbackId(uid: _uid, sessionId: _sessionId);
+
+      await repo.createWithId(
+        uid: _uid,
+        sessionId: _sessionId,
+        feedback: _feedback(id: id),
+      );
+
+      final list = await repo.list(uid: _uid, sessionId: _sessionId);
+      expect(list.single.id, id);
+    });
+
+    test('createWithId persists a photo-only entry', () async {
+      final id = repo.newFeedbackId(uid: _uid, sessionId: _sessionId);
+
+      await repo.createWithId(
+        uid: _uid,
+        sessionId: _sessionId,
+        feedback: _feedback(id: id, text: null).copyWith(
+          photoUrl: 'https://example.test/p.jpg',
+          photoPath: 'sessionFeedback/$_uid/$_sessionId/$id.jpg',
+        ),
+      );
+
+      final stored = (await repo.list(uid: _uid, sessionId: _sessionId)).single;
+      expect(stored.text, isNull);
+      expect(stored.photoUrl, isNotNull);
+      // Both fields travel together — the rules reject one without the other.
+      expect(stored.photoPath, isNotNull);
+    });
+
+    test('createWithId rejects an empty id', () async {
+      await expectLater(
+        repo.createWithId(
+          uid: _uid,
+          sessionId: _sessionId,
+          feedback: _feedback(),
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('createWithId rejects an entry with neither text nor photo', () async {
+      final id = repo.newFeedbackId(uid: _uid, sessionId: _sessionId);
+      await expectLater(
+        repo.createWithId(
+          uid: _uid,
+          sessionId: _sessionId,
+          feedback: _feedback(id: id, text: null),
+        ),
+        throwsArgumentError,
+      );
+    });
+  });
+
   group('list', () {
     test('returns entries oldest first', () async {
       await repo.create(
