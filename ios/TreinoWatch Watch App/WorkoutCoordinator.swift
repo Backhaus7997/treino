@@ -39,6 +39,14 @@ final class WorkoutCoordinator: ObservableObject {
 
     private var restTimer: Timer?
 
+    /// El permiso de Salud. Se pide al entrar en modo entreno y nunca
+    /// condiciona nada de lo que pasa despues (D2).
+    ///
+    /// Privado a proposito: en F0 nadie de afuera necesita mirarlo. Cuando F2
+    /// tenga que mostrar las pulsaciones en pantalla, que lo abra quien lo
+    /// necesite y por la razon concreta.
+    private let healthStore = HealthStore()
+
     /// Como conseguir un cliente de Firestore autenticado. Lo inyecta la app
     /// para no acoplar este coordinator al de credenciales.
     var makeClient: (() async throws -> (FirestoreREST, String))?
@@ -116,6 +124,7 @@ final class WorkoutCoordinator: ObservableObject {
             )
             WorkoutSessionStore.save(adopted)
             syncError = nil
+            requestHealthAccess()
         } catch {
             syncError = String(describing: error)
         }
@@ -157,6 +166,20 @@ final class WorkoutCoordinator: ObservableObject {
         session = stored
         self.workout = workout
         currentExerciseIndex = firstUnfinishedIndex(in: workout.exercises, session: stored)
+        requestHealthAccess()
+    }
+
+    /// Le pide permiso a Salud cuando el reloj entra en modo entreno.
+    ///
+    /// Se llama desde los TRES caminos que abren un entreno —empezarlo acá,
+    /// adoptar el que abrio el telefono, y recuperar uno a medias— y no solo
+    /// desde `start`. Un companion pasa la mayor parte del tiempo adoptando lo
+    /// que arranco el celular: dejar el pedido solo en `start` era no
+    /// preguntarle nunca justo al caso mas comun.
+    ///
+    /// Va suelto y no lanza. El entreno ya empezo y no depende de esto (D2).
+    private func requestHealthAccess() {
+        Task { await healthStore.requestAccessIfNeeded() }
     }
 
     func start(workout: TodaysWorkout) {
@@ -179,6 +202,8 @@ final class WorkoutCoordinator: ObservableObject {
         // a entrenar YA, sin esperar a la red. Si falla, el proximo sync lo
         // reintenta.
         Task { await sync() }
+
+        requestHealthAccess()
     }
 
     /// Carga una serie. Idempotente por `exerciseId + setNumber`, igual que el

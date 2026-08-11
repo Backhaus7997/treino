@@ -101,6 +101,9 @@ jobs:
       - name: Capabilities del target watchOS
         run: bash scripts/test_watch_capabilities.sh
 
+      # La logica de permisos, compilada contra el archivo REAL del reloj.
+      - name: Logica de permisos de Salud
+        run: bash scripts/test_watch_swift.sh
 
   # Gate de compilación para las Cloud Functions (functions/, Node 20 + TS).
   # Antes NADIE compilaba functions en CI: flutter analyze/test no ven functions/,
