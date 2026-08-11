@@ -8,7 +8,9 @@ import 'package:treino/features/feed/application/follow_providers.dart'
 import 'package:treino/features/feed/data/follow_repository.dart';
 import 'package:treino/features/feed/domain/follow.dart';
 import 'package:treino/features/feed/domain/follow_status.dart';
-import 'package:treino/features/gyms/domain/gym.dart' show kNoGymId;
+import 'package:treino/core/utils/geohash.dart';
+import 'package:treino/features/gyms/domain/gym.dart' show Gym, kNoGymId;
+import 'package:treino/features/gyms/domain/gym_source.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
@@ -228,5 +230,118 @@ void main() {
     expect(result, hasLength(2));
     verify(() => repository.allOf('me')).called(1);
     verifyNever(() => repository.getEdge(any()));
+  });
+
+  group('cercanía — cuando el propio gym no alcanza', () {
+    // Palermo, CABA. Los geohashes se calculan con la función real en vez de
+    // hardcodearse: si algún día cambia la precisión del geohash, el test
+    // sigue midiendo cercanía y no una constante que quedó vieja.
+    const myLat = -34.5875;
+    const myLng = -58.4300;
+
+    Future<void> seedGym({
+      required String id,
+      required double lat,
+      required double lng,
+    }) =>
+        firestore.collection('gyms').doc(id).set(
+              Gym(
+                id: id,
+                name: id,
+                lat: lat,
+                lng: lng,
+                geohash: geohash5(lat, lng),
+                source: GymSource.seed,
+                createdAt: DateTime.utc(2026, 7, 30),
+              ).toJson(),
+            );
+
+    late MockFollowRepository repository;
+
+    setUp(() {
+      repository = MockFollowRepository();
+      when(() => repository.allOf('me')).thenAnswer((_) async => const []);
+    });
+
+    test('completa con gente de un gym cercano', () async {
+      await seedGym(id: 'gym-a', lat: myLat, lng: myLng);
+      // ~1,2km: cae en la misma celda o en una vecina inmediata.
+      await seedGym(id: 'gym-cerca', lat: myLat - 0.011, lng: myLng);
+      await seedProfile(uid: 'vecino', gymId: 'gym-cerca');
+
+      final result = await buildContainer(followRepository: repository)
+          .read(suggestedUsersProvider('gym-a').future);
+
+      expect(result.map((p) => p.uid), ['vecino']);
+    });
+
+    test('un gym lejano queda afuera de la grilla', () async {
+      await seedGym(id: 'gym-a', lat: myLat, lng: myLng);
+      // Córdoba, a ~650km. Ni el 5×5 llega hasta ahí.
+      await seedGym(id: 'gym-lejos', lat: -31.4201, lng: -64.1888);
+      await seedProfile(uid: 'cordobes', gymId: 'gym-lejos');
+
+      final result = await buildContainer(followRepository: repository)
+          .read(suggestedUsersProvider('gym-a').future);
+
+      expect(result, isEmpty);
+    });
+
+    test('el propio gym va primero y los cercanos se ordenan por distancia',
+        () async {
+      await seedGym(id: 'gym-a', lat: myLat, lng: myLng);
+      await seedGym(id: 'gym-cerca', lat: myLat - 0.009, lng: myLng);
+      await seedGym(id: 'gym-medio', lat: myLat - 0.030, lng: myLng);
+
+      await seedProfile(uid: 'z-del-propio', gymId: 'gym-a');
+      await seedProfile(uid: 'a-del-medio', gymId: 'gym-medio');
+      await seedProfile(uid: 'm-del-cerca', gymId: 'gym-cerca');
+
+      final result = await buildContainer(followRepository: repository)
+          .read(suggestedUsersProvider('gym-a').future);
+
+      // El del propio gym encabeza aunque alfabéticamente vaya último, y
+      // entre los de afuera manda la distancia, no el nombre.
+      expect(
+        result.map((p) => p.uid),
+        ['z-del-propio', 'm-del-cerca', 'a-del-medio'],
+      );
+    });
+
+    test('las aristas también excluyen a los de gyms cercanos', () async {
+      when(() => repository.allOf('me')).thenAnswer(
+        (_) async => [
+          Follow(
+            id: Follow.edgeId('vecino', 'me'),
+            followerUid: 'vecino',
+            followeeUid: 'me',
+            status: FollowStatus.pending,
+            members: const ['vecino', 'me'],
+            createdAt: DateTime.utc(2026, 7, 30),
+          ),
+        ],
+      );
+      await seedGym(id: 'gym-a', lat: myLat, lng: myLng);
+      await seedGym(id: 'gym-cerca', lat: myLat - 0.009, lng: myLng);
+      await seedProfile(uid: 'vecino', gymId: 'gym-cerca');
+      await seedProfile(uid: 'otro', gymId: 'gym-cerca');
+
+      final result = await buildContainer(followRepository: repository)
+          .read(suggestedUsersProvider('gym-a').future);
+
+      // `vecino` ya tiene una solicitud pendiente conmigo: está en el inbox,
+      // no en sugerencias. La exclusión no mira la dirección de la arista.
+      expect(result.map((p) => p.uid), ['otro']);
+    });
+
+    test('sin el doc del gym propio no inventa cercanía', () async {
+      // El gym no está en la colección: no hay desde dónde medir.
+      await seedProfile(uid: 'alguien', gymId: 'gym-cerca');
+
+      final result = await buildContainer(followRepository: repository)
+          .read(suggestedUsersProvider('gym-a').future);
+
+      expect(result, isEmpty);
+    });
   });
 }

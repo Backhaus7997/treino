@@ -68,6 +68,31 @@ class GymRepository {
     return out;
   }
 
+  /// Gyms cuyo `geohash` cae en alguna de [geohashes].
+  ///
+  /// Insumo de la cercanía en las sugerencias de gente para seguir:
+  /// `userPublicProfiles` no guarda ubicación, solo `gymId`, así que la única
+  /// vía a "cerca mío" es resolver primero qué gyms quedan cerca.
+  ///
+  /// Mismo chunking de 30 que [getByIds] y por el mismo motivo. Una grilla
+  /// 5×5 son 25 celdas y entra justo, pero el chunk lo deja a salvo si alguien
+  /// amplía la grilla —que es exactamente lo que ya pasó una vez en el
+  /// discovery de entrenadores, cuando el 3×3 dejaba afuera a uno a 9,8km.
+  Future<List<Gym>> listByGeohashes(List<String> geohashes) async {
+    if (geohashes.isEmpty) return const [];
+    const chunkSize = 30;
+    final out = <Gym>[];
+    for (var i = 0; i < geohashes.length; i += chunkSize) {
+      final chunk = geohashes.sublist(
+        i,
+        i + chunkSize > geohashes.length ? geohashes.length : i + chunkSize,
+      );
+      final snap = await _collection.where('geohash', whereIn: chunk).get();
+      out.addAll(snap.docs.map(_fromDoc).whereType<Gym>());
+    }
+    return out;
+  }
+
   Gym? _fromDoc(DocumentSnapshot<Map<String, Object?>> snap) {
     final data = snap.data();
     if (!snap.exists || data == null) return null;
