@@ -20,6 +20,8 @@ import 'package:treino/features/profile/presentation/profile_edit_personal_scree
 import 'package:treino/features/profile_setup/application/profile_setup_providers.dart';
 import 'package:treino/features/profile_setup/data/avatar_upload_service.dart';
 
+import '../../../helpers/onboarding_test_helpers.dart';
+
 // ---------------------------------------------------------------------------
 // Mocks & fakes
 // ---------------------------------------------------------------------------
@@ -64,6 +66,7 @@ UserProfile _profile({
   DateTime? bornAt,
 }) =>
     UserProfile(
+      onboardingSeen: allSurfacesSeen(),
       uid: 'uid-test',
       email: 'test@test.com',
       displayName: displayName,

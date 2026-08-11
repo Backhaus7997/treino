@@ -13,6 +13,7 @@ import '../application/trainer_discovery_providers.dart';
 import '../domain/trainer_location.dart';
 import '../domain/trainer_specialty.dart';
 import '../../../l10n/app_l10n.dart';
+import '../../onboarding/application/onboarding_providers.dart';
 import 'widgets/location_permission_rationale_sheet.dart';
 import 'widgets/trainer_advanced_filter_chips.dart';
 import 'widgets/trainer_compact_filter_row.dart';
@@ -50,6 +51,8 @@ class _TrainersListScreenState extends ConsumerState<TrainersListScreen> {
 
   Future<void> _maybeShowRationale() async {
     if (_rationaleShown) return;
+    // Esperar al tour (#627): ambos disparan post-frame y se apilarían.
+    if (ref.read(onboardingBlocksProvider)) return;
     final notifier = ref.read(athleteLocationProvider.notifier);
     if (!notifier.isInitial) return;
     _rationaleShown = true;

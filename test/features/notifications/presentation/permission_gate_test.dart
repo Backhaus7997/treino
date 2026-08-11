@@ -12,6 +12,8 @@ import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 
+import '../../../helpers/onboarding_test_helpers.dart';
+
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
@@ -57,13 +59,20 @@ NotificationSettings _denied() => const NotificationSettings(
       providesAppNotificationSettings: AppleNotificationSetting.notSupported,
     );
 
-UserProfile _profile({String? displayName}) => UserProfile(
+/// By default the onboarding cards are already dismissed.
+///
+/// The gate defers the OS prompt while a card is pending (#627), so without
+/// this every scenario below would be measuring onboarding rather than FCM.
+/// Pass `cardPending: true` to exercise the deferral itself.
+UserProfile _profile({String? displayName, bool cardPending = false}) =>
+    UserProfile(
       uid: 'uid-test',
       email: 'test@test.com',
       displayName: displayName,
       role: UserRole.athlete,
       createdAt: DateTime(2024),
       updatedAt: DateTime(2024),
+      onboardingSeen: cardPending ? const {} : allSurfacesSeen(),
     );
 
 Widget _buildGate({

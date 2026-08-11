@@ -34,6 +34,8 @@ import 'package:treino/features/profile/domain/user_session_stats.dart';
 import 'package:treino/features/profile/profile_screen.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
+import '../../../helpers/onboarding_test_helpers.dart';
+
 class MockUser extends Mock implements User {
   @override
   String get uid => 'uid-test';
@@ -74,6 +76,7 @@ class _FakeRankingOptInController extends RankingOptInControllerBase {
 const _uid = 'uid-test';
 
 UserProfile _testProfile() => UserProfile(
+      onboardingSeen: allSurfacesSeen(),
       uid: _uid,
       email: 'test@test.com',
       displayName: 'Test User',

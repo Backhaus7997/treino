@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/app/theme/app_palette.dart';
 
+import '../onboarding/coach_hub_tour_gate.dart';
+
 import 'content_max_width.dart';
 import 'coach_hub_sidebar.dart';
 import 'coach_hub_top_bar.dart';
@@ -43,6 +45,9 @@ class CoachHubScaffold extends ConsumerWidget {
             child: Column(
               children: [
                 const CoachHubTopBar(),
+                // Tour de bienvenida (#627). SizedBox.shrink(); va DESPUÉS del
+                // early-return de Viewport.mobile de arriba.
+                const CoachHubTourGate(),
                 Expanded(
                   child: ContentMaxWidth(maxWidth: 1240, child: child),
                 ),
