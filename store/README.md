@@ -178,13 +178,36 @@ Run the [pre-publish checklist](#pre-publish-checklist).
 
 ## Device sizes
 
-**Confirm required sizes against App Store Connect and Play Console when you
-generate.** Apple and Google change them regularly, and a list hardcoded in this
-file will quietly go stale. Check:
+Verified against Apple and Google documentation on **2026-08-11**. Both change
+these regularly — re-check before a submission rather than trusting this table
+blindly:
 
-- App Store Connect → your app → the localization's Media Manager, which lists
-  the currently accepted display sizes.
+- App Store Connect → your app → the localization's Media Manager.
 - Play Console → Store presence → Main store listing → Graphics.
+
+**iOS** (portrait):
+
+| Display | Pixels | Status |
+|---|---|---|
+| 6.9" | 1320 × 2868 | **Required** |
+| 6.5" | 1284 × 2778 | Required *only* if 6.9" is not supplied |
+| 6.3" / 6.1" / 5.5" / 4.7" | smaller | Optional — Apple scales down from 6.9" |
+
+Since we ship 6.9", the 6.5" set is strictly optional. It is kept because
+down-scaled screenshots soften text, and the extra capture run is cheap.
+
+Limits: 1–10 screenshots per localization, `.png`/`.jpg`, **no alpha channel**.
+
+**Play** (phone):
+
+- Minimum 2 screenshots to publish; 4+ at ≥1080px to qualify for large-format
+  promotional placements.
+- 320px min / 3840px max per side, and the long side may not exceed twice the
+  short side.
+- JPEG or 24-bit PNG, **no alpha**.
+
+Screenshots captured from the 6.9" iOS simulator (1320 × 2868) satisfy every
+Play phone constraint, so the same PNGs can be reused for both stores.
 
 The folder names here (`6.9-inch`, `6.5-inch`) reflect what Apple accepted when
 this directory was created. If Apple's required sizes change, rename the folders
@@ -209,16 +232,23 @@ native resolution. Never upscale, never crop by hand.
 
 | Asset | Spec | Source |
 |---|---|---|
-| `graphics/icon-512.png` | 512×512, no alpha | Downscaled from `assets/icon/app_icon.png` |
-| `graphics/feature-graphic.png` | 1024×500, no alpha | `generate_feature_graphic.py` |
+| `graphics/icon-512.png` | 512×512, **32-bit PNG with alpha**, ≤1024 KB | `generate_play_icon.py` |
+| `graphics/feature-graphic.png` | 1024×500, 24-bit PNG **no alpha** | `generate_feature_graphic.py` |
+
+Note the alpha rules are opposite for the two assets — Play requires alpha on
+the icon and forbids it on the feature graphic. Verified against Play Console
+docs (2026-08).
 
 Generate the Play icon from the same `assets/icon/app_icon.png` that
 `flutter_launcher_icons` consumes, so the store icon and the installed app icon
 cannot drift:
 
 ```bash
-sips -z 512 512 assets/icon/app_icon.png --out store/android/graphics/icon-512.png
+/tmp/fg/bin/python store/android/graphics/generate_play_icon.py
 ```
+
+Do **not** use `sips -z 512 512` for this: it drops the alpha channel and
+produces a 24-bit file that Play rejects.
 
 The feature graphic is composed from brand assets by a script, so it can be
 regenerated when the logo or palette changes:
@@ -329,10 +359,20 @@ Run through this every time, not just the first time.
 - [ ] No debug banner.
 
 **Technical**
-- [ ] Pixel dimensions match what the store currently requires.
+- [ ] Pixel dimensions match what the store currently requires (6.9" = 1320×2868).
+- [ ] Screenshots have **no alpha channel** — both stores reject it.
 - [ ] PNGs optimized (step 6).
-- [ ] `graphics/feature-graphic.png` has **no alpha channel** — Play rejects it.
-      Verify: `file store/android/graphics/feature-graphic.png` should not say RGBA.
+- [ ] `graphics/feature-graphic.png` is 24-bit, **no alpha**.
+- [ ] `graphics/icon-512.png` is 32-bit RGBA, **with alpha** — the opposite rule.
+
+Check all three at once:
+
+```bash
+file store/android/graphics/*.png store/ios/screenshots/es/*/*.png
+```
+
+`feature-graphic.png` and every screenshot must read `RGB`; `icon-512.png` must
+read `RGBA`.
 
 **Scope**
 - [ ] `git status` shows no changes under `lib/`. Generating screenshots must
