@@ -38,6 +38,28 @@ Future<void> main() async {
     // lo reporta en consola en vez de taparlo con una descarga silenciosa.
     GoogleFonts.config.allowRuntimeFetching = false;
 
+    // Y se esperan ANTES del primer frame.
+    //
+    // Bundlearlas no alcanza: google_fonts las registra igual de forma
+    // asíncrona, así que el primer frame se dibuja con la fallback del sistema.
+    // Para casi toda la UI eso es un parpadeo, pero [TreinoBottomBar] MIDE el
+    // texto para decidir si los labels entran, y esa decisión no se revisa:
+    // su `LayoutBuilder` no se vuelve a ejecutar cuando la fuente aparece.
+    //
+    // Medido en un iPhone 17 Pro (402pt): "ENTRENAR" daba 62,01pt con SF Pro
+    // contra los 44,36 de Barlow Condensed, y como la caja del label es 56,12
+    // la barra se quedaba en íconos PARA SIEMPRE — el mismo síntoma que esto
+    // venía a arreglar, con la fuente ya bundleada.
+    //
+    // Desde assets esto es leer del bundle, no red: cuesta milisegundos.
+    await GoogleFonts.pendingFonts([
+      GoogleFonts.barlowCondensed(fontWeight: FontWeight.w700),
+      GoogleFonts.barlowCondensed(),
+      GoogleFonts.barlow(),
+      GoogleFonts.barlow(fontWeight: FontWeight.w600),
+      GoogleFonts.barlow(fontWeight: FontWeight.w700),
+    ]);
+
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
