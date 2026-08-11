@@ -22,6 +22,9 @@ export { templateRatingAggregate } from "./template-rating-aggregate";
 export { notifyOnChatMessage } from "./notifications/notify-chat-message";
 export { notifyOnAppointment } from "./notifications/notify-appointment";
 export { notifyOnLinkChange } from "./notifications/notify-link-change";
+// Issue #628: pushes ONLY for kind: "discomfort" — a plain comment must not
+// buzz the trainer's phone a dozen times per session.
+export { notifyOnExerciseFeedback } from "./notifications/notify-exercise-feedback";
 // `follow-model` PR3a: notifyOnFriendship → notifyOnFollow (trigger repuntado
 // a `follows/{followId}`). OJO en el deploy: un `--only functions:notifyOnFollow`
 // CREA la función nueva y NO poda la vieja — `notifyOnFriendship` queda
