@@ -70,6 +70,21 @@ class FeedScreen extends ConsumerWidget {
   }
 }
 
+/// Área tapeable mínima de cada acción del header.
+///
+/// 44 y no menos: es el piso de la HIG de Apple y queda apenas por debajo de
+/// los 48 de Material. La fila llegó a bajarlo a 36 en pantallas angostas y
+/// era plata tirada — con las acciones pegadas al margen derecho sobra lugar
+/// incluso en un iPhone de 393pt.
+const double _kFeedActionTapTarget = 44;
+
+/// Ancho a partir del cual la fila del header entra holgada: el toggle en su
+/// tope (176) + la separación mínima (8) + las cuatro acciones con su aire
+/// (4 × 44 + 3 × 4). Por debajo de esto los íconos se juntan, pero conservan
+/// su área tapeable completa.
+const double _kFeedHeaderRoomyWidth =
+    176 + 8 + (4 * _kFeedActionTapTarget + 3 * 4);
+
 /// Athlete Feed — segmented pill + swipeable [TabBarView].
 class _AthleteFeed extends StatelessWidget {
   const _AthleteFeed({this.initialTab});
@@ -94,9 +109,17 @@ class _AthleteFeed extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final compactActions = constraints.maxWidth < 360;
+                // Con menos que esto los íconos pierden su separación, pero
+                // NO su área tapeable: ver [_FeedActions.compact].
+                final compactActions =
+                    constraints.maxWidth < _kFeedHeaderRoomyWidth;
                 return Row(
                   key: const ValueKey('feed-fixed-navigation-row'),
+                  // Las acciones tienen que morir contra el margen derecho.
+                  // Sin esto el `Row` alinea al inicio y todo el sobrante
+                  // —25pt en un iPhone de 393— quedaba como un hueco muerto
+                  // entre el botón `+` y el borde de la pantalla.
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Flexible(
                       child: ConstrainedBox(
@@ -141,8 +164,13 @@ class _AthleteFeed extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    _FeedActions(compact: compactActions),
+                    // La separación mínima va como padding de las acciones y
+                    // no como un `SizedBox` suelto: con `spaceBetween`, un
+                    // tercer hijo invisible se comería uno de los dos huecos.
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: _FeedActions(compact: compactActions),
+                    ),
                   ],
                 );
               },
@@ -217,35 +245,32 @@ SliverAppBar _feedAppBar(
   );
 }
 
-class _FeedSegmentHeaderDelegate extends SliverPersistentHeaderDelegate {
-  const _FeedSegmentHeaderDelegate({required this.backgroundColor});
-
-  final Color backgroundColor;
+/// La fila de segmentos, como un sliver común que scrollea con el feed.
+///
+/// Era un [SliverPersistentHeader] con `pinned: true`, y eso lo obligaba a
+/// pintarse un `ColoredBox(palette.bg)` opaco: al quedar fijo, tapaba los
+/// posts que le pasaban por detrás. El problema es que `palette.bg` es solo la
+/// base sólida de [AppBackground] — le faltan los dos glows radiales. El
+/// header quedaba entonces como una franja plana recortada contra el fondo, y
+/// justo ahí arriba a la izquierda es donde el glow del accent está más
+/// presente, así que el corte saltaba a la vista.
+///
+/// Scrolleando con el contenido no se superpone con nada, así que no necesita
+/// fondo: se ve el [AppBackground] real, glow incluido. Tampoco es `floating`
+/// a propósito — floating lo haría reaparecer ENCIMA del contenido al
+/// scrollear hacia arriba, y volveríamos a necesitar el fondo opaco.
+class _FeedSegmentSliver extends StatelessWidget {
+  const _FeedSegmentSliver();
 
   @override
-  double get minExtent => 62;
-
-  @override
-  double get maxExtent => 62;
-
-  @override
-  Widget build(
-    BuildContext context,
-    double shrinkOffset,
-    bool overlapsContent,
-  ) {
-    return ColoredBox(
-      color: backgroundColor,
-      child: const Padding(
+  Widget build(BuildContext context) {
+    return const SliverToBoxAdapter(
+      child: Padding(
         padding: EdgeInsets.symmetric(vertical: 14),
         child: FeedSegmentPills(),
       ),
     );
   }
-
-  @override
-  bool shouldRebuild(_FeedSegmentHeaderDelegate oldDelegate) =>
-      backgroundColor != oldDelegate.backgroundColor;
 }
 
 /// Page 1 — thin host for the self-contained rankings surface. The shared
@@ -295,6 +320,8 @@ class _FeedHeader extends StatelessWidget {
 class _FeedActions extends ConsumerWidget {
   const _FeedActions({this.compact = false});
 
+  /// Cuando es `true` los íconos pierden la separación entre sí, y solo eso.
+  /// El área tapeable NO se toca: se queda en [_kFeedActionTapTarget] siempre.
   final bool compact;
 
   @override
@@ -309,8 +336,10 @@ class _FeedActions extends ConsumerWidget {
     // athlete's coach live under the COACH tab badge. See
     // `unreadFromCoachProvider` / `unreadFromFriendsProvider`.
     final unreadChats = ref.watch(unreadFromFriendsProvider);
+    // `compact` junta los íconos, y NADA más. El área tapeable se queda
+    // siempre en el mínimo de la HIG: achicarla a 36 en pantallas angostas
+    // era una regresión de accesibilidad, y encima innecesaria.
     final spacing = compact ? 0.0 : 4.0;
-    final tapTarget = compact ? 36.0 : 44.0;
 
     return Row(
       key: const ValueKey('feed-header-actions'),
@@ -324,9 +353,9 @@ class _FeedActions extends ConsumerWidget {
           child: TreinoTappable(
             onTap: () => context.push('/feed/notifications'),
             child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minWidth: tapTarget,
-                minHeight: 44,
+              constraints: const BoxConstraints(
+                minWidth: _kFeedActionTapTarget,
+                minHeight: _kFeedActionTapTarget,
               ),
               child: Center(
                 child: Stack(
@@ -374,9 +403,9 @@ class _FeedActions extends ConsumerWidget {
           child: TreinoTappable(
             onTap: () => context.push('/feed/messages'),
             child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minWidth: tapTarget,
-                minHeight: 44,
+              constraints: const BoxConstraints(
+                minWidth: _kFeedActionTapTarget,
+                minHeight: _kFeedActionTapTarget,
               ),
               child: Center(
                 child: Stack(
@@ -422,9 +451,9 @@ class _FeedActions extends ConsumerWidget {
           child: TreinoTappable(
             onTap: () => context.push('/feed/search'),
             child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minWidth: tapTarget,
-                minHeight: 44,
+              constraints: const BoxConstraints(
+                minWidth: _kFeedActionTapTarget,
+                minHeight: _kFeedActionTapTarget,
               ),
               child: const Center(
                 child: _FeedIconBubble(icon: TreinoIcon.search),
@@ -439,9 +468,9 @@ class _FeedActions extends ConsumerWidget {
           child: TreinoTappable(
             onTap: () => context.push('/feed/create'),
             child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minWidth: tapTarget,
-                minHeight: 44,
+              constraints: const BoxConstraints(
+                minWidth: _kFeedActionTapTarget,
+                minHeight: _kFeedActionTapTarget,
               ),
               child: Center(
                 child: Container(
@@ -605,12 +634,7 @@ class _FeedScrollViewState extends State<_FeedScrollView> {
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
         if (widget.showTitle) _feedAppBar(context, showTitle: true),
-        SliverPersistentHeader(
-          pinned: true,
-          delegate: _FeedSegmentHeaderDelegate(
-            backgroundColor: palette.bg,
-          ),
-        ),
+        const _FeedSegmentSliver(),
         if (widget.content.posts case final posts?)
           SliverPadding(
             padding: EdgeInsets.fromLTRB(20, 14, 20, bottomInset),
@@ -708,15 +732,11 @@ class _FeedStaticScrollView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
     return CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
         if (showTitle) _feedAppBar(context, showTitle: true),
-        SliverPersistentHeader(
-          pinned: true,
-          delegate: _FeedSegmentHeaderDelegate(backgroundColor: palette.bg),
-        ),
+        const _FeedSegmentSliver(),
         SliverFillRemaining(hasScrollBody: false, child: child),
       ],
     );

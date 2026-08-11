@@ -75,9 +75,10 @@ TreinoBarMetrics resolveBarMetrics({
   required double maxLabelHeight,
 }) {
   final tabWidth = availableWidth / itemCount;
-  // 16 = los dos insets de 8 con los que el pill se separa del borde del tab
-  // (ver el AnimatedPositioned: left = tabWidth*i + 8, width = tabWidth - 16).
-  final pillWidth = tabWidth - 16;
+  // Los dos insets con los que el pill se separa del borde del tab. Sale de
+  // la constante y NO de un 16 escrito a mano: el `AnimatedPositioned` del
+  // build usa la misma, así que lo que se mide acá es lo que se pinta allá.
+  final pillWidth = tabWidth - 2 * _kPillInset;
   final desiredHeight = 22 + 8 + maxLabelHeight + 20;
   final barHeight = desiredHeight > TreinoBottomBar.minHeight
       ? desiredHeight
@@ -109,14 +110,81 @@ TreinoBarMetrics resolveBarMetrics({
 }
 
 /// Cuánto se separa el pill del borde de su tab, en los cuatro lados.
-const double _kPillInset = 8;
+///
+/// Era 8, y esos 2px de más por lado eran 4px menos de caja para el label —
+/// justo los que faltaban. Medido con la fuente real (Barlow Condensed 10/w700,
+/// letterSpacing 0.8), "ENTRENAR" ocupa 44,36pt; en un Android de 360dp, el
+/// ancho más común del parque, la caja del label daba 41,41 y la barra se
+/// quedaba en íconos PARA SIEMPRE. Con 6 la caja pasa a 47,72 y entra.
+const double _kPillInset = 6;
+
+/// Margen lateral con el que la barra se despega de los bordes de la pantalla.
+/// Es la separación que le da el aire de "pill flotante" estilo WhatsApp.
+const double _kSideMarginIdeal = 20;
+
+/// Margen lateral al que la barra recurre SOLO si con [_kSideMarginIdeal] los
+/// labels no entrarían. Ver [resolveBarLayout].
+const double _kSideMarginTight = 12;
+
+/// Margen lateral + medidas de la barra, resueltos juntos.
+///
+/// Van juntos porque se determinan entre sí: cuánto margen se puede dar
+/// depende de si los labels entran, y si entran depende del margen.
+@immutable
+class TreinoBarLayout {
+  const TreinoBarLayout({required this.sideMargin, required this.metrics});
+
+  /// Separación lateral de la barra respecto de los bordes de la pantalla.
+  final double sideMargin;
+
+  /// Medidas resueltas con [sideMargin] ya descontado.
+  final TreinoBarMetrics metrics;
+}
+
+/// Elige el margen lateral más generoso con el que los labels TODAVÍA entren.
+///
+/// Primero prueba [_kSideMarginIdeal], que es el que respeta el diseño. Si con
+/// ese los labels no entran, aprieta a [_kSideMarginTight] y recalcula: ceder
+/// 8pt de aire a cada lado es mucho más barato que perder los cinco labels de
+/// la barra de navegación. Si ni apretando entran, vuelve al margen ideal y
+/// deja que la barra se quede con los íconos — a esa altura el problema es el
+/// textScale del usuario, y achicar el margen ya no lo arregla.
+///
+/// Deliberadamente NO mira `collapsed`: si el margen dependiera del estado
+/// colapsado, la barra cambiaría de ANCHO al scrollear, no solo de alto.
+TreinoBarLayout resolveBarLayout({
+  required double totalWidth,
+  required int itemCount,
+  required double maxLabelWidth,
+  required double maxLabelHeight,
+}) {
+  TreinoBarMetrics metricsFor(double margin) => resolveBarMetrics(
+        availableWidth: totalWidth - 2 * margin,
+        itemCount: itemCount,
+        maxLabelWidth: maxLabelWidth,
+        maxLabelHeight: maxLabelHeight,
+      );
+
+  final ideal = metricsFor(_kSideMarginIdeal);
+  if (ideal.labelsFit) {
+    return TreinoBarLayout(sideMargin: _kSideMarginIdeal, metrics: ideal);
+  }
+
+  final tight = metricsFor(_kSideMarginTight);
+  if (tight.labelsFit) {
+    return TreinoBarLayout(sideMargin: _kSideMarginTight, metrics: tight);
+  }
+
+  return TreinoBarLayout(sideMargin: _kSideMarginIdeal, metrics: ideal);
+}
 
 /// Redondeo del pill activo.
 ///
-/// Era 28, que sobre un pill de 56 de alto lo volvía un círculo perfecto — y a
+/// Era 28, que sobre el pill de entonces lo volvía un círculo perfecto — y a
 /// la altura del label la curva entraba 7,4px por lado cuando el label solo
-/// tenía 6px de margen, así que lo recortaba. Con 20 la curva entra 3,3px y la
-/// palabra entra entera, sin dejar de verse bien redondeado.
+/// tenía 6px de margen, así que lo recortaba. Con 20, y con el pill de 60 de
+/// alto que deja [_kPillInset], la curva entra 2,14px por lado: la palabra
+/// entra entera y el pill se sigue viendo bien redondeado.
 const double _kPillRadius = 20;
 
 /// Bottom bar de TREINO: pill flotante de vidrio (fill translúcido + reflejo
@@ -236,46 +304,54 @@ class TreinoBottomBar extends StatelessWidget {
 
     return SafeArea(
       top: false,
-      child: Padding(
-        // Generous side/bottom margins lift the pill off the edges
-        // (WhatsApp-style floating bar) — content scrolls visibly around it.
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            var maxLabelWidth = 0.0;
-            var maxLabelHeight = 0.0;
-            for (final item in _items) {
-              final painter = TextPainter(
-                text: TextSpan(text: item.label, style: labelStyle),
-                maxLines: 1,
-                textDirection: Directionality.of(context),
-                textScaler: textScaler,
-              )..layout();
-              if (painter.width > maxLabelWidth) {
-                maxLabelWidth = painter.width;
-              }
-              if (painter.height > maxLabelHeight) {
-                maxLabelHeight = painter.height;
-              }
-              // Cada TextPainter retiene un ui.Paragraph nativo. Este loop
-              // corre en cada pasada de layout (rotación, teclado, split view),
-              // así que sin esto se acumulan hasta que pase el GC.
-              painter.dispose();
+      // El LayoutBuilder va AFUERA del Padding a propósito: el margen lateral
+      // ya no es una constante, lo elige `resolveBarLayout` a partir del ancho
+      // total de la pantalla. Adentro del Padding sólo se ve el ancho ya
+      // recortado, que es justamente el dato que hay que decidir.
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          var maxLabelWidth = 0.0;
+          var maxLabelHeight = 0.0;
+          for (final item in _items) {
+            final painter = TextPainter(
+              text: TextSpan(text: item.label, style: labelStyle),
+              maxLines: 1,
+              textDirection: Directionality.of(context),
+              textScaler: textScaler,
+            )..layout();
+            if (painter.width > maxLabelWidth) {
+              maxLabelWidth = painter.width;
             }
+            if (painter.height > maxLabelHeight) {
+              maxLabelHeight = painter.height;
+            }
+            // Cada TextPainter retiene un ui.Paragraph nativo. Este loop
+            // corre en cada pasada de layout (rotación, teclado, split view),
+            // así que sin esto se acumulan hasta que pase el GC.
+            painter.dispose();
+          }
 
-            final metrics = resolveBarMetrics(
-              availableWidth: constraints.maxWidth,
-              itemCount: _items.length,
-              maxLabelWidth: maxLabelWidth,
-              maxLabelHeight: maxLabelHeight,
-            );
-            final barHeight = metrics.barHeight;
-            final expanded = !collapsed && metrics.labelsFit;
+          final layout = resolveBarLayout(
+            totalWidth: constraints.maxWidth,
+            itemCount: _items.length,
+            maxLabelWidth: maxLabelWidth,
+            maxLabelHeight: maxLabelHeight,
+          );
+          final metrics = layout.metrics;
+          final barHeight = metrics.barHeight;
+          final expanded = !collapsed && metrics.labelsFit;
 
-            // Una sola animación gobierna alto Y labels. Si fueran dos
-            // (AnimatedContainer + AnimatedOpacity) podrían desincronizarse
-            // un frame y el contenido desbordaría la caja mientras se achica.
-            return TweenAnimationBuilder<double>(
+          // Una sola animación gobierna alto Y labels. Si fueran dos
+          // (AnimatedContainer + AnimatedOpacity) podrían desincronizarse
+          // un frame y el contenido desbordaría la caja mientras se achica.
+          return Padding(
+            padding: EdgeInsets.fromLTRB(
+              layout.sideMargin,
+              8,
+              layout.sideMargin,
+              0,
+            ),
+            child: TweenAnimationBuilder<double>(
               tween: Tween<double>(end: expanded ? 1 : 0),
               duration: AppMotion.base,
               curve: AppMotion.standard,
@@ -308,10 +384,14 @@ class TreinoBottomBar extends StatelessWidget {
                                 AnimatedPositioned(
                                   duration: AppMotion.slow,
                                   curve: AppMotion.standard,
-                                  left: tabWidth * currentIndex + 8,
-                                  top: 8,
-                                  bottom: 8,
-                                  width: tabWidth - 16,
+                                  // Mismo inset que usa `resolveBarMetrics`
+                                  // para decidir si el label entra. Si acá
+                                  // hubiera un número suelto, medir y pintar
+                                  // podrían separarse sin que nadie lo note.
+                                  left: tabWidth * currentIndex + _kPillInset,
+                                  top: _kPillInset,
+                                  bottom: _kPillInset,
+                                  width: tabWidth - 2 * _kPillInset,
                                   child: _PillHighlight(palette: palette),
                                 ),
                                 Row(
@@ -348,9 +428,9 @@ class TreinoBottomBar extends StatelessWidget {
                   ),
                 );
               },
-            );
-          },
-        ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -438,15 +518,15 @@ class _TabContent extends StatelessWidget {
         fontWeight: FontWeight.w700,
         letterSpacing: 0.8,
       ),
-      // Horizontal padding matches the pill's 8px margin on each side of the
-      // tab (see AnimatedPositioned: left = tabWidth*i + 8, width = tabWidth
-      // - 16). Without this, the label's box is `tabWidth` wide but the pill
-      // is `tabWidth - 16` — so on the active tab, characters that extend
-      // past the pill are rendered in `palette.bg` (near-black) over the
-      // dark navbar bg and read as clipped (ENTRENAR → ENTRENR). Keeping the
-      // label inside the pill box guarantees readable contrast everywhere.
+      // El padding horizontal es EXACTAMENTE el inset del pill, y sale de la
+      // misma constante que usan el `AnimatedPositioned` y `resolveBarMetrics`.
+      // Sin esto la caja del label mide `tabWidth` y el pill `tabWidth - 2*
+      // inset`: en el tab activo, las letras que se pasan del pill se pintan en
+      // `palette.bg` (casi negro) sobre el fondo oscuro de la barra y se leen
+      // como recortadas (ENTRENAR → ENTRENR). Y si fuera un número suelto más
+      // grande que el inset, le comería al label ancho que el pill sí le da.
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8),
+        padding: const EdgeInsets.symmetric(horizontal: _kPillInset),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
