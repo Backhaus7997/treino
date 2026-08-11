@@ -12,6 +12,41 @@ depende_de:
     entreno. Este ciclo NO lo reemplaza — le agrega la capa que le falta para
     que watchOS lo trate como app de entrenamiento.
 
+fases_de_implementacion:
+  F0_terreno_y_permisos:
+    estado: HECHA — verificada corriendo en el simulador emparejado
+    rama: feat/watch-workout-session (sale de feat/workout-watch-connectivity)
+    entregado:
+      - Entitlement de HealthKit en el target del reloj, enganchado a las TRES
+        configuraciones (Debug, Release, Profile).
+      - Los dos textos de permiso, VISTOS en pantalla en el pliego del reloj.
+      - La solicitud, disparada en los tres caminos que abren un entreno.
+      - scripts/test_watch_capabilities.sh — guard contra la perdida silenciosa
+        de la capability. Probado con 4 mutaciones.
+      - scripts/test_watch_swift.sh — 20 chequeos de la logica de permisos.
+        Probado con 8 mutaciones.
+      - scripts/typecheck_watch.sh — typecheck con los flags del target.
+      - Job watch-capabilities en CI, en runner ubuntu.
+    cierre_verificado_corriendo: |
+      El criterio era: compila con HealthKit, pide permiso, y el entreno sigue
+      funcionando igual con permiso CONCEDIDO y DENEGADO. Los tres, vistos:
+
+        - BUILD SUCCEEDED contra el simulador del reloj.
+        - El pliego de Salud aparecio en la muñeca, con los dos textos en
+          castellano y pidiendo exactamente los tres tipos declarados
+          (Active Energy y Workouts para escribir, Heart Rate para leer).
+        - DENEGADO: se marco una serie, arranco el descanso (207s) y avanzo a
+          la serie siguiente. Estado interno: resolved(canWriteWorkouts: false).
+        - CONCEDIDO: se marco otra serie, arranco el descanso (205s) y avanzo.
+          Estado interno: resolved(canWriteWorkouts: true).
+    lo_que_NO_se_verifico: |
+      Nada en hardware. Todo esto es simulador, y F0 no lo necesitaba. Lo que
+      queda pendiente de una muñeca real esta anotado en Q1 (provisioning) y en
+      lo_que_NO_esta_verificado de Q3.
+  F1_la_sesion_de_entrenamiento: pendiente
+  F2_ritmo_cardiaco_en_vivo: pendiente
+  F3_duracion_y_escritura_en_salud: pendiente
+
 phases:
   explore: done
   propose: done
@@ -88,12 +123,213 @@ riesgo_que_define_el_ciclo: |
   puede probar sin pulsaciones. F2 y F3 se agrupan para un unico smoke en
   hardware en vez de quedar bloqueadas de a una.
 
-preguntas_abiertas_para_F0:  # lo unico realmente abierto
-  - Si el entitlement de HealthKit exige regenerar el provisioning profile.
-  - Si HKWorkoutSession corre en el simulador (aunque sea sin datos de HR) —
-    determina cuanto se puede probar sin hardware.
-  - Si la sesion se puede abrir sin permiso de lectura de HR (ver D2).
-  - Que declaraciones de privacidad pide Apple en la review por usar HealthKit.
+preguntas_abiertas_para_F0: RESPONDIDAS — ver respuestas_de_F0
+
+respuestas_de_F0:
+  Q1_provisioning_profile:
+    pregunta: Si el entitlement de HealthKit exige regenerar el provisioning profile.
+    respuesta: |
+      SI, y hay algo peor: hoy NO EXISTE ningun perfil para el reloj.
+
+      Medido decodificando los 5 perfiles instalados en
+      ~/Library/Developer/Xcode/UserData/Provisioning Profiles:
+
+        J66AQRRM96.com.treino.app          -> 0 claves healthkit
+        J66AQRRM96.com.backhaus.treino     -> 0 claves healthkit
+        J66AQRRM96.com.backhaus.treino     -> 0 (Store)
+        J66AQRRM96.com.treino.ar           -> 0 claves healthkit
+        J66AQRRM96.com.backhaus.treino-    -> 0 claves healthkit
+
+      Ninguno tiene HealthKit, y NINGUNO cubre
+      com.backhaus.treino.watchkitapp: el companion nunca se firmo para un
+      dispositivo real, todo el ciclo anterior fue simulador.
+
+      Confirmado por el lado del build: el .xcent de DISPOSITIVO del reloj sale
+      vacio ({}), mientras que el -Simulated.xcent si trae
+      com.apple.developer.healthkit = true. O sea, en simulador el entitlement
+      esta; para dispositivo todavia no hay de donde sacarlo.
+    quien_lo_destraba: |
+      La firma es automatica (CODE_SIGN_STYLE = Automatic, DEVELOPMENT_TEAM =
+      J66AQRRM96), asi que Xcode genera el perfil solo — PERO antes tiene que
+      habilitar la capability HealthKit en el App ID del portal, y eso pide una
+      cuenta con rol Admin o App Manager.
+    limite: |
+      NO VERIFICABLE desde esta sesion: hace falta la cuenta de Apple Developer.
+      Es lo primero que hay que destrabar antes de cualquier prueba en hardware,
+      o sea antes de F2.
+
+  Q2_hkworkoutsession_en_simulador:
+    pregunta: Si HKWorkoutSession corre en el simulador, aunque sea sin datos de HR.
+    respuesta: |
+      SI, CORRE. Medido con una sonda descartable en el Apple Watch Series 11
+      42mm (EF0E3E46), watchOS 26.2:
+
+        isHealthDataAvailable = true
+        HKWorkoutSession CREADA, state = 1 (notStarted)
+        startActivity -> a los 3s, state = 2 (running)
+        session.end() -> state = 3 (ended)
+
+      Y con el permiso concedido tambien recolecta:
+
+        beginCollection OK — el builder recolecta
+        el builder tiene stats de HR: HKStatistics on HKQuantityTypeIdentifierHeartRate
+
+      El objeto HKStatistics viene VACIO (rango de tiempo de ancho cero, sources
+      null): el simulador no genera pulsaciones, como estaba previsto. Pero la
+      cañeria entera —sesion, builder, data source, statistics— funciona.
+    consecuencia_para_el_plan: |
+      F1 ES VERIFICABLE EN SIMULADOR. Abrir y cerrar la sesion junto con el
+      entreno se puede probar sin hardware.
+
+      Lo que el simulador NO puede darte sigue siendo: pulsaciones reales (F2) y
+      el comportamiento con la muñeca abajo, que es el sintoma que F1 dice
+      arreglar. O sea: F1 se puede verificar en su MECANICA, no en su EFECTO.
+      Para el efecto sigue haciendo falta la muñeca.
+
+  Q3_sesion_sin_permiso_de_lectura:
+    pregunta: Si la sesion se puede abrir SIN permiso de lectura de HR (ver D2).
+    respuesta: |
+      SI SE PUEDE. Es el hallazgo mas importante de F0.
+
+      Medido con el permiso NEGADO POR COMPLETO (authStatus(workoutType) =
+      sharingDenied, todos los toggles en off):
+
+        HKWorkoutSession CREADA, state = 1
+        startActivity -> a los 3s, state = 2 (RUNNING)
+        beginCollection FALLO: Not authorized
+
+      O sea: la SESION abre y corre sin permiso ninguno. Lo unico que falla es
+      la RECOLECCION de datos del HKLiveWorkoutBuilder.
+
+      Como la ejecucion en segundo plano cuelga de que la SESION este viva —no
+      de que el builder recolecte— el atleta que niega el permiso NO pierde el
+      descanso en segundo plano. Pierde las pulsaciones y la escritura en Salud,
+      nada mas.
+    consecuencia_para_D2: |
+      D2 SE SOSTIENE COMO SE FIRMO. No hay que volver al dueño: la disyuntiva
+      que el proposal dejaba abierta —"insistir con el permiso o aceptar que ese
+      usuario pierde el descanso"— no existe. No se pierde.
+    lo_que_NO_esta_verificado: |
+      Que la sesion viva efectivamente MANTENGA corriendo el Timer del descanso
+      con la muñeca abajo. Lo medido es que la sesion abre y llega a `running`.
+      El efecto en segundo plano es justamente lo que F1 tiene que demostrar, y
+      el simulador no baja la muñeca. No darlo por hecho.
+
+  hallazgo_extra_sobre_la_lectura:
+    que: Como se comporta HealthKit cuando el atleta niega la LECTURA.
+    medido: |
+      Tres estados distintos, con la misma query de ritmo cardiaco:
+
+        sin contestar aun -> ERROR: "Authorization not determined"
+        NEGADO            -> OK, 0 muestras     <-- sin error
+        CONCEDIDO         -> OK, 1 muestras
+
+      Confirmado ademas que `authorizationStatus(for:)` habla SOLO de escritura:
+      con el permiso concedido, el status de heartRate seguia dando
+      sharingDenied, porque heartRate esta en la lista de LECTURA y nunca se
+      pidio escribirlo.
+    por_que_importa_en_F2: |
+      Una lectura negada es INDISTINGUIBLE de "no hay datos": las dos dan una
+      query exitosa con cero muestras. La pantalla de F2 no puede mostrar un
+      error cuando no llegan pulsaciones, porque no sabe —ni puede saber— si el
+      atleta las nego o si todavia no midio ninguna. Tiene que tratar el
+      silencio como silencio.
+
+      Por eso `HealthAccessState` modela solo la escritura. No es una
+      simplificacion: es lo unico que HealthKit dice de verdad.
+
+  Q4_declaraciones_de_privacidad:
+    pregunta: Que declaraciones de privacidad pide Apple en la review por HealthKit.
+    respuesta: |
+      Lo que aplica, con numero de seccion de las App Review Guidelines:
+
+        5.1.1(i)  politica de privacidad que diga que datos se recogen y para que
+        5.1.2(vi) los datos de HealthKit NO pueden usarse para marketing,
+                  publicidad ni mineria de datos, ni propios ni de terceros
+        5.1.3(i)  no divulgarlos a terceros para esos mismos fines
+        5.1.3(ii) no escribir datos falsos o inexactos en HealthKit, y
+                  NO guardar informacion de salud en iCloud
+    el_hallazgo_que_sale_de_D1: |
+      Apple define "collect" como TRANSMITIR datos fuera del dispositivo de
+      forma que queden accesibles mas alla de atender el pedido en tiempo real,
+      y dice explicitamente que los datos procesados SOLO en el dispositivo no
+      se consideran recogidos y no hay que declararlos.
+
+      Como D1 dejo el ritmo cardiaco en pantalla y en la app Salud, SIN TOCAR
+      FIRESTORE, TREINO no "recoge" datos de salud. Consecuencia concreta: este
+      ciclo NO agrega declaraciones de Health/Fitness en App Privacy ni entradas
+      al privacy manifest. El repo no tiene PrivacyInfo.xcprivacy y no le hace
+      falta para F0.
+
+      Si algun dia se firma D1(b) —resumen en Firestore— eso deja de ser cierto
+      EN EL ACTO: pasa a ser recoleccion, con declaracion en App Privacy,
+      entrada en el privacy manifest, y 5.1.3(ii) sobre iCloud pasando a
+      importar. Es un costo de D1(b) que el proposal no habia contabilizado.
+
+hallazgos_laterales_de_F0:
+  el_typecheck_rapido_dejaba_pasar_errores: |
+    El comando corto del HANDOFF (swiftc -typecheck -sdk ... -target ...) NO
+    reproduce los flags del target y deja pasar errores que aparecen recien en
+    el build largo.
+
+    Medido: HealthStore.swift usaba @Published sin `import Combine`. El
+    typecheck corto lo daba LIMPIO; el build fallo con
+    "initializer 'init(wrappedValue:)' is not available due to missing import
+    of defining module 'Combine' [#MemberImportVisibility]".
+
+    Causa: el target activa SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY.
+    Sin ese flag, el import de OTRO archivo del mismo lote alcanzaba para que
+    resolviera. Costo un build de ~20 min.
+
+    Arreglado en scripts/typecheck_watch.sh, que fija los flags del target.
+    Usar ESE y no el comando suelto.
+
+  la_premisa_del_pbxproj_estaba_imprecisa: |
+    El HANDOFF (§8.8) dice que "Flutter reescribe project.pbxproj en cada
+    build". Medido contra el historial del propio repo (commit 29bf0f90):
+    Flutter reescribe UNA sola clave, `objectVersion` (70 -> 54), y eso ya
+    quedo neutralizado commiteando el 54. Ni `pod install` ni `xcodebuild` lo
+    tocan por ese lado.
+
+    El riesgo real es OTRO y esta documentado en docs/setup/watchos-target.md:
+    CocoaPods reescribe el archivo ENTERO en cada `pod install`, y una version
+    de Xcodeproj que no entienda una clave puede descartarla al escribir, sin
+    error. Ya casi se come el enganche del target del reloj.
+
+    Verificado en esta fase: `pod install` con CocoaPods 1.17.0 respeto las 9
+    lineas agregadas.
+
+  DOS_CAMINOS_ENTRAN_EN_MODO_ENTRENO_A_LA_VEZ: |
+    ⚠️ ESTO ES PARA F1, Y ES UN RIESGO REAL.
+
+    Con la sonda puesta se vio que `requestHealthAccess()` corrio DOS VECES en
+    un mismo arranque: el log muestra dos sondas completas en paralelo, una
+    llegando a state = 2 y la otra a state = 3.
+
+    La causa es de la app, no de F0: `TreinoWatchApp` llama a
+    `workoutCoordinator.restore()` en el `.task`, y ademas
+    `adoptRemoteSessionIfAny()` en el `.onChange(of: scenePhase)` cuando la
+    escena se pone activa. Las dos corren al arrancar, las dos ven
+    `session == nil`, y las dos adoptan.
+
+    En F0 es inofensivo: pedir permiso dos veces es idempotente.
+
+    EN F1 NO LO ES. Dos caminos concurrentes abriendo cada uno su
+    HKWorkoutSession son dos sesiones de entrenamiento en watchOS para un solo
+    entreno. F1 tiene que garantizar UNA sola, y el `guard session == nil` de
+    hoy NO alcanza porque la carrera pasa antes de que ninguno asigne.
+
+  el_permiso_faltaba_en_dos_de_los_tres_caminos: |
+    El reloj entra en modo entreno por TRES caminos —empezarlo ahi, adoptar el
+    que abrio el telefono, y recuperar uno a medias—. Pedir el permiso solo en
+    `start` dejaba sin preguntar justo al caso mas comun de un companion: el
+    atleta que arranca en el celular. Corregido: los tres piden.
+
+  cocoapods_necesita_locale_UTF8: |
+    `pod install` aborta con "Unicode Normalization not appropriate for
+    ASCII-8BIT" si el entorno no tiene locale UTF-8. Va
+    `LANG=en_US.UTF-8 pod install`. Ya estaba documentado en
+    docs/setup/watchos-target.md; se re-tropezo igual.
 
 artifacts:
   explore: openspec/changes/watch-workout-session/explore.md
