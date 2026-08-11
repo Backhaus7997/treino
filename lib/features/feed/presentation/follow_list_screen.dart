@@ -93,11 +93,14 @@ class _Header extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppL10n.of(context);
+    // Mismo fallback que `UserSearchResultTile`, que es la fila de esta misma
+    // pantalla: un perfil sin nombre se muestra como "Anónimo". Un título
+    // vacío se lee como pantalla rota, no como "esta persona no puso nombre".
     final name = ref
             .watch(userPublicProfileProvider(targetUid))
             .valueOrNull
             ?.displayName ??
-        '';
+        'Anónimo';
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
@@ -230,6 +233,23 @@ class _Pill extends StatelessWidget {
 // Body
 // ---------------------------------------------------------------------------
 
+/// La rama del shell (`/feed` o `/home`) de la que cuelga esta pantalla.
+///
+/// SALIR de la lista hacia el perfil de un miembro tiene que quedarse en la
+/// misma rama, por la misma razón por la que se ENTRA respetándola:
+/// `_ShellScaffold` deriva la tab resaltada del prefijo de la ruta, así que
+/// hardcodear `/feed` haría saltar la tab a FEED —y el back caería mal— para
+/// quien abrió la lista desde INICIO (issue #387).
+///
+/// La ubicación acá siempre es `{rama}/profile/{targetUid}/follows`, así que
+/// la rama es todo lo anterior a `/profile/`. Si algún día la ruta cambia de
+/// forma, cae en `/feed`, que es de dónde se llega en la mayoría de los casos.
+String _shellBranch(BuildContext context) {
+  final location = GoRouterState.of(context).matchedLocation;
+  final i = location.indexOf('/profile/');
+  return i > 0 ? location.substring(0, i) : '/feed';
+}
+
 class _Body extends ConsumerWidget {
   const _Body({
     required this.targetUid,
@@ -262,12 +282,21 @@ class _Body extends ConsumerWidget {
       // La key incluye la dirección: sin eso, pasar de una lista vacía a la
       // otra lista vacía no cambiaría de child y el texto no se actualizaría.
       childKey: ValueKey(async.when(
+        skipLoadingOnReload: true,
         loading: () => 'loading:${kind.name}',
         error: (_, __) => 'error:${kind.name}',
         data: (list) =>
             list.isEmpty ? 'empty:${kind.name}' : 'data:${kind.name}',
       )),
+      // `skipLoadingOnReload` NO es cosmético. El provider de abajo watchea un
+      // stream de Firestore, y un stream re-emite seguido: snapshot de cache y
+      // después de servidor al abrir, y cada vez que alguien sigue o deja de
+      // seguir. Con el default (`false`), CADA re-emisión vuelve el estado a
+      // loading, tira la lista abajo, pone el spinner de pantalla completa y
+      // manda el scroll a cero — aunque el contenido no haya cambiado en nada.
+      // Con `true`, mientras recarga se sigue mostrando lo último bueno.
       child: async.when(
+        skipLoadingOnReload: true,
         loading: () => Center(
           child: Semantics(
             label: l10n.commonLoading,
@@ -311,7 +340,9 @@ class _Body extends ConsumerWidget {
               final profile = profiles[i];
               return UserSearchResultTile(
                 profile: profile,
-                onTap: () => context.push('/feed/profile/${profile.uid}'),
+                onTap: () => context.push(
+                  '${_shellBranch(context)}/profile/${profile.uid}',
+                ),
               );
             },
           );

@@ -7,7 +7,6 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
-import 'package:treino/features/feed/application/follow_list_providers.dart';
 import 'package:treino/features/feed/application/public_profile_providers.dart';
 import 'package:treino/features/feed/domain/public_profile_view.dart';
 import 'package:treino/features/feed/presentation/public_profile_screen.dart';
