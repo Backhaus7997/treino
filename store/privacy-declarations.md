@@ -67,8 +67,27 @@ this reading.
 **Does your app collect or share any of the required user data types?** Yes
 **Is all user data encrypted in transit?** Yes (Firebase, TLS)
 **Do you provide a way for users to request data deletion?** Yes — in-app
-account deletion exists. ⚠️ Confirm the deletion flow removes feed posts rather
-than anonymizing them; there is a known follow-up on that behaviour.
+account deletion exists.
+
+Verified 2026-08-11 against `functions/src/delete-account.ts`: the cascade
+deletes posts outright (`deletePosts` in `functions/src/cascade/posts.ts` issues
+real deletes, not anonymizing updates), along with the user document, public
+profile and Auth record.
+
+⚠️ **Confirm this is deployed to production before declaring it.** Cloud
+Functions do not deploy on merge to `main`. As of PR #358 this cascade was live
+on `treino-dev` only; production still ran the older behaviour, which
+*anonymized* posts to "Usuario eliminado" instead of deleting them. Declaring
+deletion while production anonymizes would make the Data safety answer false.
+
+Check with:
+
+```bash
+firebase use <prod-project> && firebase functions:list | grep deleteAccount
+```
+
+If production is still on the old version, either deploy first or declare the
+anonymizing behaviour until it ships.
 
 | Category | Type | Collected | Shared | Optional | Purpose |
 |---|---|---|---|---|---|
@@ -121,7 +140,9 @@ None.
 - [ ] Product owner has reviewed and approved every line above
 - [ ] Privacy Policy URL is live and its text matches these declarations
       (also required by Apple for External Testing)
-- [ ] Account deletion behaviour confirmed against what Play expects
+- [x] Account deletion verified in code — cascade deletes posts (2026-08-11)
+- [ ] ⚠️ Confirm the deletion cascade is deployed to **production**, not just
+      `treino-dev` — the declared behaviour must match what production does
 - [ ] Health-data declaration confirmed (see call #1)
 - [ ] Location declaration confirmed against the privacy policy (see call #2)
 - [ ] Re-checked after any feature that adds a new data type
