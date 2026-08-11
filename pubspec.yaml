@@ -76,12 +76,36 @@ dev_dependencies:
   # — only invoked during build setup.
   flutter_launcher_icons: ^0.14.4
 
-# flutter_launcher_icons config — see docs for android/web options if
-# we ever ship those targets. For now: iOS-only, mobile-only project.
+# flutter_launcher_icons config.
+#
+# `android` estuvo en `false` desde que se configuró esto, así que los
+# `mipmap-*/ic_launcher.png` del repo nunca se generaron y siguieron siendo los
+# que deja `flutter create`: el logo de Flutter. Eso es lo que se veía en el
+# teléfono Y en las instalaciones desde Play Console, porque el AAB empaqueta
+# esos mismos archivos.
+#
+# Tras tocar cualquiera de las fuentes hay que regenerar:
+#   dart run flutter_launcher_icons
+# y commitear lo que aparezca bajo android/app/src/main/res/ e ios/.
 flutter_launcher_icons:
   ios: true
-  android: false
+  android: true
+  # Ícono legacy (Android 7 y anteriores): el cuadrado completo, con su fondo.
   image_path: "assets/icon/app_icon.png"
+
+  # Adaptive icon (Android 8+). El launcher recorta con SU máscara —círculo,
+  # squircle, gota según el fabricante— y solo garantiza el 66% central del
+  # lienzo. El logo original ocupa el 80% del alto, así que pasarlo tal cual
+  # como foreground le comía las puntas al "TR"; por eso el foreground es un
+  # asset aparte con el logo al 58% y el resto transparente. El fondo lo
+  # aporta este color, no la imagen.
+  adaptive_icon_background: "#000000"
+  adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
+
+  # Themed icon (Android 13+): el launcher lo repinta con los colores del
+  # tema del sistema. Mismo trazo, en blanco, para que el tintado salga limpio.
+  adaptive_icon_monochrome: "assets/icon/app_icon_monochrome.png"
+
   remove_alpha_ios: true
 
 flutter:
