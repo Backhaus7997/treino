@@ -18,14 +18,22 @@ A store listing is public permanently. Treat everything here as published.
 ```
 store/
 ├── README.md                     ← you are here
+├── capture_screenshots.sh        ← regenerates every screenshot
 ├── privacy-declarations.md       ← draft answers for Data safety / privacy labels
 ├── ios/
 │   ├── screenshots/es/{6.9-inch,6.5-inch}/*.png
 │   └── metadata/{es,en}/{name,subtitle,description,keywords,release_notes}.txt
 └── android/
     ├── screenshots/es/phone/*.png
-    ├── graphics/{feature-graphic.png,icon-512.png}
+    ├── graphics/{feature-graphic.png,icon-512.png,generate_*.py}
     └── metadata/{es,en}/{title,short_description,full_description,release_notes}.txt
+```
+
+The capture itself lives with the other tests:
+
+```
+integration_test/screenshots_test.dart   ← drives the app, takes the shots
+test_driver/screenshots_driver.dart      ← host side, writes the PNGs to disk
 ```
 
 Metadata ships in **Spanish and English**. Screenshots ship in **Spanish only** —
@@ -52,6 +60,29 @@ bottom nav bar — that is deliberate, it makes for a cleaner capture.
 ---
 
 ## Regenerating the screenshots
+
+### The short version
+
+```bash
+bash scripts/emulator.sh                         # terminal 1 — needs JDK 21+
+cd scripts && npm run seed:emulator && cd ..     # terminal 2
+bash store/capture_screenshots.sh                # 6.9" + the Play phone set
+DEVICE=6.5 bash store/capture_screenshots.sh     # optional second iOS size
+```
+
+`capture_screenshots.sh` drives the app through
+`integration_test/screenshots_test.dart`, signs in as the seeded demo account,
+visits each store screen, writes the PNGs, copies them into place and optimizes
+them. It refuses to run if the emulator is down, because capturing against a
+dead emulator silently produces empty screens.
+
+**It does not check what is in the pixels.** Run the
+[pre-publish checklist](#pre-publish-checklist) afterwards regardless.
+
+The manual procedure below is the fallback for when the driver breaks — for
+example after a router change that moves one of the captured routes.
+
+### The manual version
 
 ### 0. Prerequisites
 

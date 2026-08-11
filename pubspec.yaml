@@ -64,6 +64,10 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  # Drives the store screenshot capture in integration_test/screenshots_test.dart
+  # (see store/README.md). Test-only — not shipped in release builds.
+  integration_test:
+    sdk: flutter
   flutter_lints: ^4.0.0
   build_runner: ^2.4.13
   freezed: ^2.5.7
