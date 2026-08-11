@@ -80,6 +80,37 @@ Es Flutter.
 
 ---
 
+## ⚠️ El typecheck rápido necesita los flags del target
+
+Para no esperar los +20 minutos de `xcodebuild` veníamos usando un `swiftc
+-typecheck` suelto contra el SDK de watchOS. **Ese comando deja pasar errores
+que después aparecen recién en el build largo**, porque no reproduce los flags
+del target.
+
+Medido en el change `watch-workout-session` (F0): un archivo usaba `@Published`
+sin `import Combine`. El typecheck corto lo daba limpio; el build falló con
+
+```
+error: initializer 'init(wrappedValue:)' is not available due to missing
+import of defining module 'Combine' [#MemberImportVisibility]
+```
+
+La causa es `SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES` en el
+target: exige que **cada archivo importe lo que usa**. Sin ese flag, el `import
+Combine` de *otro* archivo del mismo lote alcanzaba para que resolviera. Costó
+un build entero.
+
+Usar el script, que fija los flags del target:
+
+```bash
+bash scripts/typecheck_watch.sh
+```
+
+No reemplaza al build —no linkea, no firma, no arma el bundle— pero es el
+filtro rápido de antes, ahora sin ese agujero.
+
+---
+
 ## ⚠️ Nunca pasar `-sdk` al buildear un workspace con target watchOS
 
 `-sdk iphonesimulator` (o `-sdk iphoneos`) **pisa el `SDKROOT` de TODOS los
