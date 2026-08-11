@@ -181,10 +181,30 @@ respuestas_de_F0:
       F1 ES VERIFICABLE EN SIMULADOR. Abrir y cerrar la sesion junto con el
       entreno se puede probar sin hardware.
 
-      Lo que el simulador NO puede darte sigue siendo: pulsaciones reales (F2) y
-      el comportamiento con la muñeca abajo, que es el sintoma que F1 dice
-      arreglar. O sea: F1 se puede verificar en su MECANICA, no en su EFECTO.
-      Para el efecto sigue haciendo falta la muñeca.
+      CORRECCION (aporte de la sesion paralela del companion): tambien el
+      EFECTO es medible en simulador, no solo la mecanica. Yo habia escrito acá
+      que hacia falta la muñeca; estaba de mas. Mandar la app al fondo con la
+      Digital Crown la suspende igual, y eso alcanza para medir la perdida.
+
+      Medido por esa sesion, sin HKWorkoutSession abierta, en el mismo par de
+      simuladores:
+
+        banner en T0 ............ 148s
+        segundos reales T0->T1 ... 84
+        banner al volver ........ 121s
+        conto ................... 27s
+        PERDIO .................. 57s   (~47s en background + arranque)
+
+      Lo que convierte eso en prueba y no en indicio: el banner SEGUIA PRESENTE
+      al volver. Si la app se hubiera reiniciado, `restRemaining` seria nil y no
+      habria banner, porque no se persiste. O sea que no se reinicio: se
+      suspendio y retomo donde estaba.
+
+      F1 tiene entonces un test rojo/verde sin hardware: repetir ese
+      procedimiento con la sesion de entrenamiento abierta y ver si deja de
+      perder segundos.
+
+      Lo que el simulador sigue sin poder dar: pulsaciones reales (F2).
 
   Q3_sesion_sin_permiso_de_lectura:
     pregunta: Si la sesion se puede abrir SIN permiso de lectura de HR (ver D2).
@@ -330,6 +350,60 @@ hallazgos_laterales_de_F0:
     ASCII-8BIT" si el entorno no tiene locale UTF-8. Va
     `LANG=en_US.UTF-8 pod install`. Ya estaba documentado en
     docs/setup/watchos-target.md; se re-tropezo igual.
+
+candidato_para_F1_restEndsAt: |
+  Propuesta de la sesion paralela del companion. NO implementada — queda a
+  decision del dueño, y la autoria es de ellos.
+
+  `HKWorkoutSession` NO arregla que el descanso sea un contador de ticks: hace
+  que casi siempre alcance a tickear. Sigue siendo fragil ante cualquier
+  suspension que se cuele.
+
+  Guardar `restEndsAt: Date` y derivar los segundos de `Date()` —en vez de
+  restar de a uno— deja el descanso correcto AUNQUE la app se suspenda, sin
+  depender de ningun permiso. Es ortogonal a HealthKit y son pocas lineas.
+
+  Lo que suma F0 al argumento: como la sesion abre incluso con el permiso
+  NEGADO (ver Q3), ese atleta ya conserva el segundo plano. Con `restEndsAt`
+  encima, el camino de permiso denegado deja de estar degradado EN ABSOLUTO
+  para el descanso, no "casi". La fila de la tabla de riesgos del proposal
+  —"el atleta niega el permiso / sin background el descanso vuelve a morir"—
+  pasaria de riesgo aceptado a no puede pasar.
+
+  Por eso conviene hacerlo JUNTO con F1 y no despues.
+
+trampas_de_entorno_medidas_por_la_sesion_paralela: |
+  - La rutina de prueba "hhhh" (7Qiyue62lEiYsJmGzwOm) tiene `restSeconds = 0`
+    en los 5 dias. Con esa rutina el banner de descanso NO PUEDE aparecer
+    nunca, y es correcto (`guard seconds > 0`). Probar descanso ahi da un
+    falso negativo. Usar `seed-routine-001`: dia 1 tiene 180/150/120, dia 2
+    180/150/90, dia 3 210/150/150.
+
+  - La latencia de WatchConnectivity en simulador varia muchisimo con la carga
+    de la maquina: el mismo mensaje medido en 2,0 s y en 24,4 s, con load
+    average de 493. Con varios simuladores booteados y builds en paralelo, una
+    captura sacada a los 10 s da un falso "no llego el aviso". Mirar `uptime`
+    antes de medir tiempos de entrega, y rastrear el messageID en los dos lados
+    con `xcrun simctl spawn <udid> log show`.
+
+  - No lanzar builds ni instalar sobre el par emparejado sin coordinar: ademas
+    de la contencion de DerivedData, instalar cambia el binario abajo de quien
+    este probando. Paso en este ciclo — ver nota_de_coordinacion.
+
+nota_de_coordinacion: |
+  El 2026-08-11 14:23:30 esta fase dejo instalado su build de F0 en el Apple
+  Watch EF0E3E46, que es el par que usa el dueño para probar. Ese bundle trae
+  las claves de HealthKit, o sea que no es `feat/workout-watch-connectivity`.
+
+  Ademas quedaron cambiados en ese simulador:
+    - el permiso de HealthKit de TreinoWatch, CONCEDIDO (Turn On All). Persiste;
+      desinstalar la app no lo resetea.
+    - setLogs escritos en el emulador para seed-athlete-001: 3 series de Peso
+      Muerto Rumano en una sesion abierta de Upper B — Tiron.
+
+  No se revirtio a proposito: revertir eran mas builds e instalaciones sobre el
+  mismo par, que es justo lo que habia que dejar de hacer.
+
 
 artifacts:
   explore: openspec/changes/watch-workout-session/explore.md
