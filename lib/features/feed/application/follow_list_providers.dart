@@ -27,6 +27,16 @@ String followListKey(FollowListKind kind, String uid) => '${kind.name}:$uid';
   );
 }
 
+/// Traduce el `?tab=` de la URL a una dirección.
+///
+/// Cualquier valor que no sea `following` cae en `followers`: un deep link
+/// con el parámetro roto abre la lista más probable en vez de tirar la
+/// navegación abajo.
+FollowListKind followListKindFromTab(String? tab) =>
+    tab == FollowListKind.following.name
+        ? FollowListKind.following
+        : FollowListKind.followers;
+
 /// Los UIDs de una de las dos listas, en vivo.
 ///
 /// Va al repositorio directo en vez de reenviar a [followingProvider]: ese
@@ -61,8 +71,14 @@ final followListProvider =
     final uids = await ref.watch(followListUidsProvider(key).future);
     if (uids.isEmpty) return const [];
 
+    // La key del batch va ordenada y sin duplicados, como pide su doc: dos
+    // consumidores que pidan el mismo conjunto comparten una sola instancia
+    // del provider en vez de abrir dos. El orden de la key NO es el orden de
+    // salida — para eso está `uids` más abajo.
     final byUid = await ref.watch(
-      userPublicProfilesBatchProvider(uids.join(',')).future,
+      userPublicProfilesBatchProvider(
+        (uids.toSet().toList()..sort()).join(','),
+      ).future,
     );
 
     // Se recorre `uids`, no `byUid.values`: el batch devuelve un Map (sin

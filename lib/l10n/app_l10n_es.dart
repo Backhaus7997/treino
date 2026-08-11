@@ -3336,6 +3336,34 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get chatBlockedComposerHintA11y => 'No podés escribir en este chat';
+
+  @override
+  String get followListTabFollowers => 'SEGUIDORES';
+
+  @override
+  String get followListTabFollowing => 'SIGUIENDO';
+
+  @override
+  String get followListEmptyFollowers => 'Todavía no tiene seguidores';
+
+  @override
+  String get followListEmptyFollowersSelf => 'Todavía no tienes seguidores';
+
+  @override
+  String get followListEmptyFollowing => 'Todavía no sigue a nadie';
+
+  @override
+  String get followListEmptyFollowingSelf => 'Todavía no sigues a nadie';
+
+  @override
+  String get followListLoadError =>
+      'No pudimos cargar la lista. Inténtalo de nuevo.';
+
+  @override
+  String get followListOpenFollowersA11y => 'Ver seguidores';
+
+  @override
+  String get followListOpenFollowingA11y => 'Ver seguidos';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -6667,4 +6695,32 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get chatBlockedComposerHintA11y => 'No podés escribir en este chat';
+
+  @override
+  String get followListTabFollowers => 'SEGUIDORES';
+
+  @override
+  String get followListTabFollowing => 'SIGUIENDO';
+
+  @override
+  String get followListEmptyFollowers => 'Todavía no tiene seguidores';
+
+  @override
+  String get followListEmptyFollowersSelf => 'Todavía no tenés seguidores';
+
+  @override
+  String get followListEmptyFollowing => 'Todavía no sigue a nadie';
+
+  @override
+  String get followListEmptyFollowingSelf => 'Todavía no seguís a nadie';
+
+  @override
+  String get followListLoadError =>
+      'No pudimos cargar la lista. Intentá de nuevo.';
+
+  @override
+  String get followListOpenFollowersA11y => 'Ver seguidores';
+
+  @override
+  String get followListOpenFollowingA11y => 'Ver seguidos';
 }

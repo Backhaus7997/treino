@@ -5936,6 +5936,60 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'No podés escribir en este chat'**
   String get chatBlockedComposerHintA11y;
+
+  /// Pill de la lista de seguidores en la pantalla de seguidores/seguidos.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SEGUIDORES'**
+  String get followListTabFollowers;
+
+  /// Pill de la lista de seguidos en la pantalla de seguidores/seguidos.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SIGUIENDO'**
+  String get followListTabFollowing;
+
+  /// Estado vacío de la lista de seguidores de otra persona.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no tiene seguidores'**
+  String get followListEmptyFollowers;
+
+  /// Estado vacío de la lista de seguidores propia.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no tenés seguidores'**
+  String get followListEmptyFollowersSelf;
+
+  /// Estado vacío de la lista de seguidos de otra persona.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no sigue a nadie'**
+  String get followListEmptyFollowing;
+
+  /// Estado vacío de la lista de seguidos propia.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no seguís a nadie'**
+  String get followListEmptyFollowingSelf;
+
+  /// Error al cargar la lista de seguidores o seguidos.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar la lista. Intentá de nuevo.'**
+  String get followListLoadError;
+
+  /// Semantics del contador de SEGUIDORES del perfil, que abre la lista.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver seguidores'**
+  String get followListOpenFollowersA11y;
+
+  /// Semantics del contador de SIGUIENDO del perfil, que abre la lista.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver seguidos'**
+  String get followListOpenFollowingA11y;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {
