@@ -43,6 +43,8 @@ import '../features/feed/presentation/post_detail_screen.dart';
 import '../features/notifications/presentation/notification_history_screen.dart';
 import '../features/profile/application/account_deletion_notifier.dart';
 import '../features/feed/presentation/public_profile_screen.dart';
+import '../features/feed/application/follow_list_providers.dart';
+import '../features/feed/presentation/follow_list_screen.dart';
 import '../features/feed/presentation/search_users_screen.dart';
 import '../features/home/home_screen.dart';
 import 'not_found_screen.dart';
@@ -630,6 +632,7 @@ GoRouter buildRouter({
                   final uid = state.pathParameters['uid']!;
                   return _withBg(PublicProfileScreen(targetUid: uid));
                 },
+                routes: [_followListRoute],
               ),
               GoRoute(
                 path: 'search',
@@ -672,6 +675,7 @@ GoRouter buildRouter({
                   final uid = state.pathParameters['uid']!;
                   return _withBg(PublicProfileScreen(targetUid: uid));
                 },
+                routes: [_followListRoute],
               ),
             ],
           ),
@@ -855,6 +859,27 @@ class _ReportPageRoute extends CupertinoPageRoute<void> {
 /// Use INSIDE the ShellRoute branches' GoRoute builders only; top-level
 /// routes (outside the shell) own their own Scaffold + background.
 Widget _withBg(Widget child) => AppBackground(child: child);
+
+/// Listas de SEGUIDORES / SEGUIDOS, colgada de `profile/:uid`.
+///
+/// Se registra bajo las DOS ramas donde vive el perfil público —`/feed` y
+/// `/home`— porque `_ShellScaffold` deriva la tab resaltada del prefijo de la
+/// ruta: registrarla sólo bajo `/feed` haría saltar la tab a FEED al abrir la
+/// lista desde INICIO, y el pop volvería al lugar equivocado. Mismo patrón de
+/// espejo que `friend-requests` y las rutas de plan/ejercicio de Coach
+/// (issue #387).
+///
+/// Colgarla del perfil en vez de ponerla al lado (`/feed/follows/:uid`) hace
+/// que volver atrás caiga en el perfil del que se salió, sin ruta especial.
+final GoRoute _followListRoute = GoRoute(
+  path: 'follows',
+  builder: (_, state) => _withBg(
+    FollowListScreen(
+      targetUid: state.pathParameters['uid']!,
+      initialKind: followListKindFromTab(state.uri.queryParameters['tab']),
+    ),
+  ),
+);
 
 /// Full-screen immersive wrapper for routes OUTSIDE the ShellRoute whose
 /// screen does NOT own a Scaffold (e.g. MyExercisesScreen / the custom

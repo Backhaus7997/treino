@@ -9,6 +9,7 @@ import '../../../l10n/app_l10n.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../chat/application/chat_providers.dart';
 import '../../workout/application/user_routines_providers.dart';
+import '../application/follow_list_providers.dart';
 import '../application/post_providers.dart';
 import '../application/public_profile_providers.dart';
 import '../domain/follow.dart';
@@ -132,11 +133,27 @@ class PublicProfileScreen extends ConsumerWidget {
                 ] else ...[
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
+                    // Los contadores abren las listas, como en Instagram. La
+                    // ruta se arma sobre `matchedLocation` y no sobre
+                    // '/feed/profile/...' fijo: este mismo screen está
+                    // registrado también bajo /home, y hardcodear /feed haría
+                    // saltar la tab resaltada a FEED al abrir la lista desde
+                    // INICIO (issue #387).
                     child: PublicProfileStatsRow(
                       workoutsCount: view.workoutsCount,
                       racha: view.racha,
                       followersCount: view.followersCount,
                       followingCount: view.followingCount,
+                      onFollowersTap: () => context.push(
+                        '${GoRouterState.of(context).matchedLocation}'
+                        '/follows?tab=${FollowListKind.followers.name}',
+                      ),
+                      onFollowingTap: () => context.push(
+                        '${GoRouterState.of(context).matchedLocation}'
+                        '/follows?tab=${FollowListKind.following.name}',
+                      ),
+                      followersSemanticsLabel: l10n.followListOpenFollowersA11y,
+                      followingSemanticsLabel: l10n.followListOpenFollowingA11y,
                     ),
                   ),
                   const SizedBox(height: 20),
