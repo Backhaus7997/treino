@@ -1,0 +1,9 @@
+Primera versión pública de TREINO.
+
+- Registro de series en tiempo real con control de descanso
+- Editor de rutinas por semanas y días
+- Evolución por ejercicio, volumen y medidas corporales
+- Coach: encontrá tu entrenador, recibí tu plan, chat y turnos
+- Feed y tablas por gimnasio
+
+Escribinos si algo no anda como esperabas.

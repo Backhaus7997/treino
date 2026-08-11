@@ -1,0 +1,11 @@
+English screenshots are intentionally absent.
+
+The app cannot render an English UI today: lib/app/locale_resolver.dart returns
+Locale('es','AR') unconditionally, because intl_en.arb is a codegen scaffold
+with empty values. Serving it renders blank strings (ADR-I18N-005).
+
+Screenshots in English are blocked on that i18n work, not on this directory.
+Once the app can render English, drop the PNGs here following the same device
+folders used under ../es/ and delete this file.
+
+See store/README.md.

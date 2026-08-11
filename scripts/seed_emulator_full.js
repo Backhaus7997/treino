@@ -109,11 +109,17 @@ function daysFromNow(n) {
 }
 
 // ── Gyms (subset — full set in seed_gyms.js) ────────────────────────────────
+//
+// Gym names MUST be fictional. This seed feeds the store screenshots
+// (see store/README.md), and a store listing is public forever — naming a real
+// commercial gym chain there is a trademark and reputation problem we cannot
+// undo. Street addresses are intentionally invented too.
+// Keep this constraint if you add gyms here.
 
 const GYMS = [
-  { id: 'seed-gym-baires-001', name: 'Megatlon Palermo', address: 'Av. Santa Fe 5025, Palermo', lat: -34.5786, lng: -58.4243 },
-  { id: 'seed-gym-baires-002', name: 'SmartFit Caballito', address: 'Av. Rivadavia 5050, Caballito', lat: -34.6189, lng: -58.4426 },
-  { id: 'seed-gym-cba-001', name: 'Megatlon Nueva Córdoba', address: 'Av. H. Yrigoyen 384, Nueva Córdoba', lat: -31.4189, lng: -64.1859 },
+  { id: 'seed-gym-baires-001', name: 'Iron House Palermo', address: 'Av. de los Ejemplos 1200, Palermo', lat: -34.5786, lng: -58.4243 },
+  { id: 'seed-gym-baires-002', name: 'Vector Fit Caballito', address: 'Av. Demostración 3400, Caballito', lat: -34.6189, lng: -58.4426 },
+  { id: 'seed-gym-cba-001', name: 'Iron House Nueva Córdoba', address: 'Av. Muestra 850, Nueva Córdoba', lat: -31.4189, lng: -64.1859 },
 ];
 
 // ── Coaches (trainers) ───────────────────────────────────────────────────────
@@ -131,7 +137,7 @@ const COACHES = [
     trainerSpecialty: 'powerlifting',
     lat: -34.5786, lng: -58.4243,
     trainerMonthlyRate: 45000,
-    paymentAlias: 'lautaro.perez.mp',
+    paymentAlias: 'demo.coach.uno',
     slotDurationMin: 60,
   },
   {
@@ -144,7 +150,7 @@ const COACHES = [
     trainerSpecialty: 'crossfit',
     lat: -34.6189, lng: -58.4426,
     trainerMonthlyRate: 38000,
-    paymentAlias: 'camila.ruiz.mp',
+    paymentAlias: 'demo.coach.dos',
     slotDurationMin: 60,
   },
   {
@@ -157,7 +163,7 @@ const COACHES = [
     trainerSpecialty: 'kinesiologia',
     lat: -34.5847, lng: -58.4321,
     trainerMonthlyRate: 52000,
-    paymentAlias: 'diego.aguirre.mp',
+    paymentAlias: 'demo.coach.tres',
     slotDurationMin: 90,
   },
 ];
@@ -693,7 +699,7 @@ const POSTS = [
     authorDisplayName: AUTHOR_META['seed-athlete-001'].displayName,
     authorAvatarUrl: null,
     authorGymId: 'seed-gym-baires-001',
-    text: 'El rack 3 de Megatlon Palermo va a hacer que algún día me lastime. Alguien que hable con administración.',
+    text: 'Consejo para los que entrenan temprano en Iron House: el rack del fondo es el único que queda libre a las 7 AM.',
     routineTag: null,
     privacy: 'gym',
     createdAt: daysAgo(4),
@@ -715,7 +721,7 @@ const POSTS = [
     authorDisplayName: AUTHOR_META['seed-athlete-004'].displayName,
     authorAvatarUrl: null,
     authorGymId: 'seed-gym-baires-002',
-    text: 'SmartFit Caballito renovó las cintas. Finalmente.',
+    text: 'Vector Fit renovó las cintas. Finalmente.',
     routineTag: null,
     privacy: 'gym',
     createdAt: daysAgo(6),

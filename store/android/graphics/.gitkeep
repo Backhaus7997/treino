@@ -1,0 +1,8 @@
+Play Store graphic assets go here:
+
+  feature-graphic.png  1024x500, no alpha channel
+  icon-512.png         512x512, 32-bit PNG with alpha
+
+Generate icon-512.png from assets/icon/app_icon.png (the same source
+flutter_launcher_icons uses) so the store icon and the installed app icon
+never drift apart. See store/README.md.

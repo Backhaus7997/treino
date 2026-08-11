@@ -1,0 +1,9 @@
+First public release of TREINO.
+
+- Real-time set logging with rest timer
+- Routine editor organized by weeks and days
+- Per-exercise progression, volume and body measurements
+- Coach: find your trainer, get your plan, chat and appointments
+- Feed and per-gym leaderboards
+
+Let us know if anything does not work the way you expected.
