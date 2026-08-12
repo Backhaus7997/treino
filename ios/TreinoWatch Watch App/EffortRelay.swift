@@ -60,6 +60,10 @@ final class EffortRelay {
         do {
             try WCSession.default.updateApplicationContext(actual.context(measuredAt: measuredAt))
             last = (actual, now)
+            // Se loguea el EXITO y no solo el fallo: sin esto, verificar el
+            // relay de punta a punta es a ciegas — si el telefono no muestra
+            // nada no se sabe si el reloj no mando o si el telefono no recibio.
+            log.notice("Esfuerzo publicado al telefono: bpm \(bpm ?? -1), kcal \(kcal ?? -1)")
         } catch {
             // Que el telefono no reciba el dato no es un problema del entreno.
             // Se loguea y se sigue; el proximo intento lo reintenta solo.

@@ -2664,7 +2664,7 @@ class _WatchEffortRow extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (display.bpm != null) ...[
-                Icon(TreinoIcon.heartRate, size: 12, color: palette.highlight),
+                Icon(TreinoIcon.heartRate, size: 12, color: palette.reactionLike),
                 const SizedBox(width: 4),
                 Text(
                   '${display.bpm}',
@@ -2678,7 +2678,7 @@ class _WatchEffortRow extends ConsumerWidget {
               if (display.bpm != null && display.kcal != null)
                 const SizedBox(width: 12),
               if (display.kcal != null) ...[
-                Icon(TreinoIcon.calories, size: 12, color: palette.highlight),
+                Icon(TreinoIcon.calories, size: 12, color: palette.reactionFire),
                 const SizedBox(width: 4),
                 Text(
                   '${display.kcal} kcal',
