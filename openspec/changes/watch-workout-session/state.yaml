@@ -161,6 +161,52 @@ fases_de_implementacion:
       - El timestamp sale de LA MUESTRA, no de `Date()`. Fecharla al recibirla
         la haria pasar por mas fresca de lo que es y la regla de antiguedad
         dejaria de servir.
+  F4_el_esfuerzo_tambien_en_el_telefono:
+    estado: HECHA — verificada corriendo de punta a punta
+    que_es: |
+      Un AGREGADO, pedido por el dueño: si el atleta agarra el celular a mitad
+      de entreno, sus pulsaciones y calorias tambien estan ahi, al lado del
+      tiempo. Sin reloj conectado la pantalla queda exactamente como estaba.
+    NO_VIOLA_D1: |
+      D1 dice que el ritmo cardiaco vive en pantalla y en Salud, y que el ciclo
+      NO TOCA FIRESTORE. No lo toca: el dato viaja del reloj al telefono por
+      WatchConnectivity, se muestra en vivo y muere cuando termina el entreno.
+
+      Y para Apple tampoco es "collect" —transmitir datos FUERA del dispositivo
+      de forma que el desarrollador pueda accederlos—: nunca sale de los
+      dispositivos del atleta hacia un servidor nuestro. CERO declaraciones de
+      privacidad nuevas.
+
+      Si algun dia esto se guarda en Firestore, las dos cosas dejan de ser
+      ciertas en el acto. Eso es otro ciclo y arranca por una decision de
+      privacidad, no por codigo.
+    verificado_corriendo: |
+      reloj:    "Esfuerzo publicado al telefono: bpm 62, kcal 0" — 71 envios
+      telefono: 00:50 con ♥63, y un minuto despues 01:53 con ♥64
+
+      El dato viaja, se muestra al lado del tiempo y se actualiza en vivo. El
+      throttle tambien se ve: 71 envios espaciados, no uno por muestra.
+    la_caducidad_es_distinta_a_la_del_reloj: |
+      45 segundos en el telefono contra 15 en el reloj, y a proposito.
+
+      En el reloj las calorias NO caducan: son acumuladas y siguen siendo
+      verdad. En el telefono el dato viene RELAYADO, asi que su antiguedad mide
+      otra cosa — si hace 45s que no llega nada, lo mas probable es que el
+      vinculo este muerto. Mostrar calorias congeladas ahi sugiere una conexion
+      viva que no existe.
+
+      Los 45s salen de la latencia medida de WatchConnectivity: entre 2,0s y
+      24,4s segun la carga. Un umbral apretado descartaria datos buenos porque
+      el telefono estaba ocupado.
+    por_que_updateApplicationContext: |
+      `sendMessage` exige alcanzabilidad AHORA y sirve para un aviso puntual que
+      se puede perder. El contexto es estado "actual": el sistema lo COLAPSA
+      quedandose con el ultimo valor, que es exactamente lo que se quiere para
+      "a cuanto esta el pulso ahora".
+
+      Es la misma distincion que ya documentaba `watch_nudge_service.dart` para
+      el sentido inverso.
+
   F3_duracion_y_escritura_en_salud:
     estado: HECHA — verificada corriendo en simulador
     verificado_corriendo: |
