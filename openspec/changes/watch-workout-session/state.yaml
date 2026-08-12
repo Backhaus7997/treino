@@ -44,7 +44,23 @@ fases_de_implementacion:
       queda pendiente de una muñeca real esta anotado en Q1 (provisioning) y en
       lo_que_NO_esta_verificado de Q3.
   F1_la_sesion_de_entrenamiento:
-    estado: en curso
+    estado: HECHA — verificada corriendo, con control negativo
+    cierre_verificado_corriendo: |
+      El criterio era: el descanso sobrevive a bajar la muñeca. Medido:
+
+        banner en T0 ............ 145s
+        segundos reales T0->T1 ... 72
+        banner al volver ........  73s
+        conto ................... 72s
+        PERDIO ..................  0s
+
+      Y vuelve a romperse al sacar el arreglo: comentando UNA linea —la
+      inyeccion de `workoutSession`— y dejando el background mode puesto, la
+      perdida vuelve a 50s en 56. Entre verde y rojo hay una sola linea.
+
+      Ciclo completo visto en el log: una abierta, transicion a running, una
+      cerrada al terminar. Y por los tres caminos de entrada se abre
+      EXACTAMENTE UNA.
     medicion_1_abrir_la_sesion_NO_ALCANZA: |
       RESULTADO NEGATIVO, medido en el par propio (F0-Watch 0F83477D).
 
@@ -121,8 +137,52 @@ fases_de_implementacion:
 
       Verificar el timestamp del binario instalado antes de creerle a una
       medicion, siempre.
-  F2_ritmo_cardiaco_en_vivo: pendiente
-  F3_duracion_y_escritura_en_salud: pendiente
+  F2_ritmo_cardiaco_en_vivo:
+    estado: HECHA — verificada corriendo en simulador, incluido el numero
+    verificado_corriendo: |
+      El ritmo cardiaco se vio EN PANTALLA, actualizandose:
+      64 -> 61 -> 59 -> 56 -> 62 lpm. Ver la correccion en
+      `riesgo_que_define_el_ciclo`: el simulador SI genera pulsaciones.
+    la_regla_que_mas_importa: |
+      Cuando no hay dato no se dibuja NADA. Ni un guion, ni un cero, ni "sin
+      permiso".
+
+      No es minimalismo. Una lectura negada por el atleta es indistinguible de
+      "todavia no hay datos" (medido en F0: las dos dan query exitosa con cero
+      muestras). La app no puede saber cual de las dos es, asi que no puede
+      afirmar ninguna.
+
+      Y una lectura VIEJA tampoco se muestra: el sensor se corta seguido en un
+      entreno real, y dejar el ultimo numero conocido seria mentirle al atleta
+      sobre su esfuerzo justo cuando mas lo mira. Corte: 15s, tres muestras al
+      ritmo de ~5s del reloj.
+    dos_detalles_no_cosmeticos: |
+      - Se lee la estadistica MAS RECIENTE, no el promedio.
+      - El timestamp sale de LA MUESTRA, no de `Date()`. Fecharla al recibirla
+        la haria pasar por mas fresca de lo que es y la regla de antiguedad
+        dejaria de servir.
+  F3_duracion_y_escritura_en_salud:
+    estado: HECHA — verificada corriendo en simulador
+    verificado_corriendo: |
+      Duracion 2 min, origen medida
+      Entreno escrito en Salud, duracion 128.703213s
+      durationMin persistido en Firestore: 2
+    por_que_hizo_falta_loguear_el_ORIGEN: |
+      Medicion y reloj de pared COINCIDEN en el caso normal, asi que el numero
+      solo no distingue si la medicion se uso o si se cayo al respaldo en
+      silencio. Sin ese log D4 es inverificable corriendo.
+
+      No es teorico: la primera lectura de esta fase parecia mostrar que habia
+      caido al respaldo (durationMin=16 contra 352s medidos), hasta que se vio
+      que la sesion inspeccionada era la ANTERIOR, hecha con el build de F1 sin
+      F3. Verificar SIEMPRE que el dato que se mira sea del build que se probo.
+    techo_de_8_horas: |
+      Va un paso mas alla de D4, deliberado: sin el, el MISMO entreno persistia
+      una duracion distinta segun que dispositivo lo terminara.
+
+      El telefono ademas RECUPERA la duracion real desde los timestamps de las
+      series cuando se pasa del techo (session_duration.dart). Eso NO esta
+      portado — el reloj solo acota. Asimetria conocida, no un olvido.
 
 phases:
   explore: done
@@ -190,15 +250,31 @@ hallazgos_medidos:
     explicitamente fuera de alcance (watch-standalone-client/proposal.md:38).
 
 riesgo_que_define_el_ciclo: |
-  EL SIMULADOR NO GENERA RITMO CARDIACO.
+  ❌ ESTE RIESGO ERA FALSO. Se midio en F2 y no existe.
 
-  Todo el ciclo anterior se verifico en simulador y funciono. Aca eso se
-  termina: hace falta un Apple Watch REAL en la muñeca.
+  Decia: "EL SIMULADOR NO GENERA RITMO CARDIACO. Todo el ciclo anterior se
+  verifico en simulador y funciono; aca eso se termina, hace falta un Apple
+  Watch REAL en la muñeca."
 
-  Por eso las fases estan ordenadas por VERIFICABILIDAD y no por dependencia
-  tecnica: F1 entrega el arreglo importante —que el descanso sobreviva— y se
-  puede probar sin pulsaciones. F2 y F3 se agrupan para un unico smoke en
-  hardware en vez de quedar bloqueadas de a una.
+  MEDIDO: el simulador de watchOS 26.2 SI genera ritmo cardiaco sintetico
+  durante una HKWorkoutSession. Se vio actualizandose en la pantalla de
+  entreno: 64 -> 61 -> 59 -> 56 -> 62 lpm.
+
+  Las tres fases resultaron verificables en simulador, incluida F2. No queda
+  NADA del ciclo esperando hardware.
+
+  Por que se creyo lo contrario: la sonda de F0 leyo `builder.statistics` a los
+  pocos segundos de `beginCollection` y encontro un HKStatistics vacio. La
+  conclusion "no hay datos" era prematura — los datos llegan despues, por el
+  delegate. Un objeto vacio leido temprano no prueba que no vaya a haber nada.
+
+  Lo que el ordenamiento por verificabilidad SI acerto: F1 entrego el arreglo
+  grande temprano. Pero la razon que se dio para ordenarlo asi no era cierta.
+
+  ⚠️ Ojo con el alcance de esta correccion: el simulador prueba la CAÑERIA
+  —sesion, builder, delegate, pantalla— con datos sinteticos. No prueba que un
+  sensor real enganche en una muñeca real. El smoke en hardware sigue teniendo
+  sentido; lo que ya no tiene es BLOQUEAR nada esperandolo.
 
 preguntas_abiertas_para_F0: RESPONDIDAS — ver respuestas_de_F0
 
@@ -228,8 +304,12 @@ respuestas_de_F0:
     quien_lo_destraba: |
       La firma es automatica (CODE_SIGN_STYLE = Automatic, DEVELOPMENT_TEAM =
       J66AQRRM96), asi que Xcode genera el perfil solo — PERO antes tiene que
-      habilitar la capability HealthKit en el App ID del portal, y eso pide una
-      cuenta con rol Admin o App Manager.
+      habilitar la capability HealthKit en el App ID del portal.
+
+      CORRECCION: se habia anotado que eso pedia rol Admin o App Manager. La
+      cuenta del dueño es INDIVIDUAL (visto en Xcode > Signing & Capabilities,
+      Team "Martin Backhaus (Individual)"), asi que es el titular y no necesita
+      permiso de nadie. El tramite es solo suyo, no de un tercero.
     limite: |
       NO VERIFICABLE desde esta sesion: hace falta la cuenta de Apple Developer.
       Es lo primero que hay que destrabar antes de cualquier prueba en hardware,

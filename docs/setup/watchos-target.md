@@ -82,10 +82,15 @@ Es Flutter.
 
 ## 🔑 Destrabar el provisioning del reloj para HealthKit
 
-**Prerequisito manual. Necesita la cuenta de Apple Developer con rol Admin o
-App Manager — no es automatizable desde un agente ni desde CI.** Bloquea probar
-en un Apple Watch real (F2 del change `watch-workout-session`), pero **no**
-bloquea escribir ni mergear el código.
+**Prerequisito manual: hay que tocar el portal de Apple Developer — no es
+automatizable desde un agente ni desde CI.** Bloquea probar en un Apple Watch
+real, pero **no** bloquea escribir, verificar ni mergear el código: las tres
+fases del change `watch-workout-session` se verificaron en simulador, incluido
+el ritmo cardíaco.
+
+La cuenta es **Individual** (visto en Xcode → Signing & Capabilities, Team
+"Martin Backhaus (Individual)"), así que el titular puede hacerlo solo: no hay
+que pedirle permiso a ningún Admin.
 
 ### El estado de partida, medido
 
