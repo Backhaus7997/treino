@@ -1304,6 +1304,55 @@ class AppL10nEn extends AppL10n {
       'No pudimos cancelar la cuenta. Probá de nuevo.';
 
   @override
+  String onboardingStepLabel(int current, int total) {
+    return 'STEP $current OF $total';
+  }
+
+  @override
+  String get onboardingSkipCta => 'Skip';
+
+  @override
+  String get onboardingNextCta => 'NEXT';
+
+  @override
+  String get onboardingFinishCta => 'START';
+
+  @override
+  String get onboardingSaveError =>
+      'We couldn\'t save that you\'ve seen this. We may show it again.';
+
+  @override
+  String get onboardingAthleteTrainTitle => 'TRAIN';
+
+  @override
+  String get onboardingAthleteTrainBody =>
+      'It all starts on the Train tab. That\'s where you\'ll find the routine your coach built for you, ready-made templates to copy, and the routines you create yourself.';
+
+  @override
+  String get onboardingAthleteProgressTitle => 'YOUR PROGRESS';
+
+  @override
+  String get onboardingAthleteProgressBody =>
+      'Every set you log lands in your history and feeds your stats. Volume, streak and records are calculated for you; body measurements are yours to log.';
+
+  @override
+  String get onboardingAthleteCoachTitle => 'YOUR COACH';
+
+  @override
+  String get onboardingAthleteCoachBody =>
+      'The Coach tab is where you find and hire a trainer. Your history is yours: until you share a session or your profile, your coach sees nothing.';
+
+  @override
+  String get onboardingAthleteCommunityTitle => 'COMMUNITY';
+
+  @override
+  String get onboardingAthleteCommunityBody =>
+      'The Feed is social: you post your workouts only if you want to. Your gym\'s rankings are opt-in — you don\'t show up on the board until you turn them on.';
+
+  @override
+  String get onboardingAthleteCommunityRankingsCta => 'Turn on rankings';
+
+  @override
   String get reAuthPasswordLabel => 'Contraseña';
 
   @override

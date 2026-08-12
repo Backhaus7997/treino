@@ -17,6 +17,8 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
+import 'package:treino/features/onboarding/domain/onboarding_seen.dart';
+import 'package:treino/features/onboarding/domain/onboarding_surface.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/workout/application/exercise_progression_providers.dart';
@@ -48,6 +50,11 @@ UserProfile _profile() => UserProfile(
       role: UserRole.athlete,
       createdAt: _kDate,
       updatedAt: _kDate,
+      // #627: alumno que YA vio el tour de onboarding. Sin esto el gate de
+      // authRedirect lo manda a /onboarding/athlete.
+      onboardingSeen: OnboardingSeen.empty.markSeen(
+        OnboardingSurface.athleteMobile,
+      ),
     );
 
 void main() {
