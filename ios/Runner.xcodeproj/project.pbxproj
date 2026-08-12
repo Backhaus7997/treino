@@ -556,6 +556,7 @@
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "TreinoWatch-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = TreinoWatch;
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "TREINO usa tu ritmo cardíaco para mostrarte el esfuerzo en vivo mientras entrenás.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "TREINO guarda tus entrenamientos en Salud para que cuenten en tus anillos y en tu historial.";
@@ -606,6 +607,7 @@
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "TreinoWatch-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = TreinoWatch;
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "TREINO usa tu ritmo cardíaco para mostrarte el esfuerzo en vivo mientras entrenás.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "TREINO guarda tus entrenamientos en Salud para que cuenten en tus anillos y en tu historial.";
@@ -653,6 +655,7 @@
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "TreinoWatch-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = TreinoWatch;
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "TREINO usa tu ritmo cardíaco para mostrarte el esfuerzo en vivo mientras entrenás.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "TREINO guarda tus entrenamientos en Salud para que cuenten en tus anillos y en tu historial.";

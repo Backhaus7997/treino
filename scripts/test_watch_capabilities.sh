@@ -41,6 +41,9 @@ ENTITLEMENTS="${REPO_ROOT}/ios/TreinoWatch Watch App/TreinoWatch Watch App.entit
 # Ruta relativa al .xcodeproj, que es como la escribe Xcode en el pbxproj.
 ENTITLEMENTS_REL="TreinoWatch Watch App/TreinoWatch Watch App.entitlements"
 
+INFOPLIST="${REPO_ROOT}/ios/TreinoWatch-Info.plist"
+INFOPLIST_REL="TreinoWatch-Info.plist"
+
 # El target del reloj es el UNICO que declara app companion. Sirve de ancla
 # para encontrar sus configuraciones sin clavar UUIDs, que cambian.
 WATCH_MARKER="INFOPLIST_KEY_WKCompanionAppBundleIdentifier"
@@ -83,6 +86,54 @@ PY
     True)     pass "com.apple.developer.healthkit = true" ;;
     *)        fail "com.apple.developer.healthkit no esta en true (esta: ${healthkit})" ;;
   esac
+fi
+
+# --- 1b. El background mode de entrenamiento ---------------------------------
+#
+# Sin `WKBackgroundModes = workout-processing` el reloj se suspende al bajar la
+# muñeca AUNQUE haya una HKWorkoutSession abierta, y el descanso muere.
+#
+# Esto NO es teoria, esta medido con las cuatro combinaciones (F1):
+#
+#   ni sesion ni background mode ........ perdio 57s en 84 reales
+#   sesion abierta, SIN background mode .. perdio 53s en 62
+#   background mode, SIN sesion .......... perdio 50s en 56
+#   sesion + background mode ............. perdio  1s en 58
+#
+# Los dos son necesarios y ninguno alcanza solo. Por eso el guard cubre los dos:
+# perder cualquiera de los dos devuelve el bug, y sin sintoma visible.
+
+echo
+echo "Background mode de entrenamiento"
+
+if [[ ! -f "${INFOPLIST}" ]]; then
+  fail "no existe ${INFOPLIST_REL}"
+else
+  pass "existe ${INFOPLIST_REL}"
+
+  modes="$(python3 - "${INFOPLIST}" <<'PY' 2>/dev/null || echo "ILEGIBLE"
+import plistlib, sys
+try:
+    with open(sys.argv[1], "rb") as f:
+        print(",".join(plistlib.load(f).get("WKBackgroundModes", [])))
+except Exception:
+    print("ILEGIBLE")
+PY
+)"
+  case "${modes}" in
+    ILEGIBLE)            fail "${INFOPLIST_REL} no es un plist valido" ;;
+    *workout-processing*) pass "WKBackgroundModes incluye workout-processing" ;;
+    *)                   fail "WKBackgroundModes no incluye workout-processing (esta: '${modes}')" ;;
+  esac
+fi
+
+# Y que las TRES configuraciones lo enganchen: un Info.plist que no esta
+# referenciado no llega al bundle, y el sintoma seria identico a no tenerlo.
+infoplist_refs="$(grep -c "INFOPLIST_FILE = \"${INFOPLIST_REL}\"" "${PBXPROJ}" || true)"
+if [[ "${infoplist_refs}" -ne "${EXPECTED_CONFIGS}" ]]; then
+  fail "INFOPLIST_FILE apunta a ${INFOPLIST_REL} en ${infoplist_refs} configuraciones, se esperaban ${EXPECTED_CONFIGS}"
+else
+  pass "las ${EXPECTED_CONFIGS} configuraciones enganchan ${INFOPLIST_REL}"
 fi
 
 # --- 2. Las configuraciones del target del reloj -----------------------------

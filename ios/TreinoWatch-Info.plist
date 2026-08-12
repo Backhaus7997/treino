@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  El target sigue con GENERATE_INFOPLIST_FILE = YES: Xcode fusiona este
+	  archivo con las claves que genera (bundle id, version, display name,
+	  WKCompanionAppBundleIdentifier y los textos de permiso, que viven como
+	  INFOPLIST_KEY_* en project.pbxproj).
+
+	  Este archivo existe SOLO porque WKBackgroundModes no tiene equivalente
+	  INFOPLIST_KEY_ — se busco en las specs de Xcode y no esta. Todo lo demas
+	  se sigue declarando en el pbxproj.
+
+	  ⚠️ VIVE ACA Y NO ADENTRO DE "TreinoWatch Watch App/" a proposito. Esa
+	  carpeta es un PBXFileSystemSynchronizedRootGroup: todo lo que cae adentro
+	  se agrega al target, y un Info.plist ahi se COPIA como recurso ADEMAS de
+	  procesarse como Info.plist. El build falla con "Multiple commands produce
+	  ... /Info.plist". Medido, no supuesto.
+	-->
+	<key>WKBackgroundModes</key>
+	<array>
+		<!--
+		  Le declara al sistema que la app procesa entrenamientos. Es lo que
+		  permite que siga corriendo con la muñeca abajo mientras hay una
+		  HKWorkoutSession abierta.
+
+		  Change watch-workout-session, F1. Medido: con la sesion abierta pero
+		  SIN esta declaracion, el descanso seguia perdiendo 53 segundos en 62
+		  de reloj de pared. Abrir la sesion no alcanza.
+		-->
+		<string>workout-processing</string>
+	</array>
+</dict>
+</plist>
