@@ -230,7 +230,15 @@ void main() {
         routine: routine,
       ));
       await _settle(tester);
-      expect(find.byType(ExerciseSlotRow), findsNWidgets(2));
+      // `skipOffstage: false`: the start action is pinned to the bottom since
+      // #641, so the exercise list runs in a shorter viewport and the second
+      // slot sits below the fold on the test surface. The assert is about list
+      // COMPOSITION (every slot rendered, no presence filter), not about what
+      // happens to be on screen.
+      expect(
+        find.byType(ExerciseSlotRow, skipOffstage: false),
+        findsNWidgets(2),
+      );
     });
 
     // Fix 3 — REQ-PERIOD-042 "ANY day startable" on single-week plan
@@ -522,8 +530,13 @@ void main() {
       ));
       await _settle(tester);
 
-      // Both slots must render — no filtering on single-week plan
-      expect(find.byType(ExerciseSlotRow), findsNWidgets(2));
+      // Both slots must render — no filtering on single-week plan.
+      // `skipOffstage: false` since #641 pinned the start action (see the
+      // SCENARIO-038 note above).
+      expect(
+        find.byType(ExerciseSlotRow, skipOffstage: false),
+        findsNWidgets(2),
+      );
     });
   });
 

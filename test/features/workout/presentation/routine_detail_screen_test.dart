@@ -45,6 +45,20 @@ Widget _wrapWithOverrides(Widget w, List<Override> overrides) => ProviderScope(
       ),
     );
 
+/// A tall viewport mounts every slot so composition asserts see them all.
+///
+/// Needed since #641 pinned the start action to the bottom: the exercise list
+/// lost that height from its viewport, and on the default 800x600 surface the
+/// 4th slot of a 4-slot day falls outside the sliver's build range entirely —
+/// so not even `skipOffstage: false` reaches it. Same helper the sibling
+/// `exercise_detail_screen_test.dart` uses for the same reason.
+void _useTallViewport(WidgetTester tester) {
+  tester.view.physicalSize = const Size(800, 2400);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+}
+
 RoutineSlot _makeSlot({
   String exerciseId = 'bench-press',
   String exerciseName = 'Bench Press',
@@ -87,6 +101,7 @@ Routine _makeRoutine({
   String? imageUrl,
   String? assignedBy,
   String? createdBy,
+  int numWeeks = 1,
 }) =>
     Routine(
       id: id,
@@ -97,6 +112,7 @@ Routine _makeRoutine({
       imageUrl: imageUrl,
       assignedBy: assignedBy,
       createdBy: createdBy,
+      numWeeks: numWeeks,
     );
 
 void main() {
@@ -138,7 +154,10 @@ void main() {
           ]),
         );
         await tester.pump(const Duration(milliseconds: 50));
-        expect(find.byType(ExerciseSlotRow), findsNWidgets(2));
+        expect(
+          find.byType(ExerciseSlotRow, skipOffstage: false),
+          findsNWidgets(2),
+        );
       },
     );
 
@@ -332,6 +351,7 @@ void main() {
     testWidgets(
       'SCENARIO-086: EJERCICIOS header + 4 ExerciseSlotRow for 4-slot day',
       (tester) async {
+        _useTallViewport(tester);
         final day = _makeDay(slots: List.generate(4, (_) => _makeSlot()));
         await tester.pumpWidget(
           _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
@@ -384,7 +404,11 @@ void main() {
         );
         await tester.pump(const Duration(milliseconds: 50));
         // The block header appears exactly once for the two grouped slots.
-        expect(find.text('SUPERSERIE'), findsOneWidget);
+        // `skipOffstage: false`: the start action is pinned to the bottom
+        // since #641, so the exercise list sits in a shorter viewport and the
+        // block scrolls below the fold in the test surface. This asserts list
+        // COMPOSITION, not what happens to be on screen.
+        expect(find.text('SUPERSERIE', skipOffstage: false), findsOneWidget);
         // Both exercises still render as their normal cards inside the block.
         expect(
           find.byType(ExerciseSlotRow, skipOffstage: false),
@@ -423,6 +447,7 @@ void main() {
       'SCENARIO-562: mixed day (standalone + superset) keeps every slot '
       'rendered as an ExerciseSlotRow',
       (tester) async {
+        _useTallViewport(tester);
         final day = _makeDay(
           slots: [
             _makeSlot(exerciseId: 'warmup'), // standalone #1
@@ -439,7 +464,7 @@ void main() {
           ]),
         );
         await tester.pump(const Duration(milliseconds: 50));
-        expect(find.text('SUPERSERIE'), findsOneWidget);
+        expect(find.text('SUPERSERIE', skipOffstage: false), findsOneWidget);
         expect(
           find.byType(ExerciseSlotRow, skipOffstage: false),
           findsNWidgets(4),
@@ -503,6 +528,126 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('EMPEZAR'), findsOneWidget);
+    });
+
+    // ── #641 — reaching the start action must never depend on scrolling ────
+    //
+    // 5/5 usability participants failed to reach EMPEZAR while it lived at the
+    // end of the exercise list, under a 320px hero and every slot of the day.
+    // These assert the property that actually broke, which `skipOffstage:
+    // false` would happily hide: the action is ON SCREEN, unscrolled, on a day
+    // long enough to have buried it before.
+    group('#641 — pinned start action', () {
+      Widget longDayScreen({int numWeeks = 1}) => _wrapWithOverrides(
+            const RoutineDetailScreen(routineId: 'test-id'),
+            [
+              routineByIdStreamProvider('test-id').overrideWith(
+                (ref) => Stream.value(
+                  _makeRoutine(
+                    days: [
+                      _makeDay(slots: List.generate(12, (_) => _makeSlot())),
+                    ],
+                    numWeeks: numWeeks,
+                  ),
+                ),
+              ),
+              userProfileProvider.overrideWith(
+                (ref) => Stream.value(_profile(UserRole.athlete)),
+              ),
+            ],
+          );
+
+      testWidgets('single-week: the action is on screen without scrolling', (
+        tester,
+      ) async {
+        await tester.pumpWidget(longDayScreen());
+        await tester.pumpAndSettle();
+
+        // No `skipOffstage: false` on purpose — being on stage IS the assert.
+        final action = find.widgetWithText(ElevatedButton, 'EMPEZAR');
+        expect(action, findsOneWidget);
+
+        final actionRect = tester.getRect(action);
+        final screenRect = tester.getRect(find.byType(MaterialApp));
+        expect(
+          screenRect.contains(actionRect.topLeft) &&
+              screenRect.contains(actionRect.bottomRight - const Offset(1, 1)),
+          isTrue,
+          reason: 'the action must sit inside the viewport, unscrolled',
+        );
+      });
+
+      testWidgets(
+        'periodized: the action is on screen without scrolling even while '
+        'plan progress is unresolved',
+        (tester) async {
+          await tester.pumpWidget(longDayScreen(numWeeks: 3));
+          await tester.pump(const Duration(milliseconds: 50));
+
+          // Unknown progress degrades to the EMPEZAR label, never to a blank
+          // reserved slot (#497) and never to REPETIR.
+          expect(
+            find.widgetWithText(ElevatedButton, 'EMPEZAR'),
+            findsOneWidget,
+          );
+          expect(find.text('REPETIR'), findsNothing);
+        },
+      );
+
+      testWidgets(
+        'the list area and the action are disjoint — nothing can scroll '
+        'underneath the bar',
+        (tester) async {
+          await tester.pumpWidget(longDayScreen());
+          await tester.pumpAndSettle();
+
+          // The guarantee of Column + Expanded: the scroll viewport ENDS where
+          // the bar begins, so no exercise can ever end up behind it. A Stack +
+          // Positioned bar would satisfy every other assert in this group and
+          // still fail here whenever the reserved bottom inset drifts out of
+          // sync with the bar's real height — which is exactly what happens at
+          // large text scale.
+          final viewport = tester.getRect(find.byType(CustomScrollView));
+          final action =
+              tester.getRect(find.widgetWithText(ElevatedButton, 'EMPEZAR'));
+          expect(
+            viewport.overlaps(action),
+            isFalse,
+            reason: 'the pinned action must never overlap the exercise list',
+          );
+        },
+      );
+
+      testWidgets(
+        'at large text scale the bar grows and the list yields — they stay '
+        'disjoint and the action stays on screen',
+        (tester) async {
+          tester.platformDispatcher.textScaleFactorTestValue = 2.0;
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+          await tester.pumpWidget(longDayScreen());
+          await tester.pumpAndSettle();
+
+          final action = find.widgetWithText(ElevatedButton, 'EMPEZAR');
+          expect(action, findsOneWidget);
+
+          final actionRect = tester.getRect(action);
+          final viewport = tester.getRect(find.byType(CustomScrollView));
+          final screen = tester.getRect(find.byType(MaterialApp));
+
+          expect(
+            viewport.overlaps(actionRect),
+            isFalse,
+            reason: 'a taller button must take height FROM the list, not '
+                'overlap it — the failure mode of a hardcoded bottom inset',
+          );
+          expect(
+            actionRect.bottom,
+            lessThanOrEqualTo(screen.bottom),
+            reason: 'the action must not be pushed off the bottom edge',
+          );
+        },
+      );
     });
 
     testWidgets(
@@ -993,7 +1138,7 @@ void main() {
 
         // Both slots must render — no filtering on single-week plan
         expect(
-          find.byType(ExerciseSlotRow),
+          find.byType(ExerciseSlotRow, skipOffstage: false),
           findsNWidgets(2),
           reason: 'Single-week plan: all slots rendered, no filter',
         );
