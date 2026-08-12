@@ -273,6 +273,35 @@
   "workoutSnackShareSuccess": "¡Post compartido!",
   "workoutSnackShareError": "No pudimos compartir tu post. Intentá de nuevo.",
   "workoutPostAutoCompleteText": "¡Terminé mi entreno! 💪",
+  "wellbeingCheckInTitle": "¿CÓMO TE SENTISTE?",
+  "@wellbeingCheckInTitle": {
+    "description": "Title of the skippable post-session check-in step, and of the sheet it opens. Asks how the athlete felt — subjective, never a performance metric."
+  },
+  "wellbeingCheckInOptional": "Opcional. Podés saltearlo.",
+  "@wellbeingCheckInOptional": {
+    "description": "Reassures that the check-in is skippable at no cost. The post-session moment is when the user wants to leave."
+  },
+  "wellbeingFeelingVeryBad": "Muy mal",
+  "wellbeingFeelingBad": "Mal",
+  "wellbeingFeelingNeutral": "Normal",
+  "wellbeingFeelingGood": "Bien",
+  "wellbeingFeelingGreat": "Muy bien",
+  "wellbeingPainQuestion": "¿Tuviste dolor o molestia?",
+  "wellbeingPainYes": "SÍ",
+  "wellbeingPainNo": "NO",
+  "wellbeingPainAreasQuestion": "¿En qué zona?",
+  "wellbeingPainAreasHint": "Podés marcar más de una.",
+  "wellbeingNoteLabel": "Nota (opcional)",
+  "wellbeingNoteHint": "Algo que quieras recordar de hoy",
+  "wellbeingMedicalDisclaimer": "Si el dolor persiste, consultá a un profesional de la salud.",
+  "@wellbeingMedicalDisclaimer": {
+    "description": "Neutral note shown only when the athlete reports pain. The app records, it never interprets: this copy must not diagnose, recommend or condition any app behaviour on the answer."
+  },
+  "wellbeingSaveButton": "GUARDAR",
+  "wellbeingSkipButton": "AHORA NO",
+  "wellbeingSavedLabel": "REGISTRADO",
+  "wellbeingEditButton": "Editar",
+  "wellbeingSaveError": "No pudimos guardar tu registro. Probá de nuevo.",
   "shareWorkoutComposerTitle": "COMPARTIR ENTRENO",
   "@shareWorkoutComposerTitle": {
     "description": "Header title of the share-a-workout composer screen, opened from the COMPARTIR button of the post-workout summary."
