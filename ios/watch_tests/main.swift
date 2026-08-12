@@ -509,6 +509,7 @@ runHeartRateDisplay()
 runHeartRateRounding()
 runActiveEnergyDisplay()
 runWorkoutDuration()
+runEffortBroadcast()
 
 if failures.isEmpty {
     print("OK: \(totalChecks) chequeos de la logica de permisos de Salud")
@@ -520,3 +521,65 @@ for failure in failures {
     print("  ✗ \(failure)")
 }
 exit(1)
+
+// MARK: - Cuando el reloj le manda el esfuerzo al telefono (F4)
+//
+// El reloj recolecta pulsaciones cada ~5 segundos. Mandar cada muestra por
+// WatchConnectivity seria despertar al telefono decenas de veces por entreno
+// para nada: el atleta mira la pantalla del celular de vez en cuando, no
+// continuamente.
+//
+// Estas reglas deciden CUANDO vale la pena mandar. Son puras y se testean en el
+// host; el envio en si vive en `EffortRelay.swift`.
+
+private func runEffortBroadcast() {
+    let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+    let a = EffortSnapshot(bpm: 140, kcal: 50)
+    let b = EffortSnapshot(bpm: 145, kcal: 52)
+
+    // Primera vez: siempre se manda, no hay con que comparar.
+    check(
+        EffortBroadcastRules.shouldSend(last: nil, actual: a, now: t0),
+        "El primer dato siempre se manda"
+    )
+
+    // Muy seguido: no. El limite es del sistema tambien — updateApplicationContext
+    // esta rate-limited, y pasarse hace que descarte envios en silencio.
+    check(
+        !EffortBroadcastRules.shouldSend(
+            last: (a, t0), actual: b,
+            now: t0.addingTimeInterval(EffortBroadcastRules.minIntervalo - 1)
+        ),
+        "Antes del intervalo minimo no se manda, aunque el valor haya cambiado"
+    )
+
+    // Pasado el intervalo y con valor nuevo: se manda.
+    check(
+        EffortBroadcastRules.shouldSend(
+            last: (a, t0), actual: b,
+            now: t0.addingTimeInterval(EffortBroadcastRules.minIntervalo)
+        ),
+        "Pasado el intervalo, un valor nuevo se manda"
+    )
+
+    // Pasado el intervalo pero SIN cambio: no se manda.
+    //
+    // El telefono ya tiene ese dato y su regla de antiguedad es de 45s, asi que
+    // reenviar lo mismo no le agrega nada y le cuesta una activacion.
+    check(
+        !EffortBroadcastRules.shouldSend(
+            last: (a, t0), actual: a,
+            now: t0.addingTimeInterval(EffortBroadcastRules.minIntervalo * 10)
+        ),
+        "Un valor identico no se reenvia por mas que pase el tiempo"
+    )
+
+    // Un snapshot sin ninguna medicion no se manda: no hay nada que mostrar y
+    // el telefono ya sabe no dibujar nada.
+    check(
+        !EffortBroadcastRules.shouldSend(
+            last: nil, actual: EffortSnapshot(bpm: nil, kcal: nil), now: t0
+        ),
+        "Un snapshot vacio no se manda"
+    )
+}

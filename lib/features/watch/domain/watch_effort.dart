@@ -1,0 +1,167 @@
+/// Lo que el reloj le manda al teléfono mientras el atleta entrena.
+///
+/// Change `watch-workout-session`, fase F4.
+///
+/// Es un **agregado**: si el atleta agarra el celular a mitad de entreno, sus
+/// pulsaciones y calorías también están ahí, al lado del tiempo. Sin reloj
+/// conectado la pantalla queda exactamente como estaba.
+///
+/// ── Por qué esto NO viola D1 ──────────────────────────────────────────────
+///
+/// D1, firmada, dice que el ritmo cardíaco vive en pantalla y en la app Salud,
+/// y que este ciclo **no toca Firestore**. Esto no lo toca: el dato viaja del
+/// reloj al teléfono por WatchConnectivity, se muestra en vivo, y muere cuando
+/// termina el entreno. No se persiste en ningún lado.
+///
+/// Y para Apple tampoco es "collect" —que define como transmitir datos FUERA
+/// del dispositivo de forma que el desarrollador pueda accederlos—: acá el dato
+/// nunca sale de los dispositivos del atleta hacia un servidor nuestro. Por eso
+/// este agregado no suma ninguna declaración de privacidad.
+///
+/// Si algún día esto se guarda en Firestore, las dos cosas dejan de ser ciertas
+/// EN EL ACTO. Ese sería otro ciclo, y arranca por una decisión de privacidad.
+///
+/// No es freezed a propósito, igual que `WatchCredentialPayload`: el reloj
+/// arma este mismo shape en Swift, así que el JSON es un contrato entre
+/// lenguajes y conviene tenerlo escrito a mano y a la vista.
+library;
+
+class WatchEffort {
+  const WatchEffort({this.bpm, this.kcal, this.measuredAt});
+
+  /// Discrimina este payload de cualquier otro que viaje por el mismo canal.
+  ///
+  /// No es opcional: el canal lo comparte con la credencial del reloj, y sin
+  /// esto un payload de credencial se leería como esfuerzo con todo en null.
+  static const String kind = 'watchEffort';
+
+  /// Pulsaciones. Null si el reloj todavía no midió, o si el atleta negó el
+  /// permiso de lectura — que son indistinguibles entre sí, medido en F0.
+  final int? bpm;
+
+  /// Calorías activas acumuladas en lo que va del entreno.
+  final int? kcal;
+
+  /// Cuándo lo midió EL RELOJ, no cuándo llegó al teléfono.
+  ///
+  /// Esa distinción es la que hace que la regla de antigüedad funcione: la
+  /// latencia de WatchConnectivity se midió entre 2 y 24 segundos según la
+  /// carga, así que fechar el dato al recibirlo lo haría pasar por más fresco
+  /// de lo que es.
+  final DateTime? measuredAt;
+
+  /// Si trae al menos una medición.
+  bool get isEmpty => bpm == null && kcal == null;
+
+  Map<String, dynamic> toContext() => {
+        'kind': kind,
+        if (bpm != null) 'bpm': bpm,
+        if (kcal != null) 'kcal': kcal,
+        if (measuredAt != null)
+          'measuredAtMs': measuredAt!.millisecondsSinceEpoch,
+      };
+
+  /// Lee un contexto entrante, o devuelve null si no es de esfuerzo.
+  ///
+  /// Defensivo a propósito: el payload cruza un puente entre lenguajes, y un
+  /// cambio del lado Swift no puede tirar la app del teléfono.
+  static WatchEffort? tryParse(Map<String, dynamic> context) {
+    if (context['kind'] != kind) return null;
+
+    final ms = context['measuredAtMs'];
+    if (ms is! int) return null; // Sin momento no se puede juzgar la antigüedad.
+
+    final rawBpm = context['bpm'];
+    final rawKcal = context['kcal'];
+
+    return WatchEffort(
+      // Un bpm de 0 no es una medición: es un sensor que no enganchó.
+      bpm: rawBpm is int && rawBpm > 0 ? rawBpm : null,
+      // Un kcal de 0 SÍ es un dato cierto — todavía no se midió consumo.
+      // Misma asimetría que en el reloj.
+      kcal: rawKcal is int && rawKcal >= 0 ? rawKcal : null,
+      measuredAt: DateTime.fromMillisecondsSinceEpoch(ms, isUtc: true),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is WatchEffort &&
+      other.bpm == bpm &&
+      other.kcal == kcal &&
+      other.measuredAt == measuredAt;
+
+  @override
+  int get hashCode => Object.hash(bpm, kcal, measuredAt);
+
+  @override
+  String toString() => 'WatchEffort(bpm: $bpm, kcal: $kcal, at: $measuredAt)';
+}
+
+/// Qué mostrar en el player.
+class WatchEffortDisplay {
+  const WatchEffortDisplay({this.bpm, this.kcal});
+
+  /// Nada que mostrar: no se dibuja fila, ni vacía.
+  const WatchEffortDisplay.nada() : bpm = null, kcal = null;
+
+  final int? bpm;
+  final int? kcal;
+
+  bool get isEmpty => bpm == null && kcal == null;
+
+  @override
+  bool operator ==(Object other) =>
+      other is WatchEffortDisplay && other.bpm == bpm && other.kcal == kcal;
+
+  @override
+  int get hashCode => Object.hash(bpm, kcal);
+
+  @override
+  String toString() => 'WatchEffortDisplay(bpm: $bpm, kcal: $kcal)';
+}
+
+abstract final class WatchEffortRules {
+  /// Cuánto vale un dato del reloj antes de darlo por muerto.
+  ///
+  /// Más generoso que los 15 segundos que usa el reloj para su propia pantalla,
+  /// y no por descuido: acá el dato viene RELAYADO. La latencia de
+  /// WatchConnectivity se midió entre 2,0s y 24,4s según la carga de la
+  /// máquina, así que un umbral apretado descartaría datos buenos simplemente
+  /// porque el teléfono estaba ocupado.
+  static const Duration maxAntiguedad = Duration(seconds: 45);
+
+  /// Qué mostrar.
+  ///
+  /// **Acá la regla se aparta de la del reloj a propósito.** En el reloj las
+  /// calorías no caducan: son acumuladas y siguen siendo verdad. En el teléfono
+  /// la antigüedad del dato mide otra cosa — si hace 45 segundos que no llega
+  /// nada, lo más probable es que el vínculo esté muerto: el entreno terminó,
+  /// la app del reloj se cerró, o se perdió el bluetooth.
+  ///
+  /// Mostrar calorías congeladas en esa situación sugiere una conexión viva que
+  /// no existe. Se muestra nada, que es lo cierto.
+  static WatchEffortDisplay display({
+    required WatchEffort? effort,
+    required DateTime now,
+  }) {
+    if (effort == null) return const WatchEffortDisplay.nada();
+
+    // No hay un chequeo de `isEmpty` acá y no es un olvido: un esfuerzo sin
+    // mediciones ya cae en `WatchEffortDisplay(bpm: null, kcal: null)`, que ES
+    // `nada()`. Un guard extra seria codigo muerto — se detecto porque la
+    // mutacion que lo borraba no ponia ningun test en rojo.
+
+    final medido = effort.measuredAt;
+    if (medido == null) return const WatchEffortDisplay.nada();
+
+    // Antigüedad negativa = el reloj va adelantado. Es un problema de reloj, no
+    // del atleta, y no tiene por qué borrarle la pantalla.
+    final antiguedad = now.difference(medido);
+    if (antiguedad > maxAntiguedad) {
+      return const WatchEffortDisplay.nada();
+    }
+
+    return WatchEffortDisplay(bpm: effort.bpm, kcal: effort.kcal);
+  }
+}

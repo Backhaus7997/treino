@@ -33,6 +33,7 @@ WATCH_SOURCES=(
   "${REPO_ROOT}/ios/TreinoWatch Watch App/WorkoutSessionLifecycle.swift"
   "${REPO_ROOT}/ios/TreinoWatch Watch App/HeartRateRules.swift"
   "${REPO_ROOT}/ios/TreinoWatch Watch App/ActiveEnergyRules.swift"
+  "${REPO_ROOT}/ios/TreinoWatch Watch App/EffortBroadcastRules.swift"
   "${REPO_ROOT}/ios/TreinoWatch Watch App/WorkoutDurationRules.swift"
 )
 

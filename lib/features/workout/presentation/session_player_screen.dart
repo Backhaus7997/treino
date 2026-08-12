@@ -27,6 +27,8 @@ import '../domain/routine_slot.dart';
 import '../domain/set_enums.dart';
 import '../domain/set_limits.dart';
 import '../domain/set_log.dart';
+import '../../watch/application/watch_effort_notifier.dart';
+import '../../watch/domain/watch_effort.dart';
 import '../domain/set_spec.dart';
 import 'exercise_detail_screen.dart';
 import 'widgets/bounded_number_formatter.dart';
@@ -874,13 +876,19 @@ class _SessionStatsCard extends StatelessWidget {
                   ),
                 ),
               ),
-              Text(
-                _formatMMSS(state.elapsedSeconds),
-                style: GoogleFonts.barlowCondensed(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 40,
-                  color: palette.accent,
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    _formatMMSS(state.elapsedSeconds),
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 40,
+                      color: palette.accent,
+                    ),
+                  ),
+                  const _WatchEffortRow(),
+                ],
               ),
             ],
           ),
@@ -2616,6 +2624,75 @@ class _AbandonConfirmDialog extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// El esfuerzo que esta midiendo el reloj, al lado del tiempo del entreno.
+///
+/// Change `watch-workout-session`, fase F4.
+///
+/// **Es un agregado.** Sin reloj conectado no se dibuja NADA y la pantalla
+/// queda exactamente como estaba: ni un hueco, ni un "--", ni un aviso de que
+/// falta un reloj. El atleta que entrena sin reloj no tiene por que enterarse
+/// de que existe esta fila.
+///
+/// Es un widget aparte y no parte del header por rendimiento: el dato cambia
+/// cada pocos segundos, y metiendolo inline haria rebuild de toda la cabecera
+/// del player —incluido el cronometro y la barra de progreso— por un dato
+/// secundario. Asi el rebuild queda acotado a esta fila.
+class _WatchEffortRow extends ConsumerWidget {
+  const _WatchEffortRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final notifier = ref.watch(watchEffortNotifierProvider);
+
+    return ValueListenableBuilder<WatchEffort?>(
+      valueListenable: notifier,
+      builder: (context, effort, _) {
+        final display = WatchEffortRules.display(
+          effort: effort,
+          now: DateTime.now().toUtc(),
+        );
+        if (display.isEmpty) return const SizedBox.shrink();
+
+        return Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (display.bpm != null) ...[
+                Icon(TreinoIcon.heartRate, size: 12, color: palette.highlight),
+                const SizedBox(width: 4),
+                Text(
+                  '${display.bpm}',
+                  style: GoogleFonts.barlow(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                    color: palette.textMuted,
+                  ),
+                ),
+              ],
+              if (display.bpm != null && display.kcal != null)
+                const SizedBox(width: 12),
+              if (display.kcal != null) ...[
+                Icon(TreinoIcon.calories, size: 12, color: palette.highlight),
+                const SizedBox(width: 4),
+                Text(
+                  '${display.kcal} kcal',
+                  style: GoogleFonts.barlow(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                    color: palette.textMuted,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 }

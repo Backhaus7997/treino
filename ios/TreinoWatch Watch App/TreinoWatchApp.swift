@@ -18,6 +18,11 @@ struct TreinoWatch_Watch_AppApp: App {
     /// es watchOS-only y lo dejaria sin poder compilarse en el host, que es la
     /// unica forma barata de testearlo.
     @StateObject private var workoutSession = WorkoutSessionController()
+
+    /// Le manda al telefono lo que el reloj mide, para que el dato tambien este
+    /// ahi si el atleta agarra el celular (F4). Es un agregado: si falla, el
+    /// reloj sigue mostrando todo igual.
+    @State private var effortRelay = EffortRelay()
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
@@ -98,6 +103,21 @@ struct TreinoWatch_Watch_AppApp: App {
                 // esto el reloj se entera recien cuando el atleta lo mira, y la
                 // idea es que si empezaste a entrenar en el celular la muñeca
                 // se ponga en modo entreno sola.
+                // El esfuerzo se publica al telefono cuando cambia, con el
+                // throttle de `EffortBroadcastRules`. Se escuchan los DOS
+                // datos porque llegan por separado: el ritmo cardiaco cada
+                // ~5s y las calorias cuando el builder las acumula.
+                .onChange(of: workoutSession.heartRate) { _, _ in
+                    publicarEsfuerzo()
+                }
+                .onChange(of: workoutSession.activeEnergy) { _, _ in
+                    publicarEsfuerzo()
+                }
+                // Al cerrarse el entreno se olvida lo ultimo enviado, para que
+                // el proximo no se coma el primer envio por parecerse.
+                .onChange(of: workoutSession.phase) { _, phase in
+                    if phase == .idle { effortRelay.reset() }
+                }
                 .onChange(of: coordinator.externalRefresh) { _, _ in
                     Task {
                         if workoutCoordinator.session != nil {
@@ -108,5 +128,24 @@ struct TreinoWatch_Watch_AppApp: App {
                     }
                 }
         }
+    }
+
+    /// Manda el ultimo esfuerzo conocido, fechado con la medicion MAS RECIENTE
+    /// de las dos.
+    ///
+    /// Se usa la mas reciente y no `Date()` porque la regla de antiguedad del
+    /// telefono se apoya en ese timestamp: fecharlo al enviarlo lo haria pasar
+    /// por mas fresco de lo que es.
+    private func publicarEsfuerzo() {
+        let hr = workoutSession.heartRate
+        let energia = workoutSession.activeEnergy
+        let fechas = [hr?.takenAt, energia?.takenAt].compactMap { $0 }
+        guard let medido = fechas.max() else { return }
+
+        effortRelay.publish(
+            bpm: hr?.bpm,
+            kcal: energia?.kcal,
+            measuredAt: medido
+        )
     }
 }

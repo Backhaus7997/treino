@@ -50,4 +50,14 @@ class WatchBridge {
 
   /// Mensajes entrantes desde el reloj.
   Stream<Map<String, dynamic>> get messageStream => _connectivity.messageStream;
+
+  /// Contextos entrantes desde el reloj.
+  ///
+  /// Es el canal por el que llega el esfuerzo en vivo — pulsaciones y calorías
+  /// mientras el atleta entrena (change `watch-workout-session`, F4).
+  ///
+  /// El contexto de ida y el de vuelta son independientes: cada lado tiene el
+  /// suyo, así que el reloj publicando esfuerzo no pisa la credencial que el
+  /// teléfono publica hacia él.
+  Stream<Map<String, dynamic>> get contextStream => _connectivity.contextStream;
 }
