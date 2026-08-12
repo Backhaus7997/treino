@@ -533,6 +533,16 @@ void main() {
     Rect tabRect(WidgetTester tester, String label) =>
         tester.getRect(find.bySemanticsLabel(label));
 
+    /// Caja visual de la barra: el `ClipRRect` que envuelve el vidrio.
+    Rect barRect(WidgetTester tester) => tester.getRect(
+          find
+              .descendant(
+                of: find.byType(TreinoBottomBar),
+                matching: find.byType(ClipRRect),
+              )
+              .first,
+        );
+
     testWidgets('el pill queda centrado en su tab en los 5 índices', (
       tester,
     ) async {
@@ -599,6 +609,56 @@ void main() {
               reason: 'hay un hueco o un solape entre tabs — $ctx',
             );
           }
+        }
+      }
+    });
+
+    testWidgets('la barra queda centrada respecto de la pantalla', (
+      tester,
+    ) async {
+      // Esta SÍ falla sin el fix. El `SafeArea` de la barra tiene `top: false`
+      // pero aplicaba el inset izquierdo y el derecho tal como venían; el
+      // margen lateral que resuelve `resolveBarLayout` es simétrico pero se
+      // aplica DESPUÉS, adentro de una caja que el SafeArea ya dejó corrida.
+      // A 320dp con inset izquierdo de 44, el centro de la barra caía en 182
+      // en vez de 160: 22pt = medio inset.
+      for (final width in widths) {
+        for (final entry in paddings.entries) {
+          await pumpBar(tester, width: width, padding: entry.value, index: 2);
+
+          final bar = barRect(tester);
+          expect(
+            bar.center.dx,
+            closeTo(width / 2, 0.01),
+            reason: 'la barra quedó descentrada en pantalla — '
+                '${width}dp, ${entry.key}',
+          );
+        }
+      }
+    });
+
+    testWidgets('la barra nunca se mete debajo del recorte del dispositivo', (
+      tester,
+    ) async {
+      // La otra mitad del contrato: centrarla no puede lograrse a costa de
+      // meterla abajo del notch. El inset se simetriza tomando el MAYOR de
+      // los dos, así que el lado del recorte se sigue respetando entero.
+      for (final width in widths) {
+        for (final entry in paddings.entries) {
+          await pumpBar(tester, width: width, padding: entry.value, index: 2);
+
+          final bar = barRect(tester);
+          final ctx = '${width}dp, ${entry.key}';
+          expect(
+            bar.left,
+            greaterThanOrEqualTo(entry.value.left - 0.01),
+            reason: 'la barra invade el inset izquierdo — $ctx',
+          );
+          expect(
+            bar.right,
+            lessThanOrEqualTo(width - entry.value.right + 0.01),
+            reason: 'la barra invade el inset derecho — $ctx',
+          );
         }
       }
     });

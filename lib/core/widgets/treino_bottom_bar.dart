@@ -302,135 +302,160 @@ class TreinoBottomBar extends StatelessWidget {
       letterSpacing: 0.8,
     );
 
-    return SafeArea(
-      top: false,
-      // El LayoutBuilder va AFUERA del Padding a propósito: el margen lateral
-      // ya no es una constante, lo elige `resolveBarLayout` a partir del ancho
-      // total de la pantalla. Adentro del Padding sólo se ve el ancho ya
-      // recortado, que es justamente el dato que hay que decidir.
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          var maxLabelWidth = 0.0;
-          var maxLabelHeight = 0.0;
-          for (final item in _items) {
-            final painter = TextPainter(
-              text: TextSpan(text: item.label, style: labelStyle),
-              maxLines: 1,
-              textDirection: Directionality.of(context),
-              textScaler: textScaler,
-            )..layout();
-            if (painter.width > maxLabelWidth) {
-              maxLabelWidth = painter.width;
-            }
-            if (painter.height > maxLabelHeight) {
-              maxLabelHeight = painter.height;
-            }
-            // Cada TextPainter retiene un ui.Paragraph nativo. Este loop
-            // corre en cada pasada de layout (rotación, teclado, split view),
-            // así que sin esto se acumulan hasta que pase el GC.
-            painter.dispose();
-          }
+    // El inset horizontal del dispositivo se SIMETRIZA antes de aplicarlo.
+    //
+    // `SafeArea` aplica el izquierdo y el derecho tal como vienen, y en
+    // landscape sobre un iPhone con notch esos dos valores NO son iguales: 44
+    // del lado del recorte y 0 del otro. El margen lateral que resuelve
+    // `resolveBarLayout` sí es simétrico, pero se aplica DESPUÉS, adentro de
+    // la caja que el SafeArea ya dejó corrida — así que la barra entera
+    // terminaba desplazada medio inset (22pt) hacia el lado sin notch. Es un
+    // pill flotante centrado: que se corra del centro se ve.
+    //
+    // Tomando el mayor de los dos para ambos lados, la barra sigue esquivando
+    // el recorte (nunca se mete debajo) y vuelve a quedar centrada en
+    // pantalla. En portrait los dos insets son 0 y esto no hace absolutamente
+    // nada, que es por qué NO puede ser la causa de un reporte en portrait.
+    final devicePadding = MediaQuery.paddingOf(context);
+    final horizontalInset = math.max(devicePadding.left, devicePadding.right);
 
-          final layout = resolveBarLayout(
-            totalWidth: constraints.maxWidth,
-            itemCount: _items.length,
-            maxLabelWidth: maxLabelWidth,
-            maxLabelHeight: maxLabelHeight,
-          );
-          final metrics = layout.metrics;
-          final barHeight = metrics.barHeight;
-          final expanded = !collapsed && metrics.labelsFit;
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: horizontalInset),
+      child: SafeArea(
+        top: false,
+        // El horizontal ya lo puso el Padding de arriba, simetrizado. Dejarlo
+        // también acá lo cobraría dos veces.
+        left: false,
+        right: false,
+        // El LayoutBuilder va AFUERA del Padding a propósito: el margen lateral
+        // ya no es una constante, lo elige `resolveBarLayout` a partir del ancho
+        // total de la pantalla. Adentro del Padding sólo se ve el ancho ya
+        // recortado, que es justamente el dato que hay que decidir.
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            var maxLabelWidth = 0.0;
+            var maxLabelHeight = 0.0;
+            for (final item in _items) {
+              final painter = TextPainter(
+                text: TextSpan(text: item.label, style: labelStyle),
+                maxLines: 1,
+                textDirection: Directionality.of(context),
+                textScaler: textScaler,
+              )..layout();
+              if (painter.width > maxLabelWidth) {
+                maxLabelWidth = painter.width;
+              }
+              if (painter.height > maxLabelHeight) {
+                maxLabelHeight = painter.height;
+              }
+              // Cada TextPainter retiene un ui.Paragraph nativo. Este loop
+              // corre en cada pasada de layout (rotación, teclado, split view),
+              // así que sin esto se acumulan hasta que pase el GC.
+              painter.dispose();
+            }
 
-          // Una sola animación gobierna alto Y labels. Si fueran dos
-          // (AnimatedContainer + AnimatedOpacity) podrían desincronizarse
-          // un frame y el contenido desbordaría la caja mientras se achica.
-          return Padding(
-            padding: EdgeInsets.fromLTRB(
-              layout.sideMargin,
-              8,
-              layout.sideMargin,
-              0,
-            ),
-            child: TweenAnimationBuilder<double>(
-              tween: Tween<double>(end: expanded ? 1 : 0),
-              duration: AppMotion.base,
-              curve: AppMotion.standard,
-              builder: (context, expansion, _) {
-                return DecoratedBox(
-                  // Shadow lives OUTSIDE the ClipRRect — inside it gets
-                  // clipped.
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(36),
-                    boxShadow: [
-                      BoxShadow(
-                        color: palette.bg.withValues(alpha: 0.45),
-                        blurRadius: 24,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(36),
-                    child: SizedBox(
-                      height: lerpDouble(collapsedHeight, barHeight, expansion),
-                      child: TreinoGlassSurface(
-                        borderRadius: BorderRadius.circular(36),
-                        child: LayoutBuilder(
-                          builder: (context, innerConstraints) {
-                            final tabWidth =
-                                innerConstraints.maxWidth / _items.length;
-                            return Stack(
-                              children: [
-                                AnimatedPositioned(
-                                  duration: AppMotion.slow,
-                                  curve: AppMotion.standard,
-                                  // Mismo inset que usa `resolveBarMetrics`
-                                  // para decidir si el label entra. Si acá
-                                  // hubiera un número suelto, medir y pintar
-                                  // podrían separarse sin que nadie lo note.
-                                  left: tabWidth * currentIndex + _kPillInset,
-                                  top: _kPillInset,
-                                  bottom: _kPillInset,
-                                  width: tabWidth - 2 * _kPillInset,
-                                  child: _PillHighlight(palette: palette),
-                                ),
-                                Row(
-                                  children: List.generate(_items.length, (i) {
-                                    final item = _items[i];
-                                    final active = i == currentIndex;
-                                    return Expanded(
-                                      child: Semantics(
-                                        button: true,
-                                        selected: active,
-                                        label: item.label,
-                                        excludeSemantics: true,
-                                        child: GestureDetector(
-                                          behavior: HitTestBehavior.opaque,
-                                          onTap: () => onTap(i),
-                                          child: _TabContent(
-                                            spec: item,
-                                            active: active,
-                                            palette: palette,
-                                            badgeCount: _badgeCountFor(i),
-                                            expansion: expansion,
+            final layout = resolveBarLayout(
+              totalWidth: constraints.maxWidth,
+              itemCount: _items.length,
+              maxLabelWidth: maxLabelWidth,
+              maxLabelHeight: maxLabelHeight,
+            );
+            final metrics = layout.metrics;
+            final barHeight = metrics.barHeight;
+            final expanded = !collapsed && metrics.labelsFit;
+
+            // Una sola animación gobierna alto Y labels. Si fueran dos
+            // (AnimatedContainer + AnimatedOpacity) podrían desincronizarse
+            // un frame y el contenido desbordaría la caja mientras se achica.
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                layout.sideMargin,
+                8,
+                layout.sideMargin,
+                0,
+              ),
+              child: TweenAnimationBuilder<double>(
+                tween: Tween<double>(end: expanded ? 1 : 0),
+                duration: AppMotion.base,
+                curve: AppMotion.standard,
+                builder: (context, expansion, _) {
+                  return DecoratedBox(
+                    // Shadow lives OUTSIDE the ClipRRect — inside it gets
+                    // clipped.
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(36),
+                      boxShadow: [
+                        BoxShadow(
+                          color: palette.bg.withValues(alpha: 0.45),
+                          blurRadius: 24,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(36),
+                      child: SizedBox(
+                        height:
+                            lerpDouble(collapsedHeight, barHeight, expansion),
+                        child: TreinoGlassSurface(
+                          borderRadius: BorderRadius.circular(36),
+                          child: LayoutBuilder(
+                            builder: (context, innerConstraints) {
+                              final tabWidth =
+                                  innerConstraints.maxWidth / _items.length;
+                              return Stack(
+                                children: [
+                                  AnimatedPositioned(
+                                    duration: AppMotion.slow,
+                                    curve: AppMotion.standard,
+                                    // Mismo inset que usa `resolveBarMetrics`
+                                    // para decidir si el label entra. Si acá
+                                    // hubiera un número suelto, medir y pintar
+                                    // podrían separarse sin que nadie lo note.
+                                    left: tabWidth * currentIndex + _kPillInset,
+                                    top: _kPillInset,
+                                    bottom: _kPillInset,
+                                    width: tabWidth - 2 * _kPillInset,
+                                    child: _PillHighlight(palette: palette),
+                                  ),
+                                  Row(
+                                    children: List.generate(_items.length, (i) {
+                                      final item = _items[i];
+                                      final active = i == currentIndex;
+                                      return Expanded(
+                                        child: Semantics(
+                                          button: true,
+                                          selected: active,
+                                          label: item.label,
+                                          excludeSemantics: true,
+                                          child: GestureDetector(
+                                            behavior: HitTestBehavior.opaque,
+                                            onTap: () => onTap(i),
+                                            child: _TabContent(
+                                              spec: item,
+                                              active: active,
+                                              palette: palette,
+                                              badgeCount: _badgeCountFor(i),
+                                              expansion: expansion,
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                    );
-                                  }),
-                                ),
-                              ],
-                            );
-                          },
+                                      );
+                                    }),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                );
-              },
-            ),
-          );
-        },
+                  );
+                },
+              ),
+            );
+          },
+        ),
       ),
     );
   }
