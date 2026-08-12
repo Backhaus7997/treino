@@ -2396,6 +2396,90 @@ abstract class AppL10n {
   /// **'No pudimos cancelar la cuenta. Probá de nuevo.'**
   String get profileSetupCancelAccountError;
 
+  /// Onboarding tour (#627) — step counter above the page title.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PASO {current} DE {total}'**
+  String onboardingStepLabel(int current, int total);
+
+  /// Onboarding tour (#627) — skip affordance, visible from the first page.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Saltar'**
+  String get onboardingSkipCta;
+
+  /// Onboarding tour (#627) — primary CTA on every page except the last.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SIGUIENTE'**
+  String get onboardingNextCta;
+
+  /// Onboarding tour (#627) — primary CTA on the last page; closes the tour.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'EMPEZAR'**
+  String get onboardingFinishCta;
+
+  /// Onboarding tour (#627) — snackbar when persisting the seen flag fails. The tour still closes.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos guardar que ya viste esto. Puede que te lo mostremos de nuevo.'**
+  String get onboardingSaveError;
+
+  /// Onboarding tour (#627) athlete page 1 title — where a session starts.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ENTRENÁ'**
+  String get onboardingAthleteTrainTitle;
+
+  /// Onboarding tour (#627) athlete page 1 body — assigned routine vs template vs own routine.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todo arranca en la pestaña Entrenar. Ahí vas a encontrar la rutina que te armó tu profe, plantillas listas para copiar, y las rutinas que te creás vos.'**
+  String get onboardingAthleteTrainBody;
+
+  /// Onboarding tour (#627) athlete page 2 title — history, insights, measurements.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TU PROGRESO'**
+  String get onboardingAthleteProgressTitle;
+
+  /// Onboarding tour (#627) athlete page 2 body — what is tracked automatically vs manually.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cada serie que cargás queda en tu historial y alimenta tus estadísticas. El volumen, la racha y los récords se calculan solos; las medidas corporales las cargás vos.'**
+  String get onboardingAthleteProgressBody;
+
+  /// Onboarding tour (#627) athlete page 3 title — the Coach module.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TU COACH'**
+  String get onboardingAthleteCoachTitle;
+
+  /// Onboarding tour (#627) athlete page 3 body — what a PF is plus the session_shares/profile_shares consent, in plain language.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'En la pestaña Coach buscás y contratás un profe. Tu historial es tuyo: hasta que no compartas una sesión o tu perfil, tu profe no ve nada.'**
+  String get onboardingAthleteCoachBody;
+
+  /// Onboarding tour (#627) athlete page 4 title — social feed and gym rankings.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'COMUNIDAD'**
+  String get onboardingAthleteCommunityTitle;
+
+  /// Onboarding tour (#627) athlete page 4 body — the feed is 100% social and rankings are explicit opt-in.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'El Feed es social: publicás tus entrenamientos sólo si querés. Los rankings de tu gimnasio son opt-in — no aparecés en la tabla hasta que los actives.'**
+  String get onboardingAthleteCommunityBody;
+
+  /// Onboarding tour (#627) athlete page 4 secondary CTA — closes the tour and lands on the rankings page.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Activar rankings'**
+  String get onboardingAthleteCommunityRankingsCta;
+
   /// No description provided for @reAuthPasswordLabel.
   ///
   /// In es_AR, this message translates to:
