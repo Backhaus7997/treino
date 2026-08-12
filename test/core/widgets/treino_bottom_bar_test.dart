@@ -454,4 +454,153 @@ void main() {
       }
     });
   });
+
+  // Issue #634 — "barra nav desplazada y no centrada" después del login.
+  //
+  // La issue vino SIN datos de repro (plataforma, device, screenshot y versión
+  // vacíos), así que esto es diagnóstico antes que fix: barre los 5 índices,
+  // varios anchos de pantalla y insets izquierdo≠derecho, y mide la geometría
+  // REAL renderizada. Si el pill se corriera de su tab —o la barra del centro
+  // de la pantalla— acá se ve.
+  //
+  // Se mide con `getRect` y no con aritmética porque lo que se sospecha es
+  // justamente un desajuste entre lo que `resolveBarLayout` calcula y lo que
+  // el `Stack` pinta: repetir la cuenta en el test no probaría nada.
+  group('TreinoBottomBar — centrado del pill y de la barra (#634)', () {
+    const labels = ['ENTRENAR', 'FEED', 'INICIO', 'COACH', 'PERFIL'];
+
+    /// Anchos lógicos reales del parque. 320 es el piso (iPhone SE 1ª gen),
+    /// 360 el ancho más común de Android, 440 un phablet.
+    const widths = [320.0, 360.0, 393.0, 440.0];
+
+    /// Insets de dispositivo. El caso interesante es izquierdo ≠ derecho:
+    /// es lo que produce un notch en landscape, y es la única entrada
+    /// asimétrica que la barra recibe.
+    const paddings = <String, EdgeInsets>{
+      'sin insets': EdgeInsets.zero,
+      'inset solo a la izquierda': EdgeInsets.only(left: 44, bottom: 21),
+      'inset solo a la derecha': EdgeInsets.only(right: 44, bottom: 21),
+      'insets asimétricos a ambos lados':
+          EdgeInsets.only(left: 44, right: 20, bottom: 21),
+    };
+
+    /// Sin `Scaffold`: el body de un Scaffold consume padding por su cuenta y
+    /// enmascararía justo lo que se quiere medir — cómo trata la barra los
+    /// insets que le llegan por `MediaQuery`.
+    Future<void> pumpBar(
+      WidgetTester tester, {
+      required double width,
+      required EdgeInsets padding,
+      required int index,
+    }) async {
+      tester.view.physicalSize = Size(width, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.dark(),
+          builder: (context, appChild) => MediaQuery(
+            data: MediaQuery.of(context)
+                .copyWith(padding: padding, viewPadding: padding),
+            child: appChild!,
+          ),
+          home: Material(
+            color: Colors.transparent,
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: TreinoBottomBar(currentIndex: index, onTap: (_) {}),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    /// Rect REAL del pill de gradient. El `AnimatedPositioned` no tiene
+    /// RenderObject propio, así que `getRect` baja al `_PillHighlight` — o
+    /// sea, a la caja que efectivamente se pinta con su parentData ya
+    /// aplicada por el `Stack`.
+    Rect pillRect(WidgetTester tester) => tester.getRect(
+          find.descendant(
+            of: find.byType(TreinoBottomBar),
+            matching: find.byType(AnimatedPositioned),
+          ),
+        );
+
+    /// Rect del tab. El `Semantics` de cada tab recibe constraints tight del
+    /// `Expanded`, así que su caja ES la celda del tab.
+    Rect tabRect(WidgetTester tester, String label) =>
+        tester.getRect(find.bySemanticsLabel(label));
+
+    testWidgets('el pill queda centrado en su tab en los 5 índices', (
+      tester,
+    ) async {
+      for (final width in widths) {
+        for (final entry in paddings.entries) {
+          for (var index = 0; index < labels.length; index++) {
+            await pumpBar(
+              tester,
+              width: width,
+              padding: entry.value,
+              index: index,
+            );
+
+            final pill = pillRect(tester);
+            final tab = tabRect(tester, labels[index]);
+            final ctx = '${labels[index]} @ ${width}dp, ${entry.key}';
+
+            expect(
+              pill.center.dx,
+              closeTo(tab.center.dx, 0.01),
+              reason: 'el pill no está centrado en su tab — $ctx',
+            );
+            // El pill vive ADENTRO de su celda: si se pasara, estaría pisando
+            // el tab de al lado aunque el centro coincidiera.
+            expect(
+              pill.left,
+              greaterThanOrEqualTo(tab.left - 0.01),
+              reason: 'el pill se sale por la izquierda de su tab — $ctx',
+            );
+            expect(
+              pill.right,
+              lessThanOrEqualTo(tab.right + 0.01),
+              reason: 'el pill se sale por la derecha de su tab — $ctx',
+            );
+          }
+        }
+      }
+    });
+
+    testWidgets('los 5 tabs se reparten el ancho en partes iguales', (
+      tester,
+    ) async {
+      // Si la distribución se corriera —la otra mitad de lo que reporta la
+      // issue: "la distribución de los items queda corrida"— se vería acá
+      // aunque el pill siguiera pegado a su tab.
+      for (final width in widths) {
+        for (final entry in paddings.entries) {
+          await pumpBar(tester, width: width, padding: entry.value, index: 2);
+
+          final rects = [for (final l in labels) tabRect(tester, l)];
+          final ctx = '${width}dp, ${entry.key}';
+
+          for (final r in rects) {
+            expect(
+              r.width,
+              closeTo(rects.first.width, 0.01),
+              reason: 'los tabs no miden todos lo mismo — $ctx',
+            );
+          }
+          for (var i = 1; i < rects.length; i++) {
+            expect(
+              rects[i].left,
+              closeTo(rects[i - 1].right, 0.01),
+              reason: 'hay un hueco o un solape entre tabs — $ctx',
+            );
+          }
+        }
+      }
+    });
+  });
 }
