@@ -419,11 +419,18 @@ class _RoutineDetailContent extends ConsumerWidget {
   /// of letting each action widget return `SizedBox.shrink()` on its own, is
   /// what keeps the reserved space and the bar from ever disagreeing.
   ///
-  /// NOTE — the `userCreated` guard deliberately does NOT apply to periodized
-  /// plans. That mirrors the pre-#641 behaviour exactly (`_PeriodizedCTABar`
-  /// never carried it). It reads like an oversight, but changing WHO may start
-  /// a session is a behaviour change outside the scope of #641.
-  bool _startActionVisible(WidgetRef ref, {required bool isPeriodized}) {
+  /// The `userCreated` guard applies at EVERY plan length. It used to be gated
+  /// behind `!isPeriodized`, inherited verbatim from the pre-#641 split where
+  /// `_StartSessionCTABar` carried the check and `_PeriodizedCTABar` simply
+  /// never had it. Nothing justified the asymmetry: a plan reaches the
+  /// "RUTINAS PÚBLICAS" tab through `publicRoutinesByUserProvider`, which
+  /// filters on `visibility` alone and has never looked at `numWeeks`, and the
+  /// editor lets an athlete author >1 week AND share on profile at once. So the
+  /// periodized case was not merely reachable — it was the LESS protected of
+  /// the two, which is backwards: `planProgressProvider` is keyed
+  /// `(uid: viewer, routineId: theirs)`, so a periodized start pollutes the
+  /// viewer's plan progress on top of their session history.
+  bool _startActionVisible(WidgetRef ref) {
     // Trainers coach — they don't train in-app, so the plan view is read-only.
     final role = ref.watch(
       userProfileProvider.select((async) => async.valueOrNull?.role),
@@ -432,8 +439,12 @@ class _RoutineDetailContent extends ConsumerWidget {
 
     // Read-only view of someone else's public user-created routine (surfaced
     // from the "RUTINAS PÚBLICAS" tab of another user's public profile).
-    // Starting a session against it would log the workout against them.
-    if (!isPeriodized && routine.source == RoutineSource.userCreated) {
+    // Starting it would log a session under the VIEWER's uid against a routine
+    // they neither own nor can edit — history and plan progress accruing
+    // against a plan whose author can rewrite or unshare it at any time.
+    // Trainer templates are the legitimately public-and-startable kind and stay
+    // untouched: this only ever fires on `userCreated`.
+    if (routine.source == RoutineSource.userCreated) {
       final currentUid = ref.watch(currentUidProvider);
       if (currentUid != null && currentUid != routine.createdBy) return false;
     }
@@ -451,8 +462,7 @@ class _RoutineDetailContent extends ConsumerWidget {
 
     final l10n = AppL10n.of(context);
 
-    final showStartAction =
-        _startActionVisible(ref, isPeriodized: isPeriodized);
+    final showStartAction = _startActionVisible(ref);
 
     return Column(
       children: [
@@ -1100,9 +1110,12 @@ class _PeriodizedCompletionSignal extends ConsumerWidget {
 /// vanished until the app restarted. Unknown progress degrades to "label
 /// EMPEZAR", never to "no way to train".
 ///
-/// Visibility for the current viewer is decided by the parent
-/// (`_RoutineDetailContent._startActionVisible`) so the pinned slot and its
-/// occupant can never disagree.
+/// "Unconditional" is scoped to PROGRESS, not to the viewer. Who may see this
+/// at all — trainer role, or someone else's public user-created plan — is
+/// decided by the parent (`_RoutineDetailContent._startActionVisible`) so the
+/// pinned slot and its occupant can never disagree. Reading this widget alone
+/// and concluding "always rendered" is precisely the mistake that let the
+/// ownership guard skip periodized plans for as long as it did.
 class _PeriodizedStartAction extends ConsumerWidget {
   const _PeriodizedStartAction({
     required this.routine,
