@@ -1723,6 +1723,20 @@ class AppL10nEs extends AppL10n {
   String get routineEditorAddSet => '+ Agregar set';
 
   @override
+  String get routineEditorFillKgA11y =>
+      'Replicar el peso del primer set en todos';
+
+  @override
+  String get routineEditorFillKgApplied => 'Peso replicado en todos los sets.';
+
+  @override
+  String get routineEditorFillKgEmpty =>
+      'Introduce el peso del primer set para poder replicarlo.';
+
+  @override
+  String get routineEditorFillKgUndo => 'Deshacer';
+
+  @override
   String get routineEditorMeasureReps => 'Reps';
 
   @override
@@ -5094,6 +5108,20 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get routineEditorAddSet => '+ Agregar set';
+
+  @override
+  String get routineEditorFillKgA11y =>
+      'Replicar el peso del primer set en todos';
+
+  @override
+  String get routineEditorFillKgApplied => 'Peso replicado en todos los sets.';
+
+  @override
+  String get routineEditorFillKgEmpty =>
+      'Cargá el peso del primer set para poder replicarlo.';
+
+  @override
+  String get routineEditorFillKgUndo => 'Deshacer';
 
   @override
   String get routineEditorMeasureReps => 'Reps';

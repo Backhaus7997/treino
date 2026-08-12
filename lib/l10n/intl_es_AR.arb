@@ -948,6 +948,16 @@
   "@routineEditorRestLabel": {},
   "routineEditorAddSet": "+ Agregar set",
   "@routineEditorAddSet": {},
+  "routineEditorFillKgA11y": "Replicar el peso del primer set en todos",
+  "@routineEditorFillKgA11y": {
+    "description": "Screen-reader label for the KG column header, which doubles as the bulk-fill affordance."
+  },
+  "routineEditorFillKgApplied": "Peso replicado en todos los sets.",
+  "@routineEditorFillKgApplied": {},
+  "routineEditorFillKgEmpty": "Cargá el peso del primer set para poder replicarlo.",
+  "@routineEditorFillKgEmpty": {},
+  "routineEditorFillKgUndo": "Deshacer",
+  "@routineEditorFillKgUndo": {},
   "routineEditorMeasureReps": "Reps",
   "@routineEditorMeasureReps": {},
   "routineEditorMeasureTime": "Tiempo",

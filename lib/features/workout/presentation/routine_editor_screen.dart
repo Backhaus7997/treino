@@ -309,6 +309,25 @@ void copyPrescriptionInto(
       source.weeklySets[week].map((s) => s.copy()).toList();
 }
 
+/// Writes [weights] onto [sets] positionally, REPLACING each row's
+/// [_EditableSet] instance instead of mutating it in place.
+///
+/// Why replace: set rows are keyed by set identity (`ObjectKey`) and seed their
+/// [TextEditingController] once in `initState`. Mutating a set in place would
+/// update the model while the visible field kept showing the old number — the
+/// exact silent-corruption failure mode the issue warns about.
+///
+/// Only the weight moves: [_EditableSet.copy] carries the SetType, reps,
+/// range and duration through untouched, so a bulk fill can never break the
+/// slot's measurement mode. Extra [sets] beyond [weights] are left alone (an
+/// undo whose snapshot predates an added row still restores what it knows).
+void applyColumnWeights(List<_EditableSet> sets, List<double?> weights) {
+  for (var i = 0; i < sets.length && i < weights.length; i++) {
+    if (sets[i].weightKg == weights[i]) continue;
+    sets[i] = sets[i].copy()..weightKg = weights[i];
+  }
+}
+
 /// Builds the [RoutineSlot] from an [_EditableSlot], populating both new
 /// and legacy fields. Extracted top-level so the submit path and tests share
 /// the same derivation logic.
@@ -3371,6 +3390,58 @@ class _SetTableState extends State<_SetTable> {
     }
   }
 
+  /// Replicates the FIRST row's KG down every set of the exercise — "cuatro
+  /// sets al mismo peso" is the normal case, not the exception (issue #640).
+  ///
+  /// Gesture decision: this lives on the KG header, the ONLY column header
+  /// without a gesture. REPS / MÍN / MÁX / TIEMPO already open the measure-mode
+  /// picker on tap, and stacking bulk-fill onto that tap would break an
+  /// interaction that already exists.
+  ///
+  /// It overwrites whatever each row had, so it ships with an UNDO rather than
+  /// a confirmation: a shortcut that costs a dialog stops being a shortcut, and
+  /// the snapshot restores the exact previous values.
+  void _fillKgColumn() {
+    final l10n = AppL10n.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final sets = widget.sets;
+    // Dismiss the IME so the SnackBar isn't hidden behind the keyboard.
+    FocusManager.instance.primaryFocus?.unfocus();
+
+    final source = sets.isNotEmpty ? sets.first.weightKg : null;
+    if (source == null) {
+      // Nothing to replicate — say so instead of silently clearing the column.
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.routineEditorFillKgEmpty)),
+      );
+      return;
+    }
+
+    final previous = sets.map((s) => s.weightKg).toList(growable: false);
+    if (previous.every((w) => w == source)) return; // already uniform
+
+    setState(() => _applyWeights(List<double?>.filled(sets.length, source)));
+    widget.onChanged();
+
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(l10n.routineEditorFillKgApplied),
+        action: SnackBarAction(
+          key: const Key('fill_kg_undo_action'),
+          label: l10n.routineEditorFillKgUndo,
+          onPressed: () {
+            if (!mounted) return;
+            setState(() => _applyWeights(previous));
+            widget.onChanged();
+          },
+        ),
+      ),
+    );
+  }
+
+  void _applyWeights(List<double?> weights) =>
+      applyColumnWeights(widget.sets, weights);
+
   @override
   Widget build(BuildContext context) {
     final slot = widget.slot;
@@ -3386,6 +3457,9 @@ class _SetTableState extends State<_SetTable> {
           slot: slot,
           palette: palette,
           onPickMeasureMode: _pickMeasureMode,
+          // No KG column in duration mode, and nothing to replicate onto with
+          // a single set — the affordance stays out of the way in both cases.
+          onFillKgColumn: !isDuration && sets.length > 1 ? _fillKgColumn : null,
         ),
         const SizedBox(height: 4),
         // ── Set rows ───────────────────────────────────────────────────────
@@ -3428,14 +3502,20 @@ class _SetTableHeader extends StatelessWidget {
     required this.slot,
     required this.palette,
     required this.onPickMeasureMode,
+    this.onFillKgColumn,
   });
 
   final _EditableSlot slot;
   final AppPalette palette;
   final Future<void> Function(BuildContext, Offset) onPickMeasureMode;
 
+  /// Replicates the first row's KG down the column. Null hides the affordance
+  /// (duration mode, or a single-set exercise where there is nothing to fill).
+  final VoidCallback? onFillKgColumn;
+
   @override
   Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
     final isDuration = slot.exerciseMode == ExerciseMode.duration;
 
     TextStyle headerStyle() => GoogleFonts.barlowCondensed(
@@ -3470,6 +3550,41 @@ class _SetTableHeader extends StatelessWidget {
       );
     }
 
+    // KG carries its OWN gesture (bulk-fill), deliberately separate from the
+    // `tappable` measure-mode picker the other headers use — see
+    // `_SetTableState._fillKgColumn`.
+    Widget kgCell() {
+      final text = Text('KG', style: headerStyle());
+      if (onFillKgColumn == null) {
+        return Expanded(child: Center(child: text));
+      }
+      return Expanded(
+        child: Semantics(
+          button: true,
+          label: l10n.routineEditorFillKgA11y,
+          child: GestureDetector(
+            key: const Key('fill_kg_column_button'),
+            onTap: onFillKgColumn,
+            behavior: HitTestBehavior.opaque,
+            child: Padding(
+              // The bare 12px label is far too small a target; the padding
+              // grows the hit area without boxing the header.
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  text,
+                  const SizedBox(width: 3),
+                  Icon(TreinoIcon.copy, size: 11, color: palette.textMuted),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Row(
       children: [
         // SET column (fixed narrow width)
@@ -3483,7 +3598,7 @@ class _SetTableHeader extends StatelessWidget {
         if (isDuration) ...[
           cell('TIEMPO', tappable: true),
         ] else ...[
-          cell('KG'),
+          kgCell(),
           const SizedBox(width: 6),
           if (slot.repMode == RepMode.range) ...[
             cell('MÍN', tappable: true),
@@ -4237,6 +4352,34 @@ class RoutineEditorTestBridge {
     }
 
     return buildRoutineSlot(target, null);
+  }
+
+  /// Runs [applyColumnWeights] over a single-week slot built from [sets] and
+  /// returns it through [buildRoutineSlot] — lets unit tests assert that a KG
+  /// bulk fill moves ONLY the weight (SetType, reps, range and duration all
+  /// survive) without pumping the widget tree.
+  static RoutineSlot fillColumnWeightsBridge({
+    required ExerciseMode exerciseMode,
+    required RepMode repMode,
+    required List<
+            ({
+              SetType type,
+              double? weightKg,
+              int? reps,
+              int? repsMin,
+              int? repsMax,
+              int? durationSeconds,
+            })>
+        sets,
+    required List<double?> weights,
+  }) {
+    final slot = _slotFromWeeklyRecords(
+      exerciseMode: exerciseMode,
+      repMode: repMode,
+      weeklySets: [sets],
+    );
+    applyColumnWeights(slot.weeklySets.first, weights);
+    return buildRoutineSlot(slot, null);
   }
 
   /// Shared constructor for the weekly-records bridges above.

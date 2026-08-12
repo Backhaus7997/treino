@@ -1673,6 +1673,20 @@ class AppL10nEn extends AppL10n {
   String get routineEditorAddSet => '+ Add set';
 
   @override
+  String get routineEditorFillKgA11y =>
+      'Apply the first set\'s weight to every set';
+
+  @override
+  String get routineEditorFillKgApplied => 'Weight applied to every set.';
+
+  @override
+  String get routineEditorFillKgEmpty =>
+      'Enter the first set\'s weight so it can be applied.';
+
+  @override
+  String get routineEditorFillKgUndo => 'Undo';
+
+  @override
   String get routineEditorMeasureReps => 'Reps';
 
   @override
