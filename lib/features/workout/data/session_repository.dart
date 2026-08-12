@@ -9,6 +9,7 @@ import '../../profile/data/user_public_profile_repository.dart';
 import '../domain/session.dart';
 import '../domain/session_status.dart';
 import '../domain/set_log.dart';
+import '../domain/set_log_identity.dart';
 
 class SessionRepository {
   SessionRepository({
@@ -301,11 +302,72 @@ class SessionRepository {
 
   // ─── addSetLog ──────────────────────────────────────────────────────────
 
+  /// Persiste una serie. **Idempotente por identidad lógica contra lo que
+  /// escribió el RELOJ**, no solo contra el estado local del teléfono.
+  ///
+  /// Antes de crear su documento, mira la ruta determinística con la que el reloj
+  /// escribe esa misma serie (`{exerciseId}__{setNumber}`) y, si ya está, escribe
+  /// SOBRE ESE documento en vez de crear uno nuevo.
+  ///
+  /// Por qué la comprobación va acá y no alcanzaba con el guard de
+  /// `SessionNotifier.logSet`: ese guard pregunta por el estado LOCAL, y el
+  /// estado local es tan fresco como el último snapshot que llegó. Medido contra
+  /// el emulador el 2026-08-11, sobre una sesión de `seed-athlete-001`: el reloj
+  /// escribió la serie 1 a las 17:06:13 y el teléfono creó su propio documento de
+  /// la MISMA serie 37 segundos después, y cerró la sesión con
+  /// `totalVolumeKg = 1650` — sus 3 series propias, sin haber ingerido ninguno de
+  /// los 4 documentos del reloj en 55 segundos. Con 37 segundos de ventaja no hay
+  /// carrera que perder: lo que falla es depender de la frescura de una caché.
+  /// De 7 sesiones inspeccionadas, 5 tenían duplicados; la peor, 17 documentos
+  /// para 10 series reales. El volumen inflado lo leen historial, insights,
+  /// progresión y RANKINGS, que es competitivo entre gente del mismo gimnasio.
+  ///
+  /// Cuesta UNA lectura por serie cargada (~30 por entreno). Es el precio de que
+  /// la deduplicación pase a vivir en la escritura, donde no hay carrera posible,
+  /// en vez de en una caché que puede estar vieja.
+  ///
+  /// El teléfono NO pasa a usar ids determinísticos para sus propias series: al
+  /// borrar una serie renumera las siguientes, y eso obligaría a mover documentos
+  /// (HANDOFF §4.3). Solo ADOPTA el id del reloj cuando el reloj llegó primero.
   Future<SetLog> addSetLog({
     required String uid,
     required String sessionId,
     required SetLog setLog,
   }) async {
+    final watchDocId = setLogDeterministicDocId(
+      exerciseId: setLog.exerciseId,
+      setNumber: setLog.setNumber,
+    );
+    final watchRef = _setLogs(uid, sessionId).doc(watchDocId);
+    final watchSnap = await watchRef.get();
+    final watchData = watchSnap.data();
+
+    // La identidad se decide por los CAMPOS, nunca por el path. Un documento
+    // puede quedar en una ruta que ya no lo describe: `removeSet` renumera las
+    // sobrevivientes con `updateSetLog`, que conserva el id y baja el campo
+    // `setNumber`, así que `sentadilla__3` puede contener la serie 2. Escribir
+    // ahí confiando en la ruta perdería una serie que el atleta cargó — peor que
+    // el duplicado que estamos arreglando.
+    final holdsThisSet = watchSnap.exists &&
+        watchData != null &&
+        setLogDocHoldsSet(
+          docExerciseId: watchData['exerciseId'],
+          docSetNumber: watchData['setNumber'],
+          exerciseId: setLog.exerciseId,
+          setNumber: setLog.setNumber,
+        );
+
+    if (holdsThisSet) {
+      // Se pisa con los valores del teléfono a propósito: es la superficie
+      // interactiva —la única con edición de reps/peso— así que el documento
+      // queda coincidiendo con lo que el atleta está viendo. El id que se
+      // devuelve es el del reloj, para que un `updateSet`/`removeSet` posterior
+      // apunte al documento que existe y no a uno inventado.
+      final adopted = setLog.copyWith(id: watchDocId);
+      await watchRef.set(adopted.toJson());
+      return adopted;
+    }
+
     final ref = _setLogs(uid, sessionId).doc();
     final withId = setLog.copyWith(id: ref.id);
     await ref.set(withId.toJson());

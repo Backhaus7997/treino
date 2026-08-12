@@ -1,4 +1,5 @@
-import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
+import 'package:cloud_firestore/cloud_firestore.dart'
+    show QueryDocumentSnapshot, Timestamp;
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/profile/data/user_public_profile_repository.dart';
@@ -269,6 +270,163 @@ void main() {
         .get();
 
     expect(snap.exists, isTrue);
+  });
+
+  // ─── addSetLog(): dedupe contra lo que escribió el RELOJ ──────────────────
+  //
+  // El reloj escribe las series con id determinístico (`{exerciseId}__{n}`) y el
+  // teléfono con uno autogenerado. Los dos espacios de ids son disjuntos, así que
+  // el que escribía segundo no tenía contra qué deduplicar y creaba un documento
+  // nuevo: DOS documentos para una sola serie, y volumen inflado en historial,
+  // insights, progresión y rankings. Medido contra el emulador el 2026-08-11:
+  // 5 de 7 sesiones con duplicados, la peor con 17 documentos para 10 series.
+  //
+  // Escribe el documento tal como lo deja el reloj vía la REST API.
+  Future<void> seedWatchSetLog({
+    required String sessionId,
+    required String exerciseId,
+    required int setNumber,
+    required int fieldSetNumber,
+  }) async {
+    final docId = '${exerciseId}__$setNumber';
+    await firestore
+        .collection('users')
+        .doc(uid)
+        .collection('sessions')
+        .doc(sessionId)
+        .collection('setLogs')
+        .doc(docId)
+        .set({
+      'id': docId,
+      'exerciseId': exerciseId,
+      'exerciseName': 'Bench Press',
+      // Se pasa aparte del id a propósito: la renumeración del teléfono deja
+      // documentos cuyo campo `setNumber` ya no coincide con su ruta.
+      'setNumber': fieldSetNumber,
+      'reps': 10,
+      'weightKg': 80.0,
+      'completedAt': Timestamp.fromDate(DateTime.utc(2026, 5, 18, 10, 4, 0)),
+    });
+  }
+
+  Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> setLogDocs(
+    String sessionId,
+  ) async {
+    final snap = await firestore
+        .collection('users')
+        .doc(uid)
+        .collection('sessions')
+        .doc(sessionId)
+        .collection('setLogs')
+        .get();
+    return snap.docs;
+  }
+
+  test(
+      'addSetLog escribe SOBRE el documento del reloj en vez de crear un '
+      'segundo documento de la misma serie', () async {
+    final sessionId = await createActiveSession();
+    await seedWatchSetLog(
+      sessionId: sessionId,
+      exerciseId: 'bench-press',
+      setNumber: 1,
+      fieldSetNumber: 1,
+    );
+
+    final persisted = await repo.addSetLog(
+      uid: uid,
+      sessionId: sessionId,
+      setLog: buildSetLog(
+        setNumber: 1,
+        completedAt: DateTime.utc(2026, 5, 18, 10, 5, 0),
+      ),
+    );
+
+    final docs = await setLogDocs(sessionId);
+    expect(
+      docs,
+      hasLength(1),
+      reason: 'Una serie lógica = un documento. Con dos, el volumen del '
+          'historial se cuenta doble y rankings —que es competitivo entre gente '
+          'del mismo gimnasio— lee un número inflado.',
+    );
+    expect(docs.first.id, equals('bench-press__1'));
+    expect(
+      persisted.id,
+      equals('bench-press__1'),
+      reason:
+          'El id que se devuelve tiene que ser el del documento que existe: '
+          'un updateSet/removeSet posterior apunta por id.',
+    );
+  });
+
+  test(
+      'addSetLog NO pisa un documento que la renumeración dejó en la ruta '
+      'determinística con otra serie', () async {
+    final sessionId = await createActiveSession();
+    // Estado real después de que el teléfono borre una serie: `removeSet`
+    // renumera las sobrevivientes con `updateSetLog`, que CONSERVA el id del
+    // documento y baja el campo `setNumber`. Así, `bench-press__3` termina
+    // conteniendo la serie 2.
+    await seedWatchSetLog(
+      sessionId: sessionId,
+      exerciseId: 'bench-press',
+      setNumber: 3,
+      fieldSetNumber: 2,
+    );
+
+    final persisted = await repo.addSetLog(
+      uid: uid,
+      sessionId: sessionId,
+      setLog: buildSetLog(
+        setNumber: 3,
+        completedAt: DateTime.utc(2026, 5, 18, 10, 5, 0),
+      ),
+    );
+
+    expect(
+      persisted.id,
+      isNot(equals('bench-press__3')),
+      reason: 'Confiar en la RUTA en vez de en los CAMPOS pisaría la serie 2, '
+          'que el atleta cargó. Perder un dato es peor que el duplicado que '
+          'este arreglo vino a cerrar.',
+    );
+
+    final docs = await setLogDocs(sessionId);
+    expect(docs, hasLength(2));
+    final renumbered = docs.firstWhere((d) => d.id == 'bench-press__3').data();
+    expect(
+      renumbered['setNumber'],
+      equals(2),
+      reason: 'La serie 2 sigue intacta en la ruta que quedó desalineada.',
+    );
+  });
+
+  test(
+      'addSetLog sigue creando su propio documento cuando el reloj no tocó '
+      'esa serie', () async {
+    final sessionId = await createActiveSession();
+    await seedWatchSetLog(
+      sessionId: sessionId,
+      exerciseId: 'bench-press',
+      setNumber: 1,
+      fieldSetNumber: 1,
+    );
+
+    final persisted = await repo.addSetLog(
+      uid: uid,
+      sessionId: sessionId,
+      setLog: buildSetLog(
+        setNumber: 2,
+        completedAt: DateTime.utc(2026, 5, 18, 10, 6, 0),
+      ),
+    );
+
+    // El teléfono NO pasa a usar ids determinísticos para sus propias series:
+    // eso obligaría a mover documentos al renumerar (HANDOFF §4.3). Solo ADOPTA
+    // el del reloj cuando el reloj llegó primero.
+    expect(persisted.id, isNot(equals('bench-press__2')));
+    expect(await setLogDocs(sessionId), hasLength(2));
   });
 
   // ─── deleteSetLog() (live-set-editing PR2, AD-2) ─────────────────────────

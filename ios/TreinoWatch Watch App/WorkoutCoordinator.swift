@@ -312,8 +312,19 @@ final class WorkoutCoordinator: ObservableObject {
         endWorkoutSession()
     }
 
-    /// Sube al historial lo que falte: primero resuelve la sesion remota, y
-    /// despues las series pendientes una por una.
+    /// Reconcilia el entreno del reloj con el historial. El ORDEN es parte del
+    /// contrato, no un detalle de implementacion:
+    ///
+    /// 1. ¿La cerraron desde el telefono? Entonces no hay nada que escribir.
+    /// 2. Resolver la sesion remota (adoptarla o crearla).
+    /// 3. **LEER** las series que ya estan en el historial.
+    /// 4. **DESPUES** subir las pendientes, sabiendo que hay alla.
+    ///
+    /// Los pasos 3 y 4 estaban al reves, y eso dejaba DOS documentos de la misma
+    /// serie cuando el telefono la habia cargado antes: el reloj escribia con su
+    /// id deterministico contra un documento de id autogenerado, asi que no habia
+    /// nada que pisar. Leer primero no cuesta un viaje de red extra — esa lectura
+    /// ya se hacia, solo llegaba tarde.
     ///
     /// Cada serie se marca como subida SOLO si su escritura salio bien, asi que
     /// una falla parcial deja el resto en la cola en vez de darlas por hechas.
@@ -369,71 +380,121 @@ final class WorkoutCoordinator: ObservableObject {
 
             guard let remoteId = current.remoteId else { return }
 
-            for pending in current.pendingSets {
-                let name = exercises
-                    .first { $0.exerciseId == pending.exerciseId }?
-                    .exerciseName ?? pending.exerciseId
-                try await HistorySync.writeSetLog(
-                    client: client, uid: uid, sessionId: remoteId,
-                    exerciseName: name, set: pending
+            // ── Se LEE el historial antes de ESCRIBIR ──────────────────────
+            //
+            // El orden era el otro: primero se subia lo pendiente y despues se
+            // leia. Asi, la serie que el atleta acababa de marcar en la muñeca
+            // se escribia SIN saber que el telefono ya la habia cargado — y
+            // como los ids de los dos clientes no coinciden, no habia nada que
+            // pisar: quedaban DOS documentos de la misma serie. Medido contra el
+            // emulador el 2026-08-11: 5 de 7 sesiones con duplicados, en las dos
+            // direcciones.
+            //
+            // Leer primero NO cuesta un viaje de red extra. Esta lectura ya
+            // existia; lo unico que estaba mal era que llegaba tarde.
+            //
+            // Trae ademas lo que se haya cargado desde el TELEFONO, que es la
+            // otra direccion de la sincronizacion: sin esto el reloj solo ve lo
+            // suyo y le vuelve a ofrecer series que el atleta ya marco en el
+            // celular.
+            //
+            // Solo se AGREGA lo que falta; nunca se borra una serie local. Una
+            // serie cargada en el reloj y todavia sin subir no debe desaparecer
+            // porque el remoto aun no la tiene.
+            let remote = try await HistorySync.remoteSetLogs(
+                client: client, uid: uid, sessionId: remoteId
+            )
+
+            // Las series que el reloj NO tenia: sirven para saber si hay que
+            // arrancar el descanso, no solo para contar.
+            var nuevas: [LoggedSet] = []
+            for set in remote where !current.isLogged(
+                exerciseId: set.exerciseId, setNumber: set.setNumber
+            ) {
+                current.loggedSets.append(set)
+                nuevas.append(set)
+            }
+            if !nuevas.isEmpty {
+                session = current
+                WorkoutSessionStore.save(current)
+
+                // El descanso arranca TAMBIEN cuando la serie se marco en el
+                // telefono. Antes solo lo disparaba `logSet`, o sea marcar en la
+                // muñeca: el atleta marcaba en el celular y el reloj —que es
+                // donde mira el descanso— se quedaba mudo.
+                //
+                // Solo si la serie nueva es del ejercicio EN CURSO: una que
+                // llega de un ejercicio ya pasado (una correccion tardia) no
+                // tiene por que poner a contar nada.
+                if let exercise = currentExercise,
+                   restRemaining == nil,
+                   nuevas.contains(where: { $0.exerciseId == exercise.exerciseId }) {
+                    startRest(seconds: exercise.restSeconds)
+                }
+
+                // Si el telefono completo el ejercicio actual, avanzar.
+                if let exercise = currentExercise,
+                   current.loggedCount(exerciseId: exercise.exerciseId)
+                       >= exercise.sets.count,
+                   currentExerciseIndex + 1 < exercises.count {
+                    currentExerciseIndex += 1
+                }
+            }
+
+            // ── Ahora si, subir lo pendiente, sabiendo que hay alla ────────
+            //
+            // La identidad del documento se resuelve por identidad LOGICA de la
+            // serie contra el historial recien leido, no derivandola del
+            // `exerciseId__setNumber` a ciegas. `resolveSetLogWriteTarget` es
+            // pura y esta medida en el host: la decision de donde escribir es
+            // justo lo incomodo de verificar corriendo el reloj.
+            let remoteRefs = remote.compactMap { set -> RemoteSetLogRef? in
+                guard let docId = set.remoteDocId else { return nil }
+                return RemoteSetLogRef(
+                    docId: docId,
+                    exerciseId: set.exerciseId,
+                    setNumber: set.setNumber
                 )
+            }
+
+            for pending in current.pendingSets {
+                let target = resolveSetLogWriteTarget(
+                    exerciseId: pending.exerciseId,
+                    setNumber: pending.setNumber,
+                    remote: remoteRefs
+                )
+                let docId: String
+                switch target {
+                case .alreadyThere(let existing):
+                    // El historial YA tiene esta serie. No se escribe: el dato
+                    // esta, y pisarlo solo podria tapar una correccion de
+                    // reps/peso que el atleta hizo en el celular, que es la
+                    // unica superficie con edicion.
+                    docId = existing
+                case .write(let target):
+                    docId = target
+                    let name = exercises
+                        .first { $0.exerciseId == pending.exerciseId }?
+                        .exerciseName ?? pending.exerciseId
+                    try await HistorySync.writeSetLog(
+                        client: client, uid: uid, sessionId: remoteId,
+                        docId: docId, exerciseName: name, set: pending
+                    )
+                }
                 if let index = current.loggedSets.firstIndex(where: {
                     $0.exerciseId == pending.exerciseId
                         && $0.setNumber == pending.setNumber
                 }) {
                     current.loggedSets[index].synced = true
+                    // Se guarda el id REAL del documento: si un sync posterior
+                    // tiene que volver sobre esta serie, va al documento que
+                    // existe en vez de crear uno paralelo.
+                    current.loggedSets[index].remoteDocId = docId
                 }
+                // Se persiste por serie y no al final: una falla a mitad deja
+                // subido lo que entro en vez de reintentarlo todo.
                 session = current
                 WorkoutSessionStore.save(current)
-            }
-            // Trae lo que se haya cargado desde el TELEFONO. Es la otra
-            // direccion de la sincronizacion: sin esto el reloj solo ve lo
-            // suyo y le vuelve a ofrecer series que el atleta ya marco en el
-            // celular.
-            //
-            // Solo se AGREGA lo que falta; nunca se borra una serie local. Una
-            // serie cargada en el reloj y todavia sin subir no debe
-            // desaparecer porque el remoto aun no la tiene.
-            if let remoteId = current.remoteId {
-                let remote = try await HistorySync.remoteSetLogs(
-                    client: client, uid: uid, sessionId: remoteId
-                )
-                // Las series que el reloj NO tenia: sirven para saber si hay
-                // que arrancar el descanso, no solo para contar.
-                var nuevas: [LoggedSet] = []
-                for set in remote where !current.isLogged(
-                    exerciseId: set.exerciseId, setNumber: set.setNumber
-                ) {
-                    current.loggedSets.append(set)
-                    nuevas.append(set)
-                }
-                let added = !nuevas.isEmpty
-                if added {
-                    session = current
-                    WorkoutSessionStore.save(current)
-
-                    // El descanso arranca TAMBIEN cuando la serie se marco en
-                    // el telefono. Antes solo lo disparaba `logSet`, o sea
-                    // marcar en la muñeca: el atleta marcaba en el celular y el
-                    // reloj —que es donde mira el descanso— se quedaba mudo.
-                    //
-                    // Solo si la serie nueva es del ejercicio EN CURSO: una que
-                    // llega de un ejercicio ya pasado (una correccion tardia)
-                    // no tiene por que poner a contar nada.
-                    if let exercise = currentExercise,
-                       restRemaining == nil,
-                       nuevas.contains(where: { $0.exerciseId == exercise.exerciseId }) {
-                        startRest(seconds: exercise.restSeconds)
-                    }
-
-                    // Si el telefono completo el ejercicio actual, avanzar.
-                    if let exercise = currentExercise,
-                       current.loggedCount(exerciseId: exercise.exerciseId)
-                           >= exercise.sets.count,
-                       currentExerciseIndex + 1 < exercises.count {
-                        currentExerciseIndex += 1
-                    }
-                }
             }
 
             syncError = nil

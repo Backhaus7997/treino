@@ -510,6 +510,7 @@ runHeartRateRounding()
 runActiveEnergyDisplay()
 runWorkoutDuration()
 runEffortBroadcast()
+runSetLogWriteTarget()
 
 if failures.isEmpty {
     print("OK: \(totalChecks) chequeos de la logica de permisos de Salud")
@@ -581,5 +582,183 @@ private func runEffortBroadcast() {
             last: nil, actual: EffortSnapshot(bpm: nil, kcal: nil), now: t0
         ),
         "Un snapshot vacio no se manda"
+    )
+}
+
+// MARK: - Donde escribe el reloj cada serie
+//
+// El bug que estas reglas cierran, medido contra el emulador el 2026-08-11 sobre
+// sesiones de `seed-athlete-001`: la misma serie marcada en el reloj y en el
+// telefono dejaba DOS documentos en Firestore. En las 7 sesiones inspeccionadas,
+// 5 tenian duplicados; la peor, 17 documentos para 10 series reales. Los 7
+// documentos de una de ellas tenian `createTime == updateTime`, o sea que
+// ninguna escritura piso nunca a otra: los dos clientes acunan ids distintos
+// para la misma fila logica, asi que el que escribe segundo no tiene contra que
+// deduplicar y crea uno nuevo.
+//
+// La deduplicacion pasa entonces a decidirse por identidad LOGICA contra lo que
+// el historial ya tiene, no por el id. Es una decision pura para poder medirla
+// acá: verificarla corriendo el reloj cuesta dos builds y una carrera de
+// segundos que no se reproduce a pedido.
+
+private func runSetLogWriteTarget() {
+    let deterministic = setLogDeterministicDocId(
+        exerciseId: "peso-muerto", setNumber: 1
+    )
+    checkEqual(deterministic, "peso-muerto__1", "El id deterministico")
+
+    // Historial vacio: el caso normal, se escribe con el id deterministico.
+    checkEqual(
+        resolveSetLogWriteTarget(
+            exerciseId: "peso-muerto", setNumber: 1, remote: []
+        ),
+        .write(docId: "peso-muerto__1"),
+        "Sin nada en el historial se usa el id deterministico"
+    )
+
+    // La serie ya esta, escrita por el TELEFONO con id autogenerado. Es el caso
+    // que dejaba dos documentos: por id no matcheaba nunca.
+    checkEqual(
+        resolveSetLogWriteTarget(
+            exerciseId: "peso-muerto",
+            setNumber: 1,
+            remote: [
+                RemoteSetLogRef(
+                    docId: "EeFxyim8WMzP8qQvpGxj",
+                    exerciseId: "peso-muerto",
+                    setNumber: 1
+                )
+            ]
+        ),
+        .alreadyThere(docId: "EeFxyim8WMzP8qQvpGxj"),
+        "Una serie que el telefono ya cargo no se vuelve a escribir"
+    )
+
+    // La escribio un intento anterior del reloj: tampoco se reescribe.
+    checkEqual(
+        resolveSetLogWriteTarget(
+            exerciseId: "peso-muerto",
+            setNumber: 2,
+            remote: [
+                RemoteSetLogRef(
+                    docId: "peso-muerto__2",
+                    exerciseId: "peso-muerto",
+                    setNumber: 2
+                )
+            ]
+        ),
+        .alreadyThere(docId: "peso-muerto__2"),
+        "Una serie que el propio reloj ya subio no se reescribe"
+    )
+
+    // Otras series del mismo ejercicio no bloquean: la identidad es el PAR
+    // ejercicio + numero de serie, no el ejercicio.
+    checkEqual(
+        resolveSetLogWriteTarget(
+            exerciseId: "peso-muerto",
+            setNumber: 3,
+            remote: [
+                RemoteSetLogRef(
+                    docId: "peso-muerto__1",
+                    exerciseId: "peso-muerto",
+                    setNumber: 1
+                ),
+                RemoteSetLogRef(
+                    docId: "lUbF5qxLk72UbRggR084",
+                    exerciseId: "peso-muerto",
+                    setNumber: 2
+                ),
+            ]
+        ),
+        .write(docId: "peso-muerto__3"),
+        "Una serie nueva del mismo ejercicio se escribe normal"
+    )
+
+    // La misma serie de OTRO ejercicio no cuenta.
+    checkEqual(
+        resolveSetLogWriteTarget(
+            exerciseId: "peso-muerto",
+            setNumber: 1,
+            remote: [
+                RemoteSetLogRef(
+                    docId: "remo-barra__1",
+                    exerciseId: "remo-barra",
+                    setNumber: 1
+                )
+            ]
+        ),
+        .write(docId: "peso-muerto__1"),
+        "La serie 1 de otro ejercicio no es esta serie"
+    )
+
+    // La ruta deterministica ocupada por OTRA serie logica. Pasa despues de que
+    // el telefono borre una serie: al renumerar conserva el id del documento y
+    // baja el campo `setNumber`, asi que `peso-muerto__3` puede contener la
+    // serie 2. Escribir ahi PERDERIA esa serie — peor que el duplicado que este
+    // arreglo vino a cerrar.
+    checkEqual(
+        resolveSetLogWriteTarget(
+            exerciseId: "peso-muerto",
+            setNumber: 3,
+            remote: [
+                RemoteSetLogRef(
+                    docId: "peso-muerto__3",
+                    exerciseId: "peso-muerto",
+                    setNumber: 2
+                )
+            ]
+        ),
+        .write(docId: "peso-muerto__3__alt"),
+        "Una ruta ocupada por otra serie no se pisa: se usa un id propio"
+    )
+
+    // Y ese id propio es ESTABLE: reintentar la misma serie no acumula
+    // documentos, que es la propiedad por la que el id deterministico existe.
+    checkEqual(
+        resolveSetLogWriteTarget(
+            exerciseId: "peso-muerto",
+            setNumber: 3,
+            remote: [
+                RemoteSetLogRef(
+                    docId: "peso-muerto__3",
+                    exerciseId: "peso-muerto",
+                    setNumber: 2
+                )
+            ]
+        ),
+        resolveSetLogWriteTarget(
+            exerciseId: "peso-muerto",
+            setNumber: 3,
+            remote: [
+                RemoteSetLogRef(
+                    docId: "peso-muerto__3",
+                    exerciseId: "peso-muerto",
+                    setNumber: 2
+                )
+            ]
+        ),
+        "El id alternativo es estable entre llamadas"
+    )
+
+    // Y si ese id alternativo ya contiene la serie, se adopta en vez de escribir.
+    checkEqual(
+        resolveSetLogWriteTarget(
+            exerciseId: "peso-muerto",
+            setNumber: 3,
+            remote: [
+                RemoteSetLogRef(
+                    docId: "peso-muerto__3",
+                    exerciseId: "peso-muerto",
+                    setNumber: 2
+                ),
+                RemoteSetLogRef(
+                    docId: "peso-muerto__3__alt",
+                    exerciseId: "peso-muerto",
+                    setNumber: 3
+                ),
+            ]
+        ),
+        .alreadyThere(docId: "peso-muerto__3__alt"),
+        "La identidad logica manda sobre la ruta, tambien para el id alternativo"
     )
 }

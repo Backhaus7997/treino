@@ -35,6 +35,7 @@ WATCH_SOURCES=(
   "${REPO_ROOT}/ios/TreinoWatch Watch App/ActiveEnergyRules.swift"
   "${REPO_ROOT}/ios/TreinoWatch Watch App/EffortBroadcastRules.swift"
   "${REPO_ROOT}/ios/TreinoWatch Watch App/WorkoutDurationRules.swift"
+  "${REPO_ROOT}/ios/TreinoWatch Watch App/SetLogIdentity.swift"
 )
 
 TEST_SOURCES=(

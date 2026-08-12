@@ -282,6 +282,64 @@ private func runSessionCounting(fixtureURL: URL) {
     }
 }
 
+// MARK: - set_log_identity
+
+private func runSetLogIdentity(fixtureURL: URL) {
+    guard let data = try? Data(contentsOf: fixtureURL) else {
+        fail("No se pudo leer \(fixtureURL.path). Los fixtures son el contrato "
+            + "con la implementación Dart: si el archivo no está, ese contrato "
+            + "no existe.")
+        return
+    }
+
+    guard
+        let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+        let rule = json["rule"] as? String,
+        let cases = json["cases"] as? [[String: Any]]
+    else {
+        fail("\(fixtureURL.lastPathComponent) no tiene la forma esperada.")
+        return
+    }
+
+    guard rule == "set-log-identity" else {
+        fail("Se esperaba rule 'set-log-identity' y vino '\(rule)'.")
+        return
+    }
+
+    guard !cases.isEmpty else {
+        fail("\(fixtureURL.lastPathComponent) no tiene casos.")
+        return
+    }
+
+    for testCase in cases {
+        totalCases += 1
+        let name = testCase["name"] as? String ?? "(sin nombre)"
+
+        guard
+            let given = testCase["given"] as? [String: Any],
+            let exerciseId = given["exerciseId"] as? String,
+            let setNumber = given["setNumber"] as? Int,
+            let expected = testCase["expect"] as? [String: Any],
+            let expectedDocId = expected["docId"] as? String
+        else {
+            fail("  · \"\(name)\": el caso no tiene la forma esperada.")
+            continue
+        }
+
+        let actual = setLogDeterministicDocId(
+            exerciseId: exerciseId, setNumber: setNumber
+        )
+
+        if actual != expectedDocId {
+            fail("""
+              · "\(name)"
+                  esperado: \(expectedDocId)
+                  obtenido: \(actual)
+            """)
+        }
+    }
+}
+
 // MARK: - main
 
 // El script pasa la raíz de `conformance/` como primer argumento.
@@ -294,6 +352,7 @@ runPlanAdvance(fixtureURL: conformanceDir.appendingPathComponent("plan_advance.j
 runRoutineSelection(fixtureURL: conformanceDir.appendingPathComponent("routine_selection.json"))
 runSetResolution(fixtureURL: conformanceDir.appendingPathComponent("set_resolution.json"))
 runSessionCounting(fixtureURL: conformanceDir.appendingPathComponent("session_counting.json"))
+runSetLogIdentity(fixtureURL: conformanceDir.appendingPathComponent("set_log_identity.json"))
 
 if failures.isEmpty {
     print("✓ conformidad Swift: \(totalCases) casos, todos en verde")
