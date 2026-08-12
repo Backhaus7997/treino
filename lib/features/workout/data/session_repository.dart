@@ -318,13 +318,28 @@ class SessionRepository {
   /// `totalVolumeKg = 1650` — sus 3 series propias, sin haber ingerido ninguno de
   /// los 4 documentos del reloj en 55 segundos. Con 37 segundos de ventaja no hay
   /// carrera que perder: lo que falla es depender de la frescura de una caché.
-  /// De 7 sesiones inspeccionadas, 5 tenían duplicados; la peor, 17 documentos
-  /// para 10 series reales. El volumen inflado lo leen historial, insights,
-  /// progresión y RANKINGS, que es competitivo entre gente del mismo gimnasio.
+  /// De 77 sesiones inspeccionadas, 13 tenían duplicados —24 documentos de más y
+  /// 11.450 kg fantasma acumulados—; la peor, 17 documentos para 10 series
+  /// reales. El volumen inflado lo leen historial, insights, progresión y
+  /// RANKINGS, que es competitivo entre gente del mismo gimnasio.
   ///
-  /// Cuesta UNA lectura por serie cargada (~30 por entreno). Es el precio de que
-  /// la deduplicación pase a vivir en la escritura, donde no hay carrera posible,
-  /// en vez de en una caché que puede estar vieja.
+  /// Cuesta UNA lectura por serie cargada (~30 por entreno).
+  ///
+  /// ⚠️ ALCANCE EXACTO, para no prometer más de lo que hace: esto NO vuelve la
+  /// escritura atómica. La secuencia `get` → (el reloj escribe) → `set` sigue
+  /// siendo posible; lo que cambia es el TAMAÑO de la ventana, de "lo que tarde
+  /// en refrescarse la caché" —37 segundos medidos— a un round-trip de `get`.
+  /// Cerrarla del todo pediría una transacción, que reintenta si el documento
+  /// leído cambió antes del commit; no se agregó porque `fake_cloud_firestore`
+  /// resuelve `runTransaction` con un `_DummyTransaction` sin atomicidad ni
+  /// reintento, así que la garantía quedaría afirmada y no medida.
+  ///
+  /// En la práctica hay DOS defensas y la de la caché gana casi siempre: medido
+  /// en los simuladores emparejados el 2026-08-12, al escribir la serie con la
+  /// app en segundo plano y marcarla al volver, el listener llegó primero y el
+  /// guard de `logSet` cortó antes de esta lectura. Este camino es la red para
+  /// cuando ese listener NO llegó a tiempo — que es exactamente lo que pasó en la
+  /// sesión de 37 segundos de arriba.
   ///
   /// El teléfono NO pasa a usar ids determinísticos para sus propias series: al
   /// borrar una serie renumera las siguientes, y eso obligaría a mover documentos
@@ -348,6 +363,12 @@ class SessionRepository {
     // `setNumber`, así que `sentadilla__3` puede contener la serie 2. Escribir
     // ahí confiando en la ruta perdería una serie que el atleta cargó — peor que
     // el duplicado que estamos arreglando.
+    //
+    // No es hipotético: reproducido en los simuladores emparejados el
+    // 2026-08-12. El reloj escribió `peso-muerto__1/2/3`, se borró la serie 2
+    // desde el teléfono —la renumeración dejó `peso-muerto__3` conteniendo la
+    // serie 2— y al cargar una serie 3 nueva el teléfono creó su propio
+    // documento. Confiando en la ruta, esa serie 2 se habría destruido.
     final holdsThisSet = watchSnap.exists &&
         watchData != null &&
         setLogDocHoldsSet(
