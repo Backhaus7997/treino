@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/analytics/analytics_service.dart';
+import '../../../core/utils/network_timeouts.dart';
 import '../../watch/application/watch_credential_providers.dart'
     show watchNudgeServiceProvider;
 import '../../watch/data/watch_nudge_service.dart';
@@ -184,7 +185,11 @@ class SessionNotifier
     int dayNumber,
     int weekNumber,
   ) async {
-    final routine = await ref.read(routineByIdProvider(routineId).future);
+    // Misma cota que en `_buildResume`: empezar un entreno tampoco puede quedar
+    // colgado sin salida.
+    final routine = await ref
+        .read(routineByIdProvider(routineId).future)
+        .timeout(ref.read(firestoreReadTimeoutProvider));
     if (routine == null) {
       throw StateError('Rutina $routineId no encontrada');
     }
@@ -267,8 +272,13 @@ class SessionNotifier
       throw StateError('Resume solicitado sin usuario autenticado');
     }
 
+    // Cada lectura va ACOTADA. Sin cota, un `get()` que no resuelve deja este
+    // build en `AsyncLoading` para siempre: spinner eterno sobre un entreno ya
+    // empezado, sin excepción ni salida. Ver `network_timeouts.dart`.
+    final timeout = ref.read(firestoreReadTimeoutProvider);
+
     // Adaptación al contrato real de Etapa 1: getActive + listSetLogs.
-    final session = await repo.getActive(uid);
+    final session = await repo.getActive(uid).timeout(timeout);
     if (session == null) {
       throw StateError(
         'Resume solicitado para $sessionId pero no hay sesión activa',
@@ -279,13 +289,16 @@ class SessionNotifier
         'Sesión activa ${session.id} no coincide con la solicitada $sessionId',
       );
     }
-    final recoveredLogs = await repo.listSetLogs(
-      uid: uid,
-      sessionId: session.id,
-    );
+    final recoveredLogs = await repo
+        .listSetLogs(
+          uid: uid,
+          sessionId: session.id,
+        )
+        .timeout(timeout);
 
-    final routine =
-        await ref.read(routineByIdProvider(session.routineId).future);
+    final routine = await ref
+        .read(routineByIdProvider(session.routineId).future)
+        .timeout(timeout);
     if (routine == null) {
       throw StateError('Rutina ${session.routineId} no encontrada');
     }
@@ -537,13 +550,39 @@ class SessionNotifier
       // el delete/renumber (p.ej. un logSet concurrente). Mismo patrón que
       // logSet/updateSet.
       final latest = state.value ?? current;
-      final renumberedIds = {for (final s in survivorsAbove) s.id};
-      final newLogs = latest.setLogs
-          .where((l) => target == null || l.id != target.id)
-          .map((l) => renumberedIds.contains(l.id)
-              ? l.copyWith(setNumber: l.setNumber - 1)
-              : l)
-          .toList(growable: false);
+
+      // El setNumber nuevo se aplica como valor ABSOLUTO, no como un `-1`.
+      //
+      // Un delta se aplica DOS VECES. `updateSetLog` de arriba dispara su propio
+      // snapshot de Firestore (compensación de latencia: llega antes de que el
+      // `await` resuelva), el listener de `watchSetLogs` lo mete en el estado ya
+      // renumerado, y este `map` volvía a restarle uno. Con 3 series y borrando
+      // la 2, la sobreviviente pasaba de 3 → 2 por el stream → 1 por el map, y
+      // el estado quedaba con DOS series en setNumber 1 y NINGUNA en 2.
+      //
+      // Se veía así: la fila 2 sin tildar aunque la serie existía en Firestore,
+      // y la fila 3 ofrecida para cargar. Reproducido en el simulador el
+      // 2026-08-12. Es la misma trampa del §4.5 del HANDOFF que ya había mordido
+      // a `logSet` — "la propia escritura dispara su snapshot"— y por eso la
+      // defensa correcta es la misma: que el camino sea idempotente, no que
+      // adivine si el stream ya pasó.
+      //
+      // El valor absoluto es EXACTAMENTE el que se escribió a Firestore arriba,
+      // así que aplicarlo sobre un estado ya renumerado es un no-op.
+      final renumbered = {
+        for (final s in survivorsAbove) s.id: s.setNumber - 1,
+      };
+      // Pasa por el invariante, igual que `logSet` y `_applyRemoteSetLogs`.
+      // `removeSet` era el ÚNICO camino de mutación que lo salteaba, y por eso
+      // las dos series con el mismo setNumber sobrevivían en el estado.
+      final newLogs = _dedupedLogs(
+        latest.setLogs
+            .where((l) => target == null || l.id != target.id)
+            .map((l) {
+          final nuevo = renumbered[l.id];
+          return nuevo == null ? l : l.copyWith(setNumber: nuevo);
+        }).toList(growable: false),
+      );
       final loggedCountAfterRemoval =
           newLogs.where((l) => l.exerciseId == exerciseId).length;
       final lowered = latest.plannedSetsFor(slot) - 1;

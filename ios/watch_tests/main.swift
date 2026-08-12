@@ -511,6 +511,7 @@ runActiveEnergyDisplay()
 runWorkoutDuration()
 runEffortBroadcast()
 runSetLogWriteTarget()
+runSetLogDeletion()
 
 if failures.isEmpty {
     print("OK: \(totalChecks) chequeos de la logica de permisos de Salud")
@@ -760,5 +761,82 @@ private func runSetLogWriteTarget() {
         ),
         .alreadyThere(docId: "peso-muerto__3__alt"),
         "La identidad logica manda sobre la ruta, tambien para el id alternativo"
+    )
+}
+
+// MARK: - Lo que el telefono borra tiene que desaparecer del reloj
+//
+// Reportado por el dueño: "si elimino o sumo una serie desde el celu, cosa que
+// no se puede hacer desde el reloj, esos cambios no se modifican en la vista del
+// reloj".
+//
+// La sincronizacion solo AGREGABA, con este motivo escrito: "nunca se borra una
+// serie local, una serie cargada en el reloj y todavia sin subir no debe
+// desaparecer porque el remoto aun no la tiene". El motivo es correcto y sigue
+// valiendo — lo que estaba mal era aplicarlo TAMBIEN a las que ya se subieron.
+
+private func runSetLogDeletion() {
+    let remoto = [
+        RemoteSetLogRef(docId: "peso-muerto__1", exerciseId: "peso-muerto", setNumber: 1),
+        RemoteSetLogRef(docId: "peso-muerto__2", exerciseId: "peso-muerto", setNumber: 2),
+    ]
+
+    // Sincronizada y ya no esta en el historial: la borro el telefono.
+    check(
+        setLogWasDeletedRemotely(
+            exerciseId: "peso-muerto", setNumber: 3, synced: true, remote: remoto
+        ),
+        "Una serie subida que ya no esta en el historial la borro el telefono"
+    )
+
+    // Sincronizada y presente: se queda.
+    check(
+        !setLogWasDeletedRemotely(
+            exerciseId: "peso-muerto", setNumber: 2, synced: true, remote: remoto
+        ),
+        "Una serie que sigue en el historial no se toca"
+    )
+
+    // PENDIENTE y ausente del historial: NO se saca. Es la cola de subida, y
+    // perder una serie que el atleta hizo es peor que mostrarla de mas.
+    check(
+        !setLogWasDeletedRemotely(
+            exerciseId: "peso-muerto", setNumber: 9, synced: false, remote: remoto
+        ),
+        "Una serie del reloj todavia sin subir NUNCA se saca"
+    )
+
+    // La misma serie de OTRO ejercicio no la sostiene.
+    check(
+        setLogWasDeletedRemotely(
+            exerciseId: "remo-barra", setNumber: 1, synced: true, remote: remoto
+        ),
+        "La serie 1 de otro ejercicio no cuenta como presente"
+    )
+
+    // Historial vacio: todo lo sincronizado se fue, lo pendiente se queda.
+    check(
+        setLogWasDeletedRemotely(
+            exerciseId: "peso-muerto", setNumber: 1, synced: true, remote: []
+        ),
+        "Con el historial vacio, lo que estaba subido se saca"
+    )
+    check(
+        !setLogWasDeletedRemotely(
+            exerciseId: "peso-muerto", setNumber: 1, synced: false, remote: []
+        ),
+        "Con el historial vacio, lo pendiente sigue"
+    )
+
+    // Despues de que el telefono borre la serie 2 y RENUMERE la 3 a 2, el
+    // historial queda {1,2} y el reloj tenia {1,2,3}: sobra exactamente una.
+    let localDespues = [1, 2, 3].map {
+        setLogWasDeletedRemotely(
+            exerciseId: "peso-muerto", setNumber: $0, synced: true, remote: remoto
+        )
+    }
+    checkEqual(
+        localDespues, [false, false, true],
+        "Tras borrar+renumerar en el telefono, al reloj le sobra una sola serie"
     )
 }

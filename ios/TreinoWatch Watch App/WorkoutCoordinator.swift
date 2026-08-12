@@ -398,9 +398,6 @@ final class WorkoutCoordinator: ObservableObject {
             // suyo y le vuelve a ofrecer series que el atleta ya marco en el
             // celular.
             //
-            // Solo se AGREGA lo que falta; nunca se borra una serie local. Una
-            // serie cargada en el reloj y todavia sin subir no debe desaparecer
-            // porque el remoto aun no la tiene.
             let remote = try await HistorySync.remoteSetLogs(
                 client: client, uid: uid, sessionId: remoteId
             )
@@ -414,7 +411,48 @@ final class WorkoutCoordinator: ObservableObject {
                 current.loggedSets.append(set)
                 nuevas.append(set)
             }
-            if !nuevas.isEmpty {
+
+            // Y las que el TELEFONO borro. Antes esto solo AGREGABA, con este
+            // motivo escrito: "nunca se borra una serie local, una serie cargada
+            // en el reloj y todavia sin subir no debe desaparecer porque el
+            // remoto aun no la tiene". El motivo es correcto pero la regla era
+            // demasiado gruesa: protegia tambien a las YA SINCRONIZADAS.
+            //
+            // El reloj no tiene forma de borrar ni de agregar series, asi que una
+            // serie que llego a subirse y ya no esta en el historial solo pudo
+            // haberla borrado el telefono. El reloj se quedaba mostrandola hecha
+            // para siempre.
+            //
+            // La cola de pendientes NO se toca: es exactamente lo que el
+            // comentario viejo protegia, y sigue protegido.
+            let refs = remote.compactMap { set -> RemoteSetLogRef? in
+                guard let docId = set.remoteDocId else { return nil }
+                return RemoteSetLogRef(
+                    docId: docId,
+                    exerciseId: set.exerciseId,
+                    setNumber: set.setNumber
+                )
+            }
+            func fueBorrada(_ set: LoggedSet) -> Bool {
+                setLogWasDeletedRemotely(
+                    exerciseId: set.exerciseId,
+                    setNumber: set.setNumber,
+                    synced: set.synced,
+                    remote: refs
+                )
+            }
+            let huboBorradas = current.loggedSets.contains(where: fueBorrada)
+            if huboBorradas {
+                current.loggedSets.removeAll(where: fueBorrada)
+                // El cursor puede tener que RETROCEDER: si el telefono borro una
+                // serie del ejercicio en curso, ese ejercicio dejo de estar
+                // completo y hay que volver a ofrecerlo.
+                currentExerciseIndex = firstUnfinishedIndex(
+                    in: exercises, session: current
+                )
+            }
+
+            if !nuevas.isEmpty || huboBorradas {
                 session = current
                 WorkoutSessionStore.save(current)
 

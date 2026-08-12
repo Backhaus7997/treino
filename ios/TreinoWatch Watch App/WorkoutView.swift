@@ -168,19 +168,41 @@ struct WorkoutView: View {
         // mentía, y en el teléfono —que sí ordena— el ejercicio se veía
         // inconsistente. En la muñeca es fácil de hacer sin querer, porque los
         // círculos están a milímetros.
-        let nextSet = (1...max(exercise.sets.count, 1)).first {
+        // Las filas NO salen solo del plan.
+        //
+        // El teléfono puede agregar series más allá de lo planificado ("agregar
+        // serie"), y el reloj no tiene ese gesto. Dibujando solo `exercise.sets`,
+        // esa serie quedaba en el historial y era INVISIBLE en la muñeca: el
+        // atleta la cargaba en el celular y el reloj seguía mostrando el plan
+        // viejo. Se dibuja hasta la serie más alta que exista, venga del plan o
+        // del historial.
+        let ultimaCargada = session.loggedSets
+            .filter { $0.exerciseId == exercise.exerciseId }
+            .map(\.setNumber)
+            .max() ?? 0
+        let filas = max(exercise.sets.count, ultimaCargada, 1)
+
+        let nextSet = (1...filas).first {
             !session.isLogged(exerciseId: exercise.exerciseId, setNumber: $0)
         }
-        // `enumerated` da el índice 0-based; el setNumber es 1-based para que
-        // coincida con la identidad lógica que usa el teléfono.
-        return ForEach(Array(exercise.sets.enumerated()), id: \.offset) { index, spec in
-            let setNumber = index + 1
+        // El setNumber es 1-based para que coincida con la identidad lógica que
+        // usa el teléfono.
+        return ForEach(1...filas, id: \.self) { setNumber in
+            // Una fila más allá del plan no tiene prescripción: existe solo
+            // porque el atleta la cargó desde el teléfono. Se muestra con lo que
+            // hizo, no con un objetivo inventado.
+            let spec: SetSpec? = setNumber <= exercise.sets.count
+                ? exercise.sets[setNumber - 1]
+                : nil
             let done = session.isLogged(
                 exerciseId: exercise.exerciseId, setNumber: setNumber
             )
-            // Ni las hechas ni las que están más adelante que la próxima.
-            let tappable = !done && setNumber == nextSet
+            // Ni las hechas, ni las que están más adelante que la próxima, ni
+            // una fila sin prescripción: el reloj no ofrece cargar una serie de
+            // la que no sabe el objetivo. Agregar series es del teléfono.
+            let tappable = !done && setNumber == nextSet && spec != nil
             Button {
+                guard let spec else { return }
                 workout.logSet(
                     exerciseId: exercise.exerciseId,
                     setNumber: setNumber,
@@ -195,7 +217,13 @@ struct WorkoutView: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                     Spacer()
-                    Text(Self.describe(spec))
+                    Text(Self.describe(
+                        spec,
+                        hecha: session.loggedSets.first {
+                            $0.exerciseId == exercise.exerciseId
+                                && $0.setNumber == setNumber
+                        }
+                    ))
                         .font(.caption)
                         .monospacedDigit()
                 }
@@ -208,6 +236,26 @@ struct WorkoutView: View {
             .disabled(!tappable)
             .opacity(tappable ? 1 : 0.5)
         }
+    }
+
+    /// Qué mostrar en una fila: el objetivo del plan, o —si la fila no está en
+    /// el plan— lo que el atleta efectivamente hizo.
+    ///
+    /// Una fila sin `spec` solo puede venir de una serie que el TELÉFONO agregó
+    /// más allá del plan. No hay objetivo que mostrar y no se inventa uno: se
+    /// muestra lo cargado.
+    static func describe(_ spec: SetSpec?, hecha: LoggedSet?) -> String {
+        guard let spec else {
+            guard let hecha else { return "—" }
+            let reps = hecha.reps.map(String.init) ?? "—"
+            guard let peso = hecha.weightKg, peso > 0 else { return reps }
+            let redondo = peso.rounded()
+            let texto = peso == redondo
+                ? String(Int(redondo))
+                : String(format: "%.1f", peso)
+            return "\(reps) × \(texto) kg"
+        }
+        return describe(spec)
     }
 
     /// El objetivo de una serie, en el mínimo de caracteres legible de reojo.

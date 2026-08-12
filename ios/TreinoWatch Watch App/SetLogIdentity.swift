@@ -73,6 +73,31 @@ enum SetLogWriteTarget: Equatable {
     case write(docId: String)
 }
 
+/// Si una serie que el reloj tiene cargada hay que SACARLA porque el telefono la
+/// borro.
+///
+/// El reloj no puede borrar ni agregar series: son gestos del telefono. Asi que
+/// una serie que ya se subio y ya NO esta en el historial solo pudo haberla
+/// borrado el celular, y el reloj se quedaba mostrandola hecha para siempre.
+///
+/// `synced == false` NUNCA se saca: esa es la cola de pendientes. Una serie
+/// cargada en la muñeca y todavia sin subir no puede desaparecer porque el
+/// remoto aun no la tiene — perder una serie que el atleta hizo es peor que
+/// mostrar de mas. Esa era la razon por la que la sincronizacion solo AGREGABA;
+/// la razon es correcta, lo que estaba mal era aplicarla tambien a las que ya
+/// estaban arriba.
+func setLogWasDeletedRemotely(
+    exerciseId: String,
+    setNumber: Int,
+    synced: Bool,
+    remote: [RemoteSetLogRef]
+) -> Bool {
+    guard synced else { return false }
+    return !remote.contains {
+        $0.exerciseId == exerciseId && $0.setNumber == setNumber
+    }
+}
+
 func resolveSetLogWriteTarget(
     exerciseId: String,
     setNumber: Int,
