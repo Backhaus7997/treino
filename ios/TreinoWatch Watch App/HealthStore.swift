@@ -44,8 +44,10 @@ final class HealthStore: ObservableObject {
 
         guard HealthAccess.shouldRequest(current: state, isHealthDataAvailable: available) else {
             if !available {
-                // Sin Salud en el dispositivo no hay a quien preguntarle. Pasa
-                // en el simulador; en un Apple Watch real, no.
+                // Sin Salud en el dispositivo no hay a quien preguntarle.
+                //
+                // Ojo: NO es el caso del simulador. Medido en F0 —
+                // `isHealthDataAvailable = true` en el simulador de watchOS.
                 state = .unsupported
                 log.notice("Salud no esta disponible en este dispositivo")
             }

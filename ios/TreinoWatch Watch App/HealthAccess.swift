@@ -6,19 +6,36 @@
 //
 //  Que le pide TREINO a la app Salud, y como se lee la respuesta.
 //
-//  ESTE ARCHIVO NO IMPORTA HealthKit, a proposito. HealthKit no existe en
-//  macOS, asi que dejar la decision acá —separada del framework— es lo que
-//  permite testearla en el host en segundos (`scripts/test_watch_swift.sh`) en
-//  vez de depender de un simulador. El puente que si toca HealthKit vive en
-//  `HealthStore.swift` y no toma ninguna decision.
+//  ESTE ARCHIVO NO IMPORTA HealthKit, a proposito: dejar la decision acá
+//  —separada del framework— es lo que permite testearla en el host en segundos
+//  (`scripts/test_watch_swift.sh`) en vez de depender de un simulador. El
+//  puente que si toca HealthKit vive en `HealthStore.swift` y no decide nada.
+//
+//  Ojo con el porque, que es facil de escribir mal: HealthKit SI existe en
+//  macOS —`import HealthKit`, `HKHealthStore` y `HKObjectType.workoutType()`
+//  compilan— asi que no es que el framework falte. Lo que es watchOS-only es la
+//  parte de SESION DE ENTRENAMIENTO: `HKWorkoutSession.init(healthStore:
+//  configuration:)` da "unavailable in macOS". Medido, no supuesto.
+//
+//  O sea que la separacion no se justifica por "el framework no esta": se
+//  justifica porque la decision no necesita el framework para nada, y no
+//  arrastrarlo la deja verificable en segundos.
 //
 
 import Foundation
 
 /// En que quedo el pedido de permiso a Salud.
 enum HealthAccessState: Equatable {
-    /// El dispositivo no tiene Salud. Pasa en el simulador; en un Apple Watch
-    /// real, no.
+    /// El dispositivo no tiene Salud.
+    ///
+    /// NO es el caso del simulador: se midio en F0 que el simulador de watchOS
+    /// da `isHealthDataAvailable = true`, abre una `HKWorkoutSession` y la
+    /// lleva a `running`. (Este comentario decia lo contrario y era falso;
+    /// alcanzo para que alguien concluyera que F1 no se podia medir sin
+    /// hardware.)
+    ///
+    /// En la practica este caso casi no aparece en un reloj: queda como la
+    /// rama honesta para cuando el sistema diga que no hay Salud.
     case unsupported
 
     /// Todavia no se le pregunto al atleta.
