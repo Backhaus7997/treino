@@ -31,10 +31,43 @@ class Session with _$Session {
       _$SessionFromJson(json);
 }
 
+/// Si un documento de sesión cuenta como entrenamiento **HECHO**, a partir de
+/// sus valores de wire.
+///
+/// ⚠️ **Esta función es un contrato compartido con el cliente watchOS**, que la
+/// reimplementa en `ios/TreinoWatch Watch App/SessionCounting.swift`. Los
+/// fixtures de `conformance/session_counting.json` son la red entre las dos: si
+/// una cambia y la otra no, CI se pone en rojo.
+///
+/// Existe como función suelta —y no solo como el getter de abajo— porque el
+/// reloj no deserializa a [Session]: lee el JSON crudo de la REST API de
+/// Firestore, donde los campos pueden faltar o venir con nulo explícito. El
+/// contrato tiene que estar definido sobre ESO, que es lo que el reloj ve.
+///
+/// Toma `String?` y no [SessionStatus] a propósito: un valor desconocido tiene
+/// que dar `false`, no explotar. La condición es igualdad contra `'finished'`,
+/// nunca desigualdad contra `'active'` — si algún día se agrega un estado
+/// nuevo, no puede empezar a contar solo.
+///
+/// `wasFullyCompleted` nulo cuenta como `false`, igual que el `@Default(false)`
+/// del modelo: un documento viejo sin la clave no puede empezar a contar de
+/// golpe.
+bool sessionCountsAsWorkout({
+  required String? status,
+  required bool? wasFullyCompleted,
+}) =>
+    status == 'finished' && wasFullyCompleted == true;
+
 extension SessionCounting on Session {
   /// Cuenta como entrenamiento HECHO: terminado de verdad, no abandonado.
   /// Abandonar guarda `status=finished` con `wasFullyCompleted=false`
   /// (ver `SessionNotifier.abandonSession`), así que `status` solo no alcanza.
-  bool get countsAsWorkout =>
-      status == SessionStatus.finished && wasFullyCompleted;
+  ///
+  /// Delega en [sessionCountsAsWorkout] en vez de repetir la condición: si se
+  /// escribiera acá también, el contrato compartido y el que usa la app
+  /// podrían separarse sin que nada se ponga rojo.
+  bool get countsAsWorkout => sessionCountsAsWorkout(
+        status: status.toJson(),
+        wasFullyCompleted: wasFullyCompleted,
+      );
 }

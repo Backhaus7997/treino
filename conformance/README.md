@@ -60,6 +60,25 @@ fuera de rango) son justo los que alguien va a querer "arreglar" sin entender.
 | `plan_advance.json` | Qué día y semana tocan según la última sesión finalizada | `lib/features/workout/domain/plan_advance.dart` | `ios/TreinoWatch Watch App/PlanAdvance.swift` |
 | `routine_selection.json` | Cuál rutina es la activa del atleta | `lib/features/workout/domain/routine_selection.dart` | `ios/TreinoWatch Watch App/RoutineSelection.swift` |
 | `set_resolution.json` | Qué series le tocan en un ejercicio, por semana | `lib/features/workout/domain/routine_slot.dart` | `ios/TreinoWatch Watch App/SetResolution.swift` |
+| `session_counting.json` | Si una sesión cuenta como entrenamiento HECHO — la **entrada** de `plan_advance` | `lib/features/workout/domain/session.dart` | `ios/TreinoWatch Watch App/SessionCounting.swift` |
+
+## La lección que costó cuatro bugs
+
+**Un contrato sobre la decisión no protege si las dos implementaciones le pasan
+entradas distintas.**
+
+`plan_advance.json` estuvo en verde con 35 casos mientras el reloj y el teléfono
+mostraban días distintos del plan. La aritmética era idéntica; lo que difería era
+qué sesión le daban como "última terminada": el reloj filtraba por `finishedAt`
+presente y el teléfono por `status == finished && wasFullyCompleted`. No son el
+mismo conjunto — abandonar guarda `status=finished` con `wasFullyCompleted=false`.
+
+De ahí sale `session_counting.json`: pone bajo contrato la **entrada**, no solo el
+cálculo.
+
+Antes de dar por cubierta una regla portada, preguntate: *¿de dónde salen sus
+argumentos en cada lado, y eso también está bajo contrato?* Si la respuesta es
+"se arman en cada implementación por su cuenta", falta un fixture.
 
 ## Quién los corre
 
