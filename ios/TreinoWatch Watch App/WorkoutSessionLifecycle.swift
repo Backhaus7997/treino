@@ -47,6 +47,15 @@ enum WorkoutSessionCommand: Equatable {
 @MainActor
 protocol WorkoutSessionControlling: AnyObject {
     var phase: WorkoutSessionPhase { get }
+
+    /// Segundos que lleva MEDIDOS la sesion de entrenamiento, o `nil` si no hay
+    /// sesion abierta.
+    ///
+    /// Es lo que convierte la duracion de estimacion en medicion (D4). Devuelve
+    /// `nil` —y no 0— cuando no hay nada que medir, para que el llamador pueda
+    /// distinguir "duro cero" de "no se midio" y caer al calculo de respaldo.
+    var measuredElapsedSeconds: TimeInterval? { get }
+
     func begin()
     func end()
 }

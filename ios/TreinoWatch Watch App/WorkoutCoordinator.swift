@@ -7,6 +7,7 @@
 
 import Combine
 import Foundation
+import os
 
 /// Maneja la sesión de entrenamiento en curso desde el reloj.
 ///
@@ -38,6 +39,11 @@ final class WorkoutCoordinator: ObservableObject {
     @Published private(set) var syncError: String?
 
     private var restTimer: Timer?
+
+    private let log = Logger(
+        subsystem: "com.backhaus.treino.watchkitapp",
+        category: "workout"
+    )
 
     /// El permiso de Salud. Se pide al entrar en modo entreno y nunca
     /// condiciona nada de lo que pasa despues (D2).
@@ -450,10 +456,29 @@ final class WorkoutCoordinator: ObservableObject {
         }
     }
 
-    /// Duracion en minutos, con piso de 1: un entreno relampago igual duro algo,
-    /// y un 0 se lee como "no se registro".
+    /// Duracion en minutos.
+    ///
+    /// D4, firmada: la sesion de entrenamiento es la fuente de verdad cuando
+    /// existe, y el calculo de reloj de pared queda como respaldo. Antes esto
+    /// SIEMPRE estimaba restando timestamps; ahora estima solo cuando no hay
+    /// nada que medir —permiso negado, Salud caida, dispositivo sin Salud—.
+    ///
+    /// La regla vive en `WorkoutDurationRules`, sin HealthKit, para poder
+    /// testearla en el host.
     func durationMinutes(since start: Date) -> Int {
-        max(Int(Date().timeIntervalSince(start) / 60), 1)
+        let resultado = WorkoutDurationRules.minutes(
+            measuredSeconds: workoutSession?.measuredElapsedSeconds,
+            startedAt: start,
+            now: Date()
+        )
+        // Se loguea DE DONDE salio y no solo el numero: cuando medicion y
+        // reloj de pared coinciden —que es lo normal— el resultado solo no
+        // distingue si la medicion se uso o si se cayo al respaldo en silencio.
+        // Sin esto, D4 es inverificable corriendo.
+        log.notice(
+            "Duracion \(resultado.minutes) min, origen \(String(describing: resultado.source))"
+        )
+        return resultado.minutes
     }
 
     /// Si se cargaron TODAS las series de TODOS los ejercicios.
