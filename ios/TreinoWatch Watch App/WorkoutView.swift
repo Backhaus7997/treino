@@ -15,11 +15,19 @@ import SwiftUI
 struct WorkoutView: View {
     @EnvironmentObject private var workout: WorkoutCoordinator
 
+    /// La sesion de entrenamiento, solo para leerle el ritmo cardiaco (F2).
+    ///
+    /// Es opcional a proposito: si nadie la inyecta —o si el atleta nego el
+    /// permiso— la pantalla se dibuja igual, sin pulsaciones y sin hueco.
+    @EnvironmentObject private var workoutSession: WorkoutSessionController
+
     var body: some View {
         if let exercise = workout.currentExercise, let session = workout.session {
             ScrollView {
                 VStack(spacing: 6) {
                     header(exercise: exercise, session: session)
+
+                    heartRateRow()
 
                     if let remaining = workout.restRemaining {
                         restBanner(remaining)
@@ -71,6 +79,34 @@ struct WorkoutView: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+        }
+    }
+
+    /// El ritmo cardiaco, cuando lo hay (F2).
+    ///
+    /// Cuando NO lo hay no se dibuja nada: ni un guion, ni un cero, ni un aviso.
+    ///
+    /// No es minimalismo — es lo unico honesto que se puede hacer. En F0 se
+    /// midio que una lectura negada por el atleta es INDISTINGUIBLE de "todavia
+    /// no hay datos": las dos dan una query exitosa con cero muestras. La app no
+    /// puede saber cual de las dos es, asi que no puede decir ninguna. Poner
+    /// "sin permiso" seria adivinar, y poner "--" seria sugerir que algo se
+    /// rompio cuando lo mas probable es que el sensor todavia no engancho.
+    @ViewBuilder
+    private func heartRateRow() -> some View {
+        switch HeartRateRules.display(reading: workoutSession.heartRate, now: Date()) {
+        case .sinDatos:
+            EmptyView()
+        case .bpm(let bpm):
+            HStack(spacing: 4) {
+                Image(systemName: "heart.fill")
+                    .foregroundStyle(.red)
+                Text("\(bpm)")
+                    .monospacedDigit()
+                Text("lpm")
+                    .foregroundStyle(.secondary)
+            }
+            .font(.caption)
         }
     }
 

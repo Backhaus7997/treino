@@ -40,8 +40,22 @@ final class WorkoutSessionController: NSObject, ObservableObject, WorkoutSession
     /// diagnostico.
     @Published private(set) var phase: WorkoutSessionPhase = .idle
 
+    /// La ultima lectura de ritmo cardiaco que llego del reloj (F2).
+    ///
+    /// Es la LECTURA CRUDA, con su timestamp. Que mostrar a partir de ella —y
+    /// cuando no mostrar nada— lo decide `HeartRateRules`, para que la pantalla
+    /// no tenga que saber de HealthKit y la regla se pueda testear en el host.
+    @Published private(set) var heartRate: HeartRateReading?
+
+    /// Segundos medidos por la sesion (D4). `nil` sin sesion abierta.
+    var measuredElapsedSeconds: TimeInterval? {
+        guard phase == .open, let builder else { return nil }
+        return builder.elapsedTime
+    }
+
     private let store = HKHealthStore()
     private var session: HKWorkoutSession?
+    private var builder: HKLiveWorkoutBuilder?
 
     private let log = Logger(
         subsystem: "com.backhaus.treino.watchkitapp",
@@ -82,34 +96,133 @@ final class WorkoutSessionController: NSObject, ObservableObject, WorkoutSession
             return
         }
 
+        let config = Self.configuration()
         do {
-            let new = try HKWorkoutSession(
-                healthStore: store,
-                configuration: Self.configuration()
-            )
+            let new = try HKWorkoutSession(healthStore: store, configuration: config)
             new.delegate = self
             new.startActivity(with: Date())
 
+            // El builder es lo que recolecta ritmo cardiaco y calorias (F2) y lo
+            // que despues escribe el entreno en Salud (F3, D3).
+            let newBuilder = new.associatedWorkoutBuilder()
+            newBuilder.dataSource = HKLiveWorkoutDataSource(
+                healthStore: store, workoutConfiguration: config
+            )
+            newBuilder.delegate = self
+
             session = new
+            builder = newBuilder
             // El estado se avanza DESPUES de que HealthKit acepto, no antes: la
             // maquina dice a donde iriamos, el recurso dice si llegamos.
             phase = decision.next
             log.notice("Sesion de entrenamiento abierta")
+
+            // La recoleccion arranca aparte y NO condiciona nada de lo de
+            // arriba. Si el atleta nego el permiso de lectura, esto falla con
+            // "Not authorized" —medido en F0— y el entreno sigue igual, sin
+            // pulsaciones: la sesion ya esta abierta y el segundo plano ya esta
+            // conseguido. Es exactamente la degradacion que firma D2.
+            newBuilder.beginCollection(withStart: Date()) { [weak self] ok, error in
+                Task { @MainActor in
+                    guard let self else { return }
+                    if ok {
+                        self.log.notice("El builder empezo a recolectar")
+                    } else {
+                        let detalle = error?.localizedDescription ?? "sin detalle"
+                        self.log.error("El builder no pudo recolectar (sin pulsaciones): \(detalle)")
+                    }
+                }
+            }
         } catch {
             // Queda en idle: no hay sesion. El entreno sigue igual (D2).
             log.error("No se pudo abrir la sesion de entrenamiento: \(error.localizedDescription)")
         }
     }
 
-    /// Cierra la sesion, si hay una abierta.
+    /// Cierra la sesion, si hay una abierta, y escribe el entreno en Salud.
+    ///
+    /// El cambio de estado es SINCRONICO —igual que en `begin()`, y por la
+    /// misma razon—. Lo que va suelto es la escritura en Salud, que puede
+    /// tardar y no condiciona nada.
     func end() {
         let decision = WorkoutSessionLifecycle.resolve(.end, in: phase)
         guard decision.execute else { return }
 
-        session?.end()
+        let cerrando = session
+        let cerrandoBuilder = builder
+
         session = nil
+        builder = nil
+        heartRate = nil
         phase = decision.next
+
+        cerrando?.end()
         log.notice("Sesion de entrenamiento cerrada")
+
+        guard let cerrandoBuilder else { return }
+        Task { await escribirEnSalud(cerrandoBuilder) }
+    }
+
+    /// Escribe el entreno terminado en la app Salud (D3, firmada).
+    ///
+    /// Sin esto el entreno de TREINO no cuenta para los anillos ni el historial
+    /// del atleta, que es lo que espera cualquier usuario de Apple Watch.
+    ///
+    /// No lanza: si el atleta nego la escritura, el entreno ya quedo guardado en
+    /// el historial de TREINO igual. Salud es un destino ADEMAS, nunca EN VEZ.
+    private func escribirEnSalud(_ builder: HKLiveWorkoutBuilder) async {
+        let fin = Date()
+        do {
+            try await builder.endCollection(at: fin)
+            // `finishWorkout` devuelve nil cuando no hay nada que guardar —por
+            // ejemplo si la recoleccion nunca arranco por falta de permiso—.
+            // No es un error: es el caso degradado y esperado.
+            if let workout = try await builder.finishWorkout() {
+                log.notice("Entreno escrito en Salud, duracion \(workout.duration)s")
+            } else {
+                log.notice("Salud no guardo el entreno (sin permiso de escritura o sin datos)")
+            }
+        } catch {
+            log.error("No se pudo escribir el entreno en Salud: \(error.localizedDescription)")
+        }
+    }
+}
+
+// MARK: - HKLiveWorkoutBuilderDelegate
+
+extension WorkoutSessionController: HKLiveWorkoutBuilderDelegate {
+
+    /// Llega cada vez que el builder recolecta muestras nuevas.
+    ///
+    /// Se lee la estadistica MAS RECIENTE, no el promedio: al atleta le importa
+    /// a cuanto esta AHORA, no a cuanto estuvo en promedio desde que empezo.
+    nonisolated func workoutBuilder(
+        _ workoutBuilder: HKLiveWorkoutBuilder,
+        didCollectDataOf collectedTypes: Set<HKSampleType>
+    ) {
+        guard let hrType = HKObjectType.quantityType(forIdentifier: .heartRate),
+              collectedTypes.contains(hrType),
+              let stats = workoutBuilder.statistics(for: hrType),
+              let quantity = stats.mostRecentQuantity()
+        else { return }
+
+        let bpm = quantity.doubleValue(for: HKUnit.count().unitDivided(by: .minute()))
+        // El timestamp sale de la MUESTRA, no de `Date()`: si el reloj entrega
+        // una tanda con retraso, fecharla ahora la haria pasar por mas fresca de
+        // lo que es, y la regla de antiguedad dejaria de servir.
+        let tomada = stats.mostRecentQuantityDateInterval()?.end ?? Date()
+
+        Task { @MainActor in
+            self.heartRate = HeartRateReading(
+                bpm: HeartRateReading.bpm(fromQuantity: bpm),
+                takenAt: tomada
+            )
+        }
+    }
+
+    nonisolated func workoutBuilderDidCollectEvent(_ workoutBuilder: HKLiveWorkoutBuilder) {
+        // Pausas y reanudaciones del sistema. F1/F2 no las usan; el metodo es
+        // obligatorio en el protocolo.
     }
 }
 

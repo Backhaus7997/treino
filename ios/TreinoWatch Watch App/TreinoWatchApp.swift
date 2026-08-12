@@ -25,6 +25,7 @@ struct TreinoWatch_Watch_AppApp: App {
             ContentView()
                 .environmentObject(coordinator)
                 .environmentObject(workoutCoordinator)
+                .environmentObject(workoutSession)
                 // Activa WatchConnectivity y recupera la credencial guardada.
                 // Va acá y no en el init del coordinator para que el trabajo
                 // arranque con la escena viva, no durante la construcción.

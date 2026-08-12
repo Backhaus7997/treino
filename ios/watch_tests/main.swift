@@ -286,6 +286,147 @@ private func runSessionLifecycleSequences() {
     )
 }
 
+// MARK: - Ritmo cardiaco en pantalla (F2)
+//
+// La regla que mas importa acá NO es mostrar el numero: es NO MENTIR cuando no
+// hay dato.
+//
+// En F0 se midio que una lectura negada por el atleta es INDISTINGUIBLE de "no
+// hay datos": las dos dan una query exitosa con cero muestras. Y en un
+// entrenamiento real el sensor se corta seguido —muñeca floja, brazo en
+// posicion rara—. Mostrar la ultima lectura conocida como si fuera actual es
+// mentirle al atleta sobre su propio esfuerzo.
+
+private func runHeartRateDisplay() {
+    let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+
+    // Sin ninguna lectura: no hay nada que mostrar.
+    checkEqual(
+        HeartRateRules.display(reading: nil, now: t0),
+        .sinDatos,
+        "Sin lecturas no se muestra numero"
+    )
+
+    // Lectura recien tomada.
+    checkEqual(
+        HeartRateRules.display(reading: HeartRateReading(bpm: 142, takenAt: t0), now: t0),
+        .bpm(142),
+        "Una lectura del momento se muestra"
+    )
+
+    // Lectura de hace poco: sigue valiendo. El reloj muestrea cada ~5s.
+    checkEqual(
+        HeartRateRules.display(
+            reading: HeartRateReading(bpm: 138, takenAt: t0),
+            now: t0.addingTimeInterval(10)
+        ),
+        .bpm(138),
+        "A los 10s la lectura sigue siendo actual"
+    )
+
+    // LECTURA VIEJA: se deja de mostrar. Es la regla que evita la mentira.
+    checkEqual(
+        HeartRateRules.display(
+            reading: HeartRateReading(bpm: 138, takenAt: t0),
+            now: t0.addingTimeInterval(HeartRateRules.maxAntiguedad + 1)
+        ),
+        .sinDatos,
+        "Pasada la antiguedad maxima se deja de mostrar en vez de mentir"
+    )
+
+    // Justo en el limite todavia vale: el corte es estrictamente mayor.
+    checkEqual(
+        HeartRateRules.display(
+            reading: HeartRateReading(bpm: 150, takenAt: t0),
+            now: t0.addingTimeInterval(HeartRateRules.maxAntiguedad)
+        ),
+        .bpm(150),
+        "Justo en el limite la lectura todavia vale"
+    )
+
+    // Reloj corrido hacia atras: una lectura "del futuro" no puede borrar la
+    // pantalla. Es un problema del reloj, no del atleta.
+    //
+    // El desfase de prueba tiene que ser MAYOR que maxAntiguedad. Con uno chico
+    // el test no distingue esta regla de `abs(antiguedad) > maxAntiguedad`, que
+    // es la implementacion equivocada: esa SI borraria la pantalla ante un
+    // desfase grande. (Se descubrio justamente asi: la mutacion sobrevivio.)
+    for adelanto in [5.0, HeartRateRules.maxAntiguedad * 4] {
+        checkEqual(
+            HeartRateRules.display(
+                reading: HeartRateReading(bpm: 130, takenAt: t0.addingTimeInterval(adelanto)),
+                now: t0
+            ),
+            .bpm(130),
+            "Una lectura \(Int(adelanto))s en el futuro se toma como actual, no se descarta"
+        )
+    }
+
+    // Valores imposibles: 0 pulsaciones no es una medicion, es un sensor que no
+    // engancho. Mostrarlo asustaria al atleta.
+    for imposible in [0, -5] {
+        checkEqual(
+            HeartRateRules.display(reading: HeartRateReading(bpm: imposible, takenAt: t0), now: t0),
+            .sinDatos,
+            "Un bpm de \(imposible) no es una medicion"
+        )
+    }
+}
+
+private func runHeartRateRounding() {
+    // HealthKit entrega Double; la pantalla muestra entero. Se redondea, no se
+    // trunca: 141.6 es mas cerca de 142 que de 141.
+    checkEqual(HeartRateReading.bpm(fromQuantity: 141.6), 142, "141.6 redondea a 142")
+    checkEqual(HeartRateReading.bpm(fromQuantity: 141.4), 141, "141.4 redondea a 141")
+    checkEqual(HeartRateReading.bpm(fromQuantity: 0), 0, "0 se preserva para que la regla lo descarte")
+}
+
+// MARK: - De donde sale la duracion (F3, decision D4)
+//
+// D4, firmada: la sesion de entrenamiento pasa a ser la fuente de verdad cuando
+// existe, y el calculo actual queda como respaldo.
+
+private func runWorkoutDuration() {
+    let inicio = Date(timeIntervalSince1970: 1_700_000_000)
+
+    // Con medicion de la sesion: manda esa.
+    var r = WorkoutDurationRules.minutes(
+        measuredSeconds: 42 * 60, startedAt: inicio, now: inicio.addingTimeInterval(90 * 60)
+    )
+    checkEqual(r.minutes, 42, "Con medicion manda la medicion, no el reloj de pared")
+    checkEqual(r.source, .medida, "Y se declara que salio de la sesion")
+
+    // Sin medicion: cae al calculo de siempre.
+    r = WorkoutDurationRules.minutes(
+        measuredSeconds: nil, startedAt: inicio, now: inicio.addingTimeInterval(35 * 60)
+    )
+    checkEqual(r.minutes, 35, "Sin medicion se calcula por reloj de pared")
+    checkEqual(r.source, .calculada, "Y se declara que fue calculada")
+
+    // Piso de 1: un entreno relampago igual duro algo, y un 0 se lee como "no
+    // se registro". Es la regla que ya tenia el reloj y no cambia.
+    r = WorkoutDurationRules.minutes(
+        measuredSeconds: 20, startedAt: inicio, now: inicio.addingTimeInterval(20)
+    )
+    checkEqual(r.minutes, 1, "Un entreno de 20 segundos cuenta como 1 minuto")
+
+    // TECHO: una sesion olvidada no puede escribir una duracion absurda.
+    // El telefono ya acota a 8 horas (session_duration.dart); sin esto el mismo
+    // entreno daria distinto segun quien lo termine.
+    r = WorkoutDurationRules.minutes(
+        measuredSeconds: 20 * 3600, startedAt: inicio, now: inicio.addingTimeInterval(20 * 3600)
+    )
+    checkEqual(r.minutes, WorkoutDurationRules.maxMinutos, "20 horas se acotan al techo")
+    r = WorkoutDurationRules.minutes(
+        measuredSeconds: nil, startedAt: inicio, now: inicio.addingTimeInterval(20 * 3600)
+    )
+    checkEqual(r.minutes, WorkoutDurationRules.maxMinutos, "El techo tambien aplica al calculo de respaldo")
+
+    // El techo es el MISMO que el del telefono. Si alguien cambia uno solo, los
+    // dos lados vuelven a discrepar.
+    checkEqual(WorkoutDurationRules.maxMinutos, 8 * 60, "El techo son 8 horas, igual que en el telefono")
+}
+
 // MARK: - Corrida
 
 runRequestedTypes()
@@ -294,6 +435,9 @@ runAuthorizationMapping()
 runNeverBlocksWorkout()
 runSessionLifecycleBasics()
 runSessionLifecycleSequences()
+runHeartRateDisplay()
+runHeartRateRounding()
+runWorkoutDuration()
 
 if failures.isEmpty {
     print("OK: \(totalChecks) chequeos de la logica de permisos de Salud")

@@ -31,6 +31,8 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 WATCH_SOURCES=(
   "${REPO_ROOT}/ios/TreinoWatch Watch App/HealthAccess.swift"
   "${REPO_ROOT}/ios/TreinoWatch Watch App/WorkoutSessionLifecycle.swift"
+  "${REPO_ROOT}/ios/TreinoWatch Watch App/HeartRateRules.swift"
+  "${REPO_ROOT}/ios/TreinoWatch Watch App/WorkoutDurationRules.swift"
 )
 
 TEST_SOURCES=(
