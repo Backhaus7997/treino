@@ -612,6 +612,68 @@ class AppL10nEs extends AppL10n {
   String get workoutPostAutoCompleteText => '¡Terminé mi entreno! 💪';
 
   @override
+  String get wellbeingCheckInTitle => '¿CÓMO TE SENTISTE?';
+
+  @override
+  String get wellbeingCheckInOptional => 'Opcional. Podés saltearlo.';
+
+  @override
+  String get wellbeingFeelingVeryBad => 'Muy mal';
+
+  @override
+  String get wellbeingFeelingBad => 'Mal';
+
+  @override
+  String get wellbeingFeelingNeutral => 'Normal';
+
+  @override
+  String get wellbeingFeelingGood => 'Bien';
+
+  @override
+  String get wellbeingFeelingGreat => 'Muy bien';
+
+  @override
+  String get wellbeingPainQuestion => '¿Tuviste dolor o molestia?';
+
+  @override
+  String get wellbeingPainYes => 'SÍ';
+
+  @override
+  String get wellbeingPainNo => 'NO';
+
+  @override
+  String get wellbeingPainAreasQuestion => '¿En qué zona?';
+
+  @override
+  String get wellbeingPainAreasHint => 'Podés marcar más de una.';
+
+  @override
+  String get wellbeingNoteLabel => 'Nota (opcional)';
+
+  @override
+  String get wellbeingNoteHint => 'Algo que quieras recordar de hoy';
+
+  @override
+  String get wellbeingMedicalDisclaimer =>
+      'Si el dolor persiste, consultá a un profesional de la salud.';
+
+  @override
+  String get wellbeingSaveButton => 'GUARDAR';
+
+  @override
+  String get wellbeingSkipButton => 'AHORA NO';
+
+  @override
+  String get wellbeingSavedLabel => 'REGISTRADO';
+
+  @override
+  String get wellbeingEditButton => 'Editar';
+
+  @override
+  String get wellbeingSaveError =>
+      'No pudimos guardar tu registro. Probá de nuevo.';
+
+  @override
   String get shareWorkoutComposerTitle => 'COMPARTIR ENTRENO';
 
   @override
@@ -3997,6 +4059,68 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get workoutPostAutoCompleteText => '¡Terminé mi entreno! 💪';
+
+  @override
+  String get wellbeingCheckInTitle => '¿CÓMO TE SENTISTE?';
+
+  @override
+  String get wellbeingCheckInOptional => 'Opcional. Podés saltearlo.';
+
+  @override
+  String get wellbeingFeelingVeryBad => 'Muy mal';
+
+  @override
+  String get wellbeingFeelingBad => 'Mal';
+
+  @override
+  String get wellbeingFeelingNeutral => 'Normal';
+
+  @override
+  String get wellbeingFeelingGood => 'Bien';
+
+  @override
+  String get wellbeingFeelingGreat => 'Muy bien';
+
+  @override
+  String get wellbeingPainQuestion => '¿Tuviste dolor o molestia?';
+
+  @override
+  String get wellbeingPainYes => 'SÍ';
+
+  @override
+  String get wellbeingPainNo => 'NO';
+
+  @override
+  String get wellbeingPainAreasQuestion => '¿En qué zona?';
+
+  @override
+  String get wellbeingPainAreasHint => 'Podés marcar más de una.';
+
+  @override
+  String get wellbeingNoteLabel => 'Nota (opcional)';
+
+  @override
+  String get wellbeingNoteHint => 'Algo que quieras recordar de hoy';
+
+  @override
+  String get wellbeingMedicalDisclaimer =>
+      'Si el dolor persiste, consultá a un profesional de la salud.';
+
+  @override
+  String get wellbeingSaveButton => 'GUARDAR';
+
+  @override
+  String get wellbeingSkipButton => 'AHORA NO';
+
+  @override
+  String get wellbeingSavedLabel => 'REGISTRADO';
+
+  @override
+  String get wellbeingEditButton => 'Editar';
+
+  @override
+  String get wellbeingSaveError =>
+      'No pudimos guardar tu registro. Probá de nuevo.';
 
   @override
   String get shareWorkoutComposerTitle => 'COMPARTIR ENTRENO';
