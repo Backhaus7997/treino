@@ -5,8 +5,38 @@
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
 
+    <!-- ================================================================
+         SPIKE de Wear OS. Todo lo que sigue vive SOLO en debug a propósito:
+         el APK de release del teléfono no cambia, y revertir el spike es
+         borrar este bloque.
+
+         Cuando el companion Wear sea real, esto se muda a un source set
+         propio (`src/wear/`), NO al manifest principal: el teléfono no tiene
+         por qué declarar un foreground service de tipo health.
+         ================================================================ -->
+
+    <!-- Precondición de runtime del tipo `health`: es un OR entre varios
+         permisos, y HIGH_SAMPLING_RATE_SENSORS es la rama barata — es de
+         install-time (permiso normal, sin diálogo), así que arrancar el
+         servicio no queda atado al flujo de permisos de sensores. Sin cumplir
+         la precondición, startForeground() tira SecurityException aunque el
+         manifest esté perfecto. -->
+    <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <!-- Habilita HTTP en claro contra los emuladores de Firebase. Solo debug:
          este manifest no se mergea en el build de release. Ver el comentario de
          res/xml/network_security_config.xml. -->
-    <application android:networkSecurityConfig="@xml/network_security_config" />
+    <application android:networkSecurityConfig="@xml/network_security_config">
+        <!-- Sin foregroundServiceType, con targetSdk >= 34, startForeground()
+             tira IllegalArgumentException ("not a subset of ... 0x00000000"),
+             NO la MissingForegroundServiceTypeException que uno buscaría en
+             logcat. -->
+        <service
+            android:name="com.treino.app.workout.WorkoutForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="health" />
+    </application>
 </manifest>
