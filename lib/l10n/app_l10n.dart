@@ -3128,6 +3128,24 @@ abstract class AppL10n {
   /// **'Confirmar'**
   String get routineEditorDialogConfirm;
 
+  /// No description provided for @routineEditorCopyPrescriptionTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Copiar sets?'**
+  String get routineEditorCopyPrescriptionTitle;
+
+  /// Confirmation body for the slot-menu shortcut that copies the previous exercise's prescription into this one.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Se van a reemplazar los sets de este ejercicio por los de «{sourceExercise}».'**
+  String routineEditorCopyPrescriptionBody(String sourceExercise);
+
+  /// No description provided for @routineEditorSlotMenuCopyPrevious.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Copiar sets del anterior'**
+  String get routineEditorSlotMenuCopyPrevious;
+
   /// No description provided for @routineEditorSlotMenuReplace.
   ///
   /// In es_AR, this message translates to:
@@ -3163,6 +3181,30 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'+ Agregar set'**
   String get routineEditorAddSet;
+
+  /// Screen-reader label for the KG column header, which doubles as the bulk-fill affordance.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Replicar el peso del primer set en todos'**
+  String get routineEditorFillKgA11y;
+
+  /// No description provided for @routineEditorFillKgApplied.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Peso replicado en todos los sets.'**
+  String get routineEditorFillKgApplied;
+
+  /// No description provided for @routineEditorFillKgEmpty.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cargá el peso del primer set para poder replicarlo.'**
+  String get routineEditorFillKgEmpty;
+
+  /// No description provided for @routineEditorFillKgUndo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Deshacer'**
+  String get routineEditorFillKgUndo;
 
   /// No description provided for @routineEditorMeasureReps.
   ///

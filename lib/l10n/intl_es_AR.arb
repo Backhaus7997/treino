@@ -923,6 +923,19 @@
   "@routineEditorDialogCancel": {},
   "routineEditorDialogConfirm": "Confirmar",
   "@routineEditorDialogConfirm": {},
+  "routineEditorCopyPrescriptionTitle": "¿Copiar sets?",
+  "@routineEditorCopyPrescriptionTitle": {},
+  "routineEditorCopyPrescriptionBody": "Se van a reemplazar los sets de este ejercicio por los de «{sourceExercise}».",
+  "@routineEditorCopyPrescriptionBody": {
+    "description": "Confirmation body for the slot-menu shortcut that copies the previous exercise's prescription into this one.",
+    "placeholders": {
+      "sourceExercise": {
+        "type": "String"
+      }
+    }
+  },
+  "routineEditorSlotMenuCopyPrevious": "Copiar sets del anterior",
+  "@routineEditorSlotMenuCopyPrevious": {},
   "routineEditorSlotMenuReplace": "Cambiar ejercicio",
   "@routineEditorSlotMenuReplace": {},
   "routineEditorSlotMenuMoveUp": "Subir",
@@ -935,6 +948,16 @@
   "@routineEditorRestLabel": {},
   "routineEditorAddSet": "+ Agregar set",
   "@routineEditorAddSet": {},
+  "routineEditorFillKgA11y": "Replicar el peso del primer set en todos",
+  "@routineEditorFillKgA11y": {
+    "description": "Screen-reader label for the KG column header, which doubles as the bulk-fill affordance."
+  },
+  "routineEditorFillKgApplied": "Peso replicado en todos los sets.",
+  "@routineEditorFillKgApplied": {},
+  "routineEditorFillKgEmpty": "Cargá el peso del primer set para poder replicarlo.",
+  "@routineEditorFillKgEmpty": {},
+  "routineEditorFillKgUndo": "Deshacer",
+  "@routineEditorFillKgUndo": {},
   "routineEditorMeasureReps": "Reps",
   "@routineEditorMeasureReps": {},
   "routineEditorMeasureTime": "Tiempo",

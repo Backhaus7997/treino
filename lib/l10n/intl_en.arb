@@ -547,6 +547,18 @@
   "@routineEditorDialogCancel": {},
   "routineEditorDialogConfirm": "",
   "@routineEditorDialogConfirm": {},
+  "routineEditorCopyPrescriptionTitle": "Copy sets?",
+  "@routineEditorCopyPrescriptionTitle": {},
+  "routineEditorCopyPrescriptionBody": "This exercise's sets will be replaced with the ones from “{sourceExercise}”.",
+  "@routineEditorCopyPrescriptionBody": {
+    "placeholders": {
+      "sourceExercise": {
+        "type": "String"
+      }
+    }
+  },
+  "routineEditorSlotMenuCopyPrevious": "Copy sets from previous",
+  "@routineEditorSlotMenuCopyPrevious": {},
   "routineEditorSlotMenuReplace": "Change exercise",
   "@routineEditorSlotMenuReplace": {},
   "routineEditorSlotMenuMoveUp": "Move up",
@@ -559,6 +571,14 @@
   "@routineEditorRestLabel": {},
   "routineEditorAddSet": "+ Add set",
   "@routineEditorAddSet": {},
+  "routineEditorFillKgA11y": "Apply the first set's weight to every set",
+  "@routineEditorFillKgA11y": {},
+  "routineEditorFillKgApplied": "Weight applied to every set.",
+  "@routineEditorFillKgApplied": {},
+  "routineEditorFillKgEmpty": "Enter the first set's weight so it can be applied.",
+  "@routineEditorFillKgEmpty": {},
+  "routineEditorFillKgUndo": "Undo",
+  "@routineEditorFillKgUndo": {},
   "routineEditorMeasureReps": "Reps",
   "@routineEditorMeasureReps": {},
   "routineEditorMeasureTime": "Time",

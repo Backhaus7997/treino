@@ -1644,6 +1644,17 @@ class AppL10nEn extends AppL10n {
   String get routineEditorDialogConfirm => '';
 
   @override
+  String get routineEditorCopyPrescriptionTitle => 'Copy sets?';
+
+  @override
+  String routineEditorCopyPrescriptionBody(String sourceExercise) {
+    return 'This exercise\'s sets will be replaced with the ones from “$sourceExercise”.';
+  }
+
+  @override
+  String get routineEditorSlotMenuCopyPrevious => 'Copy sets from previous';
+
+  @override
   String get routineEditorSlotMenuReplace => 'Change exercise';
 
   @override
@@ -1660,6 +1671,20 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get routineEditorAddSet => '+ Add set';
+
+  @override
+  String get routineEditorFillKgA11y =>
+      'Apply the first set\'s weight to every set';
+
+  @override
+  String get routineEditorFillKgApplied => 'Weight applied to every set.';
+
+  @override
+  String get routineEditorFillKgEmpty =>
+      'Enter the first set\'s weight so it can be applied.';
+
+  @override
+  String get routineEditorFillKgUndo => 'Undo';
 
   @override
   String get routineEditorMeasureReps => 'Reps';
