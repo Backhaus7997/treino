@@ -1694,6 +1694,17 @@ class AppL10nEs extends AppL10n {
   String get routineEditorDialogConfirm => '';
 
   @override
+  String get routineEditorCopyPrescriptionTitle => '¿Copiar sets?';
+
+  @override
+  String routineEditorCopyPrescriptionBody(String sourceExercise) {
+    return 'Se reemplazarán los sets de este ejercicio por los de «$sourceExercise».';
+  }
+
+  @override
+  String get routineEditorSlotMenuCopyPrevious => 'Copiar sets del anterior';
+
+  @override
   String get routineEditorSlotMenuReplace => 'Cambiar ejercicio';
 
   @override
@@ -5054,6 +5065,17 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get routineEditorDialogConfirm => 'Confirmar';
+
+  @override
+  String get routineEditorCopyPrescriptionTitle => '¿Copiar sets?';
+
+  @override
+  String routineEditorCopyPrescriptionBody(String sourceExercise) {
+    return 'Se van a reemplazar los sets de este ejercicio por los de «$sourceExercise».';
+  }
+
+  @override
+  String get routineEditorSlotMenuCopyPrevious => 'Copiar sets del anterior';
 
   @override
   String get routineEditorSlotMenuReplace => 'Cambiar ejercicio';

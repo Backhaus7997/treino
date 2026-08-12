@@ -1644,6 +1644,17 @@ class AppL10nEn extends AppL10n {
   String get routineEditorDialogConfirm => '';
 
   @override
+  String get routineEditorCopyPrescriptionTitle => 'Copy sets?';
+
+  @override
+  String routineEditorCopyPrescriptionBody(String sourceExercise) {
+    return 'This exercise\'s sets will be replaced with the ones from “$sourceExercise”.';
+  }
+
+  @override
+  String get routineEditorSlotMenuCopyPrevious => 'Copy sets from previous';
+
+  @override
   String get routineEditorSlotMenuReplace => 'Change exercise';
 
   @override

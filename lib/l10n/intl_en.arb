@@ -547,6 +547,18 @@
   "@routineEditorDialogCancel": {},
   "routineEditorDialogConfirm": "",
   "@routineEditorDialogConfirm": {},
+  "routineEditorCopyPrescriptionTitle": "Copy sets?",
+  "@routineEditorCopyPrescriptionTitle": {},
+  "routineEditorCopyPrescriptionBody": "This exercise's sets will be replaced with the ones from “{sourceExercise}”.",
+  "@routineEditorCopyPrescriptionBody": {
+    "placeholders": {
+      "sourceExercise": {
+        "type": "String"
+      }
+    }
+  },
+  "routineEditorSlotMenuCopyPrevious": "Copy sets from previous",
+  "@routineEditorSlotMenuCopyPrevious": {},
   "routineEditorSlotMenuReplace": "Change exercise",
   "@routineEditorSlotMenuReplace": {},
   "routineEditorSlotMenuMoveUp": "Move up",

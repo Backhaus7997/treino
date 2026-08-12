@@ -3128,6 +3128,24 @@ abstract class AppL10n {
   /// **'Confirmar'**
   String get routineEditorDialogConfirm;
 
+  /// No description provided for @routineEditorCopyPrescriptionTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Copiar sets?'**
+  String get routineEditorCopyPrescriptionTitle;
+
+  /// Confirmation body for the slot-menu shortcut that copies the previous exercise's prescription into this one.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Se van a reemplazar los sets de este ejercicio por los de «{sourceExercise}».'**
+  String routineEditorCopyPrescriptionBody(String sourceExercise);
+
+  /// No description provided for @routineEditorSlotMenuCopyPrevious.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Copiar sets del anterior'**
+  String get routineEditorSlotMenuCopyPrevious;
+
   /// No description provided for @routineEditorSlotMenuReplace.
   ///
   /// In es_AR, this message translates to:

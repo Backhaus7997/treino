@@ -923,6 +923,19 @@
   "@routineEditorDialogCancel": {},
   "routineEditorDialogConfirm": "Confirmar",
   "@routineEditorDialogConfirm": {},
+  "routineEditorCopyPrescriptionTitle": "¿Copiar sets?",
+  "@routineEditorCopyPrescriptionTitle": {},
+  "routineEditorCopyPrescriptionBody": "Se van a reemplazar los sets de este ejercicio por los de «{sourceExercise}».",
+  "@routineEditorCopyPrescriptionBody": {
+    "description": "Confirmation body for the slot-menu shortcut that copies the previous exercise's prescription into this one.",
+    "placeholders": {
+      "sourceExercise": {
+        "type": "String"
+      }
+    }
+  },
+  "routineEditorSlotMenuCopyPrevious": "Copiar sets del anterior",
+  "@routineEditorSlotMenuCopyPrevious": {},
   "routineEditorSlotMenuReplace": "Cambiar ejercicio",
   "@routineEditorSlotMenuReplace": {},
   "routineEditorSlotMenuMoveUp": "Subir",
