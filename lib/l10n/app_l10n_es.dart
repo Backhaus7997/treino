@@ -1848,6 +1848,16 @@ class AppL10nEs extends AppL10n {
   String get routineEditorFillKgUndo => 'Deshacer';
 
   @override
+  String routineEditorKgStepIncreaseA11y(String amount) {
+    return 'Sumar $amount kilos al peso';
+  }
+
+  @override
+  String routineEditorKgStepDecreaseA11y(String amount) {
+    return 'Restar $amount kilos al peso';
+  }
+
+  @override
   String get routineEditorMeasureReps => 'Reps';
 
   @override
@@ -5344,6 +5354,16 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get routineEditorFillKgUndo => 'Deshacer';
+
+  @override
+  String routineEditorKgStepIncreaseA11y(String amount) {
+    return 'Sumar $amount kilos al peso';
+  }
+
+  @override
+  String routineEditorKgStepDecreaseA11y(String amount) {
+    return 'Restar $amount kilos al peso';
+  }
 
   @override
   String get routineEditorMeasureReps => 'Reps';

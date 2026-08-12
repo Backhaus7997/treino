@@ -3410,6 +3410,18 @@ abstract class AppL10n {
   /// **'Deshacer'**
   String get routineEditorFillKgUndo;
 
+  /// Screen-reader label for a KG stepper button that adds weight to the set being edited.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sumar {amount} kilos al peso'**
+  String routineEditorKgStepIncreaseA11y(String amount);
+
+  /// Screen-reader label for a KG stepper button that takes weight off the set being edited.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Restar {amount} kilos al peso'**
+  String routineEditorKgStepDecreaseA11y(String amount);
+
   /// No description provided for @routineEditorMeasureReps.
   ///
   /// In es_AR, this message translates to:
