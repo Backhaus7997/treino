@@ -221,6 +221,67 @@ private func runSetResolution(fixtureURL: URL) {
     }
 }
 
+// MARK: - session_counting
+
+private func runSessionCounting(fixtureURL: URL) {
+    guard let data = try? Data(contentsOf: fixtureURL) else {
+        fail("No se pudo leer \(fixtureURL.path). Los fixtures son el contrato "
+            + "con la implementación Dart: si el archivo no está, ese contrato "
+            + "no existe.")
+        return
+    }
+
+    guard
+        let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+        let rule = json["rule"] as? String,
+        let cases = json["cases"] as? [[String: Any]]
+    else {
+        fail("\(fixtureURL.lastPathComponent) no tiene la forma esperada.")
+        return
+    }
+
+    guard rule == "session-counting" else {
+        fail("Se esperaba rule 'session-counting' y vino '\(rule)'.")
+        return
+    }
+
+    guard !cases.isEmpty else {
+        fail("\(fixtureURL.lastPathComponent) no tiene casos.")
+        return
+    }
+
+    for testCase in cases {
+        totalCases += 1
+        let name = testCase["name"] as? String ?? "(sin nombre)"
+
+        // `status` y `wasFullyCompleted` NO se validan con `guard let`: `null`
+        // es una entrada legítima del contrato —campo ausente o nulo
+        // explícito— y es justo el caso que hay que cubrir. `as? T` sobre
+        // NSNull da nil, que es la semántica que queremos.
+        guard
+            let given = testCase["given"] as? [String: Any],
+            let expected = testCase["expect"] as? [String: Any],
+            let expectedValue = expected["countsAsWorkout"] as? Bool
+        else {
+            fail("  · \"\(name)\": el caso no tiene la forma esperada.")
+            continue
+        }
+
+        let actual = sessionCountsAsWorkout(
+            status: given["status"] as? String,
+            wasFullyCompleted: given["wasFullyCompleted"] as? Bool
+        )
+
+        if actual != expectedValue {
+            fail("""
+              · "\(name)"
+                  esperado: \(expectedValue)
+                  obtenido: \(actual)
+            """)
+        }
+    }
+}
+
 // MARK: - main
 
 // El script pasa la raíz de `conformance/` como primer argumento.
@@ -232,6 +293,7 @@ let conformanceDir = CommandLine.arguments.count > 1
 runPlanAdvance(fixtureURL: conformanceDir.appendingPathComponent("plan_advance.json"))
 runRoutineSelection(fixtureURL: conformanceDir.appendingPathComponent("routine_selection.json"))
 runSetResolution(fixtureURL: conformanceDir.appendingPathComponent("set_resolution.json"))
+runSessionCounting(fixtureURL: conformanceDir.appendingPathComponent("session_counting.json"))
 
 if failures.isEmpty {
     print("✓ conformidad Swift: \(totalCases) casos, todos en verde")

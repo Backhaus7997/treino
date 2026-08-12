@@ -1,0 +1,66 @@
+{
+  "rule": "session-counting",
+  "source_of_truth": "lib/features/workout/domain/session.dart",
+  "description": "Dada la representacion de wire de un documento de sesion, si cuenta como entrenamiento HECHO. Es la ENTRADA de plan-advance: la posicion del plan se calcula desde la ultima sesion que cuenta. Contrato compartido entre la implementacion Dart (telefono) y la Swift (reloj).",
+  "why_this_exists": "El contrato de plan-advance cubria la DECISION pero no QUE SE LE PASA. El reloj filtraba por `finishedAt` presente y el telefono por `status == finished && wasFullyCompleted`: no son el mismo conjunto, porque abandonar guarda `status=finished` con `wasFullyCompleted=false`. Los dos avanzaban el plan desde sesiones DISTINTAS y cada dispositivo mostraba otro dia. plan_advance.json estuvo en verde con 35 casos mientras ese bug estaba vivo. Este fixture cierra ese hueco.",
+  "inputs": {
+    "status": "Valor de wire del campo `status`. 'active' | 'finished'. null representa tanto AUSENTE como nulo explicito: el reloj no puede distinguirlos y el telefono los normaliza igual.",
+    "wasFullyCompleted": "Valor de wire del campo `wasFullyCompleted`. null representa AUSENTE o nulo explicito. Ojo: el telefono escribe nulos EXPLICITOS y el reloj omite la clave (ver FS.isEmpty), asi que los dos casos tienen que dar lo mismo."
+  },
+  "cases": [
+    {
+      "name": "terminado de verdad",
+      "why": "El unico caso que cuenta. Todo lo demas es no.",
+      "given": { "status": "finished", "wasFullyCompleted": true },
+      "expect": { "countsAsWorkout": true }
+    },
+    {
+      "name": "ABANDONADO: terminado pero no completado",
+      "why": "EL CASO QUE CAUSO EL BUG. Abandonar guarda status=finished con wasFullyCompleted=false (ver SessionNotifier.abandonSession). La sesion esta CERRADA pero no HECHA. Si esto contara, el plan avanzaria por entrenos que el atleta no hizo.",
+      "given": { "status": "finished", "wasFullyCompleted": false },
+      "expect": { "countsAsWorkout": false }
+    },
+    {
+      "name": "en curso no cuenta",
+      "why": "Una sesion abierta no puede avanzar el plan: el reloj le adelantaba el dia al atleta a mitad de entreno.",
+      "given": { "status": "active", "wasFullyCompleted": false },
+      "expect": { "countsAsWorkout": false }
+    },
+    {
+      "name": "en curso con wasFullyCompleted true tampoco cuenta",
+      "why": "Estado imposible salvo doc corrupto o carrera de escritura. Manda `status`: mientras no este cerrada, no esta hecha. Se define para que las dos implementaciones no inventen cada una lo suyo.",
+      "given": { "status": "active", "wasFullyCompleted": true },
+      "expect": { "countsAsWorkout": false }
+    },
+    {
+      "name": "terminado con wasFullyCompleted AUSENTE no cuenta",
+      "why": "Sesiones viejas y las que escribe el reloj pueden no traer la clave. El lado Dart la resuelve con @Default(false) al deserializar; Swift lee nil. Los dos tienen que dar false. Si Swift tratara 'ausente' como true, todo el historial legacy pasaria a contar de golpe.",
+      "given": { "status": "finished", "wasFullyCompleted": null },
+      "expect": { "countsAsWorkout": false }
+    },
+    {
+      "name": "status AUSENTE no cuenta",
+      "why": "Un documento sin `status` no es un entrenamiento hecho. El modelo Dart rechazaria ese doc antes, al deserializar, pero el reloj lee el JSON crudo y necesita una respuesta DEFINIDA en vez de un default accidental.",
+      "given": { "status": null, "wasFullyCompleted": true },
+      "expect": { "countsAsWorkout": false }
+    },
+    {
+      "name": "todo ausente no cuenta",
+      "why": "El documento vacio es el peor caso posible: si contara, cualquier basura avanzaria el plan.",
+      "given": { "status": null, "wasFullyCompleted": null },
+      "expect": { "countsAsWorkout": false }
+    },
+    {
+      "name": "status desconocido no cuenta aunque este completado",
+      "why": "COMPATIBILIDAD HACIA ADELANTE. Si algun dia se agrega un estado nuevo ('paused', 'discarded'), NO tiene que empezar a contar solo porque no es 'active'. La condicion es igualdad contra 'finished', nunca desigualdad contra 'active'. Un reloj viejo contra datos nuevos no puede corromper el plan.",
+      "given": { "status": "paused", "wasFullyCompleted": true },
+      "expect": { "countsAsWorkout": false }
+    },
+    {
+      "name": "el status distingue mayusculas",
+      "why": "'Finished' no es 'finished'. Firestore no normaliza; si alguien escribe el valor a mano, tiene que no contar en vez de contar a medias en un cliente y no en el otro.",
+      "given": { "status": "Finished", "wasFullyCompleted": true },
+      "expect": { "countsAsWorkout": false }
+    }
+  ]
+}

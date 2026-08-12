@@ -25,6 +25,7 @@ WATCH_SOURCES=(
   "${REPO_ROOT}/ios/TreinoWatch Watch App/PlanAdvance.swift"
   "${REPO_ROOT}/ios/TreinoWatch Watch App/RoutineSelection.swift"
   "${REPO_ROOT}/ios/TreinoWatch Watch App/SetResolution.swift"
+  "${REPO_ROOT}/ios/TreinoWatch Watch App/SessionCounting.swift"
 )
 
 for src in "${WATCH_SOURCES[@]}"; do
