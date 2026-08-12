@@ -47,6 +47,12 @@ final class WorkoutSessionController: NSObject, ObservableObject, WorkoutSession
     /// no tenga que saber de HealthKit y la regla se pueda testear en el host.
     @Published private(set) var heartRate: HeartRateReading?
 
+    /// Las calorias activas quemadas en lo que va del entreno.
+    ///
+    /// Acumulado, no instantaneo — por eso `ActiveEnergyRules` no las hace
+    /// caducar como al ritmo cardiaco.
+    @Published private(set) var activeEnergy: ActiveEnergyReading?
+
     /// Segundos medidos por la sesion (D4). `nil` sin sesion abierta.
     var measuredElapsedSeconds: TimeInterval? {
         guard phase == .open, let builder else { return nil }
@@ -154,6 +160,7 @@ final class WorkoutSessionController: NSObject, ObservableObject, WorkoutSession
         session = nil
         builder = nil
         heartRate = nil
+        activeEnergy = nil
         phase = decision.next
 
         cerrando?.end()
@@ -200,6 +207,8 @@ extension WorkoutSessionController: HKLiveWorkoutBuilderDelegate {
         _ workoutBuilder: HKLiveWorkoutBuilder,
         didCollectDataOf collectedTypes: Set<HKSampleType>
     ) {
+        collectActiveEnergy(from: workoutBuilder, collectedTypes: collectedTypes)
+
         guard let hrType = HKObjectType.quantityType(forIdentifier: .heartRate),
               collectedTypes.contains(hrType),
               let stats = workoutBuilder.statistics(for: hrType),
@@ -215,6 +224,34 @@ extension WorkoutSessionController: HKLiveWorkoutBuilderDelegate {
         Task { @MainActor in
             self.heartRate = HeartRateReading(
                 bpm: HeartRateReading.bpm(fromQuantity: bpm),
+                takenAt: tomada
+            )
+        }
+    }
+
+    /// Las calorias se leen con `sumQuantity`, NO con `mostRecentQuantity`.
+    ///
+    /// Es la diferencia con el ritmo cardiaco y no es un detalle: la muestra mas
+    /// reciente de energia son las calorias del ULTIMO INTERVALO —un puñado—,
+    /// mientras que lo que el atleta quiere ver es el TOTAL del entreno. Leerlas
+    /// como se lee el pulso mostraria un numero chico que sube y baja en vez de
+    /// un acumulado que crece.
+    nonisolated func collectActiveEnergy(
+        from workoutBuilder: HKLiveWorkoutBuilder,
+        collectedTypes: Set<HKSampleType>
+    ) {
+        guard let energyType = HKObjectType.quantityType(forIdentifier: .activeEnergyBurned),
+              collectedTypes.contains(energyType),
+              let stats = workoutBuilder.statistics(for: energyType),
+              let total = stats.sumQuantity()
+        else { return }
+
+        let kcal = total.doubleValue(for: .kilocalorie())
+        let tomada = stats.mostRecentQuantityDateInterval()?.end ?? Date()
+
+        Task { @MainActor in
+            self.activeEnergy = ActiveEnergyReading(
+                kcal: ActiveEnergyReading.kcal(fromQuantity: kcal),
                 takenAt: tomada
             )
         }

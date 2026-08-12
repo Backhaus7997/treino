@@ -381,6 +381,76 @@ private func runHeartRateRounding() {
     checkEqual(HeartRateReading.bpm(fromQuantity: 0), 0, "0 se preserva para que la regla lo descarte")
 }
 
+// MARK: - Calorias en pantalla
+//
+// LA DIFERENCIA DE FONDO CON EL RITMO CARDIACO, y la razon por la que estas dos
+// reglas NO comparten codigo aunque se parezcan en la pantalla:
+//
+//   El ritmo cardiaco es INSTANTANEO. Una lectura vieja es una MENTIRA: dice
+//   "estas a 140" cuando hace 40 segundos que no se mide.
+//
+//   Las calorias son ACUMULADAS. Una lectura vieja sigue siendo VERDAD: si hace
+//   40 segundos habias quemado 120, ahora quemaste 120 o mas. Borrarla seria
+//   ocultar algo cierto.
+//
+// Por eso las calorias no caducan y el ritmo cardiaco si.
+
+private func runActiveEnergyDisplay() {
+    let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+
+    checkEqual(
+        ActiveEnergyRules.display(reading: nil, now: t0),
+        .sinDatos,
+        "Sin lecturas no se muestra nada"
+    )
+
+    checkEqual(
+        ActiveEnergyRules.display(
+            reading: ActiveEnergyReading(kcal: 87, takenAt: t0), now: t0
+        ),
+        .kcal(87),
+        "Una lectura del momento se muestra"
+    )
+
+    // LO QUE LA DISTINGUE DEL RITMO CARDIACO: no caduca.
+    for antiguedad in [30.0, 300.0, 3600.0] {
+        checkEqual(
+            ActiveEnergyRules.display(
+                reading: ActiveEnergyReading(kcal: 210, takenAt: t0),
+                now: t0.addingTimeInterval(antiguedad)
+            ),
+            .kcal(210),
+            "A los \(Int(antiguedad))s las calorias SIGUEN valiendo: son acumuladas, no instantaneas"
+        )
+    }
+
+    // Y 0 kcal SI se muestra, al reves que 0 bpm.
+    //
+    // Un 0 de pulsaciones es imposible: es un sensor que no engancho. Un 0 de
+    // calorias es cierto — todavia no se midio consumo. Ocultarlo seria
+    // esconder un dato verdadero, que es el mismo pecado que mostrar uno falso.
+    checkEqual(
+        ActiveEnergyRules.display(
+            reading: ActiveEnergyReading(kcal: 0, takenAt: t0), now: t0
+        ),
+        .kcal(0),
+        "0 kcal es un dato cierto y se muestra (a diferencia de 0 bpm)"
+    )
+
+    // Negativo si es imposible: no se puede des-quemar energia.
+    checkEqual(
+        ActiveEnergyRules.display(
+            reading: ActiveEnergyReading(kcal: -3, takenAt: t0), now: t0
+        ),
+        .sinDatos,
+        "Un valor negativo no es una medicion"
+    )
+
+    // HealthKit entrega Double; la pantalla muestra entero.
+    checkEqual(ActiveEnergyReading.kcal(fromQuantity: 86.7), 87, "86.7 redondea a 87")
+    checkEqual(ActiveEnergyReading.kcal(fromQuantity: 86.2), 86, "86.2 redondea a 86")
+}
+
 // MARK: - De donde sale la duracion (F3, decision D4)
 //
 // D4, firmada: la sesion de entrenamiento pasa a ser la fuente de verdad cuando
@@ -437,6 +507,7 @@ runSessionLifecycleBasics()
 runSessionLifecycleSequences()
 runHeartRateDisplay()
 runHeartRateRounding()
+runActiveEnergyDisplay()
 runWorkoutDuration()
 
 if failures.isEmpty {

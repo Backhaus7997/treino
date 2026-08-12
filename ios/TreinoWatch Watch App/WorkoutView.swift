@@ -27,7 +27,7 @@ struct WorkoutView: View {
                 VStack(spacing: 6) {
                     header(exercise: exercise, session: session)
 
-                    heartRateRow()
+                    effortRow()
 
                     if let remaining = workout.restRemaining {
                         restBanner(remaining)
@@ -82,6 +82,40 @@ struct WorkoutView: View {
         }
     }
 
+    /// Ritmo cardiaco y calorias, en una sola fila.
+    ///
+    /// Van juntos porque son lo mismo para el atleta —cuanto se esta
+    /// esforzando— y en 42mm cada fila que se suma empuja las series fuera de
+    /// pantalla, que es lo que de verdad necesita leer entre series.
+    ///
+    /// Si NINGUNO de los dos tiene dato no se dibuja fila, ni vacia: el hueco
+    /// tambien ocupa.
+    @ViewBuilder
+    private func effortRow() -> some View {
+        let bpm = HeartRateRules.display(reading: workoutSession.heartRate, now: Date())
+        let kcal = ActiveEnergyRules.display(reading: workoutSession.activeEnergy, now: Date())
+
+        if case .sinDatos = bpm, case .sinDatos = kcal {
+            // Ninguno de los dos tiene dato: no se dibuja fila, ni vacia.
+            EmptyView()
+        } else {
+            HStack(spacing: 10) {
+                heartRateRow()
+                if case .kcal(let valor) = kcal {
+                    HStack(spacing: 4) {
+                        Image(systemName: "flame.fill")
+                            .foregroundStyle(.orange)
+                        Text("\(valor)")
+                            .monospacedDigit()
+                        Text("kcal")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .font(.caption)
+        }
+    }
+
     /// El ritmo cardiaco, cuando lo hay (F2).
     ///
     /// Cuando NO lo hay no se dibuja nada: ni un guion, ni un cero, ni un aviso.
@@ -106,7 +140,6 @@ struct WorkoutView: View {
                 Text("lpm")
                     .foregroundStyle(.secondary)
             }
-            .font(.caption)
         }
     }
 
