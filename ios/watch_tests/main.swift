@@ -185,12 +185,115 @@ private func runNeverBlocksWorkout() {
     }
 }
 
+// MARK: - El ciclo de vida de la sesion de entrenamiento (F1)
+//
+// La garantia que define F1: UNA SOLA HKWorkoutSession por entreno.
+//
+// No es paranoia. El reloj entra en modo entreno por tres caminos, y al
+// arrancar la app dos corren EN PARALELO: `restore()` desde el .task y
+// `adoptRemoteSessionIfAny()` desde el onChange de scenePhase. En F0 se midio
+// que los dos se ejecutan. Si cada uno abriera su sesion, watchOS tendria dos
+// entrenamientos abiertos para uno solo del atleta.
+//
+// La defensa NO va en cada llamador —son tres, y mañana pueden ser cuatro—
+// sino en el recurso: abrir con una sesion ya abierta es un NO-OP.
+
+private func runSessionLifecycleBasics() {
+    var r = WorkoutSessionLifecycle.resolve(.begin, in: .idle)
+    check(r.execute, "Abrir desde idle tiene que ejecutarse")
+    checkEqual(r.next, .open, "Abrir desde idle deja la sesion abierta")
+
+    // LA GARANTIA DE F1.
+    r = WorkoutSessionLifecycle.resolve(.begin, in: .open)
+    check(
+        !r.execute,
+        "Abrir con una sesion YA ABIERTA tiene que ser un NO-OP. Si esto se pone "
+            + "rojo, watchOS termina con dos entrenamientos para uno solo del atleta."
+    )
+    checkEqual(r.next, .open, "Un begin ignorado no cambia el estado")
+
+    r = WorkoutSessionLifecycle.resolve(.end, in: .open)
+    check(r.execute, "Cerrar una sesion abierta tiene que ejecutarse")
+    checkEqual(r.next, .idle, "Cerrar deja la sesion en idle")
+
+    // Pasa de verdad: el atleta descarta un entreno que el reloj nunca abrio.
+    r = WorkoutSessionLifecycle.resolve(.end, in: .idle)
+    check(!r.execute, "Cerrar sin sesion abierta tiene que ser un NO-OP")
+    checkEqual(r.next, .idle, "Un end ignorado no cambia el estado")
+}
+
+private func runSessionLifecycleSequences() {
+    func correr(_ comandos: [WorkoutSessionCommand])
+        -> (aperturas: Int, cierres: Int, final: WorkoutSessionPhase)
+    {
+        var phase = WorkoutSessionPhase.idle
+        var aperturas = 0
+        var cierres = 0
+        for c in comandos {
+            let r = WorkoutSessionLifecycle.resolve(c, in: phase)
+            if r.execute {
+                if c == .begin { aperturas += 1 } else { cierres += 1 }
+            }
+            phase = r.next
+        }
+        return (aperturas, cierres, phase)
+    }
+
+    // La carrera medida en F0: varios caminos pidiendo abrir a la vez.
+    var s = correr([.begin, .begin, .begin])
+    checkEqual(s.aperturas, 1, "Tres begin tienen que abrir UNA sola sesion")
+    checkEqual(s.final, .open, "Y dejarla abierta")
+
+    s = correr([.begin, .end, .end, .end])
+    checkEqual(s.aperturas, 1, "Una apertura")
+    checkEqual(s.cierres, 1, "Un solo cierre, aunque pidan tres")
+    checkEqual(s.final, .idle, "Termina cerrada")
+
+    // Idempotente no es "una sola vez en la vida de la app": un entreno nuevo
+    // SI abre otra sesion.
+    s = correr([.begin, .end, .begin, .end])
+    checkEqual(s.aperturas, 2, "Dos entrenos seguidos abren dos sesiones")
+    checkEqual(s.cierres, 2, "Y cierran las dos")
+    checkEqual(s.final, .idle, "Termina cerrada")
+
+    // Invariante sobre una secuencia larga y desordenada: en todo momento hay
+    // como maximo UNA sesion abierta, y nunca se cierra algo que no se abrio.
+    //
+    // La secuencia es DETERMINISTICA a proposito: un test que falla distinto en
+    // cada corrida no se puede depurar.
+    var comandos: [WorkoutSessionCommand] = []
+    var x = 7
+    for _ in 0..<200 {
+        x = (x &* 1103515245 &+ 12345) & 0x7FFF_FFFF
+        comandos.append(x % 3 == 0 ? .end : .begin)
+    }
+
+    var phase = WorkoutSessionPhase.idle
+    var abiertas = 0
+    var violaciones = 0
+    for c in comandos {
+        let r = WorkoutSessionLifecycle.resolve(c, in: phase)
+        if r.execute {
+            abiertas += (c == .begin ? 1 : -1)
+            if abiertas < 0 || abiertas > 1 { violaciones += 1 }
+        }
+        phase = r.next
+    }
+    checkEqual(
+        violaciones, 0,
+        "En 200 ordenes desordenadas nunca puede haber dos sesiones abiertas ni "
+            + "un cierre sin apertura"
+    )
+}
+
 // MARK: - Corrida
 
 runRequestedTypes()
 runShouldRequest()
 runAuthorizationMapping()
 runNeverBlocksWorkout()
+runSessionLifecycleBasics()
+runSessionLifecycleSequences()
 
 if failures.isEmpty {
     print("OK: \(totalChecks) chequeos de la logica de permisos de Salud")

@@ -47,6 +47,14 @@ final class WorkoutCoordinator: ObservableObject {
     /// necesite y por la razon concreta.
     private let healthStore = HealthStore()
 
+    /// La sesion de entrenamiento de watchOS. La inyecta la app, igual que el
+    /// cliente de Firestore, para que este coordinator no importe HealthKit y
+    /// siga compilando —y testeandose— en el host.
+    ///
+    /// Opcional a proposito: si nadie la inyecta, el entreno funciona igual.
+    /// Es la misma regla de D2 aplicada a F1.
+    var workoutSession: WorkoutSessionControlling?
+
     /// Como conseguir un cliente de Firestore autenticado. Lo inyecta la app
     /// para no acoplar este coordinator al de credenciales.
     var makeClient: (() async throws -> (FirestoreREST, String))?
@@ -125,6 +133,7 @@ final class WorkoutCoordinator: ObservableObject {
             WorkoutSessionStore.save(adopted)
             syncError = nil
             requestHealthAccess()
+            beginWorkoutSession()
         } catch {
             syncError = String(describing: error)
         }
@@ -167,6 +176,7 @@ final class WorkoutCoordinator: ObservableObject {
         self.workout = workout
         currentExerciseIndex = firstUnfinishedIndex(in: workout.exercises, session: stored)
         requestHealthAccess()
+        beginWorkoutSession()
     }
 
     /// Le pide permiso a Salud cuando el reloj entra en modo entreno.
@@ -180,6 +190,27 @@ final class WorkoutCoordinator: ObservableObject {
     /// Va suelto y no lanza. El entreno ya empezo y no depende de esto (D2).
     private func requestHealthAccess() {
         Task { await healthStore.requestAccessIfNeeded() }
+    }
+
+    /// Le declara a watchOS que esto es un entrenamiento.
+    ///
+    /// Va junto al pedido de permiso y por los mismos tres caminos, pero NO
+    /// depende de el: en F0 se midio que la sesion abre incluso con el permiso
+    /// negado por completo, y que asi el atleta conserva la ejecucion en
+    /// segundo plano. Sin permiso pierde el ritmo cardiaco, no el descanso.
+    ///
+    /// Abrir dos veces es un NO-OP; la garantia vive en el controller.
+    private func beginWorkoutSession() {
+        workoutSession?.begin()
+    }
+
+    /// Cierra la sesion cuando el entreno termina, venga de donde venga el
+    /// cierre: lo termino el atleta acá, o lo cerro el telefono.
+    ///
+    /// Dejarla abierta seria peor que no haberla abierto: watchOS mantendria la
+    /// app viva y el reloj gastando bateria por un entreno que ya no existe.
+    private func endWorkoutSession() {
+        workoutSession?.end()
     }
 
     func start(workout: TodaysWorkout) {
@@ -204,6 +235,7 @@ final class WorkoutCoordinator: ObservableObject {
         Task { await sync() }
 
         requestHealthAccess()
+        beginWorkoutSession()
     }
 
     /// Carga una serie. Idempotente por `exerciseId + setNumber`, igual que el
@@ -271,6 +303,7 @@ final class WorkoutCoordinator: ObservableObject {
         workout = nil
         currentExerciseIndex = 0
         WorkoutSessionStore.clear()
+        endWorkoutSession()
     }
 
     /// Sube al historial lo que falte: primero resuelve la sesion remota, y
@@ -299,6 +332,7 @@ final class WorkoutCoordinator: ObservableObject {
                 workout = nil
                 currentExerciseIndex = 0
                 WorkoutSessionStore.clear()
+                endWorkoutSession()
                 syncError = nil
                 return
             }

@@ -12,9 +12,16 @@
 # `conformance/run_swift.sh`, distinto contrato — aquellos fixtures son el
 # acuerdo Dart<->Swift, estos son reglas que solo viven en el reloj.
 #
-# Para que esto funcione, los archivos de acá NO pueden importar HealthKit:
-# ese framework no existe en macOS. El puente con HealthKit vive aparte y se
-# typechequea contra el SDK de watchOS (ver README de la carpeta).
+# Los archivos que corren acá se mantienen libres de HealthKit. Ojo con el
+# porque: HealthKit SI existe en macOS (`import HealthKit`, `HKHealthStore` y
+# `HKObjectType.workoutType()` compilan). Lo que es watchOS-only es la parte de
+# SESION DE ENTRENAMIENTO — `HKWorkoutSession.init(healthStore:configuration:)`
+# da "unavailable in macOS". Medido.
+#
+# O sea que la regla no es "no se puede importar", es "no hace falta": la
+# decision no necesita el framework, y no arrastrarlo la deja verificable en
+# segundos. Lo que si toca HealthKit se typechequea contra el SDK de watchOS
+# con `scripts/typecheck_watch.sh`.
 
 set -euo pipefail
 
@@ -23,6 +30,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 WATCH_SOURCES=(
   "${REPO_ROOT}/ios/TreinoWatch Watch App/HealthAccess.swift"
+  "${REPO_ROOT}/ios/TreinoWatch Watch App/WorkoutSessionLifecycle.swift"
 )
 
 TEST_SOURCES=(

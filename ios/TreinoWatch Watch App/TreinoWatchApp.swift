@@ -12,6 +12,12 @@ import SwiftUI
 struct TreinoWatch_Watch_AppApp: App {
     @StateObject private var coordinator = CredentialCoordinator()
     @StateObject private var workoutCoordinator = WorkoutCoordinator()
+
+    /// La sesion de entrenamiento de watchOS. Vive acá y no adentro del
+    /// coordinator para que ese siga sin importar HealthKit — `HKWorkoutSession`
+    /// es watchOS-only y lo dejaria sin poder compilarse en el host, que es la
+    /// unica forma barata de testearlo.
+    @StateObject private var workoutSession = WorkoutSessionController()
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
@@ -23,6 +29,12 @@ struct TreinoWatch_Watch_AppApp: App {
                 // Va acá y no en el init del coordinator para que el trabajo
                 // arranque con la escena viva, no durante la construcción.
                 .task {
+                    // La sesion de entrenamiento se inyecta ANTES de restore():
+                    // ese camino ya entra en modo entreno, y si llegara sin la
+                    // dependencia puesta, un entreno recuperado se quedaria sin
+                    // segundo plano justo despues de reabrir la app.
+                    workoutCoordinator.workoutSession = workoutSession
+
                     // El coordinator del entreno pide su cliente al de
                     // credenciales, en vez de que uno conozca al otro.
                     workoutCoordinator.makeClient = {
