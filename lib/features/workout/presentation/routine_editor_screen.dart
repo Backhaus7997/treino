@@ -3925,16 +3925,28 @@ class _SetRowState extends State<_SetRow> {
       ],
     );
 
-    if (!showKgSteps) return row;
+    // The root is ALWAYS a Column, and the bar goes in as a conditional child.
+    // Returning `row` bare when the bar is hidden and a `Column` when it shows
+    // would flip the runtimeType of the row's root widget on every focus
+    // change, and `Widget.canUpdate` compares runtimeType: Flutter would tear
+    // down and re-inflate this whole subtree — including the KG `EditableText`,
+    // whose `dispose()` closes the IME connection that the focus change had
+    // just opened, and whose replacement never reopens it (only
+    // `_handleFocusChanged` and `requestKeyboard()` do, and neither fires
+    // again). The keyboard would pop up and vanish in the same frame, and the
+    // reps/mín/máx fields — which own their FocusNode internally — would lose
+    // it mid-tap, bouncing focus back to KG.
     return Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         row,
-        _KgStepperBar(
-          palette: palette,
-          canDecrease: (_currentKg ?? 0) > 0,
-          onStep: _stepKg,
-        ),
+        if (showKgSteps)
+          _KgStepperBar(
+            palette: palette,
+            canDecrease: (_currentKg ?? 0) > 0,
+            onStep: _stepKg,
+          ),
       ],
     );
   }

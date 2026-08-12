@@ -15,10 +15,19 @@
 //     campo (se captura el draft que llega al repositorio).
 //   - que el foco sobreviva al tap: el _SetRow NO se recrea (misma FocusNode y
 //     mismo TextEditingController antes y después).
+//   - que la fila no se RE-INFLE al aparecer la barra (mismo EditableTextState)
+//     y que el teclado del sistema quede abierto y usable con UN solo tap.
+//   - que con la barra visible, tocar REPS/MÍN de la misma fila mueva el foco.
 //   - que no exista en modo duración.
 //   - que funcione en modo rango sin tocar MÍN/MÁX.
 //   - que funcione en isTrainerMode (TrainerAssigning).
 //   - que no permita valores negativos.
+//
+// Sobre el IME: los tests de teclado escriben por
+// `tester.testTextInput.updateEditingValue`, NUNCA por `tester.enterText`.
+// `enterText` llama a `showKeyboard()`, que vuelve a pedir el foco y reabre la
+// conexión con el IME antes de cada tipeo — o sea, repara el bug en el harness
+// y deja pasar una implementación que en un teléfono no deja escribir.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -259,6 +268,41 @@ Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
 String _kgText(WidgetTester tester, int index) =>
     tester.widget<TextField>(_kgField(index)).controller!.text;
 
+// ── Sondas de bajo nivel ──────────────────────────────────────────────────────
+//
+// `TextField.focusNode` sólo sirve para el KG: es el ÚNICO campo de la fila que
+// recibe una FocusNode externa. REPS/MÍN/MÁX dejan que `TextField` cree la suya
+// internamente, así que para leerles el foco hay que bajar al `EditableText`.
+// Bajar al EditableText además es lo que da la aserción que muerde: su State es
+// el que muere cuando el subárbol se re-infla, no el `_SetRowState`.
+
+Finder _editableOf(Finder field) =>
+    find.descendant(of: field, matching: find.byType(EditableText));
+
+EditableTextState _editableStateOf(WidgetTester tester, Finder field) =>
+    tester.state<EditableTextState>(_editableOf(field));
+
+bool _isFocused(WidgetTester tester, Finder field) =>
+    tester.widget<EditableText>(_editableOf(field)).focusNode.hasFocus;
+
+/// Manda una pulsación como la mandaría el teclado del sistema.
+///
+/// A propósito NO usa `tester.enterText`: ese helper llama a `showKeyboard()`,
+/// que vuelve a pedir el foco y REABRE la conexión con el IME (ver
+/// flutter_test/widget_tester.dart). O sea, repara el bug justo antes de cada
+/// tipeo — un lujo que el usuario real no tiene. Escribir por
+/// `testTextInput.updateEditingValue` sólo llega si hay un cliente conectado,
+/// que es exactamente la propiedad que queremos custodiar.
+Future<void> _typeThroughIme(WidgetTester tester, String text) async {
+  tester.testTextInput.updateEditingValue(
+    TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
 void main() {
   setUpAll(() {
     // `any(named: 'draft')` necesita un fallback registrado para Routine.
@@ -468,16 +512,173 @@ void main() {
       expect(after.focusNode?.hasFocus, isTrue,
           reason: 'un stepper se toca con el campo enfocado; perder el foco '
               'obligaría a volver a tocar el campo entre salto y salto');
-      // La prueba dura de que la fila no se recreó: si el stepper hubiese
-      // reemplazado la instancia de _EditableSet (como hace el fill de
-      // columna), el ObjectKey cambiaba, nacía un State nuevo y tanto la
-      // FocusNode como el TextEditingController serían otros.
+      // OJO con el alcance de estas dos: `_kgFocus` y `_kgCtrl` son campos
+      // `late final` de `_SetRowState`, así que su identidad sólo prueba que el
+      // State sobrevivió — es decir, que el ObjectKey no cambió porque _stepKg
+      // muta el _EditableSet in place en vez de reemplazarlo como hace el fill
+      // de columna. NO prueban que la fila no se haya re-inflado: el subárbol
+      // puede morir entero y estos dos objetos sobreviven igual, porque los
+      // posee el State y no el árbol. Esa otra propiedad la custodia el test
+      // 'el subárbol de la fila NO se re-infla…' de acá abajo.
       expect(identical(before.focusNode, after.focusNode), isTrue,
           reason: 'misma FocusNode ⇒ mismo State ⇒ el ObjectKey no cambió');
       expect(identical(before.controller, after.controller), isTrue,
-          reason: 'mismo TextEditingController ⇒ la fila no se reconstruyó');
+          reason: 'mismo TextEditingController ⇒ el stepper no reemplazó la '
+              'instancia de _EditableSet');
       // Y la barra sigue en pantalla para el siguiente salto.
       expect(_plus5, findsOneWidget);
+    });
+
+    // ── Regresión: el teclado del sistema ────────────────────────────────────
+    //
+    // `build` devolvía `Row` sin foco y `Column` con foco. `Widget.canUpdate`
+    // compara runtimeType, así que ese cambio de forma en la raíz hacía que
+    // Flutter destruyera y re-inflara TODA la fila en cada cambio de foco del
+    // campo KG. El `EditableText` nuevo no abre conexión con el IME
+    // (`initState` no lo hace; sólo `_handleFocusChanged` —que necesita un
+    // cambio de foco que ya ocurrió— y `requestKeyboard()` —que necesita otro
+    // tap—), y el viejo la cerraba al morir. Resultado: el teclado subía y se
+    // cerraba solo, y había que tocar el campo dos veces para escribir el peso.
+
+    testWidgets('el subárbol de la fila NO se re-infla cuando aparece la barra',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById('r-1'))
+          .thenAnswer((_) async => _singleModeRoutine());
+
+      await _pumpEditor(
+        tester,
+        mode: const SelfCreating(existingRoutineId: 'r-1'),
+        repo: repo,
+      );
+
+      final kgBefore = _editableStateOf(tester, _kgField(0));
+      final repsBefore =
+          _editableStateOf(tester, _fieldsWithHint('reps').at(0));
+
+      await _tapVisible(tester, _kgField(0));
+      expect(_anyStepper, findsNWidgets(4), reason: 'la barra sí apareció');
+
+      // Ésta es la aserción que muerde: el State del EditableText vive en el
+      // ÁRBOL, no en `_SetRowState`. Si la raíz de la fila cambia de tipo, éste
+      // es el objeto que muere — y con él la conexión con el teclado.
+      expect(identical(kgBefore, _editableStateOf(tester, _kgField(0))), isTrue,
+          reason: 'el EditableText del KG no puede recrearse al tomar el foco: '
+              'al morir cierra la conexión con el IME y el reemplazo no la '
+              'reabre');
+      expect(
+          identical(repsBefore,
+              _editableStateOf(tester, _fieldsWithHint('reps').at(0))),
+          isTrue,
+          reason: 'el resto de la fila tampoco: REPS crea su FocusNode adentro '
+              'del TextField y perderla le come el próximo tap');
+    });
+
+    testWidgets('tocar el campo KG deja el teclado abierto y usable',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById('r-1'))
+          .thenAnswer((_) async => _singleModeRoutine());
+
+      await _pumpEditor(
+        tester,
+        mode: const SelfCreating(existingRoutineId: 'r-1'),
+        repo: repo,
+      );
+
+      await _tapVisible(tester, _kgField(0));
+
+      expect(tester.testTextInput.hasAnyClients, isTrue,
+          reason: 'un solo tap tiene que dejar conectado el IME');
+      expect(tester.testTextInput.isVisible, isTrue,
+          reason: 'el teclado sube y se QUEDA: si se cierra solo, el usuario '
+              'tiene que tocar el campo una segunda vez para escribir el peso');
+
+      // Y lo que teclea el usuario tiene que llegar al campo.
+      await _typeThroughIme(tester, '75');
+      expect(_kgText(tester, 0), '75',
+          reason: 'sin cliente conectado la pulsación no llega a ningún lado y '
+              'el campo se queda en 60');
+    });
+
+    testWidgets('el teclado sigue vivo después de tocar un stepper',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById('r-1'))
+          .thenAnswer((_) async => _singleModeRoutine());
+
+      await _pumpEditor(
+        tester,
+        mode: const SelfCreating(existingRoutineId: 'r-1'),
+        repo: repo,
+      );
+
+      await _tapVisible(tester, _kgField(0));
+      await _tapVisible(tester, _plus5);
+
+      expect(_kgText(tester, 0), '65');
+      expect(tester.testTextInput.isVisible, isTrue,
+          reason: 'el salto no puede tirarte el teclado: la barra existe para '
+              'ahorrarte tipear, no para obligarte a reabrirlo');
+      await _typeThroughIme(tester, '80');
+      expect(_kgText(tester, 0), '80',
+          reason: 'después del salto el campo sigue siendo tipeable');
+    });
+
+    // ── Regresión: la fila no puede atrapar el foco ──────────────────────────
+
+    testWidgets(
+        'con la barra visible, tocar REPS de la MISMA fila mueve el foco',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById('r-1'))
+          .thenAnswer((_) async => _singleModeRoutine());
+
+      await _pumpEditor(
+        tester,
+        mode: const SelfCreating(existingRoutineId: 'r-1'),
+        repo: repo,
+      );
+
+      await _tapVisible(tester, _kgField(0));
+      expect(_anyStepper, findsNWidgets(4));
+
+      await _tapVisible(tester, _fieldsWithHint('reps').at(0));
+
+      expect(_isFocused(tester, _fieldsWithHint('reps').at(0)), isTrue,
+          reason: 'un solo tap alcanza: si la fila se re-infla, la FocusNode '
+              'interna de REPS se destruye justo después de ganar el foco y '
+              'el foco rebota al KG');
+      expect(
+          tester.widget<TextField>(_kgField(0)).focusNode?.hasFocus, isFalse);
+      expect(_anyStepper, findsNothing,
+          reason: 'la barra se va con el foco del KG');
+      expect(tester.testTextInput.isVisible, isTrue,
+          reason: 'el teclado sigue arriba para escribir las repeticiones');
+    });
+
+    testWidgets('modo rango: tocar MÍN de la MISMA fila mueve el foco',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById('r-range'))
+          .thenAnswer((_) async => _rangeModeRoutine);
+
+      await _pumpEditor(
+        tester,
+        mode: const SelfCreating(existingRoutineId: 'r-range'),
+        repo: repo,
+      );
+
+      await _tapVisible(tester, _kgField(0));
+      expect(_anyStepper, findsNWidgets(4));
+
+      await _tapVisible(tester, _fieldsWithHint('mín').at(0));
+
+      expect(_isFocused(tester, _fieldsWithHint('mín').at(0)), isTrue,
+          reason: 'MÍN y MÁX son el mismo _NumberField sin focusNode externa: '
+              'les pega el mismo defecto que a REPS');
+      expect(tester.testTextInput.isVisible, isTrue);
+      expect(_anyStepper, findsNothing);
     });
   });
 
