@@ -80,6 +80,83 @@ Es Flutter.
 
 ---
 
+## 🔑 Destrabar el provisioning del reloj para HealthKit
+
+**Prerequisito manual. Necesita la cuenta de Apple Developer con rol Admin o
+App Manager — no es automatizable desde un agente ni desde CI.** Bloquea probar
+en un Apple Watch real (F2 del change `watch-workout-session`), pero **no**
+bloquea escribir ni mergear el código.
+
+### El estado de partida, medido
+
+Decodificando los 5 perfiles de
+`~/Library/Developer/Xcode/UserData/Provisioning Profiles`:
+
+| application-identifier | claves healthkit |
+|---|---|
+| `J66AQRRM96.com.treino.app` | 0 |
+| `J66AQRRM96.com.backhaus.treino` | 0 |
+| `J66AQRRM96.com.backhaus.treino` (Store) | 0 |
+| `J66AQRRM96.com.treino.ar` | 0 |
+| `J66AQRRM96.com.backhaus.treino-` | 0 |
+
+Dos cosas: ninguno tiene HealthKit, y **ninguno cubre
+`com.backhaus.treino.watchkitapp`**. El companion nunca se firmó para un
+dispositivo real — todo se hizo en simulador.
+
+Confirmado por el lado del build: el `.xcent` de **dispositivo** del reloj sale
+vacío (`{}`), mientras que el `-Simulated.xcent` sí trae
+`com.apple.developer.healthkit = true`. En simulador el entitlement está; para
+dispositivo todavía no hay de dónde sacarlo.
+
+### Paso a paso
+
+**1. Habilitar HealthKit en el App ID del reloj** (developer.apple.com →
+Certificates, Identifiers & Profiles → Identifiers)
+
+- Buscar `com.backhaus.treino.watchkitapp`. **Si no existe, crearlo** — es lo
+  más probable, porque el companion nunca se firmó.
+  - Tipo: App IDs → App
+  - Bundle ID: Explicit, `com.backhaus.treino.watchkitapp`
+- En la lista de capabilities, tildar **HealthKit**. Guardar.
+- Dejar **sin** tildar "Clinical Health Records": TREINO no lee registros
+  clínicos, y pedirlo agranda la superficie que Apple revisa.
+
+**2. Dejar que Xcode regenere el perfil**
+
+La firma del target ya está en automático (`CODE_SIGN_STYLE = Automatic`,
+`DEVELOPMENT_TEAM = J66AQRRM96`), así que no hay que crear el perfil a mano:
+
+```bash
+open ios/Runner.xcworkspace
+```
+
+Target **TreinoWatch Watch App** → pestaña **Signing & Capabilities** → que el
+Team sea el correcto. Xcode regenera el perfil solo. Si muestra un error de
+firma, el botón *Try Again* fuerza el reintento después del paso 1.
+
+Desde la terminal, el equivalente es agregarle `-allowProvisioningUpdates` a un
+build con destino dispositivo.
+
+**3. Verificar que quedó bien — sin necesidad de tener el reloj**
+
+```bash
+bash scripts/verify_watch_provisioning.sh
+```
+
+Chequea las dos cosas que importan: que exista un perfil que cubra el bundle id
+del reloj, y que ese perfil declare `com.apple.developer.healthkit`.
+
+### Por qué esto no se puede saltear
+
+Sin el entitlement en el perfil de **dispositivo**, la app compila e instala
+igual y HealthKit **niega todo en silencio** en la muñeca. No hay crash ni
+error: simplemente no hay pulsaciones y el entreno no llega a Salud. Es el mismo
+modo de falla que cubre `scripts/test_watch_capabilities.sh` del lado del
+proyecto, pero éste vive en la cuenta de Apple y ningún test del repo lo alcanza.
+
+---
+
 ## ⚠️ El typecheck rápido necesita los flags del target
 
 Para no esperar los +20 minutos de `xcodebuild` veníamos usando un `swiftc
