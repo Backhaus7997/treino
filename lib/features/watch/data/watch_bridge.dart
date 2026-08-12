@@ -14,11 +14,17 @@ import 'package:watch_connectivity/watch_connectivity.dart';
 /// asumidos: `isPaired`/`isReachable` son `Future<bool>` — **no** streams, como
 /// suponía el diseño original del ciclo `watch-connectivity`.
 ///
-/// Android/Wear OS NO está soportado en v1. El paquete cubre ambos lados, pero
-/// exige que reloj y teléfono compartan clave de firma, y la firma de release
-/// de Android sigue en debug keys. En Android sin companion instalado
-/// `isPaired` devuelve false y todo esto queda inerte, que es el comportamiento
-/// deseado.
+/// Android/Wear OS NO está soportado en v1, pero **la razón cambió**. Antes
+/// decía acá que la firma de release seguía en debug keys; eso caducó con
+/// `chore(android): firmar el release con la upload key`. Hoy
+/// `android/app/build.gradle.kts` tiene un `signingConfigs.create("release")`
+/// real — aunque condicionado a que exista `android/key.properties`, que no
+/// está versionado: sin ese archivo el build sigue cayendo a la firma de debug.
+/// El requisito del paquete (que reloj y teléfono compartan clave de firma) se
+/// cumple solo cuando ambos se compilan con la misma config.
+///
+/// Lo que SÍ sigue vigente: en Android sin companion instalado `isPaired`
+/// devuelve false y todo esto queda inerte, que es el comportamiento deseado.
 class WatchBridge {
   WatchBridge({WatchConnectivity? connectivity})
       : _connectivity = connectivity ?? WatchConnectivity();
