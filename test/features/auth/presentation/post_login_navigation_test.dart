@@ -17,6 +17,8 @@ import 'package:treino/features/auth/presentation/widgets/auth_pill_button.dart'
 import 'package:treino/features/auth/presentation/widgets/auth_secondary_button.dart';
 import 'package:treino/features/auth/presentation/widgets/terms_checkbox.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
+import 'package:treino/features/onboarding/domain/onboarding_seen.dart';
+import 'package:treino/features/onboarding/domain/onboarding_surface.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/l10n/app_l10n.dart';
@@ -123,6 +125,11 @@ UserProfile _completeProfile() => UserProfile(
       role: UserRole.athlete,
       createdAt: DateTime.utc(2026, 1, 1),
       updatedAt: DateTime.utc(2026, 1, 1),
+      // #627: alumno que YA vio el tour de onboarding. Sin esto el gate de
+      // authRedirect lo manda a /onboarding/athlete en vez de /home.
+      onboardingSeen: OnboardingSeen.empty.markSeen(
+        OnboardingSurface.athleteMobile,
+      ),
     );
 
 /// Monta una pantalla de auth real sobre un router cuyo redirect ES el
