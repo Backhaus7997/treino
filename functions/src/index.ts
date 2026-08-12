@@ -43,6 +43,10 @@ export { syncSessionShareOnTrainerLink } from "./sync-session-share";
 // this function from the deployed set.
 export { notifyOverduePayments } from "./payments/notify-overdue-payments";
 export { syncSharedProfile } from "./profile/sync-shared-profile";
+// Paywall Fase 7, PR4 (ISSUE-1): keeps users/{trainerId}.weightedLoad
+// accurate for display after client-side pause/terminate/decline/cancel —
+// the gate itself (syncTrainerLoad) never trusts this field.
+export { linkLoadReconcile } from "./subscriptions/link-load-reconcile";
 // SHELVED (gym-google-places, Plan B): resolveGymPlace cannot be deployed —
 // GCP project treino-dev sits under org code-assurance.com, whose
 // Domain-Restricted-Sharing policy blocks a publicly-invokable (allUsers)
