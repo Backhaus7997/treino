@@ -43,7 +43,84 @@ fases_de_implementacion:
       Nada en hardware. Todo esto es simulador, y F0 no lo necesitaba. Lo que
       queda pendiente de una muñeca real esta anotado en Q1 (provisioning) y en
       lo_que_NO_esta_verificado de Q3.
-  F1_la_sesion_de_entrenamiento: pendiente
+  F1_la_sesion_de_entrenamiento:
+    estado: en curso
+    medicion_1_abrir_la_sesion_NO_ALCANZA: |
+      RESULTADO NEGATIVO, medido en el par propio (F0-Watch 0F83477D).
+
+      Con la HKWorkoutSession ABIERTA Y CORRIENDO —el log muestra "Sesion de
+      entrenamiento abierta" y el delegate confirmando la transicion 1 -> 2
+      (running), y watchOS dibujando el borde verde de entrenamiento en curso—
+      el descanso SIGUIO PERDIENDO TIEMPO:
+
+        banner en T0 ............ 164s
+        segundos reales T0->T1 ... 62
+        banner al volver ........ 155s
+        conto ................... 9s
+        PERDIO .................. 53s
+
+      Comparar con la medicion sin sesion de la otra tanda: 57s perdidos en 84
+      reales. O sea que abrir la sesion NO movio la aguja.
+
+      El log del sistema confirma la suspension: SPApplicationDelegate
+      _updateAppState al volver al frente.
+
+      CONCLUSION: la premisa del explore —"abrir un HKWorkoutSession le dice al
+      sistema que esto es una app de entrenamiento, y a cambio da ejecucion en
+      segundo plano"— es INCOMPLETA. La sesion sola no alcanza.
+
+      Siguiente hipotesis a medir: falta declarar WKBackgroundModes con
+      `workout-processing`. No tiene equivalente INFOPLIST_KEY_ —se busco en las
+      specs de Xcode y no esta— asi que hay que darle un Info.plist propio al
+      target, con INFOPLIST_FILE apuntandolo y GENERATE_INFOPLIST_FILE siguiendo
+      en YES para que Xcode fusione.
+    medicion_2_LAS_CUATRO_COMBINACIONES: |
+      Se aislo el mecanismo midiendo las cuatro combinaciones. Este es el
+      resultado que corrige la premisa del ciclo:
+
+        ni sesion ni background mode ......... perdio 57s en 84 reales
+        sesion abierta, SIN background mode ... perdio 53s en 62
+        background mode, SIN sesion ........... perdio 50s en 56
+        SESION + BACKGROUND MODE .............. perdio  1s en 58
+
+      LOS DOS SON NECESARIOS Y NINGUNO ALCANZA SOLO.
+
+      El explore decia: "en watchOS todo esto sale de UNA cosa: abrir un
+      HKWorkoutSession mientras dura el entreno. Eso le dice al sistema que esto
+      es una app de entrenamiento, y a cambio: ejecucion en segundo plano...".
+
+      Es falso como estaba escrito. La sesion abre, llega a `running`, watchOS
+      dibuja el borde verde de entrenamiento en curso — y la app se suspende
+      igual. La declaracion en el Info.plist no es un tramite: es la mitad del
+      mecanismo.
+
+      El ultimo segundo perdido es latencia de captura, no del timer.
+    como_se_hizo_la_mutacion: |
+      Comentando UNA linea —la inyeccion de `workoutSession` en
+      TreinoWatchApp.swift— y dejando todo lo demas igual, incluido el
+      background mode. Es un control limpio: entre verde y rojo hay una sola
+      linea de diferencia.
+
+      Se confirmo en el log que con esa linea comentada NO se abre ninguna
+      sesion, y que con ella se abre exactamente UNA.
+    trampa_del_Info_plist: |
+      El primer intento fallo el build con "Multiple commands produce
+      .../Info.plist". La carpeta `TreinoWatch Watch App/` es un
+      PBXFileSystemSynchronizedRootGroup: todo lo que cae adentro se agrega al
+      target, y un Info.plist ahi se COPIA como recurso ADEMAS de procesarse
+      como Info.plist.
+
+      Por eso vive en `ios/TreinoWatch-Info.plist`, fuera de esa carpeta. El
+      `.entitlements` de F0 no tuvo el problema —ese tipo de archivo no se
+      copia como recurso— asi que no se puede generalizar de uno al otro.
+    trampa_de_medicion: |
+      Una medicion salio mal por instalar el .app ANTES de que terminara el
+      build: el binario era el anterior y el log mostraba una sesion abierta
+      donde no debia haberla. Se detecto comparando el timestamp de
+      `simctl get_app_container` contra el del .app en DerivedData.
+
+      Verificar el timestamp del binario instalado antes de creerle a una
+      medicion, siempre.
   F2_ritmo_cardiaco_en_vivo: pendiente
   F3_duracion_y_escritura_en_salud: pendiente
 
@@ -350,6 +427,49 @@ hallazgos_laterales_de_F0:
     ASCII-8BIT" si el entorno no tiene locale UTF-8. Va
     `LANG=en_US.UTF-8 pod install`. Ya estaba documentado en
     docs/setup/watchos-target.md; se re-tropezo igual.
+
+el_HOY_viejo_NO_lo_agrava_F1: |
+  La sesion paralela aviso que el "HOY" del reloj se queda viejo en silencio, y
+  afirmo que con HKWorkoutSession manteniendo la app viva esa ventana se hace
+  MAS LARGA "porque la app deja de reiniciarse".
+
+  VERIFICADO CONTRA EL CODIGO: la afirmacion NO se sostiene, aunque la
+  conclusion practica —hace falta un refresh explicito— si.
+
+  Las dos ventanas son DISJUNTAS por construccion:
+    - La HKWorkoutSession dura exactamente lo que dura el entreno.
+    - La ventana de dato viejo ABRE cuando esa sesion CIERRA: el HOY se calcula
+      desde la ultima sesion con status=finished y wasFullyCompleted=true
+      (TodaysWorkout.swift:283-287), y lo unico que escribe esos campos desde el
+      reloj es finish() (WorkoutCoordinator.swift:253-263).
+
+  O sea: mientras la app esta viva por HealthKit, el HOY todavia no esta viejo;
+  cuando el HOY se pone viejo, la sesion ya esta cerrada. F1 no alarga nada.
+
+  Y el HOY no es una fecha: PlanAdvance.swift:42-61 no toca Date ni Calendar.
+  Es una rotacion desde la ultima sesion completada. Medianoche no lo invalida
+  — lo invalida finish(), que escribe esos campos y despues no recarga nada.
+
+  DURANTE el entreno el dato viejo no le llega al atleta: ContentView rutea a
+  WorkoutView apenas hay sesion, y WorkoutView lee `workout` del coordinator, no
+  `todaysWorkout`.
+
+  LO QUE SI ES CIERTO, y es anterior a este ciclo: la ventana DESPUES de
+  terminar ya es infinita hoy. finish() limpia el estado local sin recalcular el
+  HOY, y no hay red de contencion. Arreglarlo es barato y toca las mismas lineas
+  que F1 ya modifico —los dos puntos donde se llama endWorkoutSession()— pero es
+  un bug propio, no algo que F1 introduzca.
+
+  CORRECCION A UN AGENTE: se reporto que "F1 hace que un entreno olvidado
+  sobreviva horas en vez de morir con el proceso". Es falso. La sesion se
+  persiste en disco con su `startedAt` y se restaura, asi que ya sobrevive a que
+  el proceso muera. La duracion del reloj no tiene techo
+  (WorkoutCoordinator.swift:455-457) mientras el telefono clampea a 8 h
+  (session_duration.dart:4) — asimetria REAL pero PREEXISTENTE.
+
+  Lo que F1 si agrega de verdad: un entreno olvidado deja la app viva y el
+  reloj gastando bateria, con el indicador de entrenamiento de watchOS
+  encendido. Eso es nuevo, y es bateria, no duracion.
 
 candidato_para_F1_restEndsAt: |
   Propuesta de la sesion paralela del companion. NO implementada — queda a
