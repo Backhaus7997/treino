@@ -356,10 +356,31 @@ respuestas_de_F0:
       cuenta del dueño es INDIVIDUAL (visto en Xcode > Signing & Capabilities,
       Team "Martin Backhaus (Individual)"), asi que es el titular y no necesita
       permiso de nadie. El tramite es solo suyo, no de un tercero.
-    limite: |
-      NO VERIFICABLE desde esta sesion: hace falta la cuenta de Apple Developer.
-      Es lo primero que hay que destrabar antes de cualquier prueba en hardware,
-      o sea antes de F2.
+    RESUELTO_2026_08_12: |
+      El dueño creo el App ID y tildo HealthKit. Verificado con
+      `scripts/verify_watch_provisioning.sh`:
+
+        perfil:  iOS Team Provisioning Profile: com.backhaus.treino.watchkitapp
+        app id:  J66AQRRM96.com.backhaus.treino.watchkitapp
+        vence:   2027-08-12
+        declara: com.apple.developer.healthkit ✓
+
+      El app id coincide exacto con el DEVELOPMENT_TEAM commiteado, asi que
+      Xcode lo resuelve solo.
+
+      Y se verifico con la MISMA vara con la que se diagnostico el problema:
+      un build contra `generic/platform=watchOS` con -allowProvisioningUpdates.
+
+      Antes el .xcent de DISPOSITIVO salia vacio ({}). Ahora:
+
+        "application-identifier" => "J66AQRRM96.com.backhaus.treino.watchkitapp"
+        "com.apple.developer.healthkit" => true
+        "com.apple.developer.team-identifier" => "J66AQRRM96"
+
+      O sea que no es solo que el perfil exista: Xcode lo resuelve y el
+      entitlement llega al binario firmado. BUILD SUCCEEDED.
+
+      Ya no queda NADA del ciclo bloqueado. El smoke en hardware es posible.
 
   Q2_hkworkoutsession_en_simulador:
     pregunta: Si HKWorkoutSession corre en el simulador, aunque sea sin datos de HR.

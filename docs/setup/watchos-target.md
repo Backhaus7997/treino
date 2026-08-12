@@ -92,6 +92,17 @@ La cuenta es **Individual** (visto en Xcode → Signing & Capabilities, Team
 "Martin Backhaus (Individual)"), así que el titular puede hacerlo solo: no hay
 que pedirle permiso a ningún Admin.
 
+> ## ✅ RESUELTO (2026-08-12)
+>
+> El App ID se creo con HealthKit tildado. Verificado con
+> `bash scripts/verify_watch_provisioning.sh`, y confirmado por el lado del
+> build: un `xcodebuild -destination 'generic/platform=watchOS'` da
+> `BUILD SUCCEEDED` y el `.xcent` de dispositivo —que antes salia vacio— ahora
+> trae `com.apple.developer.healthkit = true`.
+>
+> El reloj se puede firmar e instalar en hardware. El paso a paso queda abajo
+> porque el mismo tramite hace falta en cualquier cuenta nueva.
+
 ### El estado de partida, medido
 
 Decodificando los 5 perfiles de
