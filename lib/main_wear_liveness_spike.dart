@@ -74,6 +74,15 @@ const bool _useForegroundService = bool.fromEnvironment('FGS');
 /// Si además se publica la Ongoing Activity. Segunda mitad, medible aparte.
 const bool _useOngoing = bool.fromEnvironment('ONGOING', defaultValue: true);
 
+/// Wakelock parcial acotado al descanso.
+///
+/// Doze IGNORA los wakelocks, así que esto NO evita que la alarma se difiera
+/// —medido: `setExact` corrida +21m10s por `device_idle`—. Lo que sí impide es
+/// la suspensión del SoC, y con el procesador despierto el timer de Dart sigue
+/// corriendo y la propia app detecta el vencimiento. Es la ruta que esquiva
+/// tener que pedir `USE_EXACT_ALARM` o `SCHEDULE_EXACT_ALARM`.
+const bool _useWakeLock = bool.fromEnvironment('WAKELOCK');
+
 const MethodChannel _ch = MethodChannel('com.treino.app/wear_workout/methods');
 
 /// Verde cuando el mecanismo está puesto, ámbar cuando corre el control rojo.
@@ -173,7 +182,7 @@ class _LivenessAppState extends State<_LivenessApp>
     if (!resumed) {
       await _ch.invokeMapMethod<String, dynamic>(
         'startRest',
-        {'seconds': _restSeconds},
+        {'seconds': _restSeconds, 'wakeLock': _useWakeLock},
       );
     }
     debugPrint(

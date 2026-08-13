@@ -54,6 +54,9 @@ class WearWorkoutPlugin(
      */
     private val restAlarm = RestAlarm(context)
 
+    /** Evita avisar dos veces el mismo vencimiento. */
+    private var deadlineReported = false
+
     fun dispose() {
         channel.setMethodCallHandler(null)
     }
@@ -132,7 +135,8 @@ class WearWorkoutPlugin(
                 val seconds = call.argument<Int>("seconds") ?: 0
                 val d = RestDeadline.startingAt(now, seconds * 1000L)
                 restStore.save(d)
-                restAlarm.schedule(d)
+                restAlarm.schedule(d, holdWakeLock = call.argument<Boolean>("wakeLock") ?: false)
+                deadlineReported = false
                 result.success(
                     mapOf(
                         "restEndsAtElapsedMs" to d.endsAtElapsedMs,
@@ -151,6 +155,13 @@ class WearWorkoutPlugin(
                 if (d == null) {
                     result.success(mapOf("nowElapsedMs" to now))
                 } else {
+                    // Camino sin AlarmManager: si el SoC sigue despierto (por el
+                    // wakelock), la propia app detecta el vencimiento y avisa.
+                    // Una sola vez, la primera.
+                    if (d.isFinishedAt(now) && !deadlineReported) {
+                        deadlineReported = true
+                        restAlarm.onDeadlineNoticedByApp(d.endsAtElapsedMs)
+                    }
                     result.success(
                         mapOf(
                             "restEndsAtElapsedMs" to d.endsAtElapsedMs,

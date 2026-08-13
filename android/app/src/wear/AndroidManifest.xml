@@ -33,6 +33,18 @@
          apps cuyo core ES un temporizador. Ver RestAlarm.kt. -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!-- Wakelock parcial ACOTADO al descanso (60-90 s), no al entreno entero.
+         Google pide no tomar wakelocks en entrenos largos; sostener uno mientras
+         el atleta espera un aviso de 90 s es otra cosa.
+
+         Existe porque Doze IGNORA los wakelocks pero difiere las alarmas
+         —medido: setExact corrida +21m10s por device_idle—. El wakelock no
+         arregla la alarma: mantiene despierto el SoC para que el timer de la
+         propia app detecte el vencimiento, y así no hace falta ni
+         USE_EXACT_ALARM (riesgo de politica de Play) ni SCHEDULE_EXACT_ALARM
+         (friccion de UX). Ver RestAlarm.kt. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
     <application>
         <!-- Sin foregroundServiceType, con targetSdk >= 34, startForeground()
              tira IllegalArgumentException ("not a subset of ... 0x00000000"),

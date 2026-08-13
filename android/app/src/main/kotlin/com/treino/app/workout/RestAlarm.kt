@@ -6,6 +6,7 @@ import android.media.AudioAttributes
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -63,10 +64,43 @@ class RestAlarm(private val context: Context) {
     private companion object {
         const val TAG = "TreinoRestAlarm"
         const val ALARM_TAG = "treino.rest"
+        /** El prefijo `treino:` es convencion de Android para wakelocks de app. */
+        const val WAKELOCK_TAG = "treino:rest"
+        /** Margen sobre el deadline, para que el timeout no corte justo antes. */
+        const val WAKELOCK_MARGIN_MS = 5_000L
     }
 
     private val alarmManager =
         context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
+    /**
+     * Wakelock parcial acotado al descanso.
+     *
+     * ## Qué arregla y qué NO
+     *
+     * **Doze IGNORA los wakelocks.** Sostener uno NO evita que Doze difiera la
+     * alarma — medido: `setExact` corrida +21m10s por `device_idle`. Lo que un
+     * wakelock parcial sí impide es la **suspensión del SoC**, que es otra cosa.
+     *
+     * Y ahí está el punto: con el procesador despierto, el `Timer.periodic` de
+     * Dart sigue corriendo, la app detecta por su cuenta que el deadline venció,
+     * y vibra. **Sin AlarmManager de por medio, o sea sin permiso especial.**
+     * Es la ruta que esquiva la decisión entre `USE_EXACT_ALARM` (riesgo de
+     * política de Play) y `SCHEDULE_EXACT_ALARM` (fricción de UX).
+     *
+     * ## Por qué acotado, y por qué esto no contradice a Google
+     *
+     * Google pide no tomar wakelocks en entrenos LARGOS: *"in health & fitness
+     * apps, long-running workouts don't need a wakelock"*. Un wakelock de 60-90 s
+     * durante el descanso es otra cosa que sostenerlo la hora entera del entreno.
+     * El costo de batería existe y es real, pero está acotado y es proporcional
+     * al tiempo que el atleta está esperando un aviso.
+     *
+     * Se toma SIEMPRE con timeout: si algo sale mal y nadie lo suelta, el sistema
+     * lo corta igual. Un wakelock filtrado le funde la batería al atleta sin que
+     * nadie se entere hasta que es tarde.
+     */
+    private var wakeLock: PowerManager.WakeLock? = null
 
     /** Handler del main looper: el listener se invoca ahí. */
     private val handler = Handler(Looper.getMainLooper())
@@ -82,13 +116,34 @@ class RestAlarm(private val context: Context) {
         val errorMs = if (target != null) firedAt - target else Long.MIN_VALUE
         Log.i(TAG, "ALARMA disparo elapsed=$firedAt target=$target error=${errorMs}ms")
         scheduledAtElapsedMs = null
+        releaseWakeLock()
         vibrate()
     }
 
-    /** Agenda el aviso para el fin de [deadline]. Reemplaza cualquier anterior. */
-    fun schedule(deadline: RestDeadline) {
+    /**
+     * Agenda el aviso para el fin de [deadline]. Reemplaza cualquier anterior.
+     *
+     * [holdWakeLock] mantiene el SoC despierto durante el descanso. Es el
+     * interruptor del experimento: permite medir la puntualidad con y sin, sobre
+     * el mismo código.
+     */
+    fun schedule(deadline: RestDeadline, holdWakeLock: Boolean) {
         cancel()
         scheduledAtElapsedMs = deadline.endsAtElapsedMs
+
+        val enMs = deadline.endsAtElapsedMs - SystemClock.elapsedRealtime()
+
+        if (holdWakeLock && enMs > 0) {
+            val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+            wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKELOCK_TAG).apply {
+                setReferenceCounted(false)
+                // Timeout = lo que falta + margen. Red de seguridad: aunque
+                // nadie lo suelte, el sistema lo corta.
+                acquire(enMs + WAKELOCK_MARGIN_MS)
+            }
+            Log.i(TAG, "wakelock TOMADO por ${enMs + WAKELOCK_MARGIN_MS}ms")
+        }
+
         alarmManager.setExact(
             AlarmManager.ELAPSED_REALTIME_WAKEUP,
             deadline.endsAtElapsedMs,
@@ -96,8 +151,11 @@ class RestAlarm(private val context: Context) {
             listener,
             handler,
         )
-        val enMs = deadline.endsAtElapsedMs - SystemClock.elapsedRealtime()
-        Log.i(TAG, "agendada para elapsed=${deadline.endsAtElapsedMs} (en ${enMs}ms)")
+        Log.i(
+            TAG,
+            "agendada para elapsed=${deadline.endsAtElapsedMs} " +
+                "(en ${enMs}ms) wakelock=$holdWakeLock",
+        )
     }
 
     fun cancel() {
@@ -106,6 +164,30 @@ class RestAlarm(private val context: Context) {
             Log.i(TAG, "cancelada")
         }
         scheduledAtElapsedMs = null
+        releaseWakeLock()
+    }
+
+    private fun releaseWakeLock() {
+        wakeLock?.let {
+            if (it.isHeld) {
+                it.release()
+                Log.i(TAG, "wakelock soltado")
+            }
+        }
+        wakeLock = null
+    }
+
+    /**
+     * El descanso venció y lo detectó la APP (el timer de Dart), no la alarma.
+     *
+     * Es el camino que el wakelock habilita: con el SoC despierto no hace falta
+     * AlarmManager, así que tampoco hace falta ningún permiso especial. Se
+     * loguea el error igual que el de la alarma, para poder compararlos.
+     */
+    fun onDeadlineNoticedByApp(target: Long) {
+        val noticedAt = SystemClock.elapsedRealtime()
+        Log.i(TAG, "APP detecto el vencimiento elapsed=$noticedAt target=$target error=${noticedAt - target}ms")
+        releaseWakeLock()
     }
 
     private fun vibrate() {
