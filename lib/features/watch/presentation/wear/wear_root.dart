@@ -1,0 +1,117 @@
+import 'package:flutter/material.dart';
+
+import '../../../../app/theme/app_palette.dart';
+import '../../../../core/widgets/treino_icon.dart';
+import 'wear_home.dart';
+import 'wear_round_scaffold.dart';
+import 'wear_routine_list.dart';
+import 'wear_strings.dart';
+import 'wear_view_models.dart';
+import 'wear_widgets.dart';
+import 'wear_workout_screen.dart';
+import 'wear_workout_view_model.dart';
+
+/// Pantalla raíz: estado del emparejamiento, y una vez emparejado, la app.
+///
+/// **Réplica de `ContentView`** de `ios/TreinoWatch Watch App/ContentView.swift`.
+///
+/// El orden de las ramas no es casual: **un entreno en curso gana sobre todo lo
+/// demás**, y en ese caso NO se muestran las páginas laterales. Es para no
+/// ofrecerle al atleta arrancar otra rutina mientras está a mitad de ésta.
+class WearRoot extends StatelessWidget {
+  const WearRoot({
+    super.key,
+    required this.pairing,
+    required this.session,
+    required this.workout,
+    required this.plans,
+    required this.templates,
+    required this.onStartToday,
+    required this.onSelectRoutine,
+    required this.selectedRoutine,
+    required this.onCloseDetail,
+    required this.onStartRoutine,
+    required this.onActivateRoutine,
+    this.workoutFailed = false,
+  });
+
+  final WearPairingState pairing;
+
+  /// Entreno EN CURSO, o null. Si no es null, gana sobre todo.
+  final WearWorkoutSnapshot? session;
+
+  final WearTodaysWorkout? workout;
+  final List<WearRoutineSummary> plans;
+  final List<WearRoutineSummary> templates;
+  final bool workoutFailed;
+
+  final VoidCallback onStartToday;
+  final void Function(WearRoutineSummary, WearRoutineListKind) onSelectRoutine;
+
+  /// Rutina abierta en el detalle, o null.
+  final (WearRoutineSummary, WearRoutineListKind)? selectedRoutine;
+  final VoidCallback onCloseDetail;
+  final VoidCallback onStartRoutine;
+  final VoidCallback onActivateRoutine;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    switch (pairing) {
+      case WearPairingState.waitingForPairing:
+        return const WearRoundScaffold.centered(
+          child: WearStatusMessage(
+            icon: TreinoIcon.phone,
+            text: WearStrings.openOnPhone,
+          ),
+        );
+
+      case WearPairingState.exchanging:
+        return const WearRoundScaffold.centered(
+          child: WearLoading(text: WearStrings.linking),
+        );
+
+      case WearPairingState.failed:
+        return WearRoundScaffold.centered(
+          child: WearStatusMessage(
+            icon: TreinoIcon.warning,
+            text: WearStrings.linkFailed,
+            tint: palette.warning,
+          ),
+        );
+
+      case WearPairingState.ready:
+        // El detalle es una hoja: se cierra hacia abajo y no pelea con el
+        // paginado horizontal. En el reloj, un push se cierra deslizando de
+        // costado, que es el MISMO gesto que cambia de página.
+        final selected = selectedRoutine;
+        if (selected != null) {
+          return WearRoundScaffold.inscribed(
+            child: WearRoutineDetail(
+              routine: selected.$1,
+              kind: selected.$2,
+              onStart: onStartRoutine,
+              onActivate: onActivateRoutine,
+              onClose: onCloseDetail,
+            ),
+          );
+        }
+
+        final current = session;
+        if (current != null) {
+          // Entreno en curso: sin páginas laterales.
+          return WearWorkoutScreen(snapshot: current);
+        }
+
+        return WearHome(
+          workout: workout,
+          plans: plans,
+          templates: templates,
+          workoutFailed: workoutFailed,
+          onStartToday: onStartToday,
+          onSelectRoutine: onSelectRoutine,
+        );
+    }
+  }
+}

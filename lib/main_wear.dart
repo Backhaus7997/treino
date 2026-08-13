@@ -25,7 +25,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app/theme/app_theme.dart';
 import 'features/watch/application/wear_rest_providers.dart';
-import 'features/watch/presentation/wear/wear_workout_screen.dart';
+import 'features/watch/presentation/wear/wear_root.dart';
+import 'features/watch/presentation/wear/wear_view_models.dart';
 import 'features/watch/presentation/wear/wear_workout_view_model.dart';
 import 'features/workout/domain/set_spec.dart';
 
@@ -62,6 +63,12 @@ class _WearHome extends ConsumerStatefulWidget {
 }
 
 class _WearHomeState extends ConsumerState<_WearHome> {
+  /// Rutina abierta en el detalle, o null.
+  (WearRoutineSummary, WearRoutineListKind)? _selected;
+
+  /// Entreno EN CURSO, o null. Arranca en null: el atleta ve HOY primero.
+  WearWorkoutSnapshot? _session;
+
   @override
   void initState() {
     super.initState();
@@ -72,17 +79,51 @@ class _WearHomeState extends ConsumerState<_WearHome> {
     });
   }
 
-  /// Entreno de muestra.
-  ///
-  /// TODO(wear): reemplazar por la sesión real. Falta la cadena entera —
-  /// credencial minteada por el teléfono, Firestore, resolución del entreno del
-  /// día. Existe para poder MIRAR la pantalla y validar el diseño contra la de
-  /// watchOS antes de invertir en esa cadena.
-  static const _muestra = WearWorkoutSnapshot(
+  // ── DATOS DE MUESTRA ──────────────────────────────────────────────────────
+  //
+  // TODO(wear): reemplazar por la cadena real — credencial minteada por el
+  // teléfono, Firestore con listeners, resolución del entreno del día. Existen
+  // para poder MIRAR cada pantalla y validarla contra la de watchOS antes de
+  // invertir en esa cadena.
+
+  static const _muestraHoy = WearTodaysWorkout(
+    dayName: 'Empuje',
+    routineName: 'Full Body 3 días',
+    weekNumber: 1,
+    numWeeks: 4,
+    exercises: [
+      WearExercisePreview(name: 'Sentadilla con barra', setCount: 4),
+      WearExercisePreview(name: 'Press de banca', setCount: 4),
+      WearExercisePreview(name: 'Remo con barra', setCount: 3),
+      WearExercisePreview(name: 'Elevaciones laterales', setCount: 3),
+      WearExercisePreview(name: 'Plancha', setCount: 1),
+    ],
+  );
+
+  static const _muestraPlanes = [
+    WearRoutineSummary(
+      id: 'p1',
+      name: 'Full Body 3 días',
+      dayCount: 3,
+      numWeeks: 4,
+      badge: 'PF',
+    ),
+    WearRoutineSummary(
+        id: 'p2', name: 'Fuerza básica', dayCount: 4, numWeeks: 1),
+  ];
+
+  static const _muestraPlantillas = [
+    WearRoutineSummary(
+        id: 't1', name: 'Push Pull Legs', dayCount: 6, numWeeks: 1),
+    WearRoutineSummary(
+        id: 't2', name: 'Full Body principiante', dayCount: 3, numWeeks: 1),
+  ];
+
+  static const _muestraSesion = WearWorkoutSnapshot(
     exerciseName: 'Sentadilla con barra',
     exerciseIndex: 0,
     exerciseCount: 5,
-    dayName: 'Día 3',
+    dayName: 'Empuje',
     sets: [
       SetSpec(weightKg: 60, reps: 12),
       SetSpec(weightKg: 60, reps: 12),
@@ -93,6 +134,20 @@ class _WearHomeState extends ConsumerState<_WearHome> {
   );
 
   @override
-  Widget build(BuildContext context) =>
-      const WearWorkoutScreen(snapshot: _muestra);
+  Widget build(BuildContext context) => WearRoot(
+        pairing: WearPairingState.ready,
+        session: _session,
+        workout: _muestraHoy,
+        plans: _muestraPlanes,
+        templates: _muestraPlantillas,
+        selectedRoutine: _selected,
+        onStartToday: () => setState(() => _session = _muestraSesion),
+        onSelectRoutine: (r, k) => setState(() => _selected = (r, k)),
+        onCloseDetail: () => setState(() => _selected = null),
+        onStartRoutine: () => setState(() {
+          _selected = null;
+          _session = _muestraSesion;
+        }),
+        onActivateRoutine: () => setState(() => _selected = null),
+      );
 }

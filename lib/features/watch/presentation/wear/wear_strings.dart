@@ -39,4 +39,40 @@ class WearStrings {
 
   /// Estado inicial mientras se resuelve el entreno del día.
   static const loading = 'Cargando';
+
+  // ── Emparejamiento ──────────────────────────────────────────────────────
+  static const openOnPhone =
+      'Abrí TREINO en el teléfono para vincular el reloj';
+  static const linking = 'Vinculando…';
+  static const linkFailed = 'No se pudo vincular. Abrí TREINO en el teléfono.';
+
+  // ── HOY ─────────────────────────────────────────────────────────────────
+  static const today = 'HOY';
+  static const start = 'Empezar';
+  static const exercises = 'EJERCICIOS';
+  static const loadingRoutine = 'Cargando tu rutina…';
+  static const routineLoadFailed = 'No se pudo cargar tu rutina';
+  static const noExercisesThisWeek = 'Sin ejercicios esta semana';
+
+  /// Abreviatura de semana. Sólo se muestra en planes periodizados.
+  static const weekAbbrev = 'Sem';
+
+  // ── Listas laterales ────────────────────────────────────────────────────
+  static const myPlans = 'MIS PLANES';
+  static const templates = 'PLANTILLAS';
+  static const noPlans = 'No tenés planes cargados';
+  static const noTemplates = 'No hay plantillas disponibles';
+  static const loadFailed = 'No se pudo cargar';
+
+  // ── Detalle de rutina ───────────────────────────────────────────────────
+  static const activate = 'Activar';
+
+  /// Por qué «Empezar» y «Activar» son cosas distintas.
+  ///
+  /// Texto tomado literal de `RoutineDetailView.swift`: el atleta tiene que
+  /// entender que probar una plantilla NO le pisa el plan que le armó su PF.
+  static const hintPlans =
+      '«Empezar» no cambia tu rutina activa. «Activar» sí, también en el teléfono.';
+  static const hintTemplates =
+      'Entrenás esta plantilla sin cambiar tu rutina activa.';
 }

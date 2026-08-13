@@ -228,7 +228,7 @@ class _RestBanner extends StatelessWidget {
     final color = finished ? palette.highlight : palette.accent;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(999),
@@ -418,11 +418,24 @@ class _WearTapTarget extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      // `deferToChild`, NO `opaque`: el área sensible es este widget y nada más.
-      behavior: HitTestBehavior.deferToChild,
+      // `opaque` sobre un área ACOTADA. La distinción importa y costó dos
+      // bugs opuestos en el reloj:
+      //
+      // * `opaque` sobre la PANTALLA ENTERA se dispara solo. El log mostró
+      //   `startRest → cancelRest → startRest` con un segundo entre medio:
+      //   cualquier roce del vidrio alternaba.
+      // * `deferToChild` sobre una fila con un `Spacer` en el medio deja un
+      //   agujero: sólo registra donde hay algo PINTADO, así que tocar entre
+      //   el número de serie y el peso no hacía nada.
+      //
+      // O sea que el problema nunca fue `opaque`, fue el TAMAÑO del área.
+      behavior: HitTestBehavior.opaque,
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: _minTouch),
-        child: child,
+        // El `Center` NO es cosmético: sin él, el hijo se pega arriba del área
+        // de 48dp y en la cápsula del descanso "Saltar" saltaba a otro renglón,
+        // separado del cronómetro con el que forma una sola fila.
+        child: Center(child: child),
       ),
     );
   }

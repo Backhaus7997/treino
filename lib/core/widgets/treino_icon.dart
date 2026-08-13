@@ -37,6 +37,11 @@ class TreinoIcon {
   static const IconData mapPin = PhosphorIconsRegular.mapPin;
   static const IconData bell = PhosphorIconsRegular.bell;
 
+  /// Teléfono. Lo usa el companion de Wear OS para pedirle al atleta que abra
+  /// TREINO en el celular: el reloj no puede hablar con Firestore hasta que el
+  /// teléfono le mintee una credencial.
+  static const IconData phone = PhosphorIconsRegular.deviceMobile;
+
   // Rankings (per-gym leaderboards — rachas/volumen/lifts).
   static const IconData ranking = PhosphorIconsRegular.trophy;
 

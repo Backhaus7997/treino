@@ -43,8 +43,13 @@ class WearRoundScaffold extends StatelessWidget {
     required this.child,
   }) : _inset = _inscribedInset;
 
-  /// `(1 − 1/√2) / 2`, redondeado. El cuadrado inscripto completo.
-  static const double _inscribedInset = 0.146;
+  /// `(1 − 1/√2) / 2 ≈ 0.146` es el cuadrado inscripto EXACTO — sus cuatro
+  /// esquinas TOCAN el círculo. Texto pegado a una esquina queda justo en el
+  /// borde del vidrio y se ve cortado: pasó con el título "PLANTILLAS", que se
+  /// leía "?LANTILLAS".
+  ///
+  /// Se agrega un margen para despegarlo del bisel.
+  static const double _inscribedInset = 0.16;
 
   /// Suficiente para despegarse del bisel sin comerse la pantalla.
   static const double _centeredInset = 0.08;
