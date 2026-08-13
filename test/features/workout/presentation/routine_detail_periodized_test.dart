@@ -28,6 +28,8 @@ import 'package:treino/features/workout/application/session_providers.dart'
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_day.dart';
 import 'package:treino/features/workout/domain/routine_slot.dart';
+import 'package:treino/features/workout/domain/routine_source.dart';
+import 'package:treino/features/workout/domain/routine_visibility.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
 import 'package:treino/features/workout/presentation/routine_detail_screen.dart';
@@ -230,7 +232,15 @@ void main() {
         routine: routine,
       ));
       await _settle(tester);
-      expect(find.byType(ExerciseSlotRow), findsNWidgets(2));
+      // `skipOffstage: false`: the start action is pinned to the bottom since
+      // #641, so the exercise list runs in a shorter viewport and the second
+      // slot sits below the fold on the test surface. The assert is about list
+      // COMPOSITION (every slot rendered, no presence filter), not about what
+      // happens to be on screen.
+      expect(
+        find.byType(ExerciseSlotRow, skipOffstage: false),
+        findsNWidgets(2),
+      );
     });
 
     // Fix 3 — REQ-PERIOD-042 "ANY day startable" on single-week plan
@@ -522,8 +532,13 @@ void main() {
       ));
       await _settle(tester);
 
-      // Both slots must render — no filtering on single-week plan
-      expect(find.byType(ExerciseSlotRow), findsNWidgets(2));
+      // Both slots must render — no filtering on single-week plan.
+      // `skipOffstage: false` since #641 pinned the start action (see the
+      // SCENARIO-038 note above).
+      expect(
+        find.byType(ExerciseSlotRow, skipOffstage: false),
+        findsNWidgets(2),
+      );
     });
   });
 
@@ -710,6 +725,146 @@ void main() {
           )
           .first);
       expect(btn.onPressed, isNotNull);
+    });
+  });
+
+  // ── user-created ownership guard applies at EVERY plan length ─────────────
+  //
+  // `_startActionVisible` used to gate the `userCreated` check behind
+  // `!isPeriodized`. That asymmetry was inherited verbatim from the pre-#641
+  // CTA split, where `_StartSessionCTABar` carried the guard and
+  // `_PeriodizedCTABar` simply never had it — no product decision was ever
+  // made to let strangers start someone's periodized plan.
+  //
+  // The hole was reachable: `publicRoutinesByUserProvider` selects for the
+  // "RUTINAS PÚBLICAS" tab on `visibility` alone and has never looked at
+  // `numWeeks`, and the editor lets an athlete author >1 week AND share on
+  // profile at the same time. Starting such a plan writes the session under the
+  // VIEWER's uid (`SessionNotifier._buildFresh` reads `currentUidProvider`)
+  // against a routine they neither own nor can edit — and, unique to the
+  // periodized path, accrues plan progress too, since `planProgressProvider` is
+  // keyed `(uid: viewer, routineId: theirs)`.
+  //
+  // This is a deliberate BEHAVIOUR change (who may start a session), which is
+  // why it was kept out of #641's scope and landed on its own.
+  group('userCreated ownership guard at every plan length', () {
+    const otherUid = 'other-athlete';
+
+    Routine sharedUserRoutine({
+      required int numWeeks,
+      required String createdBy,
+    }) =>
+        Routine(
+          id: 'routine-shared-$numWeeks-$createdBy',
+          name: 'Plan compartido',
+          level: ExperienceLevel.intermediate,
+          days: [_day(1), _day(2)],
+          source: RoutineSource.userCreated,
+          visibility: RoutineVisibility.public,
+          createdBy: createdBy,
+          numWeeks: numWeeks,
+        );
+
+    testWidgets(
+        'periodized + userCreated + public + viewer != createdBy → no start '
+        'action (the regression this group exists for)', (tester) async {
+      final routine = sharedUserRoutine(numWeeks: 3, createdBy: otherUid);
+      await tester.pumpWidget(_wrap(
+        RoutineDetailScreen(routineId: routine.id),
+        routine: routine,
+      ));
+      await _settle(tester);
+
+      // The screen itself must have rendered — otherwise "no EMPEZAR" would
+      // pass for the wrong reason (a blank/error state) and the guard would go
+      // untested.
+      expect(
+        find.byType(ExerciseSlotRow, skipOffstage: false),
+        findsWidgets,
+        reason: 'The plan is still fully READABLE — the guard removes the '
+            'action, not the content.',
+      );
+      // EMPEZAR and REPETIR are the only two labels `_StartActionButton` ever
+      // renders, so asserting both absent covers the action in every progress
+      // state.
+      expect(
+        find.text('EMPEZAR', skipOffstage: false),
+        findsNothing,
+        reason: 'Starting would log a session under the viewer against another '
+            "athlete's plan — exactly what the single-week guard prevents.",
+      );
+      expect(find.text('REPETIR', skipOffstage: false), findsNothing);
+    });
+
+    testWidgets(
+        'periodized + userCreated + public + viewer == createdBy → start '
+        'action still shown', (tester) async {
+      final routine = sharedUserRoutine(numWeeks: 3, createdBy: _uid);
+      await tester.pumpWidget(_wrap(
+        RoutineDetailScreen(routineId: routine.id),
+        routine: routine,
+      ));
+      await _settle(tester);
+
+      // Positive control: the guard discriminates on OWNERSHIP. Without this,
+      // a change that hid the action for every periodized plan would pass the
+      // test above.
+      expect(
+        find.text('EMPEZAR', skipOffstage: false),
+        findsOneWidget,
+        reason: 'Sharing your own plan must not lock you out of training it.',
+      );
+      final btn = tester.widget<ElevatedButton>(find
+          .ancestor(
+            of: find.text('EMPEZAR', skipOffstage: false),
+            matching: find.byType(ElevatedButton, skipOffstage: false),
+          )
+          .first);
+      expect(btn.onPressed, isNotNull);
+    });
+
+    testWidgets(
+        'single-week + userCreated + public + viewer != createdBy → no start '
+        'action (pre-existing behaviour the periodized path is aligned to)',
+        (tester) async {
+      final routine = sharedUserRoutine(numWeeks: 1, createdBy: otherUid);
+      await tester.pumpWidget(_wrap(
+        RoutineDetailScreen(routineId: routine.id),
+        routine: routine,
+      ));
+      await _settle(tester);
+
+      expect(find.text('EMPEZAR', skipOffstage: false), findsNothing);
+      expect(find.text('REPETIR', skipOffstage: false), findsNothing);
+    });
+
+    testWidgets(
+        'periodized + non-userCreated + public + viewer != createdBy → start '
+        'action shown (the guard is scoped to userCreated)', (tester) async {
+      // `system` rather than `trainerTemplate` on purpose: a public
+      // trainerTemplate additionally mounts `TemplateRatingsSection`, whose
+      // Firebase-backed providers would have to be stubbed here for reasons
+      // that have nothing to do with the guard. Both are non-userCreated
+      // sources carrying a foreign `createdBy`, so either one proves the same
+      // thing — the guard widened across plan LENGTHS, never past
+      // `userCreated` into the publicly-startable catalogue.
+      final routine = Routine(
+        id: 'routine-system-3w',
+        name: 'Plantilla del sistema',
+        level: ExperienceLevel.intermediate,
+        days: [_day(1), _day(2)],
+        source: RoutineSource.system,
+        visibility: RoutineVisibility.public,
+        createdBy: otherUid,
+        numWeeks: 3,
+      );
+      await tester.pumpWidget(_wrap(
+        RoutineDetailScreen(routineId: routine.id),
+        routine: routine,
+      ));
+      await _settle(tester);
+
+      expect(find.text('EMPEZAR', skipOffstage: false), findsOneWidget);
     });
   });
 }
