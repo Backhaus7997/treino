@@ -74,7 +74,12 @@ class WearRoundScaffold extends StatelessWidget {
       backgroundColor: palette.bg,
       body: Padding(
         padding: EdgeInsets.all(pad),
-        child: Center(child: child),
+        // `centered` centra; `inscribed` LLENA.
+        //
+        // Centrar contenido más alto que la pantalla lo recorta por ARRIBA, y
+        // arriba es justo donde va el nombre del ejercicio. Pasó en el reloj:
+        // la lista de series se veía entera y el encabezado no existía.
+        child: _inset == _centeredInset ? Center(child: child) : child,
       ),
     );
   }

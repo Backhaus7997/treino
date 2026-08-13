@@ -11,18 +11,8 @@
 class WearStrings {
   const WearStrings._();
 
-  /// Título de la pantalla de descanso. UPPERCASE porque es heading —
-  /// Barlow Condensed 700, según el design system.
-  static const restTitle = 'DESCANSO';
-
-  /// Cuando el descanso terminó y toca volver a la barra.
-  static const restDone = '¡DALE!';
-
-  /// Acción para saltear lo que queda de descanso.
-  static const restSkip = 'Saltear';
-
-  /// Acción para marcar la serie y arrancar el descanso.
-  static const markSet = 'Marcar serie';
+  /// Acción para saltear lo que queda de descanso. Igual que en watchOS.
+  static const restSkip = 'Saltar';
 
   /// Unidad de ritmo cardíaco. Coincide con la del reloj de Apple
   /// (`WorkoutView.swift`), para que el atleta lea lo mismo en los dos.
@@ -31,10 +21,21 @@ class WearStrings {
   /// Unidad de energía activa.
   static const kcalUnit = 'kcal';
 
-  /// Placeholder cuando un dato de esfuerzo está vencido o no llegó todavía.
-  /// Se muestra ESTO y no el último valor conocido: un pulso viejo presentado
-  /// como actual es peor que no mostrar nada.
-  static const noData = '--';
+  /// Series marcadas que todavía no subieron a Firestore.
+  static const pendingUpload = 'sin subir';
+
+  /// Por qué no aparece "Terminar" todavía.
+  ///
+  /// Pedido del dueño, documentado en `WorkoutView.swift`: el botón sólo sale
+  /// con TODAS las series de TODOS los ejercicios marcadas. Tenerlo siempre a
+  /// la vista invita a cerrar el entreno de más, sobre todo con la muñeca
+  /// mojada y el botón a un toque del último círculo que se marcó.
+  static const finishHint = 'Marcá todas las series para terminar';
+
+  /// NO existe un placeholder de "sin dato" a propósito. Cuando no hay pulso ni
+  /// calorías no se dibuja NADA: ni un guion, ni un cero, ni un aviso. Una
+  /// lectura negada por el atleta es indistinguible de "todavía no hay datos",
+  /// así que cualquier texto sería adivinar. Ver `WorkoutView.swift`.
 
   /// Estado inicial mientras se resuelve el entreno del día.
   static const loading = 'Cargando';

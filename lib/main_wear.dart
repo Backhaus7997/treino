@@ -25,7 +25,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app/theme/app_theme.dart';
 import 'features/watch/application/wear_rest_providers.dart';
-import 'features/watch/presentation/wear/wear_rest_screen.dart';
+import 'features/watch/presentation/wear/wear_workout_screen.dart';
+import 'features/watch/presentation/wear/wear_workout_view_model.dart';
+import 'features/workout/domain/set_spec.dart';
 
 void main() {
   runApp(const ProviderScope(child: TreinoWearApp()));
@@ -70,6 +72,31 @@ class _WearHomeState extends ConsumerState<_WearHome> {
     });
   }
 
+  /// Entreno de muestra.
+  ///
+  /// TODO(wear): reemplazar por la sesión real. Falta la cadena entera —
+  /// credencial minteada por el teléfono, Firestore, resolución del entreno del
+  /// día. Existe para poder MIRAR la pantalla y validar el diseño contra la de
+  /// watchOS antes de invertir en esa cadena.
+  static const _muestra = WearWorkoutSnapshot(
+    exerciseName: 'Sentadilla con barra',
+    exerciseIndex: 0,
+    exerciseCount: 5,
+    dayName: 'Día 3',
+    sets: [
+      SetSpec(weightKg: 60, reps: 12),
+      SetSpec(weightKg: 60, reps: 12),
+      SetSpec(weightKg: 70, reps: 10),
+      SetSpec(weightKg: 70, repsMin: 8, repsMax: 10),
+    ],
+    loggedSetNumbers: {1},
+  );
+
   @override
-  Widget build(BuildContext context) => const WearRestScreen();
+  Widget build(BuildContext context) => const WearWorkoutScreen(
+        snapshot: _muestra,
+        // Sin ExerciseClient todavía: los dos en null, así que la fila de
+        // esfuerzo NO se dibuja. Es el comportamiento correcto, no un bug.
+        effort: WearEffort(),
+      );
 }
