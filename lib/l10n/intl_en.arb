@@ -832,6 +832,8 @@
   "coachHubDashboardResumeLinkError": "We couldn't resume the link.",
   "coachHubDashboardAcceptSuccess": "Link accepted.",
   "coachHubDashboardAcceptError": "We couldn't accept the link.",
+  "coachHubDashboardAcceptPrecondition": "This request is no longer available.",
+  "coachHubDashboardAcceptUnavailable": "Check your connection and try again.",
   "coachHubDashboardRejectSuccess": "Request rejected.",
   "coachHubDashboardRejectError": "We couldn't reject the request.",
   "coachHubDashboardTerminationReasonDeclined": "Declined by the coach",

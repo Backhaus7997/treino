@@ -14,6 +14,8 @@
 // las keys l10n existentes (ADR-F4-05, l10n congelado).
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -24,10 +26,12 @@ import '../../../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../../../core/widgets/treino_icon.dart';
 import '../../../../coach/application/trainer_link_providers.dart';
+import '../../../../coach/data/trainer_link_promotion_service.dart';
 import '../../../../coach/domain/trainer_link.dart';
 import '../../../../coach/domain/trainer_link_status.dart';
 import '../../../../profile/application/user_public_profile_providers.dart';
 import '../../../../../l10n/app_l10n.dart';
+import '../facturacion_planes/plan_limit_paywall.dart';
 import '../../widgets/coach_hub_widgets.dart';
 import 'solicitudes_providers.dart';
 import 'widgets/solicitud_card.dart';
@@ -260,18 +264,40 @@ class _SolicitudTileState extends ConsumerState<_SolicitudTile> {
     );
     if (!confirmed || !mounted) return;
     setState(() => _busy = true);
-    final repo = ref.read(trainerLinkRepositoryProvider);
     try {
-      await repo.accept(widget.link.id);
+      // Server-authoritative: la callable aplica el gate de peso ponderado
+      // (paywall Fase 7, PR4).
+      await ref
+          .read(trainerLinkPromotionServiceProvider)
+          .accept(widget.link.id);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.coachHubDashboardAcceptSuccess)),
       );
-    } catch (_) {
+    } on LinkPromotionFailure$PlanLimitReached catch (failure) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      unawaited(
+        showPlanLimitPaywall(
+          context,
+          currentTier: failure.tier,
+          reason: failure.reason == 'subscription-inactive'
+              ? PlanLimitReason.subscriptionInactive
+              : PlanLimitReason.planLimit,
+        ),
+      );
+    } on LinkPromotionFailure$PromotionPrecondition {
       if (!mounted) return;
       setState(() => _busy = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.coachHubDashboardAcceptError)),
+        SnackBar(content: Text(l10n.coachHubDashboardAcceptPrecondition)),
+      );
+    } catch (_) {
+      // Catch-all a proposito (QA H5): ver dashboard_pending.dart.
+      if (!mounted) return;
+      setState(() => _busy = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.coachHubDashboardAcceptUnavailable)),
       );
     }
   }

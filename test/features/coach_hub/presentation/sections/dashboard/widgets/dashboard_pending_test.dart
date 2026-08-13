@@ -17,9 +17,11 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
+import 'package:treino/features/coach/data/trainer_link_promotion_service.dart';
 import 'package:treino/features/coach/data/trainer_link_repository.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
@@ -75,6 +77,9 @@ Future<void> _pump(
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
+
+class _MockPromotionService extends Mock
+    implements TrainerLinkPromotionService {}
 
 void main() {
   group('SCENARIO-PEND-01 — loading usa el skeleton del kit', () {
@@ -208,25 +213,43 @@ void main() {
           ),
         ];
 
-    testWidgets('tap accept_ transiciona pending → active en Firestore',
+    // Paywall Fase 7, PR4: accept dejo de escribir Firestore desde el
+    // cliente. La promocion pending -> active vive en la callable
+    // acceptTrainerLink, detras del gate de peso ponderado, y
+    // firestore.rules la bloquea del lado del cliente. Este test pineaba
+    // justamente la escritura que sacamos, asi que ahora verifica que se
+    // INVOQUE la callable; el efecto en Firestore es del server y se cubre
+    // en promote-link.test.ts.
+    testWidgets('tap accept_ invoca la callable acceptTrainerLink',
         (tester) async {
       final link = await repo.request(
         trainerId: 'trainer-1',
         athleteId: 'a1',
       );
+      final svc = _MockPromotionService();
+      when(() => svc.accept(any())).thenAnswer((_) async {});
 
       await _pump(
         tester,
-        overrides: await repoOverrides('a1'),
+        overrides: [
+          ...await repoOverrides('a1'),
+          trainerLinkPromotionServiceProvider.overrideWithValue(svc),
+        ],
       );
       await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(Key('accept_${link.id}')));
-      await tester.pumpAndSettle();
+      // Sin pumpAndSettle: al no cambiar el doc (la promocion es del server),
+      // la tarjeta queda en `busy` con un spinner indeterminado en loop y
+      // pumpAndSettle nunca asienta. Mismo motivo que en invitaciones.
+      await tester.pump();
+      await tester.pump();
 
+      verify(() => svc.accept(link.id)).called(1);
+      // El doc NO cambia desde el cliente: eso es justamente el punto.
       final snap =
           await firestore.collection('trainer_links').doc(link.id).get();
-      expect(snap.data()!['status'], 'active');
+      expect(snap.data()!['status'], 'pending');
     });
 
     testWidgets('tap decline_ transiciona pending → terminated en Firestore',
