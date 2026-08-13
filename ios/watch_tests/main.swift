@@ -512,6 +512,7 @@ runWorkoutDuration()
 runEffortBroadcast()
 runSetLogWriteTarget()
 runSetLogDeletion()
+runExerciseCursor()
 
 if failures.isEmpty {
     print("OK: \(totalChecks) chequeos de la logica de permisos de Salud")
@@ -838,5 +839,78 @@ private func runSetLogDeletion() {
     checkEqual(
         localDespues, [false, false, true],
         "Tras borrar+renumerar en el telefono, al reloj le sobra una sola serie"
+    )
+}
+
+// MARK: - Donde queda parado el cursor de ejercicio
+//
+// El cursor se movia con `currentExerciseIndex += 1`: un DELTA. Avanzaba un solo
+// paso aunque en un mismo sync entraran tres ejercicios enteros cargados desde
+// el telefono, y la muñeca quedaba clavada en un ejercicio ya terminado — sin
+// fila tocable y sin boton de Terminar.
+//
+// Cuarta vez que muerde la misma trampa (§4.5 del HANDOFF): aplicar un delta
+// sobre un estado que movio otro actor.
+
+private func runExerciseCursor() {
+    // Nada cargado: el primero.
+    checkEqual(
+        firstUnfinishedExerciseIndex(seriesPlanificadas: [4, 3, 3], seriesCargadas: [0, 0, 0]),
+        0,
+        "Sin nada cargado el cursor esta en el primer ejercicio"
+    )
+
+    // El primero completo: el segundo.
+    checkEqual(
+        firstUnfinishedExerciseIndex(seriesPlanificadas: [4, 3, 3], seriesCargadas: [4, 0, 0]),
+        1,
+        "Con el primero completo el cursor pasa al segundo"
+    )
+
+    // EL CASO DEL BUG: el telefono completo DOS ejercicios de una mientras el
+    // reloj no miraba. Con el delta el cursor avanzaba a 1 y quedaba clavado en
+    // un ejercicio ya terminado.
+    checkEqual(
+        firstUnfinishedExerciseIndex(seriesPlanificadas: [4, 3, 3], seriesCargadas: [4, 3, 0]),
+        2,
+        "Dos ejercicios completados de una: el cursor salta los DOS"
+    )
+
+    // Tres de una, con el entreno entero hecho: se queda en el ultimo para que
+    // el atleta vea que termino, no en una pantalla vacia.
+    checkEqual(
+        firstUnfinishedExerciseIndex(seriesPlanificadas: [4, 3, 3], seriesCargadas: [4, 3, 3]),
+        2,
+        "Con todo completo el cursor se queda en el ultimo"
+    )
+
+    // RETROCEDE: el telefono borro una serie del primero, que dejo de estar
+    // completo. Con un delta esto era imposible de expresar.
+    checkEqual(
+        firstUnfinishedExerciseIndex(seriesPlanificadas: [4, 3, 3], seriesCargadas: [3, 3, 3]),
+        0,
+        "Si el telefono borro una serie del primero, el cursor VUELVE ahi"
+    )
+
+    // Mas cargadas que planificadas (series agregadas desde el telefono mas alla
+    // del plan): cuenta como completo, no rompe.
+    checkEqual(
+        firstUnfinishedExerciseIndex(seriesPlanificadas: [4, 3], seriesCargadas: [5, 1]),
+        1,
+        "Series de mas no traban el cursor"
+    )
+
+    // Lista vacia: 0, nunca negativo. Un indice negativo se usa para indexar.
+    checkEqual(
+        firstUnfinishedExerciseIndex(seriesPlanificadas: [], seriesCargadas: []),
+        0,
+        "Sin ejercicios el cursor es 0, jamas negativo"
+    )
+
+    // Menos entradas de cargadas que de planificadas: se asume 0, sin reventar.
+    checkEqual(
+        firstUnfinishedExerciseIndex(seriesPlanificadas: [4, 3, 3], seriesCargadas: [4]),
+        1,
+        "Una lista de cargadas mas corta no rompe"
     )
 }

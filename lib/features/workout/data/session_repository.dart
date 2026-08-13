@@ -39,6 +39,14 @@ class SessionRepository {
   /// showed for `workoutsCount`/`racha` scoping.
   static const int counterRecomputeWindow = 365;
 
+  /// Cuántas sesiones `active` mira [getActive] para barrer las colgadas.
+  ///
+  /// No es 1 porque con `limit(1)` era imposible enterarse de que había otras;
+  /// y no es ilimitado porque la lectura no puede crecer con la basura
+  /// acumulada. 10 alcanza de sobra: el barrido corre en cada lectura, así que
+  /// una cola larga se drena en pocas visitas en vez de en una sola cara.
+  static const int _staleActiveSweep = 10;
+
   // ─── Private collection getters ─────────────────────────────────────────
 
   CollectionReference<Map<String, Object?>> _sessions(String uid) =>
@@ -290,13 +298,64 @@ class SessionRepository {
 
   // ─── getActive ──────────────────────────────────────────────────────────
 
+  /// La sesión activa del atleta. **Y cierra las que quedaron colgadas.**
+  ///
+  /// No existía ningún invariante de "una sola sesión activa por atleta": hay
+  /// DOS caminos que crean sesiones `active` —`SessionNotifier._buildFresh` en
+  /// el teléfono y `HistorySync.adoptOrCreateSession` en el reloj— y NINGUNO
+  /// cerraba las que quedaban atrás. Como esta consulta siempre devolvió la más
+  /// nueva, las viejas se volvían zombis invisibles que se acumulaban para
+  /// siempre. Es la causa de fondo del "me marca el entreno como pendiente"
+  /// (HANDOFF §8.1).
+  ///
+  /// Cerrarlas NO cambia nada de lo que ve el atleta: esta consulta ya
+  /// devolvía solo la más nueva, así que las otras no se mostraban en ningún
+  /// lado. Lo que sí cambia es que dejan de acumularse, y que el reloj —cuyo
+  /// `findAnyActiveSession` mira las 10 más recientes sin terminar— deja de
+  /// poder engancharse a una que para el atleta ya no existe.
+  ///
+  /// Va acá y no en `create` a propósito: `create` es el camino del TELÉFONO, y
+  /// el reloj crea sus sesiones por REST sin pasar por Dart. Esta consulta es el
+  /// único punto donde convergen los zombis de los dos clientes.
+  ///
+  /// Se cierran con `wasFullyCompleted: false`, así que no cuentan como entreno
+  /// hecho: no mueven el avance del plan, ni la racha, ni los rankings.
+  /// `totalVolumeKg` y `durationMin` se dejan como están —una sesión activa nace
+  /// en 0 y nadie los toca hasta terminarla— porque inventarles un valor sería
+  /// peor que dejar el 0 honesto.
   Future<Session?> getActive(String uid) async {
     final snap = await _sessions(uid)
         .where('status', isEqualTo: 'active')
         .orderBy('startedAt', descending: true)
-        .limit(1)
+        // Se piden VARIAS y no una: con `limit(1)` era imposible enterarse de
+        // que había colgadas. La cota existe igual para que la lectura no
+        // crezca con la basura acumulada.
+        .limit(_staleActiveSweep)
         .get();
     if (snap.docs.isEmpty) return null;
+
+    // Best-effort: si el barrido falla, se devuelve igual la sesión activa. El
+    // atleta tiene que poder seguir entrenando aunque la limpieza no entre.
+    if (snap.docs.length > 1) {
+      try {
+        final now = Timestamp.fromDate(DateTime.now().toUtc());
+        for (final vieja in snap.docs.skip(1)) {
+          await vieja.reference.update({
+            'status': SessionStatusX(SessionStatus.finished).toJson(),
+            'finishedAt': now,
+            'wasFullyCompleted': false,
+          });
+        }
+      } catch (e, st) {
+        developer.log(
+          'SessionRepository: no se pudieron cerrar las sesiones colgadas '
+          'de $uid',
+          error: e,
+          stackTrace: st,
+        );
+      }
+    }
+
     return _sessionFromDoc(snap.docs.first);
   }
 

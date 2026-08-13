@@ -206,6 +206,64 @@ void main() {
     expect(result.uid, equals(uid));
   });
 
+  test(
+      'getActive cierra las sesiones activas colgadas y deja solo la más nueva',
+      () async {
+    // Dos caminos crean sesiones activas —el teléfono y el reloj— y ninguno
+    // cerraba las que quedaban atrás. Como getActive siempre devolvió la más
+    // nueva, las viejas se volvían zombis invisibles que se acumulaban para
+    // siempre: la causa de fondo del "me marca el entreno como pendiente".
+    for (var d = 1; d <= 3; d++) {
+      await repo.create(
+        uid: uid,
+        routineId: routineId,
+        routineName: routineName,
+        startedAt: DateTime.utc(2026, 5, 10 + d, 9),
+      );
+    }
+
+    final activa = await repo.getActive(uid);
+
+    expect(
+      activa!.startedAt,
+      equals(DateTime.utc(2026, 5, 13, 9)),
+      reason: 'la que devuelve sigue siendo la más nueva, como siempre',
+    );
+
+    final todas = await repo.listByUid(uid);
+    final siguenActivas =
+        todas.where((s) => s.status == SessionStatus.active).toList();
+    expect(
+      siguenActivas,
+      hasLength(1),
+      reason: 'las viejas se acumulaban para siempre; el reloj podía '
+          'engancharse a una que para el atleta ya no existía',
+    );
+    expect(siguenActivas.single.id, equals(activa.id));
+
+    // Cerradas SIN contar como entreno hecho: no mueven el plan, ni la racha,
+    // ni los rankings.
+    final cerradas =
+        todas.where((s) => s.status == SessionStatus.finished).toList();
+    expect(cerradas, hasLength(2));
+    for (final c in cerradas) {
+      expect(c.wasFullyCompleted, isFalse);
+      expect(c.finishedAt, isNotNull);
+    }
+  });
+
+  test('getActive no escribe nada cuando hay una sola activa', () async {
+    await createActiveSession();
+
+    final antes = (await repo.listByUid(uid)).single;
+    await repo.getActive(uid);
+    final despues = (await repo.listByUid(uid)).single;
+
+    expect(despues.status, equals(SessionStatus.active));
+    expect(despues.finishedAt, isNull);
+    expect(despues.startedAt, equals(antes.startedAt));
+  });
+
   test('SCENARIO-246: getActive returns null when no active session', () async {
     final sessionId = await createActiveSession();
     await repo.finish(

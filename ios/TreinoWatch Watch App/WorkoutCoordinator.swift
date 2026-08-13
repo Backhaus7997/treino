@@ -360,6 +360,56 @@ final class WorkoutCoordinator: ObservableObject {
                try await HistorySync.isFinished(
                    client: client, uid: uid, sessionId: remoteId
                ) {
+                // ⚠️ ANTES DE DESCARTAR, SE SUBE LO QUE FALTE.
+                //
+                // Esta rama borraba el estado local sin mirar `pendingSets`,
+                // mientras que `finish()` SÍ lo mira —con este motivo escrito:
+                // "perder series que el atleta hizo es peor que dejarle la
+                // pantalla abierta"—. La asimetría convertía un cierre hecho
+                // desde el teléfono en PÉRDIDA DE DATOS: las series marcadas en
+                // la muñeca y todavía sin subir se borraban en silencio.
+                //
+                // El riesgo dejó de ser teórico cuando `getActive` pasó a cerrar
+                // las sesiones colgadas (HANDOFF §8.1): ahora los cierres
+                // remotos son MUCHO más frecuentes, así que esta rama se
+                // ejecuta seguido.
+                //
+                // La sesión ya está cerrada en el historial y no se puede
+                // reabrir, pero las series son trabajo real del atleta y entran
+                // igual. El `totalVolumeKg` de esa sesión queda como lo dejó
+                // quien la cerró — desajustado, y eso es lo que reporta el
+                // balde "volumen sin duplicados" de
+                // `scripts/backfill_dedupe_setlogs.js`. Preferimos un total
+                // desajustado antes que series perdidas.
+                if !current.pendingSets.isEmpty {
+                    let remote = try await HistorySync.remoteSetLogs(
+                        client: client, uid: uid, sessionId: remoteId
+                    )
+                    let refs = remote.compactMap { set -> RemoteSetLogRef? in
+                        guard let docId = set.remoteDocId else { return nil }
+                        return RemoteSetLogRef(
+                            docId: docId,
+                            exerciseId: set.exerciseId,
+                            setNumber: set.setNumber
+                        )
+                    }
+                    for pendiente in current.pendingSets {
+                        let destino = resolveSetLogWriteTarget(
+                            exerciseId: pendiente.exerciseId,
+                            setNumber: pendiente.setNumber,
+                            remote: refs
+                        )
+                        guard case .write(let docId) = destino else { continue }
+                        let nombre = exercises
+                            .first { $0.exerciseId == pendiente.exerciseId }?
+                            .exerciseName ?? pendiente.exerciseId
+                        try await HistorySync.writeSetLog(
+                            client: client, uid: uid, sessionId: remoteId,
+                            docId: docId, exerciseName: nombre, set: pendiente
+                        )
+                    }
+                }
+
                 stopRest()
                 session = nil
                 workout = nil
@@ -460,12 +510,6 @@ final class WorkoutCoordinator: ObservableObject {
             let huboBorradas = current.loggedSets.contains(where: fueBorrada)
             if huboBorradas {
                 current.loggedSets.removeAll(where: fueBorrada)
-                // El cursor puede tener que RETROCEDER: si el telefono borro una
-                // serie del ejercicio en curso, ese ejercicio dejo de estar
-                // completo y hay que volver a ofrecerlo.
-                currentExerciseIndex = firstUnfinishedIndex(
-                    in: exercises, session: current
-                )
             }
 
             if !nuevas.isEmpty || huboBorradas {
@@ -486,13 +530,30 @@ final class WorkoutCoordinator: ObservableObject {
                     startRest(seconds: exercise.restSeconds)
                 }
 
-                // Si el telefono completo el ejercicio actual, avanzar.
-                if let exercise = currentExercise,
-                   current.loggedCount(exerciseId: exercise.exerciseId)
-                       >= exercise.sets.count,
-                   currentExerciseIndex + 1 < exercises.count {
-                    currentExerciseIndex += 1
-                }
+                // El cursor se RECALCULA, no se incrementa.
+                //
+                // Antes era `currentExerciseIndex += 1`: un DELTA, y avanzaba un
+                // solo paso aunque en ese mismo sync hubieran entrado tres
+                // ejercicios enteros desde el teléfono. El atleta entrenaba un
+                // rato con el celular, miraba la muñeca, y la encontraba clavada
+                // en un ejercicio ya terminado — sin fila tocable, porque todas
+                // sus series estaban hechas, y sin botón de Terminar.
+                //
+                // Es la MISMA trampa del §4.5 del HANDOFF que ya mordió a
+                // `logSet` y a `removeSet`, ahora en el cursor: aplicar deltas
+                // sobre un estado que otro actor movió. La regla es la misma —
+                // valores absolutos.
+                //
+                // Va DESPUÉS del descanso a propósito: el descanso tiene que
+                // mirar el ejercicio en el que estaba el atleta cuando llegó la
+                // serie, no al que salta el cursor.
+                //
+                // Y cubre las dos direcciones: si el teléfono BORRÓ una serie
+                // del ejercicio en curso, ese ejercicio dejó de estar completo y
+                // el cursor tiene que RETROCEDER a ofrecerlo.
+                currentExerciseIndex = firstUnfinishedIndex(
+                    in: exercises, session: current
+                )
             }
 
             // ── Ahora si, subir lo pendiente, sabiendo que hay alla ────────
@@ -619,16 +680,18 @@ final class WorkoutCoordinator: ObservableObject {
         currentExerciseIndex += 1
     }
 
+    /// Delega en la regla pura de `ExerciseCursor.swift`, que es donde esta
+    /// medida en el host. Aca solo se traduce el estado a numeros.
     private func firstUnfinishedIndex(
         in exercises: [WatchExercise],
         session: WorkoutSession
     ) -> Int {
-        for (index, exercise) in exercises.enumerated() {
-            if session.loggedCount(exerciseId: exercise.exerciseId) < exercise.sets.count {
-                return index
+        firstUnfinishedExerciseIndex(
+            seriesPlanificadas: exercises.map { $0.sets.count },
+            seriesCargadas: exercises.map {
+                session.loggedCount(exerciseId: $0.exerciseId)
             }
-        }
-        return max(exercises.count - 1, 0)
+        )
     }
 
     /// Descanso contado LOCALMENTE por el reloj.
