@@ -111,11 +111,27 @@ Teléfono: autogenerado (`.doc()`). Reloj: determinístico
 (`exerciseId__setNumber`). La misma serie escrita de los dos lados creaba DOS
 documentos.
 
-Defensas actuales: el reloj guarda `remoteDocId` y actualiza ESE documento; y
-el teléfono avisa por cada serie para cerrar la ventana de desconocimiento.
-
 **No se puede pasar el teléfono a ids determinísticos**: al borrar una serie
 renumera las siguientes, y eso obligaría a mover documentos.
+
+Las defensas originales —`remoteDocId` en el reloj y el aviso por cada serie—
+**no alcanzaban, y está medido**: las dos preguntan por el estado LOCAL, que es
+tan fresco como el último snapshot que llegó. En el emulador el teléfono creó su
+duplicado **37 segundos** después del reloj. 13 de 77 sesiones tenían duplicados.
+
+Desde `fix/watch-sync-bugs` la deduplicación vive en la ESCRITURA:
+
+- El teléfono consulta la ruta determinística del reloj antes de crear su
+  documento, y escribe SOBRE ese si ya está.
+- `WorkoutCoordinator.sync` LEE el historial ANTES de subir lo pendiente. Ese
+  orden es parte del contrato: estaba al revés y por eso no había nada que pisar.
+- La fórmula del id quedó bajo `conformance/set_log_identity.json`, porque vive
+  escrita en los dos lenguajes y una divergencia de un carácter vuelve a
+  duplicar en silencio.
+
+⚠️ **La identidad se decide por los CAMPOS, nunca por la ruta.** Al renumerar,
+`updateSetLog` conserva el id, así que `sentadilla__3` puede contener la serie 2.
+Escribir ahí confiando en el path PIERDE esa serie — peor que el duplicado.
 
 ### 4.4 La posición del plan la manda el HISTORIAL, no el cálculo
 
@@ -137,6 +153,16 @@ reactivo un provider, preguntarse SIEMPRE quién más está escuchando:
 - `activeSessionForUidProvider` reactivo hizo que el aviso de retomar saltara
   encima del entreno recién empezado, porque Home queda montada abajo del
   player.
+- **Y mordió una tercera vez, en `removeSet`** (2026-08-13). Renumeraba con un
+  DELTA (`setNumber - 1`) sobre el estado re-leído después del await; el
+  snapshot de su propia escritura ya venía renumerado, así que el delta se
+  aplicaba dos veces: 3 → 2 → 1. El estado quedaba con dos series en el mismo
+  número y la fila del medio sin tildar.
+
+**La lección, ya con tres casos: no preguntarse "¿el stream ya pasó?" — hacer
+que el camino sea IDEMPOTENTE.** Aplicar valores absolutos, no deltas. Y pasar
+siempre por el invariante `_dedupedLogs`: `removeSet` era el único camino de
+mutación que lo salteaba, y por eso las dos series duplicadas sobrevivían.
 
 ---
 
@@ -153,6 +179,31 @@ reactivo un provider, preguntarse SIEMPRE quién más está escuchando:
   ```
 - **El Keychain sobrevive a la desinstalación** en watchOS. Para limpiar
   credencial de verdad: `xcrun simctl erase`.
+- **`flutter run` del teléfono construye LAS DOS apps** (el reloj está en
+  `Embed Watch Content` de Runner): un solo build de Xcode, ~20 min. Pero
+  **NO reinstala el companion en el reloj emparejado** — hay que hacerlo a mano:
+  ```
+  xcrun simctl install <watch-udid> \
+    build/ios/Debug-watchsimulator/"TreinoWatch Watch App.app"
+  ```
+- **Para saber si el binario instalado es el tuyo, usá `shasum -a 256`** del
+  instalado contra el construido. `nm` y `strings` NO sirven en el binario del
+  reloj: devuelve 105 símbolos, todos `OUTLINED_FUNCTION`, y cero cadenas de
+  Swift. Validá siempre el instrumento contra algo que SEPAS que está, antes de
+  creerle un resultado negativo.
+- **Los timestamps de Firestore son UTC.** Argentina es UTC-3. Leerlos como hora
+  local inventa un desfase de 3 horas y arruina cualquier cronología.
+- **El listado REST de Firestore PAGINA.** `.../sessions` sin `pageToken`
+  devolvía 30 de 77 sesiones. Cualquier conteo sobre el historial tiene que
+  seguir `nextPageToken` o subestima.
+- **`pod install` necesita `LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8`**; si no, tira
+  `Encoding::CompatibilityError` y el error REAL queda tapado por el crash del
+  generador de reportes.
+- **`sd` reemplaza TODAS las ocurrencias.** `sd 'runFoo()' 'runFoo()\nrunBar()'`
+  pisa también la línea `private func runFoo() {` y rompe la compilación.
+- **La escala de los screenshots del simulador no es 2.0.** Con el iPhone 17 Pro
+  Max (440×956 pt) es ~2.09×. Calibrala con un toque que SÍ haya funcionado; si
+  no, los toques caen fuera del botón y parece que la app no responde.
 - **`-sdk iphonesimulator` pisa el SDKROOT de TODOS los targets** y compila el
   reloj contra iOS, dando errores falsos. Usar `-destination`.
 - La suite completa a veces tira caídas del runner (`Cannot close sink while
@@ -199,17 +250,31 @@ Inspeccionar Firestore sin pasar por la app:
 - Las series no se duplican en Firestore
 - Al arrancar, ambos dispositivos muestran el MISMO día del plan
 
+### Verificado el 2026-08-13 (los tres que estaban pendientes acá)
+
+- **El descanso del reloj al marcar una serie desde el teléfono.** Banner en
+  **177s** de los 180 planificados de press de banca, serie tildada y cursor
+  movido a la siguiente — sin tocar el reloj.
+- **El orden de series** (no dejar marcar la 3 sin la 2). Medido con la MISMA
+  coordenada dos veces: con la serie 2 sin marcar no pasa nada, con la 2 hecha
+  carga la 3. Así no se confunde con un toque perdido.
+- **Descartar desde Home cierra el entreno también en el reloj.** La muñeca
+  vuelve a HOY sola. Es un camino distinto del ABANDONAR del player, y
+  `home_screen.dart` tiene su propio aviso al reloj porque ahí el notifier ni
+  siquiera está vivo.
+
 ### Implementado pero NUNCA verificado corriendo
 
-- **El descanso del reloj al marcar una serie desde el teléfono.** Se arregló
-  hace varias rondas y se fue postergando. **Es lo primero que hay que probar.**
-- El orden de series en el reloj (no dejar marcar la 3 sin la 2)
-- Que descartar desde Home cierre el entreno también en el reloj
+- (vacío por ahora — al cerrar algo, moverlo arriba con lo que se midió)
 
 ### Quality gates al último commit
 
-`flutter analyze` 0 issues · `flutter test` 4761 verdes · conformidad Swift 35
-casos · typecheck del reloj limpio.
+`flutter analyze` 0 issues · conformidad Swift 50 casos · tests puros del reloj
+87 chequeos · typecheck del reloj limpio.
+
+Dos corredores nuevos desde el traspaso original:
+`bash scripts/test_watch_swift.sh` (lógica pura del reloj, segundos) y el
+fixture `conformance/set_log_identity.json`.
 
 ---
 
@@ -227,13 +292,38 @@ casos · typecheck del reloj limpio.
 4. **El duplicado del estado local se tapó con un invariante**, no con la causa
    raíz. Si vuelve a aparecer algo relacionado, **instrumentar el notifier** en
    vez de sumar defensas.
-5. **Discrepancia "PLAN COMPLETADO" (celu) vs "Sem 2/3" (reloj)** — sin
-   investigar.
+5. ~~**Discrepancia "PLAN COMPLETADO" (celu) vs "Sem 2/3" (reloj)**~~ —
+   **RESUELTA, y NO era un bug.** `openspec/changes/repetir-plan-completado`
+   decidió (AD-2, firmada) que el rollover infinito de `todaysRoutineProvider`
+   *"was never wrong — it was only contradicted by this screen. Both stay."* El
+   problema era que la pantalla de detalle BLOQUEABA mientras Home rotaba; ese
+   candado se sacó y `planComplete` quedó como señal, con REPETIR de acción.
+   El reloj rota igual que Home, así que son consistentes.
+   **Antes de "arreglar" algo del avance de plan, leer `openspec/changes/`.**
 6. `WCErrorCodeWatchAppNotInstalled` al entregar la credencial no tiene
    reintento.
 7. Sin confirmar si `WCSession` exige algún capability nuevo en Signing &
    Capabilities.
 8. `ios/Runner.xcodeproj/project.pbxproj` lo reescribe Flutter en cada build.
+9. **Los duplicados que YA existen no se limpian.** El arreglo de la rama
+   `fix/watch-sync-bugs` es preventivo, no migratorio. Medido el 2026-08-12 en
+   el emulador: 24 documentos de más en 13 de 77 sesiones, **11.450 kg
+   fantasma**. Si algún usuario real los tiene, su volumen histórico y su
+   posición en rankings siguen inflados. Falta decidir si va un backfill.
+10. **El dedupe de escritura NO es atómico.** La secuencia `get` → (el reloj
+    escribe) → `set` sigue siendo posible; lo que cambia es el TAMAÑO de la
+    ventana, de 37 segundos medidos a un round-trip. Cerrarla del todo pide una
+    transacción, que no se agregó porque `fake_cloud_firestore` resuelve
+    `runTransaction` con un `_DummyTransaction` sin atomicidad ni reintento: la
+    garantía quedaría afirmada y no medida.
+11. **El cuelgue de `_buildResume` no se pudo reproducir a pedido** (tres
+    intentos: arranque limpio, ciclo segundo plano→primer plano, seis toques
+    seguidos). Se acotaron las lecturas para que colgarse deje de ser un estado
+    posible, pero el disparador exacto sigue sin identificarse. Si vuelve a
+    aparecer, ahora deja `TimeoutException` en vez de silencio.
+12. **El reloj no tiene concepto de "plan completado".** Rota infinito, igual
+    que Home. Es consistente con la decisión de §8.5, pero el atleta no recibe
+    ninguna señal en la muñeca de que terminó el plan. Es una feature, no un bug.
 
 ---
 
