@@ -29,12 +29,13 @@ class _CapturingUserRepository extends Fake implements UserRepository {
 }
 
 UserProfile _profile({
+  String uid = 'u1',
   UserRole role = UserRole.athlete,
   String? displayName = 'martin',
   Map<String, int> onboardingSeen = const {},
 }) =>
     UserProfile(
-      uid: 'u1',
+      uid: uid,
       email: 'u1@treino.app',
       displayName: displayName,
       role: role,
@@ -238,6 +239,47 @@ void main() {
         }
         expect(drainLayoutFailure(tester), isNull);
       }
+
+      expect(find.byType(OnboardingFlow), findsOneWidget);
+    });
+
+    testWidgets('a SECOND account on the same device still gets its tour',
+        (tester) async {
+      // signOut() flips auth state without tearing the root ProviderScope down,
+      // so a session-wide dismissal set would follow user A into user B's
+      // session and silently swallow B's onboarding — even though B's persisted
+      // onboardingSeen is empty. The set is scoped to the uid for this reason.
+      final controller = StreamController<UserProfile?>();
+      addTearDown(controller.close);
+
+      await _pump(
+        tester,
+        repo: _CapturingUserRepository(),
+        profileStream: controller.stream,
+      );
+
+      controller.add(_profile(uid: 'userA'));
+      for (var i = 0; i < 6; i++) {
+        await tester.pump(const Duration(milliseconds: 200));
+      }
+      expect(find.byType(OnboardingFlow), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('onboarding_skip_button')));
+      for (var i = 0; i < 6; i++) {
+        await tester.pump(const Duration(milliseconds: 200));
+      }
+      expect(find.byType(OnboardingFlow), findsNothing);
+
+      // Sign out, then a different account signs in on the same device.
+      controller.add(null);
+      for (var i = 0; i < 6; i++) {
+        await tester.pump(const Duration(milliseconds: 200));
+      }
+      controller.add(_profile(uid: 'userB'));
+      for (var i = 0; i < 6; i++) {
+        await tester.pump(const Duration(milliseconds: 200));
+      }
+      expect(drainLayoutFailure(tester), isNull);
 
       expect(find.byType(OnboardingFlow), findsOneWidget);
     });

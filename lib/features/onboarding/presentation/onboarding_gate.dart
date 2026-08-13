@@ -30,20 +30,33 @@ class OnboardingGate extends ConsumerStatefulWidget {
 }
 
 class _OnboardingGateState extends ConsumerState<OnboardingGate> {
+  /// The uid this instance has already presented the tour for.
+  ///
   /// Instance latch. `userProfileProvider` is a stream and re-emits, so without
-  /// this the tour would be pushed on top of itself between the dismissal and
-  /// the arrival of the updated snapshot.
-  bool _presenting = false;
+  /// it the tour would be pushed on top of itself between the dismissal and the
+  /// arrival of the updated snapshot.
+  ///
+  /// Keyed by account rather than a plain `bool` so a second account signing in
+  /// on the same device still gets its own tour. Today this widget is disposed
+  /// on sign-out anyway — it lives inside the `ShellRoute` (home_screen.dart:60)
+  /// and `/login` is a top-level route — but that makes the guarantee a property
+  /// of the router's topology rather than of this gate. The uid key keeps it
+  /// here, next to the latch it belongs to, and matches how
+  /// [onboardingDismissedProvider] scopes the same decision.
+  String? _presentedFor;
 
   @override
   Widget build(BuildContext context) {
     final surface = ref.watch(pendingMobileTourProvider);
+    final uid = ref.watch(
+      userProfileProvider.select((async) => async.valueOrNull?.uid),
+    );
     final role = ref.watch(
       userProfileProvider.select((async) => async.valueOrNull?.role),
     );
 
-    if (surface != null && role != null && !_presenting) {
-      _presenting = true;
+    if (surface != null && role != null && uid != _presentedFor) {
+      _presentedFor = uid;
       // Riverpod forbids mutating providers during build, and the navigator is
       // not ready to push mid-frame either.
       WidgetsBinding.instance.addPostFrameCallback((_) async {

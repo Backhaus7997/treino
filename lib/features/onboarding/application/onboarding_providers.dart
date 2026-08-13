@@ -6,7 +6,8 @@ import '../../profile/application/user_providers.dart';
 import '../../profile/domain/user_role.dart';
 import '../domain/onboarding_surface.dart';
 
-/// Surfaces whose tour has already been dismissed in THIS app session.
+/// Surfaces whose tour the SIGNED-IN account has already dismissed in THIS app
+/// session.
 ///
 /// Consulted BEFORE the persisted flag, for two reasons:
 ///
@@ -18,10 +19,39 @@ import '../domain/onboarding_surface.dart';
 ///     start.
 ///
 /// Lives at the root [ProviderScope] so widget re-mounts do not resurrect it.
-/// Resets only on cold start. Mirrors `permissionGateAttemptedProvider`
-/// (ADR-PN-012).
+///
+/// Scoped to the uid, NOT to the process. `signOut()` only flips auth state
+/// (auth_notifier.dart:104); it never tears the root scope down. A set that
+/// merely "resets on cold start" would therefore let the account that dismissed
+/// the tour go on suppressing it for the NEXT account signed in on the same
+/// device — one whose persisted `onboardingSeen` is empty and who has seen
+/// nothing. That is the opposite of the failure guard above: it hides
+/// onboarding from someone who never got it.
+///
+/// This is where it parts ways with `permissionGateAttemptedProvider`
+/// (ADR-PN-012), which it otherwise mirrors: asking for push permission once per
+/// process is right regardless of who is signed in, because the grant belongs to
+/// the DEVICE. A tour belongs to the PERSON.
+class OnboardingDismissed extends Notifier<Set<OnboardingSurface>> {
+  @override
+  Set<OnboardingSurface> build() {
+    // The uid, not the profile: `build()` re-runs — and the set empties — on
+    // account change and ONLY on account change. `markSeen` writes to the same
+    // document the tour was shown for, so every re-emission that follows it
+    // carries the same uid and `select` swallows it. That is the race guard.
+    ref.watch(userProfileProvider.select((p) => p.valueOrNull?.uid));
+    return const <OnboardingSurface>{};
+  }
+
+  void markDismissed(OnboardingSurface surface) {
+    state = {...state, surface};
+  }
+}
+
 final onboardingDismissedProvider =
-    StateProvider<Set<OnboardingSurface>>((ref) => <OnboardingSurface>{});
+    NotifierProvider<OnboardingDismissed, Set<OnboardingSurface>>(
+  OnboardingDismissed.new,
+);
 
 /// True while the tour is on screen.
 final onboardingTourOpenProvider = StateProvider<bool>((ref) => false);
@@ -49,9 +79,7 @@ class OnboardingController {
   /// Depending on backend merge semantics would make every test against the
   /// fake lie — in both directions.
   Future<void> markSeen(OnboardingSurface surface) async {
-    _ref.read(onboardingDismissedProvider.notifier).update(
-          (dismissed) => {...dismissed, surface},
-        );
+    _ref.read(onboardingDismissedProvider.notifier).markDismissed(surface);
 
     final profile = _ref.read(userProfileProvider).valueOrNull;
     if (profile == null) return;
