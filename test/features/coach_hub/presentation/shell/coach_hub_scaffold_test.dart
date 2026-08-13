@@ -5,7 +5,9 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/app/theme/tokens/components/coach_hub_layout_tokens.dart';
 import 'package:treino/core/persistence/shared_prefs_provider.dart';
+import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/features/coach_hub/application/sidebar_collapsed_provider.dart';
 import 'package:treino/features/coach_hub/presentation/shell/coach_hub_scaffold.dart';
 import 'package:treino/features/coach_hub/presentation/shell/coach_hub_sidebar.dart';
@@ -87,6 +89,26 @@ void main() {
     expect(find.byType(Scaffold), findsOneWidget);
   });
 
+  testWidgets(
+      'usa CoachHubLayoutTokens.contentMaxWidth (1240) — REQ-SH-008/020',
+      (tester) async {
+    await _pumpScaffold(tester);
+    final contentMaxWidth = tester.widget<ConstrainedBox>(
+      find.byWidgetPredicate(
+        (w) =>
+            w is ConstrainedBox &&
+            w.constraints.maxWidth == CoachHubLayoutTokens.contentMaxWidth,
+      ),
+    );
+    expect(contentMaxWidth.constraints.maxWidth, 1240);
+  });
+
+  testWidgets('entrada del contenido usa TreinoFadeSlideIn — REQ-SH-010',
+      (tester) async {
+    await _pumpScaffold(tester);
+    expect(find.byType(TreinoFadeSlideIn), findsWidgets);
+  });
+
   group('guard responsivo (W1.3, ADR-CHW-004)', () {
     testWidgets('ancho 600 (mobile) → MobileBanner, sin sidebar [SCENARIO-762]',
         (tester) async {
@@ -116,20 +138,20 @@ void main() {
 
       expect(find.byType(CoachHubSidebar), findsOneWidget);
       expect(_sidebarWidth(tester), 72); // forzado pese a provider=false
-      final toggle = tester.widget<IconButton>(find.ancestor(
-        of: find.byTooltip('Contraer/expandir menú'),
-        matching: find.byType(IconButton),
-      ));
+      final toggle = tester.widget<IconButton>(
+        find.byKey(const Key('sidebar_toggle_button')),
+      );
       expect(toggle.onPressed, isNull);
     });
 
     testWidgets(
-        'ancho 1400 (desktop) → sidebar respeta provider (264 expandido) '
+        'ancho 1400 (desktop) → sidebar respeta provider (240 expandido) '
         '[SCENARIO-762]', (tester) async {
       _setWidth(tester, 1400);
       await _pumpScaffold(tester); // provider = false → expandido
 
-      expect(_sidebarWidth(tester), 264);
+      expect(_sidebarWidth(tester), CoachHubLayoutTokens.sidebarExpandedWidth);
+      expect(_sidebarWidth(tester), 240);
     });
 
     testWidgets(

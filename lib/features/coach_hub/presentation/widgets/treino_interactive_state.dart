@@ -86,6 +86,7 @@ class TreinoInteractiveState extends StatefulWidget {
 class _TreinoInteractiveStateState extends State<TreinoInteractiveState> {
   bool _hovered = false;
   bool _focused = false;
+  bool _pressed = false;
   late FocusNode _focusNode;
 
   @override
@@ -108,10 +109,11 @@ class _TreinoInteractiveStateState extends State<TreinoInteractiveState> {
       _focusNode.addListener(_onFocusChange);
     }
     // Si onTap cambió a null, resetear estados interactivos.
-    if (widget.onTap == null && (_hovered || _focused)) {
+    if (widget.onTap == null && (_hovered || _focused || _pressed)) {
       setState(() {
         _hovered = false;
         _focused = false;
+        _pressed = false;
       });
     }
   }
@@ -136,6 +138,11 @@ class _TreinoInteractiveStateState extends State<TreinoInteractiveState> {
     setState(() => _hovered = value);
   }
 
+  void _onPressedChanged(bool value) {
+    if (!mounted || _pressed == value) return;
+    setState(() => _pressed = value);
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDisabled = widget.onTap == null;
@@ -143,6 +150,7 @@ class _TreinoInteractiveStateState extends State<TreinoInteractiveState> {
     final states = TreinoStates(
       hovered: isDisabled ? false : _hovered,
       focused: isDisabled ? false : _focused,
+      pressed: isDisabled ? false : _pressed,
       disabled: isDisabled,
     );
 
@@ -165,16 +173,30 @@ class _TreinoInteractiveStateState extends State<TreinoInteractiveState> {
       const SingleActivator(LogicalKeyboardKey.space): const ActivateIntent(),
     };
 
-    return MouseRegion(
-      onEnter: (_) => _onHoverChanged(true),
-      onExit: (_) => _onHoverChanged(false),
-      child: FocusableActionDetector(
-        focusNode: _focusNode,
-        actions: actions,
-        shortcuts: shortcuts,
-        child: TreinoTappable(
-          onTap: widget.onTap,
-          child: child,
+    return Semantics(
+      button: true,
+      enabled: true,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => _onHoverChanged(true),
+        onExit: (_) => _onHoverChanged(false),
+        child: FocusableActionDetector(
+          focusNode: _focusNode,
+          actions: actions,
+          shortcuts: shortcuts,
+          child: Listener(
+            // Trackea el pointer down/up/cancel de forma independiente al
+            // GestureDetector interno de TreinoTappable (que puede saltearse
+            // el AnimatedScale bajo reduceMotion) — pressed siempre es
+            // alcanzable, incluso con animaciones deshabilitadas.
+            onPointerDown: (_) => _onPressedChanged(true),
+            onPointerUp: (_) => _onPressedChanged(false),
+            onPointerCancel: (_) => _onPressedChanged(false),
+            child: TreinoTappable(
+              onTap: widget.onTap,
+              child: child,
+            ),
+          ),
         ),
       ),
     );

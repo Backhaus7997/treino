@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/empty_state/empty_state.dart';
 
@@ -32,6 +33,11 @@ void main() {
         findsOneWidget,
       );
       expect(find.byIcon(TreinoIcon.emptyState), findsOneWidget);
+      // Spacing en escala 8/12/14/18/20 — Finding W4 (no padding 32 crudo).
+      final padding = tester.widget<Padding>(
+        find.byKey(const Key('empty_state_content')),
+      );
+      expect(padding.padding, const EdgeInsets.all(AppSpacing.s20));
     });
 
     // -------------------------------------------------------------------------

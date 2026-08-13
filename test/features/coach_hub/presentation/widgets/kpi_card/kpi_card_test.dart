@@ -1,7 +1,9 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/kpi_card/kpi_card.dart';
 
 /// Envuelve en MaterialApp con tema dado.
@@ -95,14 +97,24 @@ void main() {
     });
 
     // -------------------------------------------------------------------------
-    // Hover: borde/bg cambia (no shadow), vía TreinoInteractiveState
+    // Hover: borde/bg cambia realmente a los tokens de hover (no smoke-only)
     // -------------------------------------------------------------------------
-    testWidgets('hover → widget no crashea [SCENARIO-CK-KPI-06]',
-        (tester) async {
+    testWidgets(
+        'hover → decoration usa background/border de hover (token real) '
+        '[SCENARIO-CK-KPI-06]', (tester) async {
       await tester.pumpWidget(_wrap(
-        const KpiCard(value: '42', label: 'Sesiones'),
+        KpiCard(value: '42', label: 'Sesiones', onTap: () {}),
       ));
       await tester.pump();
+
+      Color decorationColor() {
+        final container = tester.widget<AnimatedContainer>(
+          find.byKey(const Key('kpi_card_root')),
+        );
+        return (container.decoration! as BoxDecoration).color!;
+      }
+
+      final normalColor = decorationColor();
 
       final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
       await gesture.addPointer(location: Offset.zero);
@@ -110,8 +122,60 @@ void main() {
       await gesture
           .moveTo(tester.getCenter(find.byKey(const Key('kpi_card_root'))));
       await tester.pump();
-      // Simplemente verifica que no crashea y el widget sigue presente.
-      expect(find.byKey(const Key('kpi_card_root')), findsOneWidget);
+
+      final hoverColor = decorationColor();
+      expect(hoverColor, isNot(equals(normalColor)),
+          reason: 'el color de fondo debe cambiar realmente en hover');
+    });
+
+    // -------------------------------------------------------------------------
+    // Accesibilidad de teclado: focusable + activable + Semantics(button)
+    // -------------------------------------------------------------------------
+    testWidgets(
+        'onTap provisto → focusable, Enter activa onTap, Semantics(button) '
+        '[SCENARIO-CK-KPI-09]', (tester) async {
+      final handle = tester.ensureSemantics();
+
+      await tester.pumpWidget(_wrap(
+        KpiCard(
+          value: '1',
+          label: 'Foco',
+          onTap: () {},
+        ),
+      ));
+      await tester.pump();
+
+      final semantics = tester.getSemantics(
+        find.byKey(const Key('kpi_card_root')),
+      );
+      expect(semantics.flagsCollection.isButton, isTrue,
+          reason: 'KpiCard interactivo debe exponer Semantics(button: true)');
+
+      handle.dispose();
+    });
+
+    testWidgets(
+        'onTap provisto → Enter (teclado) activa onTap [SCENARIO-CK-KPI-10]',
+        (tester) async {
+      var tapped = 0;
+      await tester.pumpWidget(_wrap(
+        KpiCard(
+          value: '1',
+          label: 'Foco',
+          onTap: () => tapped++,
+        ),
+      ));
+      await tester.pump();
+
+      final focusNode = Focus.of(
+        tester.element(find.byKey(const Key('kpi_card_root'))),
+      );
+      focusNode.requestFocus();
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      expect(tapped, 1, reason: 'Enter debe activar onTap');
     });
 
     // -------------------------------------------------------------------------
@@ -154,6 +218,26 @@ void main() {
               reason: 'KpiCard no debe tener sombra');
         }
       }
+    });
+
+    // -------------------------------------------------------------------------
+    // Tipografía real: el valor hero usa la familia condensada (token)
+    // -------------------------------------------------------------------------
+    testWidgets(
+        'value → fontFamily resuelve a AppFonts.barlowCondensed (token real) '
+        '[SCENARIO-CK-KPI-11]', (tester) async {
+      await tester.pumpWidget(_wrap(
+        const KpiCard(value: '1.234', label: 'Alumnos activos'),
+      ));
+      await tester.pump();
+
+      final text = tester.widget<Text>(find.text('1.234'));
+      expect(
+        text.style?.fontFamily,
+        AppFonts.barlowCondensed,
+        reason: 'el valor hero debe usar la familia condensada real '
+            '("Barlow Condensed", no "BarlowCondensed")',
+      );
     });
   });
 }

@@ -60,6 +60,12 @@ class TreinoChipTokens {
   /// Radio del chip — `AppRadius.full` = 9999.0 (pill completa).
   static const double borderRadius = AppRadius.full;
 
+  /// Borde transparente del chip no seleccionado — invariante de tema (no
+  /// varía dark/light), por eso vive como `static const` en vez de en el
+  /// `factory .of(context)`. Expuesto en capa 3 para que los widgets del kit
+  /// nunca importen `AppColorPrimitives` (capa 1) directamente — Finding H1.
+  static const Color transparentBorder = AppColorPrimitives.transparent;
+
   /// Resuelve los tokens de color según el tema activo.
   factory TreinoChipTokens.of(BuildContext ctx) {
     final p = AppPalette.of(ctx);
