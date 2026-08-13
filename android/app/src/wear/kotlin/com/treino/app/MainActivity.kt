@@ -49,9 +49,20 @@ class MainActivity : FlutterActivity() {
                 // `AndroidComposeView.handleRotaryEvent`. Positivo = bajar.
                 // El resultado son PIXELES FISICOS; Dart los pasa a logicos.
                 val px = -event.getAxisValue(MotionEvent.AXIS_SCROLL) * scrollFactor
+                android.util.Log.i("TreinoRotary", "giro axis=" +
+                    event.getAxisValue(MotionEvent.AXIS_SCROLL) + " px=" + px)
                 sink.success(px.toDouble())
                 return true
             }
+        }
+        // Se loguea el descarte tambien: sin esto, "no anda la corona" no
+        // distingue entre "Android no manda el evento" y "lo mandamos y Dart no
+        // lo aplica". Son dos bugs distintos con arreglos distintos.
+        if (event.actionMasked == MotionEvent.ACTION_SCROLL) {
+            android.util.Log.i(
+                "TreinoRotary",
+                "scroll DESCARTADO source=" + event.source + " sink=" + (rotarySink != null),
+            )
         }
         return super.onGenericMotionEvent(event)
     }

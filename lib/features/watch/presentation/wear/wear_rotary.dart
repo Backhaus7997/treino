@@ -21,9 +21,22 @@ class WearRotary {
 
   static const _events = EventChannel('treino/wear_rotary');
 
+  /// Stream ÚNICO y compartido.
+  ///
+  /// **Ojo con hacer `receiveBroadcastStream()` en cada acceso**: cada llamada
+  /// crea un stream NUEVO, y cada suscripción/cancelación dispara
+  /// `onListen`/`onCancel` del lado Kotlin. Con varias pantallas vivas
+  /// suscribiéndose y desuscribiéndose, un `cancel` —que además es
+  /// asincrónico— llega DESPUÉS del `listen` nuevo y deja `rotarySink = null`.
+  /// La corona dejaba de andar por completo, que es exactamente lo que reportó
+  /// el dueño: *"nada de la corona"*.
+  ///
+  /// Con un stream único el canal se abre una sola vez y no se cierra nunca.
+  static Stream<double>? _shared;
+
   /// Píxeles **físicos** a sumar al offset de scroll. Positivo = bajar.
   static Stream<double> get physicalPixels =>
-      _events.receiveBroadcastStream().map((e) => e as double);
+      _shared ??= _events.receiveBroadcastStream().map((e) => e as double);
 }
 
 /// Conecta la corona a un [ScrollController].
@@ -60,8 +73,11 @@ class _WearRotaryScrollState extends State<WearRotaryScroll> {
   /// describió como *"anda pero lento"*: hay que girar media vuelta para mover
   /// la lista un renglón.
   ///
-  /// 2.5 fue el punto donde una muesca mueve aproximadamente una fila.
-  static const double _sensitivity = 2.5;
+  /// Medido en el SM-L500: cada muesca da `axis = ±1.0`, que por el
+  /// `scaledVerticalScrollFactor` son 136 píxeles FÍSICOS = 64 lógicos. En una
+  /// pantalla de 206 dp eso ya es casi un tercio de pantalla por muesca, así
+  /// que el multiplicador tiene que ser CHICO.
+  static const double _sensitivity = 1.5;
 
   StreamSubscription<double>? _sub;
   double _dpr = 1;
@@ -78,18 +94,10 @@ class _WearRotaryScrollState extends State<WearRotaryScroll> {
   @override
   void initState() {
     super.initState();
-    _resubscribe();
-  }
-
-  @override
-  void didUpdateWidget(WearRotaryScroll old) {
-    super.didUpdateWidget(old);
-    if (old.enabled != widget.enabled) _resubscribe();
-  }
-
-  void _resubscribe() {
-    _sub?.cancel();
-    _sub = widget.enabled ? WearRotary.physicalPixels.listen(_apply) : null;
+    // Se suscribe SIEMPRE, y el filtro de `enabled` se hace al recibir. Alternar
+    // la suscripción según la página era lo que rompía el canal — ver el doc de
+    // [WearRotary._shared].
+    _sub = WearRotary.physicalPixels.listen(_apply);
   }
 
   @override
@@ -105,13 +113,21 @@ class _WearRotaryScrollState extends State<WearRotaryScroll> {
   }
 
   void _apply(double physical) {
+    // El filtro va acá y no en la suscripción: en un pager las páginas quedan
+    // vivas aunque no se vean, y sin esto el giro movería listas que nadie mira.
+    if (!widget.enabled) return;
     // `scaledVerticalScrollFactor` viene en píxeles FÍSICOS; el offset de
     // Flutter es en píxeles LÓGICOS. Sin esta división, en el SM-L500
     // (devicePixelRatio 2.125) cada muesca scrollea el doble de lo que debería.
     _pending += physical / _dpr * _sensitivity;
     if (_scheduled) return;
     _scheduled = true;
-    // Una aplicación por frame. Ver el doc de [_pending].
+    // `addPostFrameCallback` corre después del PRÓXIMO frame — y una pantalla
+    // quieta no produce frames, así que sin `scheduleFrame()` el callback queda
+    // esperando para siempre y la corona no hace absolutamente nada. Fue
+    // exactamente el bug: el log mostraba los eventos llegando y la lista no se
+    // movía.
+    WidgetsBinding.instance.scheduleFrame();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scheduled = false;
       final delta = _pending;
