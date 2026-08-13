@@ -183,6 +183,22 @@ final class WorkoutCoordinator: ObservableObject {
         currentExerciseIndex = firstUnfinishedIndex(in: workout.exercises, session: stored)
         requestHealthAccess()
         beginWorkoutSession()
+
+        // Y se reconcilia con el historial, en segundo plano.
+        //
+        // Sin esto, restaurar mostraba la pantalla de entreno de una sesion que
+        // podia estar CERRADA hace rato: el reloj no tiene listeners, y este era
+        // el unico camino de entrada que no miraba el historial. Medido el
+        // 2026-08-13: relanzar la app dejo la muñeca en un entreno terminado
+        // media hora antes, y solo se entero cuando algo forzo un sync.
+        //
+        // `sync()` arranca justamente por ahi —`isFinished` primero— asi que
+        // tambien cierra la sesion sola. Y trae lo que el telefono haya cargado
+        // o borrado mientras el reloj no miraba.
+        //
+        // Va en un Task y no con await, igual que en `start()`: el atleta ve su
+        // entreno YA, sin esperar a la red. Si falla, el proximo sync reintenta.
+        Task { await sync() }
     }
 
     /// Le pide permiso a Salud cuando el reloj entra en modo entreno.
@@ -270,6 +286,25 @@ final class WorkoutCoordinator: ObservableObject {
         Task { await sync() }
     }
 
+    /// Abandona un entreno que el atleta NO puede completar (HANDOFF §8.3).
+    ///
+    /// Es el MISMO mecanismo que `finish()`, y a proposito: no hay logica
+    /// duplicada que pueda divergir. `finish()` ya escribe
+    /// `wasFullyCompleted: isFullyCompleted(current)`, que en un entreno a
+    /// medias da `false` — o sea que la sesion queda cerrada pero NO cuenta como
+    /// entreno hecho: no mueve el plan, ni la racha, ni los rankings. Es
+    /// exactamente lo que hace ABANDONAR en el telefono.
+    ///
+    /// Lo unico que faltaba era la salida en la pantalla: hasta ahora el reloj
+    /// no tenia ningun gesto, y si te lesionabas sin el telefono a mano la
+    /// sesion quedaba abierta para siempre.
+    ///
+    /// Existe con nombre propio y no se llama `finish()` desde la vista para que
+    /// el codigo diga lo que el atleta quiso hacer.
+    func abandon() async {
+        await finish()
+    }
+
     /// Cierra el entreno. Intenta subir lo que falte ANTES de descartar el
     /// estado local: si se borrara primero, una serie que nunca llego al
     /// historial se perderia sin dejar rastro.
@@ -312,8 +347,19 @@ final class WorkoutCoordinator: ObservableObject {
         endWorkoutSession()
     }
 
-    /// Sube al historial lo que falte: primero resuelve la sesion remota, y
-    /// despues las series pendientes una por una.
+    /// Reconcilia el entreno del reloj con el historial. El ORDEN es parte del
+    /// contrato, no un detalle de implementacion:
+    ///
+    /// 1. ¿La cerraron desde el telefono? Entonces no hay nada que escribir.
+    /// 2. Resolver la sesion remota (adoptarla o crearla).
+    /// 3. **LEER** las series que ya estan en el historial.
+    /// 4. **DESPUES** subir las pendientes, sabiendo que hay alla.
+    ///
+    /// Los pasos 3 y 4 estaban al reves, y eso dejaba DOS documentos de la misma
+    /// serie cuando el telefono la habia cargado antes: el reloj escribia con su
+    /// id deterministico contra un documento de id autogenerado, asi que no habia
+    /// nada que pisar. Leer primero no cuesta un viaje de red extra — esa lectura
+    /// ya se hacia, solo llegaba tarde.
     ///
     /// Cada serie se marca como subida SOLO si su escritura salio bien, asi que
     /// una falla parcial deja el resto en la cola en vez de darlas por hechas.
@@ -333,6 +379,56 @@ final class WorkoutCoordinator: ObservableObject {
                try await HistorySync.isFinished(
                    client: client, uid: uid, sessionId: remoteId
                ) {
+                // ⚠️ ANTES DE DESCARTAR, SE SUBE LO QUE FALTE.
+                //
+                // Esta rama borraba el estado local sin mirar `pendingSets`,
+                // mientras que `finish()` SÍ lo mira —con este motivo escrito:
+                // "perder series que el atleta hizo es peor que dejarle la
+                // pantalla abierta"—. La asimetría convertía un cierre hecho
+                // desde el teléfono en PÉRDIDA DE DATOS: las series marcadas en
+                // la muñeca y todavía sin subir se borraban en silencio.
+                //
+                // El riesgo dejó de ser teórico cuando `getActive` pasó a cerrar
+                // las sesiones colgadas (HANDOFF §8.1): ahora los cierres
+                // remotos son MUCHO más frecuentes, así que esta rama se
+                // ejecuta seguido.
+                //
+                // La sesión ya está cerrada en el historial y no se puede
+                // reabrir, pero las series son trabajo real del atleta y entran
+                // igual. El `totalVolumeKg` de esa sesión queda como lo dejó
+                // quien la cerró — desajustado, y eso es lo que reporta el
+                // balde "volumen sin duplicados" de
+                // `scripts/backfill_dedupe_setlogs.js`. Preferimos un total
+                // desajustado antes que series perdidas.
+                if !current.pendingSets.isEmpty {
+                    let remote = try await HistorySync.remoteSetLogs(
+                        client: client, uid: uid, sessionId: remoteId
+                    )
+                    let refs = remote.compactMap { set -> RemoteSetLogRef? in
+                        guard let docId = set.remoteDocId else { return nil }
+                        return RemoteSetLogRef(
+                            docId: docId,
+                            exerciseId: set.exerciseId,
+                            setNumber: set.setNumber
+                        )
+                    }
+                    for pendiente in current.pendingSets {
+                        let destino = resolveSetLogWriteTarget(
+                            exerciseId: pendiente.exerciseId,
+                            setNumber: pendiente.setNumber,
+                            remote: refs
+                        )
+                        guard case .write(let docId) = destino else { continue }
+                        let nombre = exercises
+                            .first { $0.exerciseId == pendiente.exerciseId }?
+                            .exerciseName ?? pendiente.exerciseId
+                        try await HistorySync.writeSetLog(
+                            client: client, uid: uid, sessionId: remoteId,
+                            docId: docId, exerciseName: nombre, set: pendiente
+                        )
+                    }
+                }
+
                 stopRest()
                 session = nil
                 workout = nil
@@ -369,71 +465,170 @@ final class WorkoutCoordinator: ObservableObject {
 
             guard let remoteId = current.remoteId else { return }
 
-            for pending in current.pendingSets {
-                let name = exercises
-                    .first { $0.exerciseId == pending.exerciseId }?
-                    .exerciseName ?? pending.exerciseId
-                try await HistorySync.writeSetLog(
-                    client: client, uid: uid, sessionId: remoteId,
-                    exerciseName: name, set: pending
+            // ── Se LEE el historial antes de ESCRIBIR ──────────────────────
+            //
+            // El orden era el otro: primero se subia lo pendiente y despues se
+            // leia. Asi, la serie que el atleta acababa de marcar en la muñeca
+            // se escribia SIN saber que el telefono ya la habia cargado — y
+            // como los ids de los dos clientes no coinciden, no habia nada que
+            // pisar: quedaban DOS documentos de la misma serie. Medido contra el
+            // emulador el 2026-08-11: 5 de 7 sesiones con duplicados, en las dos
+            // direcciones.
+            //
+            // Leer primero NO cuesta un viaje de red extra. Esta lectura ya
+            // existia; lo unico que estaba mal era que llegaba tarde.
+            //
+            // Trae ademas lo que se haya cargado desde el TELEFONO, que es la
+            // otra direccion de la sincronizacion: sin esto el reloj solo ve lo
+            // suyo y le vuelve a ofrecer series que el atleta ya marco en el
+            // celular.
+            //
+            let remote = try await HistorySync.remoteSetLogs(
+                client: client, uid: uid, sessionId: remoteId
+            )
+
+            // Las series que el reloj NO tenia: sirven para saber si hay que
+            // arrancar el descanso, no solo para contar.
+            var nuevas: [LoggedSet] = []
+            for set in remote where !current.isLogged(
+                exerciseId: set.exerciseId, setNumber: set.setNumber
+            ) {
+                current.loggedSets.append(set)
+                nuevas.append(set)
+            }
+
+            // Y las que el TELEFONO borro. Antes esto solo AGREGABA, con este
+            // motivo escrito: "nunca se borra una serie local, una serie cargada
+            // en el reloj y todavia sin subir no debe desaparecer porque el
+            // remoto aun no la tiene". El motivo es correcto pero la regla era
+            // demasiado gruesa: protegia tambien a las YA SINCRONIZADAS.
+            //
+            // El reloj no tiene forma de borrar ni de agregar series, asi que una
+            // serie que llego a subirse y ya no esta en el historial solo pudo
+            // haberla borrado el telefono. El reloj se quedaba mostrandola hecha
+            // para siempre.
+            //
+            // La cola de pendientes NO se toca: es exactamente lo que el
+            // comentario viejo protegia, y sigue protegido.
+            let refs = remote.compactMap { set -> RemoteSetLogRef? in
+                guard let docId = set.remoteDocId else { return nil }
+                return RemoteSetLogRef(
+                    docId: docId,
+                    exerciseId: set.exerciseId,
+                    setNumber: set.setNumber
                 )
+            }
+            func fueBorrada(_ set: LoggedSet) -> Bool {
+                setLogWasDeletedRemotely(
+                    exerciseId: set.exerciseId,
+                    setNumber: set.setNumber,
+                    synced: set.synced,
+                    remote: refs
+                )
+            }
+            let huboBorradas = current.loggedSets.contains(where: fueBorrada)
+            if huboBorradas {
+                current.loggedSets.removeAll(where: fueBorrada)
+            }
+
+            if !nuevas.isEmpty || huboBorradas {
+                session = current
+                WorkoutSessionStore.save(current)
+
+                // El descanso arranca TAMBIEN cuando la serie se marco en el
+                // telefono. Antes solo lo disparaba `logSet`, o sea marcar en la
+                // muñeca: el atleta marcaba en el celular y el reloj —que es
+                // donde mira el descanso— se quedaba mudo.
+                //
+                // Solo si la serie nueva es del ejercicio EN CURSO: una que
+                // llega de un ejercicio ya pasado (una correccion tardia) no
+                // tiene por que poner a contar nada.
+                if let exercise = currentExercise,
+                   restRemaining == nil,
+                   nuevas.contains(where: { $0.exerciseId == exercise.exerciseId }) {
+                    startRest(seconds: exercise.restSeconds)
+                }
+
+                // El cursor se RECALCULA, no se incrementa.
+                //
+                // Antes era `currentExerciseIndex += 1`: un DELTA, y avanzaba un
+                // solo paso aunque en ese mismo sync hubieran entrado tres
+                // ejercicios enteros desde el teléfono. El atleta entrenaba un
+                // rato con el celular, miraba la muñeca, y la encontraba clavada
+                // en un ejercicio ya terminado — sin fila tocable, porque todas
+                // sus series estaban hechas, y sin botón de Terminar.
+                //
+                // Es la MISMA trampa del §4.5 del HANDOFF que ya mordió a
+                // `logSet` y a `removeSet`, ahora en el cursor: aplicar deltas
+                // sobre un estado que otro actor movió. La regla es la misma —
+                // valores absolutos.
+                //
+                // Va DESPUÉS del descanso a propósito: el descanso tiene que
+                // mirar el ejercicio en el que estaba el atleta cuando llegó la
+                // serie, no al que salta el cursor.
+                //
+                // Y cubre las dos direcciones: si el teléfono BORRÓ una serie
+                // del ejercicio en curso, ese ejercicio dejó de estar completo y
+                // el cursor tiene que RETROCEDER a ofrecerlo.
+                currentExerciseIndex = firstUnfinishedIndex(
+                    in: exercises, session: current
+                )
+            }
+
+            // ── Ahora si, subir lo pendiente, sabiendo que hay alla ────────
+            //
+            // La identidad del documento se resuelve por identidad LOGICA de la
+            // serie contra el historial recien leido, no derivandola del
+            // `exerciseId__setNumber` a ciegas. `resolveSetLogWriteTarget` es
+            // pura y esta medida en el host: la decision de donde escribir es
+            // justo lo incomodo de verificar corriendo el reloj.
+            let remoteRefs = remote.compactMap { set -> RemoteSetLogRef? in
+                guard let docId = set.remoteDocId else { return nil }
+                return RemoteSetLogRef(
+                    docId: docId,
+                    exerciseId: set.exerciseId,
+                    setNumber: set.setNumber
+                )
+            }
+
+            for pending in current.pendingSets {
+                let target = resolveSetLogWriteTarget(
+                    exerciseId: pending.exerciseId,
+                    setNumber: pending.setNumber,
+                    remote: remoteRefs
+                )
+                let docId: String
+                switch target {
+                case .alreadyThere(let existing):
+                    // El historial YA tiene esta serie. No se escribe: el dato
+                    // esta, y pisarlo solo podria tapar una correccion de
+                    // reps/peso que el atleta hizo en el celular, que es la
+                    // unica superficie con edicion.
+                    docId = existing
+                case .write(let target):
+                    docId = target
+                    let name = exercises
+                        .first { $0.exerciseId == pending.exerciseId }?
+                        .exerciseName ?? pending.exerciseId
+                    try await HistorySync.writeSetLog(
+                        client: client, uid: uid, sessionId: remoteId,
+                        docId: docId, exerciseName: name, set: pending
+                    )
+                }
                 if let index = current.loggedSets.firstIndex(where: {
                     $0.exerciseId == pending.exerciseId
                         && $0.setNumber == pending.setNumber
                 }) {
                     current.loggedSets[index].synced = true
+                    // Se guarda el id REAL del documento: si un sync posterior
+                    // tiene que volver sobre esta serie, va al documento que
+                    // existe en vez de crear uno paralelo.
+                    current.loggedSets[index].remoteDocId = docId
                 }
+                // Se persiste por serie y no al final: una falla a mitad deja
+                // subido lo que entro en vez de reintentarlo todo.
                 session = current
                 WorkoutSessionStore.save(current)
-            }
-            // Trae lo que se haya cargado desde el TELEFONO. Es la otra
-            // direccion de la sincronizacion: sin esto el reloj solo ve lo
-            // suyo y le vuelve a ofrecer series que el atleta ya marco en el
-            // celular.
-            //
-            // Solo se AGREGA lo que falta; nunca se borra una serie local. Una
-            // serie cargada en el reloj y todavia sin subir no debe
-            // desaparecer porque el remoto aun no la tiene.
-            if let remoteId = current.remoteId {
-                let remote = try await HistorySync.remoteSetLogs(
-                    client: client, uid: uid, sessionId: remoteId
-                )
-                // Las series que el reloj NO tenia: sirven para saber si hay
-                // que arrancar el descanso, no solo para contar.
-                var nuevas: [LoggedSet] = []
-                for set in remote where !current.isLogged(
-                    exerciseId: set.exerciseId, setNumber: set.setNumber
-                ) {
-                    current.loggedSets.append(set)
-                    nuevas.append(set)
-                }
-                let added = !nuevas.isEmpty
-                if added {
-                    session = current
-                    WorkoutSessionStore.save(current)
-
-                    // El descanso arranca TAMBIEN cuando la serie se marco en
-                    // el telefono. Antes solo lo disparaba `logSet`, o sea
-                    // marcar en la muñeca: el atleta marcaba en el celular y el
-                    // reloj —que es donde mira el descanso— se quedaba mudo.
-                    //
-                    // Solo si la serie nueva es del ejercicio EN CURSO: una que
-                    // llega de un ejercicio ya pasado (una correccion tardia)
-                    // no tiene por que poner a contar nada.
-                    if let exercise = currentExercise,
-                       restRemaining == nil,
-                       nuevas.contains(where: { $0.exerciseId == exercise.exerciseId }) {
-                        startRest(seconds: exercise.restSeconds)
-                    }
-
-                    // Si el telefono completo el ejercicio actual, avanzar.
-                    if let exercise = currentExercise,
-                       current.loggedCount(exerciseId: exercise.exerciseId)
-                           >= exercise.sets.count,
-                       currentExerciseIndex + 1 < exercises.count {
-                        currentExerciseIndex += 1
-                    }
-                }
             }
 
             syncError = nil
@@ -504,16 +699,18 @@ final class WorkoutCoordinator: ObservableObject {
         currentExerciseIndex += 1
     }
 
+    /// Delega en la regla pura de `ExerciseCursor.swift`, que es donde esta
+    /// medida en el host. Aca solo se traduce el estado a numeros.
     private func firstUnfinishedIndex(
         in exercises: [WatchExercise],
         session: WorkoutSession
     ) -> Int {
-        for (index, exercise) in exercises.enumerated() {
-            if session.loggedCount(exerciseId: exercise.exerciseId) < exercise.sets.count {
-                return index
+        firstUnfinishedExerciseIndex(
+            seriesPlanificadas: exercises.map { $0.sets.count },
+            seriesCargadas: exercises.map {
+                session.loggedCount(exerciseId: $0.exerciseId)
             }
-        }
-        return max(exercises.count - 1, 0)
+        )
     }
 
     /// Descanso contado LOCALMENTE por el reloj.

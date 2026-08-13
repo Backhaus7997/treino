@@ -510,6 +510,9 @@ runHeartRateRounding()
 runActiveEnergyDisplay()
 runWorkoutDuration()
 runEffortBroadcast()
+runSetLogWriteTarget()
+runSetLogDeletion()
+runExerciseCursor()
 
 if failures.isEmpty {
     print("OK: \(totalChecks) chequeos de la logica de permisos de Salud")
@@ -581,5 +584,333 @@ private func runEffortBroadcast() {
             last: nil, actual: EffortSnapshot(bpm: nil, kcal: nil), now: t0
         ),
         "Un snapshot vacio no se manda"
+    )
+}
+
+// MARK: - Donde escribe el reloj cada serie
+//
+// El bug que estas reglas cierran, medido contra el emulador el 2026-08-11 sobre
+// sesiones de `seed-athlete-001`: la misma serie marcada en el reloj y en el
+// telefono dejaba DOS documentos en Firestore. En las 7 sesiones inspeccionadas,
+// 5 tenian duplicados; la peor, 17 documentos para 10 series reales. Los 7
+// documentos de una de ellas tenian `createTime == updateTime`, o sea que
+// ninguna escritura piso nunca a otra: los dos clientes acunan ids distintos
+// para la misma fila logica, asi que el que escribe segundo no tiene contra que
+// deduplicar y crea uno nuevo.
+//
+// La deduplicacion pasa entonces a decidirse por identidad LOGICA contra lo que
+// el historial ya tiene, no por el id. Es una decision pura para poder medirla
+// acá: verificarla corriendo el reloj cuesta dos builds y una carrera de
+// segundos que no se reproduce a pedido.
+
+private func runSetLogWriteTarget() {
+    let deterministic = setLogDeterministicDocId(
+        exerciseId: "peso-muerto", setNumber: 1
+    )
+    checkEqual(deterministic, "peso-muerto__1", "El id deterministico")
+
+    // Historial vacio: el caso normal, se escribe con el id deterministico.
+    checkEqual(
+        resolveSetLogWriteTarget(
+            exerciseId: "peso-muerto", setNumber: 1, remote: []
+        ),
+        .write(docId: "peso-muerto__1"),
+        "Sin nada en el historial se usa el id deterministico"
+    )
+
+    // La serie ya esta, escrita por el TELEFONO con id autogenerado. Es el caso
+    // que dejaba dos documentos: por id no matcheaba nunca.
+    checkEqual(
+        resolveSetLogWriteTarget(
+            exerciseId: "peso-muerto",
+            setNumber: 1,
+            remote: [
+                RemoteSetLogRef(
+                    docId: "EeFxyim8WMzP8qQvpGxj",
+                    exerciseId: "peso-muerto",
+                    setNumber: 1
+                )
+            ]
+        ),
+        .alreadyThere(docId: "EeFxyim8WMzP8qQvpGxj"),
+        "Una serie que el telefono ya cargo no se vuelve a escribir"
+    )
+
+    // La escribio un intento anterior del reloj: tampoco se reescribe.
+    checkEqual(
+        resolveSetLogWriteTarget(
+            exerciseId: "peso-muerto",
+            setNumber: 2,
+            remote: [
+                RemoteSetLogRef(
+                    docId: "peso-muerto__2",
+                    exerciseId: "peso-muerto",
+                    setNumber: 2
+                )
+            ]
+        ),
+        .alreadyThere(docId: "peso-muerto__2"),
+        "Una serie que el propio reloj ya subio no se reescribe"
+    )
+
+    // Otras series del mismo ejercicio no bloquean: la identidad es el PAR
+    // ejercicio + numero de serie, no el ejercicio.
+    checkEqual(
+        resolveSetLogWriteTarget(
+            exerciseId: "peso-muerto",
+            setNumber: 3,
+            remote: [
+                RemoteSetLogRef(
+                    docId: "peso-muerto__1",
+                    exerciseId: "peso-muerto",
+                    setNumber: 1
+                ),
+                RemoteSetLogRef(
+                    docId: "lUbF5qxLk72UbRggR084",
+                    exerciseId: "peso-muerto",
+                    setNumber: 2
+                ),
+            ]
+        ),
+        .write(docId: "peso-muerto__3"),
+        "Una serie nueva del mismo ejercicio se escribe normal"
+    )
+
+    // La misma serie de OTRO ejercicio no cuenta.
+    checkEqual(
+        resolveSetLogWriteTarget(
+            exerciseId: "peso-muerto",
+            setNumber: 1,
+            remote: [
+                RemoteSetLogRef(
+                    docId: "remo-barra__1",
+                    exerciseId: "remo-barra",
+                    setNumber: 1
+                )
+            ]
+        ),
+        .write(docId: "peso-muerto__1"),
+        "La serie 1 de otro ejercicio no es esta serie"
+    )
+
+    // La ruta deterministica ocupada por OTRA serie logica. Pasa despues de que
+    // el telefono borre una serie: al renumerar conserva el id del documento y
+    // baja el campo `setNumber`, asi que `peso-muerto__3` puede contener la
+    // serie 2. Escribir ahi PERDERIA esa serie — peor que el duplicado que este
+    // arreglo vino a cerrar.
+    checkEqual(
+        resolveSetLogWriteTarget(
+            exerciseId: "peso-muerto",
+            setNumber: 3,
+            remote: [
+                RemoteSetLogRef(
+                    docId: "peso-muerto__3",
+                    exerciseId: "peso-muerto",
+                    setNumber: 2
+                )
+            ]
+        ),
+        .write(docId: "peso-muerto__3__alt"),
+        "Una ruta ocupada por otra serie no se pisa: se usa un id propio"
+    )
+
+    // Y ese id propio es ESTABLE: reintentar la misma serie no acumula
+    // documentos, que es la propiedad por la que el id deterministico existe.
+    checkEqual(
+        resolveSetLogWriteTarget(
+            exerciseId: "peso-muerto",
+            setNumber: 3,
+            remote: [
+                RemoteSetLogRef(
+                    docId: "peso-muerto__3",
+                    exerciseId: "peso-muerto",
+                    setNumber: 2
+                )
+            ]
+        ),
+        resolveSetLogWriteTarget(
+            exerciseId: "peso-muerto",
+            setNumber: 3,
+            remote: [
+                RemoteSetLogRef(
+                    docId: "peso-muerto__3",
+                    exerciseId: "peso-muerto",
+                    setNumber: 2
+                )
+            ]
+        ),
+        "El id alternativo es estable entre llamadas"
+    )
+
+    // Y si ese id alternativo ya contiene la serie, se adopta en vez de escribir.
+    checkEqual(
+        resolveSetLogWriteTarget(
+            exerciseId: "peso-muerto",
+            setNumber: 3,
+            remote: [
+                RemoteSetLogRef(
+                    docId: "peso-muerto__3",
+                    exerciseId: "peso-muerto",
+                    setNumber: 2
+                ),
+                RemoteSetLogRef(
+                    docId: "peso-muerto__3__alt",
+                    exerciseId: "peso-muerto",
+                    setNumber: 3
+                ),
+            ]
+        ),
+        .alreadyThere(docId: "peso-muerto__3__alt"),
+        "La identidad logica manda sobre la ruta, tambien para el id alternativo"
+    )
+}
+
+// MARK: - Lo que el telefono borra tiene que desaparecer del reloj
+//
+// Reportado por el dueño: "si elimino o sumo una serie desde el celu, cosa que
+// no se puede hacer desde el reloj, esos cambios no se modifican en la vista del
+// reloj".
+//
+// La sincronizacion solo AGREGABA, con este motivo escrito: "nunca se borra una
+// serie local, una serie cargada en el reloj y todavia sin subir no debe
+// desaparecer porque el remoto aun no la tiene". El motivo es correcto y sigue
+// valiendo — lo que estaba mal era aplicarlo TAMBIEN a las que ya se subieron.
+
+private func runSetLogDeletion() {
+    let remoto = [
+        RemoteSetLogRef(docId: "peso-muerto__1", exerciseId: "peso-muerto", setNumber: 1),
+        RemoteSetLogRef(docId: "peso-muerto__2", exerciseId: "peso-muerto", setNumber: 2),
+    ]
+
+    // Sincronizada y ya no esta en el historial: la borro el telefono.
+    check(
+        setLogWasDeletedRemotely(
+            exerciseId: "peso-muerto", setNumber: 3, synced: true, remote: remoto
+        ),
+        "Una serie subida que ya no esta en el historial la borro el telefono"
+    )
+
+    // Sincronizada y presente: se queda.
+    check(
+        !setLogWasDeletedRemotely(
+            exerciseId: "peso-muerto", setNumber: 2, synced: true, remote: remoto
+        ),
+        "Una serie que sigue en el historial no se toca"
+    )
+
+    // PENDIENTE y ausente del historial: NO se saca. Es la cola de subida, y
+    // perder una serie que el atleta hizo es peor que mostrarla de mas.
+    check(
+        !setLogWasDeletedRemotely(
+            exerciseId: "peso-muerto", setNumber: 9, synced: false, remote: remoto
+        ),
+        "Una serie del reloj todavia sin subir NUNCA se saca"
+    )
+
+    // La misma serie de OTRO ejercicio no la sostiene.
+    check(
+        setLogWasDeletedRemotely(
+            exerciseId: "remo-barra", setNumber: 1, synced: true, remote: remoto
+        ),
+        "La serie 1 de otro ejercicio no cuenta como presente"
+    )
+
+    // Historial vacio: todo lo sincronizado se fue, lo pendiente se queda.
+    check(
+        setLogWasDeletedRemotely(
+            exerciseId: "peso-muerto", setNumber: 1, synced: true, remote: []
+        ),
+        "Con el historial vacio, lo que estaba subido se saca"
+    )
+    check(
+        !setLogWasDeletedRemotely(
+            exerciseId: "peso-muerto", setNumber: 1, synced: false, remote: []
+        ),
+        "Con el historial vacio, lo pendiente sigue"
+    )
+
+    // Despues de que el telefono borre la serie 2 y RENUMERE la 3 a 2, el
+    // historial queda {1,2} y el reloj tenia {1,2,3}: sobra exactamente una.
+    let localDespues = [1, 2, 3].map {
+        setLogWasDeletedRemotely(
+            exerciseId: "peso-muerto", setNumber: $0, synced: true, remote: remoto
+        )
+    }
+    checkEqual(
+        localDespues, [false, false, true],
+        "Tras borrar+renumerar en el telefono, al reloj le sobra una sola serie"
+    )
+}
+
+// MARK: - Donde queda parado el cursor de ejercicio
+//
+// El cursor se movia con `currentExerciseIndex += 1`: un DELTA. Avanzaba un solo
+// paso aunque en un mismo sync entraran tres ejercicios enteros cargados desde
+// el telefono, y la muñeca quedaba clavada en un ejercicio ya terminado — sin
+// fila tocable y sin boton de Terminar.
+//
+// Cuarta vez que muerde la misma trampa (§4.5 del HANDOFF): aplicar un delta
+// sobre un estado que movio otro actor.
+
+private func runExerciseCursor() {
+    // Nada cargado: el primero.
+    checkEqual(
+        firstUnfinishedExerciseIndex(seriesPlanificadas: [4, 3, 3], seriesCargadas: [0, 0, 0]),
+        0,
+        "Sin nada cargado el cursor esta en el primer ejercicio"
+    )
+
+    // El primero completo: el segundo.
+    checkEqual(
+        firstUnfinishedExerciseIndex(seriesPlanificadas: [4, 3, 3], seriesCargadas: [4, 0, 0]),
+        1,
+        "Con el primero completo el cursor pasa al segundo"
+    )
+
+    // EL CASO DEL BUG: el telefono completo DOS ejercicios de una mientras el
+    // reloj no miraba. Con el delta el cursor avanzaba a 1 y quedaba clavado en
+    // un ejercicio ya terminado.
+    checkEqual(
+        firstUnfinishedExerciseIndex(seriesPlanificadas: [4, 3, 3], seriesCargadas: [4, 3, 0]),
+        2,
+        "Dos ejercicios completados de una: el cursor salta los DOS"
+    )
+
+    // Tres de una, con el entreno entero hecho: se queda en el ultimo para que
+    // el atleta vea que termino, no en una pantalla vacia.
+    checkEqual(
+        firstUnfinishedExerciseIndex(seriesPlanificadas: [4, 3, 3], seriesCargadas: [4, 3, 3]),
+        2,
+        "Con todo completo el cursor se queda en el ultimo"
+    )
+
+    // RETROCEDE: el telefono borro una serie del primero, que dejo de estar
+    // completo. Con un delta esto era imposible de expresar.
+    checkEqual(
+        firstUnfinishedExerciseIndex(seriesPlanificadas: [4, 3, 3], seriesCargadas: [3, 3, 3]),
+        0,
+        "Si el telefono borro una serie del primero, el cursor VUELVE ahi"
+    )
+
+    // Mas cargadas que planificadas (series agregadas desde el telefono mas alla
+    // del plan): cuenta como completo, no rompe.
+    checkEqual(
+        firstUnfinishedExerciseIndex(seriesPlanificadas: [4, 3], seriesCargadas: [5, 1]),
+        1,
+        "Series de mas no traban el cursor"
+    )
+
+    // Lista vacia: 0, nunca negativo. Un indice negativo se usa para indexar.
+    checkEqual(
+        firstUnfinishedExerciseIndex(seriesPlanificadas: [], seriesCargadas: []),
+        0,
+        "Sin ejercicios el cursor es 0, jamas negativo"
+    )
+
+    // Menos entradas de cargadas que de planificadas: se asume 0, sin reventar.
+    checkEqual(
+        firstUnfinishedExerciseIndex(seriesPlanificadas: [4, 3, 3], seriesCargadas: [4]),
+        1,
+        "Una lista de cargadas mas corta no rompe"
     )
 }
