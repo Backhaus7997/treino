@@ -182,6 +182,16 @@ class WearWorkoutPlugin(
                     if (d.isFinishedAt(now) && !deadlineReported) {
                         deadlineReported = true
                         restAlarm.onDeadlineNoticedByApp(d.endsAtElapsedMs)
+                        // Y se BORRA. Sin esto el descanso vencido queda
+                        // persistido para siempre y la capsula no se va nunca:
+                        // en el reloj se comia el 23% de la pantalla mostrando
+                        // "0s" y empujaba las series abajo del pliegue, asi que
+                        // los circulos para marcar no se podian tocar.
+                        //
+                        // Mismo comportamiento que watchOS, donde `restRemaining`
+                        // pasa a nil al terminar y el banner desaparece. El aviso
+                        // ya lo dio la vibracion; dejar el cartel no agrega nada.
+                        restStore.clear()
                     }
                     result.success(
                         mapOf(

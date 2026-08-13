@@ -7,7 +7,7 @@ import 'wear_strings.dart';
 import 'wear_view_models.dart';
 import 'wear_widgets.dart';
 
-/// La página del medio: el entreno de hoy y, más abajo, sus ejercicios.
+/// El entreno de hoy y, más abajo, sus ejercicios.
 ///
 /// **Réplica de `TodayPage` + `TodaysWorkoutView` + `DayExerciseList`** de
 /// `ios/TreinoWatch Watch App/ContentView.swift`.
@@ -17,8 +17,8 @@ import 'wear_widgets.dart';
 ///
 /// Austera a propósito: el nombre del día es lo que el atleta necesita leer de
 /// un vistazo entre series. El resto es contexto secundario.
-class WearTodayPage extends StatelessWidget {
-  const WearTodayPage({
+class WearTodaySection extends StatelessWidget {
+  const WearTodaySection({
     super.key,
     required this.workout,
     required this.onStart,
@@ -35,22 +35,19 @@ class WearTodayPage extends StatelessWidget {
     final palette = AppPalette.of(context);
 
     if (failed) {
-      return Center(
-        child: WearStatusMessage(
-          icon: TreinoIcon.arrowRight,
-          text: WearStrings.routineLoadFailed,
-          tint: palette.warning,
-        ),
+      return WearStatusMessage(
+        icon: TreinoIcon.arrowRight,
+        text: WearStrings.routineLoadFailed,
+        tint: palette.warning,
       );
     }
 
     final w = workout;
     if (w == null) {
-      return const Center(child: WearLoading(text: WearStrings.loadingRoutine));
+      return const WearLoading(text: WearStrings.loadingRoutine);
     }
 
-    return ListView(
-      padding: EdgeInsets.zero,
+    return Column(
       children: [
         // "HOY" en accent: es la marca de que esto es lo de ahora, no un plan
         // cualquiera. Igual que el verde de watchOS.
@@ -92,7 +89,6 @@ class WearTodayPage extends StatelessWidget {
           const SizedBox(height: 18),
           _DayExerciseList(exercises: w.exercises),
         ],
-        const SizedBox(height: 12),
       ],
     );
   }

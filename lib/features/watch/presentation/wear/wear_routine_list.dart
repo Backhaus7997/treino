@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
+import 'wear_round_scaffold.dart';
 import 'wear_strings.dart';
 import 'wear_view_models.dart';
 import 'wear_widgets.dart';
@@ -17,8 +18,8 @@ import 'wear_widgets.dart';
 /// a cambio. Y una recarga fallida con datos viejos en pantalla es mejor que un
 /// cartel de error tapando la lista que estaba mirando — por eso el aviso de
 /// falla sólo sale si no hay NADA que mostrar.
-class WearRoutineList extends StatelessWidget {
-  const WearRoutineList({
+class WearRoutineSection extends StatelessWidget {
+  const WearRoutineSection({
     super.key,
     required this.kind,
     required this.routines,
@@ -47,8 +48,8 @@ class WearRoutineList extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
 
-    return ListView(
-      padding: EdgeInsets.zero,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // Centrado, a diferencia de watchOS. Allá la pantalla es rectangular y
         // el título va a la izquierda; en un círculo la esquina superior
@@ -76,7 +77,6 @@ class WearRoutineList extends StatelessWidget {
                 onTap: () => onSelect(routine),
               ),
             ),
-        const SizedBox(height: 12),
       ],
     );
   }
@@ -201,8 +201,9 @@ class WearRoutineDetail extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
 
-    return ListView(
-      padding: EdgeInsets.zero,
+    return WearRoundScaffold.list(
+      firstItem: WearItemType.icon,
+      lastItem: WearItemType.text,
       children: [
         Row(
           children: [
@@ -265,7 +266,6 @@ class WearRoutineDetail extends StatelessWidget {
             style: GoogleFonts.barlow(fontSize: 11, color: palette.warning),
           ),
         ],
-        const SizedBox(height: 12),
       ],
     );
   }

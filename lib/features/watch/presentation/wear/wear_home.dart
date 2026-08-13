@@ -1,31 +1,34 @@
 import 'package:flutter/material.dart';
 
-import '../../../../app/theme/app_palette.dart';
 import 'wear_round_scaffold.dart';
 import 'wear_routine_list.dart';
 import 'wear_today_page.dart';
 import 'wear_view_models.dart';
 
-/// Las tres páginas de la app, con HOY en el medio.
+/// La pantalla principal: HOY arriba, y abajo las rutinas.
 ///
-/// **Réplica de `WatchHome`** de `ios/TreinoWatch Watch App/ContentView.swift`.
+/// ## Por qué esto NO replica el `WatchHome` de watchOS
 ///
-/// El atleta abre el reloj en el gimnasio y lo que necesita es empezar: por eso
-/// HOY es la página inicial y las otras dos se buscan a propósito, deslizando.
-/// Poner planes o plantillas al arranque le cobraría un gesto al caso común.
+/// Allá son tres páginas deslizables horizontalmente con HOY al medio. Acá es
+/// **una sola lista vertical**, y no es una licencia estética: son tres razones
+/// que se suman y ninguna se puede esquivar.
 ///
-/// ## Lo que NO hace falta portar
+/// 1. **En Wear OS el swipe izquierda→derecha cierra la app desde CUALQUIER
+///    punto de la pantalla**, no desde un borde. Un pager horizontal compite
+///    contra el gesto de salida en el 100% de la superficie. El dueño lo reportó
+///    exacto: *"cuando quiero moverme a la izquierda no funciona y se cierra la
+///    app"*. No era un bug: era la semántica del sistema.
+/// 2. Aunque se "arregle" con `systemGestureExclusionRects`, el mejor caso deja
+///    reservado el 20% del ancho para la salida, o exige apagar el gesto de
+///    salida — que Google marca como no recomendado.
+/// 3. **Y ésta decide**: la corona rotatoria mapea a scroll VERTICAL. Con todo
+///    vertical, el hardware maneja la app entera. Con el pager horizontal, la
+///    corona que el dueño reclamó no sirve para navegar entre páginas: te
+///    quedás con un gesto roto Y un hardware inútil.
 ///
-/// watchOS relee al cambiar de página, y tiene un `refreshToken` para eso. La
-/// razón está escrita allá: *"El reloj habla Firestore por REST y no tiene
-/// listeners —es el costo de que Firestore no exista en watchOS—, así que nadie
-/// le avisa que el atleta cambió su rutina activa desde el teléfono."*
-///
-/// En Wear OS esa restricción NO existe: el SDK de Firebase corre, con listeners
-/// en vivo. Medido en este mismo reloj: los snapshots llegan empujados con una
-/// mediana de 206 ms. Así que las listas se actualizan solas y todo el mecanismo
-/// de `refreshToken` sobra. Es el primer lugar donde el replanteo se ve en la UI.
-class WearHome extends StatefulWidget {
+/// watchOS no tiene corona-para-navegar ni swipe-to-dismiss global. La réplica
+/// 1:1 acá costaba las dos cosas.
+class WearHome extends StatelessWidget {
   const WearHome({
     super.key,
     required this.workout,
@@ -44,89 +47,32 @@ class WearHome extends StatefulWidget {
   final bool workoutFailed;
 
   @override
-  State<WearHome> createState() => _WearHomeState();
-}
-
-class _WearHomeState extends State<WearHome> {
-  /// Arranca en 1 = HOY. Ver el doc de la clase.
-  static const _todayIndex = 1;
-
-  final _controller = PageController(initialPage: _todayIndex);
-  int _page = _todayIndex;
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return WearRoundScaffold.inscribed(
-      child: Column(
-        children: [
-          Expanded(
-            child: PageView(
-              controller: _controller,
-              onPageChanged: (i) => setState(() => _page = i),
-              children: [
-                WearRoutineList(
-                  kind: WearRoutineListKind.plans,
-                  routines: widget.plans,
-                  onSelect: (r) =>
-                      widget.onSelectRoutine(r, WearRoutineListKind.plans),
-                ),
-                WearTodayPage(
-                  workout: widget.workout,
-                  failed: widget.workoutFailed,
-                  onStart: widget.onStartToday,
-                ),
-                WearRoutineList(
-                  kind: WearRoutineListKind.templates,
-                  routines: widget.templates,
-                  onSelect: (r) =>
-                      widget.onSelectRoutine(r, WearRoutineListKind.templates),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          _PageDots(count: 3, current: _page),
-        ],
-      ),
-    );
-  }
-}
-
-/// Puntitos de página.
-///
-/// watchOS los dibuja solo con `.tabViewStyle(.page)`; en Flutter hay que
-/// ponerlos a mano. **No son decoración**: sin ellos nada sugiere que hay dos
-/// páginas más al costado, y el atleta no las descubre nunca.
-class _PageDots extends StatelessWidget {
-  const _PageDots({required this.count, required this.current});
-
-  final int count;
-  final int current;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    return WearRoundScaffold.list(
+      // Arriba arranca con un título ("HOY"); abajo termina con tarjetas.
+      firstItem: WearItemType.text,
+      lastItem: WearItemType.card,
       children: [
-        for (var i = 0; i < count; i++)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Container(
-              width: 5,
-              height: 5,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: i == current ? palette.accent : palette.textMuted,
-              ),
-            ),
-          ),
+        // HOY primero, y sin nada arriba: el atleta abre el reloj en el
+        // gimnasio y lo que necesita es empezar. Las rutinas quedan abajo,
+        // a un scroll de distancia, que es el gesto barato en un reloj.
+        WearTodaySection(
+          workout: workout,
+          failed: workoutFailed,
+          onStart: onStartToday,
+        ),
+        const SizedBox(height: 20),
+        WearRoutineSection(
+          kind: WearRoutineListKind.plans,
+          routines: plans,
+          onSelect: (r) => onSelectRoutine(r, WearRoutineListKind.plans),
+        ),
+        const SizedBox(height: 20),
+        WearRoutineSection(
+          kind: WearRoutineListKind.templates,
+          routines: templates,
+          onSelect: (r) => onSelectRoutine(r, WearRoutineListKind.templates),
+        ),
       ],
     );
   }

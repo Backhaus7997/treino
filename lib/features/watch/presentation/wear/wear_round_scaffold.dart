@@ -1,90 +1,168 @@
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import 'wear_rotary.dart';
+
+/// Márgenes verticales de Wear OS, en porcentaje del ALTO de pantalla.
+///
+/// **No son inventados**: son las constantes de `ScalingLazyColumnDefaults` de
+/// Horologist. Y no son simétricos ni fijos — dependen del TIPO del primer y del
+/// último ítem de la lista, porque un título no necesita el mismo aire que una
+/// tarjeta.
+///
+/// En el SM-L500 (206 dp de diámetro) esto da, por ejemplo, 45 dp arriba y 75 dp
+/// abajo para una lista de tarjetas.
+///
+/// El margen inferior grande NO es espacio muerto: es `padding` de un scroll,
+/// así que el último ítem puede subir hasta el centro. Sólo se ve vacío si la
+/// lista no scrollea.
+enum WearItemType {
+  card(0.2188, 0.3646),
+  text(0.1664, 0.3646),
+  multiButton(0.2188, 0.2083),
+  singleButton(0.1248, 0.2083),
+  icon(0.1248, 0.2188);
+
+  const WearItemType(this.topPct, this.bottomPct);
+
+  final double topPct;
+  final double bottomPct;
+}
 
 /// Andamio de pantalla para Wear OS, consciente de que la pantalla es REDONDA.
 ///
-/// ## Por qué existe
+/// ## El error que este archivo vino a corregir
 ///
-/// El spike de medición usaba un `ListView` rectangular y **perdía texto en las
-/// esquinas**: en un reloj redondo los cuatro vértices del rectángulo caen
-/// fuera del vidrio. No es un detalle estético — el atleta pierde el dato
-/// justo cuando levanta la muñeca a mitad de serie.
+/// La primera versión metía TODO el contenido dentro del cuadrado inscripto: un
+/// inset uniforme del 16% por lado. En el Samsung SM-L500 —438 px a densidad
+/// 340, o sea **206 dp de diámetro**— eso dejaba 140 dp útiles. El dueño lo
+/// describió exacto: *"ocupamos un rectángulo al medio con bordes que quedan sin
+/// uso"*. El cuadrado inscripto desperdicia el **36% del área** del círculo: es
+/// la solución obvia y es la equivocada.
 ///
-/// ## La geometría, y por qué hay dos modos
+/// ## Lo que hacen las apps nativas
 ///
-/// En un círculo de diámetro `D`, el mayor cuadrado inscripto tiene lado
-/// `D / √2`, o sea que para que un rectángulo entre COMPLETO hay que meterlo
-/// `D · (1 − 1/√2) / 2 ≈ 0.146 · D` desde cada borde. Eso es casi el 30% del
-/// ancho perdido, y en una pantalla de reloj eso duele.
-///
-/// Por eso hay dos modos:
-///
-/// * [WearRoundScaffold.inscribed] — inset completo. Para contenido que ocupa
-///   TODO el alto (listas, filas que llegan a los bordes). Nada se recorta.
-/// * [WearRoundScaffold.centered] — inset chico. Para contenido centrado
-///   verticalmente, que es donde el círculo es más ancho y hay lugar de sobra.
-///   Es el modo del número hero del descanso.
-///
-/// Elegir mal no rompe la app: recorta texto. Que es peor, porque no se ve en
-/// el emulador cuadrado y aparece recién en la muñeca.
-class WearRoundScaffold extends StatelessWidget {
-  /// Contenido centrado verticalmente. Inset chico: cerca del centro el
-  /// círculo es tan ancho como la pantalla.
-  const WearRoundScaffold.centered({
+/// * **Lateral chico**: 5.2% del ancho por lado. Es el número de Horologist.
+/// * **Vertical grande y asimétrico**: entre 12% y 36% del alto, según el tipo
+///   del primer y último ítem. Va como `padding` de la LISTA, no del andamio:
+///   padding vertical en el contenedor recorta el viewport en vez de correr el
+///   scroll, y el primer ítem nace cortado contra el bisel sin forma de traerlo
+///   a la franja ancha.
+/// * **Desvanecido en los bordes**: el recorte del vidrio tiene que leerse como
+///   fundido, no como error. Es lo que hace `ScalingLazyColumn` con escalado y
+///   opacidad progresivos; acá se aproxima con un [ShaderMask], que da el 80%
+///   del efecto con el 5% del código.
+class WearRoundScaffold extends StatefulWidget {
+  /// Contenido centrado que NO scrollea. Para pantallas de estado: emparejando,
+  /// cargando, error.
+  const WearRoundScaffold.centered({super.key, required this.children})
+      : _scrolls = false,
+        firstItem = WearItemType.text,
+        lastItem = WearItemType.text;
+
+  /// Lista vertical con la corona conectada.
+  ///
+  /// [firstItem] y [lastItem] determinan los márgenes de arriba y abajo — ver
+  /// [WearItemType].
+  const WearRoundScaffold.list({
     super.key,
-    required this.child,
-  }) : _inset = _centeredInset;
+    required this.children,
+    this.firstItem = WearItemType.text,
+    this.lastItem = WearItemType.card,
+  }) : _scrolls = true;
 
-  /// Contenido que ocupa todo el alto. Inset del cuadrado inscripto, para que
-  /// las esquinas no caigan fuera del vidrio.
-  const WearRoundScaffold.inscribed({
-    super.key,
-    required this.child,
-  }) : _inset = _inscribedInset;
-
-  /// `(1 − 1/√2) / 2 ≈ 0.146` es el cuadrado inscripto EXACTO — sus cuatro
-  /// esquinas TOCAN el círculo. Texto pegado a una esquina queda justo en el
-  /// borde del vidrio y se ve cortado: pasó con el título "PLANTILLAS", que se
-  /// leía "?LANTILLAS".
+  /// Margen lateral: 5.2% del ancho por lado, el número de Horologist.
   ///
-  /// Se agrega un margen para despegarlo del bisel.
-  static const double _inscribedInset = 0.16;
+  /// Es CHICO a propósito. El ancho se gana en la franja central, que es donde
+  /// vive lo que el atleta lee: a la altura del centro el círculo mide el 100%
+  /// del diámetro.
+  static const double horizontalInset = 0.052;
 
-  /// Suficiente para despegarse del bisel sin comerse la pantalla.
-  static const double _centeredInset = 0.08;
+  /// Qué fracción del alto ocupa el desvanecido de cada borde.
+  static const double _fade = 0.14;
 
-  final Widget child;
-  final double _inset;
+  final List<Widget> children;
+  final WearItemType firstItem;
+  final WearItemType lastItem;
+  final bool _scrolls;
 
-  /// **No expone `onTap`, y es a propósito.**
-  ///
-  /// La primera versión ponía un `GestureDetector` con `HitTestBehavior.opaque`
-  /// sobre TODA la pantalla. En el reloj físico eso se disparó solo: el log
-  /// mostró `startRest → cancelRest → startRest` con un segundo entre medio,
-  /// porque cualquier roce del vidrio cuenta como tap.
-  ///
-  /// En un reloj eso no es un bug menor: el atleta apoya la muñeca en la barra
-  /// y se cancela el descanso sin enterarse. Las acciones tienen que ser
-  /// objetivos explícitos y acotados, como en el companion de watchOS.
+  @override
+  State<WearRoundScaffold> createState() => _WearRoundScaffoldState();
+}
+
+class _WearRoundScaffoldState extends State<WearRoundScaffold> {
+  final _controller = ScrollController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final size = MediaQuery.sizeOf(context);
     // El lado corto manda: en un reloj redondo ancho y alto coinciden, pero en
-    // uno cuadrado o rectangular no, y el inset tiene que salir del menor.
-    final size = MediaQuery.sizeOf(context).shortestSide;
-    final pad = size * _inset;
+    // uno cuadrado o rectangular no.
+    final hPad = size.shortestSide * WearRoundScaffold.horizontalInset;
+
+    if (!widget._scrolls) {
+      return Scaffold(
+        backgroundColor: palette.bg,
+        body: Padding(
+          padding: EdgeInsets.symmetric(horizontal: hPad),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: widget.children,
+            ),
+          ),
+        ),
+      );
+    }
+
+    final list = ListView(
+      controller: _controller,
+      padding: EdgeInsets.only(
+        top: size.height * widget.firstItem.topPct,
+        bottom: size.height * widget.lastItem.bottomPct,
+      ),
+      children: widget.children,
+    );
 
     return Scaffold(
       backgroundColor: palette.bg,
       body: Padding(
-        padding: EdgeInsets.all(pad),
-        // `centered` centra; `inscribed` LLENA.
-        //
-        // Centrar contenido más alto que la pantalla lo recorta por ARRIBA, y
-        // arriba es justo donde va el nombre del ejercicio. Pasó en el reloj:
-        // la lista de series se veía entera y el encabezado no existía.
-        child: _inset == _centeredInset ? Center(child: child) : child,
+        padding: EdgeInsets.symmetric(horizontal: hPad),
+        // La corona va acá y no en cada pantalla: así hay UN solo scrollable
+        // por pantalla y no queda ambiguo a cuál le habla el hardware.
+        child: WearRotaryScroll(
+          controller: _controller,
+          // Sin esto, el primer y el último ítem parecen CORTADOS contra el
+          // bisel y el atleta cree que la pantalla se rompió. Con el fundido se
+          // lee como "hay más, seguí scrolleando".
+          child: ShaderMask(
+            shaderCallback: (r) => const LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color(0x00000000),
+                Color(0xFF000000),
+                Color(0xFF000000),
+                Color(0x00000000),
+              ],
+              stops: [
+                0,
+                WearRoundScaffold._fade,
+                1 - WearRoundScaffold._fade,
+                1,
+              ],
+            ).createShader(r),
+            blendMode: BlendMode.dstIn,
+            child: list,
+          ),
+        ),
       ),
     );
   }

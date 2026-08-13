@@ -119,7 +119,7 @@ class _WearHomeState extends ConsumerState<_WearHome> {
         id: 't2', name: 'Full Body principiante', dayCount: 3, numWeeks: 1),
   ];
 
-  static const _muestraSesion = WearWorkoutSnapshot(
+  static const _sesionInicial = WearWorkoutSnapshot(
     exerciseName: 'Sentadilla con barra',
     exerciseIndex: 0,
     exerciseCount: 5,
@@ -141,13 +141,17 @@ class _WearHomeState extends ConsumerState<_WearHome> {
         plans: _muestraPlanes,
         templates: _muestraPlantillas,
         selectedRoutine: _selected,
-        onStartToday: () => setState(() => _session = _muestraSesion),
+        onStartToday: () => setState(() => _session = _sesionInicial),
         onSelectRoutine: (r, k) => setState(() => _selected = (r, k)),
         onCloseDetail: () => setState(() => _selected = null),
         onStartRoutine: () => setState(() {
           _selected = null;
-          _session = _muestraSesion;
+          _session = _sesionInicial;
         }),
         onActivateRoutine: () => setState(() => _selected = null),
+        // Ésta es la línea que faltaba y hacía que "no funcionaran los
+        // botones": el tap arrancaba el descanso y nadie marcaba nunca la
+        // serie, así que el círculo era imposible de llenar.
+        onLogSet: (n) => setState(() => _session = _session?.withLogged(n)),
       );
 }

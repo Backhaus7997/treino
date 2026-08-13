@@ -32,6 +32,7 @@ class WearRoot extends StatelessWidget {
     required this.onCloseDetail,
     required this.onStartRoutine,
     required this.onActivateRoutine,
+    required this.onLogSet,
     this.workoutFailed = false,
   });
 
@@ -54,6 +55,9 @@ class WearRoot extends StatelessWidget {
   final VoidCallback onStartRoutine;
   final VoidCallback onActivateRoutine;
 
+  /// Marca una serie del entreno en curso.
+  final void Function(int setNumber) onLogSet;
+
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
@@ -61,24 +65,28 @@ class WearRoot extends StatelessWidget {
     switch (pairing) {
       case WearPairingState.waitingForPairing:
         return const WearRoundScaffold.centered(
-          child: WearStatusMessage(
-            icon: TreinoIcon.phone,
-            text: WearStrings.openOnPhone,
-          ),
+          children: [
+            WearStatusMessage(
+              icon: TreinoIcon.phone,
+              text: WearStrings.openOnPhone,
+            ),
+          ],
         );
 
       case WearPairingState.exchanging:
         return const WearRoundScaffold.centered(
-          child: WearLoading(text: WearStrings.linking),
+          children: [WearLoading(text: WearStrings.linking)],
         );
 
       case WearPairingState.failed:
         return WearRoundScaffold.centered(
-          child: WearStatusMessage(
-            icon: TreinoIcon.warning,
-            text: WearStrings.linkFailed,
-            tint: palette.warning,
-          ),
+          children: [
+            WearStatusMessage(
+              icon: TreinoIcon.warning,
+              text: WearStrings.linkFailed,
+              tint: palette.warning,
+            ),
+          ],
         );
 
       case WearPairingState.ready:
@@ -87,21 +95,20 @@ class WearRoot extends StatelessWidget {
         // costado, que es el MISMO gesto que cambia de página.
         final selected = selectedRoutine;
         if (selected != null) {
-          return WearRoundScaffold.inscribed(
-            child: WearRoutineDetail(
-              routine: selected.$1,
-              kind: selected.$2,
-              onStart: onStartRoutine,
-              onActivate: onActivateRoutine,
-              onClose: onCloseDetail,
-            ),
+          // `WearRoutineDetail` ya trae su propio andamio.
+          return WearRoutineDetail(
+            routine: selected.$1,
+            kind: selected.$2,
+            onStart: onStartRoutine,
+            onActivate: onActivateRoutine,
+            onClose: onCloseDetail,
           );
         }
 
         final current = session;
         if (current != null) {
           // Entreno en curso: sin páginas laterales.
-          return WearWorkoutScreen(snapshot: current);
+          return WearWorkoutScreen(snapshot: current, onLogSet: onLogSet);
         }
 
         return WearHome(

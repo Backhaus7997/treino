@@ -58,4 +58,24 @@ class WearWorkoutSnapshot {
   /// que se cablee la sesión completa, así que esto NO alcanza para habilitar
   /// el botón de terminar.
   bool get isCurrentExerciseComplete => nextSetNumber == null;
+
+  /// Devuelve una copia con [setNumber] marcada.
+  ///
+  /// Existe porque sin esto la app NO FUNCIONA, literal: el tap arrancaba el
+  /// descanso y nadie agregaba nunca a [loggedSetNumbers], asi que el circulo
+  /// era imposible de llenar. El dueno lo reporto como "no funcionan los
+  /// botones para marcar un ejercicio hecho" y tenia razon — el toque
+  /// registraba, no habia nada cableado atras.
+  ///
+  /// Es idempotente: volver a marcar una serie ya marcada no cambia nada, igual
+  /// que en watchOS.
+  WearWorkoutSnapshot withLogged(int setNumber) => WearWorkoutSnapshot(
+        exerciseName: exerciseName,
+        exerciseIndex: exerciseIndex,
+        exerciseCount: exerciseCount,
+        dayName: dayName,
+        sets: sets,
+        loggedSetNumbers: {...loggedSetNumbers, setNumber},
+        pendingUploadCount: pendingUploadCount,
+      );
 }

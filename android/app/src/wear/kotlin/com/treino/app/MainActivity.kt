@@ -3,6 +3,10 @@ package com.treino.app
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
+import android.view.InputDevice
+import android.view.MotionEvent
+import android.view.ViewConfiguration
+import io.flutter.plugin.common.EventChannel
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.treino.app.workout.WearWorkoutPlugin
@@ -12,6 +16,45 @@ import io.flutter.embedding.engine.FlutterEngine
 class MainActivity : FlutterActivity() {
 
     private var wearWorkout: WearWorkoutPlugin? = null
+
+    private var rotarySink: EventChannel.EventSink? = null
+
+    /// Se cachea: la corona emite a decenas de eventos por segundo y leer
+    /// recursos en cada uno es tirar CPU (y bateria) al pedo.
+    private val scrollFactor: Float by lazy {
+        ViewConfiguration.get(this).scaledVerticalScrollFactor
+    }
+
+    /// La corona / bisel giratorio del reloj.
+    ///
+    /// **El engine de Flutter TIRA estos eventos.** No es un bug de version ni
+    /// algo que arregle una actualizacion: `AndroidTouchProcessor
+    /// .onGenericMotionEvent` exige `SOURCE_CLASS_POINTER`, y el rotary es
+    /// `SOURCE_CLASS_NONE` (`0x00400000 and 0x2 == 0`), asi que sale por el
+    /// primer `if`. No hay una sola mencion de `SOURCE_ROTARY_ENCODER` en todo
+    /// flutter/flutter. `FlutterView` devuelve false y el evento burbujea hasta
+    /// aca, que es donde lo agarramos.
+    ///
+    /// La corona NO es un gesto tactil: llega como `MotionEvent` con
+    /// `ACTION_SCROLL` y el giro vive en el eje `AXIS_SCROLL`.
+    override fun onGenericMotionEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_SCROLL &&
+            // `isFromSource`, NUNCA `event.source == SOURCE_ROTARY_ENCODER`:
+            // el source es un bitmask y la comparacion directa falla.
+            event.isFromSource(InputDevice.SOURCE_ROTARY_ENCODER)
+        ) {
+            val sink = rotarySink
+            if (sink != null) {
+                // El menos NO es opcional: es lo que hace AOSP en
+                // `AndroidComposeView.handleRotaryEvent`. Positivo = bajar.
+                // El resultado son PIXELES FISICOS; Dart los pasa a logicos.
+                val px = -event.getAxisValue(MotionEvent.AXIS_SCROLL) * scrollFactor
+                sink.success(px.toDouble())
+                return true
+            }
+        }
+        return super.onGenericMotionEvent(event)
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -23,11 +66,23 @@ class MainActivity : FlutterActivity() {
             messenger = flutterEngine.dartExecutor.binaryMessenger,
         )
         requestBodySensorsIfNeeded()
+
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, ROTARY_CHANNEL)
+            .setStreamHandler(object : EventChannel.StreamHandler {
+                override fun onListen(args: Any?, sink: EventChannel.EventSink?) {
+                    rotarySink = sink
+                }
+
+                override fun onCancel(args: Any?) {
+                    rotarySink = null
+                }
+            })
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
         wearWorkout?.dispose()
         wearWorkout = null
+        rotarySink = null
         super.cleanUpFlutterEngine(flutterEngine)
     }
 
@@ -68,5 +123,6 @@ class MainActivity : FlutterActivity() {
 
     private companion object {
         const val REQ_HEART_RATE = 0x5E45
+        const val ROTARY_CHANNEL = "treino/wear_rotary"
     }
 }

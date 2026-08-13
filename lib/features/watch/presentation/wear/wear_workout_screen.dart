@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -29,13 +30,21 @@ import 'wear_workout_view_model.dart';
 ///   admite `8 · 12 · 14 · 18 · 20`, así que se mapea al valor más cercano. La
 ///   pantalla queda un poco más aireada que la de Apple; es el precio de tener
 ///   una sola escala en todo el producto.
-/// * **Pantalla redonda**: watchOS es rectangular. Acá el contenido va dentro
-///   del cuadrado inscripto ([WearRoundScaffold.inscribed]) o se recorta en las
-///   esquinas.
+/// * **Pantalla redonda**: watchOS es rectangular. Acá el contenido usa casi
+///   todo el ancho y el recorte del bisel se resuelve con márgenes verticales
+///   y un desvanecido — ver [WearRoundScaffold].
 class WearWorkoutScreen extends ConsumerWidget {
-  const WearWorkoutScreen({super.key, required this.snapshot});
+  const WearWorkoutScreen({
+    super.key,
+    required this.snapshot,
+    required this.onLogSet,
+  });
 
   final WearWorkoutSnapshot snapshot;
+
+  /// Marca la serie. **Sin esto la pantalla no hace nada**: durante un rato el
+  /// tap sólo arrancaba el descanso y el círculo nunca se llenaba.
+  final void Function(int setNumber) onLogSet;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -46,37 +55,40 @@ class WearWorkoutScreen extends ConsumerWidget {
         const WatchEffortDisplay.nada();
     final service = ref.read(wearWorkoutServiceProvider);
 
-    return WearRoundScaffold.inscribed(
-      child: ListView(
-        // Sin `shrinkWrap`: la lista llena el alto y scrollea desde ARRIBA. Con
-        // shrinkWrap + Center, un contenido más alto que la pantalla se
-        // recortaba por arriba y el nombre del ejercicio desaparecía.
-        padding: EdgeInsets.zero,
-        children: [
-          _Header(snapshot: snapshot),
+    return WearRoundScaffold.list(
+      firstItem: WearItemType.text,
+      lastItem: WearItemType.text,
+      children: [
+        _Header(snapshot: snapshot),
+        const SizedBox(height: 8),
+        _EffortRow(effort: effort),
+        if (rest != null) ...[
           const SizedBox(height: 8),
-          _EffortRow(effort: effort),
-          if (rest != null) ...[
-            const SizedBox(height: 8),
-            _RestBanner(
-              remainingMs: rest.remainingMs,
-              finished: rest.finished,
-              onSkip: service.cancelRest,
-            ),
-          ],
-          const SizedBox(height: 8),
-          _SetsList(
-            snapshot: snapshot,
-            onLog: (setNumber) => service.startRest(_restSecondsFor(setNumber)),
+          _RestRing(
+            remainingMs: rest.remainingMs,
+            totalMs: _restSecondsFor(1) * 1000,
+            finished: rest.finished,
+            onSkip: service.cancelRest,
           ),
-          if (snapshot.pendingUploadCount > 0) ...[
-            const SizedBox(height: 8),
-            _PendingUpload(count: snapshot.pendingUploadCount),
-          ],
-          const SizedBox(height: 12),
-          const _FinishHint(),
         ],
-      ),
+        const SizedBox(height: 8),
+        _SetsList(
+          snapshot: snapshot,
+          onLog: (setNumber) {
+            // En el reloj la confirmación táctil no es adorno: el atleta
+            // marca sin mirar, con la mano ocupada.
+            HapticFeedback.selectionClick();
+            onLogSet(setNumber);
+            service.startRest(_restSecondsFor(setNumber));
+          },
+        ),
+        if (snapshot.pendingUploadCount > 0) ...[
+          const SizedBox(height: 8),
+          _PendingUpload(count: snapshot.pendingUploadCount),
+        ],
+        const SizedBox(height: 12),
+        const _FinishHint(),
+      ],
     );
   }
 
@@ -208,15 +220,32 @@ class _EffortStat extends StatelessWidget {
   }
 }
 
-/// La cápsula del descanso. En watchOS es verde al 15%; acá usa el accent.
-class _RestBanner extends StatelessWidget {
-  const _RestBanner({
+/// El descanso, como ANILLO.
+///
+/// ## Por qué se fue la píldora
+///
+/// La versión anterior era una píldora ancha: contador a la izquierda, `Spacer`,
+/// y "Saltar" a la derecha. El dueño lo dijo sin vueltas: *"el botón de
+/// temporizador está feo"*. Y tenía razón — es una toolbar de escritorio metida
+/// en una pantalla redonda de 206 dp. Ocupaba el 23% del alto, obligaba a un
+/// `Spacer` que dejaba un agujero sin área táctil en el medio, y no hablaba el
+/// idioma de la pantalla.
+///
+/// Un anillo dice lo mismo con menos: el arco ES el tiempo que queda, se lee de
+/// reojo sin procesar dígitos, y todo el círculo es tocable — sin `Spacer`, sin
+/// hack de área mínima.
+class _RestRing extends StatelessWidget {
+  const _RestRing({
     required this.remainingMs,
+    required this.totalMs,
     required this.finished,
     required this.onSkip,
   });
 
+  static const double _size = 64;
+
   final int remainingMs;
+  final int totalMs;
   final bool finished;
   final VoidCallback onSkip;
 
@@ -226,42 +255,42 @@ class _RestBanner extends StatelessWidget {
     // Vencido pinta con `highlight`: el cambio de color se lee de reojo, sin
     // enfocar la vista, que es como se mira un reloj a mitad de entreno.
     final color = finished ? palette.highlight : palette.accent;
+    final progress =
+        totalMs <= 0 ? 0.0 : (remainingMs / totalMs).clamp(0.0, 1.0);
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        children: [
-          Icon(TreinoIcon.timer, size: 13, color: color),
-          const SizedBox(width: 8),
-          Text(
-            // Segundos pelados como en watchOS ("45s"), no m:ss: entre series
-            // el descanso nunca pasa de un par de minutos y menos dígitos se
-            // leen más rápido.
-            '${(remainingMs / 1000).ceil()}s',
-            style: GoogleFonts.barlow(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: color,
-              fontFeatures: const [FontFeature.tabularFigures()],
-            ),
-          ),
-          const Spacer(),
-          _WearTapTarget(
-            onTap: onSkip,
-            child: Text(
-              WearStrings.restSkip,
-              style: GoogleFonts.barlow(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: color,
+    return Center(
+      child: GestureDetector(
+        onTap: onSkip,
+        behavior: HitTestBehavior.opaque,
+        child: SizedBox(
+          width: _size,
+          height: _size,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              SizedBox.expand(
+                child: CircularProgressIndicator(
+                  value: progress,
+                  strokeWidth: 4,
+                  // El arco se VACÍA a medida que pasa el tiempo, no se llena:
+                  // "lo que queda" es la pregunta del atleta, no "lo que pasó".
+                  backgroundColor: color.withValues(alpha: 0.18),
+                  valueColor: AlwaysStoppedAnimation(color),
+                ),
               ),
-            ),
+              Text(
+                '${(remainingMs / 1000).ceil()}',
+                style: GoogleFonts.barlowCondensed(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  height: 1,
+                  color: color,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -409,6 +438,10 @@ class _WearTapTarget extends StatelessWidget {
 
   /// Mínimo recomendado por las guías de Wear OS. Por debajo, con la muñeca en
   /// movimiento y el dedo transpirado, el tap se pierde.
+  ///
+  /// OJO con dónde se aplica: en la cápsula del descanso, forzar 48 dp de alto
+  /// la hacía ocupar el 23% de una pantalla de 206 dp. Ahí el área táctil la da
+  /// el ANCHO del texto "Saltar" más su padding, no el alto.
   static const double _minTouch = 48;
 
   final VoidCallback onTap;
