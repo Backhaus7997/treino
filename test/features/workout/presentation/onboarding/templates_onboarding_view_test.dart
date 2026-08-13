@@ -425,6 +425,44 @@ void main() {
     });
   });
 
+  group('TemplatesOnboardingView — transición entre pasos', () {
+    testWidgets('nunca hay dos pasos en pantalla a la vez', (tester) async {
+      // Regresión: con un cross-fade los dos pasos compartían el frame y el
+      // Stack tomaba la altura del MÁS ALTO, así que volver de las cuatro filas
+      // de duración a las pills de días dejaba las filas viejas fantasmeando
+      // sobre un hueco alto. La transición es fade-THROUGH: sale, cambia, entra.
+      await _pumpView(tester);
+      expect(find.text('¿CUÁNTOS DÍAS PODÉS ENTRENAR?'), findsOneWidget);
+
+      await tester.tap(find.byKey(templatesOnboardingCtaKey));
+      // A mitad del fade-out el paso entrante todavía no debe existir.
+      await tester.pump(const Duration(milliseconds: 90));
+      expect(
+        find.text('¿CUÁNTO DURA TU SESIÓN?'),
+        findsNothing,
+        reason: 'el paso entrante no comparte frame con el saliente',
+      );
+
+      await tester.pumpAndSettle();
+      expect(find.text('¿CUÁNTO DURA TU SESIÓN?'), findsOneWidget);
+      expect(find.text('¿CUÁNTOS DÍAS PODÉS ENTRENAR?'), findsNothing);
+    });
+
+    testWidgets('volver del paso 2 al 1 tampoco los superpone', (tester) async {
+      // El sentido en el que apareció el defecto: de alto a bajo.
+      await _pumpView(tester);
+      await _advanceTo(tester, 2);
+
+      await tester.tap(find.byKey(templatesOnboardingBackKey));
+      await tester.pump(const Duration(milliseconds: 90));
+      expect(find.text('¿CUÁNTOS DÍAS PODÉS ENTRENAR?'), findsNothing);
+
+      await tester.pumpAndSettle();
+      expect(find.text('¿CUÁNTOS DÍAS PODÉS ENTRENAR?'), findsOneWidget);
+      expect(find.text('¿CUÁNTO DURA TU SESIÓN?'), findsNothing);
+    });
+  });
+
   group('TemplatesOnboardingView — temas', () {
     testWidgets('renders in light as well as dark', (tester) async {
       await _pumpView(tester, theme: AppTheme.light());
