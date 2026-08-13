@@ -269,7 +269,11 @@ describe("trainer_links rules — existing flows unaffected by entitlement pin",
     );
   });
 
-  it("resume: PF can transition paused -> active", async () => {
+  // FLIPPED in PR4 (was assertSucceeds): `resume` moved to the
+  // resumeTrainerLink callable. paused -> active raises weighted load
+  // 0.5 -> 1.0, so it has to clear the gate; a client that can write it
+  // directly makes the limit unenforceable.
+  it("resume: PF can NO LONGER transition paused -> active from the client", async () => {
     const linkId = "link-resume";
     const trainerId = "trainer-5";
     const athleteId = "athlete-5";
@@ -286,7 +290,7 @@ describe("trainer_links rules — existing flows unaffected by entitlement pin",
     const trainer = testEnv.authenticatedContext(trainerId);
     const ref = trainer.firestore().collection(COL_LINKS).doc(linkId);
 
-    await assertSucceeds(ref.update({ status: "active" }));
+    await assertFails(ref.update({ status: "active" }));
   });
 
   it("sharedWithTrainer: only the athlete can flip the privacy flag", async () => {
@@ -311,27 +315,112 @@ describe("trainer_links rules — existing flows unaffected by entitlement pin",
     await assertSucceeds(athleteRef.update({ sharedWithTrainer: true }));
   });
 
-  it(
-    "PR1 does NOT lock pending->active yet: client accept() still succeeds " +
-      "(the lock lands in PR4 alongside acceptTrainerLink CF)",
-    async () => {
-      const linkId = "link-accept-pr1";
-      const trainerId = "trainer-7";
-      const athleteId = "athlete-7";
+  // FLIPPED in PR4 (was assertSucceeds under "PR1 does NOT lock
+  // pending->active yet"). This assertion IS the paywall: with it green,
+  // `active` is unreachable from any client and the weighted-load gate in
+  // acceptTrainerLink/resumeTrainerLink is the only door in.
+  it("accept: the trainer can NO LONGER write pending -> active from the client", async () => {
+    const linkId = "link-accept-pr4";
+    const trainerId = "trainer-7";
+    const athleteId = "athlete-7";
+    await seedLink(linkId, {
+      trainerId,
+      athleteId,
+      status: "pending",
+      requestedAt: 1,
+      sharedWithTrainer: false,
+    });
+
+    const trainer = testEnv.authenticatedContext(trainerId);
+    const ref = trainer.firestore().collection(COL_LINKS).doc(linkId);
+
+    await assertFails(
+      ref.update({ status: "active", acceptedAt: Date.now() }),
+    );
+  });
+
+  it("accept: the athlete can NO LONGER write pending -> active either", async () => {
+    const linkId = "link-accept-athlete";
+    const trainerId = "trainer-7b";
+    const athleteId = "athlete-7b";
+    await seedLink(linkId, {
+      trainerId,
+      athleteId,
+      status: "pending",
+      requestedAt: 1,
+      sharedWithTrainer: false,
+    });
+
+    const athlete = testEnv.authenticatedContext(athleteId);
+    const ref = athlete.firestore().collection(COL_LINKS).doc(linkId);
+
+    await assertFails(
+      ref.update({ status: "active", acceptedAt: Date.now() }),
+    );
+  });
+
+  // NEW hardening in PR4, deliberate and not a side effect. The old clause
+  // allowed `!(status in ['active','paused'])`, so EITHER member could
+  // rewrite a live link back to `pending` — resetting the relationship and,
+  // combined with the create rule, muddying the lifecycle. A legitimate
+  // re-request creates a NEW doc; it never revives the old one.
+  it("nobody can revert a live link back to pending", async () => {
+    const trainerId = "trainer-8";
+    const athleteId = "athlete-8";
+
+    const cases: [string, "active" | "paused" | "terminated"][] = [
+      ["link-revert-active", "active"],
+      ["link-revert-paused", "paused"],
+      ["link-revert-terminated", "terminated"],
+    ];
+    for (const [linkId, status] of cases) {
       await seedLink(linkId, {
         trainerId,
         athleteId,
-        status: "pending",
+        status,
         requestedAt: 1,
+        acceptedAt: 2,
         sharedWithTrainer: false,
       });
 
       const trainer = testEnv.authenticatedContext(trainerId);
-      const ref = trainer.firestore().collection(COL_LINKS).doc(linkId);
-
-      await assertSucceeds(
-        ref.update({ status: "active", acceptedAt: Date.now() }),
+      await assertFails(
+        trainer
+          .firestore()
+          .collection(COL_LINKS)
+          .doc(linkId)
+          .update({ status: "pending" }),
       );
-    },
-  );
+
+      const athlete = testEnv.authenticatedContext(athleteId);
+      await assertFails(
+        athlete
+          .firestore()
+          .collection(COL_LINKS)
+          .doc(linkId)
+          .update({ status: "pending" }),
+      );
+    }
+  });
+
+  // Regression pin: pausing LOWERS weighted load, so it needs no gate and
+  // stays client-side — but only for the trainer (QA-SEC-002).
+  it("pause: the athlete still cannot pause (QA-SEC-002 preserved)", async () => {
+    const linkId = "link-pause-athlete";
+    const trainerId = "trainer-9";
+    const athleteId = "athlete-9";
+    await seedLink(linkId, {
+      trainerId,
+      athleteId,
+      status: "active",
+      requestedAt: 1,
+      acceptedAt: 2,
+      sharedWithTrainer: false,
+    });
+
+    const athlete = testEnv.authenticatedContext(athleteId);
+    const ref = athlete.firestore().collection(COL_LINKS).doc(linkId);
+
+    await assertFails(ref.update({ status: "paused", pausedAt: Date.now() }));
+  });
 });
