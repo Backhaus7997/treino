@@ -51,6 +51,11 @@ export { linkLoadReconcile } from "./subscriptions/link-load-reconcile";
 // Replaces TrainerLinkRepository.accept(); firestore.rules locks the
 // client-side path shut in slice 4, AFTER app adoption (see runbook M.4).
 export { acceptTrainerLink } from "./subscriptions/accept-trainer-link";
+// Paywall Fase 7, PR4 (ISSUE-3): server-authoritative paused -> active.
+// Gating accept alone does NOT hold the limit — pause drops weight 1.0 -> 0.5,
+// so pause 2 / accept 1 / resume 2 lands over the limit unseen. Both
+// weight-raising transitions have to live behind the gate.
+export { resumeTrainerLink } from "./subscriptions/resume-trainer-link";
 // SHELVED (gym-google-places, Plan B): resolveGymPlace cannot be deployed —
 // GCP project treino-dev sits under org code-assurance.com, whose
 // Domain-Restricted-Sharing policy blocks a publicly-invokable (allUsers)
