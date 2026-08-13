@@ -6,9 +6,10 @@ import 'package:treino/features/coach_hub/presentation/shell/sidebar_registry.da
 void main() {
   group('sidebarRegistry (REQ-CHW-SIDEBAR-001)', () {
     test(
-        'tiene exactamente 10 items (7 post-W2 reduce + Rutinas + Solicitudes '
-        '+ Nutrición): Dashboard, Alumnos, Solicitudes, Agenda, Chat, '
-        'Biblioteca, Nutrición, Rutinas, Pagos, Ajustes', () {
+        'tiene exactamente 11 items (7 post-W2 reduce + Rutinas + Solicitudes '
+        '+ Nutrición + Perfil público): Dashboard, Alumnos, Solicitudes, '
+        'Agenda, Chat, Perfil público, Biblioteca, Nutrición, Rutinas, '
+        'Pagos, Ajustes', () {
       // W2 reduce 2026-07-02: se removieron 12 items del sidebar que
       // duplicaban funcionalidad del alumno_detail o pertenecen a una
       // futura Biblioteca (sub-tabs). Reportes también sale (sin scope
@@ -26,7 +27,11 @@ void main() {
       // inmediatamente después de Biblioteca — la overview cross-alumno de
       // planes (Fase 6 WU-04) ahora es alcanzable por navegación, no solo
       // por URL directa — llevando el total de 9 a 10.
-      expect(sidebarRegistry.length, 10);
+      //
+      // Fase 11 WU-01 (ADR-F11-01): Perfil público se agrega al grupo
+      // GESTIÓN, inmediatamente después de Chat — llevando el total de 10
+      // a 11.
+      expect(sidebarRegistry.length, 11);
     });
 
     test('cubre los 2 grupos activos post-reduce, cada uno no vacío', () {
@@ -90,6 +95,7 @@ void main() {
           '/invitaciones',
           '/agenda',
           '/chat',
+          '/perfil-publico',
           '/biblioteca',
           '/nutricion',
           '/rutinas',
@@ -118,7 +124,14 @@ void main() {
           .toList();
       expect(
         gestion,
-        ['dashboard', 'alumnos', 'invitaciones', 'agenda', 'chat'],
+        [
+          'dashboard',
+          'alumnos',
+          'invitaciones',
+          'agenda',
+          'chat',
+          'perfil-publico',
+        ],
       );
     });
 
@@ -138,6 +151,7 @@ void main() {
         'Chat',
         'Dashboard',
         'Nutrición',
+        'Perfil público',
       ]) {
         expect(labels, contains(esLabel));
       }
