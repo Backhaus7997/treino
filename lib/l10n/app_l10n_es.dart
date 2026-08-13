@@ -3461,6 +3461,22 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get followListOpenFollowingA11y => 'Ver seguidos';
+
+  @override
+  String routineCardDaysPerWeek(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '$days días/sem',
+      one: '1 día/sem',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String routineCardMinutes(String value) {
+    return '$value min';
+  }
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -6917,4 +6933,20 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get followListOpenFollowingA11y => 'Ver seguidos';
+
+  @override
+  String routineCardDaysPerWeek(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '$days días/sem',
+      one: '1 día/sem',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String routineCardMinutes(String value) {
+    return '$value min';
+  }
 }

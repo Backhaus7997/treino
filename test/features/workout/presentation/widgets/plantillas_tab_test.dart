@@ -319,7 +319,15 @@ void main() {
       expect(find.byType(RoutineCard, skipOffstage: false), findsNWidgets(3));
 
       // Filtrar por Avanzado — la del coach (beginner) también sale del grid.
-      await tester.tap(find.text('Avanzado'));
+      // Scoped to the filter pills on purpose: since #639 the card caption
+      // leads with the routine's level, so a bare find.text('Avanzado')
+      // matches the card too and the tap goes ambiguous.
+      await tester.tap(
+        find.descendant(
+          of: find.byType(LevelFilterPills),
+          matching: find.text('Avanzado'),
+        ),
+      );
       await tester.pump();
       expect(find.byType(RoutineCard, skipOffstage: false), findsNWidgets(1));
       expect(find.text('SISTEMA ADV', skipOffstage: false), findsOneWidget);
