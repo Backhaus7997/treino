@@ -10,7 +10,8 @@ import 'trainer_previews.dart';
 /// knowing about roles.
 ///
 /// Spanish hardcoded, matching the handoff and the athlete deck. When the
-/// deferred i18n pass runs, both lists migrate together.
+/// deferred i18n pass runs, both lists migrate together — see
+/// `athleteOnboardingSlides` for why that pass is deferred rather than skipped.
 const trainerOnboardingSlides = <OnboardingSlide>[
   OnboardingSlide(
     icon: TreinoIcon.tabHome,
