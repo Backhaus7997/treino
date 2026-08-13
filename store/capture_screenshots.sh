@@ -35,6 +35,21 @@ if ! curl -sf -o /dev/null http://127.0.0.1:4444/; then
   exit 1
 fi
 
+# Un emulador VIVO pero VACÍO produce exactamente las mismas pantallas en blanco
+# que uno muerto: Insights sale "0 / 5", "No entrenaste este día" y todos los
+# músculos en cero. Eso ya pasó una vez y las capturas llegaron a disco sin que
+# nada avisara — el chequeo de arriba sólo mira que el proceso responda.
+#
+# `seed-routine-001` es la rutina que el driver navega en la captura 02, así que
+# si falta, la corrida no puede producir nada usable. El header de admin saltea
+# las reglas, que es lo correcto para un chequeo de infraestructura.
+SEED_DOC="http://127.0.0.1:8080/v1/projects/treino-dev/databases/(default)/documents/routines/seed-routine-001"
+if ! curl -sf -H "Authorization: Bearer owner" "$SEED_DOC" | grep -q 'seed-routine-001'; then
+  echo "ERROR: el emulador está corriendo pero NO tiene datos sembrados." >&2
+  echo "Sembralo primero:  cd scripts && npm run seed:emulator" >&2
+  exit 1
+fi
+
 SIM_UDID="$(xcrun simctl list devices available \
   | grep -F "$SIM_NAME (" \
   | head -1 \

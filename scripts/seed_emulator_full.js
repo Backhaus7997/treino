@@ -489,7 +489,12 @@ const SESSIONS = [
     routineId: 'seed-routine-001',
     routineName: 'Fuerza Base – 3 semanas',
     count: 14,
-    startDaysAgo: 27,
+    // 26 y no 27: con spacing 2 la última sesión cae en `26 - 13*2 = 0`, o sea
+    // HOY. Con 27 caía ayer y el atleta demo nunca tenía entrenamiento del día
+    // — la card MÚSCULOS DEL DÍA de Insights salía "No entrenaste este día" con
+    // todos los músculos en cero, que es justo la pantalla que se captura para
+    // las tiendas.
+    startDaysAgo: 26,
     spacing: 2,
     fullCompletedPattern: [true, true, true, false, true, true, true],
   }),
