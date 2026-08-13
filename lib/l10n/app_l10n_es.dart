@@ -3816,6 +3816,119 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get onboardingCustomExerciseCta => 'CREAR MI EJERCICIO';
+
+  @override
+  String get templatesOnboardingStep1Title => '¿Cuántos días podés entrenar?';
+
+  @override
+  String get templatesOnboardingStep1Body =>
+      'Elegí lo que vas a sostener. Ordenamos el catálogo por afinidad — nunca escondemos plantillas.';
+
+  @override
+  String get templatesOnboardingStep1Label => 'Días por semana';
+
+  @override
+  String get templatesOnboardingStep1Hint =>
+      'El catálogo arranca en 3 días: si elegís 2, mostramos lo más cercano con el motivo a la vista.';
+
+  @override
+  String get templatesOnboardingStep2Title => '¿Cuánto dura tu sesión?';
+
+  @override
+  String get templatesOnboardingStep2Body =>
+      '45 minutos reales pesan más que una hora ideal. Sin dato de duración, la plantilla queda neutra.';
+
+  @override
+  String get templatesOnboardingStep2Label => 'Minutos por sesión';
+
+  @override
+  String get templatesOnboardingStep3Title => '¿Para qué querés entrenar?';
+
+  @override
+  String get templatesOnboardingStep3Body =>
+      'Nadie elige por split, elige por para qué. Es el dato que más pesa en el orden de la grilla.';
+
+  @override
+  String get templatesOnboardingStep3Label => 'Objetivo';
+
+  @override
+  String get templatesOnboardingStep4Title =>
+      'Queda como filtro, no como examen';
+
+  @override
+  String get templatesOnboardingStep4Body =>
+      'Tus respuestas quedan arriba de PLANTILLAS. Cambiás una y el orden se recalcula, sin repetir el flujo.';
+
+  @override
+  String get templatesOnboardingStep4Label => 'Zonas a priorizar · opcional';
+
+  @override
+  String get templatesOnboardingCta => 'VER MIS PLANTILLAS';
+
+  @override
+  String get templatesOnboardingMinutes30 => '30 MIN';
+
+  @override
+  String get templatesOnboardingMinutes30Hint => 'Entro y salgo';
+
+  @override
+  String get templatesOnboardingMinutes45 => '45 MIN';
+
+  @override
+  String get templatesOnboardingMinutes45Hint => 'Lo de siempre';
+
+  @override
+  String get templatesOnboardingMinutes60 => '60 MIN';
+
+  @override
+  String get templatesOnboardingMinutes60Hint => 'Hora completa';
+
+  @override
+  String get templatesOnboardingMinutes75 => '75 MIN O MÁS';
+
+  @override
+  String get templatesOnboardingMinutes75Hint => 'Fuerza';
+
+  @override
+  String get templatesGoalHealth => 'SALUD';
+
+  @override
+  String get templatesGoalInjuryPrevention => 'PREVENCIÓN';
+
+  @override
+  String get templatesGoalAesthetics => 'ESTÉTICA';
+
+  @override
+  String get templatesGoalSport => 'DEPORTE';
+
+  @override
+  String get templatesGoalWellbeing => 'BIENESTAR';
+
+  @override
+  String get templatesZoneBack => 'ESPALDA';
+
+  @override
+  String get templatesZoneChest => 'PECHO';
+
+  @override
+  String get templatesZoneShoulders => 'HOMBROS';
+
+  @override
+  String get templatesZoneGlutes => 'GLÚTEOS';
+
+  @override
+  String get templatesZoneQuads => 'CUÁDRICEPS';
+
+  @override
+  String get templatesZoneCore => 'CORE';
+
+  @override
+  String templatesOnboardingDaysOption(int days) {
+    return '$days DÍAS';
+  }
+
+  @override
+  String get templatesOnboardingBack => 'VOLVER';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -7627,4 +7740,117 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get onboardingCustomExerciseCta => 'CREAR MI EJERCICIO';
+
+  @override
+  String get templatesOnboardingStep1Title => '¿Cuántos días podés entrenar?';
+
+  @override
+  String get templatesOnboardingStep1Body =>
+      'Elegí lo que vas a sostener. Ordenamos el catálogo por afinidad — nunca escondemos plantillas.';
+
+  @override
+  String get templatesOnboardingStep1Label => 'Días por semana';
+
+  @override
+  String get templatesOnboardingStep1Hint =>
+      'El catálogo arranca en 3 días: si elegís 2, mostramos lo más cercano con el motivo a la vista.';
+
+  @override
+  String get templatesOnboardingStep2Title => '¿Cuánto dura tu sesión?';
+
+  @override
+  String get templatesOnboardingStep2Body =>
+      '45 minutos reales pesan más que una hora ideal. Sin dato de duración, la plantilla queda neutra.';
+
+  @override
+  String get templatesOnboardingStep2Label => 'Minutos por sesión';
+
+  @override
+  String get templatesOnboardingStep3Title => '¿Para qué querés entrenar?';
+
+  @override
+  String get templatesOnboardingStep3Body =>
+      'Nadie elige por split, elige por para qué. Es el dato que más pesa en el orden de la grilla.';
+
+  @override
+  String get templatesOnboardingStep3Label => 'Objetivo';
+
+  @override
+  String get templatesOnboardingStep4Title =>
+      'Queda como filtro, no como examen';
+
+  @override
+  String get templatesOnboardingStep4Body =>
+      'Tus respuestas quedan arriba de PLANTILLAS. Cambiás una y el orden se recalcula, sin repetir el flujo.';
+
+  @override
+  String get templatesOnboardingStep4Label => 'Zonas a priorizar · opcional';
+
+  @override
+  String get templatesOnboardingCta => 'VER MIS PLANTILLAS';
+
+  @override
+  String get templatesOnboardingMinutes30 => '30 MIN';
+
+  @override
+  String get templatesOnboardingMinutes30Hint => 'Entro y salgo';
+
+  @override
+  String get templatesOnboardingMinutes45 => '45 MIN';
+
+  @override
+  String get templatesOnboardingMinutes45Hint => 'Lo de siempre';
+
+  @override
+  String get templatesOnboardingMinutes60 => '60 MIN';
+
+  @override
+  String get templatesOnboardingMinutes60Hint => 'Hora completa';
+
+  @override
+  String get templatesOnboardingMinutes75 => '75 MIN O MÁS';
+
+  @override
+  String get templatesOnboardingMinutes75Hint => 'Fuerza';
+
+  @override
+  String get templatesGoalHealth => 'SALUD';
+
+  @override
+  String get templatesGoalInjuryPrevention => 'PREVENCIÓN';
+
+  @override
+  String get templatesGoalAesthetics => 'ESTÉTICA';
+
+  @override
+  String get templatesGoalSport => 'DEPORTE';
+
+  @override
+  String get templatesGoalWellbeing => 'BIENESTAR';
+
+  @override
+  String get templatesZoneBack => 'ESPALDA';
+
+  @override
+  String get templatesZoneChest => 'PECHO';
+
+  @override
+  String get templatesZoneShoulders => 'HOMBROS';
+
+  @override
+  String get templatesZoneGlutes => 'GLÚTEOS';
+
+  @override
+  String get templatesZoneQuads => 'CUÁDRICEPS';
+
+  @override
+  String get templatesZoneCore => 'CORE';
+
+  @override
+  String templatesOnboardingDaysOption(int days) {
+    return '$days DÍAS';
+  }
+
+  @override
+  String get templatesOnboardingBack => 'VOLVER';
 }

@@ -8,6 +8,7 @@ import '../../../../l10n/app_l10n.dart';
 import '../../../profile/domain/experience_level.dart';
 import '../../application/routine_providers.dart';
 import '../../application/unified_templates_providers.dart';
+import '../onboarding/templates_onboarding_gate.dart';
 import 'coach_chip.dart';
 import 'level_filter_pills.dart';
 import 'routine_card.dart';
@@ -41,6 +42,27 @@ class _PlantillasTabState extends ConsumerState<PlantillasTab>
     with AutomaticKeepAliveClientMixin<PlantillasTab> {
   @override
   bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    // The PLANTILLAS mini-onboarding (#635 PR#2), first entry only.
+    //
+    // From a post-frame callback because `initState` has no `Localizations`
+    // ancestor resolved yet and the navigator cannot present mid-frame. The
+    // gate owns every other guard — role, profile readiness, the welcome tour,
+    // and the persisted seen-flag — so this call site stays a trigger and
+    // nothing more.
+    //
+    // Fires once per mount of `/workout` rather than once per visit to the tab:
+    // `wantKeepAlive` is true, so swiping TU ENTRENO ⇄ PLANTILLAS does not
+    // re-run it. That is the intended granularity — the flow is "first time you
+    // land here", not "every time you swipe back".
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      maybeShowTemplatesOnboarding(context: context, ref: ref);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
