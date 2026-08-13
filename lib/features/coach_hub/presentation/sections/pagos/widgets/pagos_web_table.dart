@@ -1,25 +1,44 @@
-/// Tabela de pagos para a vista web del Coach Hub (trainer-wide).
+/// Tabla de pagos para la vista web del Coach Hub (trainer-wide).
 ///
-/// Nueva en PR2b. Muestra 6 columnas: ALUMNO · CONCEPTO · MONTO · VENCIMIENTO ·
-/// ESTADO · ACCIONES. Acepta callbacks opcionales por fila.
+/// Fase 9 WU-06: migrada de un `Container` plano ad-hoc a
+/// [CoachHubDataTable] del kit v2, con celdas ricas (avatar de iniciales +
+/// badge de estado por color) y estados completos resueltos por el kit
+/// (loading shimmer / error+retry / empty). El ORDEN de [payments] es
+/// responsabilidad del caller (`PagosScreen`, que posee el estado de sort);
+/// este widget solo renderiza la lista tal cual llega junto con el
+/// indicador de columna ordenada.
+///
+/// ADR-F9-02: sin columna PLAN (no hay plan real) — la columna real es
+/// CONCEPTO.
+///
+/// Fase 9 WU-07: columna ACCIONES (Recordar / Marcar pagado) — visible solo
+/// cuando [showActions] es `true` (se oculta en el tab Pagados). Reusa la
+/// lógica existente de `marcar_pagado_actions.dart` vía los callbacks
+/// [onMarcarPagado]/[onRecordar] — este widget NO conoce Firestore/chat, solo
+/// pinta los botones y delega.
 ///
 /// Sección: coach_hub/pagos — contrato: sin Scaffold, sin HEX, es-AR + // i18n.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/payments/domain/payment.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 
+import '../../../widgets/coach_hub_widgets.dart'
+    show CoachHubColumn, CoachHubDataTable, CoachHubRow;
+import 'pagos_estado.dart';
 import 'payment_format.dart';
 
 // ── PagosWebTable ─────────────────────────────────────────────────────────────
 
-/// Tabla de pagos del Coach Hub web. Muestra una fila por [Payment].
+/// Tabla de pagos del Coach Hub web. Muestra una fila por [Payment] vía
+/// [CoachHubDataTable].
 ///
 /// [profiles] mapea `athleteId → UserPublicProfile`; si falta el perfil se
-/// muestra el fallback `'Alumno'`. [showActions] controla si se renderizan los
-/// botones de acción (Recordar / Marcar pagado) — se ocultan en el tab Pagados.
+/// muestra el fallback `'Alumno'`.
 ///
 /// REQ-PAGW-TABLE-001, REQ-PAGW-EMPTY-001.
 class PagosWebTable extends StatelessWidget {
@@ -27,28 +46,54 @@ class PagosWebTable extends StatelessWidget {
     super.key,
     required this.payments,
     required this.profiles,
-    required this.emptyLabel,
-    required this.onMarcarPagado,
-    required this.onRecordar,
-    required this.showActions,
+    required this.emptyMessage,
+    this.loading = false,
+    this.errorMessage,
+    this.onRetry,
+    this.sortColumnKey,
+    this.sortAscending = true,
+    this.onSort,
+    this.showActions = true,
+    this.onMarcarPagado,
+    this.onRecordar,
   });
 
+  /// Pagos a renderizar, ya ordenados por el caller según [sortColumnKey].
   final List<Payment> payments;
 
   /// athleteId → UserPublicProfile (o ausente si no se resolvió aún).
   final Map<String, UserPublicProfile> profiles;
 
-  /// Texto descriptivo cuando el bucket está vacío (por-tab, es-AR). // i18n
-  final String emptyLabel;
+  /// Texto descriptivo cuando [payments] está vacío (por-filtro, es-AR). // i18n
+  final String emptyMessage;
 
-  /// Callback al confirmar "Marcar pagado" para un pago; null → sin acción.
+  /// `true` mientras se cargan los pagos — muestra el skeleton del kit.
+  final bool loading;
+
+  /// Mensaje de error; si no-null, muestra el estado error del kit.
+  final String? errorMessage;
+
+  /// Callback del botón "Reintentar" del estado error.
+  final VoidCallback? onRetry;
+
+  /// Clave de la columna actualmente ordenada (owned por el caller).
+  final String? sortColumnKey;
+
+  /// Dirección del ordenamiento activo.
+  final bool sortAscending;
+
+  /// Llamado al tocar un encabezado ordenable: (columnKey, ascending).
+  final void Function(String key, bool ascending)? onSort;
+
+  /// `false` oculta la columna ACCIONES por completo (tab Pagados).
+  final bool showActions;
+
+  /// Callback de "Marcar pagado" para una fila; solo se ofrece si el pago
+  /// está `pending` (ver [_AccionesCell]).
   final void Function(Payment)? onMarcarPagado;
 
-  /// Callback al presionar "Recordar" (envía recordatorio por chat); null → sin acción.
+  /// Callback de "Recordar" para una fila.
   final void Function(Payment)? onRecordar;
-
-  /// Si `false`, la columna ACCIONES no muestra botones (usado en tab Pagados).
-  final bool showActions;
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -59,253 +104,308 @@ class PagosWebTable extends StatelessWidget {
         : 'Alumno'; // i18n fallback
   }
 
-  String _estadoLabel(Payment p) {
-    if (p.status == PaymentStatus.paid) return 'Pagado'; // i18n
-    final now = DateTime.now().toUtc();
-    final periodStart = DateTime.utc(now.year, now.month, 1);
-    return p.createdAt.toUtc().isBefore(periodStart)
-        ? 'Vencido' // i18n
-        : 'Pendiente'; // i18n
-  }
+  CoachHubRow _rowFor(AppPalette palette, Payment p) {
+    final name = _displayName(p.athleteId);
+    final (:estado, :label) = pagoEstadoOf(p, DateTime.now().toUtc());
+    final vencimiento = fmtDayMonth(p.dueAt ?? p.createdAt);
 
-  Color _estadoColor(Payment p, AppPalette palette) {
-    if (p.status == PaymentStatus.paid) return palette.accent;
-    final now = DateTime.now().toUtc();
-    final periodStart = DateTime.utc(now.year, now.month, 1);
-    return p.createdAt.toUtc().isBefore(periodStart)
-        ? palette.danger
-        : palette.warning;
+    return CoachHubRow(
+      id: p.id,
+      cells: {
+        'alumno': name,
+        'concepto': p.concept,
+        'monto': fmtArs(p.amountArs),
+        'vencimiento': vencimiento,
+        'estado': label,
+      },
+      cellWidgets: {
+        'alumno': _AlumnoCell(name: name, palette: palette),
+        'monto': _MontoCell(amountArs: p.amountArs, palette: palette),
+        'estado': _EstadoBadge(estado: estado, label: label, palette: palette),
+        if (showActions)
+          'acciones': _AccionesCell(
+            payment: p,
+            palette: palette,
+            onRecordar: onRecordar,
+            onMarcarPagado: onMarcarPagado,
+          ),
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
 
-    // Empty state
-    if (payments.isEmpty) {
-      return Center(
-        child: Text(
-          emptyLabel,
-          style: TextStyle(color: palette.textMuted, fontSize: 14),
-        ),
-      );
-    }
-
-    // Header style
-    final hStyle = TextStyle(
-      color: palette.textMuted,
-      fontSize: 11,
-      fontWeight: FontWeight.w600,
-      letterSpacing: 0.5,
-    );
-    // Cell style
-    final cStyle = TextStyle(color: palette.textPrimary, fontSize: 13);
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // ── Header row ────────────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(
-              children: [
-                Expanded(flex: 3, child: Text('ALUMNO', style: hStyle)), // i18n
-                Expanded(
-                    flex: 4, child: Text('CONCEPTO', style: hStyle)), // i18n
-                Expanded(
-                  flex: 2,
-                  child: Text('MONTO', // i18n
-                      style: hStyle,
-                      textAlign: TextAlign.right),
-                ),
-                Expanded(
-                  flex: 2,
-                  child: Text('FECHA', // i18n
-                      style: hStyle,
-                      textAlign: TextAlign.right),
-                ),
-                Expanded(
-                  flex: 2,
-                  child: Text('ESTADO', // i18n
-                      style: hStyle,
-                      textAlign: TextAlign.right),
-                ),
-                if (showActions) const Expanded(flex: 3, child: SizedBox()),
-              ],
-            ),
-          ),
-
-          // ── Divider ───────────────────────────────────────────────────────
-          Divider(height: 1, color: palette.border),
-
-          // ── Data rows ─────────────────────────────────────────────────────
-          ...payments.map(
-            (p) => _PaymentRow(
-              payment: p,
-              displayName: _displayName(p.athleteId),
-              estadoLabel: _estadoLabel(p),
-              estadoColor: _estadoColor(p, palette),
-              palette: palette,
-              cStyle: cStyle,
-              showActions: showActions,
-              onMarcarPagado: onMarcarPagado,
-              onRecordar: onRecordar,
-            ),
-          ),
-        ],
-      ),
+    return CoachHubDataTable(
+      columns: [
+        const CoachHubColumn(
+            key: 'alumno', label: 'ALUMNO', sortable: true, flex: 3), // i18n
+        const CoachHubColumn(
+            key: 'concepto', label: 'CONCEPTO', flex: 4), // i18n
+        const CoachHubColumn(
+            key: 'monto', label: 'MONTO', sortable: true, flex: 2), // i18n
+        const CoachHubColumn(
+            key: 'vencimiento',
+            label: 'VENCIMIENTO',
+            sortable: true,
+            flex: 2), // i18n
+        const CoachHubColumn(key: 'estado', label: 'ESTADO', flex: 2), // i18n
+        if (showActions)
+          const CoachHubColumn(
+              key: 'acciones', label: 'ACCIONES', flex: 3), // i18n
+      ],
+      rows: [for (final p in payments) _rowFor(palette, p)],
+      loading: loading,
+      errorMessage: errorMessage,
+      onRetry: onRetry,
+      emptyMessage: emptyMessage,
+      sortColumnKey: sortColumnKey,
+      sortAscending: sortAscending,
+      onSort: onSort,
     );
   }
 }
 
-// ── _PaymentRow ───────────────────────────────────────────────────────────────
+// ── _AlumnoCell ──────────────────────────────────────────────────────────────
 
-class _PaymentRow extends StatelessWidget {
-  const _PaymentRow({
-    required this.payment,
-    required this.displayName,
-    required this.estadoLabel,
-    required this.estadoColor,
-    required this.palette,
-    required this.cStyle,
-    required this.showActions,
-    required this.onMarcarPagado,
-    required this.onRecordar,
-  });
+/// Avatar circular con iniciales del [name] (NUNCA foto inventada) + nombre.
+class _AlumnoCell extends StatelessWidget {
+  const _AlumnoCell({required this.name, required this.palette});
 
-  final Payment payment;
-  final String displayName;
-  final String estadoLabel;
-  final Color estadoColor;
+  final String name;
   final AppPalette palette;
-  final TextStyle cStyle;
-  final bool showActions;
-  final void Function(Payment)? onMarcarPagado;
-  final void Function(Payment)? onRecordar;
+
+  static String _initialsOf(String name) {
+    final parts =
+        name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) return parts.first[0].toUpperCase();
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: palette.border)),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      child: Row(
-        children: [
-          // Alumno
-          Expanded(
-            flex: 3,
-            child: Text(
-              displayName,
-              overflow: TextOverflow.ellipsis,
-              style: cStyle,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 28,
+          height: 28,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: palette.accent.withValues(alpha: 0.12),
+            shape: BoxShape.circle,
+          ),
+          child: Text(
+            _initialsOf(name),
+            style: TextStyle(
+              fontFamily: AppFonts.barlow,
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+              color: palette.accent,
             ),
           ),
-          // Concepto
-          Expanded(
-            flex: 4,
-            child: Text(
-              payment.concept,
-              overflow: TextOverflow.ellipsis,
-              style: cStyle,
-            ),
+        ),
+        const SizedBox(width: AppSpacing.s12),
+        Flexible(
+          child: Text(
+            name,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: palette.textPrimary, fontSize: 14),
           ),
-          // Monto
-          Expanded(
-            flex: 2,
-            child: Text(
-              fmtArs(payment.amountArs),
-              style: cStyle,
-              textAlign: TextAlign.right,
-            ),
-          ),
-          // Vencimiento
-          Expanded(
-            flex: 2,
-            child: Text(
-              fmtDayMonth(payment.createdAt),
-              style: cStyle.copyWith(color: palette.textMuted),
-              textAlign: TextAlign.right,
-            ),
-          ),
-          // Estado chip
-          Expanded(
-            flex: 2,
-            child: Text(
-              estadoLabel,
-              textAlign: TextAlign.right,
-              style: TextStyle(
-                color: estadoColor,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          // Acciones
-          if (showActions)
-            Expanded(
-              flex: 3,
-              child: Wrap(
-                alignment: WrapAlignment.end,
-                spacing: 4,
-                runSpacing: 4,
-                children: [
-                  if (onRecordar != null)
-                    _ActionBtn(
-                      label: 'Recordar', // i18n
-                      color: palette.accent,
-                      onPressed: () => onRecordar!(payment),
-                    ),
-                  if (payment.status == PaymentStatus.pending &&
-                      onMarcarPagado != null)
-                    _ActionBtn(
-                      label: 'Marcar pagado', // i18n
-                      color: palette.textMuted,
-                      onPressed: () => onMarcarPagado!(payment),
-                    ),
-                ],
-              ),
-            ),
-        ],
+        ),
+      ],
+    );
+  }
+}
+
+// ── _MontoCell ───────────────────────────────────────────────────────────────
+
+class _MontoCell extends StatelessWidget {
+  const _MontoCell({required this.amountArs, required this.palette});
+
+  final int amountArs;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Text(
+        fmtArs(amountArs),
+        style: TextStyle(color: palette.textPrimary, fontSize: 14),
       ),
     );
   }
 }
 
-// ── _ActionBtn ────────────────────────────────────────────────────────────────
+// ── _EstadoBadge ─────────────────────────────────────────────────────────────
 
-class _ActionBtn extends StatelessWidget {
-  const _ActionBtn({
+/// Pill con dot + label, color por estado desde la palette semántica
+/// (vencido → danger, porVencer → accent, pagado → textMuted).
+class _EstadoBadge extends StatelessWidget {
+  const _EstadoBadge({
+    required this.estado,
     required this.label,
-    required this.color,
-    required this.onPressed,
+    required this.palette,
   });
 
+  final PagoEstado estado;
+  final String label;
+  final AppPalette palette;
+
+  Color get _color => switch (estado) {
+        PagoEstado.vencido => palette.danger,
+        PagoEstado.porVencer => palette.accent,
+        PagoEstado.pagado => palette.textMuted,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _color;
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.s12,
+          vertical: AppSpacing.hairline,
+        ),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(AppRadius.full),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: AppSpacing.hairline),
+            Flexible(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── _AccionesCell ────────────────────────────────────────────────────────────
+
+/// Botones de acción de la fila: Recordar (siempre, si hay callback) y
+/// Marcar pagado (solo si el pago está `pending`, si hay callback).
+///
+/// Sin `onRowTap` en `CoachHubDataTable` (ADR-F9-03) — no hay pelea de gestos
+/// entre el tap de fila y el tap de estos botones.
+class _AccionesCell extends StatelessWidget {
+  const _AccionesCell({
+    required this.payment,
+    required this.palette,
+    required this.onRecordar,
+    required this.onMarcarPagado,
+  });
+
+  final Payment payment;
+  final AppPalette palette;
+  final void Function(Payment)? onRecordar;
+  final void Function(Payment)? onMarcarPagado;
+
+  @override
+  Widget build(BuildContext context) {
+    final pending = payment.status == PaymentStatus.pending;
+
+    // `Flexible` en cada botón (en vez de tamaño natural fijo) evita que el
+    // Row overflowee si el ancho de la columna es angosto — el label se
+    // elide con TextOverflow.ellipsis en ese caso extremo, sin romper el
+    // layout de la fila (finders por texto siguen matcheando el `data`).
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Flexible(
+          child: _AccionButton(
+            key: Key('pagos_accion_recordar_${payment.id}'),
+            icon: TreinoIcon.bell,
+            label: 'Recordar', // i18n
+            color: palette.textMuted,
+            onTap: onRecordar == null ? null : () => onRecordar!(payment),
+          ),
+        ),
+        if (pending) ...[
+          const SizedBox(width: AppSpacing.hairline),
+          Flexible(
+            child: _AccionButton(
+              key: Key('pagos_accion_marcar_pagado_${payment.id}'),
+              icon: TreinoIcon.check,
+              // Label corto (WARNING-1, Fase 9): "Marcar pagado" completo se
+              // elidía con "…" en la columna ACCIONES a 1440x900 — el ícono
+              // check ya distingue la acción de "Recordar", así que
+              // "Pagado" alcanza sin ambigüedad y entra sin truncar.
+              label: 'Pagado', // i18n
+              color: palette.accent,
+              onTap: onMarcarPagado == null
+                  ? null
+                  : () => onMarcarPagado!(payment),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Botón compacto de acción de fila — `TextButton` con `tapTargetSize`
+/// achicado para no romper el `rowHeight` fijo de `CoachHubDataTable`.
+class _AccionButton extends StatelessWidget {
+  const _AccionButton({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
   final String label;
   final Color color;
-  final VoidCallback onPressed;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return TextButton(
-      onPressed: onPressed,
+      onPressed: onTap,
       style: TextButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        foregroundColor: color,
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.hairline),
         minimumSize: Size.zero,
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        foregroundColor: color,
+        visualDensity: VisualDensity.compact,
       ),
-      child: Text(
-        label,
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12),
+          const SizedBox(width: AppSpacing.hairline),
+          Flexible(
+            child: Text(
+              label,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
       ),
     );
   }

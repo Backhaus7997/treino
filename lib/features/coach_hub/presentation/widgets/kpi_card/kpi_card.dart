@@ -61,6 +61,7 @@ class KpiCard extends StatelessWidget {
     super.key,
     required this.value,
     required this.label,
+    this.valueBuilder,
     this.delta,
     this.deltaPositive,
     this.sublabel,
@@ -69,7 +70,21 @@ class KpiCard extends StatelessWidget {
   });
 
   /// Valor principal de la métrica (ej: "1.234", "98%").
+  ///
+  /// Cuando se pasa [valueBuilder], este texto se sigue usando como fallback
+  /// semántico pero no se pinta.
   final String value;
+
+  /// Reemplaza el [Text] del valor por un widget propio, recibiendo el
+  /// [TextStyle] exacto que usaría la card.
+  ///
+  /// Existe para que un consumidor pueda animar el número sin perder la
+  /// tipografía del kit — el caso real es Pagos, donde `main` cuenta los
+  /// montos con `TreinoCountUp` (ca5ba90c). Sin esto, migrar Pagos al kit
+  /// obligaba a elegir entre el diseño y la animación.
+  ///
+  /// Opcional y aditivo: los consumidores existentes no cambian.
+  final Widget Function(BuildContext context, TextStyle style)? valueBuilder;
 
   /// Etiqueta descriptiva de la métrica.
   final String label;
@@ -107,6 +122,7 @@ class KpiCard extends StatelessWidget {
           content = _CardContent(
             value: value,
             label: label,
+            valueBuilder: valueBuilder,
             delta: delta,
             deltaPositive: deltaPositive,
             sublabel: sublabel,
@@ -188,6 +204,7 @@ class _CardContent extends StatelessWidget {
   const _CardContent({
     required this.value,
     required this.label,
+    required this.valueBuilder,
     required this.delta,
     required this.deltaPositive,
     required this.sublabel,
@@ -197,6 +214,7 @@ class _CardContent extends StatelessWidget {
 
   final String value;
   final String label;
+  final Widget Function(BuildContext, TextStyle)? valueBuilder;
   final String? delta;
   final bool? deltaPositive;
   final String? sublabel;
@@ -220,14 +238,17 @@ class _CardContent extends StatelessWidget {
           ),
         ),
         const SizedBox(height: AppSpacing.hairline),
-        Text(
-          value,
-          style: TextStyle(
-            fontFamily: AppFonts.barlowCondensed,
-            fontWeight: FontWeight.w700,
-            fontSize: 28,
-            color: tokens.valueColor,
-          ),
+        Builder(
+          builder: (ctx) {
+            final valueStyle = TextStyle(
+              fontFamily: AppFonts.barlowCondensed,
+              fontWeight: FontWeight.w700,
+              fontSize: 28,
+              color: tokens.valueColor,
+            );
+            return valueBuilder?.call(ctx, valueStyle) ??
+                Text(value, style: valueStyle);
+          },
         ),
         if (delta != null) ...[
           const SizedBox(height: AppSpacing.s8),

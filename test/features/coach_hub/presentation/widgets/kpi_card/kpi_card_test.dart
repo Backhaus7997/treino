@@ -280,7 +280,8 @@ void main() {
           reason: 'el sublabel debe estar debajo del value');
     });
 
-    testWidgets('sublabel null (default) → no renderiza nada extra '
+    testWidgets(
+        'sublabel null (default) → no renderiza nada extra '
         '[SCENARIO-CK-KPI-14]', (tester) async {
       await tester.pumpWidget(_wrap(
         const KpiCard(value: '28', label: 'Alumnos activos'),

@@ -1,12 +1,21 @@
-/// Tests for PagosWebTable — PR2b (Strict TDD RED phase).
+/// Tests for PagosWebTable — Fase 9 WU-06 (Strict TDD RED phase).
+///
+/// Migración de la tabla plana (Container ad-hoc) a `CoachHubDataTable` del
+/// kit v2, con celdas ricas (avatar de iniciales + badge de estado por
+/// color) y estados completos resueltos por el kit (loading shimmer /
+/// error+retry / empty). Las acciones de fila se difieren a WU-07 — sin
+/// columna ACCIONES en este archivo.
 ///
 /// REQ-PAGW-TABLE-001, REQ-PAGW-EMPTY-001.
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pagos_web_table.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart'
+    show CoachHubDataTable;
 import 'package:treino/features/payments/domain/payment.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/l10n/app_l10n.dart';
@@ -39,26 +48,37 @@ Payment _paid({
       paidAt: DateTime(2025, 6, 15),
     );
 
-Payment _pending({
-  String id = 'pay-2',
-  String athleteId = 'uid-bob',
-  int amountArs = 8000,
-  String concept = 'Plan semanal',
-  bool vencido = false,
-}) {
+/// Pago pendiente vencido hace exactamente [diasAtraso] días de calendario
+/// (dueAt-aware — REQ-VENC-11), para verificar el label relativo del badge.
+Payment _vencidoHaceDias(int diasAtraso, {String id = 'pay-2'}) {
   final now = DateTime.now().toUtc();
-  final createdAt = vencido
-      ? DateTime.utc(now.year, now.month, 1).subtract(const Duration(days: 5))
-      : DateTime.utc(now.year, now.month, 1);
   return Payment(
     id: id,
     trainerId: 'trainer-1',
-    athleteId: athleteId,
-    amountArs: amountArs,
-    concept: concept,
+    athleteId: 'uid-bob',
+    amountArs: 8000,
+    concept: 'Plan semanal',
     status: PaymentStatus.pending,
-    createdAt: createdAt,
+    createdAt: now.subtract(Duration(days: diasAtraso + 30)),
+    dueAt: now.subtract(Duration(days: diasAtraso)),
   );
+}
+
+// ── Helpers de layout ────────────────────────────────────────────────────────
+
+/// `true` si el `Text` encontrado por [finder] se está elidiendo con "…"
+/// (WARNING-1, Fase 9): compara el ancho intrínseco del contenido (el que
+/// ocuparía sin restricción de ancho, con el mismo estilo/escala ya
+/// resueltos por el `RenderParagraph` real) contra el ancho efectivamente
+/// asignado tras el layout de `Flex`. Si el intrínseco excede al disponible,
+/// `TextOverflow.ellipsis` recortó el texto — más robusto que comparar
+/// contra un ancho de columna hardcodeado, porque no depende de asumir el
+/// árbol de padding/flex exacto.
+bool _isTextTruncated(WidgetTester tester, Finder finder) {
+  final renderParagraph = tester.renderObject<RenderParagraph>(finder);
+  final intrinsicWidth = renderParagraph.getMaxIntrinsicWidth(double.infinity);
+  final actualWidth = renderParagraph.size.width;
+  return intrinsicWidth > actualWidth + 0.5;
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -66,11 +86,10 @@ Payment _pending({
 void main() {
   setUp(() => TestWidgetsFlutterBinding.ensureInitialized());
 
-  group('PagosWebTable (REQ-PAGW-TABLE-001)', () {
-    // (a) Paid payment row — 6 columns visible with correct data
+  group('PagosWebTable → CoachHubDataTable (Fase 9 WU-06)', () {
     testWidgets(
-        'SCENARIO 1 — paid row shows Alumno name, Concepto, Monto, Estado=Pagado',
-        (tester) async {
+        'SCENARIO 1 — renders CoachHubDataTable with alumno name and monto '
+        'formatted es-AR', (tester) async {
       tester.view.physicalSize = _kDesktopSize;
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -84,29 +103,21 @@ void main() {
           PagosWebTable(
             payments: [_paid()],
             profiles: profiles,
-            emptyLabel: 'Sin pagos',
-            onMarcarPagado: null,
-            onRecordar: null,
-            showActions: false,
+            emptyMessage: 'Sin pagos',
           ),
         ),
       );
       await tester.pumpAndSettle();
 
-      // Alumno column shows name from profiles map
+      expect(find.byType(CoachHubDataTable), findsOneWidget);
       expect(find.text('Ana'), findsOneWidget);
-      // Concepto column
       expect(find.text('Plan mensual'), findsOneWidget);
-      // Monto formatted es-AR
       expect(find.text(r'$15.000'), findsOneWidget);
-      // Estado chip = Pagado
-      expect(find.text('Pagado'), findsOneWidget);
     });
 
-    // (b) Pending row — Estado is Pendiente or Vencido, never Pagado
     testWidgets(
-        'SCENARIO 2 — pending row Estado shows Pendiente/Vencido, not Pagado',
-        (tester) async {
+        "SCENARIO 2 — estado badge shows 'Vencido 4d' for a payment overdue "
+        '4 days (dueAt-aware, REQ-VENC-11)', (tester) async {
       tester.view.physicalSize = _kDesktopSize;
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -118,28 +129,19 @@ void main() {
       await tester.pumpWidget(
         _wrap(
           PagosWebTable(
-            payments: [_pending()],
+            payments: [_vencidoHaceDias(4)],
             profiles: profiles,
-            emptyLabel: 'Sin pagos',
-            onMarcarPagado: null,
-            onRecordar: null,
-            showActions: false,
+            emptyMessage: 'Sin pagos',
           ),
         ),
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Pagado'), findsNothing);
-      // Either Pendiente or Vencido must appear
-      final pendienteOrVencido = find.text('Pendiente').evaluate().isNotEmpty ||
-          find.text('Vencido').evaluate().isNotEmpty;
-      expect(pendienteOrVencido, isTrue);
+      expect(find.text('Vencido 4d'), findsOneWidget); // i18n
     });
 
-    // (c) Empty bucket → emptyLabel shown, no exception
-    testWidgets(
-        'SCENARIO — empty bucket renders emptyLabel without crash '
-        '(REQ-PAGW-EMPTY-001)', (tester) async {
+    testWidgets('SCENARIO 3 — empty list shows emptyMessage via kit',
+        (tester) async {
       tester.view.physicalSize = _kDesktopSize;
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -149,10 +151,7 @@ void main() {
           const PagosWebTable(
             payments: [],
             profiles: {},
-            emptyLabel: 'No hay pagos vencidos',
-            onMarcarPagado: null,
-            onRecordar: null,
-            showActions: false,
+            emptyMessage: 'No hay pagos vencidos',
           ),
         ),
       );
@@ -161,8 +160,31 @@ void main() {
       expect(find.text('No hay pagos vencidos'), findsOneWidget);
     });
 
-    // (d) Column headers rendered when non-empty
-    testWidgets('column headers ALUMNO / CONCEPTO / MONTO / ESTADO visible',
+    testWidgets('SCENARIO 4 — loading:true shows the kit skeleton shimmer',
+        (tester) async {
+      tester.view.physicalSize = _kDesktopSize;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      await tester.pumpWidget(
+        _wrap(
+          const PagosWebTable(
+            payments: [],
+            profiles: {},
+            emptyMessage: 'Sin pagos',
+            loading: true,
+          ),
+        ),
+      );
+      // No pumpAndSettle — shimmer runs an animation loop.
+      await tester.pump();
+
+      expect(find.byKey(const Key('data_table_skeleton')), findsOneWidget);
+    });
+
+    testWidgets(
+        'SCENARIO 5 — column headers ALUMNO / CONCEPTO / MONTO / '
+        'VENCIMIENTO / ESTADO visible, no PLAN column (ADR-F9-02)',
         (tester) async {
       tester.view.physicalSize = _kDesktopSize;
       tester.view.devicePixelRatio = 1.0;
@@ -177,10 +199,7 @@ void main() {
           PagosWebTable(
             payments: [_paid()],
             profiles: profiles,
-            emptyLabel: 'Sin pagos',
-            onMarcarPagado: null,
-            onRecordar: null,
-            showActions: false,
+            emptyMessage: 'Sin pagos',
           ),
         ),
       );
@@ -189,39 +208,13 @@ void main() {
       expect(find.text('ALUMNO'), findsOneWidget); // i18n
       expect(find.text('CONCEPTO'), findsOneWidget); // i18n
       expect(find.text('MONTO'), findsOneWidget); // i18n
+      expect(find.text('VENCIMIENTO'), findsOneWidget); // i18n
       expect(find.text('ESTADO'), findsOneWidget); // i18n
+      expect(find.text('PLAN'), findsNothing);
     });
 
-    // (e) Action buttons visible when showActions=true
-    testWidgets('showActions=true renders Recordar button for pending row',
+    testWidgets('SCENARIO 6 — missing profile falls back to "Alumno" label',
         (tester) async {
-      tester.view.physicalSize = _kDesktopSize;
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.resetPhysicalSize);
-
-      final profiles = {
-        'uid-bob': const UserPublicProfile(uid: 'uid-bob', displayName: 'Bob'),
-      };
-
-      await tester.pumpWidget(
-        _wrap(
-          PagosWebTable(
-            payments: [_pending()],
-            profiles: profiles,
-            emptyLabel: 'Sin pagos',
-            onMarcarPagado: (_) {},
-            onRecordar: (_) {},
-            showActions: true,
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Recordar'), findsOneWidget); // i18n
-    });
-
-    // (f) Fallback name when profile missing
-    testWidgets('missing profile falls back to "Alumno" label', (tester) async {
       tester.view.physicalSize = _kDesktopSize;
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -231,16 +224,181 @@ void main() {
           PagosWebTable(
             payments: [_paid(athleteId: 'uid-unknown')],
             profiles: const {}, // no profile for uid-unknown
-            emptyLabel: 'Sin pagos',
-            onMarcarPagado: null,
-            onRecordar: null,
-            showActions: false,
+            emptyMessage: 'Sin pagos',
           ),
         ),
       );
       await tester.pumpAndSettle();
 
       expect(find.text('Alumno'), findsOneWidget); // i18n fallback
+    });
+
+    testWidgets(
+        'SCENARIO 7 — errorMessage + onRetry renders the kit error state',
+        (tester) async {
+      tester.view.physicalSize = _kDesktopSize;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      var retried = false;
+
+      await tester.pumpWidget(
+        _wrap(
+          PagosWebTable(
+            payments: const [],
+            profiles: const {},
+            emptyMessage: 'Sin pagos',
+            errorMessage: 'Error al cargar pagos.',
+            onRetry: () => retried = true,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Error al cargar pagos.'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('data_table_retry')));
+      expect(retried, isTrue);
+    });
+  });
+
+  group('PagosWebTable → acciones de fila (Fase 9 WU-07)', () {
+    testWidgets(
+        'SCENARIO 8 — showActions:true + pago pending muestra Recordar y '
+        'Pagado; tocar Pagado invoca el callback', (tester) async {
+      tester.view.physicalSize = _kDesktopSize;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      final profiles = {
+        'uid-bob': const UserPublicProfile(uid: 'uid-bob', displayName: 'Bob'),
+      };
+      final pending = _vencidoHaceDias(4);
+      Payment? marcado;
+
+      await tester.pumpWidget(
+        _wrap(
+          PagosWebTable(
+            payments: [pending],
+            profiles: profiles,
+            emptyMessage: 'Sin pagos',
+            onMarcarPagado: (p) => marcado = p,
+            onRecordar: (_) {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Recordar'), findsOneWidget); // i18n
+      expect(find.text('Pagado'), findsOneWidget); // i18n
+
+      await tester.tap(find.text('Pagado'));
+      await tester.pumpAndSettle();
+
+      expect(marcado, pending);
+    });
+
+    testWidgets(
+        'SCENARIO 9 — showActions:false (tab Pagados) no muestra Recordar '
+        'ni Pagado', (tester) async {
+      tester.view.physicalSize = _kDesktopSize;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      final profiles = {
+        'uid-ana': const UserPublicProfile(uid: 'uid-ana', displayName: 'Ana'),
+      };
+
+      await tester.pumpWidget(
+        _wrap(
+          PagosWebTable(
+            payments: [_paid()],
+            profiles: profiles,
+            emptyMessage: 'Sin pagos',
+            showActions: false,
+            onMarcarPagado: (_) {},
+            onRecordar: (_) {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Recordar'), findsNothing);
+      // Por Key, no por texto: el payment está `paid`, así que el badge
+      // ESTADO ya rinde el texto 'Pagado' — buscar por texto sería un falso
+      // positivo/negativo ambiguo con esa celda.
+      expect(
+        find.byKey(const Key('pagos_accion_marcar_pagado_pay-1')),
+        findsNothing,
+      );
+      expect(find.text('ACCIONES'), findsNothing); // i18n — no column either
+    });
+
+    testWidgets(
+        'SCENARIO 10 — pago ya pagado con showActions:true muestra Recordar '
+        'pero NO Pagado', (tester) async {
+      tester.view.physicalSize = _kDesktopSize;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      final profiles = {
+        'uid-ana': const UserPublicProfile(uid: 'uid-ana', displayName: 'Ana'),
+      };
+
+      await tester.pumpWidget(
+        _wrap(
+          PagosWebTable(
+            payments: [_paid()],
+            profiles: profiles,
+            emptyMessage: 'Sin pagos',
+            onMarcarPagado: (_) {},
+            onRecordar: (_) {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Recordar'), findsOneWidget); // i18n
+      // Por Key, no por texto: el payment está `paid`, así que el badge
+      // ESTADO ya rinde el texto 'Pagado' — buscar por texto sería un falso
+      // positivo/negativo ambiguo con esa celda.
+      expect(
+        find.byKey(const Key('pagos_accion_marcar_pagado_pay-1')),
+        findsNothing,
+      );
+    });
+
+    testWidgets(
+        'SCENARIO 11 — label "Pagado" no se elide con "…" en la '
+        'columna ACCIONES a 1440x900 (WARNING-1, Fase 9)', (tester) async {
+      tester.view.physicalSize = _kDesktopSize;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      final profiles = {
+        'uid-bob': const UserPublicProfile(uid: 'uid-bob', displayName: 'Bob'),
+      };
+      final pending = _vencidoHaceDias(4);
+
+      await tester.pumpWidget(
+        _wrap(
+          PagosWebTable(
+            payments: [pending],
+            profiles: profiles,
+            emptyMessage: 'Sin pagos',
+            onMarcarPagado: (_) {},
+            onRecordar: (_) {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        _isTextTruncated(tester, find.text('Pagado')),
+        isFalse,
+        reason: 'El ancho intrínseco del label "Pagado" no debe exceder el '
+            'ancho realmente disponible en la columna ACCIONES (si excede, '
+            'TextOverflow.ellipsis lo está recortando).',
+      );
     });
   });
 }

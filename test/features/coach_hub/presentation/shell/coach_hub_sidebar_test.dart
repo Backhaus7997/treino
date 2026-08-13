@@ -298,8 +298,7 @@ void main() {
 
     // El badge usa los tokens semánticos (highlight magenta + texto claro),
     // no colores hardcodeados — ADR-SH-003/mockup sidebar.png.
-    final badgeTokens =
-        TreinoBadgeTokens.of(tester.element(find.text('3')));
+    final badgeTokens = TreinoBadgeTokens.of(tester.element(find.text('3')));
     final badgeContainer = tester.widget<Container>(
       find
           .ancestor(
