@@ -1243,6 +1243,7 @@
   "onboardingTourNext": "NEXT",
   "onboardingTourFinish": "START",
   "onboardingTourProgress": "Step {current} of {total}",
+  "onboardingCustomExerciseCta": "CREATE MY EXERCISE",
   "@onboardingTourProgress": {
     "placeholders": {"current": {"type": "int"}, "total": {"type": "int"}}
   }
