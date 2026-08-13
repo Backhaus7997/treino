@@ -6728,6 +6728,12 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Paso {current} de {total}'**
   String onboardingTourProgress(int current, int total);
+
+  /// CTA de la última slide del onboarding de ejercicios propios. Cierra el modal y devuelve al editor de rutina, donde 'Agregar ejercicio' lleva al alta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CREAR MI EJERCICIO'**
+  String get onboardingCustomExerciseCta;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

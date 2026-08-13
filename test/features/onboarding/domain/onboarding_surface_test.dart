@@ -46,11 +46,26 @@ void main() {
       }
     });
 
-    test('every surface has slides and none repeat', () {
-      for (final surface in OnboardingSurface.values) {
+    test('every TOUR surface has slides and none repeat', () {
+      for (final surface in onboardingTourSurfaces) {
         expect(surface.slides, isNotEmpty);
         expect(surface.slides.toSet().length, surface.slides.length,
             reason: '${surface.name} repeats a slide');
+      }
+    });
+
+    test('feature onboardings carry no module slides', () {
+      // The `customExercise*` surfaces share the flag mechanism but not
+      // the module tour: their deck is a fixed three-slide list keyed by role,
+      // not an enumeration of app sections. An empty list here is the contract,
+      // not an unfinished surface — so this asserts it rather than letting the
+      // "every surface has slides" invariant above quietly cover both kinds.
+      final featureSurfaces = OnboardingSurface.values
+          .where((s) => !onboardingTourSurfaces.contains(s));
+
+      expect(featureSurfaces, isNotEmpty, reason: 'sanity: the split exists');
+      for (final surface in featureSurfaces) {
+        expect(surface.slides, isEmpty, reason: '${surface.name} has slides');
       }
     });
   });
