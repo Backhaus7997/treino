@@ -48,6 +48,33 @@ class SessionNotifier
   /// La UI llama esto al mostrar el feedback para no re-emitir el mismo error.
   void clearLogSetError() => _logSetError.value = null;
 
+  /// Segundos transcurridos, publicados FUERA de `state`.
+  ///
+  /// El cronómetro avanza una vez por segundo y se lee en un único `Text` de
+  /// toda la app. Emitirlo por `state` reconstruía el player entero —
+  /// cabecera, cada bloque de ejercicio, cada fila de serie y el CTA— 3600
+  /// veces en un entreno de una hora, compitiendo con el scroll y con el
+  /// tipeo de reps/peso. Ese era el jank.
+  ///
+  /// `SessionState.elapsedSeconds` SIGUE existiendo y sigue siendo la fuente
+  /// que se persiste: lo actualizan las acciones reales (log/add/remove/finish),
+  /// no el tick. Sacarlo del estado habría roto la spec de session-player, que
+  /// lo documenta como parte del modelo.
+  final ValueNotifier<int> _elapsed = ValueNotifier<int>(0);
+
+  /// Canal observable del cronómetro. La UI envuelve SOLO el contador MM:SS en
+  /// un `ValueListenableBuilder` sobre esto.
+  ValueListenable<int> get elapsed => _elapsed;
+
+  /// Alinea el cronómetro con un estado ya armado.
+  ///
+  /// Los dos paths reales ([_buildFresh] / [_buildResume]) lo hacen solos. Existe
+  /// para las subclases que reemplazan [build] por completo y devuelven un
+  /// `SessionState` fijo: sin esto su contador arrancaría en cero y no
+  /// coincidiría con el `elapsedSeconds` del estado que declaran.
+  @protected
+  void seedElapsed(int seconds) => _elapsed.value = seconds;
+
   @override
   Future<SessionState> build(SessionInit arg) async {
     final state = switch (arg) {
@@ -67,6 +94,7 @@ class SessionNotifier
       _timer?.cancel();
       _timer = null;
       _logSetError.dispose();
+      _elapsed.dispose();
     });
 
     return state;
@@ -111,6 +139,7 @@ class SessionNotifier
       weekNumber: clampedWeek,
     );
     _resetElapsedBaseline(elapsedSeconds: 0, at: session.startedAt);
+    _elapsed.value = 0;
 
     // REQ-WPRES-021 (ADR-WPRES-09): filter slots by presence BEFORE building
     // session state so buildBlocks, isFullyCompleted, _nextIncompleteIndex,
@@ -190,6 +219,7 @@ class SessionNotifier
       now: now,
     );
     _resetElapsedBaseline(elapsedSeconds: elapsed, at: now);
+    _elapsed.value = elapsed;
 
     return SessionState(
       session: session,
@@ -468,7 +498,7 @@ class SessionNotifier
         finishedAt: DateTime.now(),
         wasFullyCompleted: false,
         totalVolumeKg: current.totalVolumeKg,
-        durationMin: _durationMin(current.elapsedSeconds),
+        durationMin: _durationMin(_elapsed.value),
       );
     } catch (_) {
       _finalized = false;
@@ -510,7 +540,7 @@ class SessionNotifier
         finishedAt: DateTime.now(),
         wasFullyCompleted: true,
         totalVolumeKg: current.totalVolumeKg,
-        durationMin: _durationMin(current.elapsedSeconds),
+        durationMin: _durationMin(_elapsed.value),
       );
     } catch (_) {
       _finalized = false;
@@ -542,7 +572,7 @@ class SessionNotifier
     ref.read(analyticsServiceProvider).logRoutineFinished(
           routineId: current.session.routineId,
           sessionId: current.session.id,
-          durationSeconds: current.elapsedSeconds,
+          durationSeconds: _elapsed.value,
         );
     state = AsyncData(current.copyWith(
       session: current.session.copyWith(wasFullyCompleted: true),
@@ -554,8 +584,10 @@ class SessionNotifier
   void _onTick(Timer _) {
     final current = state.value;
     if (current == null || _finalized) return;
-    final elapsed = _elapsedSecondsNow();
-    state = AsyncData(current.copyWith(elapsedSeconds: elapsed));
+    // Sólo el ValueNotifier. Reasignar `state` acá reconstruía el player
+    // completo una vez por segundo para mover un contador — ver doc de
+    // [_elapsed].
+    _elapsed.value = _elapsedSecondsNow();
   }
 
   void _finalize() {

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -614,7 +615,16 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
                         const SizedBox(height: 14),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: _SessionStatsCard(state: state),
+                          child: _SessionStatsCard(
+                            state: state,
+                            // `.notifier` sólo notifica si cambia la instancia
+                            // del notifier, nunca por tick.
+                            elapsed: ref
+                                .watch(
+                                  sessionNotifierProvider(widget.init).notifier,
+                                )
+                                .elapsed,
+                          ),
                         ),
                         const SizedBox(height: 20),
                         const Padding(
@@ -805,7 +815,15 @@ class _AttendanceCard extends ConsumerWidget {
 // ── _SessionStatsCard ─────────────────────────────────────────────────────────
 
 class _SessionStatsCard extends StatelessWidget {
-  const _SessionStatsCard({required this.state});
+  const _SessionStatsCard({required this.state, required this.elapsed});
+
+  /// El cronómetro llega por separado, NO dentro de [state].
+  ///
+  /// Avanza una vez por segundo y se lee en un único Text. Cuando viajaba en el
+  /// estado, cada tick reconstruía el player entero — cabecera, cada bloque,
+  /// cada fila de serie y el CTA— unas 3600 veces por entreno, peleando con el
+  /// scroll y con el tipeo de reps. Acá sólo rebuildea el contador.
+  final ValueListenable<int> elapsed;
 
   final SessionState state;
 
@@ -848,12 +866,15 @@ class _SessionStatsCard extends StatelessWidget {
                   ),
                 ),
               ),
-              Text(
-                _formatMMSS(state.elapsedSeconds),
-                style: GoogleFonts.barlowCondensed(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 40,
-                  color: palette.accent,
+              ValueListenableBuilder<int>(
+                valueListenable: elapsed,
+                builder: (context, seconds, _) => Text(
+                  _formatMMSS(seconds),
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 40,
+                    color: palette.accent,
+                  ),
                 ),
               ),
             ],

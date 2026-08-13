@@ -71,7 +71,12 @@ class _StubNotifier extends SessionNotifier {
   final SessionState _state;
 
   @override
-  Future<SessionState> build(SessionInit arg) async => _state;
+  Future<SessionState> build(SessionInit arg) async {
+    // El cronómetro vive fuera de SessionState; alinealo con el estado fijo
+    // que este stub declara, o el contador arrancaría en cero.
+    seedElapsed(_state.elapsedSeconds);
+    return _state;
+  }
 }
 
 /// Stub que registra la llamada a finishSession sin ejecutar lógica real.
@@ -81,7 +86,12 @@ class _FinishTrackingNotifier extends SessionNotifier {
   final void Function() onFinish;
 
   @override
-  Future<SessionState> build(SessionInit arg) async => _state;
+  Future<SessionState> build(SessionInit arg) async {
+    // El cronómetro vive fuera de SessionState; alinealo con el estado fijo
+    // que este stub declara, o el contador arrancaría en cero.
+    seedElapsed(_state.elapsedSeconds);
+    return _state;
+  }
 
   @override
   Future<void> finishSession() async => onFinish();
@@ -97,7 +107,12 @@ class _RemoveTrackingNotifier extends SessionNotifier {
   final void Function(RoutineSlot slot, SetLog? target) onRemoveSet;
 
   @override
-  Future<SessionState> build(SessionInit arg) async => _state;
+  Future<SessionState> build(SessionInit arg) async {
+    // El cronómetro vive fuera de SessionState; alinealo con el estado fijo
+    // que este stub declara, o el contador arrancaría en cero.
+    seedElapsed(_state.elapsedSeconds);
+    return _state;
+  }
 
   @override
   Future<void> removeSet(RoutineSlot slot, SetLog? target) async =>
