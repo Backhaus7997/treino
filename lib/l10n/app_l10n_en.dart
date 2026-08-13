@@ -1798,6 +1798,16 @@ class AppL10nEn extends AppL10n {
   String get routineEditorFillKgUndo => 'Undo';
 
   @override
+  String routineEditorKgStepIncreaseA11y(String amount) {
+    return 'Add $amount kilos to the weight';
+  }
+
+  @override
+  String routineEditorKgStepDecreaseA11y(String amount) {
+    return 'Take $amount kilos off the weight';
+  }
+
+  @override
   String get routineEditorMeasureReps => 'Reps';
 
   @override

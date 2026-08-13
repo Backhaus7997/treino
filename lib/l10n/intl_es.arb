@@ -170,6 +170,8 @@
   "routineEditorFillKgApplied": "Peso replicado en todos los sets.",
   "routineEditorFillKgEmpty": "Introduce el peso del primer set para poder replicarlo.",
   "routineEditorFillKgUndo": "Deshacer",
+  "routineEditorKgStepIncreaseA11y": "Sumar {amount} kilos al peso",
+  "routineEditorKgStepDecreaseA11y": "Restar {amount} kilos al peso",
   "routineEditorMeasureReps": "Reps",
   "routineEditorMeasureTime": "Tiempo",
   "routineEditorSetTypeNormal": "",

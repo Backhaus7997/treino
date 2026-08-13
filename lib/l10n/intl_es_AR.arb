@@ -1025,6 +1025,26 @@
   "@routineEditorFillKgEmpty": {},
   "routineEditorFillKgUndo": "Deshacer",
   "@routineEditorFillKgUndo": {},
+  "routineEditorKgStepIncreaseA11y": "Sumar {amount} kilos al peso",
+  "@routineEditorKgStepIncreaseA11y": {
+    "description": "Screen-reader label for a KG stepper button that adds weight to the set being edited.",
+    "placeholders": {
+      "amount": {
+        "type": "String",
+        "example": "2.5"
+      }
+    }
+  },
+  "routineEditorKgStepDecreaseA11y": "Restar {amount} kilos al peso",
+  "@routineEditorKgStepDecreaseA11y": {
+    "description": "Screen-reader label for a KG stepper button that takes weight off the set being edited.",
+    "placeholders": {
+      "amount": {
+        "type": "String",
+        "example": "2.5"
+      }
+    }
+  },
   "routineEditorMeasureReps": "Reps",
   "@routineEditorMeasureReps": {},
   "routineEditorMeasureTime": "Tiempo",

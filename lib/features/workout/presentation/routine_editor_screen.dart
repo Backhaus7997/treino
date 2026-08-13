@@ -328,6 +328,30 @@ void applyColumnWeights(List<_EditableSet> sets, List<double?> weights) {
   }
 }
 
+/// Plate-sized jumps offered by the KG steppers, smallest first. A gym user
+/// thinks in discs, not digits (issue #640): 2.5 is a pair of 1.25 plates,
+/// 5 is a pair of 2.5s.
+const List<double> kKgStepsKg = [2.5, 5];
+
+/// Returns [current] moved by [deltaKg], clamped into `[0, kMaxWeightKg]`.
+///
+/// A missing weight counts as 0, so `+2.5` on an empty field authors 2.5
+/// instead of doing nothing.
+///
+/// Landing on zero returns null — an EMPTY field is the editor's "sin peso",
+/// and a stepper must never author a `0 kg` prescription the athlete never
+/// typed. Together with the clamp, this is what makes a negative load
+/// unreachable by construction rather than by validation.
+///
+/// The result is rounded to two decimals: `17.3 + 2.5` is
+/// `19.799999999999997` in binary floating point, and the KG field renders
+/// the raw double. Two decimals is finer than any plate in any gym.
+double? steppedWeightKg(double? current, double deltaKg) {
+  final next = clampWeightKg((current ?? 0) + deltaKg);
+  if (next <= 0) return null;
+  return double.parse(next.toStringAsFixed(2));
+}
+
 /// Builds the [RoutineSlot] from an [_EditableSlot], populating both new
 /// and legacy fields. Extracted top-level so the submit path and tests share
 /// the same derivation logic.
@@ -3658,6 +3682,11 @@ class _SetRowState extends State<_SetRow> {
   late final TextEditingController _repsMinCtrl;
   late final TextEditingController _repsMaxCtrl;
 
+  /// Focus of the KG field. The stepper bar is bound to it: it exists only
+  /// while this row's weight is the one being edited, so the table never
+  /// carries four idle copies of the same four buttons.
+  late final FocusNode _kgFocus;
+
   @override
   void initState() {
     super.initState();
@@ -3669,6 +3698,11 @@ class _SetRowState extends State<_SetRow> {
         text: s.repsMin != null ? s.repsMin.toString() : '');
     _repsMaxCtrl = TextEditingController(
         text: s.repsMax != null ? s.repsMax.toString() : '');
+    _kgFocus = FocusNode()..addListener(_onKgFocusChanged);
+  }
+
+  void _onKgFocusChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -3677,12 +3711,49 @@ class _SetRowState extends State<_SetRow> {
     _repsCtrl.dispose();
     _repsMinCtrl.dispose();
     _repsMaxCtrl.dispose();
+    _kgFocus
+      ..removeListener(_onKgFocusChanged)
+      ..dispose();
     super.dispose();
   }
 
   /// Seeds the KG controller without losing fractional loads: integers show
   /// without a decimal (60), fractional values keep theirs (17.5).
   static String _formatWeight(double? w) => formatEditorWeight(w);
+
+  /// The weight this row currently shows. The controller text wins over the
+  /// model: mid-edit they can disagree for a keystroke, and the stepper must
+  /// operate on the number the user is looking at.
+  double? get _currentKg =>
+      parseEditorWeight(_kgCtrl.text) ?? widget.editableSet.weightKg;
+
+  /// Applies a plate-sized jump to this row's KG (issue #640, PR#3).
+  ///
+  /// The instance is mutated IN PLACE and the controller is written by hand —
+  /// deliberately NOT the `sets[i] = sets[i].copy()` replacement that
+  /// [applyColumnWeights] uses for the column bulk-fill. Rows are keyed by
+  /// `ObjectKey(set)`, so swapping the instance mints a new key, a new State
+  /// and a new [TextEditingController]: the field would be rebuilt from
+  /// scratch and the focus — which is the very thing that put this bar on
+  /// screen — would die under the user's finger. Mutating keeps the key
+  /// stable; writing the controller is what stops the model and the visible
+  /// field from drifting apart (the trap the bulk-fill had to dodge).
+  void _stepKg(double deltaKg) {
+    final next = steppedWeightKg(_currentKg, deltaKg);
+    final text = formatEditorWeight(next);
+    if (next == widget.editableSet.weightKg && text == _kgCtrl.text) return;
+
+    widget.editableSet.weightKg = next;
+    _kgCtrl.value = TextEditingValue(
+      text: text,
+      // Caret parked at the end so typing after a bump appends instead of
+      // landing wherever the previous selection happened to be.
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+    // Re-runs the slot's inline validation — a set completed by a stepper must
+    // stop being painted red (`_isValid` / `hasSlotError`).
+    widget.onChanged();
+  }
 
   Future<void> _pickSetType(BuildContext context) async {
     final l10n = AppL10n.of(context);
@@ -3725,7 +3796,12 @@ class _SetRowState extends State<_SetRow> {
     final l10n = AppL10n.of(context);
     final label = setChipLabel(widget.allSets, widget.index);
 
-    return Row(
+    // Duration slots have no KG column at all, so the affordance must not
+    // exist there — the focus node is never attached in that mode, and this
+    // guard says so out loud instead of relying on that side effect.
+    final showKgSteps = !widget.isDuration && _kgFocus.hasFocus;
+
+    final row = Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         // ── Set chip — 44×44 tap target ───────────────────────────────────
@@ -3776,6 +3852,7 @@ class _SetRowState extends State<_SetRow> {
           Expanded(
             child: _NumberField(
               controller: _kgCtrl,
+              focusNode: _kgFocus,
               palette: palette,
               hint: 'kg',
               decimal: true,
@@ -3847,6 +3924,31 @@ class _SetRowState extends State<_SetRow> {
         ),
       ],
     );
+
+    // The root is ALWAYS a Column, and the bar goes in as a conditional child.
+    // Returning `row` bare when the bar is hidden and a `Column` when it shows
+    // would flip the runtimeType of the row's root widget on every focus
+    // change, and `Widget.canUpdate` compares runtimeType: Flutter would tear
+    // down and re-inflate this whole subtree — including the KG `EditableText`,
+    // whose `dispose()` closes the IME connection that the focus change had
+    // just opened, and whose replacement never reopens it (only
+    // `_handleFocusChanged` and `requestKeyboard()` do, and neither fires
+    // again). The keyboard would pop up and vanish in the same frame, and the
+    // reps/mín/máx fields — which own their FocusNode internally — would lose
+    // it mid-tap, bouncing focus back to KG.
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        row,
+        if (showKgSteps)
+          _KgStepperBar(
+            palette: palette,
+            canDecrease: (_currentKg ?? 0) > 0,
+            onStep: _stepKg,
+          ),
+      ],
+    );
   }
 
   /// Builds the VoiceOver label for the set-type chip: the set position, the
@@ -3883,6 +3985,115 @@ class _SetRowState extends State<_SetRow> {
   }
 }
 
+// ── KG stepper bar ────────────────────────────────────────────────────────────
+
+/// Plate-sized shortcuts for the KG field of the row currently being edited
+/// (issue #640, PR#3): a gym user thinks in discs, not digits.
+///
+/// **Where it lives** — an accessory bar under the row whose KG field holds
+/// focus, not a pair of buttons parked beside every field. The set row is
+/// already `chip · KG · REPS · borrar` inside a card on a phone; four more
+/// controls per row would have forced the columns to shrink, and shrinking
+/// the columns is a redesign, which the issue rules out. One bar, bound to
+/// focus, keeps the table exactly as it is.
+///
+/// **Why decrements ship too** — an up-only stepper sends the user back to
+/// the keyboard the moment they overshoot, which is the tedium the shortcut
+/// exists to remove. Deloads and top-set back-offs move down, not up.
+/// [steppedWeightKg] clamps at zero, so "abajo" bottoms out at an empty
+/// field and never at a negative load.
+class _KgStepperBar extends StatelessWidget {
+  const _KgStepperBar({
+    required this.palette,
+    required this.canDecrease,
+    required this.onStep,
+  });
+
+  final AppPalette palette;
+
+  /// False when there is no weight left to take away — the two minus buttons
+  /// dim instead of pretending a tap will do something.
+  final bool canDecrease;
+
+  final void Function(double deltaKg) onStep;
+
+  @override
+  Widget build(BuildContext context) {
+    // −5 −2.5 +2.5 +5: the heaviest jump sits at each end, so the two
+    // directions mirror each other and the thumb only learns one map.
+    final deltas = <double>[
+      for (final step in kKgStepsKg.reversed) -step,
+      ...kKgStepsKg,
+    ];
+
+    return TextFieldTapRegion(
+      // Marks the bar as part of the KG field's tap region. Without it the
+      // tap counts as "outside" the field and dismisses the very focus that
+      // put this bar on screen.
+      child: Padding(
+        // left 52 = the 44px set chip + its 8px gap, so the bar starts flush
+        // with the KG field it acts on; right 40 clears the delete column.
+        padding: const EdgeInsets.only(left: 52, right: 40, top: 6, bottom: 2),
+        child: Row(
+          children: [
+            for (final delta in deltas) ...[
+              Expanded(child: _stepButton(context, delta)),
+              if (delta != deltas.last) const SizedBox(width: 6),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _stepButton(BuildContext context, double delta) {
+    final l10n = AppL10n.of(context);
+    final isIncrease = delta > 0;
+    final enabled = isIncrease || canDecrease;
+    // Same formatter as the KG field, so "+2.5" and the value it produces can
+    // never render their decimal differently.
+    final amount = formatWeightKg(delta.abs());
+    final tint = enabled ? palette.accent : palette.textMuted;
+
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: isIncrease
+          ? l10n.routineEditorKgStepIncreaseA11y(amount)
+          : l10n.routineEditorKgStepDecreaseA11y(amount),
+      child: GestureDetector(
+        // A GestureDetector on purpose: button widgets are focusable and would
+        // pull focus off the KG field on tap.
+        key: Key(
+          'kg_step_${isIncrease ? 'plus' : 'minus'}_'
+          '${amount.replaceAll('.', '_')}',
+        ),
+        behavior: HitTestBehavior.opaque,
+        onTap: enabled ? () => onStep(delta) : null,
+        child: Container(
+          height: 44,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: palette.bgCard,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: enabled ? palette.accent.withAlpha(90) : palette.border,
+            ),
+          ),
+          child: Text(
+            '${isIncrease ? '+' : '-'}$amount',
+            style: GoogleFonts.barlowCondensed(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: tint,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ── Number input field ────────────────────────────────────────────────────────
 
 /// Compact numeric text field without a label (used inside set rows).
@@ -3895,6 +4106,7 @@ class _NumberField extends StatelessWidget {
     this.decimal = false,
     this.hint,
     this.hasError = false,
+    this.focusNode,
   }) : assert(
           decimal ? onDecimalChanged != null : onChanged != null,
           'decimal fields need onDecimalChanged; integer fields need onChanged',
@@ -3903,6 +4115,10 @@ class _NumberField extends StatelessWidget {
   final TextEditingController controller;
   final AppPalette palette;
   final String? hint;
+
+  /// Optional external focus node — the KG field owns one so its row can show
+  /// the stepper bar only while that field is being edited.
+  final FocusNode? focusNode;
 
   /// Integer callback used when [decimal] is false (reps, etc.).
   final void Function(int?)? onChanged;
@@ -3924,6 +4140,7 @@ class _NumberField extends StatelessWidget {
     );
     return TextField(
       controller: controller,
+      focusNode: focusNode,
       keyboardType: decimal
           ? const TextInputType.numberWithOptions(decimal: true)
           : TextInputType.number,
