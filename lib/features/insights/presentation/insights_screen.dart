@@ -46,6 +46,19 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
   /// the muscles card unless the selected day falls outside the new week.
   late DateTime _shownWeekStart = mondayOfWeek(argentinaNow());
 
+  /// Último resultado resuelto, retenido mientras carga la semana siguiente.
+  ///
+  /// `athleteWeekInsightsProvider` está keyed por `weekStart`: tocar ‹ o › no
+  /// refresca un provider, crea otro, y el nuevo arranca en `AsyncLoading`. Sin
+  /// esto la pantalla entera colapsaba a un spinner y volvía a animar todas sus
+  /// secciones en cada paginada, con los datos anteriores todavía en pantalla un
+  /// frame antes.
+  ///
+  /// Retenerlo hace que paginar REEMPLACE contenido en vez de vaciarlo. El
+  /// spinner queda para la primera carga, que es la única que no tiene nada que
+  /// mostrar.
+  AsyncValue<WeeklyInsights?>? _lastResolved;
+
   /// [UX-week-day-selector] `true` once the athlete has paged away from the
   /// current week at least once. Gates the brand-new-account `_EmptyState`:
   /// that illustration only makes sense on first render of the CURRENT week
@@ -97,9 +110,14 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final uid = ref.watch(currentUidProvider) ?? '';
-    final async = ref.watch(
+    final raw = ref.watch(
       athleteWeekInsightsProvider((uid: uid, weekStart: _shownWeekStart)),
     );
+    if (raw.hasValue) _lastResolved = raw;
+    // Mientras la semana nueva carga, el `.when` de abajo recibe el resultado
+    // anterior y toma su rama `data` — sin spinner y sin re-animar.
+    final async =
+        (raw.isLoading && _lastResolved != null) ? _lastResolved! : raw;
     final isCurrentWeek = _shownWeekStart == mondayOfWeek(argentinaNow());
 
     return Column(
