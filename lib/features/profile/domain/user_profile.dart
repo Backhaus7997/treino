@@ -4,7 +4,6 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../../coach/domain/trainer_location.dart';
 import '../../coach/domain/trainer_subscription.dart';
-import '../../onboarding/domain/onboarding_seen.dart';
 import '../data/timestamp_converter.dart';
 import 'experience_level.dart';
 import 'gender.dart';
@@ -109,21 +108,6 @@ class UserProfile with _$UserProfile {
     // pausados=0.5) que el CF mantiene para que UI/rules lean sin agregar.
     TrainerSubscription? subscription,
     double? weightedLoad,
-
-    // ── Onboarding tour (issue #627) ───────────────────────────────────────
-    // Mapa `superficie -> versión del tour ya vista`:
-    //   { athleteMobile: 1, trainerMobile: 1, trainerWeb: 1 }
-    // Un flag POR SUPERFICIE, no uno global: el PF que ya vio el tour mobile
-    // igual tiene que ver el del Coach Hub web. Versionado, así un rediseño
-    // futuro lo re-muestra subiendo OnboardingSurface.version, sin migración.
-    //
-    // Vive acá (Firestore) y no en SharedPreferences para que sea cross-device.
-    // Es un campo PRIVADO: NO se propaga a userPublicProfiles ni a
-    // trainerPublicProfiles (no está en los subsets de UserRepository), así que
-    // los allowlists `hasOnly` de esos docs NO lo necesitan.
-    @Default(OnboardingSeen.empty)
-    @OnboardingSeenConverter()
-    OnboardingSeen onboardingSeen,
   }) = _UserProfile;
 
   factory UserProfile.fromJson(Map<String, Object?> json) =>

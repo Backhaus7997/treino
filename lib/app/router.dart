@@ -41,8 +41,6 @@ import '../features/feed/presentation/create_post_screen.dart';
 import '../features/feed/presentation/friend_requests_inbox_screen.dart';
 import '../features/feed/presentation/post_detail_screen.dart';
 import '../features/notifications/presentation/notification_history_screen.dart';
-import '../features/onboarding/application/onboarding_providers.dart';
-import '../features/onboarding/presentation/athlete_onboarding_screen.dart';
 import '../features/profile/application/account_deletion_notifier.dart';
 import '../features/feed/presentation/public_profile_screen.dart';
 import '../features/feed/application/follow_list_providers.dart';
@@ -182,38 +180,6 @@ String? authRedirect(
         !location.startsWith('/profile/edit-trainer')) {
       return '/profile/edit-trainer?mode=onboarding';
     }
-
-    // ── Onboarding tour gate (issue #627, slice 1 — alumno mobile) ────────
-    // Cadena completa: auth → profile_setup completo → trainer completo →
-    // TOUR → home. Va acá, después del gate de displayName y del de trainer
-    // incompleto, y antes del redirect "/public → /home".
-    //
-    // Lección de #429 ("onboarding sin salida"): este gate NUNCA puede
-    // comerse toda ruta protegida. Tiene tres frenos:
-    //   1. `!isPublic` — login/register/forgot siguen accesibles.
-    //   2. `kOnboardingRoutePrefix` como self-skip: cubre ya la ruta del PF
-    //      mobile que llega en la slice 2, sin volver a tocar esta función.
-    //   3. `onboardingDismissedProvider` — escape hatch de SESIÓN. El flag
-    //      real vive en Firestore; si ese write falla (offline,
-    //      permission-denied) el usuario igual sale del tour. Sin esto, un
-    //      write fallido lo encerraría exactamente como en #429.
-    //
-    // La salida va PRIMERO y a propósito: el tour no navega a mano contra el
-    // stream del perfil (esa carrera es la que atrapaba al usuario en el
-    // último step de ProfileSetup); en cuanto el flag se persiste o se baja
-    // el escape hatch, este branch lo devuelve a /home.
-    final onboardingDismissed = read(onboardingDismissedProvider);
-    final onboardingPending =
-        !onboardingDismissed && athleteOnboardingPending(profile);
-
-    if (location.startsWith(kAthleteOnboardingRoute) && !onboardingPending) {
-      return '/home';
-    }
-    if (!isPublic &&
-        onboardingPending &&
-        !location.startsWith(kOnboardingRoutePrefix)) {
-      return kAthleteOnboardingRoute;
-    }
   }
 
   // Onboarding-complete gate — saca al atleta de /profile-setup una vez que el
@@ -280,14 +246,6 @@ GoRouter buildRouter({
       GoRoute(
         path: '/profile-setup',
         pageBuilder: (_, __) => _noAnim(const ProfileSetupFlow()),
-      ),
-
-      // Tour de bienvenida del alumno (#627) — fullscreen post-profile_setup,
-      // sin bottom bar, igual que /profile-setup. Se llega por el gate de
-      // authRedirect; la pantalla persiste el flag y navega sola al salir.
-      GoRoute(
-        path: '/onboarding/athlete',
-        pageBuilder: (_, __) => _noAnim(const AthleteOnboardingScreen()),
       ),
 
       // Estado degradado "autenticado pero sin perfil accesible" (#544).

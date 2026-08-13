@@ -662,44 +662,6 @@
   "profileSetupCancelDialogTitle": "¿Cancelar la creación de tu cuenta?",
   "profileSetupCancelDialogBody": "Vamos a borrar tu cuenta. Esta acción no se puede deshacer.",
   "profileSetupCancelAccountError": "No pudimos cancelar la cuenta. Probá de nuevo.",
-  "onboardingStepLabel": "PASO {current} DE {total}",
-  "@onboardingStepLabel": {
-    "description": "Onboarding tour (#627) — step counter above the page title.",
-    "placeholders": {
-      "current": {
-        "type": "int"
-      },
-      "total": {
-        "type": "int"
-      }
-    }
-  },
-  "onboardingSkipCta": "Saltar",
-  "@onboardingSkipCta": {"description": "Onboarding tour (#627) — skip affordance, visible from the first page."},
-  "onboardingNextCta": "SIGUIENTE",
-  "@onboardingNextCta": {"description": "Onboarding tour (#627) — primary CTA on every page except the last."},
-  "onboardingFinishCta": "EMPEZAR",
-  "@onboardingFinishCta": {"description": "Onboarding tour (#627) — primary CTA on the last page; closes the tour."},
-  "onboardingSaveError": "No pudimos guardar que ya viste esto. Puede que te lo mostremos de nuevo.",
-  "@onboardingSaveError": {"description": "Onboarding tour (#627) — snackbar when persisting the seen flag fails. The tour still closes."},
-  "onboardingAthleteTrainTitle": "ENTRENÁ",
-  "@onboardingAthleteTrainTitle": {"description": "Onboarding tour (#627) athlete page 1 title — where a session starts."},
-  "onboardingAthleteTrainBody": "Todo arranca en la pestaña Entrenar. Ahí vas a encontrar la rutina que te armó tu profe, plantillas listas para copiar, y las rutinas que te creás vos.",
-  "@onboardingAthleteTrainBody": {"description": "Onboarding tour (#627) athlete page 1 body — assigned routine vs template vs own routine."},
-  "onboardingAthleteProgressTitle": "TU PROGRESO",
-  "@onboardingAthleteProgressTitle": {"description": "Onboarding tour (#627) athlete page 2 title — history, insights, measurements."},
-  "onboardingAthleteProgressBody": "Cada serie que cargás queda en tu historial y alimenta tus estadísticas. El volumen, la racha y los récords se calculan solos; las medidas corporales las cargás vos.",
-  "@onboardingAthleteProgressBody": {"description": "Onboarding tour (#627) athlete page 2 body — what is tracked automatically vs manually."},
-  "onboardingAthleteCoachTitle": "TU COACH",
-  "@onboardingAthleteCoachTitle": {"description": "Onboarding tour (#627) athlete page 3 title — the Coach module."},
-  "onboardingAthleteCoachBody": "En la pestaña Coach buscás y contratás un profe. Tu historial es tuyo: hasta que no compartas una sesión o tu perfil, tu profe no ve nada.",
-  "@onboardingAthleteCoachBody": {"description": "Onboarding tour (#627) athlete page 3 body — what a PF is plus the session_shares/profile_shares consent, in plain language."},
-  "onboardingAthleteCommunityTitle": "COMUNIDAD",
-  "@onboardingAthleteCommunityTitle": {"description": "Onboarding tour (#627) athlete page 4 title — social feed and gym rankings."},
-  "onboardingAthleteCommunityBody": "El Feed es social: publicás tus entrenamientos sólo si querés. Los rankings de tu gimnasio son opt-in — no aparecés en la tabla hasta que los actives.",
-  "@onboardingAthleteCommunityBody": {"description": "Onboarding tour (#627) athlete page 4 body — the feed is 100% social and rankings are explicit opt-in."},
-  "onboardingAthleteCommunityRankingsCta": "Activar rankings",
-  "@onboardingAthleteCommunityRankingsCta": {"description": "Onboarding tour (#627) athlete page 4 secondary CTA — closes the tour and lands on the rankings page."},
   "reAuthPasswordLabel": "Contraseña",
   "profileGymSearchHint": "Buscar gym",
   "profileEditTrainerTitleEdit": "Editá tu perfil profesional",
