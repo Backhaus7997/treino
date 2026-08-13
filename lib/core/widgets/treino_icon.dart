@@ -191,6 +191,9 @@ class TreinoIcon {
   static const IconData file = PhosphorIconsRegular.file;
   static const IconData filePdf = PhosphorIconsRegular.filePdf;
 
+  // Coach Hub Web — Kit de componentes (Fase 1, EmptyState)
+  static const IconData emptyState = PhosphorIconsRegular.empty;
+
   // Coach Hub — Alumnos roster view-mode toggle (Tabla / Cards).
   static const IconData viewTable = PhosphorIconsRegular.rows;
   static const IconData viewCards = PhosphorIconsRegular.squaresFour;
