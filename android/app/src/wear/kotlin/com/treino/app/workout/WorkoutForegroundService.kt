@@ -70,6 +70,7 @@ class WorkoutForegroundService : Service() {
         when (intent?.action) {
             ACTION_STOP -> {
                 Log.i(TAG, "stop pedido")
+                ExerciseSessionController.stop()
                 stopSelf()
                 return START_NOT_STICKY
             }
@@ -89,6 +90,11 @@ class WorkoutForegroundService : Service() {
         } else {
             startForeground(NOTIF_ID, notification)
         }
+
+        // El ejercicio se arranca DESDE ACA y no desde la Activity: la doc
+        // avisa que si la preparacion de sensores queda atada al ciclo de vida
+        // de una Activity, el sistema puede matarla sin necesidad.
+        ExerciseSessionController.start(applicationContext)
 
         Log.i(TAG, "foreground arrancado withOngoing=$withOngoing elapsed=$startedAt")
         // START_STICKY: si el sistema igual nos mata, que nos reviva. Es

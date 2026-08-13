@@ -22,6 +22,43 @@
          atado al flujo de permisos de sensores. Sin cumplir la precondición,
          startForeground() tira SecurityException con el manifest perfecto. -->
     <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS" />
+
+    <!-- El pulso de Health Services. Los DOS permisos, y no es redundancia.
+         Ambos son de RUNTIME: el atleta ve un diálogo la primera vez.
+
+         ⚠️ MEDIDO, y contradice lo que dice la documentación. La doc sostiene
+         que el corte BODY_SENSORS vs android.permission.health.READ_HEART_RATE
+         depende del **targetSdkVersion de la app**, así que con target 35
+         alcanzaría BODY_SENSORS. En un Samsung SM-L500 con Wear OS 6 (API 36)
+         y la app en target 35, `startExercise` tiró:
+
+             SecurityException: Missing permissions:
+             [android.permission.health.READ_HEART_RATE]
+
+         O sea que manda la versión del DISPOSITIVO, no el target. Se declaran
+         los dos: BODY_SENSORS acotado a <= 35 para relojes viejos, y
+         READ_HEART_RATE para 36+. En runtime se pide el que corresponda según
+         Build.VERSION.SDK_INT — ver MainActivity.
+
+         NUNCA pedir BODY_SENSORS y BODY_SENSORS_BACKGROUND en la misma
+         operación: la doc avisa que el sistema ignora el pedido y no otorga
+         NINGUNO de los dos. En v1 no se pide el de background. -->
+    <uses-permission
+        android:name="android.permission.BODY_SENSORS"
+        android:maxSdkVersion="35" />
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
+
+    <!-- Reconocimiento de actividad. Permiso de RUNTIME, y NO es opcional:
+         MEDIDO, sin esto `startExercise` tira
+         `SecurityException: Missing permissions:
+         [android.permission.ACTIVITY_RECOGNITION]`.
+
+         El sintoma es enganoso y vale anotarlo: el pulso SI aparece igual,
+         porque lo entrega `prepareExercise` (el calentamiento), que solo pide
+         el permiso de HR. Lo que falta son las calorias y el tracking real del
+         ejercicio. O sea que "se ve el pulso" NO prueba que el ejercicio
+         arranco. -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />

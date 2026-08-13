@@ -93,10 +93,6 @@ class _WearHomeState extends ConsumerState<_WearHome> {
   );
 
   @override
-  Widget build(BuildContext context) => const WearWorkoutScreen(
-        snapshot: _muestra,
-        // Sin ExerciseClient todavía: los dos en null, así que la fila de
-        // esfuerzo NO se dibuja. Es el comportamiento correcto, no un bug.
-        effort: WearEffort(),
-      );
+  Widget build(BuildContext context) =>
+      const WearWorkoutScreen(snapshot: _muestra);
 }

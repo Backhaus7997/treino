@@ -59,20 +59,3 @@ class WearWorkoutSnapshot {
   /// el botón de terminar.
   bool get isCurrentExerciseComplete => nextSetNumber == null;
 }
-
-/// Esfuerzo actual: pulso y energía activa.
-///
-/// Los dos son opcionales y **la ausencia se propaga hasta la UI**: cuando no
-/// hay dato NO se dibuja nada, ni un guion ni un cero. La razón está en
-/// `WorkoutView.swift` y es medida, no estética — una lectura negada por el
-/// atleta es INDISTINGUIBLE de "todavía no hay datos": las dos dan una consulta
-/// exitosa con cero muestras. La app no puede saber cuál de las dos es, así que
-/// no puede decir ninguna.
-class WearEffort {
-  const WearEffort({this.bpm, this.kcal});
-
-  final int? bpm;
-  final int? kcal;
-
-  bool get isEmpty => bpm == null && kcal == null;
-}

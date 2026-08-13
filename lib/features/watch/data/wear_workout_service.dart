@@ -1,5 +1,7 @@
 import 'package:flutter/services.dart';
 
+import '../domain/watch_effort.dart';
+
 /// Estado del descanso tal como lo reporta el lado nativo.
 ///
 /// Trae el DEADLINE y el `ahora` con el que se leyó, nunca una cuenta
@@ -63,6 +65,18 @@ class WearWorkoutService {
       );
 
   Future<void> cancelRest() => _channel.invokeMethod<void>('cancelRest');
+
+  /// Pulso y calorías del ejercicio en curso, o null si todavía no hay nada.
+  ///
+  /// El nativo emite el MISMO shape que Swift (`kind: 'watchEffort'`), así que
+  /// se parsea con `WatchEffort.tryParse` — el mismo parser que usa el teléfono
+  /// para el reloj de Apple. Un solo modelo para las dos plataformas: si el
+  /// contrato cambia, rompe en un solo lugar y no diverge en silencio.
+  Future<WatchEffort?> effort() async {
+    final r = await _channel.invokeMapMethod<String, dynamic>('effort');
+    if (r == null) return null;
+    return WatchEffort.tryParse(r);
+  }
 
   /// Estado actual, o null si no hay descanso en curso.
   ///

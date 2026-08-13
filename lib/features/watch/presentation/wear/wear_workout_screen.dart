@@ -6,6 +6,7 @@ import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../workout/domain/set_spec.dart';
 import '../../application/wear_rest_providers.dart';
+import '../../domain/watch_effort.dart';
 import 'wear_round_scaffold.dart';
 import 'wear_set_format.dart';
 import 'wear_strings.dart';
@@ -32,18 +33,17 @@ import 'wear_workout_view_model.dart';
 ///   del cuadrado inscripto ([WearRoundScaffold.inscribed]) o se recorta en las
 ///   esquinas.
 class WearWorkoutScreen extends ConsumerWidget {
-  const WearWorkoutScreen({
-    super.key,
-    required this.snapshot,
-    required this.effort,
-  });
+  const WearWorkoutScreen({super.key, required this.snapshot});
 
   final WearWorkoutSnapshot snapshot;
-  final WearEffort effort;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final rest = ref.watch(wearRestProvider).valueOrNull;
+    // `nada()` mientras carga: NO se dibuja fila. Mostrar un hueco reservado
+    // mientras se resuelve haria saltar el layout al llegar el primer pulso.
+    final effort = ref.watch(wearEffortProvider).valueOrNull ??
+        const WatchEffortDisplay.nada();
     final service = ref.read(wearWorkoutServiceProvider);
 
     return WearRoundScaffold.inscribed(
@@ -135,7 +135,9 @@ class _Header extends StatelessWidget {
 class _EffortRow extends StatelessWidget {
   const _EffortRow({required this.effort});
 
-  final WearEffort effort;
+  /// `WatchEffortDisplay` y no un tipo propio: es el MISMO modelo que usa el
+  /// teléfono para el reloj de Apple. Un solo tipo para las dos plataformas.
+  final WatchEffortDisplay effort;
 
   @override
   Widget build(BuildContext context) {

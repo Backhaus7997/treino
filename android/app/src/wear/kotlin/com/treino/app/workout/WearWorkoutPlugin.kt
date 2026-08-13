@@ -123,6 +123,27 @@ class WearWorkoutPlugin(
                 }
             }
 
+            // Mismo shape que emite Swift (`EffortBroadcastRules.swift`), para
+            // que el parser de Dart (`WatchEffort.tryParse`) sea UNO SOLO para
+            // las dos plataformas. `measuredAtMs` es obligatorio: sin momento
+            // no se puede juzgar la antiguedad, y tryParse descarta el payload.
+            "effort" -> {
+                val r = ExerciseSessionController.latestReading()
+                if (r == null) {
+                    result.success(mapOf("nowElapsedMs" to now))
+                } else {
+                    result.success(
+                        buildMap {
+                            put("kind", "watchEffort")
+                            r.bpm?.let { put("bpm", it) }
+                            r.kcal?.let { put("kcal", it) }
+                            put("measuredAtMs", r.measuredAtMs)
+                            put("nowElapsedMs", now)
+                        },
+                    )
+                }
+            }
+
             "stopForegroundService" -> {
                 context.startService(
                     Intent(context, WorkoutForegroundService::class.java)

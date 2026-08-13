@@ -92,6 +92,22 @@ android {
     }
 }
 
+dependencies {
+    // `wearImplementation` = SOLO el flavor `wear`. El APK del teléfono no
+    // carga nada de esto: no tiene sensores de muñeca ni corre entrenos.
+    //
+    // Health Services es el equivalente de HealthKit en Wear OS. Es lo que
+    // provee pulsaciones y calorías durante el entreno. OJO con lo que NO
+    // hace: NO mantiene vivo el proceso. Trackea en el MCU, fuera de nuestro
+    // proceso, y nos entrega datos — mantener la app viva es trabajo del
+    // WorkoutForegroundService, y eso ya está medido (22.6% de cobertura sin
+    // el servicio, 100.0% con él).
+    //
+    // 1.0.0 es la última ESTABLE. La última publicada es 1.1.0-rc02; se
+    // arranca en estable y se evalúa después.
+    "wearImplementation"("androidx.health:health-services-client:1.0.0")
+}
+
 flutter {
     source = "../.."
 }

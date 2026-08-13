@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../domain/watch_effort.dart';
 import '../data/wear_workout_service.dart';
 
 final wearWorkoutServiceProvider = Provider<WearWorkoutService>(
@@ -47,6 +48,58 @@ final wearRestProvider = StreamProvider.autoDispose<WearRestState?>((ref) {
 
   // Cancelar en dispose es obligatorio por `docs/performance.md`: un timer
   // huérfano en un reloj no es sólo un leak, es batería del atleta.
+  ref.onDispose(() {
+    timer?.cancel();
+    unawaited(controller.close());
+  });
+
+  return controller.stream;
+});
+
+/// Esfuerzo actual, ya filtrado por antigüedad.
+///
+/// ## Por qué el umbral es más CORTO que el del teléfono
+///
+/// `WatchEffortRules.maxAntiguedad` son 45 s, y es generoso a propósito: allá el
+/// dato viene RELAYADO desde el reloj de Apple y la latencia de
+/// WatchConnectivity se midió entre 2 y 24 segundos. Acá el dato es LOCAL —
+/// Health Services lo mide en este mismo reloj— así que 45 s serían tapar un
+/// sensor muerto durante casi un minuto.
+///
+/// 15 s es el mismo umbral que usa el companion de watchOS para su PROPIA
+/// pantalla, que es exactamente el caso análogo.
+const wearEffortMaxAge = Duration(seconds: 15);
+
+final wearEffortProvider =
+    StreamProvider.autoDispose<WatchEffortDisplay>((ref) {
+  final service = ref.watch(wearWorkoutServiceProvider);
+
+  final controller = StreamController<WatchEffortDisplay>();
+  Timer? timer;
+
+  Future<void> poll() async {
+    try {
+      final effort = await service.effort();
+      if (controller.isClosed) return;
+      final medido = effort?.measuredAt;
+      // Se aplica la MISMA forma de la regla que el teléfono, con el umbral de
+      // acá: si el dato está vencido no se muestra nada, ni el último valor
+      // conocido. Un pulso viejo presentado como actual es peor que nada.
+      final vencido = medido == null ||
+          DateTime.now().toUtc().difference(medido) > wearEffortMaxAge;
+      controller.add(
+        (effort == null || vencido)
+            ? const WatchEffortDisplay.nada()
+            : WatchEffortDisplay(bpm: effort.bpm, kcal: effort.kcal),
+      );
+    } on Object catch (e, st) {
+      if (!controller.isClosed) controller.addError(e, st);
+    }
+  }
+
+  unawaited(poll());
+  timer = Timer.periodic(_pollEvery, (_) => unawaited(poll()));
+
   ref.onDispose(() {
     timer?.cancel();
     unawaited(controller.close());
