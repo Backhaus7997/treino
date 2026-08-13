@@ -119,9 +119,11 @@ const List<LegalSection> kPrivacySections = <LegalSection>[
     '1. Qué datos recolectamos',
     'Recolectamos: datos de tu cuenta (email, nombre de usuario y foto/avatar si '
         'la cargás); tus datos de entrenamiento (rutinas, sesiones, pesos, '
-        'progreso); tu ubicación aproximada solo si la activás; datos de uso y '
-        'analítica para mejorar la app; y datos técnicos básicos de tu '
-        'dispositivo.',
+        'progreso); los comentarios y reportes de molestia que decidas escribir '
+        'durante una sesión, incluida la foto que adjuntes — un reporte de '
+        'molestia es un dato de salud y lo tratamos como tal; tu ubicación '
+        'aproximada solo si la activás; datos de uso y analítica para mejorar la '
+        'app; y datos técnicos básicos de tu dispositivo.',
   ),
   LegalSection(
     '2. Para qué los usamos',
@@ -146,7 +148,10 @@ const List<LegalSection> kPrivacySections = <LegalSection>[
     'Usamos proveedores de infraestructura como Google Firebase, que actúan como '
         'encargados del tratamiento por nuestra cuenta. Si te vinculás con un '
         'entrenador, este puede ver los datos de entrenamiento necesarios para '
-        'asistirte. No vendemos tus datos personales a terceros.',
+        'asistirte. Tus comentarios y reportes de molestia, y sus fotos, los ve '
+        'únicamente el entrenador al que le diste acceso a tu historial: si no '
+        'diste ese permiso, no los ve nadie más que vos. No vendemos tus datos '
+        'personales a terceros.',
   ),
   LegalSection(
     '6. Conservación',
