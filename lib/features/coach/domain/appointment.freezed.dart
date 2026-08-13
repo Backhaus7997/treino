@@ -224,7 +224,13 @@ mixin _$Appointment {
       throw _privateConstructorUsedError; // non-null → this session belongs to a recurring series created in one
 // shot by the trainer. All occurrences of the same series share this id,
 // enabling "cancel all future" without a separate series document.
-  String? get recurringId => throw _privateConstructorUsedError;
+  String? get recurringId =>
+      throw _privateConstructorUsedError; // Agenda→cobro bridge (Slice 2a, per-turno granularity). null → not
+// billed yet; non-null → the id of the `Payment` doc that covers this
+// session. Set exactly once via AppointmentRepository.billAppointment /
+// markBilled — never cleared client-side (see firestore.rules set-once
+// guard on this field).
+  String? get paymentId => throw _privateConstructorUsedError;
 
   /// Serializes this Appointment to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -255,7 +261,8 @@ abstract class $AppointmentCopyWith<$Res> {
       List<CancellationEntry> cancellationLog,
       String? noteBefore,
       String? noteAfter,
-      String? recurringId});
+      String? recurringId,
+      String? paymentId});
 }
 
 /// @nodoc
@@ -286,6 +293,7 @@ class _$AppointmentCopyWithImpl<$Res, $Val extends Appointment>
     Object? noteBefore = freezed,
     Object? noteAfter = freezed,
     Object? recurringId = freezed,
+    Object? paymentId = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -340,6 +348,10 @@ class _$AppointmentCopyWithImpl<$Res, $Val extends Appointment>
           ? _value.recurringId
           : recurringId // ignore: cast_nullable_to_non_nullable
               as String?,
+      paymentId: freezed == paymentId
+          ? _value.paymentId
+          : paymentId // ignore: cast_nullable_to_non_nullable
+              as String?,
     ) as $Val);
   }
 }
@@ -365,7 +377,8 @@ abstract class _$$AppointmentImplCopyWith<$Res>
       List<CancellationEntry> cancellationLog,
       String? noteBefore,
       String? noteAfter,
-      String? recurringId});
+      String? recurringId,
+      String? paymentId});
 }
 
 /// @nodoc
@@ -394,6 +407,7 @@ class __$$AppointmentImplCopyWithImpl<$Res>
     Object? noteBefore = freezed,
     Object? noteAfter = freezed,
     Object? recurringId = freezed,
+    Object? paymentId = freezed,
   }) {
     return _then(_$AppointmentImpl(
       id: null == id
@@ -448,6 +462,10 @@ class __$$AppointmentImplCopyWithImpl<$Res>
           ? _value.recurringId
           : recurringId // ignore: cast_nullable_to_non_nullable
               as String?,
+      paymentId: freezed == paymentId
+          ? _value.paymentId
+          : paymentId // ignore: cast_nullable_to_non_nullable
+              as String?,
     ));
   }
 }
@@ -468,7 +486,8 @@ class _$AppointmentImpl extends _Appointment {
       final List<CancellationEntry> cancellationLog = const [],
       this.noteBefore,
       this.noteAfter,
-      this.recurringId})
+      this.recurringId,
+      this.paymentId})
       : _cancellationLog = cancellationLog,
         super._();
 
@@ -513,10 +532,17 @@ class _$AppointmentImpl extends _Appointment {
 // enabling "cancel all future" without a separate series document.
   @override
   final String? recurringId;
+// Agenda→cobro bridge (Slice 2a, per-turno granularity). null → not
+// billed yet; non-null → the id of the `Payment` doc that covers this
+// session. Set exactly once via AppointmentRepository.billAppointment /
+// markBilled — never cleared client-side (see firestore.rules set-once
+// guard on this field).
+  @override
+  final String? paymentId;
 
   @override
   String toString() {
-    return 'Appointment(id: $id, trainerId: $trainerId, athleteId: $athleteId, athleteDisplayName: $athleteDisplayName, startsAt: $startsAt, durationMin: $durationMin, status: $status, cancelledAt: $cancelledAt, cancelledBy: $cancelledBy, cancellationLog: $cancellationLog, noteBefore: $noteBefore, noteAfter: $noteAfter, recurringId: $recurringId)';
+    return 'Appointment(id: $id, trainerId: $trainerId, athleteId: $athleteId, athleteDisplayName: $athleteDisplayName, startsAt: $startsAt, durationMin: $durationMin, status: $status, cancelledAt: $cancelledAt, cancelledBy: $cancelledBy, cancellationLog: $cancellationLog, noteBefore: $noteBefore, noteAfter: $noteAfter, recurringId: $recurringId, paymentId: $paymentId)';
   }
 
   @override
@@ -547,7 +573,9 @@ class _$AppointmentImpl extends _Appointment {
             (identical(other.noteAfter, noteAfter) ||
                 other.noteAfter == noteAfter) &&
             (identical(other.recurringId, recurringId) ||
-                other.recurringId == recurringId));
+                other.recurringId == recurringId) &&
+            (identical(other.paymentId, paymentId) ||
+                other.paymentId == paymentId));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -566,7 +594,8 @@ class _$AppointmentImpl extends _Appointment {
       const DeepCollectionEquality().hash(_cancellationLog),
       noteBefore,
       noteAfter,
-      recurringId);
+      recurringId,
+      paymentId);
 
   /// Create a copy of Appointment
   /// with the given fields replaced by the non-null parameter values.
@@ -598,7 +627,8 @@ abstract class _Appointment extends Appointment {
       final List<CancellationEntry> cancellationLog,
       final String? noteBefore,
       final String? noteAfter,
-      final String? recurringId}) = _$AppointmentImpl;
+      final String? recurringId,
+      final String? paymentId}) = _$AppointmentImpl;
   const _Appointment._() : super._();
 
   factory _Appointment.fromJson(Map<String, dynamic> json) =
@@ -634,7 +664,14 @@ abstract class _Appointment extends Appointment {
 // shot by the trainer. All occurrences of the same series share this id,
 // enabling "cancel all future" without a separate series document.
   @override
-  String? get recurringId;
+  String?
+      get recurringId; // Agenda→cobro bridge (Slice 2a, per-turno granularity). null → not
+// billed yet; non-null → the id of the `Payment` doc that covers this
+// session. Set exactly once via AppointmentRepository.billAppointment /
+// markBilled — never cleared client-side (see firestore.rules set-once
+// guard on this field).
+  @override
+  String? get paymentId;
 
   /// Create a copy of Appointment
   /// with the given fields replaced by the non-null parameter values.

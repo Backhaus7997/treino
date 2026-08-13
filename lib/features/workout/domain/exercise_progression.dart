@@ -1,5 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import '../../insights/domain/chart_period.dart';
+
 part 'exercise_progression.freezed.dart';
 
 /// A single time-series data point for progression charts.
@@ -55,7 +57,10 @@ class PersonalRecord with _$PersonalRecord {
 ///
 /// [personalRecords] is the first-achieved-date list derived by
 /// [derivePersonalRecords], one entry per record type that has data.
-/// [frequencyLast8Weeks] is the session count within the last 56 days.
+/// [frequencySessionCount] is the session count for the Frecuencia stat —
+/// scoped to the aggregation's period window when one is given, or to the
+/// legacy 56-day window when not (#555; was `frequencyLast8Weeks`, renamed
+/// because the window is no longer fixed).
 @freezed
 class ExerciseProgression with _$ExerciseProgression {
   const factory ExerciseProgression({
@@ -66,7 +71,7 @@ class ExerciseProgression with _$ExerciseProgression {
     required List<ProgressionPoint> bestSetVolumeSeries,
     required List<ProgressionPoint> bestSessionVolumeSeries,
     required List<PersonalRecord> personalRecords,
-    required int frequencyLast8Weeks,
+    required int frequencySessionCount,
   }) = _ExerciseProgression;
 
   factory ExerciseProgression.empty({
@@ -81,7 +86,7 @@ class ExerciseProgression with _$ExerciseProgression {
         bestSetVolumeSeries: const [],
         bestSessionVolumeSeries: const [],
         personalRecords: const [],
-        frequencyLast8Weeks: 0,
+        frequencySessionCount: 0,
       );
 }
 
@@ -93,5 +98,12 @@ class ExerciseListEntry with _$ExerciseListEntry {
   const factory ExerciseListEntry({
     required String exerciseId,
     required String exerciseName,
+
+    /// [#377] Periods whose CURRENT window holds at least one chartable set
+    /// for this exercise — same predicate the aggregator uses to build the
+    /// series (countsAsWorkout session, weightKg > 0). The section widget
+    /// bounds the default preselection to the active period with this, so
+    /// the screen never opens on the chart's empty state by itself.
+    @Default(<ChartPeriod>{}) Set<ChartPeriod> periodsWithData,
   }) = _ExerciseListEntry;
 }

@@ -3,7 +3,11 @@
 const admin = require('firebase-admin');
 const { equipmentMap } = require('./_equipment_map.js');
 const { videoMap } = require('./_video_map.js');
-admin.initializeApp(); // uses GOOGLE_APPLICATION_CREDENTIALS env var
+// Guarded: seed_emulator_full.js requires this module after initializing its
+// own emulator-bound app — a second initializeApp() here would throw.
+if (!admin.apps.length) {
+  admin.initializeApp(); // uses GOOGLE_APPLICATION_CREDENTIALS env var
+}
 const db = admin.firestore();
 
 // -- DATA ------------------------------------------------------------------
@@ -705,24 +709,28 @@ const routines = [
 
 // -- SEEDERS ---------------------------------------------------------------
 
+// Builds the Firestore doc for one catalogue exercise.
+// - `equipment` from the shared map (REQ-RER-015, ADR-RER-03). Unmapped
+//   exercises stay without the field — filter treats null as "match all".
+//   The map is the single source of truth, shared with
+//   scripts/backfill_exercise_equipment.js.
+// - `videoUrl` from the shared video map (musclewiki.com URLs).
+//   ExerciseVideoPlayer opens these in an in-app browser. Shared with
+//   scripts/backfill_exercise_videos.js.
+function buildExerciseDoc(ex) {
+  const equipment = equipmentMap[ex.id];
+  const videoUrl = videoMap[ex.id];
+  return {
+    ...ex,
+    ...(equipment ? { equipment } : {}),
+    ...(videoUrl ? { videoUrl } : {}),
+  };
+}
+
 async function seedExercises() {
   console.log(`Seeding ${exercises.length} exercises...`);
   for (const ex of exercises) {
-    // Stamp `equipment` from the shared map (REQ-RER-015, ADR-RER-03).
-    // Unmapped exercises stay without the field — filter treats null as
-    // "match all". The map is the single source of truth, shared with
-    // scripts/backfill_exercise_equipment.js.
-    const equipment = equipmentMap[ex.id];
-    // Stamp `videoUrl` from the shared video map (musclewiki.com URLs).
-    // ExerciseVideoPlayer opens these in an in-app browser. Shared with
-    // scripts/backfill_exercise_videos.js.
-    const videoUrl = videoMap[ex.id];
-    const doc = {
-      ...ex,
-      ...(equipment ? { equipment } : {}),
-      ...(videoUrl ? { videoUrl } : {}),
-    };
-    await db.collection('exercises').doc(ex.id).set(doc);
+    await db.collection('exercises').doc(ex.id).set(buildExerciseDoc(ex));
   }
   console.log('Exercises seeded.');
 }
@@ -790,7 +798,13 @@ async function main() {
   if (doRoutines) await seedRoutines();
 }
 
-main().catch((err) => {
-  console.error('Seed failed:', err);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error('Seed failed:', err);
+    process.exit(1);
+  });
+}
+
+// Reused by seed_emulator_full.js so the emulator gets the same stock
+// catalogue as prod without duplicating the data.
+module.exports = { exercises, routines, buildExerciseDoc };

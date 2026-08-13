@@ -3,14 +3,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../app/theme/app_motion.dart';
 import '../../app/theme/app_palette.dart';
 import '../../l10n/app_l10n.dart';
+import '../../core/widgets/motion/treino_fade_slide_in.dart';
+import '../../core/widgets/motion/treino_state_switcher.dart';
 import '../../core/widgets/treino_icon.dart';
 import '../coach/presentation/widgets/athlete_picker_sheet.dart';
 import '../profile/application/user_public_profile_providers.dart';
 import 'application/routine_providers.dart';
 import 'application/session_providers.dart' show currentUidProvider;
 import 'domain/routine.dart';
+import 'domain/routine_visibility.dart';
 
 /// Trainer-specific workout tab — replaces the athlete WORKOUT body (rutina /
 /// plantillas / historial) with a "Crear planes" surface. The trainer should
@@ -43,38 +47,60 @@ class TrainerWorkoutView extends ConsumerWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: ListView(
+      // SingleChildScrollView + Column (no ListView(children:)): un
+      // ListView, aunque construya sus widgets eager, sigue siendo un
+      // viewport — los Elements/State de los TreinoFadeSlideIn que salen del
+      // cacheExtent se desmontan y re-animan al volver a scrollear. Column
+      // dentro de SingleChildScrollView scrollea como una sola unidad, sin
+      // reciclar Elements por ítem (ver doc de TreinoFadeSlideIn).
+      child: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(vertical: 20),
         physics: const ClampingScrollPhysics(),
-        children: [
-          Text(
-            'CREAR PLANES',
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 28,
-              letterSpacing: 0.5,
-              color: palette.textPrimary,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TreinoFadeSlideIn(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'CREAR PLANES',
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 28,
+                      letterSpacing: 0.5,
+                      color: palette.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Tu espacio para armar plantillas de rutina y asignarlas a tus alumnos.',
+                    style: GoogleFonts.barlow(
+                      fontWeight: FontWeight.w400,
+                      fontSize: 14,
+                      color: palette.textMuted,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Tu espacio para armar plantillas de rutina y asignarlas a tus alumnos.',
-            style: GoogleFonts.barlow(
-              fontWeight: FontWeight.w400,
-              fontSize: 14,
-              color: palette.textMuted,
+            const SizedBox(height: 20),
+            TreinoFadeSlideIn(
+              delay: AppMotion.stagger(1),
+              child: _AssignFromAlumnoCard(palette: palette),
             ),
-          ),
-          const SizedBox(height: 20),
-          _AssignFromAlumnoCard(palette: palette),
-          const SizedBox(height: 12),
-          _TemplateLibrarySection(
-            palette: palette,
-            templatesAsync: templatesAsync,
-            uid: uid,
-            sharedWithAthletes: sharedFlag,
-          ),
-        ],
+            const SizedBox(height: 12),
+            TreinoFadeSlideIn(
+              delay: AppMotion.stagger(2),
+              child: _TemplateLibrarySection(
+                palette: palette,
+                templatesAsync: templatesAsync,
+                uid: uid,
+                sharedWithAthletes: sharedFlag,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -238,50 +264,60 @@ class _TemplateLibrarySection extends ConsumerWidget {
             onChanged: (v) => _onToggleShared(context, ref, v),
           ),
           const SizedBox(height: 8),
-          templatesAsync.when(
-            loading: () => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              child: Center(
-                child: SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2.2, color: palette.accent),
+          TreinoStateSwitcher(
+            childKey: ValueKey(templatesAsync.when(
+              loading: () => 'loading',
+              error: (_, __) => 'error',
+              data: (templates) => templates.isEmpty ? 'empty' : 'data',
+            )),
+            child: templatesAsync.when(
+              loading: () => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: Center(
+                  child: SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2.2, color: palette.accent),
+                  ),
                 ),
               ),
-            ),
-            error: (_, __) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              child: Text(
-                'No pudimos cargar tus plantillas.',
-                style:
-                    GoogleFonts.barlow(color: palette.textMuted, fontSize: 13),
+              error: (_, __) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Text(
+                  'No pudimos cargar tus plantillas.',
+                  style: GoogleFonts.barlow(
+                      color: palette.textMuted, fontSize: 13),
+                ),
               ),
-            ),
-            data: (templates) {
-              if (templates.isEmpty) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Text(
-                    'Todavía no creaste ninguna plantilla. Pegale a NUEVA para armar la primera.',
-                    style: GoogleFonts.barlow(
-                      fontWeight: FontWeight.w400,
-                      fontSize: 13,
-                      height: 1.4,
-                      color: palette.textPrimary,
+              data: (templates) {
+                if (templates.isEmpty) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Text(
+                      'Todavía no creaste ninguna plantilla. Pegale a NUEVA para armar la primera.',
+                      style: GoogleFonts.barlow(
+                        fontWeight: FontWeight.w400,
+                        fontSize: 13,
+                        height: 1.4,
+                        color: palette.textPrimary,
+                      ),
                     ),
-                  ),
-                );
-              }
-              return Column(
-                children: [
-                  for (final t in templates) ...[
-                    _TemplateCard(template: t, palette: palette),
-                    const SizedBox(height: 8),
+                  );
+                }
+                return Column(
+                  children: [
+                    for (final (index, t) in templates.indexed) ...[
+                      TreinoFadeSlideIn(
+                        delay: AppMotion.stagger(index),
+                        child: _TemplateCard(template: t, palette: palette),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
                   ],
-                ],
-              );
-            },
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -347,6 +383,37 @@ class _SharedToggleRow extends StatelessWidget {
   }
 }
 
+/// Secondary actions of a template card, collapsed into the overflow menu.
+enum _TemplateAction { publish, edit, delete }
+
+/// One row of the template overflow menu — icon + label, colored by intent.
+class _MenuRow extends StatelessWidget {
+  const _MenuRow({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: 12),
+        Text(
+          label,
+          style: GoogleFonts.barlow(fontSize: 14, color: color),
+        ),
+      ],
+    );
+  }
+}
+
 class _TemplateCard extends ConsumerStatefulWidget {
   const _TemplateCard({required this.template, required this.palette});
 
@@ -360,6 +427,7 @@ class _TemplateCard extends ConsumerStatefulWidget {
 class _TemplateCardState extends ConsumerState<_TemplateCard> {
   bool _assigning = false;
   bool _deleting = false;
+  bool _publishing = false;
 
   Future<void> _onDelete(BuildContext context) async {
     final confirmed = await showDialog<bool>(
@@ -423,6 +491,84 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
     }
   }
 
+  Future<void> _onTogglePublished(BuildContext context) async {
+    final isPublished = widget.template.visibility == RoutineVisibility.public;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: widget.palette.bgCard,
+        title: Text(
+          isPublished ? 'Despublicar plantilla' : 'Publicar plantilla',
+          style: GoogleFonts.barlowCondensed(
+            fontWeight: FontWeight.w700,
+            color: widget.palette.textPrimary,
+          ),
+        ),
+        content: Text(
+          isPublished
+              ? '"${widget.template.name}" va a salir del catálogo público. '
+                  'Las calificaciones que ya recibió se conservan.'
+              : '"${widget.template.name}" va a quedar visible para toda la '
+                  'comunidad de TREINO, que va a poder usarla y calificarla.',
+          style: GoogleFonts.barlow(
+            fontSize: 13,
+            color: widget.palette.textPrimary,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(
+              'Cancelar',
+              style:
+                  GoogleFonts.barlowCondensed(color: widget.palette.textMuted),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(
+              isPublished ? 'Despublicar' : 'Publicar',
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                color: widget.palette.accent,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _publishing = true);
+    try {
+      final repo = ref.read(routineRepositoryProvider);
+      if (isPublished) {
+        await repo.unpublishTemplate(widget.template.id);
+      } else {
+        await repo.publishTemplate(widget.template.id);
+      }
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isPublished
+                ? 'Tu plantilla salió del catálogo público.'
+                : '¡Tu plantilla ya está en el catálogo público!',
+          ),
+        ),
+      );
+      // The templates stream auto-refreshes from the Firestore snapshot.
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No pudimos actualizar la publicación.'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _publishing = false);
+    }
+  }
+
   Future<void> _onAssign(BuildContext context) async {
     final athleteId = await showAthletePickerSheet(context);
     if (athleteId == null || !mounted) return;
@@ -451,6 +597,8 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
     final palette = widget.palette;
     final t = widget.template;
     final daysCount = t.days.length;
+    final isPublished = t.visibility == RoutineVisibility.public;
+    final busy = _assigning || _deleting || _publishing;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
@@ -477,29 +625,55 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
                 const SizedBox(height: 2),
                 Text(
                   '${t.split ?? AppL10n.of(context).workoutSplitFallback} · $daysCount día${daysCount == 1 ? '' : 's'}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.barlow(
                     color: palette.textMuted,
                     fontSize: 12,
                   ),
                 ),
+                // Own line, not beside the split: on a narrow phone the
+                // badge and the subtitle fought for the same row and the
+                // subtitle got squeezed to nothing.
+                if (isPublished) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(TreinoIcon.globe, size: 12, color: palette.accent),
+                      const SizedBox(width: 4),
+                      // Flexible: the word is wider than the name column on a
+                      // narrow phone, and a decorative badge must degrade
+                      // rather than overflow the card.
+                      Flexible(
+                        child: Text(
+                          'PUBLICADA',
+                          key: Key('template_published_badge_${t.id}'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.barlowCondensed(
+                            color: palette.accent,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 11,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
           const SizedBox(width: 8),
-          IconButton(
-            onPressed: (_assigning || _deleting)
-                ? null
-                : () => context.push(
-                      '/workout/template-editor',
-                      extra: widget.template.id,
-                    ),
-            icon: Icon(TreinoIcon.edit, size: 18, color: palette.textMuted),
-            tooltip: 'Editar',
-            constraints: const BoxConstraints(),
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-          ),
+          // ASIGNAR stays inline (the primary action); publicar / editar /
+          // eliminar moved into an overflow menu when publishing added a
+          // fourth control. Four fixed-width buttons plus the name did not
+          // fit a 360dp phone — the name column collapsed to zero width and
+          // the row overflowed. One menu button also gives each action a
+          // full-width tap target instead of shrinking them all.
           TextButton(
-            onPressed: _assigning ? null : () => _onAssign(context),
+            onPressed: busy ? null : () => _onAssign(context),
             style: TextButton.styleFrom(
               foregroundColor: palette.accent,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -520,20 +694,65 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
                     ),
                   ),
           ),
-          IconButton(
-            onPressed:
-                (_assigning || _deleting) ? null : () => _onDelete(context),
-            icon: _deleting
+          PopupMenuButton<_TemplateAction>(
+            key: Key('template_actions_menu_${t.id}'),
+            enabled: !busy,
+            color: palette.bgCard,
+            tooltip: 'Más acciones',
+            icon: (_publishing || _deleting)
                 ? SizedBox(
                     width: 16,
                     height: 16,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2, color: palette.danger),
+                      strokeWidth: 2,
+                      color: _deleting ? palette.danger : palette.accent,
+                    ),
                   )
-                : Icon(TreinoIcon.trash, size: 18, color: palette.textMuted),
-            tooltip: 'Eliminar',
-            constraints: const BoxConstraints(),
-            padding: const EdgeInsets.symmetric(horizontal: 8),
+                : Icon(
+                    TreinoIcon.dotsThree,
+                    size: 18,
+                    color: palette.textMuted,
+                  ),
+            onSelected: (action) {
+              switch (action) {
+                case _TemplateAction.publish:
+                  _onTogglePublished(context);
+                case _TemplateAction.edit:
+                  context.push(
+                    '/workout/template-editor',
+                    extra: widget.template.id,
+                  );
+                case _TemplateAction.delete:
+                  _onDelete(context);
+              }
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                key: Key('template_publish_toggle_${t.id}'),
+                value: _TemplateAction.publish,
+                child: _MenuRow(
+                  icon: isPublished ? TreinoIcon.eyeOff : TreinoIcon.globe,
+                  label: isPublished ? 'Despublicar' : 'Publicar',
+                  color: palette.accent,
+                ),
+              ),
+              PopupMenuItem(
+                value: _TemplateAction.edit,
+                child: _MenuRow(
+                  icon: TreinoIcon.edit,
+                  label: 'Editar',
+                  color: palette.textPrimary,
+                ),
+              ),
+              PopupMenuItem(
+                value: _TemplateAction.delete,
+                child: _MenuRow(
+                  icon: TreinoIcon.trash,
+                  label: 'Eliminar',
+                  color: palette.danger,
+                ),
+              ),
+            ],
           ),
         ],
       ),

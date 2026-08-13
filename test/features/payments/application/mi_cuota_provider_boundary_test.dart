@@ -16,14 +16,20 @@ import 'package:treino/features/workout/application/session_providers.dart'
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
 
-// Regression test for the porSesion HIGH-severity bug in [miCuotaProvider]:
-// per-session billing counted every finished session ever, ignoring the
-// trainer link's acceptedAt floor, so pre-link workout history was charged.
+// Slice 1 (2026-07) — payments decoupled from training, made 100% manual.
 //
-// The sibling ISO-year-boundary bug (weekKey) is proven deterministically at
-// the shared-helper level in test/features/payments/
-// iso_week_period_key_boundary_test.dart, which this provider now delegates to
-// via isoWeekPeriodKey — not duplicated here.
+// This file used to prove the porSesion `acceptedAt` floor (a HIGH-severity
+// bug in the now-removed per-session virtual-charge logic). That logic is
+// gone: [miCuotaProvider] no longer watches Sessions or the billing
+// cadence/rate at all — it only reads real `Payment` docs.
+//
+// These tests instead prove the DEcoupling: even when a `porSesion` billing
+// config exists and the athlete has finished sessions (data that used to
+// synthesize a per-session charge), the provider's output is completely
+// unaffected by them. `athleteBillingPairProvider` / `sessionsByUidProvider`
+// are still overridden in the harness on purpose — to show that feeding them
+// data which would have produced a charge under the old logic changes
+// nothing here.
 
 const _trainerId = 'tA';
 const _athleteId = 'aA';
@@ -58,6 +64,8 @@ ProviderContainer _container({
     overrides: [
       currentAthleteLinkProvider.overrideWith((ref) async => link),
       athletePaymentsProvider.overrideWith((ref) => Stream.value(payments)),
+      // miCuotaProvider no longer reads either of these — they're overridden
+      // here purely to prove the tests below are unaffected by them.
       athleteBillingPairProvider.overrideWith(
         (ref, pair) => Stream.value(billing),
       ),
@@ -72,19 +80,14 @@ ProviderContainer _container({
 Future<MiCuotaState?> _readSettled(ProviderContainer container) async {
   await container.read(currentAthleteLinkProvider.future);
   await container.read(athletePaymentsProvider.future);
-  await container.read(
-    athleteBillingPairProvider(
-      (trainerId: _trainerId, athleteId: _athleteId),
-    ).future,
-  );
-  await container.read(sessionsByUidProvider(_athleteId).future);
   return container.read(miCuotaProvider).valueOrNull;
 }
 
 void main() {
-  group('miCuotaProvider — porSesion acceptedAt floor', () {
+  group('miCuotaProvider — no auto-generation from cadence/sessions', () {
     test(
-      'sessions finished BEFORE the link.acceptedAt are not charged',
+      'porSesion config + finished sessions, no real Payment → 0 computed '
+      'items (charge is NOT synthesized from session count)',
       () async {
         final acceptedAt = DateTime.utc(2026, 6, 1);
         final container = _container(
@@ -96,12 +99,8 @@ void main() {
             cadence: BillingCadence.porSesion,
             updatedAt: acceptedAt,
           ),
-          payments: const [], // never paid yet
+          payments: const [], // trainer never registered a real charge
           sessions: [
-            // 2 pre-link sessions — must be ignored.
-            _finished(finishedAt: DateTime.utc(2026, 3, 10)),
-            _finished(finishedAt: DateTime.utc(2026, 5, 31)),
-            // 3 post-link sessions — must be counted.
             _finished(finishedAt: DateTime.utc(2026, 6, 2)),
             _finished(finishedAt: DateTime.utc(2026, 6, 9)),
             _finished(finishedAt: DateTime.utc(2026, 6, 16)),
@@ -112,21 +111,17 @@ void main() {
         final state = await _readSettled(container);
 
         expect(state, isNotNull);
-        final perSession = state!.items
-            .where((i) => i.cadence == BillingCadence.porSesion)
-            .toList();
-        expect(perSession, hasLength(1));
-        // Only the 3 post-acceptedAt sessions: 3 * 3000.
-        expect(perSession.single.amountArs, equals(9000));
-        expect(perSession.single.concept, equals('3 sesiones'));
+        expect(state!.items, isEmpty);
+        expect(state.totalArs, equals(0));
       },
     );
 
     test(
-      'with no acceptedAt, the floor falls back to epoch (counts all history)',
+      'porSesion config + finished sessions + a real pending Payment → only '
+      'the real Payment surfaces (amount is the doc amount, NOT sessions × rate)',
       () async {
         final container = _container(
-          link: _link(), // acceptedAt == null
+          link: _link(acceptedAt: DateTime.utc(2026, 1, 1)),
           billing: AthleteBilling(
             trainerId: _trainerId,
             athleteId: _athleteId,
@@ -134,20 +129,33 @@ void main() {
             cadence: BillingCadence.porSesion,
             updatedAt: DateTime.utc(2026, 1, 1),
           ),
-          payments: const [],
+          payments: [
+            Payment(
+              id: 'p1',
+              trainerId: _trainerId,
+              athleteId: _athleteId,
+              amountArs: 5000,
+              concept: 'Clase suelta',
+              status: PaymentStatus.pending,
+              createdAt: DateTime.utc(2026, 6, 1),
+            ),
+          ],
           sessions: [
-            _finished(finishedAt: DateTime.utc(2026, 3, 10)),
             _finished(finishedAt: DateTime.utc(2026, 6, 2)),
+            _finished(finishedAt: DateTime.utc(2026, 6, 9)),
           ],
         );
         addTearDown(container.dispose);
 
         final state = await _readSettled(container);
 
-        final perSession = state!.items
-            .where((i) => i.cadence == BillingCadence.porSesion)
-            .single;
-        expect(perSession.amountArs, equals(6000));
+        expect(state, isNotNull);
+        expect(state!.items, hasLength(1));
+        expect(state.items.single.cadence, equals(BillingCadence.suelto));
+        expect(state.items.single.amountArs, equals(5000));
+        expect(state.items.single.concept, equals('Clase suelta'));
+        // 5000 (the real doc), NOT 2 sessions × 3000 = 6000.
+        expect(state.totalArs, equals(5000));
       },
     );
   });

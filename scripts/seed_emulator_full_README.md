@@ -1,7 +1,7 @@
 # scripts/seed_emulator_full.js
 
 Full-stack emulator seed for manual testing of TREINO. Creates Auth users and
-Firestore documents for 3 coaches (trainers) and 5 athletes, with trainer
+Firestore documents for 3 coaches (trainers) and 13 athletes, with trainer
 links, multi-week routines, historical sessions, posts (all privacy levels),
 friendships, appointments, and availability rules.
 
@@ -95,6 +95,14 @@ npm run seed:emulator:clear
 | `mateo@emulator.treino` | `Emulator1234!` | Mateo Quiroga | SmartFit Caballito | advanced |
 | `valentina@emulator.treino` | `Emulator1234!` | Valentina Peralta | SmartFit Caballito | intermediate |
 | `nicolas@emulator.treino` | `Emulator1234!` | Nicolás Fernández | — | beginner |
+| `julieta@emulator.treino` | `Emulator1234!` | Julieta Acosta | Megatlon Palermo | beginner |
+| `tomas@emulator.treino` | `Emulator1234!` | Tomás Benítez | Megatlon Palermo | intermediate |
+| `agustina@emulator.treino` | `Emulator1234!` | Agustina Sosa | Megatlon Palermo | advanced |
+| `franco@emulator.treino` | `Emulator1234!` | Franco Molina | Megatlon Palermo | beginner |
+| `malena@emulator.treino` | `Emulator1234!` | Malena Castro | Megatlon Palermo | intermediate |
+| `ignacio@emulator.treino` | `Emulator1234!` | Ignacio Torres | Megatlon Palermo | advanced |
+| `rocio@emulator.treino` | `Emulator1234!` | Rocío Medina | Megatlon Palermo | beginner |
+| `facundo@emulator.treino` | `Emulator1234!` | Facundo Ríos | Megatlon Palermo | intermediate |
 
 ---
 
@@ -105,9 +113,13 @@ npm run seed:emulator:clear
 
 ### Users + public profiles
 - `users/{uid}` — full `UserProfile` including trainer fields for coaches.
-- `userPublicProfiles/{uid}` — for all users (5 athletes + 3 coaches).
+- `userPublicProfiles/{uid}` — for all users (13 athletes + 3 coaches).
 - `trainerPublicProfiles/{uid}` — for coaches, with geohash set to Buenos Aires
   so trainer discovery queries resolve them correctly.
+
+Eight athletes share Martín's `gymId` but have no friendship with him. This
+leaves more than five eligible candidates for “Sugerencias”, so the UI limit
+and the remaining candidate pool can both be exercised.
 
 ### Trainer links (`trainer_links/`)
 
@@ -138,10 +150,15 @@ npm run seed:emulator:clear
 Streak + `workoutsCount` in `userPublicProfiles` are pre-computed to match.
 
 ### Posts (`posts/`)
-9 posts covering all privacy levels:
-- `public` — 3 posts (visible in home feed for any authenticated user)
-- `friends` — 3 posts (visible only to `members` of accepted friendships)
-- `gym` — 3 posts (visible to users sharing the same `gymId`)
+81 posts covering all privacy levels, with 27 posts per tier:
+- `public` — 27 posts (visible in home feed for any authenticated user)
+- `friends` — 27 posts; the extra authors are accepted friends of Martín
+- `gym` — 27 posts; 26 belong to Megatlon Palermo and are visible to Martín
+
+Every generated post has a distinct `createdAt`, separated by at least one
+hour. Each tier therefore exceeds the repository page size of 20 and exercises
+the second page, `hasMore`, infinite scroll, and the loading indicator without
+losing documents at the strict cursor boundary.
 
 ### Friendships (`friendships/`)
 - Martín ↔ Sofía — `accepted` (same gym, tests gym + friends feed)
@@ -172,6 +189,8 @@ Streak + `workoutsCount` in `userPublicProfiles` are pre-computed to match.
 | Advanced athlete, fully completed sessions, crossfit plan | `mateo@emulator.treino` |
 | Athlete with no gym, no coach link | `nicolas@emulator.treino` |
 | Coach discovery — all 3 coaches appear in Buenos Aires map | any athlete |
+| Feed pagination in public, friends, and gym segments | `martin@emulator.treino` |
+| Suggested users capped at 5 with extra candidates remaining | `martin@emulator.treino` |
 
 ---
 

@@ -40,8 +40,8 @@ class AthleteFileRepository {
   String _docId(String trainerId, String athleteId, String timestamp) =>
       '${trainerId}_${athleteId}_$timestamp';
 
-  String _storagePath(String trainerId, String athleteId, String timestamp,
-      String ext) {
+  String _storagePath(
+      String trainerId, String athleteId, String timestamp, String ext) {
     final safeExt = ext.isEmpty ? 'bin' : ext.toLowerCase();
     return 'athleteFiles/${trainerId}_$athleteId/$timestamp.$safeExt';
   }

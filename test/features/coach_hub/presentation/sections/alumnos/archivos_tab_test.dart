@@ -80,7 +80,8 @@ AthleteFile _file({
       athleteId: _athleteUid,
       fileName: fileName,
       kind: kind,
-      contentType: kind == AthleteFileKind.pdf ? 'application/pdf' : 'image/jpeg',
+      contentType:
+          kind == AthleteFileKind.pdf ? 'application/pdf' : 'image/jpeg',
       sizeBytes: sizeBytes,
       storagePath: 'athleteFiles/${_trainerUid}_$_athleteUid/$id.pdf',
       downloadUrl: 'https://example.com/$id',
@@ -96,9 +97,6 @@ class _StubNoteRepo implements AthleteNoteRepository {
 }
 
 class _StubFileRepo implements AthleteFileRepository {
-  _StubFileRepo({this.tooLargeOnUpload = false});
-
-  final bool tooLargeOnUpload;
   final List<AthleteFile> deleted = [];
   final List<Uint8List> uploadedBytes = [];
 
@@ -110,9 +108,6 @@ class _StubFileRepo implements AthleteFileRepository {
     required String contentType,
     required Uint8List bytes,
   }) async {
-    if (tooLargeOnUpload) {
-      throw AthleteFileTooLargeException(bytes.length);
-    }
     uploadedBytes.add(bytes);
     return _file(id: 'new-${uploadedBytes.length}', fileName: fileName);
   }
@@ -133,16 +128,14 @@ List<Override> _baseOverrides({
 }) =>
     [
       currentUidProvider.overrideWithValue(_trainerUid),
-      trainerLinksStreamProvider
-          .overrideWith((ref) => Stream.value([_link()])),
+      trainerLinksStreamProvider.overrideWith((ref) => Stream.value([_link()])),
       userPublicProfilesBatchProvider
           .overrideWith((ref, key) => {_athleteUid: _profile()}),
       userPublicProfileProvider
           .overrideWith((ref, id) => Stream.value(_profile())),
       pagosPorCobrarProvider
           .overrideWith((ref) => const AsyncData(<CobroPendiente>[])),
-      finishedTodayByUidProvider
-          .overrideWith((ref, uid) => const <Session>[]),
+      finishedTodayByUidProvider.overrideWith((ref, uid) => const <Session>[]),
       measurementsForAthleteProvider
           .overrideWith((ref, id) => Stream.value(const <Measurement>[])),
       performanceTestsForAthleteProvider
@@ -150,8 +143,7 @@ List<Override> _baseOverrides({
       gymsProvider.overrideWith((ref) => const <Gym>[]),
       athleteBillingProvider.overrideWith((ref, id) => Stream.value(null)),
       sessionsByUidProvider.overrideWith((ref, id) => const <Session>[]),
-      assignedRoutinesProvider
-          .overrideWith((ref, id) => const <Routine>[]),
+      assignedRoutinesProvider.overrideWith((ref, id) => const <Routine>[]),
       athleteNoteProvider(
         (trainerId: _trainerUid, athleteId: _athleteUid),
       ).overrideWith((ref) => const Stream.empty()),
@@ -230,12 +222,12 @@ void main() {
     )));
     await _selectArchivosTab(tester);
 
-    expect(
-        find.text('Todavía no subiste archivos sobre este alumno.'),
+    expect(find.text('Todavía no subiste archivos sobre este alumno.'),
         findsOneWidget);
   });
 
-  testWidgets('populated list renders one row per file with size + date subtitle',
+  testWidgets(
+      'populated list renders one row per file with size + date subtitle',
       (tester) async {
     final files = [
       _file(
@@ -297,8 +289,8 @@ void main() {
     expect(repo.deleted.single.id, 'f1');
   });
 
-  testWidgets(
-      'delete flow: cancel dialog → repository NOT called', (tester) async {
+  testWidgets('delete flow: cancel dialog → repository NOT called',
+      (tester) async {
     final files = [
       _file(id: 'f1', fileName: 'análisis.pdf'),
     ];

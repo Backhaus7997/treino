@@ -9,6 +9,16 @@ class AppL10nEs extends AppL10n {
   AppL10nEs([String locale = 'es']) : super(locale);
 
   @override
+  String get notFoundTitle => 'Página no encontrada';
+
+  @override
+  String get notFoundBody =>
+      'La ruta que buscás no existe o el enlace es inválido.';
+
+  @override
+  String get notFoundCta => 'Volver al inicio';
+
+  @override
   String get homeAthleteFirstRunTitle => 'Arrancá tu entrenamiento';
 
   @override
@@ -20,6 +30,85 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get homeAthleteFirstRunFindTrainerCta => 'Buscar entrenador';
+
+  @override
+  String get homeEstaSemanaTitle => 'ESTA SEMANA';
+
+  @override
+  String get homeEstaSemanaLoadError => 'No pudimos cargar tus insights.';
+
+  @override
+  String get homeEstaSemanaHeaderPill => 'RACHA ACTUAL';
+
+  @override
+  String get homeEstaSemanaHeaderPillEmpty => 'PRIMER PASO';
+
+  @override
+  String homeEstaSemanaWeekMonth(int week, String month) {
+    return 'SEM $week · $month';
+  }
+
+  @override
+  String homeEstaSemanaStreakUnit(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'DÍAS',
+      one: 'DÍA',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get homeEstaSemanaStreakSubtextTrained =>
+      'No rompas la racha — entrenaste hoy.';
+
+  @override
+  String get homeEstaSemanaStreakSubtextPending =>
+      'No rompas la racha — entrena hoy.';
+
+  @override
+  String get homeEstaSemanaPeriodWeek => 'SEMANA';
+
+  @override
+  String get homeEstaSemanaPeriodMonth => 'MES';
+
+  @override
+  String homeEstaSemanaPeriodUnit(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'entrenos',
+      one: 'entreno',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get homeEstaSemanaEmptyTitle => 'TU RACHA\nEMPIEZA AQUÍ';
+
+  @override
+  String get homeEstaSemanaEmptyBody =>
+      'Cada entrenamiento alimenta tu racha. Haz el primero y empieza a construir tu progreso.';
+
+  @override
+  String get homeEstaSemanaEmptyCta => 'EXPLORAR RUTINAS  →';
+
+  @override
+  String get homeEstaSemanaInsightsCta => 'VER INSIGHTS  →';
+
+  @override
+  String get homeEstaSemanaHeaderPillResume => 'A RETOMAR';
+
+  @override
+  String get homeEstaSemanaResumeTitle => 'TU RACHA\nTE ESPERA';
+
+  @override
+  String get homeEstaSemanaResumeBody =>
+      'Ya tienes historial construido. Esta semana aún está en cero — retoma hoy y sigue sumando progreso.';
+
+  @override
+  String get homeEstaSemanaResumeCta => 'VOLVER A ENTRENAR  →';
 
   @override
   String get authSplashTagline => 'ENTRENÁ. COMPARTÍ. CRECÉ.';
@@ -388,6 +477,22 @@ class AppL10nEs extends AppL10n {
       'Reserva cancelada por el entrenador.';
 
   @override
+  String get agendaBlockedDayTitle => 'Día bloqueado';
+
+  @override
+  String agendaBlockedDayBodySingle(String date) {
+    return 'El $date está marcado como bloqueado en tus horarios. ¿Querés cargar la sesión igual?';
+  }
+
+  @override
+  String agendaBlockedDayBodyRecurring(int count) {
+    return '$count de las fechas caen en días bloqueados. ¿Continuar igual?';
+  }
+
+  @override
+  String get agendaBlockedDayConfirm => 'Cargar igual';
+
+  @override
   String get agendaSlotFreeLabel => 'Disponible';
 
   @override
@@ -396,6 +501,53 @@ class AppL10nEs extends AppL10n {
   @override
   String agendaSlotBookedByLabel(String athleteName) {
     return 'Reservado por $athleteName';
+  }
+
+  @override
+  String get agendaCobrarCta => 'COBRAR';
+
+  @override
+  String get agendaCobradoLabel => 'Cobrado';
+
+  @override
+  String get agendaCobrarMontoLabel => 'MONTO (ARS)';
+
+  @override
+  String get agendaCobrarConceptoLabel => 'CONCEPTO';
+
+  @override
+  String get agendaCobrarVenceElLabel => 'VENCE EL (OPCIONAL)';
+
+  @override
+  String get agendaCobrarVenceElHint => 'Sin fecha de vencimiento';
+
+  @override
+  String get agendaCobrarVenceElQuitar => 'Quitar fecha de vencimiento';
+
+  @override
+  String get agendaCobrarConfirmCta => 'CONFIRMAR COBRO';
+
+  @override
+  String get agendaCobrarCompletaCampos => 'Completa todos los campos.';
+
+  @override
+  String get agendaCobrarMontoInvalido => 'Ingresa un monto válido.';
+
+  @override
+  String get agendaCobrarSuccess => 'Turno cobrado.';
+
+  @override
+  String get agendaCobrarError =>
+      'No pudimos registrar el cobro. Inténtalo de nuevo.';
+
+  @override
+  String agendaCobrarConceptoDefault(String date) {
+    return 'Sesión $date';
+  }
+
+  @override
+  String agendaCobrarTarifaReferencia(String amount) {
+    return 'Tarifa de referencia: $amount';
   }
 
   @override
@@ -409,6 +561,12 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get workoutStatVolume => 'VOLUMEN';
+
+  @override
+  String get workoutStatDurationMin => 'DURACIÓN MIN';
+
+  @override
+  String get workoutStatVolumeKg => 'VOLUMEN KG';
 
   @override
   String get workoutStatSets => 'SETS';
@@ -452,6 +610,101 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get workoutPostAutoCompleteText => '¡Terminé mi entreno! 💪';
+
+  @override
+  String get wellbeingCheckInTitle => '¿CÓMO TE SENTISTE?';
+
+  @override
+  String get wellbeingCheckInOptional => 'Opcional. Podés saltearlo.';
+
+  @override
+  String get wellbeingFeelingVeryBad => 'Muy mal';
+
+  @override
+  String get wellbeingFeelingBad => 'Mal';
+
+  @override
+  String get wellbeingFeelingNeutral => 'Normal';
+
+  @override
+  String get wellbeingFeelingGood => 'Bien';
+
+  @override
+  String get wellbeingFeelingGreat => 'Muy bien';
+
+  @override
+  String get wellbeingPainQuestion => '¿Tuviste dolor o molestia?';
+
+  @override
+  String get wellbeingPainYes => 'SÍ';
+
+  @override
+  String get wellbeingPainNo => 'NO';
+
+  @override
+  String get wellbeingPainAreasQuestion => '¿En qué zona?';
+
+  @override
+  String get wellbeingPainAreasHint => 'Podés marcar más de una.';
+
+  @override
+  String get wellbeingNoteLabel => 'Nota (opcional)';
+
+  @override
+  String get wellbeingNoteHint => 'Algo que quieras recordar de hoy';
+
+  @override
+  String get wellbeingMedicalDisclaimer =>
+      'Si el dolor persiste, consultá a un profesional de la salud.';
+
+  @override
+  String get wellbeingSaveButton => 'GUARDAR';
+
+  @override
+  String get wellbeingSkipButton => 'AHORA NO';
+
+  @override
+  String get wellbeingSavedLabel => 'REGISTRADO';
+
+  @override
+  String get wellbeingEditButton => 'Editar';
+
+  @override
+  String get wellbeingSaveError =>
+      'No pudimos guardar tu registro. Probá de nuevo.';
+
+  @override
+  String get shareWorkoutComposerTitle => 'COMPARTIR ENTRENO';
+
+  @override
+  String get shareWorkoutComposerHint => '¿Cómo estuvo tu entreno?';
+
+  @override
+  String get shareWorkoutComposerPublish => 'PUBLICAR';
+
+  @override
+  String get shareWorkoutComposerAddPhoto => 'AGREGAR FOTO';
+
+  @override
+  String get shareWorkoutComposerRemovePhoto => 'Quitar foto';
+
+  @override
+  String get shareWorkoutComposerPhotoError =>
+      'No pudimos usar esa foto. Probá con otra.';
+
+  @override
+  String get shareWorkoutComposerPreviewTitle => 'TU ENTRENO';
+
+  @override
+  String get postCardWorkoutDetailShow => 'VER DETALLE';
+
+  @override
+  String get postCardWorkoutDetailHide => 'OCULTAR DETALLE';
+
+  @override
+  String postCardWorkoutDetailTruncated(int count) {
+    return 'Se muestran los primeros $count ejercicios.';
+  }
 
   @override
   String get workoutHistorialHeading => 'HISTORIAL';
@@ -498,6 +751,12 @@ class AppL10nEs extends AppL10n {
   String get workoutDetailStatVolume => 'VOLUMEN';
 
   @override
+  String get workoutDetailStatDurationMin => 'DURACIÓN MIN';
+
+  @override
+  String get workoutDetailStatVolumeKg => 'VOLUMEN KG';
+
+  @override
   String get workoutDetailStatPrsToday => 'PRS HOY';
 
   @override
@@ -527,6 +786,10 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get workoutSelfEditorError => 'No pudimos crear la rutina. Reintentá.';
+
+  @override
+  String get workoutDiscardError =>
+      'No pudimos descartar la sesión. Probá de nuevo.';
 
   @override
   String get workoutSelfEditorPermissionDenied =>
@@ -606,6 +869,70 @@ class AppL10nEs extends AppL10n {
   @override
   String get workoutMisRutinasArchiveError =>
       'No pudimos eliminar la rutina. Reintentá.';
+
+  @override
+  String get workoutRutinasCoachChip => 'DE TU COACH';
+
+  @override
+  String get workoutPlantillasTrainerChip => 'ENTRENADOR';
+
+  @override
+  String get templateRatingsTitle => 'CALIFICACIONES';
+
+  @override
+  String get templateRatingsNoneYet =>
+      'Todavía nadie calificó esta plantilla. ¡Sé el primero!';
+
+  @override
+  String templateRatingsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count calificaciones',
+      one: '1 calificación',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get templateRatingsMineEmpty => '¿Qué te pareció?';
+
+  @override
+  String get templateRatingsMineLabel => 'Tu calificación';
+
+  @override
+  String get templateRatingsRateCta => 'CALIFICAR';
+
+  @override
+  String get templateRatingsEditCta => 'EDITAR';
+
+  @override
+  String get templateRatingsEmpty => 'Todavía no hay comentarios.';
+
+  @override
+  String get templateRatingsError => 'No pudimos cargar los comentarios.';
+
+  @override
+  String get templateRatingSheetTitle => 'Califica esta plantilla';
+
+  @override
+  String get templateRatingSheetTitleEdit => 'Edita tu calificación';
+
+  @override
+  String get templateRatingSheetCommentHint =>
+      'Cuenta cómo te fue con esta plantilla (opcional)';
+
+  @override
+  String get templateRatingSheetCancel => 'CANCELAR';
+
+  @override
+  String get templateRatingSheetSubmit => 'ENVIAR';
+
+  @override
+  String get templateRatingSheetSuccess => '¡Gracias por calificar!';
+
+  @override
+  String get templateRatingSheetError => 'No pudimos guardar tu calificación.';
 
   @override
   String get workoutSplitFallback => 'Sin split';
@@ -696,7 +1023,7 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get eliminarCuentaSheetBodySuffix =>
-      '. Vamos a eliminar tu cuenta, tu perfil, tu historial de entrenamientos y tu foto. Tus posts van a quedar como \"Usuario eliminado\".';
+      '. Vamos a eliminar tu cuenta, tu perfil, tu historial de entrenamientos, tus posts y tu foto.';
 
   @override
   String get eliminarCuentaSheetDeleteCta => 'ELIMINAR';
@@ -821,9 +1148,6 @@ class AppL10nEs extends AppL10n {
   String get dashboardCobroTrailingLabel => '+ Cobro';
 
   @override
-  String get dashboardInvitarAlumnoLabel => '+ INVITAR ALUMNO';
-
-  @override
   String get dashboardAsignarRutinaLabel => '+ ASIGNAR RUTINA';
 
   @override
@@ -846,6 +1170,15 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get dashboardConceptoHint => 'Ej: Clase de verano';
+
+  @override
+  String get dashboardVenceElLabel => 'VENCE EL (OPCIONAL)';
+
+  @override
+  String get dashboardVenceElHint => 'Sin fecha de vencimiento';
+
+  @override
+  String get dashboardVenceElQuitar => 'Quitar fecha de vencimiento';
 
   @override
   String get dashboardSeleccionaAlumnoHint => 'Seleccioná un alumno';
@@ -910,11 +1243,43 @@ class AppL10nEs extends AppL10n {
   String get dashboardErrorTurnos => 'No pudimos cargar tus próximos turnos.';
 
   @override
+  String get dashboardErrorResumen => 'No pudimos cargar el resumen del día.';
+
+  @override
   String get dashboardSinTurnosProximos =>
       'No tenés turnos próximos confirmados.';
 
   @override
   String get dashboardNadieEntreno => 'Nadie entrenó hoy todavía.';
+
+  @override
+  String get athleteDetailSeguimientoEmpty =>
+      'Todavía no dejaste seguimiento de este alumno.';
+
+  @override
+  String get athleteDetailSeguimientoLoadError =>
+      'No pudimos cargar el seguimiento.';
+
+  @override
+  String get dashboardFeedbackSheetTitle => 'Dejar feedback';
+
+  @override
+  String get dashboardFeedbackPickAthlete =>
+      '¿A quién le querés dejar feedback?';
+
+  @override
+  String get dashboardFeedbackComposerHint =>
+      'Escribí tu devolución del entrenamiento…';
+
+  @override
+  String get dashboardFeedbackSave => 'Guardar';
+
+  @override
+  String get dashboardFeedbackSaved => 'Feedback guardado';
+
+  @override
+  String get dashboardFeedbackSaveError =>
+      'No pudimos guardar el feedback. Probá de nuevo.';
 
   @override
   String get dashboardErrorActividad =>
@@ -934,7 +1299,11 @@ class AppL10nEs extends AppL10n {
   String get dashboardHolaSinNombre => 'HOLA';
 
   @override
-  String get dashboardInvitarProximamente => 'Invitar alumno — próximamente.';
+  String get a11yDashboardAvatarButton => 'Editar tu perfil profesional';
+
+  @override
+  String get dashboardSolicitudesPendientesEmpty =>
+      'No tenés solicitudes pendientes.';
 
   @override
   String dashboardSolicitudesPendientesTitle(int count) {
@@ -967,6 +1336,55 @@ class AppL10nEs extends AppL10n {
   @override
   String get profileSetupCancelAccountError =>
       'No pudimos cancelar la cuenta. Probá de nuevo.';
+
+  @override
+  String onboardingStepLabel(int current, int total) {
+    return 'PASO $current DE $total';
+  }
+
+  @override
+  String get onboardingSkipCta => 'Saltar';
+
+  @override
+  String get onboardingNextCta => 'SIGUIENTE';
+
+  @override
+  String get onboardingFinishCta => 'EMPEZAR';
+
+  @override
+  String get onboardingSaveError =>
+      'No pudimos guardar que ya viste esto. Puede que te lo mostremos de nuevo.';
+
+  @override
+  String get onboardingAthleteTrainTitle => 'ENTRENÁ';
+
+  @override
+  String get onboardingAthleteTrainBody =>
+      'Todo arranca en la pestaña Entrenar. Ahí vas a encontrar la rutina que te armó tu profe, plantillas listas para copiar, y las rutinas que te creás vos.';
+
+  @override
+  String get onboardingAthleteProgressTitle => 'TU PROGRESO';
+
+  @override
+  String get onboardingAthleteProgressBody =>
+      'Cada serie que cargás queda en tu historial y alimenta tus estadísticas. El volumen, la racha y los récords se calculan solos; las medidas corporales las cargás vos.';
+
+  @override
+  String get onboardingAthleteCoachTitle => 'TU COACH';
+
+  @override
+  String get onboardingAthleteCoachBody =>
+      'En la pestaña Coach buscás y contratás un profe. Tu historial es tuyo: hasta que no compartas una sesión o tu perfil, tu profe no ve nada.';
+
+  @override
+  String get onboardingAthleteCommunityTitle => 'COMUNIDAD';
+
+  @override
+  String get onboardingAthleteCommunityBody =>
+      'El Feed es social: publicás tus entrenamientos sólo si querés. Los rankings de tu gimnasio son opt-in — no aparecés en la tabla hasta que los actives.';
+
+  @override
+  String get onboardingAthleteCommunityRankingsCta => 'Activar rankings';
 
   @override
   String get reAuthPasswordLabel => 'Contraseña';
@@ -1078,7 +1496,7 @@ class AppL10nEs extends AppL10n {
   String get profileCuentaTitle => 'CUENTA';
 
   @override
-  String get profileCuentaSolicitudesTitle => 'Solicitudes de amistad';
+  String get profileCuentaSolicitudesTitle => 'Solicitudes de seguidores';
 
   @override
   String profileCuentaSolicitudesSubtitle(int count) {
@@ -1102,7 +1520,13 @@ class AppL10nEs extends AppL10n {
 
   @override
   String profileCuentaRutinasSubtitle(int count) {
-    return '$count activas';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count activas',
+      one: '1 activa',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -1381,6 +1805,17 @@ class AppL10nEs extends AppL10n {
   String get routineEditorDialogConfirm => '';
 
   @override
+  String get routineEditorCopyPrescriptionTitle => '¿Copiar sets?';
+
+  @override
+  String routineEditorCopyPrescriptionBody(String sourceExercise) {
+    return 'Se reemplazarán los sets de este ejercicio por los de «$sourceExercise».';
+  }
+
+  @override
+  String get routineEditorSlotMenuCopyPrevious => 'Copiar sets del anterior';
+
+  @override
   String get routineEditorSlotMenuReplace => 'Cambiar ejercicio';
 
   @override
@@ -1397,6 +1832,20 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get routineEditorAddSet => '+ Agregar set';
+
+  @override
+  String get routineEditorFillKgA11y =>
+      'Replicar el peso del primer set en todos';
+
+  @override
+  String get routineEditorFillKgApplied => 'Peso replicado en todos los sets.';
+
+  @override
+  String get routineEditorFillKgEmpty =>
+      'Introduce el peso del primer set para poder replicarlo.';
+
+  @override
+  String get routineEditorFillKgUndo => 'Deshacer';
 
   @override
   String get routineEditorMeasureReps => 'Reps';
@@ -1475,13 +1924,10 @@ class AppL10nEs extends AppL10n {
   String get routineDetailCompleted => 'COMPLETADO';
 
   @override
-  String get routineDetailWeekLocked => 'SEMANA BLOQUEADA';
-
-  @override
-  String get routineDetailDayLocked => 'DÍA BLOQUEADO';
-
-  @override
   String get routineDetailStart => 'EMPEZAR';
+
+  @override
+  String get routineDetailRepeat => 'REPETIR';
 
   @override
   String get routineEditorDeleteScopeTitle => '';
@@ -1555,11 +2001,11 @@ class AppL10nEs extends AppL10n {
   String get feedCreatePostA11y => 'Crear publicación';
 
   @override
-  String get feedFriendRequestsA11y => 'Solicitudes de amistad';
+  String get feedFriendRequestsA11y => 'Solicitudes de seguidores';
 
   @override
   String feedFriendRequestsWithCountA11y(int count) {
-    return 'Solicitudes de amistad, $count pendientes';
+    return 'Solicitudes de seguidores, $count pendientes';
   }
 
   @override
@@ -1577,7 +2023,36 @@ class AppL10nEs extends AppL10n {
   }
 
   @override
+  String a11yRankingRowButton(String name) {
+    return 'Ver el perfil de $name';
+  }
+
+  @override
+  String get a11yReactionLike => 'Me gusta';
+
+  @override
+  String get a11yReactionFire => 'Fuego';
+
+  @override
+  String get a11yReactionClap => 'Aplausos';
+
+  @override
+  String a11yReactionCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count reacciones',
+      one: '1 reacción',
+      zero: 'sin reacciones',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get a11yAvatarLabelGeneric => 'Foto de perfil';
+
+  @override
+  String get a11yHomeAvatarButton => 'Ver tu perfil';
 
   @override
   String homePendingRequestsA11y(int count) {
@@ -1885,6 +2360,17 @@ class AppL10nEs extends AppL10n {
   String get coachHubAlumnosStatusInactive => 'Inactivo';
 
   @override
+  String get coachHubAlumnosViewTable => 'Tabla';
+
+  @override
+  String get coachHubAlumnosViewCards => 'Cards';
+
+  @override
+  String coachHubAlumnosDebtAmount(String amount) {
+    return 'Debe $amount';
+  }
+
+  @override
   String get coachHubAlumnoDetailNotasTitle => 'Notas privadas';
 
   @override
@@ -2008,13 +2494,57 @@ class AppL10nEs extends AppL10n {
       'Completa las reps de los sets antes de guardar.';
 
   @override
+  String get routineEditorDuplicateExercise =>
+      'Ese ejercicio ya está en el día. Elegí otro.';
+
+  @override
   String get feedPostPublishedSuccess => 'Post publicado.';
+
+  @override
+  String get postCardMenuA11y => 'Opciones del post';
+
+  @override
+  String get coachHubAlumnosRowActionsA11y => 'Opciones del alumno';
+
+  @override
+  String get postCardMenuEdit => 'Editar';
+
+  @override
+  String get postCardMenuDelete => 'Eliminar';
+
+  @override
+  String get postCardDeleteConfirmTitle => '¿Eliminar este post?';
+
+  @override
+  String get postCardDeleteConfirmBody => 'Esta acción no se puede deshacer.';
+
+  @override
+  String get postCardDeleteSuccess => 'Post eliminado.';
+
+  @override
+  String get postCardDeleteError =>
+      'No pudimos eliminar el post. Inténtalo de nuevo.';
+
+  @override
+  String get createPostEditTitle => 'EDITAR POST';
+
+  @override
+  String get createPostSaveChanges => 'GUARDAR';
+
+  @override
+  String get createPostSaveChangesA11y => 'Guardar cambios';
+
+  @override
+  String get createPostSavingA11y => 'Guardando…';
+
+  @override
+  String get feedPostUpdatedSuccess => 'Cambios guardados.';
 
   @override
   String get feedRequestSentSuccess => 'Solicitud enviada.';
 
   @override
-  String get feedRequestAcceptedSuccess => 'Ahora son amigos.';
+  String get feedRequestAcceptedSuccess => 'Solicitud aceptada.';
 
   @override
   String get feedFriendActionError =>
@@ -2183,6 +2713,18 @@ class AppL10nEs extends AppL10n {
   }
 
   @override
+  String progressionFrequencyPeriod(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sesiones en este período',
+      one: '1 sesión en este período',
+      zero: 'Sin sesiones en este período',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get progressionSinglePointHint =>
       'Necesitas al menos 2 sesiones para ver la evolución.';
 
@@ -2288,12 +2830,15 @@ class AppL10nEs extends AppL10n {
   }
 
   @override
+  String get dashboardGreetingPrefix => 'BUENAS, ';
+
+  @override
   String dashboardSummaryLine(int sessions, int paraRevisar, int pagos) {
     return 'Tenés $sessions sesiones hoy, $paraRevisar para revisar, $pagos pagos pendientes';
   }
 
   @override
-  String get dashboardQuickActionNuevoAlumno => '+ Nuevo alumno';
+  String get dashboardQuickActionNuevoAlumno => 'Nuevo alumno';
 
   @override
   String get dashboardQuickActionCrearRutina => 'Crear rutina';
@@ -2450,6 +2995,110 @@ class AppL10nEs extends AppL10n {
   String get muscleDistributionScreenTitle => 'DISTRIBUCIÓN MUSCULAR';
 
   @override
+  String get muscleDistributionLoadError =>
+      'No pudimos cargar tu distribución muscular. Inténtalo de nuevo.';
+
+  @override
+  String get frequentExercisesLoadError =>
+      'No pudimos cargar tus ejercicios frecuentes. Inténtalo de nuevo.';
+
+  @override
+  String get exerciseProgressionScreenTitle => 'EVOLUCIÓN POR EJERCICIO';
+
+  @override
+  String get insightsTileExerciseProgressionTitle => 'Evolución por ejercicio';
+
+  @override
+  String get insightsTileExerciseProgressionSubtitle =>
+      'Tu progreso en cada ejercicio + records';
+
+  @override
+  String get progressionSearchHint => 'Buscar ejercicio…';
+
+  @override
+  String get progressionSearchNoResults =>
+      'Ningún ejercicio tuyo coincide con la búsqueda.';
+
+  @override
+  String get insightsTileMeasurementsTitle => 'Medidas';
+
+  @override
+  String get insightsTileMeasurementsSubtitle =>
+      'Peso y medidas corporales en el tiempo';
+
+  @override
+  String get measurementsScreenTitle => 'MEDIDAS';
+
+  @override
+  String get measurementsSelfLogNotesHint => 'Notas (opcional)…';
+
+  @override
+  String get measurementsAddSelfLog => 'Registrar medición';
+
+  @override
+  String get measurementsProfileCardTitle => 'TUS DATOS';
+
+  @override
+  String get measurementsProfileCardHint =>
+      'Los cargaste al registrarte. Edítalos desde tu perfil.';
+
+  @override
+  String get measurementsWeightLabel => 'Peso';
+
+  @override
+  String get measurementsHeightLabel => 'Altura';
+
+  @override
+  String get measurementsEmptyState =>
+      'Todavía no hay mediciones cargadas. Toca + para registrar la primera y seguir tu evolución.';
+
+  @override
+  String get measurementsNeedsMoreData =>
+      'Con una sola medición no hay progreso que mostrar. Falta al menos una más.';
+
+  @override
+  String get measurementsHistoryTitle => 'HISTORIAL';
+
+  @override
+  String get measurementHistoryEditTooltip => 'Editar medición';
+
+  @override
+  String get measurementHistoryDeleteTooltip => 'Eliminar medición';
+
+  @override
+  String measurementHistoryShowAll(int count) {
+    return 'Ver todas ($count)';
+  }
+
+  @override
+  String get measurementHistoryShowLess => 'Ver menos';
+
+  @override
+  String get measurementDeleteConfirmTitle => '¿Eliminar medición?';
+
+  @override
+  String measurementDeleteConfirmBody(String date) {
+    return 'Se eliminará la medición del $date. Esta acción no se puede deshacer.';
+  }
+
+  @override
+  String get measurementDeleteConfirmAction => 'Eliminar';
+
+  @override
+  String get measurementDeleteSuccess => 'Medición eliminada';
+
+  @override
+  String get measurementDeleteError =>
+      'No pudimos eliminar la medición. Inténtalo de nuevo.';
+
+  @override
+  String get measurementHistorySelfLoggedTag => 'Auto-registro';
+
+  @override
+  String get measurementHistoryTrainerLoggedTag =>
+      'Registrada por tu entrenador';
+
+  @override
   String get insightsTileFrequentExercisesTitle => 'Ejercicios frecuentes';
 
   @override
@@ -2471,11 +3120,401 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get volumeByGroupScreenTitle => 'VOLUMEN POR GRUPO';
+
+  @override
+  String get volumeByGroupEmptyTarget =>
+      'Necesitás una rutina asignada para ver tu volumen objetivo.';
+
+  @override
+  String get measurementChartSectionLabel => 'PROGRESO';
+
+  @override
+  String measurementChartSpanDays(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'días',
+      one: 'día',
+    );
+    return '($count $_temp0)';
+  }
+
+  @override
+  String measurementChartSpanWeeks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'semanas',
+      one: 'semana',
+    );
+    return '($count $_temp0)';
+  }
+
+  @override
+  String get measurementChartMetricWeight => 'Peso';
+
+  @override
+  String get measurementChartMetricBodyFat => '% Graso';
+
+  @override
+  String get measurementChartMetricMuscleMass => 'Masa muscular';
+
+  @override
+  String get measurementChartMetricWaist => 'Cintura';
+
+  @override
+  String get measurementChartMetricChest => 'Pecho';
+
+  @override
+  String get measurementChartMetricHips => 'Cadera';
+
+  @override
+  String get measurementChartMetricShoulders => 'Hombros';
+
+  @override
+  String get measurementChartMetricGlutes => 'Glúteos';
+
+  @override
+  String get measurementChartMetricBiceps => 'Bíceps';
+
+  @override
+  String get measurementChartMetricBicepsFlexed => 'Bíceps flex';
+
+  @override
+  String get measurementChartMetricForearm => 'Antebrazo';
+
+  @override
+  String get measurementChartMetricUpperThigh => 'Muslo sup';
+
+  @override
+  String get measurementChartMetricMidThigh => 'Muslo medio';
+
+  @override
+  String get measurementChartMetricCalf => 'Gemelo';
+
+  @override
+  String get measurementLogTitleCreate => 'Cargar medición';
+
+  @override
+  String get measurementLogTitleEdit => 'Editar medición';
+
+  @override
+  String get measurementLogNoSession =>
+      'No hay sesión activa. No se puede guardar.';
+
+  @override
+  String get measurementLogSaveSuccess => 'Medición guardada';
+
+  @override
+  String get measurementLogUpdateSuccess => 'Medición actualizada';
+
+  @override
+  String get measurementLogSaveError =>
+      'No pudimos guardar la medición. Probá de nuevo.';
+
+  @override
+  String get measurementLogSaveCta => 'GUARDAR MEDICIÓN';
+
+  @override
+  String get measurementLogUpdateCta => 'GUARDAR CAMBIOS';
+
+  @override
+  String get measurementLogSectionBodyComposition => 'COMPOSICIÓN CORPORAL';
+
+  @override
+  String get measurementLogSectionNotes => 'NOTAS';
+
+  @override
+  String get measurementLogNotesHint => 'Observaciones del entrenador…';
+
+  @override
+  String get measurementLogFieldWeight => 'Peso (kg)';
+
+  @override
+  String get measurementLogFieldBodyFat => 'Grasa (%)';
+
+  @override
+  String get measurementLogFieldMuscleMass => 'Masa muscular (kg)';
+
+  @override
+  String get measurementLogCircumferencesTitle => 'CIRCUNFERENCIAS';
+
+  @override
+  String get measurementLogCircumferencesHint =>
+      'Opcional. Cargá las que quieras.';
+
+  @override
+  String get measurementLogGroupTrunk => 'TRONCO';
+
+  @override
+  String get measurementLogGroupUpperBody => 'TREN SUPERIOR';
+
+  @override
+  String get measurementLogGroupLowerBody => 'TREN INFERIOR';
+
+  @override
+  String get measurementLogFieldShoulders => 'Hombros';
+
+  @override
+  String get measurementLogFieldChest => 'Pecho';
+
+  @override
+  String get measurementLogFieldWaist => 'Cintura';
+
+  @override
+  String get measurementLogFieldHips => 'Cadera';
+
+  @override
+  String get measurementLogFieldGlutes => 'Glúteos';
+
+  @override
+  String get measurementLogFieldBiceps => 'Bíceps';
+
+  @override
+  String get measurementLogFieldBicepsFlexed => 'Bíceps (flex)';
+
+  @override
+  String get measurementLogFieldForearm => 'Antebrazo';
+
+  @override
+  String get measurementLogFieldUpperThigh => 'Muslo superior';
+
+  @override
+  String get measurementLogFieldMidThigh => 'Muslo medio';
+
+  @override
+  String get measurementLogFieldCalf => 'Gemelo';
+
+  @override
+  String get measurementLogBilateralLeftHint => 'I (cm)';
+
+  @override
+  String get measurementLogBilateralRightHint => 'D (cm)';
+
+  @override
+  String get reviewSheetTitleEdit => 'Editá tu reseña';
+
+  @override
+  String reviewSheetTitleThirtyDay(String trainerName) {
+    return 'Ya llevás un mes entrenando con $trainerName. ¿Cómo va?';
+  }
+
+  @override
+  String reviewSheetTitleStandard(String trainerName) {
+    return '¿Cómo fue tu experiencia con $trainerName?';
+  }
+
+  @override
+  String get reviewSheetCommentHint => 'Contanos cómo fue (opcional)';
+
+  @override
+  String get reviewSheetCancel => 'CANCELAR';
+
+  @override
+  String get reviewSheetSubmit => 'ENVIAR';
+
+  @override
+  String get reviewSnackBarError =>
+      'No pudimos guardar tu reseña. Probá de nuevo.';
+
+  @override
+  String get reviewCtaCreate => 'DEJAR UNA RESEÑA';
+
+  @override
+  String get reviewCtaEdit => 'EDITAR MI RESEÑA';
+
+  @override
+  String get reviewTrainerFallbackName => 'tu Personal Trainer';
+
+  @override
+  String get reviewsSectionTitle => 'RESEÑAS';
+
+  @override
+  String get reviewsSectionEmpty => 'Sin reseñas todavía';
+
+  @override
+  String get reviewTileDeletedUser => 'Usuario eliminado';
+
+  @override
+  String get reviewTileDateToday => 'hoy';
+
+  @override
+  String reviewTileDateDaysAgo(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'días',
+      one: 'día',
+    );
+    return 'hace $count $_temp0';
+  }
+
+  @override
+  String reviewTileDateMonthsAgo(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'meses',
+      one: 'mes',
+    );
+    return 'hace $count $_temp0';
+  }
+
+  @override
+  String get postPrivacySelectorTitle => 'VISIBILIDAD';
+
+  @override
+  String get postPrivacyFriends => 'SEGUIDORES';
+
+  @override
+  String get postPrivacyGym => 'MI GYM';
+
+  @override
+  String get postPrivacyPublic => 'PÚBLICO';
+
+  @override
+  String get postPrivacyNoGymHint => 'Asociate a un gym para postear acá';
+
+  @override
+  String get suggestedUsersTitle => 'PERSONAS DE TU GYM';
+
+  @override
+  String get suggestedUserAnonymous => 'Anónimo';
+
+  @override
+  String a11ySuggestedUserButton(String name) {
+    return 'Ver el perfil de $name';
+  }
+
+  @override
+  String get notificationHistoryTitle => 'NOTIFICACIONES';
+
+  @override
+  String get notificationHistoryEmpty => 'Todavía no tenés notificaciones';
+
+  @override
+  String get notificationHistoryError =>
+      'No pudimos cargar tus notificaciones.';
+
+  @override
+  String notificationPendingRequests(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count solicitudes de seguidor pendientes',
+      one: '1 solicitud de seguidor pendiente',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get notificationBellA11y => 'Abrir notificaciones';
+
+  @override
+  String notificationBellWithCountA11y(int count) {
+    return 'Abrir notificaciones, $count pendientes';
+  }
+
+  @override
+  String get postDetailTitle => 'PUBLICACIÓN';
+
+  @override
+  String get postDetailUnavailable => 'Este post ya no está disponible.';
+
+  @override
+  String feedUnfollowConfirmTitle(String name) {
+    return '¿Dejar de seguir a $name?';
+  }
+
+  @override
+  String get feedUnfollowConfirmAction => 'DEJAR DE SEGUIR';
+
+  @override
+  String get feedUnfollowDismiss => 'CANCELAR';
+
+  @override
+  String feedCancelRequestConfirmTitle(String name) {
+    return '¿Cancelar la solicitud a $name?';
+  }
+
+  @override
+  String get feedCancelRequestConfirmAction => 'CANCELAR SOLICITUD';
+
+  @override
+  String get feedCancelRequestDismiss => 'VOLVER';
+
+  @override
+  String get feedFollowButtonFollowA11y => 'Seguir a esta persona';
+
+  @override
+  String get feedFollowButtonFollowingA11y =>
+      'Siguiendo. Tocá para dejar de seguir';
+
+  @override
+  String get feedFollowButtonRequestedA11y =>
+      'Solicitud enviada. Tocá para cancelarla';
+
+  @override
+  String get feedFollowButtonAcceptA11y => 'Aceptar la solicitud de seguidor';
+
+  @override
+  String get feedFollowStartedSuccess => 'Ahora seguís a esta persona.';
+
+  @override
+  String get feedSegmentFollowing => 'SEGUIDORES';
+
+  @override
+  String get feedEmptyFollowing => 'Aún no hay posts de a quienes seguís';
+
+  @override
+  String get chatBlockedComposerNotice =>
+      'Para escribirle, esta persona tiene que seguirte.';
+
+  @override
+  String get chatBlockedComposerHintA11y => 'No podés escribir en este chat';
+
+  @override
+  String get followListTabFollowers => 'SEGUIDORES';
+
+  @override
+  String get followListTabFollowing => 'SIGUIENDO';
+
+  @override
+  String get followListEmptyFollowers => 'Todavía no tiene seguidores';
+
+  @override
+  String get followListEmptyFollowersSelf => 'Todavía no tienes seguidores';
+
+  @override
+  String get followListEmptyFollowing => 'Todavía no sigue a nadie';
+
+  @override
+  String get followListEmptyFollowingSelf => 'Todavía no sigues a nadie';
+
+  @override
+  String get followListLoadError =>
+      'No pudimos cargar la lista. Inténtalo de nuevo.';
+
+  @override
+  String get followListOpenFollowersA11y => 'Ver seguidores';
+
+  @override
+  String get followListOpenFollowingA11y => 'Ver seguidos';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
 class AppL10nEsAr extends AppL10nEs {
   AppL10nEsAr() : super('es_AR');
+
+  @override
+  String get notFoundTitle => 'Página no encontrada';
+
+  @override
+  String get notFoundBody =>
+      'La ruta que buscás no existe o el enlace es inválido.';
+
+  @override
+  String get notFoundCta => 'Volver al inicio';
 
   @override
   String get homeAthleteFirstRunTitle => 'Arrancá tu entrenamiento';
@@ -2489,6 +3528,85 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get homeAthleteFirstRunFindTrainerCta => 'Buscar entrenador';
+
+  @override
+  String get homeEstaSemanaTitle => 'ESTA SEMANA';
+
+  @override
+  String get homeEstaSemanaLoadError => 'No pudimos cargar tus insights.';
+
+  @override
+  String get homeEstaSemanaHeaderPill => 'RACHA ACTUAL';
+
+  @override
+  String get homeEstaSemanaHeaderPillEmpty => 'PRIMER PASO';
+
+  @override
+  String homeEstaSemanaWeekMonth(int week, String month) {
+    return 'SEM $week · $month';
+  }
+
+  @override
+  String homeEstaSemanaStreakUnit(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'DÍAS',
+      one: 'DÍA',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get homeEstaSemanaStreakSubtextTrained =>
+      'No rompas la racha — entrenaste hoy.';
+
+  @override
+  String get homeEstaSemanaStreakSubtextPending =>
+      'No rompas la racha — entrená hoy.';
+
+  @override
+  String get homeEstaSemanaPeriodWeek => 'SEMANA';
+
+  @override
+  String get homeEstaSemanaPeriodMonth => 'MES';
+
+  @override
+  String homeEstaSemanaPeriodUnit(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'entrenos',
+      one: 'entreno',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get homeEstaSemanaEmptyTitle => 'TU RACHA\nEMPIEZA ACÁ';
+
+  @override
+  String get homeEstaSemanaEmptyBody =>
+      'Cada entrenamiento alimenta tu racha. Hacé el primero y empezá a construir tu progreso.';
+
+  @override
+  String get homeEstaSemanaEmptyCta => 'EXPLORAR RUTINAS  →';
+
+  @override
+  String get homeEstaSemanaInsightsCta => 'VER INSIGHTS  →';
+
+  @override
+  String get homeEstaSemanaHeaderPillResume => 'A RETOMAR';
+
+  @override
+  String get homeEstaSemanaResumeTitle => 'TU RACHA\nTE ESPERA';
+
+  @override
+  String get homeEstaSemanaResumeBody =>
+      'Ya tenés historial construido. Esta semana todavía está en cero — retomá hoy y seguí sumando progreso.';
+
+  @override
+  String get homeEstaSemanaResumeCta => 'VOLVER A ENTRENAR  →';
 
   @override
   String get authSplashTagline => 'ENTRENÁ. COMPARTÍ. CRECÉ.';
@@ -2857,6 +3975,22 @@ class AppL10nEsAr extends AppL10nEs {
       'Reserva cancelada por el entrenador.';
 
   @override
+  String get agendaBlockedDayTitle => 'Día bloqueado';
+
+  @override
+  String agendaBlockedDayBodySingle(String date) {
+    return 'El $date está marcado como bloqueado en tus horarios. ¿Querés cargar la sesión igual?';
+  }
+
+  @override
+  String agendaBlockedDayBodyRecurring(int count) {
+    return '$count de las fechas caen en días bloqueados. ¿Continuar igual?';
+  }
+
+  @override
+  String get agendaBlockedDayConfirm => 'Cargar igual';
+
+  @override
   String get agendaSlotFreeLabel => 'Disponible';
 
   @override
@@ -2865,6 +3999,53 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String agendaSlotBookedByLabel(String athleteName) {
     return 'Reservado por $athleteName';
+  }
+
+  @override
+  String get agendaCobrarCta => 'COBRAR';
+
+  @override
+  String get agendaCobradoLabel => 'Cobrado';
+
+  @override
+  String get agendaCobrarMontoLabel => 'MONTO (ARS)';
+
+  @override
+  String get agendaCobrarConceptoLabel => 'CONCEPTO';
+
+  @override
+  String get agendaCobrarVenceElLabel => 'VENCE EL (OPCIONAL)';
+
+  @override
+  String get agendaCobrarVenceElHint => 'Sin fecha de vencimiento';
+
+  @override
+  String get agendaCobrarVenceElQuitar => 'Quitar fecha de vencimiento';
+
+  @override
+  String get agendaCobrarConfirmCta => 'CONFIRMAR COBRO';
+
+  @override
+  String get agendaCobrarCompletaCampos => 'Completá todos los campos.';
+
+  @override
+  String get agendaCobrarMontoInvalido => 'Ingresá un monto válido.';
+
+  @override
+  String get agendaCobrarSuccess => 'Turno cobrado.';
+
+  @override
+  String get agendaCobrarError =>
+      'No pudimos registrar el cobro. Probá de nuevo.';
+
+  @override
+  String agendaCobrarConceptoDefault(String date) {
+    return 'Sesión $date';
+  }
+
+  @override
+  String agendaCobrarTarifaReferencia(String amount) {
+    return 'Tarifa de referencia: $amount';
   }
 
   @override
@@ -2878,6 +4059,12 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get workoutStatVolume => 'VOLUMEN';
+
+  @override
+  String get workoutStatDurationMin => 'DURACIÓN MIN';
+
+  @override
+  String get workoutStatVolumeKg => 'VOLUMEN KG';
 
   @override
   String get workoutStatSets => 'SETS';
@@ -2921,6 +4108,101 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get workoutPostAutoCompleteText => '¡Terminé mi entreno! 💪';
+
+  @override
+  String get wellbeingCheckInTitle => '¿CÓMO TE SENTISTE?';
+
+  @override
+  String get wellbeingCheckInOptional => 'Opcional. Podés saltearlo.';
+
+  @override
+  String get wellbeingFeelingVeryBad => 'Muy mal';
+
+  @override
+  String get wellbeingFeelingBad => 'Mal';
+
+  @override
+  String get wellbeingFeelingNeutral => 'Normal';
+
+  @override
+  String get wellbeingFeelingGood => 'Bien';
+
+  @override
+  String get wellbeingFeelingGreat => 'Muy bien';
+
+  @override
+  String get wellbeingPainQuestion => '¿Tuviste dolor o molestia?';
+
+  @override
+  String get wellbeingPainYes => 'SÍ';
+
+  @override
+  String get wellbeingPainNo => 'NO';
+
+  @override
+  String get wellbeingPainAreasQuestion => '¿En qué zona?';
+
+  @override
+  String get wellbeingPainAreasHint => 'Podés marcar más de una.';
+
+  @override
+  String get wellbeingNoteLabel => 'Nota (opcional)';
+
+  @override
+  String get wellbeingNoteHint => 'Algo que quieras recordar de hoy';
+
+  @override
+  String get wellbeingMedicalDisclaimer =>
+      'Si el dolor persiste, consultá a un profesional de la salud.';
+
+  @override
+  String get wellbeingSaveButton => 'GUARDAR';
+
+  @override
+  String get wellbeingSkipButton => 'AHORA NO';
+
+  @override
+  String get wellbeingSavedLabel => 'REGISTRADO';
+
+  @override
+  String get wellbeingEditButton => 'Editar';
+
+  @override
+  String get wellbeingSaveError =>
+      'No pudimos guardar tu registro. Probá de nuevo.';
+
+  @override
+  String get shareWorkoutComposerTitle => 'COMPARTIR ENTRENO';
+
+  @override
+  String get shareWorkoutComposerHint => '¿Cómo estuvo tu entreno?';
+
+  @override
+  String get shareWorkoutComposerPublish => 'PUBLICAR';
+
+  @override
+  String get shareWorkoutComposerAddPhoto => 'AGREGAR FOTO';
+
+  @override
+  String get shareWorkoutComposerRemovePhoto => 'Quitar foto';
+
+  @override
+  String get shareWorkoutComposerPhotoError =>
+      'No pudimos usar esa foto. Probá con otra.';
+
+  @override
+  String get shareWorkoutComposerPreviewTitle => 'TU ENTRENO';
+
+  @override
+  String get postCardWorkoutDetailShow => 'VER DETALLE';
+
+  @override
+  String get postCardWorkoutDetailHide => 'OCULTAR DETALLE';
+
+  @override
+  String postCardWorkoutDetailTruncated(int count) {
+    return 'Se muestran los primeros $count ejercicios.';
+  }
 
   @override
   String get workoutHistorialHeading => 'HISTORIAL';
@@ -2967,6 +4249,12 @@ class AppL10nEsAr extends AppL10nEs {
   String get workoutDetailStatVolume => 'VOLUMEN';
 
   @override
+  String get workoutDetailStatDurationMin => 'DURACIÓN MIN';
+
+  @override
+  String get workoutDetailStatVolumeKg => 'VOLUMEN KG';
+
+  @override
   String get workoutDetailStatPrsToday => 'PRS HOY';
 
   @override
@@ -2996,6 +4284,10 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get workoutSelfEditorError => 'No pudimos crear la rutina. Reintentá.';
+
+  @override
+  String get workoutDiscardError =>
+      'No pudimos descartar la sesión. Probá de nuevo.';
 
   @override
   String get workoutSelfEditorPermissionDenied =>
@@ -3075,6 +4367,70 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get workoutMisRutinasArchiveError =>
       'No pudimos eliminar la rutina. Reintentá.';
+
+  @override
+  String get workoutRutinasCoachChip => 'DE TU COACH';
+
+  @override
+  String get workoutPlantillasTrainerChip => 'ENTRENADOR';
+
+  @override
+  String get templateRatingsTitle => 'CALIFICACIONES';
+
+  @override
+  String get templateRatingsNoneYet =>
+      'Todavía nadie calificó esta plantilla. ¡Sé el primero!';
+
+  @override
+  String templateRatingsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count calificaciones',
+      one: '1 calificación',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get templateRatingsMineEmpty => '¿Qué te pareció?';
+
+  @override
+  String get templateRatingsMineLabel => 'Tu calificación';
+
+  @override
+  String get templateRatingsRateCta => 'CALIFICAR';
+
+  @override
+  String get templateRatingsEditCta => 'EDITAR';
+
+  @override
+  String get templateRatingsEmpty => 'Todavía no hay comentarios.';
+
+  @override
+  String get templateRatingsError => 'No pudimos cargar los comentarios.';
+
+  @override
+  String get templateRatingSheetTitle => 'Calificá esta plantilla';
+
+  @override
+  String get templateRatingSheetTitleEdit => 'Editá tu calificación';
+
+  @override
+  String get templateRatingSheetCommentHint =>
+      'Contá cómo te fue con esta plantilla (opcional)';
+
+  @override
+  String get templateRatingSheetCancel => 'CANCELAR';
+
+  @override
+  String get templateRatingSheetSubmit => 'ENVIAR';
+
+  @override
+  String get templateRatingSheetSuccess => '¡Gracias por calificar!';
+
+  @override
+  String get templateRatingSheetError => 'No pudimos guardar tu calificación.';
 
   @override
   String get workoutSplitFallback => 'Sin split';
@@ -3165,7 +4521,7 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get eliminarCuentaSheetBodySuffix =>
-      '. Vamos a eliminar tu cuenta, tu perfil, tu historial de entrenamientos y tu foto. Tus posts van a quedar como \"Usuario eliminado\".';
+      '. Vamos a eliminar tu cuenta, tu perfil, tu historial de entrenamientos, tus posts y tu foto.';
 
   @override
   String get eliminarCuentaSheetDeleteCta => 'ELIMINAR';
@@ -3290,9 +4646,6 @@ class AppL10nEsAr extends AppL10nEs {
   String get dashboardCobroTrailingLabel => '+ Cobro';
 
   @override
-  String get dashboardInvitarAlumnoLabel => '+ INVITAR ALUMNO';
-
-  @override
   String get dashboardAsignarRutinaLabel => '+ ASIGNAR RUTINA';
 
   @override
@@ -3315,6 +4668,15 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get dashboardConceptoHint => 'Ej: Clase de verano';
+
+  @override
+  String get dashboardVenceElLabel => 'VENCE EL (OPCIONAL)';
+
+  @override
+  String get dashboardVenceElHint => 'Sin fecha de vencimiento';
+
+  @override
+  String get dashboardVenceElQuitar => 'Quitar fecha de vencimiento';
 
   @override
   String get dashboardSeleccionaAlumnoHint => 'Seleccioná un alumno';
@@ -3379,11 +4741,43 @@ class AppL10nEsAr extends AppL10nEs {
   String get dashboardErrorTurnos => 'No pudimos cargar tus próximos turnos.';
 
   @override
+  String get dashboardErrorResumen => 'No pudimos cargar el resumen del día.';
+
+  @override
   String get dashboardSinTurnosProximos =>
       'No tenés turnos próximos confirmados.';
 
   @override
   String get dashboardNadieEntreno => 'Nadie entrenó hoy todavía.';
+
+  @override
+  String get athleteDetailSeguimientoEmpty =>
+      'Todavía no dejaste seguimiento de este alumno.';
+
+  @override
+  String get athleteDetailSeguimientoLoadError =>
+      'No pudimos cargar el seguimiento.';
+
+  @override
+  String get dashboardFeedbackSheetTitle => 'Dejar feedback';
+
+  @override
+  String get dashboardFeedbackPickAthlete =>
+      '¿A quién le querés dejar feedback?';
+
+  @override
+  String get dashboardFeedbackComposerHint =>
+      'Escribí tu devolución del entrenamiento…';
+
+  @override
+  String get dashboardFeedbackSave => 'Guardar';
+
+  @override
+  String get dashboardFeedbackSaved => 'Feedback guardado';
+
+  @override
+  String get dashboardFeedbackSaveError =>
+      'No pudimos guardar el feedback. Probá de nuevo.';
 
   @override
   String get dashboardErrorActividad =>
@@ -3403,7 +4797,11 @@ class AppL10nEsAr extends AppL10nEs {
   String get dashboardHolaSinNombre => 'HOLA';
 
   @override
-  String get dashboardInvitarProximamente => 'Invitar alumno — próximamente.';
+  String get a11yDashboardAvatarButton => 'Editar tu perfil profesional';
+
+  @override
+  String get dashboardSolicitudesPendientesEmpty =>
+      'No tenés solicitudes pendientes.';
 
   @override
   String dashboardSolicitudesPendientesTitle(int count) {
@@ -3436,6 +4834,55 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get profileSetupCancelAccountError =>
       'No pudimos cancelar la cuenta. Probá de nuevo.';
+
+  @override
+  String onboardingStepLabel(int current, int total) {
+    return 'PASO $current DE $total';
+  }
+
+  @override
+  String get onboardingSkipCta => 'Saltar';
+
+  @override
+  String get onboardingNextCta => 'SIGUIENTE';
+
+  @override
+  String get onboardingFinishCta => 'EMPEZAR';
+
+  @override
+  String get onboardingSaveError =>
+      'No pudimos guardar que ya viste esto. Puede que te lo mostremos de nuevo.';
+
+  @override
+  String get onboardingAthleteTrainTitle => 'ENTRENÁ';
+
+  @override
+  String get onboardingAthleteTrainBody =>
+      'Todo arranca en la pestaña Entrenar. Ahí vas a encontrar la rutina que te armó tu profe, plantillas listas para copiar, y las rutinas que te creás vos.';
+
+  @override
+  String get onboardingAthleteProgressTitle => 'TU PROGRESO';
+
+  @override
+  String get onboardingAthleteProgressBody =>
+      'Cada serie que cargás queda en tu historial y alimenta tus estadísticas. El volumen, la racha y los récords se calculan solos; las medidas corporales las cargás vos.';
+
+  @override
+  String get onboardingAthleteCoachTitle => 'TU COACH';
+
+  @override
+  String get onboardingAthleteCoachBody =>
+      'En la pestaña Coach buscás y contratás un profe. Tu historial es tuyo: hasta que no compartas una sesión o tu perfil, tu profe no ve nada.';
+
+  @override
+  String get onboardingAthleteCommunityTitle => 'COMUNIDAD';
+
+  @override
+  String get onboardingAthleteCommunityBody =>
+      'El Feed es social: publicás tus entrenamientos sólo si querés. Los rankings de tu gimnasio son opt-in — no aparecés en la tabla hasta que los actives.';
+
+  @override
+  String get onboardingAthleteCommunityRankingsCta => 'Activar rankings';
 
   @override
   String get reAuthPasswordLabel => 'Contraseña';
@@ -3547,7 +4994,7 @@ class AppL10nEsAr extends AppL10nEs {
   String get profileCuentaTitle => 'CUENTA';
 
   @override
-  String get profileCuentaSolicitudesTitle => 'Solicitudes de amistad';
+  String get profileCuentaSolicitudesTitle => 'Solicitudes de seguidores';
 
   @override
   String profileCuentaSolicitudesSubtitle(int count) {
@@ -3571,7 +5018,13 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String profileCuentaRutinasSubtitle(int count) {
-    return '$count activas';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count activas',
+      one: '1 activa',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -3850,6 +5303,17 @@ class AppL10nEsAr extends AppL10nEs {
   String get routineEditorDialogConfirm => 'Confirmar';
 
   @override
+  String get routineEditorCopyPrescriptionTitle => '¿Copiar sets?';
+
+  @override
+  String routineEditorCopyPrescriptionBody(String sourceExercise) {
+    return 'Se van a reemplazar los sets de este ejercicio por los de «$sourceExercise».';
+  }
+
+  @override
+  String get routineEditorSlotMenuCopyPrevious => 'Copiar sets del anterior';
+
+  @override
   String get routineEditorSlotMenuReplace => 'Cambiar ejercicio';
 
   @override
@@ -3866,6 +5330,20 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get routineEditorAddSet => '+ Agregar set';
+
+  @override
+  String get routineEditorFillKgA11y =>
+      'Replicar el peso del primer set en todos';
+
+  @override
+  String get routineEditorFillKgApplied => 'Peso replicado en todos los sets.';
+
+  @override
+  String get routineEditorFillKgEmpty =>
+      'Cargá el peso del primer set para poder replicarlo.';
+
+  @override
+  String get routineEditorFillKgUndo => 'Deshacer';
 
   @override
   String get routineEditorMeasureReps => 'Reps';
@@ -3944,13 +5422,10 @@ class AppL10nEsAr extends AppL10nEs {
   String get routineDetailCompleted => 'COMPLETADO';
 
   @override
-  String get routineDetailWeekLocked => 'SEMANA BLOQUEADA';
-
-  @override
-  String get routineDetailDayLocked => 'DÍA BLOQUEADO';
-
-  @override
   String get routineDetailStart => 'EMPEZAR';
+
+  @override
+  String get routineDetailRepeat => 'REPETIR';
 
   @override
   String get routineEditorDeleteScopeTitle =>
@@ -4026,11 +5501,11 @@ class AppL10nEsAr extends AppL10nEs {
   String get feedCreatePostA11y => 'Crear publicación';
 
   @override
-  String get feedFriendRequestsA11y => 'Solicitudes de amistad';
+  String get feedFriendRequestsA11y => 'Solicitudes de seguidores';
 
   @override
   String feedFriendRequestsWithCountA11y(int count) {
-    return 'Solicitudes de amistad, $count pendientes';
+    return 'Solicitudes de seguidores, $count pendientes';
   }
 
   @override
@@ -4048,7 +5523,36 @@ class AppL10nEsAr extends AppL10nEs {
   }
 
   @override
+  String a11yRankingRowButton(String name) {
+    return 'Ver el perfil de $name';
+  }
+
+  @override
+  String get a11yReactionLike => 'Me gusta';
+
+  @override
+  String get a11yReactionFire => 'Fuego';
+
+  @override
+  String get a11yReactionClap => 'Aplausos';
+
+  @override
+  String a11yReactionCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count reacciones',
+      one: '1 reacción',
+      zero: 'sin reacciones',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get a11yAvatarLabelGeneric => 'Foto de perfil';
+
+  @override
+  String get a11yHomeAvatarButton => 'Ver tu perfil';
 
   @override
   String homePendingRequestsA11y(int count) {
@@ -4355,6 +5859,17 @@ class AppL10nEsAr extends AppL10nEs {
   String get coachHubAlumnosStatusInactive => 'Inactivo';
 
   @override
+  String get coachHubAlumnosViewTable => 'Tabla';
+
+  @override
+  String get coachHubAlumnosViewCards => 'Cards';
+
+  @override
+  String coachHubAlumnosDebtAmount(String amount) {
+    return 'Debe $amount';
+  }
+
+  @override
   String get coachHubAlumnoDetailNotasTitle => 'Notas privadas';
 
   @override
@@ -4476,13 +5991,57 @@ class AppL10nEsAr extends AppL10nEs {
       'Completá las reps de los sets antes de guardar.';
 
   @override
+  String get routineEditorDuplicateExercise =>
+      'Ese ejercicio ya está en el día. Elegí otro.';
+
+  @override
   String get feedPostPublishedSuccess => 'Post publicado.';
+
+  @override
+  String get postCardMenuA11y => 'Opciones del post';
+
+  @override
+  String get coachHubAlumnosRowActionsA11y => 'Opciones del alumno';
+
+  @override
+  String get postCardMenuEdit => 'Editar';
+
+  @override
+  String get postCardMenuDelete => 'Eliminar';
+
+  @override
+  String get postCardDeleteConfirmTitle => '¿Eliminar este post?';
+
+  @override
+  String get postCardDeleteConfirmBody => 'Esta acción no se puede deshacer.';
+
+  @override
+  String get postCardDeleteSuccess => 'Post eliminado.';
+
+  @override
+  String get postCardDeleteError =>
+      'No pudimos eliminar el post. Probá de nuevo.';
+
+  @override
+  String get createPostEditTitle => 'EDITAR POST';
+
+  @override
+  String get createPostSaveChanges => 'GUARDAR';
+
+  @override
+  String get createPostSaveChangesA11y => 'Guardar cambios';
+
+  @override
+  String get createPostSavingA11y => 'Guardando…';
+
+  @override
+  String get feedPostUpdatedSuccess => 'Cambios guardados.';
 
   @override
   String get feedRequestSentSuccess => 'Solicitud enviada.';
 
   @override
-  String get feedRequestAcceptedSuccess => 'Ahora son amigos.';
+  String get feedRequestAcceptedSuccess => 'Solicitud aceptada.';
 
   @override
   String get feedFriendActionError =>
@@ -4650,6 +6209,18 @@ class AppL10nEsAr extends AppL10nEs {
   }
 
   @override
+  String progressionFrequencyPeriod(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sesiones en este período',
+      one: '1 sesión en este período',
+      zero: 'Sin sesiones en este período',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get progressionSinglePointHint =>
       'Necesitás al menos 2 sesiones para ver la evolución.';
 
@@ -4755,12 +6326,15 @@ class AppL10nEsAr extends AppL10nEs {
   }
 
   @override
+  String get dashboardGreetingPrefix => 'BUENAS, ';
+
+  @override
   String dashboardSummaryLine(int sessions, int paraRevisar, int pagos) {
     return 'Tenés $sessions sesiones hoy, $paraRevisar para revisar, $pagos pagos pendientes';
   }
 
   @override
-  String get dashboardQuickActionNuevoAlumno => '+ Nuevo alumno';
+  String get dashboardQuickActionNuevoAlumno => 'Nuevo alumno';
 
   @override
   String get dashboardQuickActionCrearRutina => 'Crear rutina';
@@ -4917,6 +6491,109 @@ class AppL10nEsAr extends AppL10nEs {
   String get muscleDistributionScreenTitle => 'DISTRIBUCIÓN MUSCULAR';
 
   @override
+  String get muscleDistributionLoadError =>
+      'No pudimos cargar tu distribución muscular. Probá de nuevo.';
+
+  @override
+  String get frequentExercisesLoadError =>
+      'No pudimos cargar tus ejercicios frecuentes. Probá de nuevo.';
+
+  @override
+  String get exerciseProgressionScreenTitle => 'EVOLUCIÓN POR EJERCICIO';
+
+  @override
+  String get insightsTileExerciseProgressionTitle => 'Evolución por ejercicio';
+
+  @override
+  String get insightsTileExerciseProgressionSubtitle =>
+      'Tu progreso en cada ejercicio + records';
+
+  @override
+  String get progressionSearchHint => 'Buscar ejercicio…';
+
+  @override
+  String get progressionSearchNoResults =>
+      'Ningún ejercicio tuyo coincide con la búsqueda.';
+
+  @override
+  String get insightsTileMeasurementsTitle => 'Medidas';
+
+  @override
+  String get insightsTileMeasurementsSubtitle =>
+      'Peso y medidas corporales en el tiempo';
+
+  @override
+  String get measurementsScreenTitle => 'MEDIDAS';
+
+  @override
+  String get measurementsSelfLogNotesHint => 'Notas (opcional)…';
+
+  @override
+  String get measurementsAddSelfLog => 'Cargar medición';
+
+  @override
+  String get measurementsProfileCardTitle => 'TUS DATOS';
+
+  @override
+  String get measurementsProfileCardHint =>
+      'Los cargaste al registrarte. Editalos desde tu perfil.';
+
+  @override
+  String get measurementsWeightLabel => 'Peso';
+
+  @override
+  String get measurementsHeightLabel => 'Altura';
+
+  @override
+  String get measurementsEmptyState =>
+      'Todavía no hay mediciones cargadas. Tocá + para registrar la primera y seguir tu evolución.';
+
+  @override
+  String get measurementsNeedsMoreData =>
+      'Con una sola medición no hay progreso que mostrar. Falta al menos una más.';
+
+  @override
+  String get measurementsHistoryTitle => 'HISTORIAL';
+
+  @override
+  String get measurementHistoryEditTooltip => 'Editar medición';
+
+  @override
+  String get measurementHistoryDeleteTooltip => 'Eliminar medición';
+
+  @override
+  String measurementHistoryShowAll(int count) {
+    return 'Ver todas ($count)';
+  }
+
+  @override
+  String get measurementHistoryShowLess => 'Ver menos';
+
+  @override
+  String get measurementDeleteConfirmTitle => '¿Eliminar medición?';
+
+  @override
+  String measurementDeleteConfirmBody(String date) {
+    return 'Se eliminará la medición del $date. Esta acción no se puede deshacer.';
+  }
+
+  @override
+  String get measurementDeleteConfirmAction => 'Eliminar';
+
+  @override
+  String get measurementDeleteSuccess => 'Medición eliminada';
+
+  @override
+  String get measurementDeleteError =>
+      'No pudimos eliminar la medición. Probá de nuevo.';
+
+  @override
+  String get measurementHistorySelfLoggedTag => 'Auto-registro';
+
+  @override
+  String get measurementHistoryTrainerLoggedTag => 'Cargada por tu entrenador';
+
+  @override
   String get insightsTileFrequentExercisesTitle => 'Ejercicios frecuentes';
 
   @override
@@ -4938,4 +6615,384 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get volumeByGroupScreenTitle => 'VOLUMEN POR GRUPO';
+
+  @override
+  String get volumeByGroupEmptyTarget =>
+      'Necesitás una rutina asignada para ver tu volumen objetivo.';
+
+  @override
+  String get measurementChartSectionLabel => 'PROGRESO';
+
+  @override
+  String measurementChartSpanDays(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'días',
+      one: 'día',
+    );
+    return '($count $_temp0)';
+  }
+
+  @override
+  String measurementChartSpanWeeks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'semanas',
+      one: 'semana',
+    );
+    return '($count $_temp0)';
+  }
+
+  @override
+  String get measurementChartMetricWeight => 'Peso';
+
+  @override
+  String get measurementChartMetricBodyFat => '% Graso';
+
+  @override
+  String get measurementChartMetricMuscleMass => 'Masa muscular';
+
+  @override
+  String get measurementChartMetricWaist => 'Cintura';
+
+  @override
+  String get measurementChartMetricChest => 'Pecho';
+
+  @override
+  String get measurementChartMetricHips => 'Cadera';
+
+  @override
+  String get measurementChartMetricShoulders => 'Hombros';
+
+  @override
+  String get measurementChartMetricGlutes => 'Glúteos';
+
+  @override
+  String get measurementChartMetricBiceps => 'Bíceps';
+
+  @override
+  String get measurementChartMetricBicepsFlexed => 'Bíceps flex';
+
+  @override
+  String get measurementChartMetricForearm => 'Antebrazo';
+
+  @override
+  String get measurementChartMetricUpperThigh => 'Muslo sup';
+
+  @override
+  String get measurementChartMetricMidThigh => 'Muslo medio';
+
+  @override
+  String get measurementChartMetricCalf => 'Gemelo';
+
+  @override
+  String get measurementLogTitleCreate => 'Cargar medición';
+
+  @override
+  String get measurementLogTitleEdit => 'Editar medición';
+
+  @override
+  String get measurementLogNoSession =>
+      'No hay sesión activa. No se puede guardar.';
+
+  @override
+  String get measurementLogSaveSuccess => 'Medición guardada';
+
+  @override
+  String get measurementLogUpdateSuccess => 'Medición actualizada';
+
+  @override
+  String get measurementLogSaveError =>
+      'No pudimos guardar la medición. Probá de nuevo.';
+
+  @override
+  String get measurementLogSaveCta => 'GUARDAR MEDICIÓN';
+
+  @override
+  String get measurementLogUpdateCta => 'GUARDAR CAMBIOS';
+
+  @override
+  String get measurementLogSectionBodyComposition => 'COMPOSICIÓN CORPORAL';
+
+  @override
+  String get measurementLogSectionNotes => 'NOTAS';
+
+  @override
+  String get measurementLogNotesHint => 'Observaciones del entrenador…';
+
+  @override
+  String get measurementLogFieldWeight => 'Peso (kg)';
+
+  @override
+  String get measurementLogFieldBodyFat => 'Grasa (%)';
+
+  @override
+  String get measurementLogFieldMuscleMass => 'Masa muscular (kg)';
+
+  @override
+  String get measurementLogCircumferencesTitle => 'CIRCUNFERENCIAS';
+
+  @override
+  String get measurementLogCircumferencesHint =>
+      'Opcional. Cargá las que quieras.';
+
+  @override
+  String get measurementLogGroupTrunk => 'TRONCO';
+
+  @override
+  String get measurementLogGroupUpperBody => 'TREN SUPERIOR';
+
+  @override
+  String get measurementLogGroupLowerBody => 'TREN INFERIOR';
+
+  @override
+  String get measurementLogFieldShoulders => 'Hombros';
+
+  @override
+  String get measurementLogFieldChest => 'Pecho';
+
+  @override
+  String get measurementLogFieldWaist => 'Cintura';
+
+  @override
+  String get measurementLogFieldHips => 'Cadera';
+
+  @override
+  String get measurementLogFieldGlutes => 'Glúteos';
+
+  @override
+  String get measurementLogFieldBiceps => 'Bíceps';
+
+  @override
+  String get measurementLogFieldBicepsFlexed => 'Bíceps (flex)';
+
+  @override
+  String get measurementLogFieldForearm => 'Antebrazo';
+
+  @override
+  String get measurementLogFieldUpperThigh => 'Muslo superior';
+
+  @override
+  String get measurementLogFieldMidThigh => 'Muslo medio';
+
+  @override
+  String get measurementLogFieldCalf => 'Gemelo';
+
+  @override
+  String get measurementLogBilateralLeftHint => 'I (cm)';
+
+  @override
+  String get measurementLogBilateralRightHint => 'D (cm)';
+
+  @override
+  String get reviewSheetTitleEdit => 'Editá tu reseña';
+
+  @override
+  String reviewSheetTitleThirtyDay(String trainerName) {
+    return 'Ya llevás un mes entrenando con $trainerName. ¿Cómo va?';
+  }
+
+  @override
+  String reviewSheetTitleStandard(String trainerName) {
+    return '¿Cómo fue tu experiencia con $trainerName?';
+  }
+
+  @override
+  String get reviewSheetCommentHint => 'Contanos cómo fue (opcional)';
+
+  @override
+  String get reviewSheetCancel => 'CANCELAR';
+
+  @override
+  String get reviewSheetSubmit => 'ENVIAR';
+
+  @override
+  String get reviewSnackBarError =>
+      'No pudimos guardar tu reseña. Probá de nuevo.';
+
+  @override
+  String get reviewCtaCreate => 'DEJAR UNA RESEÑA';
+
+  @override
+  String get reviewCtaEdit => 'EDITAR MI RESEÑA';
+
+  @override
+  String get reviewTrainerFallbackName => 'tu Personal Trainer';
+
+  @override
+  String get reviewsSectionTitle => 'RESEÑAS';
+
+  @override
+  String get reviewsSectionEmpty => 'Sin reseñas todavía';
+
+  @override
+  String get reviewTileDeletedUser => 'Usuario eliminado';
+
+  @override
+  String get reviewTileDateToday => 'hoy';
+
+  @override
+  String reviewTileDateDaysAgo(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'días',
+      one: 'día',
+    );
+    return 'hace $count $_temp0';
+  }
+
+  @override
+  String reviewTileDateMonthsAgo(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'meses',
+      one: 'mes',
+    );
+    return 'hace $count $_temp0';
+  }
+
+  @override
+  String get postPrivacySelectorTitle => 'VISIBILIDAD';
+
+  @override
+  String get postPrivacyFriends => 'SEGUIDORES';
+
+  @override
+  String get postPrivacyGym => 'MI GYM';
+
+  @override
+  String get postPrivacyPublic => 'PÚBLICO';
+
+  @override
+  String get postPrivacyNoGymHint => 'Asociate a un gym para postear acá';
+
+  @override
+  String get suggestedUsersTitle => 'PERSONAS DE TU GYM';
+
+  @override
+  String get suggestedUserAnonymous => 'Anónimo';
+
+  @override
+  String a11ySuggestedUserButton(String name) {
+    return 'Ver el perfil de $name';
+  }
+
+  @override
+  String get notificationHistoryTitle => 'NOTIFICACIONES';
+
+  @override
+  String get notificationHistoryEmpty => 'Todavía no tenés notificaciones';
+
+  @override
+  String get notificationHistoryError =>
+      'No pudimos cargar tus notificaciones.';
+
+  @override
+  String notificationPendingRequests(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count solicitudes de seguidor pendientes',
+      one: '1 solicitud de seguidor pendiente',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get notificationBellA11y => 'Abrir notificaciones';
+
+  @override
+  String notificationBellWithCountA11y(int count) {
+    return 'Abrir notificaciones, $count pendientes';
+  }
+
+  @override
+  String get postDetailTitle => 'PUBLICACIÓN';
+
+  @override
+  String get postDetailUnavailable => 'Este post ya no está disponible.';
+
+  @override
+  String feedUnfollowConfirmTitle(String name) {
+    return '¿Dejar de seguir a $name?';
+  }
+
+  @override
+  String get feedUnfollowConfirmAction => 'DEJAR DE SEGUIR';
+
+  @override
+  String get feedUnfollowDismiss => 'CANCELAR';
+
+  @override
+  String feedCancelRequestConfirmTitle(String name) {
+    return '¿Cancelar la solicitud a $name?';
+  }
+
+  @override
+  String get feedCancelRequestConfirmAction => 'CANCELAR SOLICITUD';
+
+  @override
+  String get feedCancelRequestDismiss => 'VOLVER';
+
+  @override
+  String get feedFollowButtonFollowA11y => 'Seguir a esta persona';
+
+  @override
+  String get feedFollowButtonFollowingA11y =>
+      'Siguiendo. Tocá para dejar de seguir';
+
+  @override
+  String get feedFollowButtonRequestedA11y =>
+      'Solicitud enviada. Tocá para cancelarla';
+
+  @override
+  String get feedFollowButtonAcceptA11y => 'Aceptar la solicitud de seguidor';
+
+  @override
+  String get feedFollowStartedSuccess => 'Ahora seguís a esta persona.';
+
+  @override
+  String get feedSegmentFollowing => 'SEGUIDORES';
+
+  @override
+  String get feedEmptyFollowing => 'Todavía no hay posts de a quienes seguís';
+
+  @override
+  String get chatBlockedComposerNotice =>
+      'Para escribirle, esta persona tiene que seguirte.';
+
+  @override
+  String get chatBlockedComposerHintA11y => 'No podés escribir en este chat';
+
+  @override
+  String get followListTabFollowers => 'SEGUIDORES';
+
+  @override
+  String get followListTabFollowing => 'SIGUIENDO';
+
+  @override
+  String get followListEmptyFollowers => 'Todavía no tiene seguidores';
+
+  @override
+  String get followListEmptyFollowersSelf => 'Todavía no tenés seguidores';
+
+  @override
+  String get followListEmptyFollowing => 'Todavía no sigue a nadie';
+
+  @override
+  String get followListEmptyFollowingSelf => 'Todavía no seguís a nadie';
+
+  @override
+  String get followListLoadError =>
+      'No pudimos cargar la lista. Intentá de nuevo.';
+
+  @override
+  String get followListOpenFollowersA11y => 'Ver seguidores';
+
+  @override
+  String get followListOpenFollowingA11y => 'Ver seguidos';
 }

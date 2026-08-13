@@ -21,7 +21,6 @@ import 'package:treino/features/coach/data/athlete_note_repository.dart';
 import 'package:treino/features/coach/data/nutrition_plan_repository.dart';
 import 'package:treino/features/coach/domain/athlete_file.dart';
 import 'package:treino/features/coach/domain/athlete_note.dart';
-import 'package:treino/features/coach/domain/follow_up_entry.dart';
 import 'package:treino/features/coach/domain/nutrition_plan.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
@@ -110,24 +109,21 @@ List<Override> _baseOverrides({
       currentUidProvider.overrideWithValue(_trainerUid),
       trainerLinksStreamProvider
           .overrideWith((ref) => Stream.value([_link(athleteUid)])),
-      userPublicProfilesBatchProvider.overrideWith(
-          (ref, key) => {athleteUid: _profile(athleteUid)}),
-      userPublicProfileProvider.overrideWith(
-          (ref, id) => Stream.value(_profile(id))),
+      userPublicProfilesBatchProvider
+          .overrideWith((ref, key) => {athleteUid: _profile(athleteUid)}),
+      userPublicProfileProvider
+          .overrideWith((ref, id) => Stream.value(_profile(id))),
       pagosPorCobrarProvider
           .overrideWith((ref) => const AsyncData(<CobroPendiente>[])),
-      finishedTodayByUidProvider
-          .overrideWith((ref, uid) => const <Session>[]),
+      finishedTodayByUidProvider.overrideWith((ref, uid) => const <Session>[]),
       measurementsForAthleteProvider
           .overrideWith((ref, id) => Stream.value(const <Measurement>[])),
       performanceTestsForAthleteProvider
-          .overrideWith(
-              (ref, id) => Stream.value(const <PerformanceTest>[])),
+          .overrideWith((ref, id) => Stream.value(const <PerformanceTest>[])),
       gymsProvider.overrideWith((ref) => const <Gym>[]),
       athleteBillingProvider.overrideWith((ref, id) => Stream.value(null)),
       sessionsByUidProvider.overrideWith((ref, id) => const <Session>[]),
-      assignedRoutinesProvider
-          .overrideWith((ref, id) => const <Routine>[]),
+      assignedRoutinesProvider.overrideWith((ref, id) => const <Routine>[]),
       athleteNoteProvider(
         (trainerId: _trainerUid, athleteId: athleteUid),
       ).overrideWith((ref) => const Stream.empty()),
@@ -142,8 +138,7 @@ List<Override> _baseOverrides({
       nutritionPlanProvider(
         (trainerId: _trainerUid, athleteId: athleteUid),
       ).overrideWith((ref) => Stream.value(existing)),
-      if (repo != null)
-        nutritionPlanRepositoryProvider.overrideWithValue(repo),
+      if (repo != null) nutritionPlanRepositoryProvider.overrideWithValue(repo),
     ];
 
 Widget _wrap(List<Override> overrides, String athleteUid) => ProviderScope(
@@ -179,10 +174,10 @@ Future<void> _selectNutricionTab(WidgetTester tester) async {
 }
 
 void main() {
-  testWidgets('empty state: se seedean los 6 presets default',
-      (tester) async {
+  testWidgets('empty state: se seedean los 6 presets default', (tester) async {
     _useDesktopViewport(tester);
-    await tester.pumpWidget(_wrap(_baseOverrides(athleteUid: _athleteUid), _athleteUid));
+    await tester.pumpWidget(
+        _wrap(_baseOverrides(athleteUid: _athleteUid), _athleteUid));
     await _selectNutricionTab(tester);
 
     expect(find.text('Plan de alimentación'), findsOneWidget);

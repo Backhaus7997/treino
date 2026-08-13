@@ -7,6 +7,8 @@ import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
+import '../../workout/application/exercise_providers.dart';
+import '../../workout/application/session_providers.dart';
 import '../../workout/presentation/widgets/exercise_progression_section.dart'
     show ChartPeriodLabels, ChartPeriodSelector;
 import '../application/muscle_distribution_providers.dart';
@@ -120,7 +122,18 @@ class _MuscleDistributionScreenState
                           height: 240,
                           child: Center(child: CircularProgressIndicator()),
                         ),
-                        error: (_, __) => const SizedBox.shrink(),
+                        // NUNCA `SizedBox.shrink()` acá: un error silencioso
+                        // deja la card vacía (ni gráfico ni empty state) y el
+                        // usuario no tiene forma de distinguir "no hay datos"
+                        // de "algo explotó". Ver muscleDistributionInsights-
+                        // Provider: una rutina ilegible ya no rompe el radar,
+                        // pero si alguna vez vuelve a fallar, se VE.
+                        error: (_, __) => _ErrorState(
+                          message: l10n.muscleDistributionLoadError,
+                          retryLabel: l10n.coachRetryLabel,
+                          onRetry: () =>
+                              _retry(ref, widget.uid, _selectedPeriod),
+                        ),
                         data: (insights) => MuscleDistributionRadar(
                           insights: insights,
                           labels: radarLabels,
@@ -177,5 +190,58 @@ void _safePopOrInsights(BuildContext context) {
     context.pop();
   } else {
     context.go('/home/insights');
+  }
+}
+
+// ── Retry ─────────────────────────────────────────────────────────────────────
+
+/// Invalidates the radar provider AND the two providers that actually perform
+/// the fetches it depends on.
+///
+/// `ref.invalidate` does NOT cascade to dependencies, and [exercisesProvider] is
+/// NOT autoDispose — it caches its `AsyncError` for the container's lifetime. So
+/// invalidating only [muscleDistributionInsightsProvider] would rebuild it,
+/// re-read the SAME cached catalogue error, and re-render the identical error
+/// state: a retry button that can never recover, precisely in the case that
+/// brings the user here (offline / failed cold catalogue fetch).
+void _retry(WidgetRef ref, String uid, ChartPeriod period) {
+  ref.invalidate(exercisesProvider);
+  ref.invalidate(sessionsByUidProvider(uid));
+  ref.invalidate(
+    muscleDistributionInsightsProvider((uid: uid, period: period)),
+  );
+}
+
+// ── Error state ───────────────────────────────────────────────────────────────
+
+/// Message + retry CTA — same shape as [MonthlyReportScreen]'s `_ErrorState`.
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({
+    required this.message,
+    required this.retryLabel,
+    required this.onRetry,
+  });
+
+  final String message;
+  final String retryLabel;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      child: Column(
+        children: [
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
+          ),
+          const SizedBox(height: 8),
+          TextButton(onPressed: onRetry, child: Text(retryLabel)),
+        ],
+      ),
+    );
   }
 }

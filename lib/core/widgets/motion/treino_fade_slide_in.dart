@@ -33,8 +33,16 @@ import '../../../app/theme/app_motion.dart';
 ///
 /// **PROHIBIDO en builders lazy** (`ListView.builder`/`.separated`): los
 /// ítems reciclados re-montan su State al re-entrar al viewport y la
-/// entrada re-animaría en cada scroll. Solo para children construidos
-/// eager (columns, `ListView(children: [...])`).
+/// entrada re-animaría en cada scroll.
+///
+/// **`ListView(children: [...])` TAMPOCO es seguro**: aunque la lista de
+/// widgets se construye eager, sigue siendo un viewport — los Elements/State
+/// de los children que salen del `cacheExtent` (~250px) se DESMONTAN igual
+/// que en un builder lazy, y se re-montan (re-animando) al volver a
+/// scrollear hacia ellos. Usar únicamente dentro de un layout realmente
+/// eager sin viewport propio: `Column` (opcionalmente envuelto en
+/// `SingleChildScrollView`, que scrollea el `Column` entero como una sola
+/// unidad, sin reciclar Elements por ítem).
 class TreinoFadeSlideIn extends StatefulWidget {
   const TreinoFadeSlideIn({
     super.key,

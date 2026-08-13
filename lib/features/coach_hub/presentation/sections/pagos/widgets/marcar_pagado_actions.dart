@@ -182,8 +182,13 @@ String reminderText({
   required String? paymentAlias,
 }) {
   final monto = fmtArs(amount);
-  final buf =
-      StringBuffer('Hola! Te recuerdo el pago de $concept por $monto.'); // i18n
+  // Fallback: a too-short or empty concept (e.g. a test value like "jaj")
+  // reads as broken in the reminder. Below 4 chars we use a generic label
+  // instead of interpolating it. The trainer can still edit the message.
+  final trimmed = concept.trim();
+  final conceptLabel = trimmed.length < 4 ? 'tu cuota' : trimmed; // i18n
+  final buf = StringBuffer(
+      'Hola! Te recuerdo el pago de $conceptLabel por $monto.'); // i18n
   if (paymentAlias != null && paymentAlias.isNotEmpty) {
     buf.write(' Podés transferir a: $paymentAlias'); // i18n
   }
@@ -298,13 +303,14 @@ class _RecordarDialogState extends State<_RecordarDialog> {
   }
 }
 
-/// Abre `RegistrarPagoDialog` y, si el trainer confirma, crea un Payment pagado
-/// ad-hoc para el alumno [athleteId].
+/// Abre `RegistrarPagoDialog` fijado al alumno [athleteId] (el dropdown se
+/// oculta) y, si el trainer confirma, crea un Payment ad-hoc para ese
+/// alumno — pagado o pendiente según lo elegido en el diálogo.
 Future<void> registrarPago(
     BuildContext context, WidgetRef ref, String athleteId) async {
-  final result = await showDialog<({int amount, String concept})>(
+  final result = await showDialog<RegistrarPagoResult>(
     context: context,
-    builder: (_) => const RegistrarPagoDialog(),
+    builder: (_) => RegistrarPagoDialog(athleteId: athleteId),
   );
   if (result == null) return;
 
@@ -315,12 +321,13 @@ Future<void> registrarPago(
     await ref.read(paymentRepositoryProvider).add(Payment(
           id: '',
           trainerId: trainerId,
-          athleteId: athleteId,
+          athleteId: result.athleteId,
           amountArs: result.amount,
           concept: result.concept,
-          status: PaymentStatus.paid,
+          status: result.status,
           createdAt: now,
-          paidAt: now,
+          paidAt: result.status == PaymentStatus.paid ? now : null,
+          dueAt: result.status == PaymentStatus.pending ? result.dueAt : null,
         ));
     if (context.mounted) {
       pagoSnack(context, 'Pago registrado.'); // i18n

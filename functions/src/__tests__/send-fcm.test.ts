@@ -96,7 +96,7 @@ describe("SCENARIO-677: empty uids array → no-op", () => {
 
     const result = await sendFcm(
       testApp,
-      { uids: [], notification: NOTIFICATION, data: DATA },
+      { uids: [], kind: "review", notification: NOTIFICATION, data: DATA },
       mockMessaging,
     );
 
@@ -122,7 +122,7 @@ describe("SCENARIO-625: single uid with one token → dispatches to that token",
 
     const result = await sendFcm(
       testApp,
-      { uids: [uid], notification: NOTIFICATION, data: DATA },
+      { uids: [uid], kind: "review", notification: NOTIFICATION, data: DATA },
       mockMessaging,
     );
 
@@ -155,7 +155,7 @@ describe("SCENARIO-625: two uids each with one token → both tokens dispatched"
 
     const result = await sendFcm(
       testApp,
-      { uids: [uid1, uid2], notification: NOTIFICATION, data: DATA },
+      { uids: [uid1, uid2], kind: "review", notification: NOTIFICATION, data: DATA },
       mockMessaging,
     );
 
@@ -190,7 +190,7 @@ describe("SCENARIO-628: uid with empty or absent fcmTokens → skipped silently"
 
     const result = await sendFcm(
       testApp,
-      { uids: [uidEmpty], notification: NOTIFICATION, data: DATA },
+      { uids: [uidEmpty], kind: "review", notification: NOTIFICATION, data: DATA },
       mockMessaging,
     );
 
@@ -206,7 +206,7 @@ describe("SCENARIO-628: uid with empty or absent fcmTokens → skipped silently"
 
     const result = await sendFcm(
       testApp,
-      { uids: [uidAbsent], notification: NOTIFICATION, data: DATA },
+      { uids: [uidAbsent], kind: "review", notification: NOTIFICATION, data: DATA },
       mockMessaging,
     );
 
@@ -235,7 +235,7 @@ describe("SCENARIO-626: stale token removed on registration-token-not-registered
 
     await sendFcm(
       testApp,
-      { uids: [uid], notification: NOTIFICATION, data: DATA },
+      { uids: [uid], kind: "review", notification: NOTIFICATION, data: DATA },
       mockMessaging,
     );
 
@@ -261,7 +261,7 @@ describe("SCENARIO-627: stale token removed on invalid-registration-token", () =
 
     await sendFcm(
       testApp,
-      { uids: [uid], notification: NOTIFICATION, data: DATA },
+      { uids: [uid], kind: "review", notification: NOTIFICATION, data: DATA },
       mockMessaging,
     );
 

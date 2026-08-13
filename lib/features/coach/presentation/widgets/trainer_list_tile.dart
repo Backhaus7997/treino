@@ -7,6 +7,8 @@ import '../../../reviews/presentation/widgets/star_rating_display.dart';
 import '../../domain/trainer_public_profile.dart';
 import '../../domain/trainer_specialty.dart';
 import '../../../../l10n/app_l10n.dart';
+import '../../../coach_hub/presentation/sections/pagos/widgets/payment_format.dart'
+    show fmtArs;
 
 /// A list tile for a single trainer in the discovery list.
 ///
@@ -95,7 +97,7 @@ class TrainerListTile extends StatelessWidget {
               children: [
                 if (rate != null)
                   Text(
-                    '\$$rate${l10n.coachMonthlyRateUnit}',
+                    '${fmtArs(rate)}${l10n.coachMonthlyRateUnit}',
                     style: GoogleFonts.barlowCondensed(
                       fontWeight: FontWeight.w600,
                       fontSize: 13,

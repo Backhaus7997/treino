@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/analytics/analytics_service.dart';
+import '../../../core/utils/kg_format.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../coach/application/trainer_link_providers.dart';
@@ -15,6 +16,7 @@ import '../../coach/domain/trainer_link_status.dart';
 import '../../profile/application/user_providers.dart';
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../profile/domain/experience_level.dart';
+import '../../workout/application/exercise_filter.dart';
 import '../../workout/application/exercise_providers.dart';
 import '../../workout/domain/exercise.dart';
 import '../../workout/domain/muscle_group.dart';
@@ -745,12 +747,9 @@ class _DayCard extends StatelessWidget {
         i.repsMin == i.repsMax ? '${i.repsMin}' : '${i.repsMin}-${i.repsMax}';
     final base = '${i.sets} × $reps';
     final rest = i.restSec != null ? ' · ${i.restSec}s' : '';
-    final w = i.weightKg != null ? ' · ${_formatWeight(i.weightKg!)} kg' : '';
+    final w = i.weightKg != null ? ' · ${formatWeightKg(i.weightKg)} kg' : '';
     return '$base$rest$w';
   }
-
-  String _formatWeight(double w) =>
-      w == w.truncateToDouble() ? w.toInt().toString() : w.toString();
 }
 
 /// Bottom sheet con search + lista del catálogo de exercises.
@@ -777,17 +776,20 @@ class _ExercisePickerSheetState extends State<_ExercisePickerSheet> {
     super.dispose();
   }
 
+  /// Same predicate as the catalog picker and the Coach Hub web dialog
+  /// (tokenized, diacritic-tolerant, name + aliases). The old raw
+  /// `muscleGroup` substring match is gone on purpose: it compared against
+  /// the internal English key ('chest', …) that the Spanish UI never shows.
   List<Exercise> get _filtered {
-    final q = _query.toLowerCase().trim();
-    if (q.isEmpty) return widget.exercises;
-    return widget.exercises.where((e) {
-      if (e.name.toLowerCase().contains(q)) return true;
-      if (e.muscleGroup.toLowerCase().contains(q)) return true;
-      for (final alias in e.aliases) {
-        if (alias.toLowerCase().contains(q)) return true;
-      }
-      return false;
-    }).toList();
+    if (_query.trim().isEmpty) return widget.exercises;
+    return widget.exercises
+        .where((e) => exerciseMatchesFilters(
+              e,
+              query: _query,
+              muscles: const {},
+              equipment: const {},
+            ))
+        .toList();
   }
 
   @override

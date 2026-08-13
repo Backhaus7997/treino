@@ -47,7 +47,10 @@ async function seedAppointment(
   await db().collection("appointments").doc(docId).set({
     athleteId: uid,
     trainerId: "trainer-xyz",
-    scheduledAt: opts.isFuture ? futureDate() : pastDate(),
+    // QA-API-001: real docs key the appointment time as `startsAt` (see
+    // Appointment model + appointment_repository). The suite previously seeded
+    // `scheduledAt`, matching the buggy query and masking the defect.
+    startsAt: opts.isFuture ? futureDate() : pastDate(),
     status: opts.status ?? "confirmed",
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   });

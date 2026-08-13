@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_background.dart';
+import '../../../../app/theme/app_motion.dart';
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import 'legal_content.dart';
 
@@ -45,17 +47,20 @@ class LegalDocumentScreen extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                     Expanded(
-                      child: Semantics(
-                        header: true,
-                        child: Text(
-                          title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.barlowCondensed(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.3,
-                            color: palette.textPrimary,
+                      child: TreinoFadeSlideIn(
+                        distance: AppMotion.slideSm,
+                        child: Semantics(
+                          header: true,
+                          child: Text(
+                            title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.barlowCondensed(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.3,
+                              color: palette.textPrimary,
+                            ),
                           ),
                         ),
                       ),
@@ -64,55 +69,64 @@ class LegalDocumentScreen extends StatelessWidget {
                 ),
               ),
               Expanded(
-                child: ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-                  itemCount: sections.length + 1,
-                  separatorBuilder: (_, __) => const SizedBox(height: 18),
-                  itemBuilder: (context, i) {
-                    // Footer: última actualización + contacto.
-                    if (i == sections.length) {
-                      return Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Text(
-                          'Última actualización: $kLegalLastUpdated.\n'
-                          'Consultas: $kLegalContactEmail',
-                          style: GoogleFonts.barlow(
-                            fontSize: 12,
-                            height: 1.5,
-                            color: palette.textMuted,
-                          ),
-                        ),
-                      );
-                    }
-
-                    final section = sections[i];
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Semantics(
-                          header: true,
+                // Completa el patrón de las pantallas hermanas de auth (login/
+                // register/welcome): headline + bloque de contenido entran
+                // juntos con stagger, en vez de un título solo deslizándose
+                // junto a contenido ya quieto. Un solo State eager al nivel
+                // del ListView completo — NUNCA per-ítem dentro del
+                // itemBuilder, que re-animaría en cada scroll.
+                child: TreinoFadeSlideIn(
+                  delay: AppMotion.stagger(1),
+                  child: ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                    itemCount: sections.length + 1,
+                    separatorBuilder: (_, __) => const SizedBox(height: 18),
+                    itemBuilder: (context, i) {
+                      // Footer: última actualización + contacto.
+                      if (i == sections.length) {
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8),
                           child: Text(
-                            section.heading,
-                            style: GoogleFonts.barlowCondensed(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.3,
-                              color: palette.accent,
+                            'Última actualización: $kLegalLastUpdated.\n'
+                            'Consultas: $kLegalContactEmail',
+                            style: GoogleFonts.barlow(
+                              fontSize: 12,
+                              height: 1.5,
+                              color: palette.textMuted,
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          section.body,
-                          style: GoogleFonts.barlow(
-                            fontSize: 14,
-                            height: 1.55,
-                            color: palette.textPrimary,
+                        );
+                      }
+
+                      final section = sections[i];
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Semantics(
+                            header: true,
+                            child: Text(
+                              section.heading,
+                              style: GoogleFonts.barlowCondensed(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.3,
+                                color: palette.accent,
+                              ),
+                            ),
                           ),
-                        ),
-                      ],
-                    );
-                  },
+                          const SizedBox(height: 6),
+                          Text(
+                            section.body,
+                            style: GoogleFonts.barlow(
+                              fontSize: 14,
+                              height: 1.55,
+                              color: palette.textPrimary,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
                 ),
               ),
             ],

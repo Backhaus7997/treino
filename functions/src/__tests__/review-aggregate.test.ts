@@ -293,3 +293,48 @@ describe("SCENARIO-594: no trainerId in doc → no error from aggregate", () => 
     await expect(recomputeAggregate(testApp, trainerId)).resolves.not.toThrow();
   });
 });
+
+// ---------------------------------------------------------------------------
+// SCENARIO-REV-002 — same athlete relinks → counted once (QA-REV-002)
+// A review doc id is `${linkId}_${athleteId}`, so relinking mints a new doc.
+// The aggregate must dedupe by athleteId ("una persona = una opinión").
+// ---------------------------------------------------------------------------
+describe("SCENARIO-REV-002: dedupe by athleteId (relink manipulation)", () => {
+  const trainerId = "trainer-agg-rev002";
+
+  beforeEach(() => seedTrainerProfile(trainerId));
+  afterEach(() => cleanupTrainer(trainerId));
+
+  it("collapses multiple reviews from the same athlete to one, keeping the latest rating", async () => {
+    // Same athlete, two different links (end link1 → relink as link2).
+    const older = buildReview("link1", "athlete1", trainerId, 5);
+    const newer = buildReview("link2", "athlete1", trainerId, 1);
+    // Unambiguous ordering: newer.updatedAt strictly after older.
+    older.updatedAt = admin.firestore.Timestamp.fromMillis(1_000);
+    newer.updatedAt = admin.firestore.Timestamp.fromMillis(2_000);
+    await seedReview(older);
+    await seedReview(newer);
+
+    await recomputeAggregate(testApp, trainerId);
+
+    const agg = await getProfileAgg(trainerId);
+    // Counted ONCE (not two), and the latest opinion (1) wins — not the
+    // inflated average of 5 and 1 (which would be 3).
+    expect(agg!.reviewCount).toBe(1);
+    expect(agg!.averageRating).toBeCloseTo(1, 2);
+  });
+
+  it("still counts distinct athletes separately", async () => {
+    // athlete1 relinked (two docs) + one distinct athlete2.
+    await seedReview(buildReview("link1", "athlete1", trainerId, 4));
+    await seedReview(buildReview("link2", "athlete1", trainerId, 4));
+    await seedReview(buildReview("link3", "athlete2", trainerId, 2));
+
+    await recomputeAggregate(testApp, trainerId);
+
+    const agg = await getProfileAgg(trainerId);
+    // Two distinct opinions: athlete1 (deduped) + athlete2. (4 + 2) / 2 = 3.
+    expect(agg!.reviewCount).toBe(2);
+    expect(agg!.averageRating).toBeCloseTo(3, 2);
+  });
+});

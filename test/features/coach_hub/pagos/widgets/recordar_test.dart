@@ -52,6 +52,26 @@ void main() {
       expect(text, contains('alias.trainer'));
     });
 
+    test('concepto muy corto (ej "jaj") → cae a "tu cuota"', () {
+      final text = reminderText(
+        amount: 500000,
+        concept: 'jaj',
+        paymentAlias: null,
+      );
+      expect(text, contains('tu cuota'));
+      expect(text, isNot(contains('jaj')));
+      expect(text, contains(r'$500.000'));
+    });
+
+    test('concepto vacío → cae a "tu cuota"', () {
+      final text = reminderText(
+        amount: 500000,
+        concept: '   ',
+        paymentAlias: null,
+      );
+      expect(text, contains('tu cuota'));
+    });
+
     test('alias null → mensaje válido, sin substring "null"', () {
       final text = reminderText(
         amount: 12000,

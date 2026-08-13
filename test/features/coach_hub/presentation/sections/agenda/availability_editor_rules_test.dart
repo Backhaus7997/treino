@@ -11,7 +11,6 @@ import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/data/availability_repository.dart';
 import 'package:treino/features/coach/domain/availability_rule.dart';
 import 'package:treino/features/coach_hub/presentation/sections/agenda/agenda_web_screen.dart';
-import 'package:treino/features/coach_hub/presentation/sections/agenda/availability_editor_panel.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
 import 'package:treino/l10n/app_l10n.dart';

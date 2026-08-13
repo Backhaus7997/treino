@@ -4,6 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/utils/date_labels.dart';
+import '../../../core/utils/kg_format.dart';
+import '../../../core/widgets/motion/treino_success_check.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../workout/application/session_providers.dart'
@@ -25,28 +28,10 @@ final List<TextInputFormatter> _decimalInputFormatters = <TextInputFormatter>[
   FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
 ];
 
-// ── Month names (Spanish, no lib dependency) ──────────────────────────────────
-
-const _kMonths = <String>[
-  '',
-  'ene',
-  'feb',
-  'mar',
-  'abr',
-  'may',
-  'jun',
-  'jul',
-  'ago',
-  'sep',
-  'oct',
-  'nov',
-  'dic',
-];
-
-String _formatDateTimeEs(DateTime dt) {
+String _formatDateTimeEs(DateTime dt, String localeName) {
   final local = dt.toLocal();
   final d = local.day;
-  final m = _kMonths[local.month];
+  final m = monthAbbrev(local, localeName);
   final y = local.year;
   final hh = local.hour.toString().padLeft(2, '0');
   final mm = local.minute.toString().padLeft(2, '0');
@@ -55,7 +40,8 @@ String _formatDateTimeEs(DateTime dt) {
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
-/// Full-screen dialog to log a new [Measurement] for [athleteId].
+/// Full-screen dialog to log a new [Measurement] for [athleteId], or — when
+/// [initial] is set — to EDIT an existing one (#439).
 ///
 /// Opened via:
 /// ```dart
@@ -65,11 +51,43 @@ String _formatDateTimeEs(DateTime dt) {
 /// ));
 /// ```
 ///
-/// All fields are optional — the trainer saves whatever metrics they measured.
-class LogMeasurementScreen extends ConsumerStatefulWidget {
-  const LogMeasurementScreen({super.key, required this.athleteId});
+/// All fields are optional — whoever logs saves whatever metrics they measured.
+///
+/// Two authoring modes (design ADR-ASM-6):
+/// - default [LogMeasurementScreen] — a TRAINER logging FOR [athleteId]
+///   (`recordedBy = uid`, `athleteId = the passed athlete`).
+/// - [LogMeasurementScreen.selfLog] — an ATHLETE logging their OWN measurement.
+///   [athleteId] is null and the effective athleteId is derived from the
+///   authenticated uid at save time, so the caller cannot inject someone
+///   else's id → the write is always `recordedBy == athleteId == uid`, exactly
+///   what the create rule's athlete-self branch requires.
+///
+/// Edit mode ([initial] != null) pre-populates every field and saves via
+/// `update()` preserving `id`/`athleteId`/`recordedBy`/`recordedAt` — the
+/// update rule pins the first three, and the measurement keeps its original
+/// point on the chart timeline. Only the author may edit (the update rule
+/// requires `recordedBy == uid`), so callers must gate the affordance on
+/// `initial.recordedBy == currentUid`.
+enum _LogAuthorMode { trainerForAthlete, athleteSelf }
 
-  final String athleteId;
+class LogMeasurementScreen extends ConsumerStatefulWidget {
+  /// Trainer logging FOR an athlete (existing behavior), or editing a
+  /// measurement they recorded when [initial] is set.
+  const LogMeasurementScreen({super.key, required this.athleteId, this.initial})
+      : _mode = _LogAuthorMode.trainerForAthlete;
+
+  /// Athlete logging their OWN measurement. `athleteId` resolves from the
+  /// authenticated uid at save time. With [initial], edits a self-logged one.
+  const LogMeasurementScreen.selfLog({super.key, this.initial})
+      : athleteId = null,
+        _mode = _LogAuthorMode.athleteSelf;
+
+  /// The subject athlete in trainer mode; null in self mode (derived from uid).
+  final String? athleteId;
+
+  /// When set, the form edits THIS measurement instead of creating a new one.
+  final Measurement? initial;
+  final _LogAuthorMode _mode;
 
   @override
   ConsumerState<LogMeasurementScreen> createState() =>
@@ -128,27 +146,38 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
   @override
   void initState() {
     super.initState();
-    _weightCtrl = TextEditingController();
-    _fatCtrl = TextEditingController();
-    _muscleCtrl = TextEditingController();
-    _shouldersCtrl = TextEditingController();
-    _chestCtrl = TextEditingController();
-    _waistCtrl = TextEditingController();
-    _hipsCtrl = TextEditingController();
-    _glutesCtrl = TextEditingController();
-    _bicepsLCtrl = TextEditingController();
-    _bicepsRCtrl = TextEditingController();
-    _bicepsFlexLCtrl = TextEditingController();
-    _bicepsFlexRCtrl = TextEditingController();
-    _forearmLCtrl = TextEditingController();
-    _forearmRCtrl = TextEditingController();
-    _upperThighLCtrl = TextEditingController();
-    _upperThighRCtrl = TextEditingController();
-    _midThighLCtrl = TextEditingController();
-    _midThighRCtrl = TextEditingController();
-    _calfLCtrl = TextEditingController();
-    _calfRCtrl = TextEditingController();
-    _notesCtrl = TextEditingController();
+    // Edit mode: pre-populate every field from the measurement being edited.
+    // formatWeightKg renders the exact value with no redundant `.0` and maps
+    // null → '' (empty field) — the same prefill contract set editors use.
+    final i = widget.initial;
+    _weightCtrl = TextEditingController(text: formatWeightKg(i?.weightKg));
+    _fatCtrl = TextEditingController(text: formatWeightKg(i?.fatPercentage));
+    _muscleCtrl = TextEditingController(text: formatWeightKg(i?.muscleMassKg));
+    _shouldersCtrl =
+        TextEditingController(text: formatWeightKg(i?.shouldersCm));
+    _chestCtrl = TextEditingController(text: formatWeightKg(i?.chestCm));
+    _waistCtrl = TextEditingController(text: formatWeightKg(i?.waistCm));
+    _hipsCtrl = TextEditingController(text: formatWeightKg(i?.hipsCm));
+    _glutesCtrl = TextEditingController(text: formatWeightKg(i?.glutesCm));
+    _bicepsLCtrl = TextEditingController(text: formatWeightKg(i?.bicepsLCm));
+    _bicepsRCtrl = TextEditingController(text: formatWeightKg(i?.bicepsRCm));
+    _bicepsFlexLCtrl =
+        TextEditingController(text: formatWeightKg(i?.bicepsFlexedLCm));
+    _bicepsFlexRCtrl =
+        TextEditingController(text: formatWeightKg(i?.bicepsFlexedRCm));
+    _forearmLCtrl = TextEditingController(text: formatWeightKg(i?.forearmLCm));
+    _forearmRCtrl = TextEditingController(text: formatWeightKg(i?.forearmRCm));
+    _upperThighLCtrl =
+        TextEditingController(text: formatWeightKg(i?.upperThighLCm));
+    _upperThighRCtrl =
+        TextEditingController(text: formatWeightKg(i?.upperThighRCm));
+    _midThighLCtrl =
+        TextEditingController(text: formatWeightKg(i?.midThighLCm));
+    _midThighRCtrl =
+        TextEditingController(text: formatWeightKg(i?.midThighRCm));
+    _calfLCtrl = TextEditingController(text: formatWeightKg(i?.calfLCm));
+    _calfRCtrl = TextEditingController(text: formatWeightKg(i?.calfRCm));
+    _notesCtrl = TextEditingController(text: i?.notes ?? '');
 
     _allCtrls = <TextEditingController>[
       _weightCtrl,
@@ -176,6 +205,12 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
     for (final c in _allCtrls) {
       c.addListener(_onFieldChanged);
     }
+
+    // Edit mode starts with values already present: reflect that in the
+    // GUARDAR gate, and open the circumferences section when it holds
+    // prefilled data (otherwise those values would start hidden).
+    _hasValue = _hasAnyValue();
+    _circumferencesExpanded = _circumferenceCtrls.any((c) => c.text.isNotEmpty);
   }
 
   /// Recomputes [_hasValue] whenever any field changes so GUARDAR reflects the
@@ -246,7 +281,8 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
 
   /// All circumference controllers (the collapsible section). Kept separate so
   /// the section can be force-expanded when one of them holds invalid input.
-  List<TextEditingController> get _circumferenceCtrls => <TextEditingController>[
+  List<TextEditingController> get _circumferenceCtrls =>
+      <TextEditingController>[
         _shouldersCtrl,
         _chestCtrl,
         _waistCtrl,
@@ -300,22 +336,28 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
   Future<void> _save() async {
     if (_saving) return;
     final l10n = AppL10n.of(context);
-    final trainerUid = ref.read(currentUidProvider);
-    if (trainerUid == null) {
+    final uid = ref.read(currentUidProvider);
+    if (uid == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'No hay sesión activa. No se puede guardar.',
-          ),
-        ),
+        SnackBar(content: Text(l10n.measurementLogNoSession)),
       );
       return;
     }
 
+    // Effective subject: self mode ALWAYS uses the authenticated uid (the
+    // caller cannot inject another athleteId), trainer mode uses the passed id.
+    // In self mode this guarantees `athleteId == recordedBy == uid`, the exact
+    // invariant the create rule's athlete-self branch enforces.
+    final effectiveAthleteId =
+        widget._mode == _LogAuthorMode.athleteSelf ? uid : widget.athleteId!;
+    assert(
+      widget._mode != _LogAuthorMode.athleteSelf || effectiveAthleteId == uid,
+      'self-log must attribute the measurement to the authenticated athlete',
+    );
+
     // If a collapsed circumference holds an invalid value, expand the section
     // first so its inline error is actually visible before we validate.
-    if (!_circumferencesExpanded &&
-        _circumferenceCtrls.any(_isMetricInvalid)) {
+    if (!_circumferencesExpanded && _circumferenceCtrls.any(_isMetricInvalid)) {
       setState(() => _circumferencesExpanded = true);
       // Let the section mount before its fields' validators run.
       await Future<void>.delayed(Duration.zero);
@@ -335,11 +377,19 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
 
     setState(() => _saving = true);
 
+    // Edit mode: keep id/athleteId/recordedBy (the update rule pins them) and
+    // the original recordedAt (editing values must not move the point on the
+    // chart timeline). Create mode: fresh doc attributed to the current uid.
+    final initial = widget.initial;
+    assert(
+      initial == null || initial.recordedBy == uid,
+      'only the author may edit a measurement (update rule pins recordedBy)',
+    );
     final measurement = Measurement(
-      id: '',
-      athleteId: widget.athleteId,
-      recordedBy: trainerUid,
-      recordedAt: DateTime.now().toUtc(),
+      id: initial?.id ?? '',
+      athleteId: initial?.athleteId ?? effectiveAthleteId,
+      recordedBy: initial?.recordedBy ?? uid,
+      recordedAt: initial?.recordedAt ?? DateTime.now().toUtc(),
       weightKg: _parseDouble(_weightCtrl),
       fatPercentage: _parseDouble(_fatCtrl),
       muscleMassKg: _parseDouble(_muscleCtrl),
@@ -364,21 +414,40 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
     );
 
     try {
-      await ref.read(measurementRepositoryProvider).add(measurement);
+      final repo = ref.read(measurementRepositoryProvider);
+      if (initial != null) {
+        await repo.update(measurement);
+      } else {
+        await repo.add(measurement);
+      }
       if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Medición guardada')),
+        SnackBar(
+          content: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // El pop ya pasó (línea de arriba) — el check no compite con
+              // ninguna navegación, solo acompaña el mensaje mientras el
+              // SnackBar hace su propia entrada.
+              const TreinoSuccessCheck(size: 18, strokeWidth: 2),
+              const SizedBox(width: 10),
+              Flexible(
+                child: Text(
+                  initial != null
+                      ? l10n.measurementLogUpdateSuccess
+                      : l10n.measurementLogSaveSuccess,
+                ),
+              ),
+            ],
+          ),
+        ),
       );
     } catch (_) {
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'No pudimos guardar la medición. Probá de nuevo.',
-          ),
-        ),
+        SnackBar(content: Text(l10n.measurementLogSaveError)),
       );
     }
   }
@@ -389,11 +458,14 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    final trainerUid = ref.watch(currentUidProvider);
+    final uid = ref.watch(currentUidProvider);
     // GUARDAR stays disabled until there is at least one value to save, so an
     // accidental tap cannot persist an all-null record.
-    final canSave = trainerUid != null && !_saving && _hasValue;
-    final now = DateTime.now();
+    final canSave = uid != null && !_saving && _hasValue;
+    final isEditing = widget.initial != null;
+    // Create shows "now" (the instant being recorded); edit shows the original
+    // recordedAt of the measurement being corrected.
+    final headerDate = widget.initial?.recordedAt ?? DateTime.now();
 
     return Scaffold(
       backgroundColor: palette.bg,
@@ -409,7 +481,7 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
                     onPressed:
                         _saving ? null : () => Navigator.of(context).pop(),
                     child: Text(
-                      'Cancelar',
+                      l10n.commonCancel,
                       style: GoogleFonts.barlow(
                         color: _saving ? palette.textMuted : palette.highlight,
                         fontSize: 14,
@@ -422,7 +494,9 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        'Cargar medición',
+                        isEditing
+                            ? l10n.measurementLogTitleEdit
+                            : l10n.measurementLogTitleCreate,
                         style: GoogleFonts.barlowCondensed(
                           fontWeight: FontWeight.w700,
                           fontSize: 16,
@@ -430,7 +504,7 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
                         ),
                       ),
                       Text(
-                        _formatDateTimeEs(now),
+                        _formatDateTimeEs(headerDate, l10n.localeName),
                         style: GoogleFonts.barlow(
                           fontSize: 12,
                           color: palette.textMuted,
@@ -451,80 +525,85 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                    // Body composition
-                    _sectionLabel('COMPOSICIÓN CORPORAL', palette),
-                    const SizedBox(height: 12),
-                    _numericField(
-                      label: 'Peso (kg)',
-                      controller: _weightCtrl,
-                      palette: palette,
-                      validator: (v) => _validateMetric(v, l10n),
-                    ),
-                    const SizedBox(height: 12),
-                    _numericField(
-                      label: 'Grasa (%)',
-                      controller: _fatCtrl,
-                      palette: palette,
-                      validator: (v) => _validateMetric(v, l10n),
-                    ),
-                    const SizedBox(height: 12),
-                    _numericField(
-                      label: 'Masa muscular (kg)',
-                      controller: _muscleCtrl,
-                      palette: palette,
-                      validator: (v) => _validateMetric(v, l10n),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Circumferences — collapsible
-                    _CircumferencesSection(
-                      palette: palette,
-                      validateMetric: (v) => _validateMetric(v, l10n),
-                      expanded: _circumferencesExpanded,
-                      onToggle: () => setState(
-                        () => _circumferencesExpanded =
-                            !_circumferencesExpanded,
+                      // Body composition
+                      _sectionLabel(
+                        l10n.measurementLogSectionBodyComposition,
+                        palette,
                       ),
-                      shouldersCtrl: _shouldersCtrl,
-                      chestCtrl: _chestCtrl,
-                      waistCtrl: _waistCtrl,
-                      hipsCtrl: _hipsCtrl,
-                      glutesCtrl: _glutesCtrl,
-                      bicepsLCtrl: _bicepsLCtrl,
-                      bicepsRCtrl: _bicepsRCtrl,
-                      bicepsFlexLCtrl: _bicepsFlexLCtrl,
-                      bicepsFlexRCtrl: _bicepsFlexRCtrl,
-                      forearmLCtrl: _forearmLCtrl,
-                      forearmRCtrl: _forearmRCtrl,
-                      upperThighLCtrl: _upperThighLCtrl,
-                      upperThighRCtrl: _upperThighRCtrl,
-                      midThighLCtrl: _midThighLCtrl,
-                      midThighRCtrl: _midThighRCtrl,
-                      calfLCtrl: _calfLCtrl,
-                      calfRCtrl: _calfRCtrl,
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Notes
-                    _sectionLabel('NOTAS', palette),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _notesCtrl,
-                      minLines: 3,
-                      maxLines: 6,
-                      keyboardType: TextInputType.multiline,
-                      style: GoogleFonts.barlow(
-                        color: palette.textPrimary,
-                        fontSize: 14,
-                      ),
-                      decoration: _inputDecoration(
+                      const SizedBox(height: 12),
+                      _numericField(
+                        label: l10n.measurementLogFieldWeight,
+                        controller: _weightCtrl,
                         palette: palette,
-                        hint: 'Observaciones del entrenador…',
+                        validator: (v) => _validateMetric(v, l10n),
                       ),
-                    ),
+                      const SizedBox(height: 12),
+                      _numericField(
+                        label: l10n.measurementLogFieldBodyFat,
+                        controller: _fatCtrl,
+                        palette: palette,
+                        validator: (v) => _validateMetric(v, l10n),
+                      ),
+                      const SizedBox(height: 12),
+                      _numericField(
+                        label: l10n.measurementLogFieldMuscleMass,
+                        controller: _muscleCtrl,
+                        palette: palette,
+                        validator: (v) => _validateMetric(v, l10n),
+                      ),
+                      const SizedBox(height: 20),
 
-                    // Space so FAB doesn't cover last field
-                    const SizedBox(height: 80),
+                      // Circumferences — collapsible
+                      _CircumferencesSection(
+                        palette: palette,
+                        validateMetric: (v) => _validateMetric(v, l10n),
+                        expanded: _circumferencesExpanded,
+                        onToggle: () => setState(
+                          () => _circumferencesExpanded =
+                              !_circumferencesExpanded,
+                        ),
+                        shouldersCtrl: _shouldersCtrl,
+                        chestCtrl: _chestCtrl,
+                        waistCtrl: _waistCtrl,
+                        hipsCtrl: _hipsCtrl,
+                        glutesCtrl: _glutesCtrl,
+                        bicepsLCtrl: _bicepsLCtrl,
+                        bicepsRCtrl: _bicepsRCtrl,
+                        bicepsFlexLCtrl: _bicepsFlexLCtrl,
+                        bicepsFlexRCtrl: _bicepsFlexRCtrl,
+                        forearmLCtrl: _forearmLCtrl,
+                        forearmRCtrl: _forearmRCtrl,
+                        upperThighLCtrl: _upperThighLCtrl,
+                        upperThighRCtrl: _upperThighRCtrl,
+                        midThighLCtrl: _midThighLCtrl,
+                        midThighRCtrl: _midThighRCtrl,
+                        calfLCtrl: _calfLCtrl,
+                        calfRCtrl: _calfRCtrl,
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Notes
+                      _sectionLabel(l10n.measurementLogSectionNotes, palette),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _notesCtrl,
+                        minLines: 3,
+                        maxLines: 6,
+                        keyboardType: TextInputType.multiline,
+                        style: GoogleFonts.barlow(
+                          color: palette.textPrimary,
+                          fontSize: 14,
+                        ),
+                        decoration: _inputDecoration(
+                          palette: palette,
+                          hint: widget._mode == _LogAuthorMode.athleteSelf
+                              ? l10n.measurementsSelfLogNotesHint
+                              : l10n.measurementLogNotesHint,
+                        ),
+                      ),
+
+                      // Space so FAB doesn't cover last field
+                      const SizedBox(height: 80),
                     ],
                   ),
                 ),
@@ -558,7 +637,9 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
                           ),
                         )
                       : Text(
-                          'GUARDAR MEDICIÓN',
+                          isEditing
+                              ? l10n.measurementLogUpdateCta
+                              : l10n.measurementLogSaveCta,
                           style: GoogleFonts.barlowCondensed(
                             fontWeight: FontWeight.w700,
                             fontSize: 14,
@@ -676,6 +757,7 @@ Widget _bilateralField({
   required TextEditingController leftCtrl,
   required TextEditingController rightCtrl,
   required AppPalette palette,
+  required AppL10n l10n,
   FormFieldValidator<String>? validator,
 }) {
   return Column(
@@ -706,7 +788,7 @@ Widget _bilateralField({
               ),
               decoration: _inputDecoration(
                 palette: palette,
-                hint: 'I (cm)',
+                hint: l10n.measurementLogBilateralLeftHint,
               ),
             ),
           ),
@@ -724,7 +806,7 @@ Widget _bilateralField({
               ),
               decoration: _inputDecoration(
                 palette: palette,
-                hint: 'D (cm)',
+                hint: l10n.measurementLogBilateralRightHint,
               ),
             ),
           ),
@@ -786,6 +868,7 @@ class _CircumferencesSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = palette;
+    final l10n = AppL10n.of(context);
 
     return Container(
       decoration: BoxDecoration(
@@ -809,7 +892,7 @@ class _CircumferencesSection extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'CIRCUNFERENCIAS',
+                          l10n.measurementLogCircumferencesTitle,
                           style: GoogleFonts.barlowCondensed(
                             fontWeight: FontWeight.w700,
                             fontSize: 13,
@@ -819,7 +902,7 @@ class _CircumferencesSection extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          'Opcional. Cargá las que quieras.',
+                          l10n.measurementLogCircumferencesHint,
                           style: GoogleFonts.barlow(
                             fontSize: 12,
                             color: p.textMuted,
@@ -846,10 +929,10 @@ class _CircumferencesSection extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _subGroupLabel('TRONCO', p),
+                  _subGroupLabel(l10n.measurementLogGroupTrunk, p),
                   const SizedBox(height: 12),
                   _numericField(
-                    label: 'Hombros',
+                    label: l10n.measurementLogFieldShoulders,
                     controller: shouldersCtrl,
                     palette: p,
                     suffix: 'cm',
@@ -857,7 +940,7 @@ class _CircumferencesSection extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   _numericField(
-                    label: 'Pecho',
+                    label: l10n.measurementLogFieldChest,
                     controller: chestCtrl,
                     palette: p,
                     suffix: 'cm',
@@ -865,7 +948,7 @@ class _CircumferencesSection extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   _numericField(
-                    label: 'Cintura',
+                    label: l10n.measurementLogFieldWaist,
                     controller: waistCtrl,
                     palette: p,
                     suffix: 'cm',
@@ -873,7 +956,7 @@ class _CircumferencesSection extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   _numericField(
-                    label: 'Cadera',
+                    label: l10n.measurementLogFieldHips,
                     controller: hipsCtrl,
                     palette: p,
                     suffix: 'cm',
@@ -881,62 +964,68 @@ class _CircumferencesSection extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   _numericField(
-                    label: 'Glúteos',
+                    label: l10n.measurementLogFieldGlutes,
                     controller: glutesCtrl,
                     palette: p,
                     suffix: 'cm',
                     validator: validateMetric,
                   ),
                   const SizedBox(height: 20),
-                  _subGroupLabel('TREN SUPERIOR', p),
+                  _subGroupLabel(l10n.measurementLogGroupUpperBody, p),
                   const SizedBox(height: 12),
                   _bilateralField(
-                    label: 'Bíceps',
+                    label: l10n.measurementLogFieldBiceps,
                     leftCtrl: bicepsLCtrl,
                     rightCtrl: bicepsRCtrl,
                     palette: p,
+                    l10n: l10n,
                     validator: validateMetric,
                   ),
                   const SizedBox(height: 12),
                   _bilateralField(
-                    label: 'Bíceps (flex)',
+                    label: l10n.measurementLogFieldBicepsFlexed,
                     leftCtrl: bicepsFlexLCtrl,
                     rightCtrl: bicepsFlexRCtrl,
                     palette: p,
+                    l10n: l10n,
                     validator: validateMetric,
                   ),
                   const SizedBox(height: 12),
                   _bilateralField(
-                    label: 'Antebrazo',
+                    label: l10n.measurementLogFieldForearm,
                     leftCtrl: forearmLCtrl,
                     rightCtrl: forearmRCtrl,
                     palette: p,
+                    l10n: l10n,
                     validator: validateMetric,
                   ),
                   const SizedBox(height: 20),
-                  _subGroupLabel('TREN INFERIOR', p),
+                  _subGroupLabel(l10n.measurementLogGroupLowerBody, p),
                   const SizedBox(height: 12),
                   _bilateralField(
-                    label: 'Muslo superior',
+                    label: l10n.measurementLogFieldUpperThigh,
                     leftCtrl: upperThighLCtrl,
                     rightCtrl: upperThighRCtrl,
                     palette: p,
+                    l10n: l10n,
                     validator: validateMetric,
                   ),
                   const SizedBox(height: 12),
                   _bilateralField(
-                    label: 'Muslo medio',
+                    label: l10n.measurementLogFieldMidThigh,
                     leftCtrl: midThighLCtrl,
                     rightCtrl: midThighRCtrl,
                     palette: p,
+                    l10n: l10n,
                     validator: validateMetric,
                   ),
                   const SizedBox(height: 12),
                   _bilateralField(
-                    label: 'Gemelo',
+                    label: l10n.measurementLogFieldCalf,
                     leftCtrl: calfLCtrl,
                     rightCtrl: calfRCtrl,
                     palette: p,
+                    l10n: l10n,
                     validator: validateMetric,
                   ),
                 ],

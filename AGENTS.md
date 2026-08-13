@@ -58,9 +58,14 @@ Estas son las que más fácil se olvidan o más fácil rompen el producto. Si el
 
 Aunque el repo viejo lo tenía, en TREINO Flutter quedan **fuera**:
 
-Ranking · Retos / Challenges · Missions · Bets · Levels / XP · Gamificación.
+Retos / Challenges · Missions · Bets · Levels / XP · Gamificación.
 
 Si el usuario pide alguno → **frená y confirmá**.
+
+**Rankings SÍ está en scope** y ya está implementado: ranking por gym, opt-in
+explícito del atleta (rachas / volumen / main lifts). Vive en la 2da página
+swipeable del tab Entrenar (`/workout?tab=rankings`). No lo confundas con
+"Gamificación" de la lista de arriba. → Detalle en [docs/product.md](./docs/product.md).
 
 ### 5. Tab bar (5 tabs, Inicio al medio)
 

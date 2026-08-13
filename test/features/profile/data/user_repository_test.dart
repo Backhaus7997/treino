@@ -73,6 +73,42 @@ void main() {
       );
     });
 
+    // QA-AUTH-001 (issue #434): email signup passes termsAcceptedAt; it must
+    // be persisted on the created doc.
+    test('getOrCreate with termsAcceptedAt persists it on the new doc',
+        () async {
+      final acceptedAt = DateTime.utc(2026, 6, 1, 9, 30);
+
+      final result = await repo.getOrCreate(
+        uid: 'uid-terms-1',
+        email: 'a@b.com',
+        termsAcceptedAt: acceptedAt,
+      );
+
+      expect(result.termsAcceptedAt, equals(acceptedAt));
+
+      final snap = await firestore.collection('users').doc('uid-terms-1').get();
+      final stored = snap.data()!['termsAcceptedAt'] as Timestamp;
+      // Timestamp.toDate() returns a LOCAL DateTime — .toUtc() normalizes it
+      // before comparing against the UTC fixture (mirrors TimestampConverter).
+      expect(stored.toDate().toUtc(), equals(acceptedAt));
+    });
+
+    // OAuth backfill paths never pass termsAcceptedAt — it must stay unset.
+    test(
+        'getOrCreate without termsAcceptedAt leaves it null/absent on the new doc',
+        () async {
+      final result = await repo.getOrCreate(
+        uid: 'uid-terms-2',
+        email: 'a@b.com',
+      );
+
+      expect(result.termsAcceptedAt, isNull);
+
+      final snap = await firestore.collection('users').doc('uid-terms-2').get();
+      expect(snap.data()!['termsAcceptedAt'], isNull);
+    });
+
     // T18: getOrCreate — idempotency
     test('SCENARIO-011: existing uid returns existing profile without writing',
         () async {

@@ -154,7 +154,10 @@ export async function recomputeMetrics(
     const rankingOptIn = profileSnap.data()?.rankingOptIn === true;
 
     if (!rankingOptIn) {
-      await profileRef.set(OPTED_OUT_METRICS, { merge: true });
+      // QA-507: update() en vez de set(merge) — falla si el doc no existe, así
+      // un borrado de cuenta que ocurrió DESPUÉS del chequeo de existencia de
+      // arriba no puede resucitar el perfil público (race check-then-act).
+      await profileRef.update({ ...OPTED_OUT_METRICS });
       logger.info(
         `rankingAggregate: rankingOptIn is false for ${uid} — wrote default metrics`,
         { uid },
@@ -200,7 +203,10 @@ export async function recomputeMetrics(
     };
 
     // 4. Merge aggregate fields — never overwrite identity fields.
-    await profileRef.set(update, { merge: true });
+    // QA-507: update() en vez de set(merge) — si la cuenta se borró entre el
+    // chequeo de existencia y este write, set(merge) RECREABA el perfil público
+    // (zombie). update() tira NOT_FOUND y el catch de abajo lo loguea.
+    await profileRef.update({ ...update });
 
     logger.info(`rankingAggregate: updated userPublicProfiles/${uid}`, {
       uid,

@@ -88,6 +88,7 @@ describe("SCENARIO-642: new review → sendFcm called with trainerId, correct bo
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
     expect(callArg.tokens).toContain("trainer-token-642");
     expect(callArg.tokens).not.toContain("athlete-token-642");
+    expect(callArg.data?.kind).toBe("review");
   });
 
   it("body is '${athleteName} dejó una reseña de ${rating}⭐'", async () => {

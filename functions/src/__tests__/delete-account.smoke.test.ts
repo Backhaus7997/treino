@@ -101,7 +101,7 @@ async function cleanupUser(uid: string): Promise<void> {
       .catch(() => undefined),
     admin
       .firestore(smokeApp)
-      .collection("friendships")
+      .collection("follows")
       .where("members", "array-contains", uid)
       .get()
       .then((qs) => {
@@ -141,12 +141,23 @@ async function seedFullAthleteData(uid: string): Promise<void> {
     uid,
     displayName: "Athlete Name",
   });
-  // 2 friendships
-  batch.set(db.collection("friendships").doc(`friendship-${uid}-a`), {
+  // 2 aristas de follow: una saliente y una ENTRANTE. La entrante es la que
+  // prueba que el barrido se lleva las DOS direcciones — si consultara por
+  // `followerUid` en vez de por `members`, dejaría vivos a los seguidores de la
+  // cuenta borrada (`follow-model` PR3a, ADR-FOLLOW-002).
+  batch.set(db.collection("follows").doc(`${uid}_other-user-a`), {
+    id: `${uid}_other-user-a`,
+    followerUid: uid,
+    followeeUid: "other-user-a",
+    status: "accepted",
     members: [uid, "other-user-a"],
   });
-  batch.set(db.collection("friendships").doc(`friendship-${uid}-b`), {
-    members: [uid, "other-user-b"],
+  batch.set(db.collection("follows").doc(`other-user-b_${uid}`), {
+    id: `other-user-b_${uid}`,
+    followerUid: "other-user-b",
+    followeeUid: uid,
+    status: "accepted",
+    members: ["other-user-b", uid],
   });
   // 1 post
   batch.set(db.collection("posts").doc(`post-${uid}`), {
@@ -164,7 +175,7 @@ async function seedFullAthleteData(uid: string): Promise<void> {
   batch.set(db.collection("appointments").doc(`appt-future-${uid}`), {
     athleteId: uid,
     trainerId: "trainer-xyz",
-    scheduledAt: admin.firestore.Timestamp.fromDate(
+    startsAt: admin.firestore.Timestamp.fromDate(
       new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
     ),
     status: "confirmed",
@@ -173,7 +184,7 @@ async function seedFullAthleteData(uid: string): Promise<void> {
   batch.set(db.collection("appointments").doc(`appt-past-${uid}`), {
     athleteId: uid,
     trainerId: "trainer-xyz",
-    scheduledAt: admin.firestore.Timestamp.fromDate(
+    startsAt: admin.firestore.Timestamp.fromDate(
       new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
     ),
     status: "confirmed",
@@ -344,11 +355,13 @@ describe("SCENARIO-551 (full): deletedCollections includes all cascade collectio
 
     expect(result.status).toBe("success");
     const expected = [
-      "friendships",
+      "follows",
       "posts",
       "trainer_links",
       "appointments",
       "storage",
+      "storage-athlete",
+      "athlete-data",
       "users",
       "userPublicProfiles",
       "users-auth",

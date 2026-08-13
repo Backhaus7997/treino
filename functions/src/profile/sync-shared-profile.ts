@@ -214,6 +214,21 @@ export async function syncSharedProfileHandler(
     updatedAt: admin.firestore.Timestamp.fromDate(now),
   };
 
+  // QA-507 (PRIVACIDAD): con `merge: true`, una clave AUSENTE significa "no
+  // tocar", NO "borrar". Un campo que el atleta retiró de su perfil quedaba
+  // pegado para siempre en profile_shares/{uid} y el PF seguía viendo un dato
+  // personal ya retirado (phone, bornAt, heightCm, bodyWeightKg, gender,
+  // experienceLevel). Emitimos un delete() explícito por cada campo compartido
+  // que estaba en el share y ya no está en el snapshot nuevo.
+  for (const field of SHARED_FIELDS) {
+    if (
+      newSnapshot[field] === undefined &&
+      existingShare[field] !== undefined
+    ) {
+      writePayload[field] = admin.firestore.FieldValue.delete();
+    }
+  }
+
   await shareRef.set(writePayload, { merge: true });
 
   logger.info("syncSharedProfile: snapshot refreshed", {

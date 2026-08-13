@@ -18,6 +18,7 @@ import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
 import 'package:treino/features/workout/data/session_repository.dart';
 import 'package:treino/features/workout/domain/routine.dart';
+import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/routine_slot.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/domain/set_spec.dart';
@@ -615,6 +616,49 @@ void main() {
             wasFullyCompleted: any(named: 'wasFullyCompleted'),
           )).called(1);
     });
+
+    // #367: an abandoned session is persisted too, so any session-derived view
+    // (historial, and the now-cleared active session) must reflect it without
+    // an app restart. abandonSession must invalidate sessionsByUidProvider.
+    test('REGRESSION-367: abandonSession invalidates sessionsByUidProvider',
+        () async {
+      final repo = MockSessionRepository();
+      when(() => repo.create(
+            uid: any(named: 'uid'),
+            routineId: any(named: 'routineId'),
+            routineName: any(named: 'routineName'),
+            startedAt: any(named: 'startedAt'),
+            dayNumber: any(named: 'dayNumber'),
+          )).thenAnswer((_) async => makeSession());
+      when(() => repo.finish(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            finishedAt: any(named: 'finishedAt'),
+            totalVolumeKg: any(named: 'totalVolumeKg'),
+            durationMin: any(named: 'durationMin'),
+            wasFullyCompleted: any(named: 'wasFullyCompleted'),
+          )).thenAnswer((_) async {});
+      when(() => repo.listByUid('u1', limit: any(named: 'limit')))
+          .thenAnswer((_) async => <Session>[]);
+
+      final routine = makeRoutine();
+      final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
+      addTearDown(container.dispose);
+
+      final sub = container.listen(sessionsByUidProvider('u1'), (_, __) {});
+      addTearDown(sub.close);
+      await container.read(sessionsByUidProvider('u1').future); // fetch #1
+
+      final init = FreshSession(routineId: routine.id, dayNumber: 1);
+      await container.read(sessionNotifierProvider(init).future);
+      await container
+          .read(sessionNotifierProvider(init).notifier)
+          .abandonSession();
+
+      await container.read(sessionsByUidProvider('u1').future); // forces #2
+
+      verify(() => repo.listByUid('u1', limit: any(named: 'limit'))).called(2);
+    });
   });
 
   // ── finishSession (SCENARIO-267..268) ────────────────────────────────────
@@ -701,6 +745,67 @@ void main() {
             .finishSession(),
         throwsA(isA<StateError>()),
       );
+    });
+
+    // #367: on finish, Home ("HOY" card) and Insights showed pre-workout data
+    // until the app was restarted — the finish flow never refreshed the
+    // session-derived caches. finishSession must invalidate
+    // sessionsByUidProvider so everything watching it (todaysRoutineProvider,
+    // the Insights aggregators, historial) re-fetches with the new session.
+    test(
+        'REGRESSION-367: finishSession invalidates sessionsByUidProvider so '
+        'Home/Insights refresh without an app restart', () async {
+      final repo = MockSessionRepository();
+      final routine = makeRoutine(
+        days: [
+          makeDay(slots: [makeSlot(exerciseId: 'e1', targetSets: 1)])
+        ],
+      );
+      when(() => repo.create(
+            uid: any(named: 'uid'),
+            routineId: any(named: 'routineId'),
+            routineName: any(named: 'routineName'),
+            startedAt: any(named: 'startedAt'),
+            dayNumber: any(named: 'dayNumber'),
+          )).thenAnswer((_) async => makeSession());
+      when(() => repo.addSetLog(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            setLog: any(named: 'setLog'),
+          )).thenAnswer((_) async => makeSetLog());
+      when(() => repo.finish(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            finishedAt: any(named: 'finishedAt'),
+            totalVolumeKg: any(named: 'totalVolumeKg'),
+            durationMin: any(named: 'durationMin'),
+            wasFullyCompleted: any(named: 'wasFullyCompleted'),
+          )).thenAnswer((_) async {});
+      // sessionsByUidProvider's fetch — counted to prove the invalidation
+      // forces a re-fetch.
+      when(() => repo.listByUid('u1', limit: any(named: 'limit')))
+          .thenAnswer((_) async => <Session>[]);
+
+      final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
+      addTearDown(container.dispose);
+
+      // Keep the provider alive: WITHOUT the fix its autoDispose cache would
+      // survive and a re-read would NOT re-fetch, isolating the invalidation as
+      // the only thing that can force fetch #2.
+      final sub = container.listen(sessionsByUidProvider('u1'), (_, __) {});
+      addTearDown(sub.close);
+      await container.read(sessionsByUidProvider('u1').future); // fetch #1
+
+      final init = FreshSession(routineId: routine.id, dayNumber: 1);
+      await container.read(sessionNotifierProvider(init).future);
+      final notifier = container.read(sessionNotifierProvider(init).notifier);
+      await notifier.logSet(makeSetLog(exerciseId: 'e1', setNumber: 1));
+      await notifier.finishSession();
+
+      // The invalidate scheduled a rebuild; awaiting the future forces fetch #2.
+      await container.read(sessionsByUidProvider('u1').future);
+
+      verify(() => repo.listByUid('u1', limit: any(named: 'limit'))).called(2);
     });
   });
 

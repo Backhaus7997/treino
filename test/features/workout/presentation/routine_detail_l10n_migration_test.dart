@@ -65,7 +65,8 @@ void main() {
     testWidgets('badge uses routineDetailDayLabel + stat labels from AppL10n',
         (tester) async {
       await tester.pumpWidget(_wrap([
-        routineByIdProvider('rt').overrideWith((ref) async => _routine()),
+        routineByIdStreamProvider('rt')
+            .overrideWith((ref) => Stream.value(_routine())),
       ]));
       await tester.pump(const Duration(milliseconds: 50));
       final l10n = _l10n(tester);
@@ -76,8 +77,8 @@ void main() {
         findsOneWidget,
       );
       // Stat labels come from AppL10n, not literals.
-      expect(find.text(l10n.routineDetailStatExercises),
-          findsAtLeastNWidgets(1));
+      expect(
+          find.text(l10n.routineDetailStatExercises), findsAtLeastNWidgets(1));
       expect(find.text(l10n.routineDetailStatSets), findsOneWidget);
       expect(find.text(l10n.routineDetailStatMinutes), findsOneWidget);
       // CTA label from AppL10n.
@@ -86,7 +87,8 @@ void main() {
 
     testWidgets('not-found state uses routineDetailNotFound', (tester) async {
       await tester.pumpWidget(_wrap([
-        routineByIdProvider('rt').overrideWith((ref) async => null),
+        routineByIdStreamProvider('rt')
+            .overrideWith((ref) => Stream.value(null)),
       ]));
       await tester.pump(const Duration(milliseconds: 50));
       expect(find.text(_l10n(tester).routineDetailNotFound), findsOneWidget);
@@ -95,9 +97,11 @@ void main() {
     testWidgets('empty-day state uses routineDetailNoExercisesThisDay',
         (tester) async {
       await tester.pumpWidget(_wrap([
-        routineByIdProvider('rt').overrideWith(
-          (ref) async => _routine(
-            days: [const RoutineDay(dayNumber: 1, name: 'Push', slots: [])],
+        routineByIdStreamProvider('rt').overrideWith(
+          (ref) => Stream.value(
+            _routine(
+              days: [const RoutineDay(dayNumber: 1, name: 'Push', slots: [])],
+            ),
           ),
         ),
       ]));
@@ -111,19 +115,21 @@ void main() {
     testWidgets('superset block header uses routineDetailSuperset',
         (tester) async {
       await tester.pumpWidget(_wrap([
-        routineByIdProvider('rt').overrideWith(
-          (ref) async => _routine(
-            days: [
-              RoutineDay(
-                dayNumber: 1,
-                name: 'Push',
-                slots: [
-                  _slot(exerciseId: 'bench', supersetGroup: 1),
-                  _slot(exerciseId: 'fly', supersetGroup: 1),
-                ],
-                estimatedMinutes: 45,
-              ),
-            ],
+        routineByIdStreamProvider('rt').overrideWith(
+          (ref) => Stream.value(
+            _routine(
+              days: [
+                RoutineDay(
+                  dayNumber: 1,
+                  name: 'Push',
+                  slots: [
+                    _slot(exerciseId: 'bench', supersetGroup: 1),
+                    _slot(exerciseId: 'fly', supersetGroup: 1),
+                  ],
+                  estimatedMinutes: 45,
+                ),
+              ],
+            ),
           ),
         ),
       ]));

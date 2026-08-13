@@ -28,6 +28,8 @@ _$RoutineImpl _$$RoutineImplFromJson(Map<String, dynamic> json) =>
       status: $enumDecodeNullable(_$RoutineStatusEnumMap, json['status']) ??
           RoutineStatus.active,
       numWeeks: (json['numWeeks'] as num?)?.toInt() ?? 1,
+      ratingAvg: (json['ratingAvg'] as num?)?.toDouble(),
+      ratingsCount: (json['ratingsCount'] as num?)?.toInt(),
     );
 
 Map<String, dynamic> _$$RoutineImplToJson(_$RoutineImpl instance) =>

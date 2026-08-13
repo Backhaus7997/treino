@@ -32,6 +32,64 @@ function getApp(): admin.app.App {
 }
 
 /**
+ * Milliseconds for an `updatedAt`-style field that may be a Firestore
+ * Timestamp, a raw number, or missing. Used only to pick the most recent
+ * review per athlete when deduping (QA-REV-002).
+ */
+function toMillis(value: unknown): number {
+  if (
+    value &&
+    typeof (value as { toMillis?: unknown }).toMillis === "function"
+  ) {
+    return (value as { toMillis: () => number }).toMillis();
+  }
+  if (typeof value === "number") return value;
+  return 0;
+}
+
+/**
+ * QA-REV-002: compute a trainer's public review aggregate from raw review rows,
+ * deduped to one review per athlete (the most recent by `updatedAt`).
+ *
+ * The review doc id is `${linkId}_${athleteId}`, so an athlete who ends a link
+ * and re-links produces a SECOND review doc — without deduping, both would
+ * count toward averageRating/reviewCount, letting a single person inflate a
+ * trainer's rating just by relinking. `docId` is the fallback dedup key for any
+ * legacy/malformed doc missing `athleteId`, so a review is never dropped.
+ *
+ * Pure (no Firestore access) so it is unit-testable without the emulator.
+ */
+export function aggregateFromReviews(
+  reviews: {
+    docId: string;
+    athleteId?: string;
+    rating?: number;
+    updatedAt?: unknown;
+  }[],
+): { averageRating: number | null; reviewCount: number } {
+  const latestByAthlete = new Map<
+    string,
+    { rating: number; updatedAtMs: number }
+  >();
+  for (const review of reviews) {
+    const key = review.athleteId ?? review.docId;
+    const updatedAtMs = toMillis(review.updatedAt);
+    const existing = latestByAthlete.get(key);
+    if (!existing || updatedAtMs >= existing.updatedAtMs) {
+      latestByAthlete.set(key, { rating: review.rating ?? 0, updatedAtMs });
+    }
+  }
+
+  const ratings = [...latestByAthlete.values()].map((v) => v.rating);
+  if (ratings.length === 0) {
+    // REQ-RV-CF-004: no reviews → null + 0.
+    return { averageRating: null, reviewCount: 0 };
+  }
+  const sum = ratings.reduce((acc, r) => acc + r, 0);
+  return { averageRating: sum / ratings.length, reviewCount: ratings.length };
+}
+
+/**
  * Recomputes aggregate stats for a trainer and persists them.
  *
  * Exported separately to enable direct unit/integration testing without
@@ -51,22 +109,17 @@ export async function recomputeAggregate(
       .where("trainerId", "==", trainerId)
       .get();
 
-    const count = snap.size;
-    let update: { averageRating: number | null; reviewCount: number };
-
-    if (count === 0) {
-      // REQ-RV-CF-004: last review deleted → null + 0
-      update = { averageRating: null, reviewCount: 0 };
-    } else {
-      const sumRatings = snap.docs.reduce((acc, doc) => {
-        const rating = (doc.data().rating as number) ?? 0;
-        return acc + rating;
-      }, 0);
-      update = {
-        averageRating: sumRatings / count,
-        reviewCount: count,
-      };
-    }
+    // QA-REV-002: dedupe by athleteId — "una persona = una opinión". A relink
+    // mints a new `${linkId}_${athleteId}` doc that would otherwise inflate the
+    // aggregate; aggregateFromReviews collapses to the latest review per athlete.
+    const update = aggregateFromReviews(
+      snap.docs.map((doc) => ({
+        docId: doc.id,
+        athleteId: doc.data().athleteId as string | undefined,
+        rating: doc.data().rating as number | undefined,
+        updatedAt: doc.data().updatedAt,
+      })),
+    );
 
     // 2. Check profile exists before writing (REQ-RV-CF-006).
     const profileRef = db.collection("trainerPublicProfiles").doc(trainerId);

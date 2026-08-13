@@ -2,10 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/feed/presentation/widgets/unfriend_confirmation_sheet.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 // ---------------------------------------------------------------------------
 // Helper: open the sheet from inside a test
 // ---------------------------------------------------------------------------
+
+/// Envuelve un widget suelto con el theme y los delegates de l10n.
+Widget _wrap(Widget child) => MaterialApp(
+      theme: AppTheme.dark(),
+      localizationsDelegates: AppL10n.localizationsDelegates,
+      supportedLocales: AppL10n.supportedLocales,
+      locale: const Locale('es', 'AR'),
+      home: Scaffold(body: child),
+    );
 
 Widget _buildOpenSheetButton({
   required String friendDisplayName,
@@ -13,6 +23,9 @@ Widget _buildOpenSheetButton({
 }) {
   return MaterialApp(
     theme: AppTheme.dark(),
+    localizationsDelegates: AppL10n.localizationsDelegates,
+    supportedLocales: AppL10n.supportedLocales,
+    locale: const Locale('es', 'AR'),
     home: Scaffold(
       body: Builder(
         builder: (ctx) => Center(
@@ -40,9 +53,9 @@ Widget _buildOpenSheetButton({
 
 void main() {
   group('UnfriendConfirmationSheet', () {
-    // SCENARIO-470: sheet renders interpolated friend name + CANCELAR + ELIMINAR
+    // SCENARIO-470: el sheet interpola el nombre + CANCELAR + DEJAR DE SEGUIR
     testWidgets(
-        'SCENARIO-470: sheet renders interpolated friend name, CANCELAR, and ELIMINAR buttons',
+        'SCENARIO-470: el sheet interpola el nombre y muestra CANCELAR y DEJAR DE SEGUIR',
         (tester) async {
       await tester.pumpWidget(
         _buildOpenSheetButton(
@@ -60,13 +73,13 @@ void main() {
 
       // Interpolated copy
       expect(
-        find.text('¿Eliminar amistad con Vicente?'),
+        find.text('¿Dejar de seguir a Vicente?'),
         findsOneWidget,
       );
 
       // Both action buttons
       expect(find.text('CANCELAR'), findsOneWidget);
-      expect(find.text('ELIMINAR'), findsOneWidget);
+      expect(find.text('DEJAR DE SEGUIR'), findsOneWidget);
     });
 
     // SCENARIO-471b: CANCELAR pops the sheet WITHOUT firing onConfirm
@@ -101,7 +114,7 @@ void main() {
 
     // SCENARIO-471: ELIMINAR pops the sheet and fires onConfirm
     testWidgets(
-        'SCENARIO-471: tapping ELIMINAR closes the sheet and calls onConfirm',
+        'SCENARIO-471: tapping DEJAR DE SEGUIR closes the sheet and calls onConfirm',
         (tester) async {
       var confirmCallCount = 0;
 
@@ -118,8 +131,8 @@ void main() {
       // Sheet is open
       expect(find.byType(UnfriendConfirmationSheet), findsOneWidget);
 
-      // Tap ELIMINAR
-      await tester.tap(find.text('ELIMINAR'));
+      // Tap DEJAR DE SEGUIR
+      await tester.tap(find.text('DEJAR DE SEGUIR'));
       await tester.pumpAndSettle();
 
       // Sheet is dismissed
@@ -127,6 +140,48 @@ void main() {
 
       // onConfirm was called exactly once
       expect(confirmCallCount, equals(1));
+    });
+  });
+
+  // REQ-FOLLOW-007 — el sheet se reusa para cancelar una solicitud enviada, y
+  // ahí el copy NO puede hablar de eliminar: todavía no hay vínculo que
+  // eliminar, sólo un pedido que nadie contestó.
+  group('UnfriendConfirmationSheet — modo cancelar solicitud', () {
+    testWidgets('el copy habla de la solicitud, no de dejar de seguir',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        UnfriendConfirmationSheet(
+          friendDisplayName: 'Vicente',
+          mode: UnfollowSheetMode.cancelRequest,
+          onConfirm: () {},
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('¿Cancelar la solicitud a Vicente?'), findsOneWidget);
+      expect(find.text('CANCELAR SOLICITUD'), findsOneWidget);
+      expect(find.text('DEJAR DE SEGUIR'), findsNothing);
+    });
+
+    testWidgets('el botón de descarte dice VOLVER, no CANCELAR',
+        (tester) async {
+      // Si dijera CANCELAR quedarían dos botones que empiezan igual —
+      // "CANCELAR" y "CANCELAR SOLICITUD"— uno al lado del otro, y el que
+      // descarta se leería como el que confirma.
+      var confirmed = false;
+      await tester.pumpWidget(_wrap(
+        UnfriendConfirmationSheet(
+          friendDisplayName: 'Vicente',
+          mode: UnfollowSheetMode.cancelRequest,
+          onConfirm: () => confirmed = true,
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('VOLVER'), findsOneWidget);
+      await tester.tap(find.text('VOLVER'));
+      await tester.pumpAndSettle();
+      expect(confirmed, isFalse);
     });
   });
 }

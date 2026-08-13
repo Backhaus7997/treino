@@ -3,10 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
+import '../../../core/utils/argentina_time.dart';
+import '../../../core/utils/date_labels.dart';
 import '../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../l10n/app_l10n.dart';
 import '../../insights/application/insights_providers.dart';
 import '../../insights/domain/weekly_insights.dart';
 import '../../insights/presentation/widgets/body_silhouette_placeholder.dart';
@@ -58,19 +62,20 @@ class EstaSemanaCard extends ConsumerWidget {
     final palette = AppPalette.of(context);
     final async = ref.watch(weeklyInsightsProvider);
 
-    return TreinoTappable(
-      onTap: () => context.push('/home/insights'),
-      child: Container(
-        decoration: BoxDecoration(
-          color: palette.bgCard,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: palette.border, width: 1),
-        ),
-        child: async.when(
-          loading: () => const _Skeleton(),
-          error: (_, __) => const _ErrorFallback(),
-          data: (insights) => _Loaded(insights: insights),
-        ),
+    // The card itself is NOT tappable. It used to navigate to /home/insights
+    // as a whole, which was undiscoverable (no affordance) and made the
+    // silhouettes/period cards feel accidentally clickable. The explicit
+    // `VER INSIGHTS` CTA inside [_Loaded] now owns that navigation.
+    return Container(
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: palette.border, width: 1),
+      ),
+      child: async.when(
+        loading: () => const _Skeleton(),
+        error: (_, __) => const _ErrorFallback(),
+        data: (insights) => _Loaded(insights: insights),
       ),
     );
   }
@@ -84,6 +89,7 @@ class _Skeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     return TreinoShimmer(
       child: Padding(
         padding: const EdgeInsets.all(18),
@@ -91,7 +97,7 @@ class _Skeleton extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'ESTA SEMANA',
+              l10n.homeEstaSemanaTitle,
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
                 fontSize: 14,
@@ -116,13 +122,14 @@ class _ErrorFallback extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     return Padding(
       padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'ESTA SEMANA',
+            l10n.homeEstaSemanaTitle,
             style: GoogleFonts.barlowCondensed(
               fontWeight: FontWeight.w700,
               fontSize: 14,
@@ -132,7 +139,7 @@ class _ErrorFallback extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           Text(
-            'No pudimos cargar tus insights.',
+            l10n.homeEstaSemanaLoadError,
             style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
           ),
         ],
@@ -151,10 +158,20 @@ class _Loaded extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final wi = insights;
 
+    // #551: "0 esta semana" y "cuenta nueva" son dos estados distintos.
+    // `sessionsCount` cuenta SÓLO la semana corriente, así que por sí solo no
+    // alcanza para elegir copy — un usuario con historial que no entrenó esta
+    // semana veía "Hacé el primero". El fork real lo da
+    // [WeeklyInsights.hasEverCompletedAnyWorkout] (mismo criterio que ya usa
+    // el `_EmptyState` de insights_screen): sin historial → onboarding; con
+    // historial → retomar.
     if (wi == null || wi.sessionsCount == 0) {
-      return const _EmptyState();
+      return _ZeroWeekState(
+        hasHistory: wi?.hasEverCompletedAnyWorkout ?? false,
+      );
     }
 
     return Padding(
@@ -166,7 +183,12 @@ class _Loaded extends StatelessWidget {
           const _CardHeader(),
           const SizedBox(height: 18),
 
-          // ── Streak number (big) + DÍAS ────────────────────────────────
+          // ── Streak number (big) + DÍAS + insights CTA ─────────────────
+          //
+          // The CTA sits in the dead space to the RIGHT of the streak
+          // number — the largest void in the card. Bottom-aligned with the
+          // whole row so it shares a baseline with the "DÍA(S)" unit label
+          // instead of floating against the 96 px digits.
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -183,13 +205,22 @@ class _Loaded extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(bottom: 14),
                 child: Text(
-                  'DÍAS',
+                  l10n.homeEstaSemanaStreakUnit(wi.streak),
                   style: GoogleFonts.barlowCondensed(
                     fontWeight: FontWeight.w700,
                     fontSize: 20,
                     letterSpacing: 1.2,
                     color: palette.accent,
                   ),
+                ),
+              ),
+              const Spacer(),
+              // Flexible, not a bare child: a 3-digit streak plus a long
+              // translated label would otherwise overflow the row.
+              const Flexible(
+                child: Padding(
+                  padding: EdgeInsets.only(bottom: 14),
+                  child: _InsightsCta(),
                 ),
               ),
             ],
@@ -218,11 +249,17 @@ class _Loaded extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: _PeriodCard(label: 'SEMANA', count: wi.sessionsCount),
+                child: _PeriodCard(
+                  label: l10n.homeEstaSemanaPeriodWeek,
+                  count: wi.sessionsCount,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _PeriodCard(label: 'MES', count: wi.monthSessionsCount),
+                child: _PeriodCard(
+                  label: l10n.homeEstaSemanaPeriodMonth,
+                  count: wi.monthSessionsCount,
+                ),
               ),
             ],
           ),
@@ -232,29 +269,140 @@ class _Loaded extends StatelessWidget {
   }
 }
 
-// ── Empty state — para users con 0 sesiones (cuenta nueva) ───────────────────
+// ── Insights CTA ──────────────────────────────────────────────────────────────
+//
+// The whole card is already a tap target for /home/insights
+// ([EstaSemanaCard]'s TreinoTappable), but that carried NO visible affordance —
+// the destination was effectively undiscoverable. This makes it explicit, and
+// gives the action real button semantics, which the card-level GestureDetector
+// (a bare GestureDetector) never had.
+//
+// Compact — NOT full-width like _ZeroWeekState's CTA — because it lives inline
+// beside the streak number rather than as a block at the foot of the card.
+
+class _InsightsCta extends StatefulWidget {
+  const _InsightsCta();
+
+  @override
+  State<_InsightsCta> createState() => _InsightsCtaState();
+}
+
+class _InsightsCtaState extends State<_InsightsCta> {
+  bool _hovered = false;
+
+  void _setHovered(bool value) {
+    if (_hovered == value) return;
+    setState(() => _hovered = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+
+    // Same construction as [HomeCTAButton] (Motion PR3), compact instead of
+    // full-width: Semantics + TreinoTappable + Container. NOT an
+    // OutlinedButton/ElevatedButton — TreinoTappable must REPLACE the tap
+    // handler, never wrap one, or the two recognizers fight in the gesture
+    // arena and the press animation breaks.
+    //
+    // Filled accent, not an outline: the outlined version was visually
+    // indistinguishable from the "RACHA ACTUAL" chip right above it.
+    //
+    // Two distinct feedbacks:
+    // - PRESS  → scale 0.97, owned by [TreinoTappable] (works everywhere).
+    // - HOVER  → lighter fill + accent glow, below. Pointer-only by nature:
+    //   a touch screen never emits enter/exit, so on phones this branch is
+    //   simply never entered. It exists for iPad-with-pointer / desktop /
+    //   web, mirroring the MouseRegion pattern in CoachHubSidebar.
+    return MouseRegion(
+      onEnter: (_) => _setHovered(true),
+      onExit: (_) => _setHovered(false),
+      cursor: SystemMouseCursors.click,
+      child: Semantics(
+        button: true,
+        child: TreinoTappable(
+          onTap: () => context.push('/home/insights'),
+          child: AnimatedContainer(
+            // resolve() collapses to Duration.zero under reduce-motion: the
+            // hover STATE still applies, it just stops being animated.
+            duration: AppMotion.resolve(context, AppMotion.micro),
+            curve: AppMotion.standard,
+            height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: ShapeDecoration(
+              color: _hovered
+                  ? Color.lerp(palette.accent, Colors.white, 0.18)!
+                  : palette.accent,
+              shape: const StadiumBorder(),
+              shadows: _hovered
+                  ? [
+                      BoxShadow(
+                        color: palette.accent.withValues(alpha: 0.45),
+                        blurRadius: 16,
+                        spreadRadius: 1,
+                      ),
+                    ]
+                  : const [],
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              l10n.homeEstaSemanaInsightsCta,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                letterSpacing: 0.8,
+                color: palette.bg,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Zero-week state — semana corriente sin sesiones ──────────────────────────
 //
 // Replace al placeholder "Tocá para ver tus insights" con un layout más
 // motivador: titular grande + ícono de llama (TreinoIcon.streak) + copy
 // invitante + CTA explícito que lleva a la tab Entrenar. Diseño 2026-05-22:
 // no mostramos "0 días / 0 entrenos" porque desmotiva al primer login.
+//
+// #551: dos variantes del mismo layout según [hasHistory]:
+// - `false` → cuenta nueva (0 sesiones TOTALES): copy de onboarding
+//   ("Hacé el primero").
+// - `true` → historial previo pero semana en 0: copy de retomar — decirle
+//   "hacé el primero" a alguien con 19 sesiones borra simbólicamente su
+//   historial.
 
-class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+class _ZeroWeekState extends StatelessWidget {
+  const _ZeroWeekState({required this.hasHistory});
+
+  final bool hasHistory;
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     return Padding(
       padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _CardHeader(emptyState: true),
+          _CardHeader(
+            pillLabel: hasHistory
+                ? l10n.homeEstaSemanaHeaderPillResume
+                : l10n.homeEstaSemanaHeaderPillEmpty,
+          ),
           const SizedBox(height: 18),
           Center(
             child: Text(
-              'TU RACHA\nEMPIEZA ACÁ',
+              hasHistory
+                  ? l10n.homeEstaSemanaResumeTitle
+                  : l10n.homeEstaSemanaEmptyTitle,
               textAlign: TextAlign.center,
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
@@ -272,7 +420,9 @@ class _EmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           Text(
-            'Cada entrenamiento alimenta tu racha. Hacé el primero y empezá a construir tu progreso.',
+            hasHistory
+                ? l10n.homeEstaSemanaResumeBody
+                : l10n.homeEstaSemanaEmptyBody,
             textAlign: TextAlign.center,
             style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
           ),
@@ -290,7 +440,9 @@ class _EmptyState extends StatelessWidget {
                 ),
               ),
               child: Text(
-                'EXPLORAR RUTINAS  →',
+                hasHistory
+                    ? l10n.homeEstaSemanaResumeCta
+                    : l10n.homeEstaSemanaEmptyCta,
                 style: GoogleFonts.barlowCondensed(
                   fontWeight: FontWeight.w700,
                   fontSize: 13,
@@ -307,35 +459,25 @@ class _EmptyState extends StatelessWidget {
 
 // ── Card header: pill (left) + SEM N · MMM (right) ───────────────────────────
 //
-// `emptyState=true` cambia el label a "PRIMER PASO" — versión empty state.
-// `emptyState=false` (default) muestra "RACHA ACTUAL" — versión con data.
+// [pillLabel] permite a los estados de semana-en-cero elegir su propio pill
+// ("PRIMER PASO" / "A RETOMAR", #551). Null (default) muestra "RACHA ACTUAL"
+// — versión con data.
 
 class _CardHeader extends StatelessWidget {
-  const _CardHeader({this.emptyState = false});
+  const _CardHeader({this.pillLabel});
 
-  final bool emptyState;
-
-  static const _monthsEs = [
-    'ENE',
-    'FEB',
-    'MAR',
-    'ABR',
-    'MAY',
-    'JUN',
-    'JUL',
-    'AGO',
-    'SEP',
-    'OCT',
-    'NOV',
-    'DIC',
-  ];
+  final String? pillLabel;
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final now = DateTime.now().toLocal();
+    final l10n = AppL10n.of(context);
+    // QA-PAY-100: ancla "hoy"/semana en ART fijo, para alinear con
+    // insights.daysTrained (ya bucketizado en ART). DateTime.now().toLocal()
+    // se desalineaba en devices con timezone != ART.
+    final now = argentinaNow();
     final week = isoWeekNumber(now);
-    final month = _monthsEs[now.month - 1];
+    final month = monthAbbrev(now, l10n.localeName, upperCase: true);
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -363,7 +505,7 @@ class _CardHeader extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                emptyState ? 'PRIMER PASO' : 'RACHA ACTUAL',
+                pillLabel ?? l10n.homeEstaSemanaHeaderPill,
                 style: GoogleFonts.barlowCondensed(
                   fontWeight: FontWeight.w700,
                   fontSize: 12,
@@ -376,7 +518,7 @@ class _CardHeader extends StatelessWidget {
         ),
         // "SEM N · MMM"
         Text(
-          'SEM $week · $month',
+          l10n.homeEstaSemanaWeekMonth(week, month),
           style: GoogleFonts.barlowCondensed(
             fontWeight: FontWeight.w700,
             fontSize: 12,
@@ -398,14 +540,18 @@ class _StreakSubtext extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final now = DateTime.now().toLocal();
+    final l10n = AppL10n.of(context);
+    // QA-PAY-100: ancla "hoy"/semana en ART fijo, para alinear con
+    // insights.daysTrained (ya bucketizado en ART). DateTime.now().toLocal()
+    // se desalineaba en devices con timezone != ART.
+    final now = argentinaNow();
     final todayIndex = now.weekday - DateTime.monday;
     final trainedToday =
         todayIndex >= 0 && todayIndex < 7 && insights.daysTrained[todayIndex];
 
     final text = trainedToday
-        ? 'No rompas la racha — entrenaste hoy.'
-        : 'No rompas la racha — entrená hoy.';
+        ? l10n.homeEstaSemanaStreakSubtextTrained
+        : l10n.homeEstaSemanaStreakSubtextPending;
 
     return Text(
       text,
@@ -420,12 +566,15 @@ class _DayStrip extends StatelessWidget {
   const _DayStrip({required this.insights});
   final WeeklyInsights insights;
 
-  static const _dayLabels = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
-
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final now = DateTime.now().toLocal();
+    final localeName = AppL10n.of(context).localeName;
+    final dayLabels = weekdayInitials(localeName);
+    // QA-PAY-100: ancla "hoy"/semana en ART fijo, para alinear con
+    // insights.daysTrained (ya bucketizado en ART). DateTime.now().toLocal()
+    // se desalineaba en devices con timezone != ART.
+    final now = argentinaNow();
     final todayIndex = now.weekday - DateTime.monday;
 
     return Row(
@@ -435,7 +584,7 @@ class _DayStrip extends StatelessWidget {
             child: Padding(
               padding: EdgeInsets.only(right: i < 6 ? 8 : 0),
               child: _DayBar(
-                label: _dayLabels[i],
+                label: dayLabels[i],
                 trained: insights.daysTrained[i],
                 isToday: i == todayIndex,
                 isPast: i < todayIndex,
@@ -520,6 +669,7 @@ class _PeriodCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       decoration: BoxDecoration(
@@ -551,7 +701,7 @@ class _PeriodCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'entrenos',
+            l10n.homeEstaSemanaPeriodUnit(count),
             style: GoogleFonts.barlow(fontSize: 12, color: palette.textMuted),
           ),
         ],

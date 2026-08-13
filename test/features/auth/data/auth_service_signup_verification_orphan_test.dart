@@ -44,10 +44,13 @@ void main() {
     when(() => cred.user).thenReturn(user);
     when(() => user.uid).thenReturn('uid-test');
     when(() => user.email).thenReturn('a@b.c');
+    // termsAcceptedAt must be matched too — signUpWithEmail always passes it
+    // now (QA-AUTH-001, issue #434).
     when(
       () => mockRepo.getOrCreate(
         uid: any(named: 'uid'),
         email: any(named: 'email'),
+        termsAcceptedAt: any(named: 'termsAcceptedAt'),
       ),
     ).thenAnswer((_) async => _fakeProfile);
 
@@ -79,6 +82,7 @@ void main() {
       () => mockRepo.getOrCreate(
         uid: 'uid-test',
         email: 'a@b.c',
+        termsAcceptedAt: any(named: 'termsAcceptedAt'),
       ),
     ).called(1);
   });

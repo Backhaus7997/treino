@@ -64,7 +64,7 @@ void main() {
           onTap: () {},
         ),
       ));
-      expect(find.textContaining('5000'), findsOneWidget);
+      expect(find.textContaining('5.000'), findsOneWidget);
     });
 
     testWidgets('renders "—" when distanceKm is null', (tester) async {

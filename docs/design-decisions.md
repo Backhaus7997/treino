@@ -6,7 +6,11 @@ Documento de referencia con la imagen de diseño definitiva de cada módulo de T
 
 ## Navigation bars (fijas en toda la UI)
 
-Las barras de navegación deben quedar **fijas en toda la app**: el contenido scrollea por debajo, la barra permanece visible siempre. Su movimiento y animación siguen el patrón **liquid glass** implementado en [`lib/core/widgets/treino_bottom_bar.dart`](../lib/core/widgets/treino_bottom_bar.dart) (frosted blur + pill highlight con gradient + `AnimatedPositioned` al cambiar de tab).
+Las barras de navegación deben quedar **fijas en toda la app**: el contenido scrollea por debajo y la barra permanece visible siempre. Al scrollear hacia abajo se **compacta** (pierde alto y esconde los labels, quedan los íconos); al subir vuelve entera. Nunca desaparece: los cinco destinos siguen a un toque de distancia.
+
+Su acabado sigue el patrón **liquid glass**, implementado en [`lib/core/widgets/treino_glass_surface.dart`](../lib/core/widgets/treino_glass_surface.dart) y aplicado en [`lib/core/widgets/treino_bottom_bar.dart`](../lib/core/widgets/treino_bottom_bar.dart): relleno translúcido + reflejo especular diagonal + pill highlight con gradient + `AnimatedPositioned` al cambiar de tab.
+
+> **Liquid glass en TREINO NO lleva `BackdropFilter`.** Este documento decía "frosted blur"; era incorrecto. El blur re-samplea en cada frame en el que se mueve contenido por detrás —y todas las pantallas del shell corren con `extendBody: true`, así que siempre hay contenido moviéndose ahí— y tiraba frames en device incluso a `sigma 8` (medido 2026-06-11). El efecto vidrio se consigue con alpha + gradiente: mismo lenguaje visual, costo cero. Si vas a agregar una superficie de vidrio nueva, usá `TreinoGlassSurface`; no reintroduzcas el blur.
 
 ### App Alumno — Bottom Bar
 

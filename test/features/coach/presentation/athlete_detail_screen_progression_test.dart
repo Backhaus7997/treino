@@ -8,7 +8,6 @@ import 'package:treino/features/workout/application/exercise_progression_provide
 import 'package:treino/features/workout/application/session_providers.dart'
     show sessionRepositoryProvider, sessionsByUidProvider;
 import 'package:treino/features/workout/data/session_repository.dart';
-import 'package:treino/features/workout/domain/exercise_progression.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
@@ -44,23 +43,6 @@ SetLog _log(
 // Minimal widget that only renders _ProgressionSection for isolation.
 // We import the progression section indirectly through the athlete_detail_screen
 // by looking for the progression section title key.
-
-Widget _buildTestApp({
-  required WidgetRef Function(BuildContext) refBuilder,
-  required List<Override> overrides,
-}) {
-  return ProviderScope(
-    overrides: overrides,
-    child: MaterialApp(
-      theme: AppTheme.dark(),
-      localizationsDelegates: AppL10n.localizationsDelegates,
-      supportedLocales: AppL10n.supportedLocales,
-      locale: const Locale('es', 'AR'),
-      home:
-          const Scaffold(body: _ProgressionSectionTestHarness(athleteId: 'a1')),
-    ),
-  );
-}
 
 /// Test harness that directly instantiates the progression section.
 /// This avoids needing the full athlete_detail_screen with all its providers.

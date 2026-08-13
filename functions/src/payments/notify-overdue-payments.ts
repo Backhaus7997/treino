@@ -181,6 +181,7 @@ export async function notifyOverduePaymentsHandler(
         app,
         {
           uids: [athleteId],
+          kind: "overdue-payment",
           notification: {
             title: "Pago pendiente",
             body: `Tenés un pago vencido con ${trainerName}. Regularizalo cuando puedas.`,

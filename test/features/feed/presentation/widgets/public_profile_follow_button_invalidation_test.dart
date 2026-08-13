@@ -1,9 +1,14 @@
 /// Tests for REQ-FPS-008 invalidation cleanup (SCENARIO-491b, SCENARIO-492).
 ///
 /// Verifies that after the stream conversion:
-///   - SEGUIR and ACEPTAR do NOT call ref.invalidate for friendshipByPairProvider
-///     or acceptedFriendsProvider (streams self-update)
-///   - ACEPTAR / unfriend DOES preserve ref.invalidate(myFriendsFeedProvider)
+///   - SEGUIR and ACEPTAR do NOT call ref.invalidate for followEdgeProvider
+///     or followingProvider (streams self-update)
+///   - ACEPTAR / dejar de seguir DOES preserve ref.invalidate(myFollowingFeedProvider)
+///
+/// Migración al grafo dirigido: donde antes había UN `friendshipByPairProvider`
+/// por par ahora hay DOS aristas (`follows/{follower}_{followee}`), así que
+/// `friendshipByPairProvider` mapea a `followEdgeProvider(Follow.edgeId(a, b))`
+/// y `acceptedFriendsProvider` a `followingProvider`. Los doc id NO se ordenan.
 library;
 
 import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
@@ -13,13 +18,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/feed/application/feed_screen_providers.dart'
-    show myFriendsFeedProvider;
-import 'package:treino/features/feed/application/friendship_providers.dart'
-    show acceptedFriendsProvider;
-import 'package:treino/features/feed/application/public_profile_providers.dart'
-    show friendshipByPairProvider;
-import 'package:treino/features/feed/domain/friendship.dart';
-import 'package:treino/features/feed/domain/friendship_status.dart';
+    show myFollowingFeedProvider;
+import 'package:treino/features/feed/application/follow_providers.dart'
+    show followEdgeProvider, followingProvider;
+import 'package:treino/features/feed/domain/follow.dart';
+import 'package:treino/features/feed/domain/follow_status.dart';
 import 'package:treino/features/feed/presentation/widgets/public_profile_follow_button.dart';
 import 'package:treino/features/profile/application/user_providers.dart'
     show firestoreProvider;
@@ -29,12 +32,21 @@ import 'package:treino/l10n/app_l10n.dart';
 // Helpers
 // ---------------------------------------------------------------------------
 
-Friendship _pending({required String requesterId}) => Friendship(
-      id: Friendship.sortedDocId('viewer', 'target'),
-      uidA: 'target',
-      uidB: 'viewer',
-      status: FriendshipStatus.pending,
-      requesterId: requesterId,
+/// Arista SALIENTE del viewer: `follows/viewer_target` ("yo lo sigo").
+String get _outgoingId => Follow.edgeId('viewer', 'target');
+
+/// Arista ENTRANTE al viewer: `follows/target_viewer` ("él me sigue").
+String get _incomingId => Follow.edgeId('target', 'viewer');
+
+/// Solicitud RECIBIDA por el viewer: la mandó `target`, así que la arista
+/// pendiente es la ENTRANTE. Reemplaza al viejo `_pending(requesterId: 'target')`
+/// — con un doc por par la dirección se leía de `requesterId`; ahora se lee del
+/// doc id, que no se ordena.
+Follow _incomingPending() => Follow(
+      id: _incomingId,
+      followerUid: 'target',
+      followeeUid: 'viewer',
+      status: FollowStatus.pending,
       members: const ['target', 'viewer'],
       createdAt: DateTime.utc(2026, 1, 1),
     );
@@ -66,89 +78,120 @@ void main() {
   group('PublicProfileFollowButton invalidation cleanup (SCENARIO-491b, 492)',
       () {
     // SCENARIO-491b: SEGUIR onTap does NOT call ref.invalidate for
-    // friendshipByPairProvider or acceptedFriendsProvider
+    // followEdgeProvider or followingProvider
     testWidgets(
-        'SCENARIO-491b: tap SEGUIR does NOT invalidate friendshipByPairProvider or acceptedFriendsProvider',
+        'SCENARIO-491b: tap SEGUIR does NOT invalidate followEdgeProvider or followingProvider',
         (tester) async {
       final firestore = FakeFirebaseFirestore();
 
-      // Track which providers are read (as proxy for invalidation detection).
-      // Since we can't easily intercept ref.invalidate in widget tests,
-      // we verify the behavior by checking that the Firestore doc IS written
-      // (SEGUIR action fired) but no manual invalidate was attempted on
-      // the stream providers.
+      // Invalidation detection: each overridden stream provider counts how many
+      // times its create function runs. With an ACTIVE listener (the Consumer
+      // below) a `ref.invalidate` would force a re-create and bump the counter;
+      // a plain stream emission would not. So "counter unchanged after the tap"
+      // is exactly "no manual invalidate was fired on these stream providers".
       //
-      // The real assertion is structural: after T19 GREEN, the source code
-      // will not contain `invalidate(friendshipByPairProvider` or
-      // `invalidate(acceptedFriendsProvider` — verified by flutter analyze.
-      //
-      // For the widget test, we assert the primary action fired (doc created)
-      // and that no exception occurred (invalidating a StreamProvider is
-      // harmless but we verify the action path was clean).
+      // (El test viejo no podía afirmar esto y lo dejaba como aserción
+      // estructural en el código fuente; el contador lo vuelve ejecutable.)
+      var edgeBuildCount = 0;
+      var followingBuildCount = 0;
 
       await tester.pumpWidget(_wrap(
-        const PublicProfileFollowButton(
-          friendship: null, // null → SEGUIR state
-          viewerUid: 'viewer',
-          targetUid: 'target',
+        Column(
+          children: [
+            // Listeners activos: sin ellos los autoDispose se recrean solos y
+            // el contador no probaría nada.
+            Consumer(
+              builder: (_, ref, __) {
+                ref.watch(followEdgeProvider(_outgoingId));
+                ref.watch(followingProvider('viewer'));
+                return const SizedBox.shrink();
+              },
+            ),
+            const PublicProfileFollowButton(
+              // Sin arista saliente ni entrante → SEGUIR.
+              outgoingFollow: null,
+              incomingFollow: null,
+              viewerUid: 'viewer',
+              targetUid: 'target',
+            ),
+          ],
         ),
         firestore,
         extraOverrides: [
           // Stream providers override — no invalidate should be called on these
-          friendshipByPairProvider.overrideWith(
-            (ref, pair) => Stream.value(null),
-          ),
-          acceptedFriendsProvider.overrideWith(
-            (ref, uid) => Stream.value(const <String>[]),
-          ),
+          followEdgeProvider.overrideWith((ref, edgeId) {
+            edgeBuildCount++;
+            return Stream.value(null);
+          }),
+          followingProvider.overrideWith((ref, uid) {
+            followingBuildCount++;
+            return Stream.value(const <String>[]);
+          }),
         ],
       ));
       await tester.pump();
 
       expect(find.text('SEGUIR'), findsOneWidget);
+      expect(edgeBuildCount, equals(1));
+      expect(followingBuildCount, equals(1));
 
       await tester.tap(find.text('SEGUIR'));
       await tester.pumpAndSettle();
 
-      // Primary action: friendship doc written
-      final docId = Friendship.sortedDocId('viewer', 'target');
-      final snap = await firestore.collection('friendships').doc(docId).get();
+      // Primary action: la arista SALIENTE quedó escrita
+      final snap = await firestore.collection('follows').doc(_outgoingId).get();
       expect(snap.exists, isTrue);
-      expect(snap.data()!['requesterId'], equals('viewer'));
-      // No crash occurred — the tap succeeded without the obsolete invalidation calls
+      expect(snap.data()!['followerUid'], equals('viewer'));
+      expect(snap.data()!['followeeUid'], equals('target'));
+
+      // Los stream providers NO fueron invalidados a mano — se auto-actualizan.
+      expect(
+        edgeBuildCount,
+        equals(1),
+        reason: 'SEGUIR no debe invalidar followEdgeProvider',
+      );
+      expect(
+        followingBuildCount,
+        equals(1),
+        reason: 'SEGUIR no debe invalidar followingProvider',
+      );
     });
 
-    // SCENARIO-492: ACEPTAR onTap DOES call ref.invalidate(myFriendsFeedProvider)
+    // SCENARIO-492: ACEPTAR onTap DOES call ref.invalidate(myFollowingFeedProvider)
     testWidgets(
-        'SCENARIO-492: tap ACEPTAR calls repo.accept AND invalidates myFriendsFeedProvider',
+        'SCENARIO-492: tap ACEPTAR calls repo.acceptRequest AND invalidates myFollowingFeedProvider',
         (tester) async {
       final firestore = FakeFirebaseFirestore();
-      final pending = _pending(requesterId: 'target');
+      // "Solicitud recibida" → arista ENTRANTE pending (`follows/target_viewer`).
+      final incoming = _incomingPending();
 
-      // Seed the friendship doc in Firestore so accept() can update it
+      // Seed la arista en Firestore para que acceptRequest() pueda promoverla
       await firestore
-          .collection('friendships')
-          .doc(pending.id)
-          .set({...pending.toJson(), 'createdAt': Timestamp.now()});
+          .collection('follows')
+          .doc(incoming.id)
+          .set({...incoming.toJson(), 'createdAt': Timestamp.now()});
 
-      // Track myFriendsFeedProvider rebuilds to detect invalidation.
+      // Track myFollowingFeedProvider rebuilds to detect invalidation.
       // Invalidation causes a rebuild only when there's an active listener.
-      // We create an active listener on myFriendsFeedProvider via ProviderScope
+      // We create an active listener on myFollowingFeedProvider via ProviderScope
       // + a Consumer widget, then check if it rebuilt after ACEPTAR.
-      var myFriendsFeedBuildCount = 0;
+      var myFollowingFeedBuildCount = 0;
 
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
             firestoreProvider.overrideWithValue(firestore),
-            friendshipByPairProvider.overrideWith(
-              (ref, pair) => Stream.value(pending),
+            followEdgeProvider.overrideWith(
+              // Saliente ausente, entrante pendiente: el pill ofrece ACEPTAR.
+              (ref, edgeId) => Stream.value(
+                edgeId == _incomingId ? incoming : null,
+              ),
             ),
-            acceptedFriendsProvider.overrideWith(
+            followingProvider.overrideWith(
               (ref, uid) => Stream.value(const <String>[]),
             ),
-            myFriendsFeedProvider.overrideWith((ref) async {
-              myFriendsFeedBuildCount++;
+            myFollowingFeedProvider.overrideWith((ref) async {
+              myFollowingFeedBuildCount++;
               return const [];
             }),
           ],
@@ -160,16 +203,17 @@ void main() {
             home: Scaffold(
               body: Column(
                 children: [
-                  // Active consumer of myFriendsFeedProvider — ensures
+                  // Active consumer of myFollowingFeedProvider — ensures
                   // ref.invalidate triggers a rebuild
                   Consumer(
                     builder: (_, ref, __) {
-                      ref.watch(myFriendsFeedProvider);
+                      ref.watch(myFollowingFeedProvider);
                       return const SizedBox.shrink();
                     },
                   ),
                   PublicProfileFollowButton(
-                    friendship: pending,
+                    outgoingFollow: null,
+                    incomingFollow: incoming,
                     viewerUid: 'viewer',
                     targetUid: 'target',
                   ),
@@ -180,25 +224,25 @@ void main() {
         ),
       );
 
-      // Wait for myFriendsFeedProvider to have an initial build
+      // Wait for myFollowingFeedProvider to have an initial build
       await tester.pump();
-      final countAfterInitialRender = myFriendsFeedBuildCount;
+      final countAfterInitialRender = myFollowingFeedBuildCount;
       expect(countAfterInitialRender, greaterThan(0),
-          reason: 'myFriendsFeedProvider should build at least once on render');
+          reason:
+              'myFollowingFeedProvider should build at least once on render');
 
       await tester.tap(find.text('ACEPTAR'));
       await tester.pumpAndSettle();
 
-      // myFriendsFeedProvider should have been invalidated and rebuilt
+      // myFollowingFeedProvider should have been invalidated and rebuilt
       expect(
-        myFriendsFeedBuildCount,
+        myFollowingFeedBuildCount,
         greaterThan(countAfterInitialRender),
-        reason: 'ACEPTAR must call ref.invalidate(myFriendsFeedProvider)',
+        reason: 'ACEPTAR must call ref.invalidate(myFollowingFeedProvider)',
       );
 
-      // Friendship doc in Firestore should now be accepted
-      final snap =
-          await firestore.collection('friendships').doc(pending.id).get();
+      // La arista entrante en Firestore ahora debe estar aceptada
+      final snap = await firestore.collection('follows').doc(incoming.id).get();
       expect(snap.data()!['status'], equals('accepted'));
     });
   });

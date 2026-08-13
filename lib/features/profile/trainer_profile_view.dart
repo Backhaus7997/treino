@@ -9,6 +9,7 @@ import '../auth/application/auth_providers.dart';
 import '../coach/application/trainer_discovery_providers.dart';
 import '../coach/application/trainer_link_providers.dart';
 import '../coach/domain/trainer_link_status.dart';
+import 'presentation/widgets/eliminar_cuenta_sheet.dart';
 import '../coach/domain/trainer_public_profile.dart';
 import '../workout/application/session_providers.dart' show currentUidProvider;
 import 'application/user_providers.dart';
@@ -27,7 +28,8 @@ import 'application/user_providers.dart';
 ///   - Public profile visibility, location summary, online flag (trainerById)
 ///   - VER PREVIEW → /coach/trainer/:uid
 ///   - EDITAR → /profile/edit-personal (shared form; full trainer fields TBD)
-///   - Disponibilidad → /coach/availability-editor
+///   - Disponibilidad → /profile/availability-editor (mirror of the /coach
+///     route so the PERFIL tab stays highlighted — issue #387)
 ///   - Configuración por defecto → /profile/settings
 ///   - Cerrar sesión → AuthNotifier.signOut
 ///
@@ -50,6 +52,7 @@ class TrainerProfileView extends ConsumerWidget {
 
     final displayName = profileAsync.valueOrNull?.displayName ?? '';
     final initials = _initials(displayName);
+    final linksHasError = linksAsync.hasError && !linksAsync.hasValue;
     final links = linksAsync.valueOrNull ?? const [];
     final activeAlumnos =
         links.where((l) => l.status == TrainerLinkStatus.active).length;
@@ -88,7 +91,8 @@ class TrainerProfileView extends ConsumerWidget {
         _IdentityCard(
           initials: initials.isEmpty ? '·' : initials,
           displayName: displayName.isEmpty ? 'Coach' : displayName,
-          activeAlumnos: activeAlumnos,
+          // A failed links read shows "—" (unknown), not a false "0 alumnos".
+          activeAlumnos: linksHasError ? null : activeAlumnos,
           palette: palette,
         ),
         const SizedBox(height: 14),
@@ -114,9 +118,11 @@ class TrainerProfileView extends ConsumerWidget {
         _MenuRow(
           icon: TreinoIcon.bell,
           label: 'Disponibilidad',
+          // /profile twin of /coach/availability-editor so the bottom bar
+          // keeps PERFIL highlighted while the editor is open (issue #387).
           onTap: () => uid.isEmpty
               ? _toast(context, 'Iniciá sesión para configurar.')
-              : context.push('/coach/availability-editor?trainerId=$uid'),
+              : context.push('/profile/availability-editor?trainerId=$uid'),
           palette: palette,
         ),
         const SizedBox(height: 10),
@@ -143,6 +149,26 @@ class TrainerProfileView extends ConsumerWidget {
           onTap: () => ref.read(authNotifierProvider.notifier).signOut(),
           palette: palette,
         ),
+        const SizedBox(height: 10),
+        // QA-PRO-001: account deletion must be reachable for trainers too —
+        // Apple Guideline 5.1.1(v). The deleteAccount CF is role-agnostic; only
+        // the entry point was missing (EliminarCuentaSheet was athlete-only).
+        _MenuRow(
+          icon: TreinoIcon.trash,
+          label: 'Eliminar cuenta',
+          color: palette.danger,
+          onTap: () => showModalBottomSheet<void>(
+            context: context,
+            useRootNavigator: true,
+            backgroundColor: palette.bgCard,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+            ),
+            isScrollControlled: true,
+            builder: (_) => const EliminarCuentaSheet(),
+          ),
+          palette: palette,
+        ),
       ],
     );
   }
@@ -160,7 +186,10 @@ class _IdentityCard extends StatelessWidget {
 
   final String initials;
   final String displayName;
-  final int activeAlumnos;
+
+  /// Active-athlete count, or null when the links read failed → renders "—"
+  /// (unknown) instead of a misleading "0".
+  final int? activeAlumnos;
   final AppPalette palette;
 
   @override
@@ -232,7 +261,7 @@ class _IdentityCard extends StatelessWidget {
                 Row(
                   children: [
                     _IdentityStat(
-                      value: '$activeAlumnos',
+                      value: activeAlumnos == null ? '—' : '$activeAlumnos',
                       label: 'ALUMNOS',
                       color: palette.accent,
                       palette: palette,

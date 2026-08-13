@@ -15,11 +15,11 @@ import 'package:treino/l10n/app_l10n.dart';
 AppL10n _l10n(WidgetTester tester) =>
     AppL10n.of(tester.element(find.byType(SizedBox)));
 
-Widget _harness() => MaterialApp(
+Widget _harness() => const MaterialApp(
       localizationsDelegates: AppL10n.localizationsDelegates,
       supportedLocales: AppL10n.supportedLocales,
-      locale: const Locale('es', 'AR'),
-      home: const Scaffold(body: SizedBox.shrink()),
+      locale: Locale('es', 'AR'),
+      home: Scaffold(body: SizedBox.shrink()),
     );
 
 // ── Tests ──────────────────────────────────────────────────────────────────
@@ -49,6 +49,18 @@ void main() {
       await t.pumpWidget(_harness());
       await t.pumpAndSettle();
       expect(_l10n(t).workoutStatVolume, 'VOLUMEN');
+    });
+
+    testWidgets('workoutStatDurationMin', (t) async {
+      await t.pumpWidget(_harness());
+      await t.pumpAndSettle();
+      expect(_l10n(t).workoutStatDurationMin, 'DURACIÓN MIN');
+    });
+
+    testWidgets('workoutStatVolumeKg', (t) async {
+      await t.pumpWidget(_harness());
+      await t.pumpAndSettle();
+      expect(_l10n(t).workoutStatVolumeKg, 'VOLUMEN KG');
     });
 
     testWidgets('workoutStatSets', (t) async {
@@ -211,6 +223,18 @@ void main() {
       expect(_l10n(t).workoutDetailStatVolume, 'VOLUMEN');
     });
 
+    testWidgets('workoutDetailStatDurationMin', (t) async {
+      await t.pumpWidget(_harness());
+      await t.pumpAndSettle();
+      expect(_l10n(t).workoutDetailStatDurationMin, 'DURACIÓN MIN');
+    });
+
+    testWidgets('workoutDetailStatVolumeKg', (t) async {
+      await t.pumpWidget(_harness());
+      await t.pumpAndSettle();
+      expect(_l10n(t).workoutDetailStatVolumeKg, 'VOLUMEN KG');
+    });
+
     testWidgets('workoutDetailStatPrsToday', (t) async {
       await t.pumpWidget(_harness());
       await t.pumpAndSettle();
@@ -325,8 +349,7 @@ void main() {
     testWidgets('workoutMisRutinasError', (t) async {
       await t.pumpWidget(_harness());
       await t.pumpAndSettle();
-      expect(
-          _l10n(t).workoutMisRutinasError, 'No pudimos cargar tus rutinas.');
+      expect(_l10n(t).workoutMisRutinasError, 'No pudimos cargar tus rutinas.');
     });
 
     testWidgets('workoutMisRutinasErrorRetry', (t) async {
@@ -432,8 +455,7 @@ void main() {
     testWidgets('workoutPickerEmptyFiltered', (t) async {
       await t.pumpWidget(_harness());
       await t.pumpAndSettle();
-      expect(
-          _l10n(t).workoutPickerEmptyFiltered, 'Ningún ejercicio coincide');
+      expect(_l10n(t).workoutPickerEmptyFiltered, 'Ningún ejercicio coincide');
     });
 
     testWidgets('workoutPickerEmptyFilteredHint', (t) async {

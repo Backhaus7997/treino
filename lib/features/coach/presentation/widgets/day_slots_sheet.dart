@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/widgets/motion/treino_tappable.dart';
 import '../../domain/appointment.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../agenda_formatters.dart';
@@ -46,6 +47,10 @@ class DaySlotsSheet extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+      // Sin TreinoFadeSlideIn de bloque: la ruta modal ya anima la entrada
+      // del sheet — un fade+slide interno era ruido redundante y, además,
+      // inconsistente con los sheets hermanos del módulo (appointment_detail,
+      // session_detail, new_session no tenían ninguna entrada propia).
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -218,7 +223,7 @@ class _BookedChip extends StatelessWidget {
           ),
           if (_canCancel) ...[
             const SizedBox(width: 8),
-            GestureDetector(
+            TreinoTappable(
               onTap: onCancel,
               child:
                   Icon(Icons.cancel_outlined, size: 16, color: palette.accent),

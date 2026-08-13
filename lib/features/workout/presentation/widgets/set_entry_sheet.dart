@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/utils/kg_format.dart';
+import '../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../domain/routine_slot.dart';
 
@@ -73,9 +75,6 @@ class _SetEntrySheetState extends State<SetEntrySheet> {
     );
   }
 
-  String _formatWeight(double w) =>
-      w == w.truncateToDouble() ? w.toInt().toString() : w.toString();
-
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
@@ -88,6 +87,11 @@ class _SetEntrySheetState extends State<SetEntrySheet> {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottomPad),
+      // Sin TreinoFadeSlideIn de bloque: showModalBottomSheet ya anima la
+      // sheet deslizándola desde abajo; el fade+slide-8px interno corría en
+      // simultáneo comunicando lo mismo — motion redundante en el flujo de
+      // logueo de sets, el de mayor frecuencia si vuelve a montarse desde el
+      // player.
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -123,7 +127,7 @@ class _SetEntrySheetState extends State<SetEntrySheet> {
               SizedBox(
                 width: 32,
                 child: (widget.techniqueInstructions?.isNotEmpty ?? false)
-                    ? GestureDetector(
+                    ? TreinoTappable(
                         onTap: _showTechniqueModal,
                         child: Icon(
                           TreinoIcon.infoCircle,
@@ -150,7 +154,7 @@ class _SetEntrySheetState extends State<SetEntrySheet> {
           // Hint objetivo
           Text(
             'Objetivo: ${widget.slot.targetRepsMin}–${widget.slot.targetRepsMax} reps '
-            '· ${widget.slot.targetWeightKg != null ? '${widget.slot.targetWeightKg} kg' : '– kg'}',
+            '· ${widget.slot.targetWeightKg != null ? '${formatWeightKg(widget.slot.targetWeightKg)} kg' : '– kg'}',
             style: GoogleFonts.barlow(
               fontWeight: FontWeight.w400,
               fontSize: 12,
@@ -196,7 +200,7 @@ class _SetEntrySheetState extends State<SetEntrySheet> {
               _StepperButton(icon: '–', onTap: _decWeight),
               const SizedBox(width: 20),
               Text(
-                _formatWeight(_weight),
+                formatWeightKg(_weight),
                 style: GoogleFonts.barlowCondensed(
                   fontWeight: FontWeight.w700,
                   fontSize: 40,
@@ -261,7 +265,7 @@ class _StepperButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    return GestureDetector(
+    return TreinoTappable(
       onTap: onTap,
       child: Container(
         width: 44,
@@ -317,6 +321,8 @@ class TechniqueSheet extends StatelessWidget {
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.75,
       ),
+      // Sin TreinoFadeSlideIn de bloque: showModalBottomSheet ya anima la
+      // sheet — mismo motivo que SetEntrySheet arriba.
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,

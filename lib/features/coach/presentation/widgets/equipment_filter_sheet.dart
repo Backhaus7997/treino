@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../workout/domain/equipment_type.dart';
 import '../../../../l10n/app_l10n.dart';
@@ -73,6 +74,9 @@ class _EquipmentFilterSheetContentState
             color: palette.bg,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
+          // Sin TreinoFadeSlideIn de bloque: la ruta modal (DraggableScrollableSheet)
+          // ya anima la entrada — un fade+slide interno quedaba enmascarado y
+          // era inconsistente con los sheets hermanos sin entrada propia.
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -188,7 +192,7 @@ class _EquipmentRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return TreinoTappable(
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),

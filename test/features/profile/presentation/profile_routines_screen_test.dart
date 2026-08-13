@@ -1,3 +1,8 @@
+// Tests for ProfileRoutinesScreen — read-only mirror of the UNIFIED routines
+// list (workout-area redesign slice 1, 2026-07-27): coach plans pinned on top
+// with "DE TU COACH" chip, ACTIVA chip by activeRoutineId match (always), and
+// the "Buscar PF" promo card while no coach plan exists.
+
 import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -9,6 +14,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
+import 'package:treino/features/profile/data/user_repository.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
@@ -24,6 +30,8 @@ class MockUser extends Mock implements User {
   @override
   String get uid => 'test-uid';
 }
+
+class _MockUserRepository extends Mock implements UserRepository {}
 
 const _uid = 'test-uid';
 
@@ -88,8 +96,20 @@ Widget _buildScreen({required List<Override> overrides}) {
 }
 
 void main() {
-  group('ProfileRoutinesScreen — both sections', () {
+  setUpAll(() {
+    registerFallbackValue(<String, Object?>{});
+  });
+
+  group('ProfileRoutinesScreen — unified list', () {
     final mockUser = MockUser();
+    late _MockUserRepository userRepo;
+
+    setUp(() {
+      // unifiedRoutinesProvider's lazy adoption writes activeRoutineId when
+      // the profile resolves without one — always absorb it with a mock.
+      userRepo = _MockUserRepository();
+      when(() => userRepo.update(any(), any())).thenAnswer((_) async {});
+    });
 
     List<Override> baseOverrides({
       required List<Routine> assigned,
@@ -104,30 +124,48 @@ void main() {
           userProfileProvider.overrideWith(
             (_) => Stream.value(_profile(activeRoutineId: activeRoutineId)),
           ),
+          userRepositoryProvider.overrideWithValue(userRepo),
         ];
 
-    testWidgets('headers for both sections are always present', (tester) async {
+    testWidgets(
+        'coach plan pinned ABOVE own routines in a single list, with the '
+        'DE TU COACH chip', (tester) async {
       await tester.pumpWidget(_buildScreen(
-        overrides: baseOverrides(assigned: const [], own: const []),
+        overrides: baseOverrides(
+          assigned: [_assignedRoutine(id: 'a1', name: 'Plan Fuerza')],
+          own: [_ownRoutine(id: 'o1', name: 'PPL')],
+          activeRoutineId: 'a1',
+        ),
       ));
       await tester.pumpAndSettle();
 
-      expect(find.text('RUTINAS ASIGNADAS POR TU PF'), findsOneWidget);
-      expect(find.text('MIS RUTINAS PROPIAS'), findsOneWidget);
+      // Old section headers are gone — one unified list.
+      expect(find.text('RUTINAS ASIGNADAS POR TU PF'), findsNothing);
+      expect(find.text('MIS RUTINAS PROPIAS'), findsNothing);
+
+      expect(find.text('PLAN FUERZA'), findsOneWidget);
+      expect(find.text('PPL'), findsOneWidget);
+      final coachY = tester.getTopLeft(find.text('PLAN FUERZA')).dy;
+      final ownY = tester.getTopLeft(find.text('PPL')).dy;
+      expect(coachY, lessThan(ownY), reason: 'coach plan pinned on top');
+
+      expect(find.byKey(const Key('profile_routines_coach_chip_a1')),
+          findsOneWidget);
+      expect(find.text('DE TU COACH'), findsOneWidget);
     });
 
     testWidgets(
-        'no assigned + no own → both empty states render, CTA "BUSCAR PF" '
-        'is on the assigned section', (tester) async {
+        'no routines at all → empty card + BUSCAR PF promo render together',
+        (tester) async {
       await tester.pumpWidget(_buildScreen(
         overrides: baseOverrides(assigned: const [], own: const []),
       ));
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('profile_routines_assigned_empty')),
-          findsOneWidget);
       expect(
           find.byKey(const Key('profile_routines_own_empty')), findsOneWidget);
+      expect(find.byKey(const Key('profile_routines_assigned_empty')),
+          findsOneWidget);
       expect(find.byKey(const Key('profile_routines_find_trainer_cta')),
           findsOneWidget);
       expect(find.text('BUSCAR PF'), findsOneWidget);
@@ -147,7 +185,8 @@ void main() {
       expect(find.text('COACH_DESTINATION'), findsOneWidget);
     });
 
-    testWidgets('assigned plans render as cards in the assigned section',
+    testWidgets(
+        'with a coach plan present → the BUSCAR PF promo does NOT render',
         (tester) async {
       await tester.pumpWidget(_buildScreen(
         overrides: baseOverrides(
@@ -156,19 +195,20 @@ void main() {
             _assignedRoutine(id: 'a2', name: 'Plan Fuerza'),
           ],
           own: const [],
+          activeRoutineId: 'a1',
         ),
       ));
       await tester.pumpAndSettle();
 
       expect(find.text('PLAN HIPERTROFIA'), findsOneWidget);
       expect(find.text('PLAN FUERZA'), findsOneWidget);
-      // The empty state of the assigned section is GONE (replaced by cards).
       expect(find.byKey(const Key('profile_routines_assigned_empty')),
           findsNothing);
     });
 
-    testWidgets('own routines render as cards in the own section',
-        (tester) async {
+    testWidgets(
+        'own routines only → cards render + promo still visible below '
+        '(discovery stays promoted while no coach)', (tester) async {
       await tester.pumpWidget(_buildScreen(
         overrides: baseOverrides(
           assigned: const [],
@@ -176,6 +216,7 @@ void main() {
             _ownRoutine(id: 'o1', name: 'PPL'),
             _ownRoutine(id: 'o2', name: 'Full Body'),
           ],
+          activeRoutineId: 'o1',
         ),
       ));
       await tester.pumpAndSettle();
@@ -183,31 +224,13 @@ void main() {
       expect(find.text('PPL'), findsOneWidget);
       expect(find.text('FULL BODY'), findsOneWidget);
       expect(find.byKey(const Key('profile_routines_own_empty')), findsNothing);
-    });
-
-    testWidgets(
-        'ACTIVA chip renders on the active card only when 2+ own routines '
-        'AND activeRoutineId points to one of them', (tester) async {
-      await tester.pumpWidget(_buildScreen(
-        overrides: baseOverrides(
-          assigned: const [],
-          own: [
-            _ownRoutine(id: 'o1', name: 'PPL'),
-            _ownRoutine(id: 'o2', name: 'Full Body'),
-          ],
-          activeRoutineId: 'o2',
-        ),
-      ));
-      await tester.pumpAndSettle();
-
-      expect(find.byKey(const Key('profile_routines_active_chip')),
+      expect(find.byKey(const Key('profile_routines_assigned_empty')),
           findsOneWidget);
-      expect(find.text('ACTIVA'), findsOneWidget);
     });
 
     testWidgets(
-        'ACTIVA chip is HIDDEN with a single own routine even if activeRoutineId '
-        'matches it (single-routine activation is implicit)', (tester) async {
+        'ACTIVA chip renders on the matching card — even with a SINGLE '
+        'routine (slice 1 contract: no >1 gate)', (tester) async {
       await tester.pumpWidget(_buildScreen(
         overrides: baseOverrides(
           assigned: const [],
@@ -217,14 +240,31 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(
-          find.byKey(const Key('profile_routines_active_chip')), findsNothing);
+      expect(find.byKey(const Key('profile_routines_active_chip')),
+          findsOneWidget);
+      expect(find.text('ACTIVA'), findsOneWidget);
+    });
+
+    testWidgets('ACTIVA chip can sit on the coach plan card', (tester) async {
+      await tester.pumpWidget(_buildScreen(
+        overrides: baseOverrides(
+          assigned: [_assignedRoutine(id: 'a1', name: 'Plan Fuerza')],
+          own: [_ownRoutine(id: 'o1', name: 'PPL')],
+          activeRoutineId: 'a1',
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('profile_routines_active_chip')),
+          findsOneWidget);
+      // Both chips coexist on the pinned coach card.
+      expect(find.byKey(const Key('profile_routines_coach_chip_a1')),
+          findsOneWidget);
     });
 
     testWidgets(
-        'ACTIVA chip is HIDDEN when no own routine matches activeRoutineId '
-        '(stale pointer, e.g. routine was archived after being marked active)',
-        (tester) async {
+        'ACTIVA chip is HIDDEN when activeRoutineId matches nothing '
+        '(stale pointer)', (tester) async {
       await tester.pumpWidget(_buildScreen(
         overrides: baseOverrides(
           assigned: const [],
@@ -241,7 +281,7 @@ void main() {
           find.byKey(const Key('profile_routines_active_chip')), findsNothing);
     });
 
-    testWidgets('shows loader while assigned routines are loading',
+    testWidgets('shows loader while the unified list is loading',
         (tester) async {
       // Use a Completer that never completes to hold loading state without
       // creating a pending timer (would fail test teardown).
@@ -253,6 +293,7 @@ void main() {
           userCreatedRoutinesProvider(_uid)
               .overrideWith((_) => Stream<List<Routine>>.value(const [])),
           userProfileProvider.overrideWith((_) => Stream.value(_profile())),
+          userRepositoryProvider.overrideWithValue(userRepo),
         ],
       ));
       await tester.pump();

@@ -5,6 +5,49 @@
   "homeAthleteFirstRunBody": "Creá tu primera rutina o buscá un entrenador para empezar.",
   "homeAthleteFirstRunCreateCta": "CREAR RUTINA",
   "homeAthleteFirstRunFindTrainerCta": "Buscar entrenador",
+  "homeEstaSemanaTitle": "ESTA SEMANA",
+  "homeEstaSemanaLoadError": "No pudimos cargar tus insights.",
+  "homeEstaSemanaHeaderPill": "RACHA ACTUAL",
+  "homeEstaSemanaHeaderPillEmpty": "PRIMER PASO",
+  "homeEstaSemanaWeekMonth": "SEM {week} · {month}",
+  "@homeEstaSemanaWeekMonth": {
+    "placeholders": {
+      "week": {
+        "type": "int"
+      },
+      "month": {
+        "type": "String"
+      }
+    }
+  },
+  "homeEstaSemanaStreakUnit": "{count, plural, =1{DÍA} other{DÍAS}}",
+  "@homeEstaSemanaStreakUnit": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeEstaSemanaStreakSubtextTrained": "No rompas la racha — entrenaste hoy.",
+  "homeEstaSemanaStreakSubtextPending": "No rompas la racha — entrena hoy.",
+  "homeEstaSemanaPeriodWeek": "SEMANA",
+  "homeEstaSemanaPeriodMonth": "MES",
+  "homeEstaSemanaPeriodUnit": "{count, plural, =1{entreno} other{entrenos}}",
+  "@homeEstaSemanaPeriodUnit": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeEstaSemanaEmptyTitle": "TU RACHA\nEMPIEZA AQUÍ",
+  "homeEstaSemanaEmptyBody": "Cada entrenamiento alimenta tu racha. Haz el primero y empieza a construir tu progreso.",
+  "homeEstaSemanaEmptyCta": "EXPLORAR RUTINAS  →",
+  "homeEstaSemanaInsightsCta": "VER INSIGHTS  →",
+  "homeEstaSemanaHeaderPillResume": "A RETOMAR",
+  "homeEstaSemanaResumeTitle": "TU RACHA\nTE ESPERA",
+  "homeEstaSemanaResumeBody": "Ya tienes historial construido. Esta semana aún está en cero — retoma hoy y sigue sumando progreso.",
+  "homeEstaSemanaResumeCta": "VOLVER A ENTRENAR  →",
   "@@locale": "es",
   "@@x-note": "Copia defensiva de intl_es_AR.arb (decisión Q3 del audit). El locale real lo fija locale_resolver.dart → es-AR; esto es seguro de muerte: si algún día se quita ese lock, plain-`es` muestra español válido en vez de strings vacíos.",
   "authSplashTagline": "ENTRENÁ. COMPARTÍ. CRECÉ.",
@@ -114,12 +157,19 @@
   "routineEditorDuplicateWeekBody": "",
   "routineEditorDialogCancel": "",
   "routineEditorDialogConfirm": "",
+  "routineEditorCopyPrescriptionTitle": "¿Copiar sets?",
+  "routineEditorCopyPrescriptionBody": "Se reemplazarán los sets de este ejercicio por los de «{sourceExercise}».",
+  "routineEditorSlotMenuCopyPrevious": "Copiar sets del anterior",
   "routineEditorSlotMenuReplace": "Cambiar ejercicio",
   "routineEditorSlotMenuMoveUp": "Subir",
   "routineEditorSlotMenuMoveDown": "Bajar",
   "routineEditorSlotMenuRemove": "Eliminar",
   "routineEditorRestLabel": "Descanso",
   "routineEditorAddSet": "+ Agregar set",
+  "routineEditorFillKgA11y": "Replicar el peso del primer set en todos",
+  "routineEditorFillKgApplied": "Peso replicado en todos los sets.",
+  "routineEditorFillKgEmpty": "Introduce el peso del primer set para poder replicarlo.",
+  "routineEditorFillKgUndo": "Deshacer",
   "routineEditorMeasureReps": "Reps",
   "routineEditorMeasureTime": "Tiempo",
   "routineEditorSetTypeNormal": "",
@@ -143,9 +193,8 @@
   "routineDetailWeekLabel": "SEM {week}",
   "routineDetailPlanComplete": "PLAN COMPLETADO",
   "routineDetailCompleted": "COMPLETADO",
-  "routineDetailWeekLocked": "SEMANA BLOQUEADA",
-  "routineDetailDayLocked": "DÍA BLOQUEADO",
   "routineDetailStart": "EMPEZAR",
+  "routineDetailRepeat": "REPETIR",
   "@routineEditorDuplicateWeekBody": {
     "placeholders": {
       "sourceWeek": {
@@ -186,8 +235,8 @@
   "feedMessagesA11y": "Mensajes",
   "feedSearchA11y": "Buscar",
   "feedCreatePostA11y": "Crear publicación",
-  "feedFriendRequestsA11y": "Solicitudes de amistad",
-  "feedFriendRequestsWithCountA11y": "Solicitudes de amistad, {count} pendientes",
+  "feedFriendRequestsA11y": "Solicitudes de seguidores",
+  "feedFriendRequestsWithCountA11y": "Solicitudes de seguidores, {count} pendientes",
   "feedPublishingA11y": "Publicando…",
   "searchUsersClearA11y": "Limpiar búsqueda",
   "publicProfileMessageDisabledA11y": "Mensaje (próximamente)",
@@ -199,7 +248,38 @@
       }
     }
   },
+  "a11yRankingRowButton": "Ver el perfil de {name}",
+  "@a11yRankingRowButton": {
+    "description": "Semantics label for a leaderboard row in gym rankings. The row is a button that opens that athlete's public profile. Describes the ACTION, not the visuals — the row shows rank, name and metric, so reusing an avatar label would announce something the row is not.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "a11yReactionLike": "Me gusta",
+  "@a11yReactionLike": {
+    "description": "Localized accessible name for the like reaction in a feed post's reaction row."
+  },
+  "a11yReactionFire": "Fuego",
+  "@a11yReactionFire": {
+    "description": "Localized accessible name for the fire reaction in a feed post's reaction row."
+  },
+  "a11yReactionClap": "Aplausos",
+  "@a11yReactionClap": {
+    "description": "Localized accessible name for the applause reaction in a feed post's reaction row."
+  },
+  "a11yReactionCount": "{count, plural, =0{sin reacciones} =1{1 reacción} other{{count} reacciones}}",
+  "@a11yReactionCount": {
+    "description": "Localized reaction count announced after the reaction name in a feed post's reaction row.",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
   "a11yAvatarLabelGeneric": "Foto de perfil",
+  "a11yHomeAvatarButton": "Ver tu perfil",
   "homePendingRequestsA11y": "{count} solicitudes pendientes",
   "@homePendingRequestsA11y": {
     "placeholders": {
@@ -237,6 +317,34 @@
   "agendaNoUpcomingSessions": "Tu entrenador todavía no te agendó sesiones.",
   "agendaSaveError": "No pudimos guardar. Inténtalo de nuevo.",
   "agendaSaveSuccess": "Horario guardado.",
+  "agendaCobrarCta": "COBRAR",
+  "agendaCobradoLabel": "Cobrado",
+  "agendaCobrarMontoLabel": "MONTO (ARS)",
+  "agendaCobrarConceptoLabel": "CONCEPTO",
+  "agendaCobrarVenceElLabel": "VENCE EL (OPCIONAL)",
+  "agendaCobrarVenceElHint": "Sin fecha de vencimiento",
+  "agendaCobrarVenceElQuitar": "Quitar fecha de vencimiento",
+  "agendaCobrarConfirmCta": "CONFIRMAR COBRO",
+  "agendaCobrarCompletaCampos": "Completa todos los campos.",
+  "agendaCobrarMontoInvalido": "Ingresa un monto válido.",
+  "agendaCobrarSuccess": "Turno cobrado.",
+  "agendaCobrarError": "No pudimos registrar el cobro. Inténtalo de nuevo.",
+  "agendaCobrarConceptoDefault": "Sesión {date}",
+  "@agendaCobrarConceptoDefault": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "agendaCobrarTarifaReferencia": "Tarifa de referencia: {amount}",
+  "@agendaCobrarTarifaReferencia": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
   "coachHubSectionLoadError": "No pudimos cargar esta sección.",
   "coachHubSignOutError": "No pudimos cerrar sesión. Inténtalo de nuevo.",
   "coachHubLoginPrompt": "Ingresa con la cuenta que ya usas en la app móvil.",
@@ -311,6 +419,16 @@
   "coachHubAlumnosStatusDebt": "Con deuda",
   "coachHubAlumnosStatusPaused": "Pausado",
   "coachHubAlumnosStatusInactive": "Inactivo",
+  "coachHubAlumnosViewTable": "Tabla",
+  "coachHubAlumnosViewCards": "Cards",
+  "coachHubAlumnosDebtAmount": "Debe {amount}",
+  "@coachHubAlumnosDebtAmount": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
   "coachHubAlumnoDetailNotasTitle": "Notas privadas",
   "coachHubAlumnoDetailNotasSubtitle": "Anota lo que necesites sobre este alumno. Solo tú lo ves.",
   "coachHubAlumnoDetailNotasHint": "Ej: Lesión de rodilla derecha, evitar sentadilla profunda…",
@@ -353,8 +471,21 @@
   },
   "routineEditorMissingReps": "Completa las reps de los sets antes de guardar.",
   "feedPostPublishedSuccess": "Post publicado.",
+  "postCardMenuA11y": "Opciones del post",
+  "coachHubAlumnosRowActionsA11y": "Opciones del alumno",
+  "postCardMenuEdit": "Editar",
+  "postCardMenuDelete": "Eliminar",
+  "postCardDeleteConfirmTitle": "¿Eliminar este post?",
+  "postCardDeleteConfirmBody": "Esta acción no se puede deshacer.",
+  "postCardDeleteSuccess": "Post eliminado.",
+  "postCardDeleteError": "No pudimos eliminar el post. Inténtalo de nuevo.",
+  "createPostEditTitle": "EDITAR POST",
+  "createPostSaveChanges": "GUARDAR",
+  "createPostSaveChangesA11y": "Guardar cambios",
+  "createPostSavingA11y": "Guardando…",
+  "feedPostUpdatedSuccess": "Cambios guardados.",
   "feedRequestSentSuccess": "Solicitud enviada.",
-  "feedRequestAcceptedSuccess": "Ahora son amigos.",
+  "feedRequestAcceptedSuccess": "Solicitud aceptada.",
   "feedFriendActionError": "No pudimos completar la acción. Inténtalo de nuevo.",
   "profilePersonalSaveSuccess": "Cambios guardados.",
   "profileGymSaveSuccess": "Gimnasio actualizado.",
@@ -413,6 +544,14 @@
       }
     }
   },
+  "progressionFrequencyPeriod": "{count, plural, =0{Sin sesiones en este período} =1{1 sesión en este período} other{{count} sesiones en este período}}",
+  "@progressionFrequencyPeriod": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "progressionSinglePointHint": "Necesitas al menos 2 sesiones para ver la evolución.",
   "progressionEmptyExercise": "Sin datos para este ejercicio.",
   "progressionEmpty": "Sin registros de series todavía.",
@@ -445,6 +584,10 @@
       "name": { "type": "String" }
     }
   },
+  "dashboardGreetingPrefix": "BUENAS, ",
+  "@dashboardGreetingPrefix": {
+    "description": "Greeting prefix rendered before the trainer's name (styled separately) in the Coach Hub dashboard WelcomeCard. Trailing space is intentional."
+  },
   "dashboardSummaryLine": "Tenés {sessions} sesiones hoy, {paraRevisar} para revisar, {pagos} pagos pendientes",
   "@dashboardSummaryLine": {
     "description": "Dashboard WelcomeCard summary line.",
@@ -454,7 +597,7 @@
       "pagos": { "type": "int" }
     }
   },
-  "dashboardQuickActionNuevoAlumno": "+ Nuevo alumno",
+  "dashboardQuickActionNuevoAlumno": "Nuevo alumno",
   "@dashboardQuickActionNuevoAlumno": {
     "description": "Quick action to navigate to alumnos section."
   },
@@ -569,11 +712,177 @@
   "insightsTileMuscleDistributionTitle": "Distribución muscular",
   "insightsTileMuscleDistributionSubtitle": "Comparativa actual vs. período anterior",
   "muscleDistributionScreenTitle": "DISTRIBUCIÓN MUSCULAR",
+  "muscleDistributionLoadError": "No pudimos cargar tu distribución muscular. Inténtalo de nuevo.",
+  "frequentExercisesLoadError": "No pudimos cargar tus ejercicios frecuentes. Inténtalo de nuevo.",
+  "exerciseProgressionScreenTitle": "EVOLUCIÓN POR EJERCICIO",
+  "insightsTileExerciseProgressionTitle": "Evolución por ejercicio",
+  "insightsTileExerciseProgressionSubtitle": "Tu progreso en cada ejercicio + records",
+  "progressionSearchHint": "Buscar ejercicio…",
+  "progressionSearchNoResults": "Ningún ejercicio tuyo coincide con la búsqueda.",
+  "insightsTileMeasurementsTitle": "Medidas",
+  "insightsTileMeasurementsSubtitle": "Peso y medidas corporales en el tiempo",
+  "measurementsScreenTitle": "MEDIDAS",
+  "measurementsSelfLogNotesHint": "Notas (opcional)…",
+  "measurementsAddSelfLog": "Registrar medición",
+  "measurementsProfileCardTitle": "TUS DATOS",
+  "measurementsProfileCardHint": "Los cargaste al registrarte. Edítalos desde tu perfil.",
+  "measurementsWeightLabel": "Peso",
+  "measurementsHeightLabel": "Altura",
+  "measurementsEmptyState": "Todavía no hay mediciones cargadas. Toca + para registrar la primera y seguir tu evolución.",
+  "measurementsNeedsMoreData": "Con una sola medición no hay progreso que mostrar. Falta al menos una más.",
+  "measurementsHistoryTitle": "HISTORIAL",
+  "measurementHistoryEditTooltip": "Editar medición",
+  "measurementHistoryDeleteTooltip": "Eliminar medición",
+  "measurementHistoryShowAll": "Ver todas ({count})",
+  "measurementHistoryShowLess": "Ver menos",
+  "measurementDeleteConfirmTitle": "¿Eliminar medición?",
+  "measurementDeleteConfirmBody": "Se eliminará la medición del {date}. Esta acción no se puede deshacer.",
+  "measurementDeleteConfirmAction": "Eliminar",
+  "measurementDeleteSuccess": "Medición eliminada",
+  "measurementDeleteError": "No pudimos eliminar la medición. Inténtalo de nuevo.",
+  "measurementHistorySelfLoggedTag": "Auto-registro",
+  "measurementHistoryTrainerLoggedTag": "Registrada por tu entrenador",
   "insightsTileFrequentExercisesTitle": "Ejercicios frecuentes",
   "insightsTileFrequentExercisesSubtitle": "Tus ejercicios más entrenados",
   "frequentExercisesScreenTitle": "EJERCICIOS FRECUENTES",
   "insightsTileMonthlyReportSubtitle": "Resumen de entrenos por mes",
   "insightsTileVolumeByGroupTitle": "Volumen por grupo",
   "insightsTileVolumeByGroupSubtitle": "Sets vs. objetivo por grupo muscular",
-  "volumeByGroupScreenTitle": "VOLUMEN POR GRUPO"
+  "volumeByGroupScreenTitle": "VOLUMEN POR GRUPO",
+  "volumeByGroupEmptyTarget": "Necesitás una rutina asignada para ver tu volumen objetivo.",
+  "workoutRutinasCoachChip": "DE TU COACH",
+  "workoutPostAutoCompleteText": "¡Terminé mi entreno! 💪",
+  "wellbeingCheckInTitle": "¿CÓMO TE SENTISTE?",
+  "wellbeingCheckInOptional": "Opcional. Podés saltearlo.",
+  "wellbeingFeelingVeryBad": "Muy mal",
+  "wellbeingFeelingBad": "Mal",
+  "wellbeingFeelingNeutral": "Normal",
+  "wellbeingFeelingGood": "Bien",
+  "wellbeingFeelingGreat": "Muy bien",
+  "wellbeingPainQuestion": "¿Tuviste dolor o molestia?",
+  "wellbeingPainYes": "SÍ",
+  "wellbeingPainNo": "NO",
+  "wellbeingPainAreasQuestion": "¿En qué zona?",
+  "wellbeingPainAreasHint": "Podés marcar más de una.",
+  "wellbeingNoteLabel": "Nota (opcional)",
+  "wellbeingNoteHint": "Algo que quieras recordar de hoy",
+  "wellbeingMedicalDisclaimer": "Si el dolor persiste, consultá a un profesional de la salud.",
+  "wellbeingSaveButton": "GUARDAR",
+  "wellbeingSkipButton": "AHORA NO",
+  "wellbeingSavedLabel": "REGISTRADO",
+  "wellbeingEditButton": "Editar",
+  "wellbeingSaveError": "No pudimos guardar tu registro. Probá de nuevo.",
+  "shareWorkoutComposerTitle": "COMPARTIR ENTRENO",
+  "shareWorkoutComposerHint": "¿Cómo estuvo tu entreno?",
+  "shareWorkoutComposerPublish": "PUBLICAR",
+  "shareWorkoutComposerAddPhoto": "AGREGAR FOTO",
+  "shareWorkoutComposerRemovePhoto": "Quitar foto",
+  "shareWorkoutComposerPhotoError": "No pudimos usar esa foto. Probá con otra.",
+  "shareWorkoutComposerPreviewTitle": "TU ENTRENO",
+  "postCardWorkoutDetailShow": "VER DETALLE",
+  "postCardWorkoutDetailHide": "OCULTAR DETALLE",
+  "postCardWorkoutDetailTruncated": "Se muestran los primeros {count} ejercicios.",
+  "workoutPlantillasTrainerChip": "ENTRENADOR",
+  "templateRatingsTitle": "CALIFICACIONES",
+  "templateRatingsNoneYet": "Todavía nadie calificó esta plantilla. ¡Sé el primero!",
+  "templateRatingsCount": "{count, plural, =1{1 calificación} other{{count} calificaciones}}",
+  "templateRatingsMineEmpty": "¿Qué te pareció?",
+  "templateRatingsMineLabel": "Tu calificación",
+  "templateRatingsRateCta": "CALIFICAR",
+  "templateRatingsEditCta": "EDITAR",
+  "templateRatingsEmpty": "Todavía no hay comentarios.",
+  "templateRatingsError": "No pudimos cargar los comentarios.",
+  "templateRatingSheetTitle": "Califica esta plantilla",
+  "templateRatingSheetTitleEdit": "Edita tu calificación",
+  "templateRatingSheetCommentHint": "Cuenta cómo te fue con esta plantilla (opcional)",
+  "templateRatingSheetCancel": "CANCELAR",
+  "templateRatingSheetSubmit": "ENVIAR",
+  "templateRatingSheetSuccess": "¡Gracias por calificar!",
+  "templateRatingSheetError": "No pudimos guardar tu calificación.",
+  "postPrivacySelectorTitle": "VISIBILIDAD",
+  "postPrivacyFriends": "SEGUIDORES",
+  "postPrivacyGym": "MI GYM",
+  "postPrivacyPublic": "PÚBLICO",
+  "postPrivacyNoGymHint": "Asociate a un gym para postear acá",
+  "suggestedUsersTitle": "PERSONAS DE TU GYM",
+  "@suggestedUsersTitle": {
+    "description": "Section heading for same-gym people suggested below the empty Friends feed."
+  },
+  "suggestedUserAnonymous": "Anónimo",
+  "@suggestedUserAnonymous": {
+    "description": "Fallback display name for a suggested public profile without a name."
+  },
+  "a11ySuggestedUserButton": "Ver el perfil de {name}",
+  "@a11ySuggestedUserButton": {
+    "description": "Semantics label for a suggested-user row that opens that person's public profile.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "notificationHistoryTitle": "NOTIFICACIONES",
+  "@notificationHistoryTitle": {"description": "Título de la pantalla de historial de notificaciones."},
+  "notificationHistoryEmpty": "Todavía no tenés notificaciones",
+  "@notificationHistoryEmpty": {"description": "Estado vacío del historial de notificaciones."},
+  "notificationHistoryError": "No pudimos cargar tus notificaciones.",
+  "@notificationHistoryError": {"description": "Estado de error del historial de notificaciones."},
+  "notificationPendingRequests": "{count, plural, =1{1 solicitud de seguidor pendiente} other{{count} solicitudes de seguidor pendientes}}",
+  "@notificationPendingRequests": {"description": "Acceso compacto a solicitudes de amistad pendientes.", "placeholders": {"count": {"type": "int"}}},
+  "notificationBellA11y": "Abrir notificaciones",
+  "@notificationBellA11y": {"description": "Etiqueta accesible de la campanita de notificaciones del feed."},
+  "notificationBellWithCountA11y": "Abrir notificaciones, {count} pendientes",
+  "@notificationBellWithCountA11y": {"description": "Etiqueta accesible de la campanita con su badge combinado.", "placeholders": {"count": {"type": "int"}}},
+  "postDetailTitle": "PUBLICACIÓN",
+  "@postDetailTitle": {"description": "Título de la pantalla de post individual del feed."},
+  "postDetailUnavailable": "Este post ya no está disponible.",
+  "@postDetailUnavailable": {"description": "Estado seguro mostrado cuando el post no existe, fue borrado o no se puede leer."},
+  "feedUnfollowConfirmTitle": "¿Dejar de seguir a {name}?",
+  "@feedUnfollowConfirmTitle": {"description": "Título del sheet de confirmación para dejar de seguir.", "placeholders": {"name": {"type": "String"}}},
+  "feedUnfollowConfirmAction": "DEJAR DE SEGUIR",
+  "@feedUnfollowConfirmAction": {"description": "Botón que confirma dejar de seguir."},
+  "feedUnfollowDismiss": "CANCELAR",
+  "@feedUnfollowDismiss": {"description": "Botón que descarta el sheet de dejar de seguir."},
+  "feedCancelRequestConfirmTitle": "¿Cancelar la solicitud a {name}?",
+  "@feedCancelRequestConfirmTitle": {"description": "Título del sheet para cancelar una solicitud enviada.", "placeholders": {"name": {"type": "String"}}},
+  "feedCancelRequestConfirmAction": "CANCELAR SOLICITUD",
+  "@feedCancelRequestConfirmAction": {"description": "Botón que confirma cancelar la solicitud enviada."},
+  "feedCancelRequestDismiss": "VOLVER",
+  "@feedCancelRequestDismiss": {"description": "Botón que descarta el sheet de cancelar solicitud. Dice VOLVER y no CANCELAR para no chocar con el botón que SÍ cancela la solicitud."},
+  "feedFollowButtonFollowA11y": "Seguir a esta persona",
+  "@feedFollowButtonFollowA11y": {"description": "Semantics del pill en estado SEGUIR."},
+  "feedFollowButtonFollowingA11y": "Siguiendo. Tocá para dejar de seguir",
+  "@feedFollowButtonFollowingA11y": {"description": "Semantics del pill en estado SIGUIENDO."},
+  "feedFollowButtonRequestedA11y": "Solicitud enviada. Tocá para cancelarla",
+  "@feedFollowButtonRequestedA11y": {"description": "Semantics del pill en estado SOLICITUD ENVIADA."},
+  "feedFollowButtonAcceptA11y": "Aceptar la solicitud de seguidor",
+  "@feedFollowButtonAcceptA11y": {"description": "Semantics del pill en estado ACEPTAR."},
+  "feedFollowStartedSuccess": "Ahora seguís a esta persona.",
+  "@feedFollowStartedSuccess": {"description": "Confirmación al seguir a una cuenta pública (auto-aceptada)."},
+  "feedSegmentFollowing": "SEGUIDORES",
+  "@feedSegmentFollowing": {"description": "Pill del segmento del feed que muestra posts de a quienes seguís."},
+  "feedEmptyFollowing": "Aún no hay posts de a quienes seguís",
+  "@feedEmptyFollowing": {"description": "Estado vacío del feed SEGUIDORES."},
+  "chatBlockedComposerNotice": "Para escribirle, esta persona tiene que seguirte.",
+  "@chatBlockedComposerNotice": {"description": "Aviso persistente sobre el composer cuando el destinatario no sigue al usuario y por lo tanto el servidor deniega el envío (REQ-FOLLOW-021)."},
+  "chatBlockedComposerHintA11y": "No podés escribir en este chat",
+  "@chatBlockedComposerHintA11y": {"description": "Semantics del composer deshabilitado por falta de permiso."},
+  "followListTabFollowers": "SEGUIDORES",
+  "@followListTabFollowers": {"description": "Pill de la lista de seguidores en la pantalla de seguidores/seguidos."},
+  "followListTabFollowing": "SIGUIENDO",
+  "@followListTabFollowing": {"description": "Pill de la lista de seguidos en la pantalla de seguidores/seguidos."},
+  "followListEmptyFollowers": "Todavía no tiene seguidores",
+  "@followListEmptyFollowers": {"description": "Estado vacío de la lista de seguidores de otra persona."},
+  "followListEmptyFollowersSelf": "Todavía no tienes seguidores",
+  "@followListEmptyFollowersSelf": {"description": "Estado vacío de la lista de seguidores propia."},
+  "followListEmptyFollowing": "Todavía no sigue a nadie",
+  "@followListEmptyFollowing": {"description": "Estado vacío de la lista de seguidos de otra persona."},
+  "followListEmptyFollowingSelf": "Todavía no sigues a nadie",
+  "@followListEmptyFollowingSelf": {"description": "Estado vacío de la lista de seguidos propia."},
+  "followListLoadError": "No pudimos cargar la lista. Inténtalo de nuevo.",
+  "@followListLoadError": {"description": "Error al cargar la lista de seguidores o seguidos."},
+  "followListOpenFollowersA11y": "Ver seguidores",
+  "@followListOpenFollowersA11y": {"description": "Semantics del contador de SEGUIDORES del perfil, que abre la lista."},
+  "followListOpenFollowingA11y": "Ver seguidos",
+  "@followListOpenFollowingA11y": {"description": "Semantics del contador de SIGUIENDO del perfil, que abre la lista."}
 }

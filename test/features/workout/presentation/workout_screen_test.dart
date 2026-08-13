@@ -1,16 +1,14 @@
-import 'package:firebase_auth/firebase_auth.dart' show User;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/treino_bottom_bar.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
-import 'package:treino/features/gym_rankings/application/ranking_providers.dart';
+import 'package:treino/features/coach/domain/trainer_link.dart';
+import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/l10n/app_l10n.dart';
-import 'package:treino/features/profile/application/ranking_optin_controller_provider.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
@@ -24,18 +22,10 @@ import 'package:treino/features/workout/application/user_routines_providers.dart
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/presentation/routine_detail_screen.dart';
 import 'package:treino/features/workout/presentation/widgets/historial_section.dart';
-import 'package:treino/features/workout/presentation/widgets/mi_plan_section.dart';
-import 'package:treino/features/workout/presentation/widgets/plantillas_section.dart';
+import 'package:treino/features/workout/presentation/widgets/plantillas_tab.dart';
+import 'package:treino/features/workout/presentation/widgets/rutinas_section.dart';
 import 'package:treino/features/workout/trainer_workout_view.dart';
 import 'package:treino/features/workout/workout_screen.dart';
-
-class _MockUser extends Mock implements User {}
-
-User fakeUser(String uid) {
-  final u = _MockUser();
-  when(() => u.uid).thenReturn(uid);
-  return u;
-}
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -61,22 +51,41 @@ UserProfile makeProfile() => UserProfile(
       updatedAt: DateTime.utc(2026, 5, 12),
     );
 
+TrainerLink makeLink() => TrainerLink(
+      id: 'link-1',
+      trainerId: 'trainer-1',
+      athleteId: 'athlete-1',
+      status: TrainerLinkStatus.active,
+      requestedAt: DateTime.utc(2026, 1, 1),
+      acceptedAt: DateTime.utc(2026, 1, 2),
+    );
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-Widget _wrapWorkout(Widget w, {List<Override> overrides = const []}) =>
+Widget _wrapWorkout(
+  Widget w, {
+  List<Override> overrides = const [],
+  TextScaler textScaler = TextScaler.noScaling,
+}) =>
     ProviderScope(
       overrides: [
         currentUidProvider.overrideWithValue('test-uid'),
         sessionsByUidProvider.overrideWith((ref, uid) async => []),
-        // MiPlanSection: return null user → section renders SizedBox.shrink.
-        // Tests that only care about PLANTILLAS / HISTORIAL order don't need
-        // the full MiPlanSection provider stack.
+        // RutinasSection: resolve the unified list to empty so tests that
+        // only care about PLANTILLAS / HISTORIAL don't need a full stack.
         authStateChangesProvider.overrideWith((ref) => const Stream.empty()),
         currentAthleteLinkProvider.overrideWith((ref) async => null),
+        assignedRoutinesProvider('test-uid').overrideWith((ref) async => []),
+        userCreatedRoutinesProvider('test-uid')
+            .overrideWith((ref) => Stream.value(const <Routine>[])),
         ...overrides,
       ],
       child: MaterialApp(
         theme: AppTheme.dark(),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+          child: child!,
+        ),
         localizationsDelegates: AppL10n.localizationsDelegates,
         supportedLocales: AppL10n.supportedLocales,
         locale: const Locale('es', 'AR'),
@@ -100,7 +109,8 @@ void main() {
 
       final container = ProviderContainer(
         overrides: [
-          routineByIdProvider('test-id').overrideWith((_) async => routine),
+          routineByIdStreamProvider('test-id')
+              .overrideWith((_) => Stream.value(routine)),
         ],
       );
       addTearDown(container.dispose);
@@ -171,7 +181,8 @@ void main() {
 
       final container = ProviderContainer(
         overrides: [
-          routineByIdProvider('test-id').overrideWith((_) async => routine),
+          routineByIdStreamProvider('test-id')
+              .overrideWith((_) => Stream.value(routine)),
         ],
       );
       addTearDown(container.dispose);
@@ -195,52 +206,72 @@ void main() {
     });
   });
 
-  // ─── WorkoutScreen tests (T-8.1) ──────────────────────────────────────────
+  // ─── WorkoutScreen tests (workout redesign slice 2: 2 tabs) ───────────────
 
-  group('WorkoutScreen', () {
+  group('WorkoutScreen — tab TU ENTRENO (page 0)', () {
     testWidgets(
-        'three sections rendered in order: MI PLAN → PLANTILLAS → HISTORIAL',
+        'accessibility text scale grows and scrolls the top tabs without overflow',
         (tester) async {
       await tester.pumpWidget(
         _wrapWorkout(
           const WorkoutScreen(),
+          textScaler: const TextScaler.linear(3.2),
           overrides: [
             routinesProvider.overrideWith((ref) async => []),
-            // Provide a user so MiPlanSection is visible (shows empty state).
-            authStateChangesProvider.overrideWith(
-              (ref) => Stream.value(null),
-            ),
-            assignedRoutinesProvider('').overrideWith((ref) async => []),
           ],
         ),
       );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
 
-      // MiPlanSection renders SizedBox.shrink when uid is null (null User).
-      // Test presence of MiPlanSection widget and remaining sections.
-      expect(find.byType(MiPlanSection), findsOneWidget);
-      expect(find.text('PLANTILLAS'), findsOneWidget);
-      expect(find.text('HISTORIAL'), findsOneWidget);
-
-      final miPlanPos = tester.getTopLeft(find.byType(MiPlanSection)).dy;
-      final plantillasPos = tester.getTopLeft(find.text('PLANTILLAS')).dy;
-      final historialPos = tester.getTopLeft(find.text('HISTORIAL')).dy;
-
-      expect(miPlanPos, lessThanOrEqualTo(plantillasPos));
-      expect(plantillasPos, lessThan(historialPos));
+      expect(tester.takeException(), isNull);
+      expect(find.byType(TabBar), findsOneWidget);
+      expect(find.text('TU ENTRENO').hitTestable(), findsOneWidget);
+      for (final label in ['TU ENTRENO', 'PLANTILLAS']) {
+        final text = tester.widget<Text>(find.text(label));
+        expect(text.maxLines, 1);
+        expect(text.softWrap, isFalse);
+      }
     });
 
-    testWidgets('MiPlanSection empty state appears when plans list is empty',
+    testWidgets(
+        'default: pill tabs TU ENTRENO | PLANTILLAS y page 0 con '
+        'RUTINAS → HISTORIAL (sin secciones de plantillas)', (tester) async {
+      await tester.pumpWidget(
+        _wrapWorkout(
+          const WorkoutScreen(),
+          overrides: [
+            routinesProvider.overrideWith((ref) async => []),
+          ],
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      // Segmented pill control with both labels.
+      expect(find.byType(TabBar), findsOneWidget);
+      expect(find.text('TU ENTRENO'), findsOneWidget);
+      expect(find.text('PLANTILLAS'), findsOneWidget);
+
+      // Page 0 body: unified routines + history, in that order. The template
+      // sections left this page — they live in the PLANTILLAS tab now.
+      expect(find.byType(RutinasSection), findsOneWidget);
+      expect(find.text('HISTORIAL'), findsOneWidget);
+      expect(find.byType(PlantillasTab), findsNothing);
+
+      final rutinasPos = tester.getTopLeft(find.byType(RutinasSection)).dy;
+      final historialPos = tester.getTopLeft(find.text('HISTORIAL')).dy;
+      expect(rutinasPos, lessThanOrEqualTo(historialPos));
+    });
+
+    testWidgets(
+        'RutinasSection empty state appears when the unified list is empty',
         (tester) async {
       await tester.pumpWidget(
         _wrapWorkout(
           const WorkoutScreen(),
           overrides: [
             routinesProvider.overrideWith((ref) async => []),
-            currentUidProvider.overrideWithValue('athlete-1'),
-            assignedRoutinesProvider('athlete-1')
-                .overrideWith((ref) async => []),
           ],
         ),
       );
@@ -248,7 +279,10 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
 
       expect(
-        find.text('No tenés rutina asignada todavía.'),
+        find.text(
+          'Todavía no creaste ninguna rutina. '
+          'Tocá CREAR RUTINA para armar la primera.',
+        ),
         findsOneWidget,
       );
     });
@@ -313,9 +347,10 @@ void main() {
 
       expect(tester.takeException(), isNull);
     });
+  });
 
-    testWidgets(
-        'PlantillasSection is present and functional with filteredRoutinesProvider override',
+  group('WorkoutScreen — tab PLANTILLAS (page 1)', () {
+    testWidgets('tapping the PLANTILLAS tab shows the unified template grid',
         (tester) async {
       final routines = [makeRoutine(id: 'r1'), makeRoutine(id: 'r2')];
 
@@ -330,152 +365,204 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
 
-      expect(find.byType(PlantillasSection), findsOneWidget);
+      await tester.tap(find.text('PLANTILLAS'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(PlantillasTab), findsOneWidget);
+      expect(find.text('ROUTINE'), findsNWidgets(2));
+      // Page 0 swiped away.
+      expect(find.byType(RutinasSection), findsNothing);
     });
-  });
 
-  // ─── Two-page Entrenar tab (rankings-v2 Phase 2, task 2.1) ────────────────
-  //
-  // Spec `gym-rankings` — Rankings Placement: for the athlete role, rankings
-  // MUST be reachable as the second page of the Entrenar tab, by swipe
-  // and/or a top tab control. Trainer role NEVER sees the rankings page.
-  // Design `sdd/rankings-v2/design` AD-1: fixed 2-page DefaultTabController +
-  // swipeable TabBarView, zero added rebuilds to page 0's section providers.
-  group('WorkoutScreen — two-page Entrenar tab', () {
-    const uid = 'athlete-1';
-    const gymId = 'gym-a';
-
-    UserProfile athleteProfile({String? gymIdOverride = gymId}) => UserProfile(
-          uid: uid,
-          email: 'a1@test.com',
-          displayName: 'Athlete',
-          role: UserRole.athlete,
-          createdAt: DateTime.utc(2026, 5, 12),
-          updatedAt: DateTime.utc(2026, 5, 12),
-          gymId: gymIdOverride,
-        );
-
-    UserProfile trainerProfile() => UserProfile(
-          uid: uid,
-          email: 't1@test.com',
-          displayName: 'Trainer',
-          role: UserRole.trainer,
-          createdAt: DateTime.utc(2026, 5, 12),
-          updatedAt: DateTime.utc(2026, 5, 12),
-        );
-
-    List<Override> rankingsOverrides({bool rankingOptIn = true}) => [
-          userPublicProfileProvider(uid).overrideWith(
-            (_) => Stream.value(
-              UserPublicProfile(uid: uid, rankingOptIn: rankingOptIn),
-            ),
-          ),
-          streakLeaderboardProvider(gymId).overrideWith((_) async => []),
-          volumeLeaderboardProvider(gymId).overrideWith((_) async => []),
-          squatLeaderboardProvider(gymId).overrideWith((_) async => []),
-          benchLeaderboardProvider(gymId).overrideWith((_) async => []),
-          deadliftLeaderboardProvider(gymId).overrideWith((_) async => []),
-          // AD-4 self-heal fires unconditionally via ref.read whenever
-          // rankingOptIn == true — default to a no-op fake so these tests
-          // never touch real Firestore through the singleton controller.
-          rankingOptInControllerProvider
-              .overrideWithValue(_FakeRankingOptInController()),
-        ];
-
-    Widget wrapAthleteWorkout({
-      String? initialTab,
-      List<Override> overrides = const [],
-    }) =>
-        ProviderScope(
+    testWidgets("initialTab: 'plantillas' opens directly on the grid page",
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapWorkout(
+          const WorkoutScreen(initialTab: 'plantillas'),
           overrides: [
-            currentUidProvider.overrideWithValue(uid),
-            sessionsByUidProvider.overrideWith((ref, u) async => []),
-            authStateChangesProvider
-                .overrideWith((ref) => Stream.value(fakeUser(uid))),
-            currentAthleteLinkProvider.overrideWith((ref) async => null),
-            userProfileProvider.overrideWith(
-              (ref) => Stream.value(athleteProfile()),
-            ),
             routinesProvider.overrideWith((ref) async => []),
-            assignedRoutinesProvider(uid).overrideWith((ref) async => []),
-            userCreatedRoutinesProvider(uid).overrideWith((ref) => Stream.value(
-                  const <Routine>[],
-                )),
-            ...rankingsOverrides(),
-            ...overrides,
           ],
-          child: MaterialApp(
-            theme: AppTheme.dark(),
-            localizationsDelegates: AppL10n.localizationsDelegates,
-            supportedLocales: AppL10n.supportedLocales,
-            locale: const Locale('es', 'AR'),
-            home: Scaffold(
-              body: SizedBox(
-                height: 800,
-                child: WorkoutScreen(initialTab: initialTab),
-              ),
-            ),
-          ),
-        );
-
-    testWidgets(
-        'default (initialTab absent) starts _AthleteWorkout on page 0 '
-        '("Tu entreno")', (tester) async {
-      await tester.pumpWidget(wrapAthleteWorkout());
+        ),
+      );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
 
-      expect(find.byType(MiPlanSection), findsOneWidget);
-      expect(find.byKey(const Key('rankings_invitation_state')), findsNothing);
-      expect(find.byKey(const Key('rankings_section_streak')), findsNothing);
-    });
-
-    testWidgets("initialTab: 'rankings' starts on page 1 (Rankings)",
-        (tester) async {
-      await tester.pumpWidget(wrapAthleteWorkout(initialTab: 'rankings'));
-      await tester.pumpAndSettle();
-
-      expect(find.byType(MiPlanSection), findsNothing);
-      expect(find.byKey(const Key('rankings_section_streak')), findsOneWidget);
-    });
-
-    testWidgets('swiping the TabBarView switches pages', (tester) async {
-      await tester.pumpWidget(wrapAthleteWorkout());
-      await tester.pumpAndSettle();
-
-      expect(find.byType(MiPlanSection), findsOneWidget);
-
-      await tester.fling(find.byType(TabBarView), const Offset(-400, 0), 800);
-      await tester.pumpAndSettle();
-
-      expect(find.byType(MiPlanSection), findsNothing);
-      expect(find.byKey(const Key('rankings_section_streak')), findsOneWidget);
+      expect(find.byType(PlantillasTab), findsOneWidget);
+      expect(find.text('No hay plantillas todavía.'), findsOneWidget);
+      expect(find.byType(RutinasSection), findsNothing);
     });
 
     testWidgets(
-        'a trainer-role user still renders ONLY TrainerWorkoutView — no '
-        'TabBar, no rankings page, no swipe target exists', (tester) async {
+        "unknown initialTab (e.g. 'rankings'-era junk) falls back to "
+        'page 0 without crashing', (tester) async {
       await tester.pumpWidget(
-        ProviderScope(
+        _wrapWorkout(
+          const WorkoutScreen(initialTab: 'xyz'),
           overrides: [
-            currentUidProvider.overrideWithValue(uid),
-            sessionsByUidProvider.overrideWith((ref, u) async => []),
-            authStateChangesProvider
-                .overrideWith((ref) => const Stream.empty()),
-            currentAthleteLinkProvider.overrideWith((ref) async => null),
-            userProfileProvider.overrideWith(
-              (ref) => Stream.value(trainerProfile()),
-            ),
+            routinesProvider.overrideWith((ref) async => []),
           ],
-          child: MaterialApp(
-            theme: AppTheme.dark(),
-            localizationsDelegates: AppL10n.localizationsDelegates,
-            supportedLocales: AppL10n.supportedLocales,
-            locale: const Locale('es', 'AR'),
-            home: const Scaffold(
-              body: SizedBox(height: 800, child: WorkoutScreen()),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(tester.takeException(), isNull);
+      expect(find.byType(RutinasSection), findsOneWidget);
+      expect(find.byType(PlantillasTab), findsNothing);
+    });
+
+    testWidgets(
+        'lifecycle: la cadena de templates del coach sobrevive los swipes '
+        '(keep-alive) y se libera al desmontar la pantalla', (tester) async {
+      final container = ProviderContainer(
+        overrides: [
+          currentUidProvider.overrideWithValue('test-uid'),
+          sessionsByUidProvider.overrideWith((ref, uid) async => []),
+          authStateChangesProvider.overrideWith((ref) => const Stream.empty()),
+          currentAthleteLinkProvider.overrideWith((ref) async => makeLink()),
+          assignedRoutinesProvider('test-uid').overrideWith((ref) async => []),
+          userCreatedRoutinesProvider('test-uid')
+              .overrideWith((ref) => Stream.value(const <Routine>[])),
+          routinesProvider.overrideWith((ref) async => []),
+          userPublicProfileProvider('trainer-1').overrideWith(
+            (ref) => Stream.value(
+              const UserPublicProfile(
+                uid: 'trainer-1',
+                displayName: 'Coach Vic',
+                displayNameLowercase: 'coach vic',
+                sharedTemplatesWithAthletes: true,
+              ),
             ),
           ),
+          trainerTemplatesStreamProvider('trainer-1').overrideWith(
+            (ref) => Stream.value([makeRoutine(id: 'coach-1')]),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      Widget host(Widget child) => UncontrolledProviderScope(
+            container: container,
+            child: MaterialApp(
+              theme: AppTheme.dark(),
+              localizationsDelegates: AppL10n.localizationsDelegates,
+              supportedLocales: AppL10n.supportedLocales,
+              locale: const Locale('es', 'AR'),
+              home: Scaffold(
+                body: SizedBox(height: 800, child: child),
+              ),
+            ),
+          );
+
+      await tester.pumpWidget(host(const WorkoutScreen()));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      // Page 0 activa: PLANTILLAS nunca se visitó → la cadena del coach ni
+      // siquiera se construyó.
+      expect(
+        container.exists(trainerTemplatesStreamProvider('trainer-1')),
+        isFalse,
+      );
+
+      await tester.drag(find.byType(TabBarView), const Offset(-600, 0));
+      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump();
+      expect(find.byType(PlantillasTab), findsOneWidget);
+      expect(
+        container.exists(trainerTemplatesStreamProvider('trainer-1')),
+        isTrue,
+      );
+
+      // Volver a TU ENTRENO: keep-alive → el stream NO se desmonta (sin
+      // churn de listener ni flicker del coach al volver a PLANTILLAS).
+      await tester.drag(find.byType(TabBarView), const Offset(600, 0));
+      await tester.pumpAndSettle();
+      expect(find.byType(RutinasSection), findsOneWidget);
+      expect(
+        container.exists(trainerTemplatesStreamProvider('trainer-1')),
+        isTrue,
+      );
+
+      // Salir de /workout (desmontar la pantalla): TODA la cadena
+      // autoDispose se libera.
+      await tester.pumpWidget(host(const SizedBox()));
+      await tester.pump();
+      await tester.pump();
+      expect(
+        container.exists(trainerTemplatesStreamProvider('trainer-1')),
+        isFalse,
+      );
+    });
+
+    testWidgets('swiping between pages works both ways', (tester) async {
+      await tester.pumpWidget(
+        _wrapWorkout(
+          const WorkoutScreen(),
+          overrides: [
+            routinesProvider.overrideWith((ref) async => []),
+          ],
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.byType(RutinasSection), findsOneWidget);
+
+      // > half the 800px test viewport so the ballistic lands on page 1.
+      await tester.drag(find.byType(TabBarView), const Offset(-600, 0));
+      await tester.pumpAndSettle();
+      expect(find.byType(PlantillasTab), findsOneWidget);
+
+      await tester.drag(find.byType(TabBarView), const Offset(600, 0));
+      await tester.pumpAndSettle();
+      expect(find.byType(RutinasSection), findsOneWidget);
+    });
+  });
+
+  // ─── Rankings relocation ──────────────────────────────────────────────────
+  //
+  // Rankings moved from the Entrenar tab to the FEED tab
+  // (`/feed?tab=rankings`) — the second page here is PLANTILLAS now, never
+  // rankings. Rankings host coverage lives in feed_screen_test.dart.
+  group('WorkoutScreen — no rankings page', () {
+    testWidgets('athlete tabs are TU ENTRENO | PLANTILLAS — no RANKINGS label',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapWorkout(
+          const WorkoutScreen(),
+          overrides: [
+            routinesProvider.overrideWith((ref) async => []),
+          ],
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.text('RANKINGS'), findsNothing);
+      expect(find.byType(RutinasSection), findsOneWidget);
+    });
+
+    testWidgets('a trainer-role user renders ONLY TrainerWorkoutView',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapWorkout(
+          const WorkoutScreen(),
+          overrides: [
+            userProfileProvider.overrideWith(
+              (ref) => Stream.value(
+                UserProfile(
+                  uid: 'u1',
+                  email: 't1@test.com',
+                  displayName: 'Trainer',
+                  role: UserRole.trainer,
+                  createdAt: DateTime.utc(2026, 5, 12),
+                  updatedAt: DateTime.utc(2026, 5, 12),
+                ),
+              ),
+            ),
+          ],
         ),
       );
       await tester.pump();
@@ -485,224 +572,5 @@ void main() {
       expect(find.byType(TabBar), findsNothing);
       expect(find.byType(TabBarView), findsNothing);
     });
-
-    testWidgets(
-        "page 0's section providers are NOT rebuilt when swiping to page 1 "
-        'and back (keep-alive assertion)', (tester) async {
-      var buildCount = 0;
-
-      await tester.pumpWidget(wrapAthleteWorkout(overrides: [
-        assignedRoutinesProvider(uid).overrideWith((ref) async {
-          buildCount++;
-          return <Routine>[];
-        }),
-      ]));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 50));
-
-      expect(buildCount, equals(1));
-
-      // Swipe to page 1 (Rankings).
-      await tester.fling(find.byType(TabBarView), const Offset(-400, 0), 800);
-      await tester.pumpAndSettle();
-
-      // Swipe back to page 0 (Tu entreno).
-      await tester.fling(find.byType(TabBarView), const Offset(400, 0), 800);
-      await tester.pumpAndSettle();
-
-      expect(find.byType(MiPlanSection), findsOneWidget);
-      // autoDispose provider would re-fire if page 0 was disposed on swipe
-      // away — keep-alive means the FutureProvider result is cached, so the
-      // fetch only runs once.
-      expect(buildCount, equals(1));
-    });
   });
-
-  // ─── Rankings page host (rankings-v2 Phase 2, task 2.3) ────────────────────
-  //
-  // Page 1 hosts the gated rankings surface (the Phase 1 leaderboard body) —
-  // reusing the invitation/leaderboards override pattern from
-  // rankings_screen_test.dart.
-  group('WorkoutScreen — rankings page host', () {
-    const uid = 'athlete-1';
-    const gymId = 'gym-a';
-
-    UserProfile athleteProfile() => UserProfile(
-          uid: uid,
-          email: 'a1@test.com',
-          displayName: 'Athlete',
-          role: UserRole.athlete,
-          createdAt: DateTime.utc(2026, 5, 12),
-          updatedAt: DateTime.utc(2026, 5, 12),
-          gymId: gymId,
-        );
-
-    Widget wrapAthleteWorkout({
-      required bool rankingOptIn,
-    }) =>
-        ProviderScope(
-          overrides: [
-            currentUidProvider.overrideWithValue(uid),
-            sessionsByUidProvider.overrideWith((ref, u) async => []),
-            authStateChangesProvider
-                .overrideWith((ref) => Stream.value(fakeUser(uid))),
-            currentAthleteLinkProvider.overrideWith((ref) async => null),
-            userProfileProvider.overrideWith(
-              (ref) => Stream.value(athleteProfile()),
-            ),
-            routinesProvider.overrideWith((ref) async => []),
-            assignedRoutinesProvider(uid).overrideWith((ref) async => []),
-            userCreatedRoutinesProvider(uid).overrideWith((ref) => Stream.value(
-                  const <Routine>[],
-                )),
-            userPublicProfileProvider(uid).overrideWith(
-              (_) => Stream.value(
-                UserPublicProfile(uid: uid, rankingOptIn: rankingOptIn),
-              ),
-            ),
-            streakLeaderboardProvider(gymId).overrideWith((_) async => []),
-            volumeLeaderboardProvider(gymId).overrideWith((_) async => []),
-            squatLeaderboardProvider(gymId).overrideWith((_) async => []),
-            benchLeaderboardProvider(gymId).overrideWith((_) async => []),
-            deadliftLeaderboardProvider(gymId).overrideWith((_) async => []),
-            rankingOptInControllerProvider
-                .overrideWithValue(_FakeRankingOptInController()),
-          ],
-          child: MaterialApp(
-            theme: AppTheme.dark(),
-            localizationsDelegates: AppL10n.localizationsDelegates,
-            supportedLocales: AppL10n.supportedLocales,
-            locale: const Locale('es', 'AR'),
-            home: const Scaffold(
-              body: SizedBox(
-                height: 800,
-                child: WorkoutScreen(initialTab: 'rankings'),
-              ),
-            ),
-          ),
-        );
-
-    testWidgets('invitation state renders when opted out', (tester) async {
-      await tester.pumpWidget(wrapAthleteWorkout(rankingOptIn: false));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 50));
-
-      expect(
-          find.byKey(const Key('rankings_invitation_state')), findsOneWidget);
-      expect(find.byKey(const Key('rankings_section_streak')), findsNothing);
-    });
-
-    testWidgets('leaderboards state renders when opted in', (tester) async {
-      await tester.pumpWidget(wrapAthleteWorkout(rankingOptIn: true));
-      await tester.pumpAndSettle();
-
-      expect(find.byKey(const Key('rankings_section_streak')), findsOneWidget);
-      expect(find.byKey(const Key('rankings_section_volume')), findsOneWidget);
-      expect(find.byKey(const Key('rankings_section_lifts')), findsOneWidget);
-      expect(find.byKey(const Key('rankings_invitation_state')), findsNothing);
-    });
-  });
-
-  // ─── Disable affordance header (rankings-v2 Phase 2, task 2.7) ─────────────
-  group('WorkoutScreen — rankings header disable affordance', () {
-    const uid = 'athlete-1';
-    const gymId = 'gym-a';
-
-    UserProfile athleteProfile() => UserProfile(
-          uid: uid,
-          email: 'a1@test.com',
-          displayName: 'Athlete',
-          role: UserRole.athlete,
-          createdAt: DateTime.utc(2026, 5, 12),
-          updatedAt: DateTime.utc(2026, 5, 12),
-          gymId: gymId,
-        );
-
-    Widget wrapAthleteWorkout({
-      required RankingOptInControllerBase controller,
-    }) =>
-        ProviderScope(
-          overrides: [
-            currentUidProvider.overrideWithValue(uid),
-            sessionsByUidProvider.overrideWith((ref, u) async => []),
-            authStateChangesProvider
-                .overrideWith((ref) => Stream.value(fakeUser(uid))),
-            currentAthleteLinkProvider.overrideWith((ref) async => null),
-            userProfileProvider.overrideWith(
-              (ref) => Stream.value(athleteProfile()),
-            ),
-            routinesProvider.overrideWith((ref) async => []),
-            assignedRoutinesProvider(uid).overrideWith((ref) async => []),
-            userCreatedRoutinesProvider(uid).overrideWith((ref) => Stream.value(
-                  const <Routine>[],
-                )),
-            userPublicProfileProvider(uid).overrideWith(
-              (_) => Stream.value(
-                const UserPublicProfile(uid: uid, rankingOptIn: true),
-              ),
-            ),
-            streakLeaderboardProvider(gymId).overrideWith((_) async => []),
-            volumeLeaderboardProvider(gymId).overrideWith((_) async => []),
-            squatLeaderboardProvider(gymId).overrideWith((_) async => []),
-            benchLeaderboardProvider(gymId).overrideWith((_) async => []),
-            deadliftLeaderboardProvider(gymId).overrideWith((_) async => []),
-            rankingOptInControllerProvider.overrideWithValue(controller),
-          ],
-          child: MaterialApp(
-            theme: AppTheme.dark(),
-            localizationsDelegates: AppL10n.localizationsDelegates,
-            supportedLocales: AppL10n.supportedLocales,
-            locale: const Locale('es', 'AR'),
-            home: const Scaffold(
-              body: SizedBox(
-                height: 800,
-                child: WorkoutScreen(initialTab: 'rankings'),
-              ),
-            ),
-          ),
-        );
-
-    testWidgets(
-        'disable affordance is accessible in the slim header, confirming '
-        'calls disableRankingOptIn', (tester) async {
-      final fake = _FakeRankingOptInController();
-      await tester.pumpWidget(wrapAthleteWorkout(controller: fake));
-      await tester.pumpAndSettle();
-
-      // Both the segmented tab pill and the slim page header read
-      // "RANKINGS" (tab label vs. header title) — assert 2, not scoping by
-      // text alone.
-      expect(find.text('RANKINGS'), findsNWidgets(2));
-      expect(
-          find.byKey(const Key('rankings_disable_affordance')), findsOneWidget);
-
-      await tester.tap(find.byKey(const Key('rankings_disable_affordance')));
-      await tester.pumpAndSettle();
-
-      // Confirm dialog appears — confirm it.
-      expect(find.byType(AlertDialog), findsOneWidget);
-      await tester.tap(find.text('Desactivar'));
-      await tester.pumpAndSettle();
-
-      expect(fake.disabledCalls, equals([uid]));
-    });
-  });
-}
-
-class _FakeRankingOptInController implements RankingOptInControllerBase {
-  final List<String> enabledCalls = [];
-  final List<String> disabledCalls = [];
-
-  @override
-  Future<void> enableRankingOptIn(String uid) async {
-    enabledCalls.add(uid);
-  }
-
-  @override
-  Future<void> disableRankingOptIn(String uid) async {
-    disabledCalls.add(uid);
-  }
-
-  @override
-  Future<void> syncGymIfDesynced(String uid) async {}
 }

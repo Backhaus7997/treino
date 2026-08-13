@@ -17,7 +17,7 @@ import '../../domain/workout_days_month.dart';
 class WorkoutDaysCalendarLabels {
   const WorkoutDaysCalendarLabels({
     required this.streakLabelBuilder,
-    this.weekdayLetters = const ['L', 'M', 'M', 'J', 'V', 'S', 'D'],
+    required this.weekdayLetters,
   });
 
   /// Builds the streak line's full text from the current streak value, e.g.
@@ -25,10 +25,10 @@ class WorkoutDaysCalendarLabels {
   /// not treated as a signal to hide the row.
   final String Function(int streak) streakLabelBuilder;
 
-  /// Mon..Sun single-letter column headers. Defaults to Spanish letters
-  /// (same set as [DayStripNavigator]'s `_weekdayLettersEs`) since the app
-  /// is currently locked to es-AR — callers may override for future
-  /// locales.
+  /// Mon..Sun single-letter column headers. This widget is AppL10n-free
+  /// (R3) — the caller must compute the letters (e.g. via
+  /// `weekdayInitials(localeName)` from `core/utils/date_labels.dart`) and
+  /// inject them here.
   final List<String> weekdayLetters;
 }
 

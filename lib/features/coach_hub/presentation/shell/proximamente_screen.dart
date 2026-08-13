@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 
 import 'section_header.dart';
 
 /// Placeholder único reutilizable para las secciones aún no shipeadas
 /// (ADR-CHW-009). Cada `sections/<section>/routes.dart` lo construye con su
 /// `label`. Sin `Scaffold` — el shell lo provee.
+///
+/// TREINO Motion: entrada fade-slide sobria — al ser compartido por 11
+/// secciones (actividad, cuestionario, habitos, invitaciones, nutricion,
+/// planes, planner, reportes, recetas, templates, suplementos), este único
+/// wrap les suma motion a todas de una.
 class ProximamenteScreen extends StatelessWidget {
   const ProximamenteScreen({super.key, required this.label});
 
@@ -18,17 +24,19 @@ class ProximamenteScreen extends StatelessWidget {
     // proponía 24/32 pero la escala del proyecto no los permite.
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SectionHeader(title: label),
-          const SizedBox(height: 18),
-          Text(
-            'Próximamente.', // i18n: Fase W1
-            style: TextStyle(color: palette.textMuted, fontSize: 16),
-          ),
-          // TODO(W2+): wire real screen
-        ],
+      child: TreinoFadeSlideIn(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SectionHeader(title: label),
+            const SizedBox(height: 18),
+            Text(
+              'Próximamente.', // i18n: Fase W1
+              style: TextStyle(color: palette.textMuted, fontSize: 16),
+            ),
+            // TODO(W2+): wire real screen
+          ],
+        ),
       ),
     );
   }

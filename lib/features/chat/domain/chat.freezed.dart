@@ -31,6 +31,16 @@ mixin _$Chat {
   @TimestampMapConverter()
   Map<String, DateTime>? get lastRead => throw _privateConstructorUsedError;
 
+  /// Id del `trainer_links` que respalda este chat, si es un chat de Coach.
+  ///
+  /// Se expone al cliente porque el gate de escritura del chat social
+  /// (REQ-FOLLOW-012) tiene que poder distinguir un chat de Coach: las rules
+  /// escapan por `'linkId' in chat` en `senderMayPost`, y si la UI no mira lo
+  /// mismo le bloquearía el composer al entrenador aunque el servidor se lo
+  /// permita. La validez del link la garantiza `chatCreateOk` al crear el doc
+  /// y el pin de inmutabilidad en `chats/update`; acá sólo se lee.
+  String? get linkId => throw _privateConstructorUsedError;
+
   /// Serializes this Chat to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
 
@@ -52,7 +62,8 @@ abstract class $ChatCopyWith<$Res> {
       @TimestampConverter() DateTime? lastMessageAt,
       String? lastMessageText,
       String? lastMessageSenderId,
-      @TimestampMapConverter() Map<String, DateTime>? lastRead});
+      @TimestampMapConverter() Map<String, DateTime>? lastRead,
+      String? linkId});
 }
 
 /// @nodoc
@@ -77,6 +88,7 @@ class _$ChatCopyWithImpl<$Res, $Val extends Chat>
     Object? lastMessageText = freezed,
     Object? lastMessageSenderId = freezed,
     Object? lastRead = freezed,
+    Object? linkId = freezed,
   }) {
     return _then(_value.copyWith(
       chatId: null == chatId
@@ -107,6 +119,10 @@ class _$ChatCopyWithImpl<$Res, $Val extends Chat>
           ? _value.lastRead
           : lastRead // ignore: cast_nullable_to_non_nullable
               as Map<String, DateTime>?,
+      linkId: freezed == linkId
+          ? _value.linkId
+          : linkId // ignore: cast_nullable_to_non_nullable
+              as String?,
     ) as $Val);
   }
 }
@@ -125,7 +141,8 @@ abstract class _$$ChatImplCopyWith<$Res> implements $ChatCopyWith<$Res> {
       @TimestampConverter() DateTime? lastMessageAt,
       String? lastMessageText,
       String? lastMessageSenderId,
-      @TimestampMapConverter() Map<String, DateTime>? lastRead});
+      @TimestampMapConverter() Map<String, DateTime>? lastRead,
+      String? linkId});
 }
 
 /// @nodoc
@@ -147,6 +164,7 @@ class __$$ChatImplCopyWithImpl<$Res>
     Object? lastMessageText = freezed,
     Object? lastMessageSenderId = freezed,
     Object? lastRead = freezed,
+    Object? linkId = freezed,
   }) {
     return _then(_$ChatImpl(
       chatId: null == chatId
@@ -177,6 +195,10 @@ class __$$ChatImplCopyWithImpl<$Res>
           ? _value._lastRead
           : lastRead // ignore: cast_nullable_to_non_nullable
               as Map<String, DateTime>?,
+      linkId: freezed == linkId
+          ? _value.linkId
+          : linkId // ignore: cast_nullable_to_non_nullable
+              as String?,
     ));
   }
 }
@@ -191,7 +213,8 @@ class _$ChatImpl implements _Chat {
       @TimestampConverter() this.lastMessageAt,
       this.lastMessageText,
       this.lastMessageSenderId,
-      @TimestampMapConverter() final Map<String, DateTime>? lastRead})
+      @TimestampMapConverter() final Map<String, DateTime>? lastRead,
+      this.linkId})
       : _members = members,
         _lastRead = lastRead;
 
@@ -229,9 +252,20 @@ class _$ChatImpl implements _Chat {
     return EqualUnmodifiableMapView(value);
   }
 
+  /// Id del `trainer_links` que respalda este chat, si es un chat de Coach.
+  ///
+  /// Se expone al cliente porque el gate de escritura del chat social
+  /// (REQ-FOLLOW-012) tiene que poder distinguir un chat de Coach: las rules
+  /// escapan por `'linkId' in chat` en `senderMayPost`, y si la UI no mira lo
+  /// mismo le bloquearía el composer al entrenador aunque el servidor se lo
+  /// permita. La validez del link la garantiza `chatCreateOk` al crear el doc
+  /// y el pin de inmutabilidad en `chats/update`; acá sólo se lee.
+  @override
+  final String? linkId;
+
   @override
   String toString() {
-    return 'Chat(chatId: $chatId, members: $members, createdAt: $createdAt, lastMessageAt: $lastMessageAt, lastMessageText: $lastMessageText, lastMessageSenderId: $lastMessageSenderId, lastRead: $lastRead)';
+    return 'Chat(chatId: $chatId, members: $members, createdAt: $createdAt, lastMessageAt: $lastMessageAt, lastMessageText: $lastMessageText, lastMessageSenderId: $lastMessageSenderId, lastRead: $lastRead, linkId: $linkId)';
   }
 
   @override
@@ -249,7 +283,8 @@ class _$ChatImpl implements _Chat {
                 other.lastMessageText == lastMessageText) &&
             (identical(other.lastMessageSenderId, lastMessageSenderId) ||
                 other.lastMessageSenderId == lastMessageSenderId) &&
-            const DeepCollectionEquality().equals(other._lastRead, _lastRead));
+            const DeepCollectionEquality().equals(other._lastRead, _lastRead) &&
+            (identical(other.linkId, linkId) || other.linkId == linkId));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -262,7 +297,8 @@ class _$ChatImpl implements _Chat {
       lastMessageAt,
       lastMessageText,
       lastMessageSenderId,
-      const DeepCollectionEquality().hash(_lastRead));
+      const DeepCollectionEquality().hash(_lastRead),
+      linkId);
 
   /// Create a copy of Chat
   /// with the given fields replaced by the non-null parameter values.
@@ -282,14 +318,14 @@ class _$ChatImpl implements _Chat {
 
 abstract class _Chat implements Chat {
   const factory _Chat(
-          {required final String chatId,
-          required final List<String> members,
-          @TimestampConverter() required final DateTime createdAt,
-          @TimestampConverter() final DateTime? lastMessageAt,
-          final String? lastMessageText,
-          final String? lastMessageSenderId,
-          @TimestampMapConverter() final Map<String, DateTime>? lastRead}) =
-      _$ChatImpl;
+      {required final String chatId,
+      required final List<String> members,
+      @TimestampConverter() required final DateTime createdAt,
+      @TimestampConverter() final DateTime? lastMessageAt,
+      final String? lastMessageText,
+      final String? lastMessageSenderId,
+      @TimestampMapConverter() final Map<String, DateTime>? lastRead,
+      final String? linkId}) = _$ChatImpl;
 
   factory _Chat.fromJson(Map<String, dynamic> json) = _$ChatImpl.fromJson;
 
@@ -310,6 +346,17 @@ abstract class _Chat implements Chat {
   @override
   @TimestampMapConverter()
   Map<String, DateTime>? get lastRead;
+
+  /// Id del `trainer_links` que respalda este chat, si es un chat de Coach.
+  ///
+  /// Se expone al cliente porque el gate de escritura del chat social
+  /// (REQ-FOLLOW-012) tiene que poder distinguir un chat de Coach: las rules
+  /// escapan por `'linkId' in chat` en `senderMayPost`, y si la UI no mira lo
+  /// mismo le bloquearía el composer al entrenador aunque el servidor se lo
+  /// permita. La validez del link la garantiza `chatCreateOk` al crear el doc
+  /// y el pin de inmutabilidad en `chats/update`; acá sólo se lee.
+  @override
+  String? get linkId;
 
   /// Create a copy of Chat
   /// with the given fields replaced by the non-null parameter values.

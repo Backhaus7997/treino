@@ -62,6 +62,13 @@ final chatsForCurrentUserProvider =
 /// Stream de mensajes de un chat, ordenados por createdAt desc (más nuevo
 /// primero). El ChatScreen usa `ListView.reverse: true` para que se vea más
 /// nuevo abajo sin shifting.
+/// Un chat puntual, en vivo, por id. Alimenta el gate de escritura del
+/// composer: necesita `linkId` para reconocer un chat de Coach.
+final chatByIdProvider =
+    StreamProvider.family.autoDispose<Chat?, String>((ref, chatId) {
+  return ref.watch(chatRepositoryProvider).watchById(chatId);
+});
+
 final messagesProvider =
     StreamProvider.autoDispose.family<List<Message>, String>(
   (ref, chatId) {

@@ -3,15 +3,27 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
+import '../../../core/utils/date_labels.dart';
 import '../../../l10n/app_l10n.dart';
+import '../../../core/widgets/motion/treino_fade_slide_in.dart';
+import '../../../core/widgets/motion/treino_state_switcher.dart';
+import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../chat/application/chat_providers.dart';
 import '../../measurements/application/measurement_providers.dart';
+import '../../measurements/domain/measurement.dart';
 import '../../measurements/presentation/log_measurement_screen.dart';
+import '../../measurements/presentation/widgets/measurement_history_list.dart';
 import '../../measurements/presentation/widgets/measurement_progress_chart.dart';
 import '../application/athlete_note_providers.dart';
+import '../application/follow_up_entry_providers.dart';
 import '../domain/athlete_note.dart';
+import '../domain/follow_up_entry.dart';
+import '../../coach_hub/presentation/sections/pagos/widgets/payment_format.dart'
+    show groupThousands;
+import '../../coach_hub/presentation/sections/pagos/widgets/thousands_input_formatter.dart';
 import '../../payments/application/billing_providers.dart';
 import '../../payments/domain/athlete_billing.dart';
 import '../../insights/presentation/widgets/daily_heatmap_section.dart';
@@ -127,114 +139,76 @@ class _AthleteDetailBody extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
 
-    if (profileAsync.isLoading || plansAsync.isLoading) {
-      return Center(
-        child: CircularProgressIndicator(color: palette.accent),
-      );
-    }
-
-    if (profileAsync.hasError) {
-      return Center(
-        child: Text(
-          AppL10n.of(context).athleteDetailProfileLoadError,
-          style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
-        ),
-      );
-    }
-
-    if (plansAsync.hasError) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Error cargando planes:',
-                style:
-                    GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                plansAsync.error.toString(),
-                style:
-                    GoogleFonts.barlow(color: palette.textMuted, fontSize: 12),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    // Client-side filter: only show plans assigned by current trainer
-    final allPlans = plansAsync.valueOrNull ?? const [];
-    final myPlans = allPlans.where((r) => r.assignedBy == trainerUid).toList();
-
+    // #503: NO whole-screen loading/error gate. Cada sección resuelve su propio
+    // async (igual que antropometría, rendimiento, historial, cobro y nota), así
+    // un `permission-denied` en `assignedRoutinesProvider` — el que dispara el PF
+    // nuevo cuando entra al detalle antes de que la CF
+    // `cleanupAssignedPlansOnUnlink` borre las rutinas del PF anterior — degrada
+    // sólo esa sección en vez de llevarse la pantalla entera puesta.
     return Column(
       children: [
         Expanded(
-          child: ListView(
+          // SingleChildScrollView + Column (no ListView(children:)): un
+          // ListView, aunque construya sus widgets eager, sigue siendo un
+          // viewport — los Elements/State de los TreinoFadeSlideIn que
+          // salen del cacheExtent se desmontan y re-animan al volver a
+          // scrollear. Column dentro de SingleChildScrollView scrollea
+          // como una sola unidad, sin reciclar Elements por ítem (ver doc
+          // de TreinoFadeSlideIn) — esta pantalla es larga, así que el
+          // riesgo era real (ver _PlanesSection más abajo).
+          child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-            children: [
-              // ── Athlete header ──────────────────────────────────────
-              _AthleteHeader(profileAsync: profileAsync),
-              const SizedBox(height: 20),
-
-              // ── Planes section ──────────────────────────────────────
-              Text(
-                AppL10n.of(context).athleteDetailPlansSection,
-                style: GoogleFonts.barlowCondensed(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 12,
-                  letterSpacing: 1.2,
-                  color: palette.textMuted,
-                ),
-              ),
-              const SizedBox(height: 12),
-              if (myPlans.isEmpty)
-                Text(
-                  AppL10n.of(context).coachAthleteDetailNoPlans,
-                  style: GoogleFonts.barlow(
-                    fontWeight: FontWeight.w400,
-                    fontSize: 14,
-                    color: palette.textMuted,
-                  ),
-                )
-              else
-                for (final plan in myPlans) ...[
-                  _PlanCard(
-                    plan: plan,
-                    onTap: () => context.push('/workout/routine/${plan.id}'),
-                    onEdit: () => context.push(
-                      '/workout/routine-editor/$athleteId',
-                      extra: plan.id,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // ── Athlete header ──────────────────────────────────────
+                _AthleteHeader(profileAsync: profileAsync),
+                if (profileAsync.hasError) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    AppL10n.of(context).athleteDetailProfileLoadError,
+                    style: GoogleFonts.barlow(
+                      fontSize: 13,
+                      color: palette.textMuted,
                     ),
-                    onDelete: () => _onDeletePlan(context, ref, plan),
                   ),
-                  const SizedBox(height: 12),
                 ],
+                const SizedBox(height: 20),
 
-              // ── Antropometría section ────────────────────────────────
-              const SizedBox(height: 8),
-              _AntropometriaSection(athleteId: athleteId),
+                // ── Planes section ──────────────────────────────────────
+                _PlanesSection(
+                  athleteId: athleteId,
+                  trainerUid: trainerUid,
+                  plansAsync: plansAsync,
+                ),
 
-              // ── Rendimiento section ──────────────────────────────────
-              const SizedBox(height: 20),
-              _RendimientoSection(athleteId: athleteId),
+                // ── Antropometría section ────────────────────────────────
+                const SizedBox(height: 8),
+                _AntropometriaSection(
+                    athleteId: athleteId, trainerUid: trainerUid),
 
-              // ── Historial de sesiones section ─────────────────────────
-              const SizedBox(height: 20),
-              _EntrenamientosSection(athleteId: athleteId),
+                // ── Rendimiento section ──────────────────────────────────
+                const SizedBox(height: 20),
+                _RendimientoSection(athleteId: athleteId),
 
-              // ── Cobro section ─────────────────────────────────────────
-              const SizedBox(height: 20),
-              _CobroSection(athleteId: athleteId),
+                // ── Historial de sesiones section ─────────────────────────
+                const SizedBox(height: 20),
+                _EntrenamientosSection(athleteId: athleteId),
 
-              // ── Nota del alumno section ───────────────────────────────
-              const SizedBox(height: 20),
-              _NotaSection(athleteId: athleteId, trainerUid: trainerUid),
-            ],
+                // ── Cobro section ─────────────────────────────────────────
+                const SizedBox(height: 20),
+                _CobroSection(athleteId: athleteId),
+
+                // ── Seguimiento section ───────────────────────────────────
+                const SizedBox(height: 20),
+                _SeguimientoSection(
+                    athleteId: athleteId, trainerUid: trainerUid),
+
+                // ── Nota del alumno section ───────────────────────────────
+                const SizedBox(height: 20),
+                _NotaSection(athleteId: athleteId, trainerUid: trainerUid),
+              ],
+            ),
           ),
         ),
 
@@ -342,6 +316,133 @@ class _AthleteDetailBody extends ConsumerWidget {
       );
     }
   }
+}
+
+// ── Planes section ────────────────────────────────────────────────────────────
+
+/// PLANES ASIGNADOS section — the plans [trainerUid] assigned to [athleteId].
+///
+/// Owns its own loading/error rendering (#503). `assignedRoutinesProvider` hits
+/// `RoutineRepository.listAssignedTo()`, and the rules deny the WHOLE query when
+/// a single doc doesn't match — which happens for real while the athlete is
+/// re-linking trainers and `cleanupAssignedPlansOnUnlink` hasn't purged the
+/// previous trainer's routines yet. Scoping the failure here keeps antropometría,
+/// rendimiento, historial, cobro and nota usable instead of replacing the entire
+/// screen with a raw exception dump.
+class _PlanesSection extends ConsumerWidget {
+  const _PlanesSection({
+    required this.athleteId,
+    required this.trainerUid,
+    required this.plansAsync,
+  });
+
+  final String athleteId;
+  final String trainerUid;
+  final AsyncValue<List<Routine>> plansAsync;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Section header ─────────────────────────────────────────────────
+        Text(
+          AppL10n.of(context).athleteDetailPlansSection,
+          style: GoogleFonts.barlowCondensed(
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
+            letterSpacing: 1.2,
+            color: palette.textMuted,
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // ── Async content ──────────────────────────────────────────────────
+        TreinoStateSwitcher(
+          childKey: ValueKey(plansAsync.when(
+            loading: () => 'loading',
+            error: (_, __) => 'error',
+            data: (_) => 'data',
+          )),
+          child: plansAsync.when(
+            loading: () => _card(
+              palette: palette,
+              child: Text(
+                'Cargando…',
+                style:
+                    GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+              ),
+            ),
+            error: (e, __) => _card(
+              palette: palette,
+              child: Text(
+                (e is FirebaseException && e.code == 'permission-denied')
+                    ? 'No pudimos cargar los planes. Puede que el vínculo con '
+                        'este alumno se haya actualizado recién.'
+                    : 'No pudimos cargar los planes.',
+                style:
+                    GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+              ),
+            ),
+            data: (allPlans) {
+              // Client-side filter: only show plans assigned by current trainer
+              final myPlans =
+                  allPlans.where((r) => r.assignedBy == trainerUid).toList();
+
+              if (myPlans.isEmpty) {
+                return Text(
+                  AppL10n.of(context).coachAthleteDetailNoPlans,
+                  style: GoogleFonts.barlow(
+                    fontWeight: FontWeight.w400,
+                    fontSize: 14,
+                    color: palette.textMuted,
+                  ),
+                );
+              }
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final (i, plan) in myPlans.indexed) ...[
+                    TreinoFadeSlideIn(
+                      delay: AppMotion.stagger(i),
+                      child: _PlanCard(
+                        plan: plan,
+                        onTap: () => context.push(
+                          '/coach/athlete/$athleteId/plan/${plan.id}',
+                        ),
+                        onEdit: () => context.push(
+                          '/workout/routine-editor/$athleteId',
+                          extra: plan.id,
+                        ),
+                        onDelete: () => _onDeletePlan(context, ref, plan),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                ],
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _card({required AppPalette palette, required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: palette.border),
+      ),
+      child: child,
+    );
+  }
 
   /// Confirms then deletes a plan the trainer assigned to this athlete, and
   /// refreshes the list (the provider is a Future, so it needs an explicit
@@ -448,26 +549,13 @@ class _AthleteHeader extends StatelessWidget {
 
 // ── Antropometría section ─────────────────────────────────────────────────────
 
-const _kMonthsShort = <String>[
-  '',
-  'ene',
-  'feb',
-  'mar',
-  'abr',
-  'may',
-  'jun',
-  'jul',
-  'ago',
-  'sep',
-  'oct',
-  'nov',
-  'dic',
-];
-
-String _formatMeasurementDate(DateTime dt) {
-  // Dates are stored UTC; display as-is (no .toLocal()) — same UTC convention
-  // used across the dashboard (see appointment_detail_sheet.dart).
-  return '${dt.day} ${_kMonthsShort[dt.month]} ${dt.year}';
+String _formatMeasurementDate(DateTime dt, String localeName) {
+  // Measurement/PerformanceTest recordedAt are real instants (UTC), NOT
+  // appointment wall-clock — localize before formatting or they read +3h in
+  // Argentina and shift the day near midnight (#392). Both call sites here pass
+  // a real instant, so converting inside the helper is safe.
+  final local = dt.toLocal();
+  return '${local.day} ${monthAbbrev(local, localeName)} ${local.year}';
 }
 
 /// Formats a metric double for the summary cards. Mirrors the chart header
@@ -485,16 +573,26 @@ String _formatMetricValue(double value) =>
 ///
 /// When ≥2 measurements exist a PROGRESO chart card is rendered below the
 /// summary card (TANDA-3). With <2 measurements a muted hint card is shown.
+///
+/// Below that, a HISTORIAL list offers per-measurement EDIT/DELETE (#439) via
+/// [MeasurementHistoryList]. Actions only appear on rows this trainer authored
+/// (`recordedBy == trainerUid`) — self-logged rows are read-only, matching the
+/// update/delete rules.
 class _AntropometriaSection extends ConsumerWidget {
-  const _AntropometriaSection({required this.athleteId});
+  const _AntropometriaSection({
+    required this.athleteId,
+    required this.trainerUid,
+  });
 
   final String athleteId;
+  final String trainerUid;
 
-  void _openLogForm(BuildContext context) {
+  void _openLogForm(BuildContext context, {Measurement? initial}) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         fullscreenDialog: true,
-        builder: (_) => LogMeasurementScreen(athleteId: athleteId),
+        builder: (_) =>
+            LogMeasurementScreen(athleteId: athleteId, initial: initial),
       ),
     );
   }
@@ -502,6 +600,7 @@ class _AntropometriaSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final localeName = AppL10n.of(context).localeName;
     final measurementsAsync =
         ref.watch(measurementsForAthleteProvider(athleteId));
 
@@ -521,7 +620,7 @@ class _AntropometriaSection extends ConsumerWidget {
               ),
             ),
             const Spacer(),
-            GestureDetector(
+            TreinoTappable(
               onTap: () => _openLogForm(context),
               child: Text(
                 '+ Cargar',
@@ -537,123 +636,150 @@ class _AntropometriaSection extends ConsumerWidget {
         const SizedBox(height: 12),
 
         // ── Async content ──────────────────────────────────────────────────
-        measurementsAsync.when(
-          loading: () => _card(
-            palette: palette,
-            child: Text(
-              'Cargando…',
-              style: GoogleFonts.barlow(
-                fontSize: 13,
-                color: palette.textMuted,
-              ),
-            ),
-          ),
-          error: (_, __) => _card(
-            palette: palette,
-            child: Text(
-              'No pudimos cargar las medidas.',
-              style: GoogleFonts.barlow(
-                fontSize: 13,
-                color: palette.textMuted,
-              ),
-            ),
-          ),
-          data: (measurements) {
-            if (measurements.isEmpty) {
-              return _card(
-                palette: palette,
-                child: Text(
-                  'Sin mediciones todavía. Cargá la primera.',
-                  style: GoogleFonts.barlow(
-                    fontSize: 13,
-                    color: palette.textMuted,
-                  ),
+        TreinoStateSwitcher(
+          childKey: ValueKey(measurementsAsync.when(
+            loading: () => 'loading',
+            error: (_, __) => 'error',
+            data: (_) => 'data',
+          )),
+          child: measurementsAsync.when(
+            loading: () => _card(
+              palette: palette,
+              child: Text(
+                'Cargando…',
+                style: GoogleFonts.barlow(
+                  fontSize: 13,
+                  color: palette.textMuted,
                 ),
-              );
-            }
-
-            // List sorted ASC → latest is last
-            final latest = measurements.last;
-            final count = measurements.length;
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ── Latest-measurement summary card ────────────────────
-                _card(
+              ),
+            ),
+            error: (_, __) => _card(
+              palette: palette,
+              child: Text(
+                'No pudimos cargar las medidas.',
+                style: GoogleFonts.barlow(
+                  fontSize: 13,
+                  color: palette.textMuted,
+                ),
+              ),
+            ),
+            data: (measurements) {
+              if (measurements.isEmpty) {
+                return _card(
                   palette: palette,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Date
-                      Text(
-                        _formatMeasurementDate(latest.recordedAt),
-                        style: GoogleFonts.barlowCondensed(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                          color: palette.textPrimary,
-                          letterSpacing: 0.4,
+                  child: Text(
+                    'Sin mediciones todavía. Cargá la primera.',
+                    style: GoogleFonts.barlow(
+                      fontSize: 13,
+                      color: palette.textMuted,
+                    ),
+                  ),
+                );
+              }
+
+              // List sorted ASC → latest is last
+              final latest = measurements.last;
+              final count = measurements.length;
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── Latest-measurement summary card ────────────────────
+                  _card(
+                    palette: palette,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Date
+                        Text(
+                          _formatMeasurementDate(latest.recordedAt, localeName),
+                          style: GoogleFonts.barlowCondensed(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            color: palette.textPrimary,
+                            letterSpacing: 0.4,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
+                        const SizedBox(height: 8),
 
-                      // Key metrics (non-null only)
-                      _MetricRow(
-                        metrics: [
-                          if (latest.weightKg != null)
-                            _Metric(
-                              'Peso',
-                              '${_formatMetricValue(latest.weightKg!)} kg',
-                            ),
-                          if (latest.fatPercentage != null)
-                            _Metric(
-                              '% Graso',
-                              '${_formatMetricValue(latest.fatPercentage!)}%',
-                            ),
-                          if (latest.muscleMassKg != null)
-                            _Metric(
-                              'Masa muscular',
-                              '${_formatMetricValue(latest.muscleMassKg!)} kg',
-                            ),
-                          if (latest.waistCm != null)
-                            _Metric(
-                              'Cintura',
-                              '${_formatMetricValue(latest.waistCm!)} cm',
-                            ),
-                        ],
-                        palette: palette,
-                      ),
+                        // Key metrics (non-null only)
+                        _MetricRow(
+                          metrics: [
+                            if (latest.weightKg != null)
+                              _Metric(
+                                'Peso',
+                                '${_formatMetricValue(latest.weightKg!)} kg',
+                              ),
+                            if (latest.fatPercentage != null)
+                              _Metric(
+                                '% Graso',
+                                '${_formatMetricValue(latest.fatPercentage!)}%',
+                              ),
+                            if (latest.muscleMassKg != null)
+                              _Metric(
+                                'Masa muscular',
+                                '${_formatMetricValue(latest.muscleMassKg!)} kg',
+                              ),
+                            if (latest.waistCm != null)
+                              _Metric(
+                                'Cintura',
+                                '${_formatMetricValue(latest.waistCm!)} cm',
+                              ),
+                          ],
+                          palette: palette,
+                        ),
 
-                      const SizedBox(height: 8),
-                      Text(
-                        '$count ${count == 1 ? 'medición registrada' : 'mediciones registradas'}',
+                        const SizedBox(height: 8),
+                        Text(
+                          '$count ${count == 1 ? 'medición registrada' : 'mediciones registradas'}',
+                          style: GoogleFonts.barlow(
+                            fontSize: 12,
+                            color: palette.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // ── Progress chart (TANDA-3) ───────────────────────────
+                  const SizedBox(height: 12),
+                  if (measurements.length >= 2)
+                    MeasurementProgressChart(measurements: measurements)
+                  else
+                    _card(
+                      palette: palette,
+                      child: Text(
+                        'Cargá otra medición para ver el progreso.',
                         style: GoogleFonts.barlow(
-                          fontSize: 12,
+                          fontSize: 13,
                           color: palette.textMuted,
                         ),
                       ),
-                    ],
-                  ),
-                ),
+                    ),
 
-                // ── Progress chart (TANDA-3) ───────────────────────────
-                const SizedBox(height: 12),
-                if (measurements.length >= 2)
-                  MeasurementProgressChart(measurements: measurements)
-                else
-                  _card(
-                    palette: palette,
-                    child: Text(
-                      'Cargá otra medición para ver el progreso.',
-                      style: GoogleFonts.barlow(
-                        fontSize: 13,
-                        color: palette.textMuted,
-                      ),
+                  // ── Historial con editar/borrar por fila (#439) ────────
+                  const SizedBox(height: 12),
+                  Text(
+                    AppL10n.of(context).measurementsHistoryTitle,
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                      letterSpacing: 1.2,
+                      color: palette.textMuted,
                     ),
                   ),
-              ],
-            );
-          },
+                  const SizedBox(height: 8),
+                  MeasurementHistoryList(
+                    measurements: measurements,
+                    currentUid: trainerUid,
+                    readOnlyLabel:
+                        AppL10n.of(context).measurementHistorySelfLoggedTag,
+                    onEdit: (m) => _openLogForm(context, initial: m),
+                  ),
+                ],
+              );
+            },
+          ),
         ),
       ],
     );
@@ -766,6 +892,7 @@ class _RendimientoSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final localeName = AppL10n.of(context).localeName;
     final testsAsync = ref.watch(performanceTestsForAthleteProvider(athleteId));
 
     return Column(
@@ -784,7 +911,7 @@ class _RendimientoSection extends ConsumerWidget {
               ),
             ),
             const Spacer(),
-            GestureDetector(
+            TreinoTappable(
               onTap: () => _openLogForm(context),
               child: Text(
                 '+ Cargar',
@@ -800,113 +927,125 @@ class _RendimientoSection extends ConsumerWidget {
         const SizedBox(height: 12),
 
         // ── Async content ──────────────────────────────────────────────────
-        testsAsync.when(
-          loading: () => _card(
-            palette: palette,
-            child: Text(
-              'Cargando…',
-              style: GoogleFonts.barlow(
-                fontSize: 13,
-                color: palette.textMuted,
-              ),
-            ),
-          ),
-          error: (_, __) => _card(
-            palette: palette,
-            child: Text(
-              'No pudimos cargar las evaluaciones.',
-              style: GoogleFonts.barlow(
-                fontSize: 13,
-                color: palette.textMuted,
-              ),
-            ),
-          ),
-          data: (tests) {
-            if (tests.isEmpty) {
-              return _card(
-                palette: palette,
-                child: Text(
-                  'Sin evaluaciones todavía. Cargá la primera.',
-                  style: GoogleFonts.barlow(
-                    fontSize: 13,
-                    color: palette.textMuted,
-                  ),
+        TreinoStateSwitcher(
+          childKey: ValueKey(testsAsync.when(
+            loading: () => 'loading',
+            error: (_, __) => 'error',
+            data: (_) => 'data',
+          )),
+          child: testsAsync.when(
+            loading: () => _card(
+              palette: palette,
+              child: Text(
+                'Cargando…',
+                style: GoogleFonts.barlow(
+                  fontSize: 13,
+                  color: palette.textMuted,
                 ),
-              );
-            }
-
-            // List sorted ASC → latest is last
-            final latest = tests.last;
-            final count = tests.length;
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ── Latest-test summary card ───────────────────────────
-                _card(
+              ),
+            ),
+            error: (_, __) => _card(
+              palette: palette,
+              child: Text(
+                'No pudimos cargar las evaluaciones.',
+                style: GoogleFonts.barlow(
+                  fontSize: 13,
+                  color: palette.textMuted,
+                ),
+              ),
+            ),
+            data: (tests) {
+              if (tests.isEmpty) {
+                return _card(
                   palette: palette,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Date
-                      Text(
-                        _formatMeasurementDate(latest.recordedAt),
-                        style: GoogleFonts.barlowCondensed(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                          color: palette.textPrimary,
-                          letterSpacing: 0.4,
+                  child: Text(
+                    'Sin evaluaciones todavía. Cargá la primera.',
+                    style: GoogleFonts.barlow(
+                      fontSize: 13,
+                      color: palette.textMuted,
+                    ),
+                  ),
+                );
+              }
+
+              // List sorted ASC → latest is last
+              final latest = tests.last;
+              final count = tests.length;
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── Latest-test summary card ───────────────────────────
+                  _card(
+                    palette: palette,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Date
+                        Text(
+                          _formatMeasurementDate(latest.recordedAt, localeName),
+                          style: GoogleFonts.barlowCondensed(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            color: palette.textPrimary,
+                            letterSpacing: 0.4,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
+                        const SizedBox(height: 8),
 
-                      // Key metrics (non-null only)
-                      _MetricRow(
-                        metrics: [
-                          if (latest.cmjCm != null)
-                            _Metric('CMJ', '${latest.cmjCm} cm'),
-                          if (latest.squat1rmKg != null)
-                            _Metric(
-                                'Sentadilla 1RM', '${latest.squat1rmKg} kg'),
-                          if (latest.sprint20mS != null)
-                            _Metric('Sprint 20m', '${latest.sprint20mS} s'),
-                          if (latest.vo2maxMlKgMin != null)
-                            _Metric(
-                                'VO2máx', '${latest.vo2maxMlKgMin} ml/kg/min'),
-                        ],
-                        palette: palette,
-                      ),
+                        // Key metrics (non-null only)
+                        _MetricRow(
+                          metrics: [
+                            // QA-PERF-104: formatear con el helper existente para
+                            // no interpolar el double crudo (30.0 -> 30),
+                            // consistente con la card de MEDICIONES vecina.
+                            if (latest.cmjCm != null)
+                              _Metric('CMJ',
+                                  '${_formatMetricValue(latest.cmjCm!)} cm'),
+                            if (latest.squat1rmKg != null)
+                              _Metric('Sentadilla 1RM',
+                                  '${_formatMetricValue(latest.squat1rmKg!)} kg'),
+                            if (latest.sprint20mS != null)
+                              _Metric('Sprint 20m',
+                                  '${_formatMetricValue(latest.sprint20mS!)} s'),
+                            if (latest.vo2maxMlKgMin != null)
+                              _Metric('VO2máx',
+                                  '${_formatMetricValue(latest.vo2maxMlKgMin!)} ml/kg/min'),
+                          ],
+                          palette: palette,
+                        ),
 
-                      const SizedBox(height: 8),
-                      Text(
-                        '$count ${count == 1 ? 'evaluación registrada' : 'evaluaciones registradas'}',
+                        const SizedBox(height: 8),
+                        Text(
+                          '$count ${count == 1 ? 'evaluación registrada' : 'evaluaciones registradas'}',
+                          style: GoogleFonts.barlow(
+                            fontSize: 12,
+                            color: palette.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // ── Progress chart ─────────────────────────────────────
+                  const SizedBox(height: 12),
+                  if (tests.length >= 2)
+                    PerformanceProgressChart(tests: tests)
+                  else
+                    _card(
+                      palette: palette,
+                      child: Text(
+                        'Cargá otra evaluación para ver el progreso.',
                         style: GoogleFonts.barlow(
-                          fontSize: 12,
+                          fontSize: 13,
                           color: palette.textMuted,
                         ),
                       ),
-                    ],
-                  ),
-                ),
-
-                // ── Progress chart ─────────────────────────────────────
-                const SizedBox(height: 12),
-                if (tests.length >= 2)
-                  PerformanceProgressChart(tests: tests)
-                else
-                  _card(
-                    palette: palette,
-                    child: Text(
-                      'Cargá otra evaluación para ver el progreso.',
-                      style: GoogleFonts.barlow(
-                        fontSize: 13,
-                        color: palette.textMuted,
-                      ),
                     ),
-                  ),
-              ],
-            );
-          },
+                ],
+              );
+            },
+          ),
         ),
       ],
     );
@@ -961,7 +1100,7 @@ class _CobroSection extends ConsumerWidget {
               ),
             ),
             const Spacer(),
-            GestureDetector(
+            TreinoTappable(
               onTap: () =>
                   _openConfigSheet(context, ref, billingAsync.valueOrNull),
               child: Text(
@@ -978,51 +1117,60 @@ class _CobroSection extends ConsumerWidget {
         const SizedBox(height: 12),
 
         // ── Content ─────────────────────────────────────────────────────
-        billingAsync.when(
-          loading: () => _card(
-            palette: palette,
-            child: Text(
-              'Cargando…',
-              style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+        TreinoStateSwitcher(
+          childKey: ValueKey(billingAsync.when(
+            loading: () => 'loading',
+            error: (_, __) => 'error',
+            data: (_) => 'data',
+          )),
+          child: billingAsync.when(
+            loading: () => _card(
+              palette: palette,
+              child: Text(
+                'Cargando…',
+                style:
+                    GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+              ),
             ),
-          ),
-          error: (_, __) => _card(
-            palette: palette,
-            child: Text(
-              'No pudimos cargar la config de cobro.',
-              style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+            error: (_, __) => _card(
+              palette: palette,
+              child: Text(
+                'No pudimos cargar la config de cobro.',
+                style:
+                    GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+              ),
             ),
-          ),
-          data: (billing) => _card(
-            palette: palette,
-            child: billing == null
-                ? Text(
-                    'Sin configurar.',
-                    style: GoogleFonts.barlow(
-                        fontSize: 13, color: palette.textMuted),
-                  )
-                : Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '\$${billing.amountArs} ARS',
-                          style: GoogleFonts.barlow(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 15,
-                            color: palette.textPrimary,
+            data: (billing) => _card(
+              palette: palette,
+              child: billing == null
+                  ? Text(
+                      'Sin configurar.',
+                      style: GoogleFonts.barlow(
+                          fontSize: 13, color: palette.textMuted),
+                    )
+                  : Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '\$${billing.amountArs} ARS',
+                            style: GoogleFonts.barlow(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                              color: palette.textPrimary,
+                            ),
                           ),
                         ),
-                      ),
-                      Text(
-                        _kCadenceLabels[billing.cadence] ??
-                            billing.cadence.name,
-                        style: GoogleFonts.barlow(
-                          fontSize: 13,
-                          color: palette.textMuted,
+                        Text(
+                          _kCadenceLabels[billing.cadence] ??
+                              billing.cadence.name,
+                          style: GoogleFonts.barlow(
+                            fontSize: 13,
+                            color: palette.textMuted,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
+            ),
           ),
         ),
       ],
@@ -1090,8 +1238,9 @@ class _CobroConfigSheetState extends ConsumerState<_CobroConfigSheet> {
     final trainerRate =
         widget.ref.read(userProfileProvider).valueOrNull?.trainerMonthlyRate;
     final initialAmount = widget.existing?.amountArs ?? trainerRate ?? 0;
-    _priceController =
-        TextEditingController(text: initialAmount > 0 ? '$initialAmount' : '');
+    _priceController = TextEditingController(
+      text: initialAmount > 0 ? groupThousands('$initialAmount') : '',
+    );
     _cadence = widget.existing?.cadence ?? BillingCadence.mensual;
   }
 
@@ -1103,7 +1252,7 @@ class _CobroConfigSheetState extends ConsumerState<_CobroConfigSheet> {
 
   Future<void> _save() async {
     if (_saving) return;
-    final amount = int.tryParse(_priceController.text.trim());
+    final amount = parseGroupedInt(_priceController.text);
     if (amount == null || amount <= 0) return;
 
     final trainerId = ref.read(currentUidProvider);
@@ -1166,6 +1315,15 @@ class _CobroConfigSheetState extends ConsumerState<_CobroConfigSheet> {
               letterSpacing: 1.2,
             ),
           ),
+          const SizedBox(height: 8),
+          Text(
+            'Es tu tarifa de referencia para este alumno. No genera cobros '
+            'automáticos: cada cobro lo registrás vos a mano desde Pagos.',
+            style: GoogleFonts.barlow(
+              fontSize: 12,
+              color: palette.textMuted,
+            ),
+          ),
           const SizedBox(height: 18),
 
           // ── Precio ──────────────────────────────────────────────────
@@ -1182,6 +1340,7 @@ class _CobroConfigSheetState extends ConsumerState<_CobroConfigSheet> {
           TextField(
             controller: _priceController,
             keyboardType: TextInputType.number,
+            inputFormatters: [ThousandsSeparatorInputFormatter()],
             style: TextStyle(color: palette.textPrimary),
             decoration: InputDecoration(
               hintText: 'Ej: 7000',
@@ -1268,267 +1427,499 @@ class _CobroConfigSheetState extends ConsumerState<_CobroConfigSheet> {
   }
 }
 
+// ── Seguimiento section ───────────────────────────────────────────────────────
+
+/// Read-only history of [FollowUpEntry] — the private trainer→athlete log.
+///
+/// Distinct from [_NotaSection] right below: that is ONE editable memo per
+/// athlete, this is an append-only, tagged, timestamped log. Until now the log
+/// could be WRITTEN from mobile (the dashboard's "Dejar feedback" sheet) but
+/// only READ in the Coach Hub (web) — the trainer left a note on their phone
+/// and it vanished from their view. This closes that asymmetry.
+///
+/// Read-only on purpose: creating entries stays in the dashboard sheet (tagged
+/// `entrenamiento`, anchored to "who trained today"), and editing/deleting
+/// stays in the web hub, which already owns that surface.
+class _SeguimientoSection extends ConsumerWidget {
+  const _SeguimientoSection(
+      {required this.athleteId, required this.trainerUid});
+
+  final String athleteId;
+  final String trainerUid;
+
+  /// Same tag → (label, colour) mapping the web hub uses, so an entry does not
+  /// change identity depending on which surface the trainer reads it from.
+  (String, Color) _tagStyle(FollowUpTag tag, AppPalette palette) {
+    switch (tag) {
+      case FollowUpTag.general:
+        return ('GENERAL', palette.textMuted);
+      case FollowUpTag.entrenamiento:
+        return ('ENTRENAMIENTO', palette.accent);
+      case FollowUpTag.nutricion:
+        return ('NUTRICIÓN', palette.warning);
+      case FollowUpTag.molestia:
+        return ('MOLESTIA', palette.danger);
+      case FollowUpTag.motivacion:
+        return ('MOTIVACIÓN', palette.highlight);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    final entriesAsync = ref.watch(
+      followUpEntriesProvider(
+        (trainerId: trainerUid, athleteId: athleteId),
+      ),
+    );
+
+    Widget card(Widget child) => Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: palette.bgCard,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: palette.border),
+          ),
+          child: child,
+        );
+
+    Widget muted(String text) => Text(
+          text,
+          style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'SEGUIMIENTO',
+          style: GoogleFonts.barlowCondensed(
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
+            letterSpacing: 1.2,
+            color: palette.textMuted,
+          ),
+        ),
+        const SizedBox(height: 12),
+        TreinoStateSwitcher(
+          childKey: ValueKey(entriesAsync.when(
+            loading: () => 'loading',
+            error: (_, __) => 'error',
+            data: (_) => 'data',
+          )),
+          child: entriesAsync.when(
+            loading: () => card(muted(l10n.dashboardCargando)),
+            error: (_, __) =>
+                card(muted(l10n.athleteDetailSeguimientoLoadError)),
+            data: (entries) {
+              if (entries.isEmpty) {
+                return card(muted(l10n.athleteDetailSeguimientoEmpty));
+              }
+              // Server-side DESC already; cap the mobile view — the full log
+              // lives in the web hub.
+              final shown = entries.take(10).toList();
+              return card(
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (var i = 0; i < shown.length; i++) ...[
+                      if (i > 0) ...[
+                        const SizedBox(height: 12),
+                        Divider(color: palette.border, height: 1),
+                        const SizedBox(height: 12),
+                      ],
+                      _SeguimientoRow(
+                        entry: shown[i],
+                        tagStyle: _tagStyle(shown[i].tag, palette),
+                        palette: palette,
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SeguimientoRow extends StatelessWidget {
+  const _SeguimientoRow({
+    required this.entry,
+    required this.tagStyle,
+    required this.palette,
+  });
+
+  final FollowUpEntry entry;
+  final (String, Color) tagStyle;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, color) = tagStyle;
+    final d = entry.recordedAt.toLocal();
+    final date = '${d.day.toString().padLeft(2, '0')}/'
+        '${d.month.toString().padLeft(2, '0')}';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                border: Border.all(color: color),
+                borderRadius: BorderRadius.circular(9999),
+              ),
+              child: Text(
+                label,
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 10,
+                  letterSpacing: 1.0,
+                  color: color,
+                ),
+              ),
+            ),
+            const Spacer(),
+            Text(
+              date,
+              style: GoogleFonts.barlow(
+                fontSize: 12,
+                color: palette.textMuted,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          entry.text,
+          style: GoogleFonts.barlow(
+            fontSize: 14,
+            color: palette.textPrimary,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 // ── Nota del alumno section ───────────────────────────────────────────────────
 
-class _NotaSection extends ConsumerWidget {
+/// NOTA DEL ALUMNO — one free-text memo per (trainer, athlete), edited IN
+/// PLACE.
+///
+/// It used to be a read-only card plus an "Agregar"/"Editar" link that opened
+/// a bottom sheet. Tapping the card itself now turns it into the field, which
+/// is the gesture the card already looked like it supported — the sheet was a
+/// detour to type one line of text.
+///
+/// The link is gone on purpose: with the card tappable it was a second door to
+/// the same room, and the empty state now says what to do instead of just
+/// "Sin nota.".
+///
+/// NOT to be confused with [_SeguimientoSection] right above: that one is an
+/// append-only tagged log; this is a single memo that gets overwritten.
+class _NotaSection extends ConsumerStatefulWidget {
   const _NotaSection({required this.athleteId, required this.trainerUid});
 
   final String athleteId;
   final String trainerUid;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final palette = AppPalette.of(context);
-    final noteAsync = ref.watch(
-      athleteNoteProvider((trainerId: trainerUid, athleteId: athleteId)),
-    );
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // ── Section header row ──────────────────────────────────────────
-        Row(
-          children: [
-            Text(
-              'NOTA DEL ALUMNO',
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
-                letterSpacing: 1.2,
-                color: palette.textMuted,
-              ),
-            ),
-            const Spacer(),
-            GestureDetector(
-              onTap: () => _openEditSheet(context, ref, noteAsync.valueOrNull),
-              child: Text(
-                noteAsync.valueOrNull == null ? 'Agregar' : 'Editar',
-                style: GoogleFonts.barlow(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                  color: palette.accent,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-
-        // ── Content ─────────────────────────────────────────────────────
-        noteAsync.when(
-          loading: () => _card(
-            palette: palette,
-            child: Text(
-              'Cargando…',
-              style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
-            ),
-          ),
-          error: (_, __) => _card(
-            palette: palette,
-            child: Text(
-              'No pudimos cargar la nota.',
-              style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
-            ),
-          ),
-          data: (note) => _card(
-            palette: palette,
-            child: note == null || note.note.trim().isEmpty
-                ? Text(
-                    'Sin nota.',
-                    style: GoogleFonts.barlow(
-                        fontSize: 13, color: palette.textMuted),
-                  )
-                : Text(
-                    note.note,
-                    style: GoogleFonts.barlow(
-                      fontSize: 14,
-                      color: palette.textPrimary,
-                    ),
-                  ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _openEditSheet(
-    BuildContext context,
-    WidgetRef ref,
-    AthleteNote? existing,
-  ) {
-    showModalBottomSheet<void>(
-      context: context,
-      useRootNavigator: true,
-      isScrollControlled: true,
-      backgroundColor: AppPalette.of(context).bgCard,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => _NotaEditSheet(
-        athleteId: athleteId,
-        trainerUid: trainerUid,
-        existing: existing,
-      ),
-    );
-  }
-
-  Widget _card({required AppPalette palette, required Widget child}) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: palette.border),
-      ),
-      child: child,
-    );
-  }
+  ConsumerState<_NotaSection> createState() => _NotaSectionState();
 }
 
-class _NotaEditSheet extends ConsumerStatefulWidget {
-  const _NotaEditSheet({
-    required this.athleteId,
-    required this.trainerUid,
-    required this.existing,
-  });
+class _NotaSectionState extends ConsumerState<_NotaSection> {
+  final _controller = TextEditingController();
 
-  final String athleteId;
-  final String trainerUid;
-  final AthleteNote? existing;
+  /// Anchors the editor block (field + Cancelar/Guardar) so it can be scrolled
+  /// into view — see [_startEditing].
+  final _editorKey = GlobalKey();
 
-  @override
-  ConsumerState<_NotaEditSheet> createState() => _NotaEditSheetState();
-}
-
-class _NotaEditSheetState extends ConsumerState<_NotaEditSheet> {
-  late final TextEditingController _noteController;
+  bool _editing = false;
   bool _saving = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _noteController = TextEditingController(text: widget.existing?.note ?? '');
-  }
+  bool _failed = false;
 
   @override
   void dispose() {
-    _noteController.dispose();
+    _controller.dispose();
     super.dispose();
+  }
+
+  /// Seeds the field from the note as it stands RIGHT NOW, then scrolls the
+  /// editor into view.
+  ///
+  /// The controller is filled here rather than kept in sync with the stream on
+  /// every build: while the trainer is typing, an incoming snapshot must not
+  /// overwrite what they wrote.
+  ///
+  /// The scroll is not cosmetic. This section sits at the BOTTOM of a long
+  /// ListView, so entering edit mode grows the card and pushes Cancelar /
+  /// Guardar past the fold — the trainer tapped to write and the way to
+  /// confirm was off-screen. Flutter auto-scrolls a focused TextField into
+  /// view but stops at the field itself; the buttons below it are what need
+  /// the extra room, hence aligning the whole block's BOTTOM (alignment: 1).
+  ///
+  /// Post-frame because the editor does not exist in the tree until this
+  /// setState has been laid out.
+  void _startEditing(String current) {
+    _controller.text = current;
+    _controller.selection = TextSelection.collapsed(offset: current.length);
+    setState(() {
+      _editing = true;
+      _failed = false;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = _editorKey.currentContext;
+      if (ctx == null || !mounted) return;
+      Scrollable.ensureVisible(
+        ctx,
+        alignment: 1,
+        duration: AppMotion.resolve(context, AppMotion.fast),
+        curve: AppMotion.standard,
+      );
+    });
+  }
+
+  void _cancel() {
+    setState(() {
+      _editing = false;
+      _saving = false;
+      _failed = false;
+    });
   }
 
   Future<void> _save() async {
     if (_saving) return;
-    setState(() => _saving = true);
+    setState(() {
+      _saving = true;
+      _failed = false;
+    });
     try {
       await ref.read(athleteNoteRepositoryProvider).setNote(
             AthleteNote(
               trainerId: widget.trainerUid,
               athleteId: widget.athleteId,
-              note: _noteController.text.trim(),
+              note: _controller.text.trim(),
               updatedAt: DateTime.now().toUtc(),
             ),
           );
       if (!mounted) return;
-      Navigator.of(context).pop();
+      setState(() {
+        _saving = false;
+        _editing = false;
+      });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No pudimos guardar. Probá de nuevo.')),
-      );
+      // Stay in edit mode with the text intact — a failed write must not cost
+      // the trainer what they just wrote.
+      setState(() {
+        _saving = false;
+        _failed = true;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+    final noteAsync = ref.watch(
+      athleteNoteProvider(
+        (trainerId: widget.trainerUid, athleteId: widget.athleteId),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // ── Handle ──────────────────────────────────────────────────
-          Center(
-            child: Container(
-              width: 36,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 14),
-              decoration: BoxDecoration(
-                color: palette.border,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          Text(
-            'NOTA DEL ALUMNO',
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 18,
-              color: palette.textPrimary,
-              letterSpacing: 1.2,
-            ),
-          ),
-          const SizedBox(height: 18),
+    );
 
-          // ── Nota field ───────────────────────────────────────────────
-          TextField(
-            controller: _noteController,
-            maxLines: 5,
-            style: TextStyle(color: palette.textPrimary),
-            decoration: InputDecoration(
-              hintText: 'Ej: viene de lesión de rodilla, no cargar piernas…',
-              hintStyle: TextStyle(color: palette.textMuted),
-              filled: true,
-              fillColor: palette.bg,
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide(color: palette.border),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide(color: palette.accent, width: 1.5),
-              ),
+    Widget card({required Widget child}) => Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: palette.bgCard,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: _editing ? palette.accent : palette.border,
             ),
           ),
-          const SizedBox(height: 20),
+          child: child,
+        );
 
-          // ── Save button ──────────────────────────────────────────────
-          ElevatedButton(
-            onPressed: _saving ? null : _save,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: palette.accent,
-              foregroundColor: palette.bg,
-              minimumSize: const Size.fromHeight(48),
-              shape: const StadiumBorder(),
-              disabledBackgroundColor: palette.accent.withValues(alpha: 0.3),
-            ),
-            child: _saving
-                ? SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: palette.bg,
-                    ),
-                  )
-                : Text(
-                    'GUARDAR',
-                    style: GoogleFonts.barlowCondensed(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                      letterSpacing: 1.4,
+    Widget muted(String text) => Text(
+          text,
+          style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'NOTA DEL ALUMNO',
+          style: GoogleFonts.barlowCondensed(
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
+            letterSpacing: 1.2,
+            color: palette.textMuted,
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (_editing)
+          _NotaEditor(
+            key: _editorKey,
+            controller: _controller,
+            palette: palette,
+            saving: _saving,
+            failed: _failed,
+            onCancel: _cancel,
+            onSave: _save,
+            card: card,
+          )
+        else
+          // Cross-fade SOLO de la rama de display (loading→data→error). El
+          // editor inline queda deliberadamente afuera: envolverlo también
+          // re-montaría el TextField en cada transición y le robaría el foco
+          // mientras el PF escribe.
+          TreinoStateSwitcher(
+            childKey: ValueKey(noteAsync.when(
+              loading: () => 'loading',
+              error: (_, __) => 'error',
+              data: (_) => 'data',
+            )),
+            child: noteAsync.when(
+              loading: () => card(child: muted('Cargando…')),
+              error: (_, __) =>
+                  card(child: muted('No pudimos cargar la nota.')),
+              data: (note) {
+                final text = note?.note.trim() ?? '';
+                return Semantics(
+                  button: true,
+                  container: true,
+                  label: text.isEmpty
+                      ? 'Escribir una nota sobre el alumno'
+                      : 'Editar la nota del alumno',
+                  child: GestureDetector(
+                    onTap: () => _startEditing(text),
+                    behavior: HitTestBehavior.opaque,
+                    child: card(
+                      child: text.isEmpty
+                          // The hint doubles as the affordance now that the
+                          // "Agregar" link is gone.
+                          ? muted('Tocá para escribir una nota.')
+                          : Text(
+                              text,
+                              style: GoogleFonts.barlow(
+                                fontSize: 14,
+                                color: palette.textPrimary,
+                              ),
+                            ),
                     ),
                   ),
+                );
+              },
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// The in-place editor: the same card, now holding the field plus its
+/// Cancelar / Guardar pair.
+class _NotaEditor extends StatelessWidget {
+  const _NotaEditor({
+    super.key,
+    required this.controller,
+    required this.palette,
+    required this.saving,
+    required this.failed,
+    required this.onCancel,
+    required this.onSave,
+    required this.card,
+  });
+
+  final TextEditingController controller;
+  final AppPalette palette;
+  final bool saving;
+  final bool failed;
+  final VoidCallback onCancel;
+  final Future<void> Function() onSave;
+  final Widget Function({required Widget child}) card;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        card(
+          child: TextField(
+            controller: controller,
+            autofocus: true,
+            enabled: !saving,
+            minLines: 2,
+            maxLines: 6,
+            style: GoogleFonts.barlow(fontSize: 14, color: palette.textPrimary),
+            decoration: InputDecoration(
+              // The card already draws the border and padding.
+              isDense: true,
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              contentPadding: EdgeInsets.zero,
+              hintText: 'Escribí una nota sobre el alumno…',
+              hintStyle:
+                  GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
+            ),
+          ),
+        ),
+        if (failed) ...[
+          const SizedBox(height: 8),
+          Text(
+            'No pudimos guardar. Probá de nuevo.',
+            style: GoogleFonts.barlow(fontSize: 13, color: palette.danger),
           ),
         ],
-      ),
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            TextButton(
+              onPressed: saving ? null : onCancel,
+              style: TextButton.styleFrom(foregroundColor: palette.textMuted),
+              child: Text(
+                'Cancelar',
+                style: GoogleFonts.barlow(
+                    fontWeight: FontWeight.w600, fontSize: 13),
+              ),
+            ),
+            const SizedBox(width: 4),
+            FilledButton(
+              onPressed: saving ? null : onSave,
+              style: FilledButton.styleFrom(
+                backgroundColor: palette.accent,
+                foregroundColor: palette.bg,
+                minimumSize: const Size(0, 40),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                shape: const StadiumBorder(),
+              ),
+              child: saving
+                  ? SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: palette.bg),
+                    )
+                  : Text(
+                      'Guardar',
+                      style: GoogleFonts.barlow(
+                          fontWeight: FontWeight.w700, fontSize: 13),
+                    ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -1668,6 +2059,7 @@ class _DailyHeatmapSection extends StatelessWidget {
         dayStripLabels: DayStripLabels(
           todayLabel: l10n.insightsDayStripTodayLabel,
           emptyDayHint: l10n.insightsDayEmptyHint,
+          weekdayLetters: weekdayInitials(l10n.localeName),
         ),
       ),
     );
@@ -1723,7 +2115,8 @@ class _ProgressionSectionState extends State<_ProgressionSection> {
               bestSessionVolumeLabel: l10n.progressionMetricVolume,
               volumeUnit: 'kg·reps',
               weightUnit: 'kg',
-              frequencyLabel: (n) => l10n.progressionFrequency(n),
+              // #555: el count viene acotado al período activo del selector.
+              frequencyLabel: (n) => l10n.progressionFrequencyPeriod(n),
               singlePointHint: l10n.progressionSinglePointHint,
               emptyHint: l10n.progressionEmptyExercise,
             ),
@@ -1890,8 +2283,15 @@ class _ExpandableSessionRowState extends ConsumerState<_ExpandableSessionRow> {
   }
 }
 
-String _fmtDate(DateTime d) =>
-    '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+/// QA-WKT-006: [finishedAt] is a real UTC instant, so it must be converted to
+/// the device (ART) zone before splitting into day/month/year — matching the
+/// sibling session-history screens fixed in #405. Formatting the raw UTC value
+/// showed tomorrow's date for any session finished after ~21:00 ART (already
+/// past midnight UTC).
+String _fmtDate(DateTime d) {
+  final local = d.toLocal();
+  return '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}/${local.year}';
+}
 
 /// Loads and renders the set logs for one session (read-only trainer view).
 /// Maps permission-denied to the no-share placeholder (REQ-SETLOGS-008).

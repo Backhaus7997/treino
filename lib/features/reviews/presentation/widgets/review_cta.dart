@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../l10n/app_l10n.dart';
 import '../../../coach/application/trainer_link_providers.dart';
 import '../../../coach/domain/trainer_link_status.dart';
 import '../../../profile/application/user_public_profile_providers.dart';
@@ -32,6 +33,7 @@ class ReviewCta extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final linkAsync = ref.watch(currentAthleteLinkProvider);
     final link = linkAsync.valueOrNull;
 
@@ -49,13 +51,12 @@ class ReviewCta extends ConsumerWidget {
     // Resolve trainer name for the sheet title.
     final trainerPub =
         ref.watch(userPublicProfileProvider(trainerId)).valueOrNull;
-    final trainerName = trainerPub?.displayName ??
-        'tu Personal Trainer'; // i18n: Fase 6 Etapa 7
+    final trainerName =
+        trainerPub?.displayName ?? l10n.reviewTrainerFallbackName;
 
     // Determine label based on whether review exists.
-    final label = existingReview != null
-        ? 'EDITAR MI RESEÑA' // i18n: Fase 6 Etapa 7
-        : 'DEJAR UNA RESEÑA'; // i18n: Fase 6 Etapa 7
+    final label =
+        existingReview != null ? l10n.reviewCtaEdit : l10n.reviewCtaCreate;
 
     return SizedBox(
       width: double.infinity,

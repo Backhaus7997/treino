@@ -56,6 +56,25 @@ class ExerciseVideoPlayer extends StatelessWidget {
   }
 }
 
+/// Opens a YouTube watch page in a Safari View Controller (iOS) / Chrome
+/// Custom Tab (Android) modal sheet — the user never leaves TREINO. Falls
+/// back to the external app, then to a snackbar if nothing can launch.
+/// Shared by the VIDEO card below and the exercise-detail video hero.
+Future<void> openYoutubeWatchPage(BuildContext context, String videoId) async {
+  final uri = Uri.parse('https://www.youtube.com/watch?v=$videoId');
+  try {
+    final ok = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+    if (!ok && context.mounted) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  } catch (_) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('No pudimos abrir el video.')),
+    );
+  }
+}
+
 /// YouTube thumbnail card. Tap → opens the watch page in an in-app browser
 /// sheet via `url_launcher`. We don't try to embed inline anymore.
 class _YoutubeThumbCard extends StatelessWidget {
@@ -63,21 +82,6 @@ class _YoutubeThumbCard extends StatelessWidget {
 
   final String videoId;
   final AppPalette palette;
-
-  Future<void> _open(BuildContext context) async {
-    final uri = Uri.parse('https://www.youtube.com/watch?v=$videoId');
-    try {
-      final ok = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
-      if (!ok && context.mounted) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
-    } catch (_) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No pudimos abrir el video.')),
-      );
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -88,7 +92,7 @@ class _YoutubeThumbCard extends StatelessWidget {
         child: Material(
           color: palette.bgCard,
           child: InkWell(
-            onTap: () => _open(context),
+            onTap: () => openYoutubeWatchPage(context, videoId),
             child: Stack(
               alignment: Alignment.center,
               fit: StackFit.expand,
@@ -103,48 +107,9 @@ class _YoutubeThumbCard extends StatelessWidget {
                 Container(
                     color: Colors.black
                         .withValues(alpha: 0.22)), // intentional: media surface
-                const _PlayOverlay(),
+                const VideoPlayOverlay(),
               ],
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Subtle, brand-neutral play overlay reused by every video card. Sits
-/// 40×40 in the middle with a soft drop shadow — no big black puck.
-class _PlayOverlay extends StatelessWidget {
-  const _PlayOverlay();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          color: Colors.white
-              .withValues(alpha: 0.92), // intentional: media surface
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black
-                  .withValues(alpha: 0.35), // intentional: media surface
-              blurRadius: 12,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        alignment: Alignment.center,
-        child: const Padding(
-          // Optical centering — play triangles read offset-left without it.
-          padding: EdgeInsets.only(left: 3),
-          child: Icon(
-            TreinoIcon.play,
-            color: Colors.black, // intentional: media surface
-            size: 20,
           ),
         ),
       ),

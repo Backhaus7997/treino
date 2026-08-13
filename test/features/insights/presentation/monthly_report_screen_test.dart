@@ -5,12 +5,14 @@ import 'package:intl/intl.dart' as intl;
 import 'package:mocktail/mocktail.dart';
 
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/utils/argentina_time.dart';
 import 'package:treino/features/insights/presentation/monthly_report_screen.dart';
 import 'package:treino/features/insights/presentation/widgets/monthly_report_chart.dart';
 import 'package:treino/features/workout/application/exercise_providers.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/data/session_repository.dart';
+import 'package:treino/features/workout/domain/exercise.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
@@ -31,7 +33,7 @@ void main() {
           // hit real Firebase resolving routines/exercises — individual
           // tests can still override these explicitly if needed.
           exercisesProvider.overrideWith((ref) async => []),
-          routineByIdProvider('r1').overrideWith((ref) async => null),
+          visibleRoutineByIdProvider('r1').overrideWith((ref) async => null),
           ...overrides,
         ],
         child: MaterialApp(
@@ -46,15 +48,16 @@ void main() {
   testWidgets('renders chart + summary cards when data loads', (tester) async {
     final repo = MockSessionRepository();
     final now = DateTime.now();
-    when(() => repo.listByUid('u1')).thenAnswer((_) async => [
-          makeSession(
-            id: 's1',
-            startedAt: now,
-            status: SessionStatus.finished,
-            wasFullyCompleted: true,
-            durationMin: 45,
-          ),
-        ]);
+    when(() => repo.listByUid('u1', limit: any(named: 'limit')))
+        .thenAnswer((_) async => [
+              makeSession(
+                id: 's1',
+                startedAt: now,
+                status: SessionStatus.finished,
+                wasFullyCompleted: true,
+                durationMin: 45,
+              ),
+            ]);
     when(() => repo.listSetLogs(uid: 'u1', sessionId: 's1'))
         .thenAnswer((_) async => [makeSetLog()]);
 
@@ -75,32 +78,37 @@ void main() {
       '(AD6/PR5c pinning test — not just presence of the label)',
       (tester) async {
     final repo = MockSessionRepository();
-    final now = DateTime.now();
-    final monthStart = DateTime(now.year, now.month, 1);
+    // [#379] Anchor in the Argentina frame (as the aggregator does via
+    // argentinaNow()) and store startedAt as real UTC instants at NOON on
+    // mid-month days: `toArgentina` shifts by -3h, so day-1 LOCAL midnight would
+    // spill into the PREVIOUS month and drop the session — noon mid-month keeps
+    // the Argentina calendar month unambiguous and TZ-independent.
+    final now = argentinaNow();
 
-    when(() => repo.listByUid('u1')).thenAnswer((_) async => [
-          makeSession(
-            id: 's1',
-            startedAt: monthStart,
-            status: SessionStatus.finished,
-            wasFullyCompleted: true,
-            durationMin: 40,
-          ),
-          makeSession(
-            id: 's2',
-            startedAt: DateTime(monthStart.year, monthStart.month, 2),
-            status: SessionStatus.finished,
-            wasFullyCompleted: true,
-            durationMin: 25,
-          ),
-          // A non-finished session's duration must NOT be counted.
-          makeSession(
-            id: 's3',
-            startedAt: DateTime(monthStart.year, monthStart.month, 3),
-            status: SessionStatus.active,
-            durationMin: 999,
-          ),
-        ]);
+    when(() => repo.listByUid('u1', limit: any(named: 'limit')))
+        .thenAnswer((_) async => [
+              makeSession(
+                id: 's1',
+                startedAt: DateTime.utc(now.year, now.month, 10, 12),
+                status: SessionStatus.finished,
+                wasFullyCompleted: true,
+                durationMin: 40,
+              ),
+              makeSession(
+                id: 's2',
+                startedAt: DateTime.utc(now.year, now.month, 11, 12),
+                status: SessionStatus.finished,
+                wasFullyCompleted: true,
+                durationMin: 25,
+              ),
+              // A non-finished session's duration must NOT be counted.
+              makeSession(
+                id: 's3',
+                startedAt: DateTime.utc(now.year, now.month, 12, 12),
+                status: SessionStatus.active,
+                durationMin: 999,
+              ),
+            ]);
     when(() => repo.listSetLogs(uid: 'u1', sessionId: any(named: 'sessionId')))
         .thenAnswer((_) async => [makeSetLog()]);
 
@@ -117,7 +125,8 @@ void main() {
 
   testWidgets('shows error state + retry on load failure', (tester) async {
     final repo = MockSessionRepository();
-    when(() => repo.listByUid('u1')).thenThrow(Exception('boom'));
+    when(() => repo.listByUid('u1', limit: any(named: 'limit')))
+        .thenThrow(Exception('boom'));
 
     await tester.pumpWidget(wrap(
       const SizedBox.shrink(),
@@ -132,21 +141,91 @@ void main() {
     expect(find.text('Reintentar'), findsOneWidget);
   });
 
+  // QA-498: `ref.invalidate` NO cascada a las dependencias, y exercisesProvider
+  // NO es autoDispose — cachea su AsyncError para toda la vida del container.
+  // Invalidando SOLO el provider del radar se re-leía el MISMO error del
+  // catálogo: un botón que no podía recuperar justo el caso que trae al usuario
+  // acá (catálogo frío que falló / offline).
+  testWidgets(
+      'QA-498: Reintentar en el radar RECUPERA — re-fetchea el catálogo, '
+      'no repite su error cacheado', (tester) async {
+    final repo = MockSessionRepository();
+    final now = DateTime.now();
+    when(() => repo.listByUid('u1', limit: any(named: 'limit')))
+        .thenAnswer((_) async => [
+              makeSession(
+                id: 's1',
+                startedAt: now,
+                status: SessionStatus.finished,
+                wasFullyCompleted: true,
+                routineId: 'r1',
+              ),
+            ]);
+    when(() => repo.listSetLogs(uid: 'u1', sessionId: 's1'))
+        .thenAnswer((_) async => [makeSetLog(id: 'l1', exerciseId: 'e-chest')]);
+
+    // El catálogo falla en frío una vez y después anda.
+    var catalogAttempts = 0;
+
+    await tester.pumpWidget(wrap(
+      const SizedBox.shrink(),
+      overrides: [
+        sessionRepositoryProvider.overrideWithValue(repo),
+        exercisesProvider.overrideWith((ref) async {
+          catalogAttempts++;
+          if (catalogAttempts == 1) throw Exception('catalogue fetch failed');
+          return [
+            const Exercise(
+              id: 'e-chest',
+              name: 'Press',
+              muscleGroup: 'chest',
+              category: 'compound',
+            ),
+          ];
+        }),
+      ],
+    ));
+    await tester.pumpAndSettle();
+
+    // El radar vive al fondo del scroll: hay que llegar hasta él para que se
+    // construya (mismo criterio que el test del legend del radar).
+    await tester.scrollUntilVisible(
+      find.text('Reintentar'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    // El radar cayó en error (las sesiones sí cargaron).
+    expect(find.text('Reintentar'), findsOneWidget);
+
+    await tester.tap(find.text('Reintentar'));
+    await tester.pumpAndSettle();
+
+    expect(
+      catalogAttempts,
+      2,
+      reason: 'el retry debe re-fetchear el catálogo, no repetir su error '
+          'cacheado (sin el fix queda en 1)',
+    );
+  });
+
   testWidgets('switching to POR DÍA renders the daily duration chart',
       (tester) async {
     final repo = MockSessionRepository();
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
-    when(() => repo.listByUid('u1')).thenAnswer((_) async => [
-          makeSession(
-            id: 's1',
-            startedAt: today,
-            status: SessionStatus.finished,
-            wasFullyCompleted: true,
-            durationMin: 45,
-          ),
-        ]);
+    when(() => repo.listByUid('u1', limit: any(named: 'limit')))
+        .thenAnswer((_) async => [
+              makeSession(
+                id: 's1',
+                startedAt: today,
+                status: SessionStatus.finished,
+                wasFullyCompleted: true,
+                durationMin: 45,
+              ),
+            ]);
     when(() => repo.listSetLogs(uid: 'u1', sessionId: any(named: 'sessionId')))
         .thenAnswer((_) async => [makeSetLog()]);
 
@@ -168,21 +247,22 @@ void main() {
     final repo = MockSessionRepository();
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    when(() => repo.listByUid('u1')).thenAnswer((_) async => [
-          makeSession(
-            id: 's1',
-            startedAt: today,
-            status: SessionStatus.finished,
-            wasFullyCompleted: true,
-            durationMin: 45,
-          ),
-          makeSession(
-            id: 's2',
-            startedAt: today.subtract(const Duration(days: 1)),
-            status: SessionStatus.finished,
-            wasFullyCompleted: true,
-          ),
-        ]);
+    when(() => repo.listByUid('u1', limit: any(named: 'limit')))
+        .thenAnswer((_) async => [
+              makeSession(
+                id: 's1',
+                startedAt: today,
+                status: SessionStatus.finished,
+                wasFullyCompleted: true,
+                durationMin: 45,
+              ),
+              makeSession(
+                id: 's2',
+                startedAt: today.subtract(const Duration(days: 1)),
+                status: SessionStatus.finished,
+                wasFullyCompleted: true,
+              ),
+            ]);
     when(() => repo.listSetLogs(uid: 'u1', sessionId: any(named: 'sessionId')))
         .thenAnswer((_) async => [makeSetLog()]);
 
@@ -214,16 +294,17 @@ void main() {
     final now = DateTime.now();
     final olderMonth = DateTime(now.year, now.month - 2);
 
-    when(() => repo.listByUid('u1')).thenAnswer((_) async => [
-          // Only trains in the OLDER month — the current month (default
-          // selection) has zero trained days.
-          makeSession(
-            id: 's1',
-            startedAt: DateTime(olderMonth.year, olderMonth.month, 10),
-            status: SessionStatus.finished,
-            wasFullyCompleted: true,
-          ),
-        ]);
+    when(() => repo.listByUid('u1', limit: any(named: 'limit')))
+        .thenAnswer((_) async => [
+              // Only trains in the OLDER month — the current month (default
+              // selection) has zero trained days.
+              makeSession(
+                id: 's1',
+                startedAt: DateTime(olderMonth.year, olderMonth.month, 10),
+                status: SessionStatus.finished,
+                wasFullyCompleted: true,
+              ),
+            ]);
     when(() => repo.listSetLogs(uid: 'u1', sessionId: any(named: 'sessionId')))
         .thenAnswer((_) async => [makeSetLog()]);
 
@@ -280,15 +361,16 @@ void main() {
     final now = DateTime.now();
     final currentMonthStart = DateTime(now.year, now.month, 1);
 
-    when(() => repo.listByUid('u1')).thenAnswer((_) async => [
-          makeSession(
-            id: 's1',
-            startedAt: currentMonthStart,
-            status: SessionStatus.finished,
-            wasFullyCompleted: true,
-            durationMin: 45,
-          ),
-        ]);
+    when(() => repo.listByUid('u1', limit: any(named: 'limit')))
+        .thenAnswer((_) async => [
+              makeSession(
+                id: 's1',
+                startedAt: currentMonthStart,
+                status: SessionStatus.finished,
+                wasFullyCompleted: true,
+                durationMin: 45,
+              ),
+            ]);
     when(() => repo.listSetLogs(uid: 'u1', sessionId: any(named: 'sessionId')))
         .thenAnswer((_) async => [makeSetLog()]);
 
@@ -323,14 +405,15 @@ void main() {
     final now = DateTime.now();
     final olderMonth = DateTime(now.year, now.month - 2);
 
-    when(() => repo.listByUid('u1')).thenAnswer((_) async => [
-          makeSession(
-            id: 's1',
-            startedAt: DateTime(olderMonth.year, olderMonth.month, 10),
-            status: SessionStatus.finished,
-            wasFullyCompleted: true,
-          ),
-        ]);
+    when(() => repo.listByUid('u1', limit: any(named: 'limit')))
+        .thenAnswer((_) async => [
+              makeSession(
+                id: 's1',
+                startedAt: DateTime(olderMonth.year, olderMonth.month, 10),
+                status: SessionStatus.finished,
+                wasFullyCompleted: true,
+              ),
+            ]);
     when(() => repo.listSetLogs(uid: 'u1', sessionId: any(named: 'sessionId')))
         .thenAnswer((_) async => [makeSetLog()]);
 

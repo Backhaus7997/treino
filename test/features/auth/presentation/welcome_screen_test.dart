@@ -6,6 +6,7 @@ import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/features/auth/presentation/welcome_screen.dart';
 import 'package:treino/features/auth/presentation/widgets/auth_pill_button.dart';
 import 'package:treino/features/auth/presentation/widgets/auth_secondary_button.dart';
+import 'package:treino/features/auth/presentation/widgets/terms_notice_text.dart';
 import 'package:treino/features/auth/presentation/widgets/treino_logo.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
@@ -194,5 +195,16 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('LOGIN'), findsOneWidget);
+  });
+
+  // ---------------------------------------------------------------------------
+  // QA-AUTH-001 (issue #434): Terms notice below the social buttons
+  // ---------------------------------------------------------------------------
+  testWidgets('renders the TermsNoticeText legend below the social buttons',
+      (tester) async {
+    await tester.pumpWidget(_buildApp());
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TermsNoticeText), findsOneWidget);
   });
 }

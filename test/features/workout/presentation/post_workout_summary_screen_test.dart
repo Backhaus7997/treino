@@ -7,13 +7,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
+import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/features/checkins/application/check_in_providers.dart';
+import 'package:treino/features/checkins/domain/check_in.dart';
+import 'package:treino/features/feed/domain/post_privacy.dart';
+import 'package:treino/features/insights/domain/radar_axis.dart';
+import 'package:treino/features/insights/presentation/widgets/muscle_distribution_radar.dart';
 import 'package:treino/features/workout/application/post_workout_notifier.dart';
+import 'package:treino/features/workout/application/session_highlights.dart';
+import 'package:treino/features/workout/application/session_muscle_distribution.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
+import 'package:treino/features/workout/application/session_recognition.dart';
+import 'package:treino/features/workout/domain/exercise_progression.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/presentation/post_workout_summary_screen.dart';
+import 'package:treino/features/workout/presentation/widgets/session_stats_card.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -39,9 +52,9 @@ Session _makeSession({
       wasFullyCompleted: wasFullyCompleted,
     );
 
-SetLog _makeSetLog() => SetLog(
+SetLog _makeSetLog({String exerciseId = 'e1'}) => SetLog(
       id: 'sl1',
-      exerciseId: 'e1',
+      exerciseId: exerciseId,
       exerciseName: 'Press',
       setNumber: 1,
       reps: 10,
@@ -51,11 +64,51 @@ SetLog _makeSetLog() => SetLog(
 
 typedef _SummaryRecord = ({Session? session, List<SetLog> setLogs});
 
+SessionExerciseSummary _exercise({
+  String id = 'e1',
+  String name = 'Press banca',
+  int setCount = 4,
+  double bestWeightKg = 80,
+  int bestSetReps = 5,
+  double sessionVolumeKg = 1200,
+  bool isFirstTime = false,
+  List<SessionExerciseRecord> records = const [],
+}) =>
+    (
+      exerciseId: id,
+      exerciseName: name,
+      setCount: setCount,
+      bestWeightKg: bestWeightKg,
+      bestSetReps: bestSetReps,
+      sessionVolumeKg: sessionVolumeKg,
+      isFirstTime: isFirstTime,
+      records: records,
+    );
+
+SessionHighlights _highlights({
+  List<SessionExerciseSummary> exercises = const [],
+  int recordCount = 0,
+  bool hasHistory = true,
+  SessionRecognition recognition = noRecognition,
+}) =>
+    (
+      exercises: exercises,
+      recordCount: recordCount,
+      hasHistory: hasHistory,
+      recognition: recognition,
+    );
+
 Widget _buildWithRouter({
   required _SummaryRecord Function() summaryOverride,
   PostWorkoutNotifier Function()? notifierOverride,
   bool summaryLoading = false,
   bool summaryError = false,
+  SessionMuscleDistribution muscleDistribution = emptySessionMuscleDistribution,
+  bool muscleError = false,
+  SessionHighlights highlights = emptySessionHighlights,
+  bool reduceMotion = false,
+  double? textScale,
+  CheckIn? existingCheckIn,
 }) {
   final router = GoRouter(
     initialLocation: '/workout/session-summary/s1',
@@ -72,6 +125,14 @@ Widget _buildWithRouter({
           body: Center(child: Text('workout-home')),
         ),
       ),
+      // Stub del composer: acá sólo importa que COMPARTIR navegue; el
+      // composer real se testea en share_workout_composer_screen_test.dart.
+      GoRoute(
+        path: '/workout/session-summary/:sessionId/share',
+        builder: (_, __) => const Scaffold(
+          body: Center(child: Text('composer-screen')),
+        ),
+      ),
     ],
   );
 
@@ -81,6 +142,22 @@ Widget _buildWithRouter({
       if (summaryError) return Future.error(Exception('load error'));
       return Future.value(summaryOverride());
     }),
+    // Always overridden: the real provider would hit the real exercise
+    // catalog (Firestore) from inside a widget test.
+    sessionMuscleDistributionProvider.overrideWith((ref, key) {
+      if (muscleError) return Future.error(Exception('catalog error'));
+      return Future.value(muscleDistribution);
+    }),
+    // Always overridden: the real provider would scan the athlete's session
+    // history (Firestore) from inside a widget test.
+    sessionHighlightsProvider.overrideWith(
+      (ref, key) => Future.value(highlights),
+    ),
+    // Always overridden: el paso de check-in (#643) lee el registro del día y
+    // el provider real iría a Firestore desde un widget test.
+    checkInByDateProvider.overrideWith(
+      (ref, key) => Future.value(existingCheckIn),
+    ),
     currentUidProvider.overrideWithValue('u1'),
     if (notifierOverride != null)
       postWorkoutNotifierProvider.overrideWith(notifierOverride),
@@ -91,6 +168,19 @@ Widget _buildWithRouter({
     child: MaterialApp.router(
       theme: AppTheme.dark(),
       routerConfig: router,
+      // Ajustes de accesibilidad inyectados por MediaQuery: "reducir
+      // movimiento" (las entradas TreinoFadeSlideIn deben quedar visibles al
+      // primer frame) y font scale grande.
+      builder: reduceMotion || textScale != null
+          ? (context, child) => MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  disableAnimations: reduceMotion ? true : null,
+                  textScaler:
+                      textScale == null ? null : TextScaler.linear(textScale),
+                ),
+                child: child!,
+              )
+          : null,
       localizationsDelegates: AppL10n.localizationsDelegates,
       supportedLocales: AppL10n.supportedLocales,
       locale: const Locale('es', 'AR'),
@@ -162,7 +252,14 @@ void main() {
     expect(find.text('52'), findsOneWidget);
     expect(find.text('3.2'), findsOneWidget);
     expect(find.text('22'), findsOneWidget);
-    expect(find.text('—'), findsWidgets);
+    // PRS HOY ya es real: con highlights resueltos y sin récords muestra 0.
+    expect(find.text('0'), findsOneWidget);
+
+    // Labels carry their unit (#363) — bare DURACIÓN/VOLUMEN must be gone.
+    expect(find.text('DURACIÓN MIN'), findsOneWidget);
+    expect(find.text('VOLUMEN KG'), findsOneWidget);
+    expect(find.text('DURACIÓN'), findsNothing);
+    expect(find.text('VOLUMEN'), findsNothing);
   });
 
   testWidgets('SCENARIO-346: SETS stat uses count from setLogs',
@@ -179,19 +276,266 @@ void main() {
     expect(find.text('5'), findsOneWidget);
   });
 
-  // ── SCENARIO-347/348: PRs section + mood row ─────────────────────────────
-
-  testWidgets('SCENARIO-347: renders PRs section with placeholder content',
+  testWidgets('stat card owns tile stagger and mood follows its four slots',
       (tester) async {
     await tester.pumpWidget(_buildWithRouter(
       summaryOverride: () => (session: _makeSession(), setLogs: []),
     ));
+    await tester.pump();
+    await tester.pump();
+
+    final card = tester.widget<SessionStatsCard>(
+      find.byType(SessionStatsCard),
+    );
+    expect(card.animateTiles, isTrue);
+    expect(card.entryDelay, AppMotion.stagger(1));
+
+    final cardEntries = tester.widgetList<TreinoFadeSlideIn>(
+      find.descendant(
+        of: find.byType(SessionStatsCard),
+        matching: find.byType(TreinoFadeSlideIn),
+      ),
+    );
+    expect(cardEntries, hasLength(4));
+
+    final moodEntry = tester.widget<TreinoFadeSlideIn>(
+      find.ancestor(
+        of: find.text('😐'),
+        matching: find.byType(TreinoFadeSlideIn),
+      ),
+    );
+    expect(moodEntry.delay, AppMotion.stagger(5));
+  });
+
+  // ── PRs reales (reemplaza el stub de SCENARIO-347) ───────────────────────
+
+  testWidgets(
+      'PRs: un récord muestra ejercicio, tipo, valor nuevo y marca anterior',
+      (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+      highlights: _highlights(
+        recordCount: 1,
+        exercises: [
+          _exercise(records: const [
+            (
+              recordType: ProgressionRecordType.heaviestWeight,
+              value: 80.0,
+              previousBest: 75.0,
+            ),
+          ]),
+        ],
+      ),
+    ));
     await tester.pumpAndSettle();
 
-    expect(
-      find.textContaining('Próximamente'),
-      findsOneWidget,
+    expect(find.text('PRS DE LA SESIÓN'), findsOneWidget);
+    expect(find.text('Peso máximo'), findsOneWidget);
+    expect(find.text('80'), findsOneWidget);
+    expect(find.text('→ 75 kg'), findsOneWidget);
+    expect(find.textContaining('Próximamente'), findsNothing);
+    // El tile PRS HOY refleja el conteo real.
+    expect(find.text('1'), findsWidgets);
+  });
+
+  testWidgets('PRs: tile PRS HOY muestra el conteo real de récords',
+      (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+      highlights: _highlights(
+        recordCount: 7,
+        exercises: [_exercise()],
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('7'), findsOneWidget);
+    expect(find.text('—'), findsNothing);
+  });
+
+  testWidgets('PRs: sin récords pero con historial → línea coherente',
+      (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+      highlights: _highlights(exercises: [_exercise()]),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('PRS DE LA SESIÓN'), findsOneWidget);
+    expect(find.textContaining('Sin récords nuevos'), findsOneWidget);
+  });
+
+  testWidgets(
+      'PRs: primer entreno (sin historial) → punto de partida + banner, '
+      'sin números inventados', (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+      highlights: _highlights(
+        hasHistory: false,
+        exercises: [_exercise()],
+        recognition: (kind: SessionRecognitionKind.firstWorkout, count: 0),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('punto de partida'), findsOneWidget);
+    expect(find.text('PRIMER ENTRENO COMPLETADO'), findsOneWidget);
+  });
+
+  testWidgets(
+      'PRs: sesión abandonada → sin sección PRS, tile "—", EJERCICIOS sí',
+      (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () =>
+          (session: _makeSession(wasFullyCompleted: false), setLogs: []),
+      highlights: _highlights(exercises: [_exercise()]),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('PRS DE LA SESIÓN'), findsNothing);
+    expect(find.text('EJERCICIOS'), findsOneWidget);
+    expect(find.text('—'), findsOneWidget);
+  });
+
+  // ── Banner de reconocimiento ─────────────────────────────────────────────
+
+  testWidgets('reconocimiento: récords → "2 RÉCORDS NUEVOS"', (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+      highlights: _highlights(
+        recordCount: 2,
+        exercises: [_exercise()],
+        recognition: (kind: SessionRecognitionKind.records, count: 2),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('2 RÉCORDS NUEVOS'), findsOneWidget);
+  });
+
+  testWidgets('reconocimiento: nthSessionOfWeek → "3ª SESIÓN DE LA SEMANA"',
+      (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+      highlights: _highlights(
+        exercises: [_exercise()],
+        recognition: (
+          kind: SessionRecognitionKind.nthSessionOfWeek,
+          count: 3,
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('3ª SESIÓN DE LA SEMANA'), findsOneWidget);
+  });
+
+  testWidgets('reconocimiento: none → sin banner', (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+      highlights: _highlights(exercises: [_exercise()]),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('RÉCORD'), findsNothing);
+    expect(find.textContaining('SESIÓN DE LA SEMANA'), findsNothing);
+  });
+
+  // ── Sección EJERCICIOS ───────────────────────────────────────────────────
+
+  testWidgets(
+      'EJERCICIOS: filas con sets y mejor set, badges PR / 1ª VEZ y '
+      'estrella al de mayor volumen', (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+      highlights: _highlights(
+        recordCount: 1,
+        exercises: [
+          _exercise(
+            records: const [
+              (
+                recordType: ProgressionRecordType.heaviestWeight,
+                value: 80.0,
+                previousBest: 75.0,
+              ),
+            ],
+          ),
+          _exercise(
+            id: 'e2',
+            name: 'Dominadas',
+            setCount: 3,
+            bestWeightKg: 0,
+            bestSetReps: 12,
+            sessionVolumeKg: 0,
+            isFirstTime: true,
+          ),
+        ],
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('EJERCICIOS'), findsOneWidget);
+    expect(find.text('Press banca'), findsWidgets);
+    expect(find.text('4 sets · 80 kg × 5'), findsOneWidget);
+    // Bodyweight (#368): mejor set solo por reps.
+    expect(find.text('3 sets · 12 reps'), findsOneWidget);
+    expect(find.text('PR'), findsOneWidget);
+    expect(find.text('1ª VEZ'), findsOneWidget);
+    // Destacado: e1 tiene el mayor volumen → una sola estrella.
+    expect(find.byIcon(TreinoIcon.starFill), findsOneWidget);
+  });
+
+  // ── Reduced motion ───────────────────────────────────────────────────────
+
+  testWidgets(
+      'reduce-motion: todo visible al primer frame, sin animar entradas',
+      (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+      highlights: _highlights(
+        recordCount: 1,
+        exercises: [_exercise()],
+        recognition: (kind: SessionRecognitionKind.records, count: 1),
+      ),
+      reduceMotion: true,
+    ));
+    // Solo frames sueltos — nada de pumpAndSettle: si algo animara, acá
+    // seguiría a mitad de camino.
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('BUEN ENTRENO'), findsOneWidget);
+    expect(find.text('1 RÉCORD NUEVO'), findsOneWidget);
+    final fades = tester.widgetList<FadeTransition>(
+      find.descendant(
+        of: find.byType(TreinoFadeSlideIn),
+        matching: find.byType(FadeTransition),
+      ),
     );
+    expect(fades, isNotEmpty);
+    for (final fade in fades) {
+      expect(fade.opacity.value, 1.0);
+    }
+  });
+
+  testWidgets('sin reduce-motion las entradas SÍ arrancan invisibles',
+      (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+    ));
+    await tester.pump();
+    await tester.pump();
+
+    final fades = tester.widgetList<FadeTransition>(
+      find.descendant(
+        of: find.byType(TreinoFadeSlideIn),
+        matching: find.byType(FadeTransition),
+      ),
+    );
+    expect(fades, isNotEmpty);
+    expect(fades.any((f) => f.opacity.value < 1.0), isTrue);
+
+    await tester.pumpAndSettle();
   });
 
   testWidgets('SCENARIO-348: renders exactly 5 emoji Text widgets in mood row',
@@ -209,6 +553,246 @@ void main() {
             RegExp(r'[\u{1F600}-\u{1F64F}]', unicode: true).hasMatch(t.data!))
         .toList();
     expect(emojiTexts.length, equals(5));
+  });
+
+  // ── Check-in post-sesión (#643 slice 1) ──────────────────────────────────
+  //
+  // La fila de emojis dejó de ser decorativa: ahora es el paso SALTABLE de
+  // registro. Lo que estos tests protegen es el "saltable de verdad" — el
+  // resumen no puede quedar detrás de un formulario.
+
+  testWidgets('check-in: el paso se anuncia como opcional', (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('¿CÓMO TE SENTISTE?'), findsOneWidget);
+    expect(find.text('Opcional. Podés saltearlo.'), findsOneWidget);
+  });
+
+  testWidgets(
+      'check-in: tocar un nivel abre el sheet con esa sensación ya elegida',
+      (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('😄'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('😄'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('GUARDAR'), findsOneWidget);
+    expect(find.text('¿Tuviste dolor o molestia?'), findsOneWidget);
+    // GUARDAR habilitado ⇒ el nivel del tap llegó precargado al sheet; sin
+    // eso el botón arrancaría deshabilitado y el tap se habría perdido.
+    expect(
+      tester.widget<FilledButton>(find.byType(FilledButton).last).onPressed,
+      isNotNull,
+    );
+  });
+
+  testWidgets('check-in: saltear no bloquea el cierre — LISTO sigue navegando',
+      (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+    ));
+    await tester.pumpAndSettle();
+
+    // Sin tocar el check-in: el camino crítico (cerrar la sesión) queda
+    // exactamente como estaba.
+    await tester.ensureVisible(find.text('LISTO'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('LISTO'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('workout-home'), findsOneWidget);
+  });
+
+  testWidgets(
+      'check-in: con registro del día muestra REGISTRADO en vez de la escala',
+      (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+      existingCheckIn: CheckIn(
+        date: checkInDateKey(DateTime.now()),
+        feeling: CheckInFeeling.bien,
+        recordedAt: DateTime.now().toUtc(),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('REGISTRADO'), findsOneWidget);
+    expect(find.text('Editar'), findsOneWidget);
+    // El id del doc es la fecha: un segundo registro pisa al primero. Mostrar
+    // el que ya existe es lo que evita que eso sea una pérdida silenciosa.
+    expect(find.text('😞'), findsNothing);
+    expect(find.text('🙂'), findsOneWidget);
+  });
+
+  // ── #456 regression: mood row must never overflow ────────────────────────
+
+  testWidgets(
+      '#456: mood row scales down instead of overflowing on a narrow screen',
+      (tester) async {
+    tester.view.physicalSize = const Size(180, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    // At this extreme width the StatTile grid cells legitimately overflow
+    // vertically before the mood row is even laid out, which would fail the
+    // test for an unrelated reason. Capture layout errors and assert that
+    // nothing overflows HORIZONTALLY — the mood row is the only horizontal
+    // Flex at risk on this screen (#456).
+    final horizontalOverflows = <FlutterErrorDetails>[];
+    final originalOnError = FlutterError.onError;
+    FlutterError.onError = (details) {
+      final message = details.exceptionAsString();
+      if (message.contains('overflowed')) {
+        if (message.contains('on the right')) {
+          horizontalOverflows.add(details);
+        }
+        return; // vertical overflows of unrelated widgets tolerated here
+      }
+      originalOnError?.call(details);
+    };
+    try {
+      await tester.pumpWidget(_buildWithRouter(
+        summaryOverride: () => (session: _makeSession(), setLogs: []),
+      ));
+      await tester.pumpAndSettle();
+    } finally {
+      // Must be restored BEFORE any expect(): the test binding reports expect
+      // failures through FlutterError.onError and asserts it wasn't replaced.
+      FlutterError.onError = originalOnError;
+    }
+
+    expect(
+      horizontalOverflows.map((d) => d.exceptionAsString()).toList(),
+      isEmpty,
+    );
+
+    // The row itself still renders its 5 emojis (scaled, not dropped).
+    final emojiTexts = tester
+        .widgetList<Text>(find.byType(Text))
+        .where((t) =>
+            t.data != null &&
+            RegExp(r'[\u{1F600}-\u{1F64F}]', unicode: true).hasMatch(t.data!))
+        .toList();
+    expect(emojiTexts.length, equals(5));
+  });
+
+  testWidgets(
+      'filas de PRs y EJERCICIOS no desbordan horizontalmente: pantalla '
+      'angosta con estrella, badges y valores largos', (tester) async {
+    tester.view.physicalSize = const Size(180, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final horizontalOverflows = <FlutterErrorDetails>[];
+    final originalOnError = FlutterError.onError;
+    FlutterError.onError = (details) {
+      final message = details.exceptionAsString();
+      if (message.contains('overflowed')) {
+        if (message.contains('on the right')) {
+          horizontalOverflows.add(details);
+        }
+        return; // los overflows verticales del grid a este ancho no aplican
+      }
+      originalOnError?.call(details);
+    };
+    try {
+      await tester.pumpWidget(_buildWithRouter(
+        summaryOverride: () => (session: _makeSession(), setLogs: []),
+        highlights: _highlights(
+          recordCount: 1,
+          exercises: [
+            _exercise(
+              name: 'Press de banca inclinado con mancuernas',
+              records: const [
+                (
+                  recordType: ProgressionRecordType.bestSetVolume,
+                  value: 412.5,
+                  previousBest: 375.0,
+                ),
+              ],
+            ),
+            _exercise(
+              id: 'e2',
+              name: 'Elevaciones laterales',
+              sessionVolumeKg: 300,
+              isFirstTime: true,
+            ),
+          ],
+        ),
+      ));
+      await tester.pumpAndSettle();
+    } finally {
+      FlutterError.onError = originalOnError;
+    }
+
+    expect(
+      horizontalOverflows.map((d) => d.exceptionAsString()).toList(),
+      isEmpty,
+    );
+    // Las secciones siguen presentes (escaladas, no descartadas).
+    expect(find.text('PRS DE LA SESIÓN'), findsOneWidget);
+    expect(find.text('EJERCICIOS'), findsOneWidget);
+    expect(find.text('PR'), findsOneWidget);
+    expect(find.text('1ª VEZ'), findsOneWidget);
+  });
+
+  testWidgets(
+      'filas de PRs y EJERCICIOS no desbordan con font scale de '
+      'accesibilidad 3x en un ancho normal', (tester) async {
+    tester.view.physicalSize = const Size(390, 3000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final horizontalOverflows = <FlutterErrorDetails>[];
+    final originalOnError = FlutterError.onError;
+    FlutterError.onError = (details) {
+      final message = details.exceptionAsString();
+      if (message.contains('overflowed')) {
+        if (message.contains('on the right')) {
+          horizontalOverflows.add(details);
+        }
+        return;
+      }
+      originalOnError?.call(details);
+    };
+    try {
+      await tester.pumpWidget(_buildWithRouter(
+        textScale: 3.0,
+        summaryOverride: () => (session: _makeSession(), setLogs: []),
+        highlights: _highlights(
+          recordCount: 1,
+          exercises: [
+            _exercise(
+              name: 'Press de banca inclinado con mancuernas',
+              isFirstTime: true,
+              records: const [
+                (
+                  recordType: ProgressionRecordType.bestSetVolume,
+                  value: 412.5,
+                  previousBest: 375.0,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ));
+      await tester.pumpAndSettle();
+    } finally {
+      FlutterError.onError = originalOnError;
+    }
+
+    expect(
+      horizontalOverflows.map((d) => d.exceptionAsString()).toList(),
+      isEmpty,
+    );
   });
 
   // ── SCENARIO-349/350: LISTO + COMPARTIR buttons ──────────────────────────
@@ -234,8 +818,15 @@ void main() {
     expect(shareCalled, isFalse);
   });
 
-  testWidgets(
-      'SCENARIO-350: COMPARTIR button triggers shareWorkout on notifier',
+  // ── SCENARIO-350 (actualizado, share-composer PR2) ───────────────────────
+  //
+  // COMPARTIR ya NO publica de una: abre el composer, donde el texto es
+  // editable y se puede adjuntar una foto. Publicar (y sus snackbars de éxito
+  // y error, ex SCENARIO-351/352) vive ahora en
+  // share_workout_composer_screen_test.dart, junto con el assert del conteo
+  // de ejercicios DISTINTOS (ex QA-FEED-364/389).
+
+  testWidgets('SCENARIO-350: COMPARTIR abre el composer sin publicar todavía',
       (tester) async {
     bool shareCalled = false;
 
@@ -252,44 +843,10 @@ void main() {
     await tester.tap(find.text('COMPARTIR'));
     await tester.pumpAndSettle();
 
-    expect(shareCalled, isTrue);
-  });
-
-  // ── SCENARIO-351/352: SnackBars ──────────────────────────────────────────
-
-  testWidgets(
-      'SCENARIO-351: success SnackBar "¡Post compartido!" + nav to /workout',
-      (tester) async {
-    await tester.pumpWidget(_buildWithRouter(
-      summaryOverride: () => (session: _makeSession(), setLogs: []),
-      notifierOverride: () => _SuccessNotifier(),
-    ));
-    await tester.pumpAndSettle();
-
-    await tester.ensureVisible(find.text('COMPARTIR'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('COMPARTIR'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('¡Post compartido!'), findsOneWidget);
-    expect(find.text('workout-home'), findsOneWidget);
-  });
-
-  testWidgets(
-      'SCENARIO-352: error SnackBar shown without nav on shareWorkout failure',
-      (tester) async {
-    await tester.pumpWidget(_buildWithRouter(
-      summaryOverride: () => (session: _makeSession(), setLogs: []),
-      notifierOverride: () => _ErrorNotifier(),
-    ));
-    await tester.pumpAndSettle();
-
-    await tester.ensureVisible(find.text('COMPARTIR'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('COMPARTIR'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('No pudimos compartir tu post. Intentá de nuevo.'), findsOneWidget);
+    expect(find.text('composer-screen'), findsOneWidget);
+    // Nada se publicó con el tap: eso ocurre recién al confirmar en el
+    // composer.
+    expect(shareCalled, isFalse);
     expect(find.text('workout-home'), findsNothing);
   });
 
@@ -309,6 +866,95 @@ void main() {
 
     expect(find.text('workout-home'), findsOneWidget);
   });
+
+  // ── Muscle distribution section ──────────────────────────────────────────
+
+  testWidgets(
+      'muscle distribution: ≥3 axes → radar without legend or stat cards',
+      (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+      muscleDistribution: (
+        setsByAxis: {
+          RadarAxis.chest: 6,
+          RadarAxis.arms: 4,
+          RadarAxis.shoulders: 3,
+        },
+        volumeKgByAxis: {
+          RadarAxis.chest: 1200.0,
+          RadarAxis.arms: 400.0,
+          RadarAxis.shoulders: 300.0,
+        },
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('DISTRIBUCIÓN MUSCULAR'), findsOneWidget);
+    expect(find.byType(MuscleDistributionRadar), findsOneWidget);
+    // Single-session mode: no Actual/Anterior legend, no stat cards (the
+    // 2×2 grid above already shows those metrics).
+    expect(find.text('Actual'), findsNothing);
+    expect(find.text('Anterior'), findsNothing);
+    expect(find.text('Entrenos'), findsNothing);
+  });
+
+  testWidgets(
+      'muscle distribution: con 2 ejes también va el radar — las barras del '
+      'PR #586 ya no existen (pedido directo: el mismo gráfico de Insights)',
+      (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+      muscleDistribution: (
+        setsByAxis: {RadarAxis.legs: 4, RadarAxis.core: 2},
+        volumeKgByAxis: {RadarAxis.legs: 400.0, RadarAxis.core: 0.0},
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('DISTRIBUCIÓN MUSCULAR'), findsOneWidget);
+    expect(find.byType(MuscleDistributionRadar), findsOneWidget);
+    expect(find.text('4 sets · 400 kg'), findsNothing);
+  });
+
+  testWidgets(
+      'muscle distribution: un solo grupo (día de piernas) → radar igual, '
+      'sin NaN ni crash', (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+      muscleDistribution: (
+        setsByAxis: {RadarAxis.legs: 12},
+        volumeKgByAxis: {RadarAxis.legs: 2400.0},
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(MuscleDistributionRadar), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('muscle distribution: empty distribution → whole section absent',
+      (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('DISTRIBUCIÓN MUSCULAR'), findsNothing);
+    expect(find.byType(MuscleDistributionRadar), findsNothing);
+  });
+
+  testWidgets(
+      'muscle distribution: resolver error → section absent, summary intact',
+      (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+      muscleError: true,
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('DISTRIBUCIÓN MUSCULAR'), findsNothing);
+    expect(find.text('BUEN ENTRENO'), findsOneWidget);
+  });
 }
 
 // ── Stub notifiers ────────────────────────────────────────────────────────────
@@ -316,30 +962,22 @@ void main() {
 class _TrackingNotifier extends PostWorkoutNotifier {
   _TrackingNotifier({required this.onShare});
   final void Function() onShare;
+  int? capturedExerciseCount;
 
   @override
-  Future<void> shareWorkout(Session session, {required String text}) async {
+  Future<void> shareWorkout(
+    Session session, {
+    required String text,
+    required int exerciseCount,
+    required PostPrivacy privacy,
+    String? localPhotoPath,
+  }) async {
+    capturedExerciseCount = exerciseCount;
     onShare();
     state = const AsyncData(null);
   }
 }
 
-class _SuccessNotifier extends PostWorkoutNotifier {
-  @override
-  Future<void> shareWorkout(Session session, {required String text}) async {
-    state = const AsyncLoading();
-    await Future<void>.delayed(Duration.zero);
-    state = const AsyncData(null);
-  }
-}
-
-class _ErrorNotifier extends PostWorkoutNotifier {
-  @override
-  Future<void> shareWorkout(Session session, {required String text}) async {
-    state = const AsyncLoading();
-    await Future<void>.delayed(Duration.zero);
-    final err = Exception('fail');
-    state = AsyncError(err, StackTrace.empty);
-    throw err;
-  }
-}
+// Los stubs de éxito/error del share vivían acá para SCENARIO-351/352; esos
+// escenarios se mudaron a share_workout_composer_screen_test.dart cuando
+// COMPARTIR pasó a abrir el composer en vez de publicar.

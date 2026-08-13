@@ -12,13 +12,14 @@ import 'package:treino/l10n/app_l10n.dart';
 
 // ── Helper ─────────────────────────────────────────────────────────────────
 
-AppL10n _l10n(WidgetTester tester) => AppL10n.of(tester.element(find.byType(SizedBox)));
+AppL10n _l10n(WidgetTester tester) =>
+    AppL10n.of(tester.element(find.byType(SizedBox)));
 
-Widget _harness() => MaterialApp(
+Widget _harness() => const MaterialApp(
       localizationsDelegates: AppL10n.localizationsDelegates,
       supportedLocales: AppL10n.supportedLocales,
-      locale: const Locale('es', 'AR'),
-      home: const Scaffold(body: SizedBox.shrink()),
+      locale: Locale('es', 'AR'),
+      home: Scaffold(body: SizedBox.shrink()),
     );
 
 // ── Tests ──────────────────────────────────────────────────────────────────
@@ -55,8 +56,7 @@ void main() {
       await t.pumpAndSettle();
       // Using a fixed date 15/03/2026 at 10:30
       final result = _l10n(t).agendaBookingConfirmBody('15/03/2026', '10:30');
-      expect(result,
-          '¿Confirmar reserva el 15/03/2026 a las 10:30?');
+      expect(result, '¿Confirmar reserva el 15/03/2026 a las 10:30?');
     });
 
     testWidgets('agendaBookingConfirmCta', (t) async {
@@ -147,7 +147,7 @@ void main() {
       expect(
         _l10n(t).agendaTrainerEmptyAvailability,
         'Todavía no configuraste tus horarios de trabajo. '
-            'Agregá uno para que tus alumnos puedan reservar.',
+        'Agregá uno para que tus alumnos puedan reservar.',
       );
     });
 
@@ -210,8 +210,8 @@ void main() {
     testWidgets('agendaSlotBookedByLabel — ICU interpolation', (t) async {
       await t.pumpWidget(_harness());
       await t.pumpAndSettle();
-      expect(_l10n(t).agendaSlotBookedByLabel('Martín'),
-          'Reservado por Martín');
+      expect(
+          _l10n(t).agendaSlotBookedByLabel('Martín'), 'Reservado por Martín');
     });
   });
 }

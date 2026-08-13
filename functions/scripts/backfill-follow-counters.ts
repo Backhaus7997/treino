@@ -1,6 +1,6 @@
 /**
  * backfill-follow-counters.ts — recompute followersCount / followingCount for
- * every userPublicProfiles doc from the authoritative `friendships` collection.
+ * every userPublicProfiles doc from the authoritative `follows` collection.
  *
  * ## Why
  *
@@ -10,12 +10,24 @@
  * The `maintainFollowCounters` Cloud Function now keeps them correct going
  * forward; this one-shot script reconciles the EXISTING data.
  *
- * ## Model
+ * ## Model (post follow-model, design §7.4)
  *
- * A friendship doc is a directed follow: `requesterId` follows the other
- * member. Only `status == 'accepted'` counts. For each accepted friendship:
- *   - requester.followingCount += 1
- *   - other.followersCount     += 1
+ * `follows` es un doc por arista DIRIGIDA (`follows/{followerUid}_{followeeUid}`).
+ * Cada arista ya es direccional — no hay que partir nada por `requesterId`
+ * como en el modelo viejo de `friendships`. Sólo cuenta `status == 'accepted'`.
+ * Por cada arista aceptada:
+ *   - followerUid.followingCount += 1
+ *   - followeeUid.followersCount += 1
+ *
+ * Con follow mutuo (que es como queda TODA relación migrada — dos aristas,
+ * `{A}_{B}` y `{B}_{A}`, ambas `accepted`) las dos aristas suman 1 a cada lado
+ * de cada usuario: no colapsan en 1. Los contadores SUBEN respecto del split
+ * viejo por `requesterId`, que era engañoso — mostraba "siguiendo 1,
+ * seguidores 0" para una relación que en los hechos era mutua (ADR-FOLLOW-013).
+ *
+ * El agregador viejo sobre `friendships` (`tallyFollowCounters`) se conserva
+ * para no romper tests existentes, pero el camino que corre `main()` es el
+ * nuevo, sobre `follows`.
  *
  * The script recomputes each profile's counters FROM SCRATCH (not increments),
  * so it is idempotent — running it twice yields the same result. It only
@@ -27,7 +39,7 @@
  * - Dry-run by default: prints the diff, writes nothing.
  * - Pass `--apply` to actually write the corrections.
  * - Only touches `followersCount` / `followingCount`; no other fields.
- * - Skips friendships whose members[] is malformed.
+ * - Skips edges missing `followerUid` / `followeeUid`.
  *
  * Run with admin credentials, from the functions/ directory:
  *   # dry run (no writes):
@@ -83,6 +95,42 @@ export function tallyFollowCounters(
   return tallies;
 }
 
+/**
+ * Pure aggregator — folds accepted `follows` edges into a per-uid tally.
+ * Exported for unit testing without Firestore.
+ *
+ * A diferencia de `tallyFollowCounters`, acá NO hay split en memoria: cada
+ * arista ya es direccional (design §7.4), así que dos aristas del mismo par
+ * (`{A}_{B}` y `{B}_{A}`, follow mutuo) suman 1 a cada lado de cada usuario,
+ * no colapsan en 1.
+ *
+ * @param edges array de { followerUid, followeeUid, status }
+ */
+export function tallyFollowCountersFromEdges(
+  edges: Array<{
+    followerUid?: string;
+    followeeUid?: string;
+    status?: string;
+  }>,
+): Map<string, Tally> {
+  const tallies = new Map<string, Tally>();
+  const bump = (uid: string, key: keyof Tally) => {
+    const t = tallies.get(uid) ?? { followers: 0, following: 0 };
+    t[key] += 1;
+    tallies.set(uid, t);
+  };
+
+  for (const e of edges) {
+    if (e.status !== "accepted") continue;
+    if (!e.followerUid || !e.followeeUid) continue;
+
+    bump(e.followerUid, "following"); // followerUid sigue a followeeUid
+    bump(e.followeeUid, "followers"); // followeeUid es seguido por followerUid
+  }
+
+  return tallies;
+}
+
 async function main(): Promise<void> {
   const apply = process.argv.includes("--apply");
   admin.initializeApp();
@@ -92,17 +140,17 @@ async function main(): Promise<void> {
     `\n=== backfill-follow-counters (${apply ? "APPLY" : "DRY RUN"}) ===\n`,
   );
 
-  // 1. Read every accepted friendship and tally the truth.
-  const friendshipsSnap = await db
-    .collection("friendships")
+  // 1. Read every accepted follow edge and tally the truth.
+  const followsSnap = await db
+    .collection("follows")
     .where("status", "==", "accepted")
     .get();
 
-  const truth = tallyFollowCounters(
-    friendshipsSnap.docs.map((d) => d.data() as Record<string, unknown>),
+  const truth = tallyFollowCountersFromEdges(
+    followsSnap.docs.map((d) => d.data() as Record<string, unknown>),
   );
   console.log(
-    `Read ${friendshipsSnap.size} accepted friendships → ` +
+    `Read ${followsSnap.size} accepted follow edges → ` +
       `${truth.size} users with non-zero counters.\n`,
   );
 

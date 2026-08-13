@@ -5,11 +5,14 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
+import '../../../core/utils/argentina_time.dart';
+import '../../../core/utils/date_labels.dart';
 import '../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
+import '../../workout/application/exercise_providers.dart';
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../application/day_insights_providers.dart';
@@ -41,7 +44,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
   /// by the SEMANA card. Defaults to the current week; paged by the ‹ ›
   /// chevrons. Independent of `_selectedDay` — paging does NOT force-change
   /// the muscles card unless the selected day falls outside the new week.
-  late DateTime _shownWeekStart = mondayOfWeek(DateTime.now().toLocal());
+  late DateTime _shownWeekStart = mondayOfWeek(argentinaNow());
 
   /// [UX-week-day-selector] `true` once the athlete has paged away from the
   /// current week at least once. Gates the brand-new-account `_EmptyState`:
@@ -53,8 +56,8 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
   bool _hasPagedAway = false;
 
   static DateTime _todayOnly() {
-    final now = DateTime.now();
-    return DateTime(now.year, now.month, now.day);
+    final now = argentinaNow();
+    return DateTime.utc(now.year, now.month, now.day);
   }
 
   /// [UX-week-day-selector] Future days of the current week are NOT
@@ -77,12 +80,12 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
   /// selection persists until the athlete explicitly taps a day in the new
   /// week. This avoids a jarring auto-jump of the card below while paging.
   void _pageWeek(int deltaWeeks) {
-    final candidate = DateTime(
+    final candidate = DateTime.utc(
       _shownWeekStart.year,
       _shownWeekStart.month,
       _shownWeekStart.day + deltaWeeks * 7,
     );
-    final currentWeekStart = mondayOfWeek(DateTime.now().toLocal());
+    final currentWeekStart = mondayOfWeek(argentinaNow());
     if (candidate.isAfter(currentWeekStart)) return;
     setState(() {
       _shownWeekStart = candidate;
@@ -97,8 +100,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
     final async = ref.watch(
       athleteWeekInsightsProvider((uid: uid, weekStart: _shownWeekStart)),
     );
-    final isCurrentWeek =
-        _shownWeekStart == mondayOfWeek(DateTime.now().toLocal());
+    final isCurrentWeek = _shownWeekStart == mondayOfWeek(argentinaNow());
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -121,11 +123,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                 child: CircularProgressIndicator(color: palette.accent),
               ),
               error: (_, __) => _ErrorState(
-                onRetry: () => ref.invalidate(
-                  athleteWeekInsightsProvider(
-                    (uid: uid, weekStart: _shownWeekStart),
-                  ),
-                ),
+                onRetry: () => _retryWeek(ref, uid, _shownWeekStart),
               ),
               data: (insights) {
                 // Bug fix (abandoned-session-streak-reports): el CTA de
@@ -144,49 +142,56 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                   return const _EmptyState();
                 }
                 // TREINO Motion PR3: entrada fade+slide staggerada de las
-                // secciones. Seguro acá porque `ListView(children:)` es
-                // EAGER (todos los States montan juntos una sola vez) — en
-                // un builder lazy los ítems reciclados re-animarían al
-                // scrollear. Los setState locales (seleccionar día, pagear
-                // semana) NO re-animan: TreinoFadeSlideIn es one-shot y su
-                // State sobrevive al rebuild.
-                return ListView(
+                // secciones. SingleChildScrollView + Column (no
+                // ListView(children:)): un ListView, aunque construya sus
+                // widgets eager, sigue siendo un viewport — los Elements/
+                // State de los TreinoFadeSlideIn que salen del cacheExtent
+                // se desmontan y re-animan al volver a scrollear. Column
+                // dentro de SingleChildScrollView scrollea como una sola
+                // unidad, sin reciclar Elements por ítem (ver doc de
+                // TreinoFadeSlideIn). Los setState locales (seleccionar día,
+                // pagear semana) NO re-animan: TreinoFadeSlideIn es one-shot
+                // y su State sobrevive al rebuild.
+                return SingleChildScrollView(
                   padding: EdgeInsets.fromLTRB(
                       20, 12, 20, 20 + MediaQuery.paddingOf(context).bottom),
                   physics: const AlwaysScrollableScrollPhysics(),
-                  children: [
-                    TreinoFadeSlideIn(
-                      delay: AppMotion.stagger(0),
-                      child: _WeekStripCard(
-                        insights: insights,
-                        selectedDay: _selectedDay,
-                        onDaySelected: _onDaySelected,
-                        isCurrentWeek: isCurrentWeek,
-                        onPreviousWeek: () => _pageWeek(-1),
-                        onNextWeek: () => _pageWeek(1),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      TreinoFadeSlideIn(
+                        delay: AppMotion.stagger(0),
+                        child: _WeekStripCard(
+                          insights: insights,
+                          selectedDay: _selectedDay,
+                          onDaySelected: _onDaySelected,
+                          isCurrentWeek: isCurrentWeek,
+                          onPreviousWeek: () => _pageWeek(-1),
+                          onNextWeek: () => _pageWeek(1),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 14),
-                    TreinoFadeSlideIn(
-                      delay: AppMotion.stagger(1),
-                      child: _DailyMusclesCard(selectedDay: _selectedDay),
-                    ),
-                    const SizedBox(height: 20),
-                    TreinoFadeSlideIn(
-                      delay: AppMotion.stagger(2),
-                      child: const _AdvancedStatsHeading(),
-                    ),
-                    const SizedBox(height: 12),
-                    TreinoFadeSlideIn(
-                      delay: AppMotion.stagger(3),
-                      child: const _StatsHubTileList(),
-                    ),
-                    const SizedBox(height: 20),
-                    TreinoFadeSlideIn(
-                      delay: AppMotion.stagger(4),
-                      child: _VolverButton(),
-                    ),
-                  ],
+                      const SizedBox(height: 14),
+                      TreinoFadeSlideIn(
+                        delay: AppMotion.stagger(1),
+                        child: _DailyMusclesCard(selectedDay: _selectedDay),
+                      ),
+                      const SizedBox(height: 20),
+                      TreinoFadeSlideIn(
+                        delay: AppMotion.stagger(2),
+                        child: const _AdvancedStatsHeading(),
+                      ),
+                      const SizedBox(height: 12),
+                      TreinoFadeSlideIn(
+                        delay: AppMotion.stagger(3),
+                        child: const _StatsHubTileList(),
+                      ),
+                      const SizedBox(height: 20),
+                      TreinoFadeSlideIn(
+                        delay: AppMotion.stagger(4),
+                        child: _VolverButton(),
+                      ),
+                    ],
+                  ),
                 );
               },
             ),
@@ -271,6 +276,27 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
+// ── Retry ─────────────────────────────────────────────────────────────────────
+
+/// QA-498: `ref.invalidate` NO cascada a las dependencias, y [exercisesProvider]
+/// NO es autoDispose — cachea su `AsyncError` para toda la vida del container.
+/// Invalidar solo el provider de la card lo rebuildeaba, re-leía el MISMO error
+/// cacheado del catálogo y re-renderizaba el mismo estado de error: un botón de
+/// reintentar que no podía recuperar nunca, justo en el caso que trae al usuario
+/// acá (offline / fallo al cargar el catálogo en frío). Mismo criterio que el
+/// `_retry` de MuscleDistributionScreen y FrequentExercisesScreen (#376).
+void _retryWeek(WidgetRef ref, String uid, DateTime weekStart) {
+  ref.invalidate(exercisesProvider);
+  ref.invalidate(athleteWeekInsightsProvider((uid: uid, weekStart: weekStart)));
+}
+
+/// Ver [_retryWeek] — [athleteDayInsightsProvider] también lee
+/// `exercisesProvider.future`.
+void _retryDay(WidgetRef ref, String uid, DateTime day) {
+  ref.invalidate(exercisesProvider);
+  ref.invalidate(athleteDayInsightsProvider((uid: uid, day: day)));
+}
+
 // ── Error state ───────────────────────────────────────────────────────────────
 
 class _ErrorState extends StatelessWidget {
@@ -333,16 +359,16 @@ class _WeekStripCard extends StatelessWidget {
   final VoidCallback onPreviousWeek;
   final VoidCallback onNextWeek;
 
-  static const _dayLabels = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
-
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final today = DateTime.now().toLocal();
-    final todayOnly = DateTime(today.year, today.month, today.day);
+    final localeName = AppL10n.of(context).localeName;
+    final dayLabels = weekdayInitials(localeName);
+    final today = argentinaNow();
+    final todayOnly = DateTime.utc(today.year, today.month, today.day);
     final todayIndex = today.weekday - DateTime.monday;
     final selectedOnly =
-        DateTime(selectedDay.year, selectedDay.month, selectedDay.day);
+        DateTime.utc(selectedDay.year, selectedDay.month, selectedDay.day);
 
     return Container(
       decoration: BoxDecoration(
@@ -366,7 +392,8 @@ class _WeekStripCard extends StatelessWidget {
               ),
               Expanded(
                 child: Text(
-                  _formatRange(insights.weekStart, insights.weekEnd),
+                  _formatRange(
+                      insights.weekStart, insights.weekEnd, localeName),
                   textAlign: TextAlign.center,
                   style: GoogleFonts.barlowCondensed(
                     fontWeight: FontWeight.w700,
@@ -402,7 +429,7 @@ class _WeekStripCard extends StatelessWidget {
           // Labels L M M J V S D
           Row(
             children: [
-              for (final label in _dayLabels)
+              for (final label in dayLabels)
                 Expanded(
                   child: Center(
                     child: Text(
@@ -424,7 +451,7 @@ class _WeekStripCard extends StatelessWidget {
             children: [
               for (var i = 0; i < 7; i++)
                 Builder(builder: (context) {
-                  final day = DateTime(
+                  final day = DateTime.utc(
                     insights.weekStart.year,
                     insights.weekStart.month,
                     insights.weekStart.day + i,
@@ -616,7 +643,14 @@ class _DailyMusclesCard extends ConsumerWidget {
               height: 240,
               child: Center(child: CircularProgressIndicator()),
             ),
-            error: (_, __) => const SizedBox.shrink(),
+            // QA-INS-005: nunca `SizedBox.shrink()` en error — antes la card
+            // quedaba vacía (ni silueta ni mensaje) y no había forma de
+            // distinguir "sin datos" de "falló la carga", ni de reintentar.
+            // Reusa `_ErrorState` (compacto) con retry que invalida el
+            // provider de ESTE card (day-insights), no el semanal.
+            error: (_, __) => _ErrorState(
+              onRetry: () => _retryDay(ref, uid, selectedDay),
+            ),
             // [UX-back-view] `showBack: true` renders bodyfront + bodyback
             // side by side — that pair needs more horizontal room than the
             // old single-body 160px column had next to it. Stacked
@@ -762,6 +796,13 @@ class _StatsHubTileList extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         _StatTile(
+          icon: TreinoIcon.trendUp,
+          title: l10n.insightsTileExerciseProgressionTitle,
+          subtitle: l10n.insightsTileExerciseProgressionSubtitle,
+          onTap: () => context.push('/home/insights/exercise-progression'),
+        ),
+        const SizedBox(height: 12),
+        _StatTile(
           icon: TreinoIcon.calendar,
           title: l10n.insightsMonthlyReportTile,
           subtitle: l10n.insightsTileMonthlyReportSubtitle,
@@ -773,6 +814,18 @@ class _StatsHubTileList extends StatelessWidget {
           title: l10n.insightsTileVolumeByGroupTitle,
           subtitle: l10n.insightsTileVolumeByGroupSubtitle,
           onTap: () => context.push('/home/insights/volume-by-group'),
+        ),
+        const SizedBox(height: 12),
+        // MEDIDAS: el PF carga peso y circunferencias de su alumno y era el
+        // ÚNICO que las veía. El alumno no tenía dónde mirarlas. (Rendimiento
+        // NO se surfacea al alumno: son evaluaciones profesionales —CMJ,
+        // sprints, VO2máx— que toma el coach con equipo específico; siguen
+        // viviendo sólo en el detalle de alumno del PF.)
+        _StatTile(
+          icon: TreinoIcon.ruler,
+          title: l10n.insightsTileMeasurementsTitle,
+          subtitle: l10n.insightsTileMeasurementsSubtitle,
+          onTap: () => context.push('/home/insights/measurements'),
         ),
       ],
     );
@@ -878,13 +931,8 @@ class _VolverButton extends StatelessWidget {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const _monthsEs = [
-  'ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', //
-  'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC',
-];
-
-String _formatRange(DateTime start, DateTime end) {
-  final s = '${start.day} ${_monthsEs[start.month - 1]}';
-  final e = '${end.day} ${_monthsEs[end.month - 1]}';
+String _formatRange(DateTime start, DateTime end, String localeName) {
+  final s = '${start.day} ${monthAbbrev(start, localeName, upperCase: true)}';
+  final e = '${end.day} ${monthAbbrev(end, localeName, upperCase: true)}';
   return 'SEMANA · $s – $e';
 }

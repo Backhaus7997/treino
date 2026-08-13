@@ -83,6 +83,7 @@ describe("SCENARIO-637: new link status=pending → notify trainer", () => {
     expect(callArg.tokens).toContain("trainer-token-637");
     expect(callArg.tokens).not.toContain("athlete-token-637");
     expect(callArg.data?.deepLink).toBe("/coach");
+    expect(callArg.data?.kind).toBe("link-change");
   });
 });
 
