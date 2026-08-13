@@ -69,20 +69,36 @@ class WearRotaryScroll extends StatefulWidget {
 
 class _WearRotaryScrollState extends State<WearRotaryScroll>
     with SingleTickerProviderStateMixin {
-  /// Cuánto scroll produce una muesca.
+  /// Cuánto scroll produce una muesca girando DESPACIO.
   ///
   /// Medido en el SM-L500: cada muesca da `axis = ±1.0`, que por el
   /// `scaledVerticalScrollFactor` son 136 píxeles FÍSICOS = 64 lógicos. En una
-  /// pantalla de 206 dp eso ya es casi un tercio de pantalla por muesca, así
-  /// que el multiplicador tiene que ser CHICO.
-  static const double _sensitivity = 1.5;
+  /// pantalla de 206 dp eso ya es casi un tercio de pantalla, así que el
+  /// multiplicador base tiene que ser CHICO — girar despacio es el gesto de
+  /// precisión, cuando el atleta busca una fila concreta.
+  static const double _sensitivity = 0.9;
+
+  /// Cuánto se agranda el paso girando rápido.
+  ///
+  /// **Ésta es la parte que hacía falta.** Con un paso fijo, girar despacio se
+  /// siente escalonado (pasos grandes para un gesto fino) y girar rápido se
+  /// siente corto (hay que dar muchas vueltas para recorrer una lista). Los
+  /// dispositivos nativos escalan el paso con la velocidad, y por eso se sienten
+  /// continuos.
+  static const double _maxBoost = 3.5;
+
+  /// Intervalo entre muescas que se considera "despacio", en segundos.
+  ///
+  /// Por encima de esto no hay refuerzo; por debajo crece hasta [_maxBoost].
+  static const double _slowInterval = 0.14;
 
   /// Qué tan rápido persigue el destino, en unidades de 1/segundo.
   ///
   /// Más alto = más pegado a la muesca pero más brusco; más bajo = más suave
-  /// pero se siente flotando. 18 llega al ~95% del destino en unos 165 ms, que
-  /// es el punto donde el gesto se siente conectado y fluido a la vez.
-  static const double _responsiveness = 18;
+  /// pero se siente flotando. 14 llega al ~95% del destino en unos 215 ms: con
+  /// el refuerzo por velocidad ya no hace falta ir tan pegado, y aflojarlo un
+  /// poco es lo que redondea la sensación de continuidad.
+  static const double _responsiveness = 14;
 
   /// Con menos de esto ya llegamos: perseguir décimas de píxel sólo gasta
   /// frames sin que se vea nada.
@@ -107,6 +123,9 @@ class _WearRotaryScrollState extends State<WearRotaryScroll>
   double? _target;
 
   Duration _lastTick = Duration.zero;
+
+  /// Cuándo llegó la muesca anterior, para medir la velocidad del giro.
+  final _sinceLastNotch = Stopwatch();
 
   @override
   void initState() {
@@ -139,10 +158,20 @@ class _WearRotaryScrollState extends State<WearRotaryScroll>
     if (!c.hasClients) return;
     final p = c.position;
 
+    // Refuerzo por velocidad. Se mide el intervalo REAL entre muescas en vez
+    // de asumir una cadencia: la corona no emite a frecuencia fija.
+    final gap = _sinceLastNotch.isRunning
+        ? _sinceLastNotch.elapsedMicroseconds / 1e6
+        : _slowInterval;
+    _sinceLastNotch
+      ..reset()
+      ..start();
+    final boost = (_slowInterval / gap).clamp(1.0, _maxBoost);
+
     // `scaledVerticalScrollFactor` viene en píxeles FÍSICOS; el offset de
     // Flutter es en píxeles LÓGICOS. Sin esta división, en el SM-L500
     // (devicePixelRatio 2.125) cada muesca scrollea el doble de lo que debería.
-    final delta = physical / _dpr * _sensitivity;
+    final delta = physical / _dpr * _sensitivity * boost;
 
     // Se acumula sobre el destino ANTERIOR, no sobre la posición actual: si no,
     // girar rápido perdería las muescas que llegan mientras todavía desliza.
