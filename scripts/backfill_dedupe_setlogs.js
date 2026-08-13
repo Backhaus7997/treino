@@ -72,6 +72,36 @@
  *   corrida ya no la vería como afectada.
  * - Idempotente: una sesión ya sana no se toca. Correrlo dos veces no escribe.
  *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * ⚠️ ORDEN DE DEPLOY — correr esto ANTES de publicar el fix no sirve.
+ *
+ * Los duplicados los crean los CLIENTES. Con la versión vieja instalada siguen
+ * apareciendo, así que limpiar antes es tirar la corrida: la base se vuelve a
+ * ensuciar sola.
+ *
+ * Y una app móvil no se actualiza de golpe. Aunque el fix salga hoy, los
+ * atletas que sigan en la versión anterior van a seguir generando duplicados
+ * durante semanas. El orden real es:
+ *
+ *   1. Publicar la app con el fix (iOS lleva el companion del reloj embebido:
+ *      los dos lados salen en la misma release).
+ *   2. Esperar a que la mayoría del padrón actualice.
+ *   3. `--dry-run`, mirar el reporte —sobre todo las SALTEADAS—, y recién ahí
+ *      `--apply`.
+ *   4. Volver a correrlo más adelante si quedó una cola larga de versiones
+ *      viejas. Es idempotente justamente para eso.
+ *
+ * NO hace falta deployar nada de `functions/` ni de `firestore.rules`: este
+ * script usa el Admin SDK, que las saltea, y `rankingAggregateOnSession` ya
+ * está en producción.
+ *
+ * ⚠️ COSTO EN PRODUCCIÓN. Cada sesión que se escribe dispara
+ * `rankingAggregateOnSession`, y esa función lee hasta 365 sesiones del atleta
+ * MÁS todos los `setLogs` de cada una. O sea que tocar N sesiones de un mismo
+ * atleta cuesta N recálculos completos, no uno. Es correcto —la función es
+ * idempotente y gana la última— pero es plata. Si el dry-run muestra muchas
+ * sesiones por atleta, conviene mirar la factura antes de aplicar.
+ *
  * Usage:
  *   # Emulador (sin credenciales):
  *   FIRESTORE_EMULATOR_HOST=localhost:8080 node scripts/backfill_dedupe_setlogs.js --dry-run
