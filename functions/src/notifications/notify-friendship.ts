@@ -1,8 +1,15 @@
 /**
- * notifyOnFriendship — Cloud Function for TREINO.
+ * notifyOnFollow — Cloud Function for TREINO.
  *
- * Fires on writes to `friendships/{friendshipId}`.
- * Sends push notifications on friendship lifecycle transitions.
+ * Fires on writes to `follows/{followId}`.
+ * Sends push notifications on follow lifecycle transitions.
+ *
+ * `follow-model` PR3a (design §4.2): las 3 ramas y TODO el copy quedan
+ * INTACTOS. Lo único que cambió es de dónde sale la dirección — antes
+ * `requesterId` + búsqueda dentro de `members`, ahora `followerUid`/
+ * `followeeUid`, explícitos en la arista. El copy del backend ya estaba
+ * escrito en clave "seguidor", así que es la única pieza del sistema que no
+ * necesitó adaptarse a este cambio de modelo: ya estaba escrita para él.
  *
  * Design (Instagram-style — mirror of `PublicProfileFollowButton` flow):
  *
@@ -10,24 +17,24 @@
  *   the actor already knows because they took the action):
  *
  *     1. create + status='pending'
- *        → private target received a follow request
- *        → notify the non-requester (target) with copy
+ *        → private followee received a follow request
+ *        → notify the followee with copy
  *          "{displayName} te envió una solicitud de seguidor"
  *
  *     2. create + status='accepted'  (auto-accept path, PR #273)
- *        → requester followed a public target directly
- *        → notify the non-requester (target) with copy
+ *        → follower followed a public followee directly
+ *        → notify the followee with copy
  *          "{displayName} empezó a seguirte"
  *
  *     3. update  pending → accepted   (manual accept)
- *        → target approved a pending request
- *        → notify the requester with copy
+ *        → followee approved a pending request
+ *        → notify the follower with copy
  *          "{displayName} aceptó tu solicitud"
  *
  *   Guards mirror `notify-link-change`:
  *     - after missing → skip (delete event, e.g. unfollow)
  *     - no-op write (status unchanged) → skip
- *     - requesterId or members[] missing → warn + skip
+ *     - followerUid/followeeUid missing or reflexive → warn + skip
  *
  *   Sender name is read from `userPublicProfiles/{actorId}.displayName` with
  *   fallback 'Alguien', matching the notify-chat-message pattern.
@@ -52,13 +59,13 @@ function getApp(): admin.app.App {
   }
 }
 
-type FriendshipData = Record<string, unknown>;
+type FollowData = Record<string, unknown>;
 
 /**
  * The three notif shapes this CF can dispatch. Exported as a discriminated
  * union so the tests can assert exact branch resolution.
  */
-export type FriendshipNotif =
+export type FollowNotif =
   | { kind: "request-received"; recipientUid: string; actorUid: string }
   | { kind: "auto-followed"; recipientUid: string; actorUid: string }
   | { kind: "request-accepted"; recipientUid: string; actorUid: string }
@@ -69,36 +76,37 @@ export type FriendshipNotif =
  * before/after pair. Kept side-effect-free so the branching logic is 100%
  * covered by unit tests without Firestore or Messaging mocks.
  */
-export function resolveFriendshipNotif(
-  before: FriendshipData | undefined,
-  after: FriendshipData | undefined,
-): FriendshipNotif {
+export function resolveFollowNotif(
+  before: FollowData | undefined,
+  after: FollowData | undefined,
+): FollowNotif {
   if (!after) {
     return { kind: "skip", reason: "after missing (delete or unfollow)" };
   }
 
   const afterStatus = after.status as string | undefined;
   const beforeStatus = before?.status as string | undefined;
-  const requesterId = after.requesterId as string | undefined;
-  const members = (after.members as string[] | undefined) ?? [];
+  // La dirección se LEE de la arista. No se infiere: `members` existe para el
+  // barrido del borrado de cuenta (LD-01), no para deducir quién sigue a quién.
+  const followerUid = after.followerUid as string | undefined;
+  const followeeUid = after.followeeUid as string | undefined;
 
-  if (!afterStatus || !requesterId || members.length !== 2) {
+  if (!afterStatus || !followerUid || !followeeUid) {
     return { kind: "skip", reason: "missing required fields" };
   }
 
-  // The "other" party is whoever in members[] isn't the requester.
-  const otherUid = members.find((m) => m !== requesterId);
-  if (!otherUid) {
-    return { kind: "skip", reason: "cannot infer other party from members" };
+  // Las rules prohíben la arista reflexiva, pero el Admin SDK las saltea.
+  if (followerUid === followeeUid) {
+    return { kind: "skip", reason: "reflexive edge" };
   }
 
   // ── Branch 3: manual accept (update path) ────────────────────────────────
   if (beforeStatus === "pending" && afterStatus === "accepted") {
-    // The target (non-requester) accepted → notify the requester.
+    // El followee aceptó → se le avisa al follower.
     return {
       kind: "request-accepted",
-      recipientUid: requesterId,
-      actorUid: otherUid,
+      recipientUid: followerUid,
+      actorUid: followeeUid,
     };
   }
 
@@ -111,8 +119,8 @@ export function resolveFriendshipNotif(
   if (afterStatus === "pending") {
     return {
       kind: "request-received",
-      recipientUid: otherUid,
-      actorUid: requesterId,
+      recipientUid: followeeUid,
+      actorUid: followerUid,
     };
   }
 
@@ -120,8 +128,8 @@ export function resolveFriendshipNotif(
   if (afterStatus === "accepted") {
     return {
       kind: "auto-followed",
-      recipientUid: otherUid,
-      actorUid: requesterId,
+      recipientUid: followeeUid,
+      actorUid: followerUid,
     };
   }
 
@@ -132,8 +140,8 @@ export function resolveFriendshipNotif(
  * Copy generator — pure. Falls back to 'Alguien' when the actor's public
  * profile is missing or has no displayName, matching notify-chat-message.
  */
-export function buildFriendshipCopy(
-  kind: FriendshipNotif["kind"] & Exclude<FriendshipNotif["kind"], "skip">,
+export function buildFollowCopy(
+  kind: FollowNotif["kind"] & Exclude<FollowNotif["kind"], "skip">,
   displayName: string,
 ): string {
   switch (kind) {
@@ -149,16 +157,16 @@ export function buildFriendshipCopy(
 /**
  * Pure handler extracted for jest testability.
  */
-export async function notifyOnFriendshipHandler(
+export async function notifyOnFollowHandler(
   app: admin.app.App,
-  before: FriendshipData | undefined,
-  after: FriendshipData | undefined,
+  before: FollowData | undefined,
+  after: FollowData | undefined,
   messaging?: admin.messaging.Messaging,
 ): Promise<void> {
-  const notif = resolveFriendshipNotif(before, after);
+  const notif = resolveFollowNotif(before, after);
 
   if (notif.kind === "skip") {
-    logger.info("notifyOnFriendship: skip", { reason: notif.reason });
+    logger.info("notifyOnFollow: skip", { reason: notif.reason });
     return;
   }
 
@@ -172,7 +180,7 @@ export async function notifyOnFriendshipHandler(
   const displayName: string =
     (profileSnap.data()?.displayName as string | undefined) ?? "Alguien"; // i18n: Fase W3
 
-  const body = buildFriendshipCopy(notif.kind, displayName);
+  const body = buildFollowCopy(notif.kind, displayName);
   // Nested under /feed — matches the router's ShellRoute for the public
   // profile screen (`/feed/profile/:uid`). A bare `/profile/:uid` would
   // 404 and fall back to the general router fallback (`/coach`).
@@ -207,14 +215,14 @@ export async function notifyOnFriendshipHandler(
  * Cloud Function trigger.
  * Deployed to southamerica-east1 per ADR-PN-005.
  */
-export const notifyOnFriendship = onDocumentWritten(
+export const notifyOnFollow = onDocumentWritten(
   {
-    document: "friendships/{friendshipId}",
+    document: "follows/{followId}",
     region: "southamerica-east1",
   },
   async (event) => {
-    const before = event.data?.before?.data() as FriendshipData | undefined;
-    const after = event.data?.after?.data() as FriendshipData | undefined;
-    await notifyOnFriendshipHandler(getApp(), before, after);
+    const before = event.data?.before?.data() as FollowData | undefined;
+    const after = event.data?.after?.data() as FollowData | undefined;
+    await notifyOnFollowHandler(getApp(), before, after);
   },
 );

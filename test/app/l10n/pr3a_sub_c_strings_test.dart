@@ -33,7 +33,7 @@ void main() {
         return const SizedBox.shrink();
       })));
       await tester.pumpAndSettle();
-      expect(l10n.profileCuentaSolicitudesTitle, 'Solicitudes de amistad');
+      expect(l10n.profileCuentaSolicitudesTitle, 'Solicitudes de seguidores');
     });
 
     testWidgets('profileCuentaSolicitudesSubtitle(3) verbatim', (tester) async {

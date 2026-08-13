@@ -4,7 +4,7 @@
  * scripts/seed_emulator_full.js
  *
  * EMULATOR-ONLY full-stack seed for manual testing.
- * Creates Auth users + Firestore docs for 5 athletes and 3 coaches,
+ * Creates Auth users + Firestore docs for 13 athletes and 3 coaches,
  * with trainer links, routines, historical sessions, posts (all privacy
  * levels), friendships, and appointments.
  *
@@ -106,6 +106,12 @@ function daysAgo(n) {
 
 function daysFromNow(n) {
   return new Date(NOW.getTime() + n * 86_400_000);
+}
+
+// Feed pagination uses a strict `createdAt < cursor` comparison. Keep every
+// generated post on its own timestamp so no document can fall between pages.
+function postTime(sequence) {
+  return new Date(NOW.getTime() - (sequence * 60 + 17) * 60_000);
 }
 
 // ── Gyms (subset — full set in seed_gyms.js) ────────────────────────────────
@@ -220,6 +226,28 @@ const ATHLETES = [
     bodyWeightKg: 75.0,
     heightCm: 174,
   },
+  // Same-gym athletes intentionally have NO friendship with Martín. They make
+  // the suggestions query exceed its five-user UI limit.
+  ...[
+    ['006', 'julieta', 'Julieta Acosta', 'female', 'beginner', 59.0, 163],
+    ['007', 'tomas', 'Tomás Benítez', 'male', 'intermediate', 79.0, 177],
+    ['008', 'agustina', 'Agustina Sosa', 'female', 'advanced', 64.0, 168],
+    ['009', 'franco', 'Franco Molina', 'male', 'beginner', 84.0, 181],
+    ['010', 'malena', 'Malena Castro', 'female', 'intermediate', 62.5, 166],
+    ['011', 'ignacio', 'Ignacio Torres', 'male', 'advanced', 88.0, 183],
+    ['012', 'rocio', 'Rocío Medina', 'female', 'beginner', 57.5, 161],
+    ['013', 'facundo', 'Facundo Ríos', 'male', 'intermediate', 76.0, 175],
+  ].map(([suffix, email, displayName, gender, experienceLevel, bodyWeightKg, heightCm]) => ({
+    uid: `seed-athlete-${suffix}`,
+    email: `${email}@emulator.treino`,       // EMULATOR-ONLY
+    password: 'Emulator1234!',               // EMULATOR-ONLY
+    displayName,
+    gymId: 'seed-gym-baires-001',
+    gender,
+    experienceLevel,
+    bodyWeightKg,
+    heightCm,
+  })),
 ];
 
 // ── Trainer links ─────────────────────────────────────────────────────────────
@@ -617,6 +645,102 @@ const AUTHOR_META = {
   'seed-coach-001':   { displayName: 'Lautaro P.', avatarUrl: null, gymId: 'seed-gym-baires-001' },
 };
 
+function generatedPost(id, authorUid, text, privacy, sequence) {
+  const author = AUTHOR_META[authorUid];
+  return {
+    id,
+    authorUid,
+    authorDisplayName: author.displayName,
+    authorAvatarUrl: author.avatarUrl,
+    authorGymId: author.gymId,
+    text,
+    routineTag: null,
+    privacy,
+    createdAt: postTime(sequence),
+  };
+}
+
+const PUBLIC_POST_TEXTS = [
+  'Hoy salió press de banca con pausa y por fin sentí estable la técnica.',
+  'Volví después de una semana liviana: menos peso, mucha mejor velocidad.',
+  'Primeras dominadas sin banda. Fueron tres y cuentan como una victoria enorme.',
+  'No todo es sumar discos: hoy mejoré profundidad y control en la sentadilla.',
+  'Cerré el mes con más constancia que nunca. El progreso vino de aparecer.',
+  'Peso muerto técnico, sin apurar el bloqueo. La espalda lo agradece.',
+  'Entreno corto antes del trabajo: cuarenta minutos bien usados alcanzaron.',
+  'Probé zancadas búlgaras y descubrí músculos que no sabía que tenía.',
+  'Nueva marca en remo con barra, pero lo mejor fue no perder la postura.',
+  'Semana de descarga: cuesta frenar, aunque sé que también es parte del plan.',
+  'Hoy acompañé a una amiga en su primer día de gimnasio. Se fue feliz.',
+  'Cinco kilómetros suaves y movilidad para cerrar. Buen domingo de recuperación.',
+  'Me animé al rack libre en hora pico. Pequeña victoria contra la vergüenza.',
+  'La última repetición de sentadilla fue lenta, pero salió limpia.',
+  'Cambiar el agarre en jalones me ayudó a sentir mucho mejor la espalda.',
+  'Preparé la mochila anoche y no hubo excusas esta mañana.',
+  'Dos meses registrando cargas: ver la tendencia vale más que un día aislado.',
+  'Hoy tocó tren superior y terminé con los brazos temblando para bien.',
+  'Aprendiendo a respirar y bracear antes de cada repetición pesada.',
+  'Dormí ocho horas y el rendimiento cambió por completo. Nada reemplaza descansar.',
+  'Subí apenas dos kilos y medio. Progreso chico, sostenido y sin apuro.',
+  'Cardio en bici después de fuerza: ritmo tranquilo y conversación posible.',
+  'La técnica de hoy no fue perfecta, pero grabarme me mostró qué corregir.',
+  'Terminé la semana con cuatro entrenos cumplidos. Ahora toca comer y recuperar.',
+];
+
+const FRIENDS_POST_TEXTS = [
+  'Mañana voy temprano. ¿Quién se prende a hacer pierna antes de las ocho?',
+  'Necesito testigo: hoy no salteé ni una serie de abdominales.',
+  'Sofi me ganó otra vez en el finisher. Pido revancha para el viernes.',
+  'Ese momento en que guardás todo y recordás que faltaban gemelos.',
+  'Hoy el mate de después del entreno fue más necesario que el entreno.',
+  '¿Alguien tiene una playlist nueva? Ya sé de memoria la del gimnasio.',
+  'Me quedé sin magnesio justo en peso muerto. Acepto donaciones.',
+  'Confirmado: entrenar acompañado hace que el descanso dure exactamente lo pautado.',
+  'No saqué foto, pero juro que la última serie salió con buena cara.',
+  'El viernes hacemos técnica de sentadilla y después merienda, queda decretado.',
+  'Hoy vine con cero ganas y terminé haciendo una sesión buenísima.',
+  '¿Quién dejó el foam roller escondido detrás de las colchonetas?',
+  'Mateo dijo “una ronda más” y claramente no se puede confiar en él.',
+  'Probé el calentamiento que me pasaron y llegué mucho mejor a las series pesadas.',
+  'Mañana descarga. Si me ven cargando de más, sáquenme los discos.',
+  'La selfie salió movida, pero el bombeo de hombros fue real.',
+  'Necesito ideas para una merienda rápida antes de entrenar.',
+  'Hoy contamos mal los discos y salió un PR accidental. No recomiendo el método.',
+  'Qué lindo cuando alguien te cuida el rack sin que tengas que pedirlo.',
+  'El desafío de esta semana: llegar a horario y hacer movilidad completa.',
+  'Me deben una revancha en remo. Esta vez llevo cronómetro.',
+  'Terminamos pierna bajando la escalera de costado. Gran planificación.',
+  'Gracias por el empujón de hoy; solo no arrancaba ni la primera serie.',
+  'Sábado de técnica tranquila. Después no digan que siempre competimos.',
+];
+
+const GYM_POST_TEXTS = [
+  'El rack del fondo quedó libre y tiene los seguros nuevos.',
+  'Aviso: hoy están arreglando dos duchas del vestuario principal.',
+  '¿Alguien encontró una botella negra al lado de la prensa?',
+  'La clase de movilidad de las seis tuvo lugares libres y estuvo buenísima.',
+  'Llegaron bandas nuevas; por favor no las dejen tiradas junto a las poleas.',
+  'Entre las dos y las cuatro se entrena con bastante espacio.',
+  'El aire del salón de arriba ya funciona de nuevo.',
+  'Hoy faltan discos chicos en el sector de peso libre.',
+  'La barra nueva gira muy bien, ideal para quienes hacen levantamientos.',
+  'Dejaron un buzo gris en el banco junto a recepción.',
+  'El dispenser del primer piso está sin agua desde esta mañana.',
+  'Se armó un lindo grupo para hacer técnica de peso muerto los jueves.',
+  'La prensa inclinada volvió a estar habilitada después del mantenimiento.',
+  'A primera hora hay lugar de sobra en todos los racks.',
+  '¿Quién se suma a compartir rack mañana a las siete?',
+  'Los cierres rojos están guardados en recepción, no se perdieron.',
+  'Hoy la música estuvo más baja y se pudo entrenar en paz.',
+  'Hay una colchoneta rota al lado del sector de abdominales.',
+  'Recordatorio amistoso: descarguemos las barras cuando terminamos.',
+  'El banco regulable del medio quedó flojo; ya avisé en recepción.',
+  'La clase del salón grande termina a las ocho y después queda libre.',
+  'Encontré una toalla azul; la dejé en objetos perdidos.',
+  'Las bicicletas nuevas ya están disponibles en el primer piso.',
+  'Buen clima hoy en el turno tarde, todos compartiendo material.',
+];
+
 const POSTS = [
   // public ──────────────────────────────────────────────────────────────
   {
@@ -720,6 +844,29 @@ const POSTS = [
     privacy: 'gym',
     createdAt: daysAgo(6),
   },
+  // 24 extra per tier + the 3 hand-written fixtures above = 27 per tier.
+  // Sequences never overlap, so all generated createdAt values are distinct.
+  ...PUBLIC_POST_TEXTS.map((text, index) => generatedPost(
+    `seed-post-public-${String(index + 1).padStart(2, '0')}`,
+    ['seed-athlete-001', 'seed-athlete-002', 'seed-athlete-003', 'seed-athlete-004', 'seed-coach-001'][index % 5],
+    text,
+    'public',
+    index + 1,
+  )),
+  ...FRIENDS_POST_TEXTS.map((text, index) => generatedPost(
+    `seed-post-friends-${String(index + 1).padStart(2, '0')}`,
+    ['seed-athlete-002', 'seed-athlete-003'][index % 2],
+    text,
+    'friends',
+    index + 25,
+  )),
+  ...GYM_POST_TEXTS.map((text, index) => generatedPost(
+    `seed-post-gym-${String(index + 1).padStart(2, '0')}`,
+    ['seed-athlete-001', 'seed-athlete-002'][index % 2],
+    text,
+    'gym',
+    index + 49,
+  )),
 ];
 
 // ── Appointments ─────────────────────────────────────────────────────────────

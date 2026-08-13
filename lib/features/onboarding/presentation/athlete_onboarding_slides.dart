@@ -38,8 +38,8 @@ const athleteOnboardingSlides = <OnboardingSlide>[
   OnboardingSlide(
     icon: TreinoIcon.tabFeed,
     title: 'COMPARTÍ TU PROGRESO', // i18n
-    body: 'Mirá lo que entrenan tus amigos y tu gym, reaccioná a sus sesiones '
-        'y compará tu volumen en los rankings.', // i18n
+    body: 'Mirá lo que entrenan tus seguidores y tu gym, reaccioná a sus '
+        'sesiones y compará tu volumen en los rankings.', // i18n
     preview: OnboardingFeedPreview(),
   ),
   OnboardingSlide(

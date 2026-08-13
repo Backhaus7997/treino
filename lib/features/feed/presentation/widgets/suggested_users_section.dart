@@ -5,24 +5,37 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/motion/treino_tappable.dart';
-import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../../gyms/domain/gym.dart' show kNoGymId;
 import '../../../profile/domain/user_public_profile.dart';
 import '../../application/suggested_users_providers.dart';
 import 'post_avatar.dart';
 
-/// Up to five same-gym profiles shown below the empty AMIGOS feed state.
+/// Same-gym profiles shown in a horizontal carousel.
 ///
 /// Loading, errors, no-gym, and an empty result are intentionally silent: the
 /// existing feed empty state remains the complete fallback in those cases.
 class SuggestedUsersSection extends ConsumerWidget {
-  const SuggestedUsersSection({super.key, required this.gymId});
+  const SuggestedUsersSection({super.key, required this.gymId})
+      : profiles = null;
+
+  const SuggestedUsersSection.profiles({
+    super.key,
+    required List<UserPublicProfile> this.profiles,
+  }) : gymId = null;
 
   final String? gymId;
+  final List<UserPublicProfile>? profiles;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final resolvedProfiles = profiles;
+    if (resolvedProfiles != null) {
+      return resolvedProfiles.isEmpty
+          ? const SizedBox.shrink()
+          : _SuggestedUsersContent(profiles: resolvedProfiles);
+    }
+
     final resolvedGymId = gymId;
     if (resolvedGymId == null ||
         resolvedGymId.isEmpty ||
@@ -40,43 +53,80 @@ class SuggestedUsersSection extends ConsumerWidget {
   }
 }
 
-class _SuggestedUsersContent extends StatelessWidget {
+class _SuggestedUsersContent extends StatefulWidget {
   const _SuggestedUsersContent({required this.profiles});
 
   final List<UserPublicProfile> profiles;
 
   @override
+  State<_SuggestedUsersContent> createState() => _SuggestedUsersContentState();
+}
+
+class _SuggestedUsersContentState extends State<_SuggestedUsersContent> {
+  /// `keepScrollOffset: false` NO es un detalle: es la corrección de un bug
+  /// real. Por defecto un `Scrollable` guarda su offset en `PageStorage`, y el
+  /// `CustomScrollView` del feed abre ese bucket con su
+  /// `PageStorageKey('feed-scroll-position')`. Como el carrusel vive dentro de
+  /// un sliver perezoso, al alejarse se destruye y al volver se reconstruye —
+  /// restaurando el offset viejo. Resultado observado en device: la fila
+  /// reaparecía scrolleada al final y las primeras sugerencias quedaban
+  /// escondidas a la izquierda. Una fila de sugerencias SIEMPRE tiene que
+  /// empezar por la primera.
+  late final ScrollController _controller = ScrollController(
+    keepScrollOffset: false,
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
+    final profiles = widget.profiles;
 
     return Padding(
       key: const Key('suggested_users_section'),
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 14),
+      padding: const EdgeInsets.symmetric(vertical: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            l10n.suggestedUsersTitle,
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 18,
-              letterSpacing: 0.8,
-              color: AppPalette.of(context).textPrimary,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Text(
+              l10n.suggestedUsersTitle,
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 18,
+                letterSpacing: 0.8,
+                color: AppPalette.of(context).textPrimary,
+              ),
             ),
           ),
           const SizedBox(height: 12),
-          for (var index = 0; index < profiles.length; index++) ...[
-            if (index > 0) const SizedBox(height: 8),
-            _SuggestedUserRow(profile: profiles[index]),
-          ],
+          SizedBox(
+            height: 156,
+            child: ListView.builder(
+              controller: _controller,
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              itemCount: profiles.length * 2 - 1,
+              itemBuilder: (context, index) {
+                if (index.isOdd) return const SizedBox(width: 12);
+                return _SuggestedUserCard(profile: profiles[index ~/ 2]);
+              },
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _SuggestedUserRow extends StatelessWidget {
-  const _SuggestedUserRow({required this.profile});
+class _SuggestedUserCard extends StatelessWidget {
+  const _SuggestedUserCard({required this.profile});
 
   final UserPublicProfile profile;
 
@@ -94,8 +144,8 @@ class _SuggestedUserRow extends StatelessWidget {
       child: TreinoTappable(
         onTap: () => context.push('/feed/profile/${profile.uid}'),
         child: Container(
-          constraints: const BoxConstraints(minHeight: 48),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          width: 104,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           decoration: BoxDecoration(
             color: palette.bgCard,
             borderRadius: BorderRadius.circular(14),
@@ -103,31 +153,33 @@ class _SuggestedUserRow extends StatelessWidget {
               color: palette.textMuted.withValues(alpha: 0.12),
             ),
           ),
-          child: Row(
+          child: Column(
             children: [
               PostAvatar(
                 authorDisplayName: displayName,
                 authorAvatarUrl: profile.avatarUrl,
-                size: 40,
+                size: 56,
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Text(
-                  displayName.toUpperCase(),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 16,
-                    color: palette.textPrimary,
+              const SizedBox(height: 12),
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.topCenter,
+                  child: SizedBox(
+                    width: 80,
+                    child: Text(
+                      displayName.toUpperCase(),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.barlowCondensed(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                        color: palette.textPrimary,
+                      ),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Icon(
-                TreinoIcon.chevronRight,
-                size: 16,
-                color: palette.textMuted,
               ),
             ],
           ),

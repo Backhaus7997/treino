@@ -601,7 +601,10 @@ class TrainerFeedPreview extends StatelessWidget {
         Row(
           children: [
             TChip(
-              label: 'AMIGOS',
+              // Espeja `feedSegmentFollowing` del pill real (SEGUIDORES). Si
+              // ese label cambia, este chip queda desactualizado en silencio —
+              // es la contracara de dibujar la pantalla en vez de capturarla.
+              label: 'SEGUIDORES',
               color: palette.accent,
               filled: true,
               fontSize: 11,

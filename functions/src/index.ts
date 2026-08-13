@@ -22,7 +22,12 @@ export { templateRatingAggregate } from "./template-rating-aggregate";
 export { notifyOnChatMessage } from "./notifications/notify-chat-message";
 export { notifyOnAppointment } from "./notifications/notify-appointment";
 export { notifyOnLinkChange } from "./notifications/notify-link-change";
-export { notifyOnFriendship } from "./notifications/notify-friendship";
+// `follow-model` PR3a: notifyOnFriendship → notifyOnFollow (trigger repuntado
+// a `follows/{followId}`). OJO en el deploy: un `--only functions:notifyOnFollow`
+// CREA la función nueva y NO poda la vieja — `notifyOnFriendship` queda
+// desplegada escuchando `friendships`. Queda inerte porque esa colección está
+// congelada y el cascade dejó de escribirla, pero hay que borrarla a mano.
+export { notifyOnFollow } from "./notifications/notify-friendship";
 export { notifyOnReaction } from "./notifications/notify-reaction";
 export { reassignFcmToken } from "./notifications/reassign-fcm-token";
 export { maintainFollowCounters } from "./social/maintain-follow-counters";

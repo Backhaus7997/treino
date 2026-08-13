@@ -52,7 +52,7 @@ Map<String, dynamic> _$$PostImplToJson(_$PostImpl instance) =>
     };
 
 const _$PostPrivacyEnumMap = {
-  PostPrivacy.friends: 'friends',
+  PostPrivacy.followers: 'friends',
   PostPrivacy.gym: 'gym',
   PostPrivacy.public: 'public',
 };

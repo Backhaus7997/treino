@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/utils/argentina_time.dart';
+import '../../../core/utils/firestore_error.dart';
 import '../../workout/application/session_providers.dart'
     show finishedTodayByUidProvider;
 import '../../workout/domain/session.dart';
@@ -65,6 +66,9 @@ final trainedTodayProvider =
 
   final entries = <TrainedTodayEntry>[];
   bool anyLoading = false;
+  // First non-permission-denied athlete error, kept so an all-failed read can
+  // surface it instead of a misleading "nobody trained today".
+  (Object, StackTrace)? firstRealError;
 
   for (final athleteId in athleteIds) {
     final sessionsAsync = ref.watch(finishedTodayByUidProvider(athleteId));
@@ -74,7 +78,13 @@ final trainedTodayProvider =
       continue; // will recalculate once data arrives
     }
     if (sessionsAsync.hasError && !sessionsAsync.hasValue) {
-      continue; // skip this athlete on error
+      // permission-denied = this athlete has not opted into session_shares;
+      // skip them, as before. Any OTHER code (missing index, unavailable, …)
+      // is a real failure — remember it (see the all-failed guard below).
+      if (!isPermissionDenied(sessionsAsync.error)) {
+        firstRealError ??= (sessionsAsync.error!, sessionsAsync.stackTrace!);
+      }
+      continue;
     }
 
     final sessions = sessionsAsync.valueOrNull ?? const [];
@@ -106,6 +116,14 @@ final trainedTodayProvider =
   // If every athlete was still loading (and entries is empty), stay loading.
   if (anyLoading && entries.isEmpty) {
     return const AsyncValue.loading();
+  }
+
+  // Settled with nothing to show but a real (non-permission-denied) read
+  // failed: surface the error so the UI shows a retryable error state instead
+  // of a false "nobody trained today". A partial result (entries non-empty) is
+  // still shown — a single failing athlete must not hide the ones who trained.
+  if (entries.isEmpty && firstRealError != null) {
+    return AsyncValue.error(firstRealError.$1, firstRealError.$2);
   }
 
   // Sort by finishedAt descending.

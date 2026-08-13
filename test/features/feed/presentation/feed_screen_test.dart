@@ -9,15 +9,19 @@ import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_background.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
+import 'package:treino/core/widgets/treino_bottom_bar.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/feed/application/feed_pagination_notifier.dart';
 import 'package:treino/features/feed/application/feed_screen_providers.dart';
-import 'package:treino/features/feed/application/friendship_providers.dart';
+import 'package:treino/features/feed/application/follow_providers.dart';
 import 'package:treino/features/feed/application/post_providers.dart';
+import 'package:treino/features/feed/application/suggested_users_providers.dart';
+import 'package:treino/features/feed/data/post_repository.dart';
 import 'package:treino/features/feed/domain/feed_segment.dart';
 import 'package:treino/features/feed/domain/post.dart';
+import 'package:treino/features/feed/domain/post_page.dart';
 import 'package:treino/features/feed/domain/post_privacy.dart';
 import 'package:treino/features/feed/domain/routine_tag.dart';
 import 'package:treino/features/feed/feed_screen.dart';
@@ -64,6 +68,23 @@ class _FakeRankingOptInController implements RankingOptInControllerBase {
   Future<void> syncGymIfDesynced(String uid) async {}
 }
 
+class _CountingPublicPostRepository extends Fake implements PostRepository {
+  _CountingPublicPostRepository(this.initialPosts);
+
+  final List<Post> initialPosts;
+  int pageRequests = 0;
+
+  @override
+  Future<PostPage> feedPublic({int limit = 20, DateTime? after}) async {
+    pageRequests++;
+    return PostPage(
+      posts: after == null ? initialPosts : const <Post>[],
+      nextCursor: after == null ? DateTime.utc(2026, 8, 1) : null,
+      hasMore: after == null,
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -76,7 +97,7 @@ Post _makePost({
   String? authorGymId,
   String text = 'Buena sesión',
   RoutineTag? routineTag,
-  PostPrivacy privacy = PostPrivacy.friends,
+  PostPrivacy privacy = PostPrivacy.followers,
   DateTime? createdAt,
 }) =>
     Post(
@@ -153,7 +174,7 @@ void main() {
   group('REQ-FEED-SCREEN-001: composition', () {
     final baseOverrides = <Override>[
       feedSegmentProvider.overrideWith((ref) => FeedSegment.amigos),
-      myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+      myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
       myGymFeedProvider.overrideWith((ref) async => null),
       feedPublicProvider.overrideWith((ref) async => const <Post>[]),
     ];
@@ -167,7 +188,7 @@ void main() {
     testWidgets('SCENARIO-144: labels FEED once — the pill, not a duplicate',
         (tester) async {
       await tester.pumpWidget(_wrapProvider(const FeedScreen(), baseOverrides));
-      await tester.pump();
+      await tester.pumpAndSettle();
 
       expect(find.text('FEED'), findsOneWidget);
     });
@@ -182,7 +203,7 @@ void main() {
           unreadFromFriendsProvider.overrideWith((_) => 3),
         ]),
       );
-      await tester.pump();
+      await tester.pumpAndSettle();
 
       expect(find.text('3'), findsOneWidget);
     });
@@ -217,7 +238,7 @@ void main() {
       tester,
     ) async {
       await tester.pumpWidget(_wrapProvider(const FeedScreen(), baseOverrides));
-      await tester.pump();
+      await tester.pumpAndSettle();
 
       expect(find.byType(FeedSegmentPills), findsOneWidget);
     });
@@ -247,14 +268,26 @@ void main() {
             ),
           ),
         );
-        await tester.pump();
+        await tester.pumpAndSettle();
 
         // Only 1 Scaffold: the outer test wrapper
         expect(find.byType(Scaffold), findsOneWidget);
         // No AppBackground anywhere
         expect(find.byType(AppBackground), findsNothing);
-        // No SafeArea inside FeedScreen subtree
-        expect(find.byType(SafeArea), findsNothing);
+        // What the shell contract forbids is FeedScreen wrapping its whole
+        // scroll surface in another SafeArea.
+        final feedScrollView = find.ancestor(
+          of: find.byType(FeedSegmentPills),
+          matching: find.byType(CustomScrollView),
+        );
+        expect(feedScrollView, findsOneWidget);
+        expect(
+          find.ancestor(
+            of: feedScrollView,
+            matching: find.byType(SafeArea),
+          ),
+          findsNothing,
+        );
       },
     );
 
@@ -265,7 +298,7 @@ void main() {
         await tester.pumpWidget(
           _wrapProvider(const FeedScreen(), [
             feedSegmentProvider.overrideWith((ref) => FeedSegment.gym),
-            myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+            myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
             myGymFeedProvider.overrideWith((ref) async => null),
             feedPublicProvider.overrideWith((ref) async => const <Post>[]),
           ]),
@@ -285,7 +318,7 @@ void main() {
         await tester.pumpWidget(
           _wrapProvider(const FeedScreen(), [
             feedSegmentProvider.overrideWith((ref) => FeedSegment.public),
-            myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+            myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
             myGymFeedProvider.overrideWith((ref) async => null),
             feedPublicProvider.overrideWith((ref) async => const <Post>[]),
           ]),
@@ -308,7 +341,7 @@ void main() {
 
     List<Override> makeOverrides(List<Post> posts) => [
           feedSegmentProvider.overrideWith((ref) => FeedSegment.amigos),
-          myFriendsFeedProvider.overrideWith((ref) async => posts),
+          myFollowingFeedProvider.overrideWith((ref) async => posts),
           myGymFeedProvider.overrideWith((ref) async => null),
           feedPublicProvider.overrideWith((ref) async => const <Post>[]),
         ];
@@ -381,7 +414,7 @@ void main() {
   group('REQ-FEED-SCREEN-003: amigos empty state', () {
     final emptyOverrides = <Override>[
       feedSegmentProvider.overrideWith((ref) => FeedSegment.amigos),
-      myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+      myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
       myGymFeedProvider.overrideWith((ref) async => null),
       feedPublicProvider.overrideWith((ref) async => const <Post>[]),
     ];
@@ -414,7 +447,7 @@ void main() {
   group('REQ-FEED-SCREEN-004: amigos loading state', () {
     List<Override> loadingOverrides() => [
           feedSegmentProvider.overrideWith((ref) => FeedSegment.amigos),
-          myFriendsFeedProvider.overrideWith((ref) async {
+          myFollowingFeedProvider.overrideWith((ref) async {
             // Never resolves → AsyncLoading
             await Completer<void>().future;
             return const <Post>[];
@@ -455,7 +488,7 @@ void main() {
   group('REQ-FEED-SCREEN-005: amigos error state', () {
     final errorOverrides = <Override>[
       feedSegmentProvider.overrideWith((ref) => FeedSegment.amigos),
-      myFriendsFeedProvider.overrideWith(
+      myFollowingFeedProvider.overrideWith(
         (ref) => Future<List<Post>>.error(Exception('net'), StackTrace.empty),
       ),
       myGymFeedProvider.overrideWith((ref) async => null),
@@ -499,7 +532,7 @@ void main() {
     }) =>
         [
           feedSegmentProvider.overrideWith((ref) => FeedSegment.gym),
-          myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
           myGymFeedProvider.overrideWith((ref) => gymFuture()),
           feedPublicProvider.overrideWith((ref) async => const <Post>[]),
           userProfileProvider.overrideWith(
@@ -512,7 +545,7 @@ void main() {
       await tester.pumpWidget(
         _wrapProvider(const FeedScreen(), [
           feedSegmentProvider.overrideWith((ref) => FeedSegment.gym),
-          myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
           myGymFeedProvider.overrideWith((ref) async {
             await Completer<void>().future;
             return null;
@@ -532,7 +565,7 @@ void main() {
       await tester.pumpWidget(
         _wrapProvider(const FeedScreen(), [
           feedSegmentProvider.overrideWith((ref) => FeedSegment.gym),
-          myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
           myGymFeedProvider.overrideWith(
             (ref) =>
                 Future<List<Post>?>.error(Exception('err'), StackTrace.empty),
@@ -631,7 +664,7 @@ void main() {
       await tester.pumpWidget(
         _wrapProvider(const FeedScreen(), [
           feedSegmentProvider.overrideWith((ref) => FeedSegment.public),
-          myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
           myGymFeedProvider.overrideWith((ref) async => null),
           feedPublicProvider.overrideWith((ref) async {
             await Completer<void>().future;
@@ -651,7 +684,7 @@ void main() {
       await tester.pumpWidget(
         _wrapProvider(const FeedScreen(), [
           feedSegmentProvider.overrideWith((ref) => FeedSegment.public),
-          myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
           myGymFeedProvider.overrideWith((ref) async => null),
           feedPublicProvider.overrideWith(
             (ref) =>
@@ -674,7 +707,7 @@ void main() {
       await tester.pumpWidget(
         _wrapProvider(const FeedScreen(), [
           feedSegmentProvider.overrideWith((ref) => FeedSegment.public),
-          myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
           myGymFeedProvider.overrideWith((ref) async => null),
           feedPublicProvider.overrideWith((ref) async => const <Post>[]),
         ]),
@@ -700,7 +733,7 @@ void main() {
       await tester.pumpWidget(
         _wrapProvider(const FeedScreen(), [
           feedSegmentProvider.overrideWith((ref) => FeedSegment.public),
-          myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
           myGymFeedProvider.overrideWith((ref) async => null),
           feedPublicProvider.overrideWith((ref) async => posts),
         ]),
@@ -726,12 +759,12 @@ void main() {
     List<Override> tabOverrides({bool rankingOptIn = true}) => [
           // Page 0 (feed) dependencies.
           feedSegmentProvider.overrideWith((ref) => FeedSegment.amigos),
-          myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
           myGymFeedProvider.overrideWith((ref) async => null),
           feedPublicProvider.overrideWith((ref) async => const <Post>[]),
           unreadFromFriendsProvider.overrideWith((_) => 0),
           unreadNotificationCountProvider.overrideWith((_) => 0),
-          pendingRequestCountProvider(uid).overrideWith((_) => 0),
+          pendingFollowRequestCountProvider(uid).overrideWith((_) => 0),
           // Page 1 (rankings) dependencies — mirrors the override set the
           // Entrenar tab used while it hosted rankings.
           currentUidProvider.overrideWithValue(uid),
@@ -759,8 +792,7 @@ void main() {
       await tester.pumpWidget(
         _wrapProvider(const FeedScreen(), tabOverrides()),
       );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pumpAndSettle();
 
       expect(find.byType(FeedSegmentPills), findsOneWidget);
       expect(find.byKey(const Key('rankings_invitation_state')), findsNothing);
@@ -849,8 +881,7 @@ void main() {
           ),
         ]),
       );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('rankings_section_streak')), findsNothing);
       expect(find.byKey(const Key('rankings_invitation_state')), findsNothing);
@@ -866,8 +897,7 @@ void main() {
           ),
         ]),
       );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pumpAndSettle();
 
       expect(find.byType(TabBar), findsOneWidget);
       expect(find.text('RANKINGS'), findsOneWidget);
@@ -881,7 +911,7 @@ void main() {
       await tester.pumpWidget(
         _wrapProvider(const FeedScreen(), [
           ...tabOverrides(),
-          myFriendsFeedProvider.overrideWith((ref) async {
+          myFollowingFeedProvider.overrideWith((ref) async {
             buildCount++;
             return const <Post>[];
           }),
@@ -908,7 +938,7 @@ void main() {
   group('infinite-scroll footer', () {
     List<Override> publicOverrides(List<Post> posts) => [
           feedSegmentProvider.overrideWith((ref) => FeedSegment.public),
-          myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
           myGymFeedProvider.overrideWith((ref) async => null),
           feedPublicProvider.overrideWith((ref) async => posts),
         ];
@@ -956,6 +986,455 @@ void main() {
         find.byKey(const ValueKey('feed-loading-more-indicator')),
         findsNothing,
       );
+    });
+  });
+
+  group('sliver feed surface', () {
+    List<Post> longPosts() => List.generate(
+          24,
+          (index) => _makePost(
+            id: 'sliver-$index',
+            authorUid: 'author-$index',
+            text: 'Post largo $index ${'contenido ' * 10}',
+            privacy: PostPrivacy.public,
+          ),
+        );
+
+    List<Override> publicOverrides(List<Post> posts) => [
+          feedSegmentProvider.overrideWith((ref) => FeedSegment.public),
+          myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myGymFeedProvider.overrideWith((ref) async => null),
+          feedPublicProvider.overrideWith((ref) async => posts),
+        ];
+
+    Finder feedScrollView() => find.byType(CustomScrollView);
+
+    testWidgets('FEED/RANKINGS toggle stays visible after scrolling', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), publicOverrides(longPosts())),
+      );
+      await tester.pumpAndSettle();
+
+      final scrollView = feedScrollView();
+      await tester.drag(scrollView, const Offset(0, -500));
+      await tester.pumpAndSettle();
+
+      expect(find.text('FEED'), findsOneWidget);
+      expect(find.text('RANKINGS'), findsOneWidget);
+    });
+
+    testWidgets('renders exactly one FEED/RANKINGS toggle', (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), publicOverrides(longPosts())),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TabBar, skipOffstage: false), findsOneWidget);
+      expect(find.text('FEED', skipOffstage: false), findsOneWidget);
+      expect(find.text('RANKINGS', skipOffstage: false), findsOneWidget);
+    });
+
+    testWidgets('toggle and action icons share the same fixed row', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), publicOverrides(longPosts())),
+      );
+      await tester.pumpAndSettle();
+
+      final toggleRect = tester.getRect(
+        find.byKey(const ValueKey('feed-rankings-toggle')),
+      );
+      final actionsRect = tester.getRect(
+        find.byKey(const ValueKey('feed-header-actions')),
+      );
+
+      expect(toggleRect.center.dy, closeTo(actionsRect.center.dy, 1));
+      expect(
+        find.ancestor(
+          of: find.byKey(const ValueKey('feed-rankings-toggle')),
+          matching: find.byKey(const ValueKey('feed-fixed-navigation-row')),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.ancestor(
+          of: find.byKey(const ValueKey('feed-header-actions')),
+          matching: find.byKey(const ValueKey('feed-fixed-navigation-row')),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    // Regresión: en un iPhone de 393pt la fila disparaba el modo `compact`
+    // (353 < 360), que achicaba las acciones de 44 a 36. Con eso la fila
+    // medía 328 sobre 353 disponibles y el `Row`, alineado al inicio, dejaba
+    // los 25pt sobrantes como un hueco muerto: el botón `+` moría a 45pt del
+    // borde en vez de a los 20 del margen.
+    testWidgets('las acciones del header mueren contra el margen derecho', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(393, 850);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), publicOverrides(longPosts())),
+      );
+      await tester.pumpAndSettle();
+
+      final actionsRect = tester.getRect(
+        find.byKey(const ValueKey('feed-header-actions')),
+      );
+      // 393 - 20 de margen. La tolerancia es por el `Padding` de separación
+      // mínima, que no mueve el borde derecho.
+      expect(actionsRect.right, closeTo(373, 1));
+    });
+
+    testWidgets('las acciones conservan sus 44pt tapeables en pantalla chica', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), publicOverrides(longPosts())),
+      );
+      await tester.pumpAndSettle();
+
+      // Cuatro acciones de 44 como piso de la HIG. Cuando bajaban a 36 esto
+      // daba 144 — por debajo del mínimo, y encima sin necesidad.
+      final actionsRect = tester.getRect(
+        find.byKey(const ValueKey('feed-header-actions')),
+      );
+      expect(actionsRect.width, greaterThanOrEqualTo(4 * 44));
+    });
+
+    testWidgets('fixed merged header remains visible when scrolling down', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), publicOverrides(longPosts())),
+      );
+      await tester.pumpAndSettle();
+
+      final scrollView = feedScrollView();
+      expect(scrollView, findsOneWidget);
+      final chatIcon = find.byIcon(TreinoIcon.chat);
+      expect(chatIcon, findsOneWidget);
+
+      await tester.drag(scrollView, const Offset(0, -500));
+      await tester.pumpAndSettle();
+
+      expect(chatIcon, findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('feed-rankings-toggle')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('merged header does not duplicate after reverse scrolling', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), publicOverrides(longPosts())),
+      );
+      await tester.pumpAndSettle();
+
+      final scrollView = feedScrollView();
+      final chatIcon = find.byIcon(TreinoIcon.chat);
+      await tester.drag(scrollView, const Offset(0, -500));
+      await tester.pumpAndSettle();
+      expect(chatIcon, findsOneWidget);
+
+      await tester.drag(scrollView, const Offset(0, 120));
+      await tester.pumpAndSettle();
+      expect(chatIcon, findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('feed-header-actions')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('large text scale does not overflow the merged header', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(320, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        _wrapProvider(
+          const MediaQuery(
+            data: MediaQueryData(
+              size: Size(320, 800),
+              textScaler: TextScaler.linear(2.5),
+            ),
+            child: FeedScreen(),
+          ),
+          publicOverrides(longPosts()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byType(TabBar, skipOffstage: false), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('feed-header-actions')),
+        findsOneWidget,
+      );
+    });
+
+    // Cambio de comportamiento deliberado: las pills DEJARON de estar fijas.
+    //
+    // Antes eran un `SliverPersistentHeader(pinned: true)`, y quedar fijas las
+    // obligaba a pintarse un fondo opaco `palette.bg` para tapar los posts que
+    // les pasaban por detrás. Ese fondo es solo la base sólida de
+    // AppBackground, sin sus dos glows radiales, así que la franja se recortaba
+    // contra el resto de la pantalla — y encima justo donde el glow del accent
+    // está más presente. Scrollean con el contenido, no se superponen con
+    // nada, y por eso ya no necesitan fondo.
+    testWidgets('las pills scrollean con el feed y se van de pantalla', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), publicOverrides(longPosts())),
+      );
+      await tester.pumpAndSettle();
+
+      final scrollView = feedScrollView();
+      final viewportRect = tester.getRect(scrollView);
+
+      // Arrancan a la vista.
+      expect(find.byType(FeedSegmentPills), findsOneWidget);
+      expect(
+        tester.getRect(find.text('PÚBLICO')).bottom,
+        greaterThan(viewportRect.top),
+      );
+
+      await tester.drag(scrollView, const Offset(0, -700));
+      await tester.pumpAndSettle();
+
+      // Y se fueron: o se desmontaron, o quedaron por encima del viewport.
+      final gone = find.text('PÚBLICO').evaluate().isEmpty ||
+          tester.getRect(find.text('PÚBLICO')).bottom <= viewportRect.top;
+      expect(gone, isTrue, reason: 'las pills deberían haberse ido');
+    });
+
+    testWidgets('las pills vuelven al scrollear de nuevo hasta arriba', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), publicOverrides(longPosts())),
+      );
+      await tester.pumpAndSettle();
+
+      final scrollView = feedScrollView();
+      await tester.drag(scrollView, const Offset(0, -700));
+      await tester.pumpAndSettle();
+      await tester.drag(scrollView, const Offset(0, 900));
+      await tester.pumpAndSettle();
+
+      final viewportRect = tester.getRect(scrollView);
+      expect(find.byType(FeedSegmentPills), findsOneWidget);
+      final pillsRect = tester.getRect(find.text('PÚBLICO'));
+      expect(pillsRect.bottom, greaterThan(viewportRect.top));
+      expect(pillsRect.top, lessThan(viewportRect.bottom));
+    });
+
+    testWidgets('post sliver preserves shell-safe bottom padding', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), publicOverrides(longPosts())),
+      );
+      await tester.pumpAndSettle();
+
+      final context = tester.element(find.byType(PostCard).first);
+      final expectedBottom =
+          MediaQuery.paddingOf(context).bottom + TreinoBottomBar.minHeight;
+      final paddings = tester.widgetList<SliverPadding>(
+        find.descendant(
+          of: feedScrollView(),
+          matching: find.byType(SliverPadding),
+        ),
+      );
+
+      expect(
+        paddings.any(
+          (sliver) => (sliver.padding as EdgeInsets).bottom == expectedBottom,
+        ),
+        isTrue,
+      );
+    });
+
+    testWidgets('loadMore still fires within 400px of the end', (tester) async {
+      final posts = longPosts();
+      final repository = _CountingPublicPostRepository(posts);
+
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), [
+          feedSegmentProvider.overrideWith((ref) => FeedSegment.public),
+          myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myGymFeedProvider.overrideWith((ref) async => null),
+          postRepositoryProvider.overrideWithValue(repository),
+        ]),
+      );
+      await tester.pumpAndSettle();
+      expect(repository.pageRequests, 1);
+
+      final scrollView = feedScrollView();
+      final controller =
+          tester.widget<CustomScrollView>(scrollView).controller!;
+      controller.jumpTo(controller.position.maxScrollExtent - 399);
+      await tester.pumpAndSettle();
+
+      expect(repository.pageRequests, 2);
+    });
+  });
+
+  // ── Sugerencias intercaladas ────────────────────────────────────────────
+  //
+  // `suggestedUsersAfterPost` ya tiene tests unitarios, pero probar la función
+  // pura contra sí misma no protege la frontera: el feed podría no llamarla
+  // nunca y esos tests seguirían verdes. Estos tests scrollean el feed REAL y
+  // miran si el carrusel aparece entre los posts.
+  group('sugerencias intercaladas en el scroll del feed', () {
+    List<Post> manyPosts() => List.generate(
+          24,
+          (index) => _makePost(
+            id: 'inter-$index',
+            authorUid: 'author-$index',
+            text: 'Post $index',
+            privacy: PostPrivacy.public,
+          ),
+        );
+
+    List<Override> overridesWith({
+      required List<UserPublicProfile> candidates,
+    }) =>
+        [
+          feedSegmentProvider.overrideWith((ref) => FeedSegment.public),
+          myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myGymFeedProvider.overrideWith((ref) async => null),
+          feedPublicProvider.overrideWith((ref) async => manyPosts()),
+          userProfileProvider.overrideWith(
+            (ref) => Stream.value(_makeProfile(gymId: 'gym-a')),
+          ),
+          suggestedUsersProvider('gym-a')
+              .overrideWith((ref) async => candidates),
+        ];
+
+    List<UserPublicProfile> candidates(int count) => [
+          for (var index = 0; index < count; index++)
+            UserPublicProfile(
+              uid: 'cand-$index',
+              displayName: 'Candidato $index',
+              gymId: 'gym-a',
+            ),
+        ];
+
+    /// Baja de a poco hasta encontrar [target]. El `SliverList` es perezoso:
+    /// el post 10 no existe en el árbol hasta que el viewport se le acerca.
+    Future<bool> scrollUntil(WidgetTester tester, Finder target) async {
+      for (var step = 0; step < 40; step++) {
+        if (target.evaluate().isNotEmpty) return true;
+        await tester.drag(find.byType(CustomScrollView), const Offset(0, -300));
+        await tester.pumpAndSettle();
+      }
+      return target.evaluate().isNotEmpty;
+    }
+
+    testWidgets('con candidatos, el carrusel aparece después del post 10', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+            const FeedScreen(), overridesWith(candidates: candidates(20))),
+      );
+      await tester.pumpAndSettle();
+
+      final carousel = find.byKey(const Key('suggested_users_section'));
+      expect(await scrollUntil(tester, carousel), isTrue,
+          reason: 'el carrusel nunca se renderizó entre los posts');
+
+      // Y está DEBAJO del post 10 (índice 9), no en cualquier lado.
+      final post10 = find.byKey(const ValueKey('inter-9'));
+      if (post10.evaluate().isNotEmpty) {
+        expect(
+          tester.getRect(carousel).top,
+          greaterThan(tester.getRect(post10).top),
+        );
+      }
+    });
+
+    testWidgets(
+        'el carrusel vuelve al principio después de reciclarse (regresión)', (
+      tester,
+    ) async {
+      // Bug visto en device: `Scrollable` guarda su offset en `PageStorage` y
+      // el `CustomScrollView` del feed abre ese bucket, así que al alejarse y
+      // volver el carrusel reaparecía scrolleado al final —con las primeras
+      // sugerencias escondidas—. Ningún test lo veía porque todos lo miraban
+      // recién montado.
+      await tester.pumpWidget(
+        _wrapProvider(
+          const FeedScreen(),
+          overridesWith(candidates: candidates(20)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final carousel = find.byKey(const Key('suggested_users_section'));
+      Finder row() =>
+          find.descendant(of: carousel, matching: find.byType(ListView));
+      double rowOffset() =>
+          tester.widget<ListView>(row()).controller!.position.pixels;
+
+      expect(await scrollUntil(tester, carousel), isTrue);
+      // `scrollUntil` corta cuando el carrusel EXISTE, y el cacheExtent lo
+      // construye antes de que se vea. Sin este ensureVisible el drag de abajo
+      // no impacta y el test pasa sin haber probado nada.
+      await tester.ensureVisible(carousel);
+      await tester.pumpAndSettle();
+
+      // Lo scrolleamos a mano hasta el fondo…
+      await tester.drag(row(), const Offset(-1200, 0));
+      await tester.pumpAndSettle();
+      expect(rowOffset(), greaterThan(0),
+          reason: 'setup del test: el carrusel tiene que haberse movido');
+
+      // …lo sacamos del viewport para que el sliver lo destruya…
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, -2500));
+      await tester.pumpAndSettle();
+      expect(carousel.evaluate(), isEmpty,
+          reason: 'setup del test: el sliver tiene que haberlo reciclado');
+
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, 2500));
+      await tester.pumpAndSettle();
+
+      // …y al volver tiene que estar en cero otra vez.
+      expect(await scrollUntil(tester, carousel), isTrue);
+      expect(rowOffset(), 0,
+          reason: 'una fila de sugerencias siempre empieza por la primera');
+    });
+
+    testWidgets('sin candidatos no se intercala nada en todo el scroll', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), overridesWith(candidates: const [])),
+      );
+      await tester.pumpAndSettle();
+
+      final carousel = find.byKey(const Key('suggested_users_section'));
+      expect(await scrollUntil(tester, carousel), isFalse);
     });
   });
 }

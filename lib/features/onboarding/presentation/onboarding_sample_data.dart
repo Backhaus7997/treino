@@ -237,7 +237,7 @@ final _samplePost = Post(
   authorGymId: null,
   text: 'Cerré la semana con PR en sentadilla. Vamos que se puede 💪',
   routineTag: null,
-  privacy: PostPrivacy.friends,
+  privacy: PostPrivacy.followers,
   createdAt: _now.subtract(const Duration(hours: 2)),
   reactionCounts: const {ReactionType.like: 7, ReactionType.fire: 3},
 );
@@ -250,7 +250,7 @@ final _samplePostTwo = Post(
   authorGymId: null,
   text: 'Push A cerrado. Las dominadas por fin salen limpias.',
   routineTag: null,
-  privacy: PostPrivacy.friends,
+  privacy: PostPrivacy.followers,
   createdAt: _now.subtract(const Duration(hours: 5)),
   reactionCounts: const {ReactionType.like: 4, ReactionType.fire: 2},
 );
@@ -263,7 +263,7 @@ final _samplePostThree = Post(
   authorGymId: null,
   text: 'Legs day. Foto obligatoria antes de que me fallen las piernas.',
   routineTag: null,
-  privacy: PostPrivacy.friends,
+  privacy: PostPrivacy.followers,
   createdAt: _now.subtract(const Duration(hours: 8)),
   reactionCounts: const {
     ReactionType.like: 12,

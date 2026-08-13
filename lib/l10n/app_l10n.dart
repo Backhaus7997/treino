@@ -95,7 +95,7 @@ abstract class AppL10n {
   static const List<Locale> supportedLocales = <Locale>[
     Locale('en'),
     Locale('es'),
-    Locale('es', 'AR')
+    Locale('es', 'AR'),
   ];
 
   /// No description provided for @notFoundTitle.
@@ -1201,6 +1201,126 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'¡Terminé mi entreno! 💪'**
   String get workoutPostAutoCompleteText;
+
+  /// Title of the skippable post-session check-in step, and of the sheet it opens. Asks how the athlete felt — subjective, never a performance metric.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿CÓMO TE SENTISTE?'**
+  String get wellbeingCheckInTitle;
+
+  /// Reassures that the check-in is skippable at no cost. The post-session moment is when the user wants to leave.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Opcional. Podés saltearlo.'**
+  String get wellbeingCheckInOptional;
+
+  /// No description provided for @wellbeingFeelingVeryBad.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Muy mal'**
+  String get wellbeingFeelingVeryBad;
+
+  /// No description provided for @wellbeingFeelingBad.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Mal'**
+  String get wellbeingFeelingBad;
+
+  /// No description provided for @wellbeingFeelingNeutral.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Normal'**
+  String get wellbeingFeelingNeutral;
+
+  /// No description provided for @wellbeingFeelingGood.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Bien'**
+  String get wellbeingFeelingGood;
+
+  /// No description provided for @wellbeingFeelingGreat.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Muy bien'**
+  String get wellbeingFeelingGreat;
+
+  /// No description provided for @wellbeingPainQuestion.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Tuviste dolor o molestia?'**
+  String get wellbeingPainQuestion;
+
+  /// No description provided for @wellbeingPainYes.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SÍ'**
+  String get wellbeingPainYes;
+
+  /// No description provided for @wellbeingPainNo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'NO'**
+  String get wellbeingPainNo;
+
+  /// No description provided for @wellbeingPainAreasQuestion.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿En qué zona?'**
+  String get wellbeingPainAreasQuestion;
+
+  /// No description provided for @wellbeingPainAreasHint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Podés marcar más de una.'**
+  String get wellbeingPainAreasHint;
+
+  /// No description provided for @wellbeingNoteLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Nota (opcional)'**
+  String get wellbeingNoteLabel;
+
+  /// No description provided for @wellbeingNoteHint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Algo que quieras recordar de hoy'**
+  String get wellbeingNoteHint;
+
+  /// Neutral note shown only when the athlete reports pain. The app records, it never interprets: this copy must not diagnose, recommend or condition any app behaviour on the answer.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Si el dolor persiste, consultá a un profesional de la salud.'**
+  String get wellbeingMedicalDisclaimer;
+
+  /// No description provided for @wellbeingSaveButton.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'GUARDAR'**
+  String get wellbeingSaveButton;
+
+  /// No description provided for @wellbeingSkipButton.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'AHORA NO'**
+  String get wellbeingSkipButton;
+
+  /// No description provided for @wellbeingSavedLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'REGISTRADO'**
+  String get wellbeingSavedLabel;
+
+  /// No description provided for @wellbeingEditButton.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Editar'**
+  String get wellbeingEditButton;
+
+  /// No description provided for @wellbeingSaveError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos guardar tu registro. Probá de nuevo.'**
+  String get wellbeingSaveError;
 
   /// Header title of the share-a-workout composer screen, opened from the COMPARTIR button of the post-workout summary.
   ///
@@ -2603,7 +2723,7 @@ abstract class AppL10n {
   /// No description provided for @profileCuentaSolicitudesTitle.
   ///
   /// In es_AR, this message translates to:
-  /// **'Solicitudes de amistad'**
+  /// **'Solicitudes de seguidores'**
   String get profileCuentaSolicitudesTitle;
 
   /// No description provided for @profileCuentaSolicitudesSubtitle.
@@ -3128,6 +3248,24 @@ abstract class AppL10n {
   /// **'Confirmar'**
   String get routineEditorDialogConfirm;
 
+  /// No description provided for @routineEditorCopyPrescriptionTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Copiar sets?'**
+  String get routineEditorCopyPrescriptionTitle;
+
+  /// Confirmation body for the slot-menu shortcut that copies the previous exercise's prescription into this one.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Se van a reemplazar los sets de este ejercicio por los de «{sourceExercise}».'**
+  String routineEditorCopyPrescriptionBody(String sourceExercise);
+
+  /// No description provided for @routineEditorSlotMenuCopyPrevious.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Copiar sets del anterior'**
+  String get routineEditorSlotMenuCopyPrevious;
+
   /// No description provided for @routineEditorSlotMenuReplace.
   ///
   /// In es_AR, this message translates to:
@@ -3163,6 +3301,42 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'+ Agregar set'**
   String get routineEditorAddSet;
+
+  /// Screen-reader label for the KG column header, which doubles as the bulk-fill affordance.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Replicar el peso del primer set en todos'**
+  String get routineEditorFillKgA11y;
+
+  /// No description provided for @routineEditorFillKgApplied.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Peso replicado en todos los sets.'**
+  String get routineEditorFillKgApplied;
+
+  /// No description provided for @routineEditorFillKgEmpty.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cargá el peso del primer set para poder replicarlo.'**
+  String get routineEditorFillKgEmpty;
+
+  /// No description provided for @routineEditorFillKgUndo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Deshacer'**
+  String get routineEditorFillKgUndo;
+
+  /// Screen-reader label for a KG stepper button that adds weight to the set being edited.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sumar {amount} kilos al peso'**
+  String routineEditorKgStepIncreaseA11y(String amount);
+
+  /// Screen-reader label for a KG stepper button that takes weight off the set being edited.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Restar {amount} kilos al peso'**
+  String routineEditorKgStepDecreaseA11y(String amount);
 
   /// No description provided for @routineEditorMeasureReps.
   ///
@@ -3455,13 +3629,13 @@ abstract class AppL10n {
   /// Accessibility label for the icon-only friend-requests inbox action in the feed header bell icon (navigation finding: friend-requests inbox was unreachable from the feed/social surface).
   ///
   /// In es_AR, this message translates to:
-  /// **'Solicitudes de amistad'**
+  /// **'Solicitudes de seguidores'**
   String get feedFriendRequestsA11y;
 
   /// Accessibility label for the feed header friend-requests bell icon when there are pending requests; announces the badge count to screen readers.
   ///
   /// In es_AR, this message translates to:
-  /// **'Solicitudes de amistad, {count} pendientes'**
+  /// **'Solicitudes de seguidores, {count} pendientes'**
   String feedFriendRequestsWithCountA11y(int count);
 
   /// Semantics liveRegion/label for the create-post submit spinner state while a post is being published (finding 12 create_post_screen PUBLICAR spinner branch).
@@ -4397,7 +4571,7 @@ abstract class AppL10n {
   /// Success feedback when a friend request is accepted (finding 25). Used by the public profile accept action and optionally the inbox accept.
   ///
   /// In es_AR, this message translates to:
-  /// **'Ahora son amigos.'**
+  /// **'Solicitud aceptada.'**
   String get feedRequestAcceptedSuccess;
 
   /// Error snackbar for friendship mutations (accept/reject/request/unfriend) that currently swallow errors, in the inbox tile and public profile follow button (findings 11/26).
@@ -5005,7 +5179,10 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'{vencidos, plural, =1{1 vencido} other{{vencidos} vencidos}} · {solicitudes, plural, =1{1 solicitud} other{{solicitudes} solicitudes}} · {inactivos, plural, =1{1 inactivo} other{{inactivos} inactivos}}'**
   String dashboardAlertBannerSummary(
-      int vencidos, int solicitudes, int inactivos);
+    int vencidos,
+    int solicitudes,
+    int inactivos,
+  );
 
   /// Formatted adherencia percentage value shown in the adherencia ring and KPI tile once the aggregate provider has data.
   ///
@@ -5760,7 +5937,7 @@ abstract class AppL10n {
   /// PostPrivacySelector pill for posts visible only to the author's friends. Doubles as the pill's Semantics label.
   ///
   /// In es_AR, this message translates to:
-  /// **'AMIGOS'**
+  /// **'SEGUIDORES'**
   String get postPrivacyFriends;
 
   /// PostPrivacySelector pill for posts visible to the author's gym. Disabled when the athlete has no gym.
@@ -5820,7 +5997,7 @@ abstract class AppL10n {
   /// Acceso compacto a solicitudes de amistad pendientes.
   ///
   /// In es_AR, this message translates to:
-  /// **'{count, plural, =1{1 solicitud de amistad pendiente} other{{count} solicitudes de amistad pendientes}}'**
+  /// **'{count, plural, =1{1 solicitud de seguidor pendiente} other{{count} solicitudes de seguidor pendientes}}'**
   String notificationPendingRequests(int count);
 
   /// Etiqueta accesible de la campanita de notificaciones del feed.
@@ -5846,6 +6023,150 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Este post ya no está disponible.'**
   String get postDetailUnavailable;
+
+  /// Título del sheet de confirmación para dejar de seguir.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Dejar de seguir a {name}?'**
+  String feedUnfollowConfirmTitle(String name);
+
+  /// Botón que confirma dejar de seguir.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DEJAR DE SEGUIR'**
+  String get feedUnfollowConfirmAction;
+
+  /// Botón que descarta el sheet de dejar de seguir.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CANCELAR'**
+  String get feedUnfollowDismiss;
+
+  /// Título del sheet para cancelar una solicitud enviada.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Cancelar la solicitud a {name}?'**
+  String feedCancelRequestConfirmTitle(String name);
+
+  /// Botón que confirma cancelar la solicitud enviada.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CANCELAR SOLICITUD'**
+  String get feedCancelRequestConfirmAction;
+
+  /// Botón que descarta el sheet de cancelar solicitud. Dice VOLVER y no CANCELAR para no chocar con el botón que SÍ cancela la solicitud.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VOLVER'**
+  String get feedCancelRequestDismiss;
+
+  /// Semantics del pill en estado SEGUIR.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Seguir a esta persona'**
+  String get feedFollowButtonFollowA11y;
+
+  /// Semantics del pill en estado SIGUIENDO.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Siguiendo. Tocá para dejar de seguir'**
+  String get feedFollowButtonFollowingA11y;
+
+  /// Semantics del pill en estado SOLICITUD ENVIADA.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Solicitud enviada. Tocá para cancelarla'**
+  String get feedFollowButtonRequestedA11y;
+
+  /// Semantics del pill en estado ACEPTAR.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Aceptar la solicitud de seguidor'**
+  String get feedFollowButtonAcceptA11y;
+
+  /// Confirmación al seguir a una cuenta pública (auto-aceptada).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ahora seguís a esta persona.'**
+  String get feedFollowStartedSuccess;
+
+  /// Pill del segmento del feed que muestra posts de a quienes seguís.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SEGUIDORES'**
+  String get feedSegmentFollowing;
+
+  /// Estado vacío del feed SEGUIDORES.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no hay posts de a quienes seguís'**
+  String get feedEmptyFollowing;
+
+  /// Aviso persistente sobre el composer cuando el destinatario no sigue al usuario y por lo tanto el servidor deniega el envío (REQ-FOLLOW-021).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Para escribirle, esta persona tiene que seguirte.'**
+  String get chatBlockedComposerNotice;
+
+  /// Semantics del composer deshabilitado por falta de permiso.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No podés escribir en este chat'**
+  String get chatBlockedComposerHintA11y;
+
+  /// Pill de la lista de seguidores en la pantalla de seguidores/seguidos.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SEGUIDORES'**
+  String get followListTabFollowers;
+
+  /// Pill de la lista de seguidos en la pantalla de seguidores/seguidos.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SIGUIENDO'**
+  String get followListTabFollowing;
+
+  /// Estado vacío de la lista de seguidores de otra persona.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no tiene seguidores'**
+  String get followListEmptyFollowers;
+
+  /// Estado vacío de la lista de seguidores propia.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no tenés seguidores'**
+  String get followListEmptyFollowersSelf;
+
+  /// Estado vacío de la lista de seguidos de otra persona.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no sigue a nadie'**
+  String get followListEmptyFollowing;
+
+  /// Estado vacío de la lista de seguidos propia.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no seguís a nadie'**
+  String get followListEmptyFollowingSelf;
+
+  /// Error al cargar la lista de seguidores o seguidos.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar la lista. Intentá de nuevo.'**
+  String get followListLoadError;
+
+  /// Semantics del contador de SEGUIDORES del perfil, que abre la lista.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver seguidores'**
+  String get followListOpenFollowersA11y;
+
+  /// Semantics del contador de SIGUIENDO del perfil, que abre la lista.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver seguidos'**
+  String get followListOpenFollowingA11y;
 
   /// Única salida de la card de onboarding de un módulo. Al tocarla se persiste el flag y la card no vuelve.
   ///
@@ -6108,8 +6429,9 @@ AppL10n lookupAppL10n(Locale locale) {
   }
 
   throw FlutterError(
-      'AppL10n.delegate failed to load unsupported locale "$locale". This is likely '
-      'an issue with the localizations generation tool. Please file an issue '
-      'on GitHub with a reproducible sample app and the gen-l10n configuration '
-      'that was used.');
+    'AppL10n.delegate failed to load unsupported locale "$locale". This is likely '
+    'an issue with the localizations generation tool. Please file an issue '
+    'on GitHub with a reproducible sample app and the gen-l10n configuration '
+    'that was used.',
+  );
 }

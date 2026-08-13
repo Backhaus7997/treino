@@ -9,10 +9,11 @@ import '../../../l10n/app_l10n.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../chat/application/chat_providers.dart';
 import '../../workout/application/user_routines_providers.dart';
+import '../application/follow_list_providers.dart';
 import '../application/post_providers.dart';
 import '../application/public_profile_providers.dart';
-import '../domain/friendship.dart';
-import '../domain/friendship_status.dart';
+import '../domain/follow.dart';
+import '../domain/follow_status.dart';
 import 'widgets/post_card.dart';
 import 'widgets/public_profile_follow_button.dart';
 import 'widgets/public_profile_hero.dart';
@@ -75,7 +76,12 @@ class PublicProfileScreen extends ConsumerWidget {
           // follower, hide detailed content (stats numbers, rutinas, actividad).
           // Header (name / avatar / gym) and the SEGUIR button stay visible so
           // the viewer can still send a follow request.
-          final isAcceptedFollower = view.friendship?.status.name == 'accepted';
+          // El gate de privacidad mira la arista SALIENTE: para ver el
+          // contenido de una cuenta privada hay que SEGUIRLA. Que ella te siga
+          // a vos no te da acceso a lo suyo (REQ-FOLLOW-010, mismo criterio que
+          // el gate de posts en las rules).
+          final isAcceptedFollower =
+              view.outgoingFollow?.status == FollowStatus.accepted;
           final gated = !view.isSelf && !view.isPublic && !isAcceptedFollower;
           // Bottom inset so the last post/routine clears the floating
           // TreinoBottomBar (WhatsApp-style: extendBody + translucent pill).
@@ -101,7 +107,8 @@ class PublicProfileScreen extends ConsumerWidget {
                       children: [
                         Expanded(
                           child: PublicProfileFollowButton(
-                            friendship: view.friendship,
+                            outgoingFollow: view.outgoingFollow,
+                            incomingFollow: view.incomingFollow,
                             viewerUid: viewerUid,
                             targetUid: targetUid,
                             targetIsPublic: view.isPublic,
@@ -110,7 +117,7 @@ class PublicProfileScreen extends ConsumerWidget {
                         const SizedBox(width: 12),
                         Expanded(
                           child: _MessageButton(
-                            friendship: view.friendship,
+                            incomingFollow: view.incomingFollow,
                             viewerUid: viewerUid,
                             targetUid: targetUid,
                           ),
@@ -126,11 +133,27 @@ class PublicProfileScreen extends ConsumerWidget {
                 ] else ...[
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
+                    // Los contadores abren las listas, como en Instagram. La
+                    // ruta se arma sobre `matchedLocation` y no sobre
+                    // '/feed/profile/...' fijo: este mismo screen está
+                    // registrado también bajo /home, y hardcodear /feed haría
+                    // saltar la tab resaltada a FEED al abrir la lista desde
+                    // INICIO (issue #387).
                     child: PublicProfileStatsRow(
                       workoutsCount: view.workoutsCount,
                       racha: view.racha,
                       followersCount: view.followersCount,
                       followingCount: view.followingCount,
+                      onFollowersTap: () => context.push(
+                        '${GoRouterState.of(context).matchedLocation}'
+                        '/follows?tab=${FollowListKind.followers.name}',
+                      ),
+                      onFollowingTap: () => context.push(
+                        '${GoRouterState.of(context).matchedLocation}'
+                        '/follows?tab=${FollowListKind.following.name}',
+                      ),
+                      followersSemanticsLabel: l10n.followListOpenFollowersA11y,
+                      followingSemanticsLabel: l10n.followListOpenFollowingA11y,
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -215,9 +238,20 @@ class _PrivateProfileNotice extends StatelessWidget {
   }
 }
 
-/// MENSAJE pill on the public profile screen. Gated by friendship state
-/// (Option B — Instagram DMs model): only enabled when the viewer and the
-/// target are accepted followers of each other.
+/// MENSAJE pill on the public profile screen.
+///
+/// **Habilitado sólo si el DEL PERFIL me sigue a mí** — la arista ENTRANTE
+/// (REQ-FOLLOW-012 / LD-08). Es el espejo literal de `chatCreateOk` en las
+/// rules: abrir un chat es poder mandar el primer mensaje, y eso requiere que
+/// el destinatario me siga.
+///
+/// **No es el OR de las dos direcciones**, y tampoco la saliente. El OR era el
+/// espejo de la regla vieja, cuando `friendships` tenía un doc por par y las
+/// dos direcciones eran el mismo hecho — de hecho `_isAcceptedFriend` miraba
+/// UN documento y habilitaba a los dos lados. Si el cliente y las rules no
+/// coinciden exactamente, el UX miente: o el botón está habilitado y el envío
+/// rebota con `permission-denied`, o está gris cuando el servidor sí lo
+/// permitiría. Si cambia `chatCreateOk`, esto cambia con ella.
 ///
 /// When enabled, tapping the pill calls `ChatRepository.getOrCreate` and
 /// pushes `/coach/chat/{chatId}?other={targetUid}` — the same route already
@@ -226,12 +260,13 @@ class _PrivateProfileNotice extends StatelessWidget {
 /// historical reasons but it's actually generic between any two uids.
 class _MessageButton extends ConsumerStatefulWidget {
   const _MessageButton({
-    required this.friendship,
+    required this.incomingFollow,
     required this.viewerUid,
     required this.targetUid,
   });
 
-  final Friendship? friendship;
+  /// `follows/{target}_{viewer}` — ¿el del perfil me sigue?
+  final Follow? incomingFollow;
   final String viewerUid;
   final String targetUid;
 
@@ -242,11 +277,11 @@ class _MessageButton extends ConsumerStatefulWidget {
 class _MessageButtonState extends ConsumerState<_MessageButton> {
   bool _busy = false;
 
-  bool get _isAcceptedFriend =>
-      widget.friendship?.status == FriendshipStatus.accepted;
+  bool get _chatEligible =>
+      widget.incomingFollow?.status == FollowStatus.accepted;
 
   Future<void> _onTap() async {
-    if (_busy || !_isAcceptedFriend) return;
+    if (_busy || !_chatEligible) return;
     setState(() => _busy = true);
     // Capture the router + messenger BEFORE the await — same protocol as
     // PublicProfileFollowButton: the route may pop mid-write, after which
@@ -277,7 +312,7 @@ class _MessageButtonState extends ConsumerState<_MessageButton> {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    final enabled = _isAcceptedFriend && !_busy;
+    final enabled = _chatEligible && !_busy;
     final textColor = enabled ? palette.textPrimary : palette.textMuted;
     return Semantics(
       button: true,

@@ -6,8 +6,10 @@ import 'package:treino/features/coach_hub/presentation/shell/sidebar_registry.da
 void main() {
   group('sidebarRegistry (REQ-CHW-SIDEBAR-001)', () {
     test(
-        'tiene exactamente 8 items (7 post-W2 reduce + Rutinas): Dashboard, '
-        'Alumnos, Agenda, Chat, Biblioteca, Rutinas, Pagos, Ajustes', () {
+        'tiene exactamente 11 items (7 post-W2 reduce + Rutinas + Solicitudes '
+        '+ Nutrición + Perfil público): Dashboard, Alumnos, Solicitudes, '
+        'Agenda, Chat, Perfil público, Biblioteca, Nutrición, Rutinas, '
+        'Pagos, Ajustes', () {
       // W2 reduce 2026-07-02: se removieron 12 items del sidebar que
       // duplicaban funcionalidad del alumno_detail o pertenecen a una
       // futura Biblioteca (sub-tabs). Reportes también sale (sin scope
@@ -16,7 +18,20 @@ void main() {
       //
       // Rutinas se re-agregó al grupo RECURSOS como entrada del editor de
       // rutinas web (elegí alumno → editor), llevando el total de 7 a 8.
-      expect(sidebarRegistry.length, 8);
+      //
+      // Fase 4 WU-06 (ADR-F4-04): Solicitudes (ex-Invitaciones) vuelve al
+      // grupo GESTIÓN, inmediatamente después de Alumnos, con badge real de
+      // pendientes — llevando el total de 8 a 9.
+      //
+      // Fase 6 WU-06 (ADR-F6-07): Nutrición vuelve al grupo RECURSOS,
+      // inmediatamente después de Biblioteca — la overview cross-alumno de
+      // planes (Fase 6 WU-04) ahora es alcanzable por navegación, no solo
+      // por URL directa — llevando el total de 9 a 10.
+      //
+      // Fase 11 WU-01 (ADR-F11-01): Perfil público se agrega al grupo
+      // GESTIÓN, inmediatamente después de Chat — llevando el total de 10
+      // a 11.
+      expect(sidebarRegistry.length, 11);
     });
 
     test('cubre los 2 grupos activos post-reduce, cada uno no vacío', () {
@@ -43,7 +58,7 @@ void main() {
         SidebarGroup.resumen,
         SidebarGroup.alumnos,
         SidebarGroup.plan,
-        SidebarGroup.wellness,
+        SidebarGroup.wellness, // Nutrición ahora vive en recursos (ADR-F6-07)
         SidebarGroup.negocio,
         SidebarGroup.comunicacion,
       ];
@@ -77,13 +92,46 @@ void main() {
         {
           '/dashboard',
           '/alumnos',
+          '/invitaciones',
           '/agenda',
           '/chat',
+          '/perfil-publico',
           '/biblioteca',
+          '/nutricion',
           '/rutinas',
           '/pagos',
           '/ajustes',
         },
+      );
+    });
+
+    test(
+        'Nutrición queda en RECURSOS, inmediatamente después de Biblioteca '
+        '[ADR-F6-07]', () {
+      final recursos = sidebarRegistry
+          .where((i) => i.group == SidebarGroup.recursos)
+          .map((i) => i.id)
+          .toList();
+      expect(recursos, ['biblioteca', 'nutricion', 'rutinas', 'pagos']);
+    });
+
+    test(
+        'Solicitudes (ex-Invitaciones) queda en GESTIÓN, inmediatamente '
+        'después de Alumnos [ADR-F4-04]', () {
+      final gestion = sidebarRegistry
+          .where((i) => i.group == SidebarGroup.gestion)
+          .map((i) => i.id)
+          .toList();
+      expect(
+        gestion,
+        [
+          'dashboard',
+          'alumnos',
+          'invitaciones',
+          'agenda',
+          'chat',
+          'perfil-publico',
+        ],
       );
     });
 
@@ -96,11 +144,14 @@ void main() {
       for (final esLabel in [
         'Ajustes',
         'Alumnos',
+        'Solicitudes',
         'Pagos',
         'Agenda',
         'Biblioteca',
         'Chat',
         'Dashboard',
+        'Nutrición',
+        'Perfil público',
       ]) {
         expect(labels, contains(esLabel));
       }
@@ -112,6 +163,7 @@ void main() {
         'Payments',
         'Schedule',
         'Library',
+        'Invitations',
       ]) {
         expect(labels, isNot(contains(enLabel)));
       }
@@ -123,9 +175,20 @@ void main() {
       }
     });
 
-    test('todos los items arrancan sin badgeProvider en W1', () {
+    test(
+        'Solicitudes (fase 4, ADR-F4-04) y Pagos (fase 9, WU-08) exponen '
+        'badgeProvider; el resto sigue sin badge', () {
+      const withBadge = {'invitaciones', 'pagos'};
       for (final item in sidebarRegistry) {
-        expect(item.badgeProvider, isNull);
+        if (withBadge.contains(item.id)) {
+          expect(
+            item.badgeProvider,
+            isNotNull,
+            reason: '${item.id} cablea su badgeProvider real',
+          );
+        } else {
+          expect(item.badgeProvider, isNull);
+        }
       }
     });
   });

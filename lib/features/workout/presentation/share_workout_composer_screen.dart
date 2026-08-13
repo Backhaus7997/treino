@@ -112,7 +112,7 @@ class _ComposerBodyState extends ConsumerState<_ComposerBody> {
   TextEditingController? _controller;
   String? _photoPath;
   bool _photoError = false;
-  PostPrivacy _privacy = PostPrivacy.friends;
+  PostPrivacy _privacy = PostPrivacy.followers;
 
   @override
   void dispose() {

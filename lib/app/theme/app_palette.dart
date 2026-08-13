@@ -1,18 +1,26 @@
 import 'package:flutter/material.dart';
 
+import 'tokens/primitives.dart';
+
 /// Tokens de color del sistema de diseño TREINO.
 ///
 /// El producto usa una única paleta oficial: **Mint Magenta** (definida en
 /// `docs/design-system.md` y en el PDF de marca de mayo 2026).
 /// Ningún widget debe usar HEX literales — siempre vía `AppPalette.of(context)`.
+///
+/// @Deprecated: usar [AppPalette.of(context)] — esta clase queda como alias
+/// a los primitivos para retrocompatibilidad de call sites legacy.
+@Deprecated(
+  'Usar AppPalette.of(context). AppColors es alias legacy a AppColorPrimitives.',
+)
 class AppColors {
-  static const ink = Color(0xFF0A0A0A);
-  static const espresso = Color(0xFF3C3534);
-  static const sage = Color(0xFF4F6358);
-  static const bone = Color(0xFFFFFFFF);
+  static const ink = AppColorPrimitives.ink950;
+  static const espresso = AppColorPrimitives.espresso500;
+  static const sage = AppColorPrimitives.sage500;
+  static const bone = AppColorPrimitives.bone;
 
-  static const magenta = Color(0xFFC123E0);
-  static const mint = Color(0xFF2CE5A2);
+  static const magenta = AppColorPrimitives.magenta500;
+  static const mint = AppColorPrimitives.mint500;
 }
 
 @immutable
@@ -79,51 +87,46 @@ class AppPalette extends ThemeExtension<AppPalette> {
   /// dark for image/video legibility.
   final Color scrimDark;
 
+  /// Paleta oscura — identidad de marca TREINO (default).
   static const mintMagenta = AppPalette(
-    accent: AppColors.mint,
-    highlight: AppColors.magenta,
-    bg: AppColors.ink,
-    bgCard: Color(0xFF0F1513),
-    border: Color(0x1AFFFFFF),
-    borderHover: Color(0x33FFFFFF),
-    textPrimary: AppColors.bone,
-    textMuted: Color(0x8CFFFFFF),
-    sage: AppColors.sage,
-    espresso: AppColors.espresso,
-    danger: Color(0xFFE53935),
-    warning: Color(0xFFFFB300),
-    reactionLike: Color(0xFFFF4D6D),
-    reactionFire: Color(0xFFFF7A2F),
-    reactionClap: Color(0xFFFFC93C),
-    onDanger: Color(0xFFFFFFFF),
-    scrimDark: Color(0xFF000000),
+    accent: AppColorPrimitives.mint500,
+    highlight: AppColorPrimitives.magenta500,
+    bg: AppColorPrimitives.ink950,
+    bgCard: AppColorPrimitives.ink900,
+    border: AppColorPrimitives.white10,
+    borderHover: AppColorPrimitives.white20,
+    textPrimary: AppColorPrimitives.bone,
+    textMuted: AppColorPrimitives.white55,
+    sage: AppColorPrimitives.sage500,
+    espresso: AppColorPrimitives.espresso500,
+    danger: AppColorPrimitives.dangerRed,
+    warning: AppColorPrimitives.warningAmber,
+    reactionLike: AppColorPrimitives.reactionLike,
+    reactionFire: AppColorPrimitives.reactionFire,
+    reactionClap: AppColorPrimitives.reactionClap,
+    onDanger: AppColorPrimitives.white,
+    scrimDark: AppColorPrimitives.black,
   );
 
+  /// Paleta clara — soportada como alternativa al dark (dark = identidad).
   static const mintMagentaLight = AppPalette(
-    accent: Color(0xFF2CE5A2),
-    highlight: Color(0xFFC123E0),
-    bg: Color(0xFFFAFAFA),
-    bgCard: Color(0xFFFFFFFF),
-    border: Color(0x1A000000),
-    borderHover: Color(0x33000000),
-    textPrimary: Color(0xFF0F1513),
-    textMuted: Color(0x99000000),
-    sage: Color(0xFFDDE5DF),
-    espresso: Color(0xFFEDE5E2),
-    danger: Color(0xFFD32F2F),
-    warning: Color(0xFFFB8C00),
-    reactionLike: Color(0xFFE63950),
-    reactionFire: Color(0xFFF4630C),
-    // Ámbar dorado, no el mostaza #B87500 que salía de maximizar contraste: a
-    // ese tono los aplausos se leían apagados y no como el emoji 👏.
-    //
-    // Da ~3:1 sobre bgCard, algo menos que los otros dos, y es aceptable acá
-    // porque el color NO es el único indicador de estado: la reacción propia
-    // además cambia de contorno a relleno. Un daltónico distingue el estado por
-    // la forma sin depender del tono. Ver `_iconFor` en post_reactions_row.dart.
-    reactionClap: Color(0xFFD99000),
-    onDanger: Color(0xFFFFFFFF),
-    scrimDark: Color(0xFF000000),
+    accent: AppColorPrimitives.mint500,
+    highlight: AppColorPrimitives.magenta500,
+    bg: AppColorPrimitives.paper50,
+    bgCard: AppColorPrimitives.white,
+    border: AppColorPrimitives.black10,
+    borderHover: AppColorPrimitives.black20,
+    textPrimary: AppColorPrimitives.inkText900,
+    textMuted: AppColorPrimitives.black60,
+    sage: AppColorPrimitives.sageTint50,
+    espresso: AppColorPrimitives.espressoTint50,
+    danger: AppColorPrimitives.dangerRedDark,
+    warning: AppColorPrimitives.warningAmberDark,
+    reactionLike: AppColorPrimitives.reactionLikeDark,
+    reactionFire: AppColorPrimitives.reactionFireDark,
+    reactionClap: AppColorPrimitives.reactionClapDark,
+    onDanger: AppColorPrimitives.white,
+    scrimDark: AppColorPrimitives.black,
   );
 
   static AppPalette of(BuildContext context) =>

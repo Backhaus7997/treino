@@ -19,7 +19,12 @@ mixin _$PublicProfileView {
   String get authorDisplayName => throw _privateConstructorUsedError;
   String? get authorAvatarUrl => throw _privateConstructorUsedError;
   String? get authorGymId => throw _privateConstructorUsedError;
-  Friendship? get friendship => throw _privateConstructorUsedError;
+
+  /// `follows/{viewer}_{target}` — ¿el que mira sigue al del perfil?
+  Follow? get outgoingFollow => throw _privateConstructorUsedError;
+
+  /// `follows/{target}_{viewer}` — ¿el del perfil sigue al que mira?
+  Follow? get incomingFollow => throw _privateConstructorUsedError;
   bool get isSelf => throw _privateConstructorUsedError;
   int? get workoutsCount => throw _privateConstructorUsedError;
   int? get racha => throw _privateConstructorUsedError;
@@ -47,7 +52,8 @@ abstract class $PublicProfileViewCopyWith<$Res> {
       {String authorDisplayName,
       String? authorAvatarUrl,
       String? authorGymId,
-      Friendship? friendship,
+      Follow? outgoingFollow,
+      Follow? incomingFollow,
       bool isSelf,
       int? workoutsCount,
       int? racha,
@@ -55,7 +61,8 @@ abstract class $PublicProfileViewCopyWith<$Res> {
       int? followingCount,
       bool isPublic});
 
-  $FriendshipCopyWith<$Res>? get friendship;
+  $FollowCopyWith<$Res>? get outgoingFollow;
+  $FollowCopyWith<$Res>? get incomingFollow;
 }
 
 /// @nodoc
@@ -76,7 +83,8 @@ class _$PublicProfileViewCopyWithImpl<$Res, $Val extends PublicProfileView>
     Object? authorDisplayName = null,
     Object? authorAvatarUrl = freezed,
     Object? authorGymId = freezed,
-    Object? friendship = freezed,
+    Object? outgoingFollow = freezed,
+    Object? incomingFollow = freezed,
     Object? isSelf = null,
     Object? workoutsCount = freezed,
     Object? racha = freezed,
@@ -97,10 +105,14 @@ class _$PublicProfileViewCopyWithImpl<$Res, $Val extends PublicProfileView>
           ? _value.authorGymId
           : authorGymId // ignore: cast_nullable_to_non_nullable
               as String?,
-      friendship: freezed == friendship
-          ? _value.friendship
-          : friendship // ignore: cast_nullable_to_non_nullable
-              as Friendship?,
+      outgoingFollow: freezed == outgoingFollow
+          ? _value.outgoingFollow
+          : outgoingFollow // ignore: cast_nullable_to_non_nullable
+              as Follow?,
+      incomingFollow: freezed == incomingFollow
+          ? _value.incomingFollow
+          : incomingFollow // ignore: cast_nullable_to_non_nullable
+              as Follow?,
       isSelf: null == isSelf
           ? _value.isSelf
           : isSelf // ignore: cast_nullable_to_non_nullable
@@ -132,13 +144,27 @@ class _$PublicProfileViewCopyWithImpl<$Res, $Val extends PublicProfileView>
   /// with the given fields replaced by the non-null parameter values.
   @override
   @pragma('vm:prefer-inline')
-  $FriendshipCopyWith<$Res>? get friendship {
-    if (_value.friendship == null) {
+  $FollowCopyWith<$Res>? get outgoingFollow {
+    if (_value.outgoingFollow == null) {
       return null;
     }
 
-    return $FriendshipCopyWith<$Res>(_value.friendship!, (value) {
-      return _then(_value.copyWith(friendship: value) as $Val);
+    return $FollowCopyWith<$Res>(_value.outgoingFollow!, (value) {
+      return _then(_value.copyWith(outgoingFollow: value) as $Val);
+    });
+  }
+
+  /// Create a copy of PublicProfileView
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $FollowCopyWith<$Res>? get incomingFollow {
+    if (_value.incomingFollow == null) {
+      return null;
+    }
+
+    return $FollowCopyWith<$Res>(_value.incomingFollow!, (value) {
+      return _then(_value.copyWith(incomingFollow: value) as $Val);
     });
   }
 }
@@ -155,7 +181,8 @@ abstract class _$$PublicProfileViewImplCopyWith<$Res>
       {String authorDisplayName,
       String? authorAvatarUrl,
       String? authorGymId,
-      Friendship? friendship,
+      Follow? outgoingFollow,
+      Follow? incomingFollow,
       bool isSelf,
       int? workoutsCount,
       int? racha,
@@ -164,7 +191,9 @@ abstract class _$$PublicProfileViewImplCopyWith<$Res>
       bool isPublic});
 
   @override
-  $FriendshipCopyWith<$Res>? get friendship;
+  $FollowCopyWith<$Res>? get outgoingFollow;
+  @override
+  $FollowCopyWith<$Res>? get incomingFollow;
 }
 
 /// @nodoc
@@ -183,7 +212,8 @@ class __$$PublicProfileViewImplCopyWithImpl<$Res>
     Object? authorDisplayName = null,
     Object? authorAvatarUrl = freezed,
     Object? authorGymId = freezed,
-    Object? friendship = freezed,
+    Object? outgoingFollow = freezed,
+    Object? incomingFollow = freezed,
     Object? isSelf = null,
     Object? workoutsCount = freezed,
     Object? racha = freezed,
@@ -204,10 +234,14 @@ class __$$PublicProfileViewImplCopyWithImpl<$Res>
           ? _value.authorGymId
           : authorGymId // ignore: cast_nullable_to_non_nullable
               as String?,
-      friendship: freezed == friendship
-          ? _value.friendship
-          : friendship // ignore: cast_nullable_to_non_nullable
-              as Friendship?,
+      outgoingFollow: freezed == outgoingFollow
+          ? _value.outgoingFollow
+          : outgoingFollow // ignore: cast_nullable_to_non_nullable
+              as Follow?,
+      incomingFollow: freezed == incomingFollow
+          ? _value.incomingFollow
+          : incomingFollow // ignore: cast_nullable_to_non_nullable
+              as Follow?,
       isSelf: null == isSelf
           ? _value.isSelf
           : isSelf // ignore: cast_nullable_to_non_nullable
@@ -243,7 +277,8 @@ class _$PublicProfileViewImpl implements _PublicProfileView {
       {required this.authorDisplayName,
       required this.authorAvatarUrl,
       required this.authorGymId,
-      required this.friendship,
+      required this.outgoingFollow,
+      required this.incomingFollow,
       required this.isSelf,
       this.workoutsCount,
       this.racha,
@@ -257,8 +292,14 @@ class _$PublicProfileViewImpl implements _PublicProfileView {
   final String? authorAvatarUrl;
   @override
   final String? authorGymId;
+
+  /// `follows/{viewer}_{target}` — ¿el que mira sigue al del perfil?
   @override
-  final Friendship? friendship;
+  final Follow? outgoingFollow;
+
+  /// `follows/{target}_{viewer}` — ¿el del perfil sigue al que mira?
+  @override
+  final Follow? incomingFollow;
   @override
   final bool isSelf;
   @override
@@ -278,7 +319,7 @@ class _$PublicProfileViewImpl implements _PublicProfileView {
 
   @override
   String toString() {
-    return 'PublicProfileView(authorDisplayName: $authorDisplayName, authorAvatarUrl: $authorAvatarUrl, authorGymId: $authorGymId, friendship: $friendship, isSelf: $isSelf, workoutsCount: $workoutsCount, racha: $racha, followersCount: $followersCount, followingCount: $followingCount, isPublic: $isPublic)';
+    return 'PublicProfileView(authorDisplayName: $authorDisplayName, authorAvatarUrl: $authorAvatarUrl, authorGymId: $authorGymId, outgoingFollow: $outgoingFollow, incomingFollow: $incomingFollow, isSelf: $isSelf, workoutsCount: $workoutsCount, racha: $racha, followersCount: $followersCount, followingCount: $followingCount, isPublic: $isPublic)';
   }
 
   @override
@@ -292,8 +333,10 @@ class _$PublicProfileViewImpl implements _PublicProfileView {
                 other.authorAvatarUrl == authorAvatarUrl) &&
             (identical(other.authorGymId, authorGymId) ||
                 other.authorGymId == authorGymId) &&
-            (identical(other.friendship, friendship) ||
-                other.friendship == friendship) &&
+            (identical(other.outgoingFollow, outgoingFollow) ||
+                other.outgoingFollow == outgoingFollow) &&
+            (identical(other.incomingFollow, incomingFollow) ||
+                other.incomingFollow == incomingFollow) &&
             (identical(other.isSelf, isSelf) || other.isSelf == isSelf) &&
             (identical(other.workoutsCount, workoutsCount) ||
                 other.workoutsCount == workoutsCount) &&
@@ -312,7 +355,8 @@ class _$PublicProfileViewImpl implements _PublicProfileView {
       authorDisplayName,
       authorAvatarUrl,
       authorGymId,
-      friendship,
+      outgoingFollow,
+      incomingFollow,
       isSelf,
       workoutsCount,
       racha,
@@ -335,7 +379,8 @@ abstract class _PublicProfileView implements PublicProfileView {
       {required final String authorDisplayName,
       required final String? authorAvatarUrl,
       required final String? authorGymId,
-      required final Friendship? friendship,
+      required final Follow? outgoingFollow,
+      required final Follow? incomingFollow,
       required final bool isSelf,
       final int? workoutsCount,
       final int? racha,
@@ -349,8 +394,14 @@ abstract class _PublicProfileView implements PublicProfileView {
   String? get authorAvatarUrl;
   @override
   String? get authorGymId;
+
+  /// `follows/{viewer}_{target}` — ¿el que mira sigue al del perfil?
   @override
-  Friendship? get friendship;
+  Follow? get outgoingFollow;
+
+  /// `follows/{target}_{viewer}` — ¿el del perfil sigue al que mira?
+  @override
+  Follow? get incomingFollow;
   @override
   bool get isSelf;
   @override

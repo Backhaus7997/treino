@@ -125,7 +125,14 @@ class SelectGymAction extends AsyncNotifier<ResolveGymPlaceResult?> {
   /// outright) because [ResolveGymPlaceService.call] still accepts an
   /// optional token, and a future session-backed source is not
   /// architecturally precluded.
-  Future<void> select({
+  /// Devuelve `true` si la resolución y el guardado salieron bien.
+  ///
+  /// El valor de retorno existe para que quien llama NO tenga que leer el
+  /// estado del provider después del `await`: hacerlo desde un widget tira
+  /// "Cannot use ref after the widget was disposed" si la pantalla se
+  /// desmontó mientras la operación estaba en vuelo. El estado se sigue
+  /// publicando igual para quien quiera mostrar loading/error.
+  Future<bool> select({
     required String uid,
     required String placeId,
     bool useSessionToken = false,
@@ -141,6 +148,7 @@ class SelectGymAction extends AsyncNotifier<ResolveGymPlaceResult?> {
           .update(uid, {'gymId': result.gymId});
       return result;
     });
+    return !state.hasError;
   }
 }
 

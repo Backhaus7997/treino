@@ -105,7 +105,7 @@ void main() {
         id: 'p1',
         authorUid: 'u1',
         text: 'Original text',
-        privacy: PostPrivacy.friends,
+        privacy: PostPrivacy.followers,
         routineTag: null,
       );
       await repo.create(original);
@@ -190,8 +190,8 @@ void main() {
         () async {
       await repo.create(
           _makePost(id: 'pub1', authorUid: 'u1', privacy: PostPrivacy.public));
-      await repo.create(
-          _makePost(id: 'fri1', authorUid: 'u2', privacy: PostPrivacy.friends));
+      await repo.create(_makePost(
+          id: 'fri1', authorUid: 'u2', privacy: PostPrivacy.followers));
       await repo.create(
           _makePost(id: 'gym1', authorUid: 'u3', privacy: PostPrivacy.gym));
 
@@ -260,10 +260,10 @@ void main() {
     test(
         'SCENARIO-121: feedForFriends returns friends-privacy posts by uidB and uidC only',
         () async {
-      await repo.create(
-          _makePost(id: 'f1', authorUid: 'uidB', privacy: PostPrivacy.friends));
-      await repo.create(
-          _makePost(id: 'f2', authorUid: 'uidC', privacy: PostPrivacy.friends));
+      await repo.create(_makePost(
+          id: 'f1', authorUid: 'uidB', privacy: PostPrivacy.followers));
+      await repo.create(_makePost(
+          id: 'f2', authorUid: 'uidC', privacy: PostPrivacy.followers));
       // uidD has public post — should not appear in friends feed
       await repo.create(
           _makePost(id: 'f3', authorUid: 'uidD', privacy: PostPrivacy.public));
@@ -276,8 +276,8 @@ void main() {
     });
 
     test('feedForFriends: empty list returns empty result', () async {
-      await repo.create(
-          _makePost(id: 'f1', authorUid: 'uidB', privacy: PostPrivacy.friends));
+      await repo.create(_makePost(
+          id: 'f1', authorUid: 'uidB', privacy: PostPrivacy.followers));
 
       final result = await repo.feedForFriends([]);
 
@@ -291,37 +291,37 @@ void main() {
         _makePost(
           id: 'chunk-1-new',
           authorUid: 'uid-0',
-          privacy: PostPrivacy.friends,
+          privacy: PostPrivacy.followers,
           createdAt: DateTime.utc(2026, 6, 5),
         ),
         _makePost(
           id: 'chunk-1-mid',
           authorUid: 'uid-1',
-          privacy: PostPrivacy.friends,
+          privacy: PostPrivacy.followers,
           createdAt: DateTime.utc(2026, 6, 3),
         ),
         _makePost(
           id: 'chunk-1-old',
           authorUid: 'uid-2',
-          privacy: PostPrivacy.friends,
+          privacy: PostPrivacy.followers,
           createdAt: DateTime.utc(2026, 6, 1),
         ),
         _makePost(
           id: 'chunk-2-new',
           authorUid: 'uid-10',
-          privacy: PostPrivacy.friends,
+          privacy: PostPrivacy.followers,
           createdAt: DateTime.utc(2026, 6, 6),
         ),
         _makePost(
           id: 'chunk-2-mid',
           authorUid: 'uid-10',
-          privacy: PostPrivacy.friends,
+          privacy: PostPrivacy.followers,
           createdAt: DateTime.utc(2026, 6, 4),
         ),
         _makePost(
           id: 'chunk-2-old',
           authorUid: 'uid-10',
-          privacy: PostPrivacy.friends,
+          privacy: PostPrivacy.followers,
           createdAt: DateTime.utc(2026, 6, 2),
         ),
       ];
@@ -344,13 +344,13 @@ void main() {
       await repo.create(_makePost(
         id: 'first-chunk',
         authorUid: 'uid-0',
-        privacy: PostPrivacy.friends,
+        privacy: PostPrivacy.followers,
         createdAt: DateTime.utc(2026, 1, 1),
       ));
       await repo.create(_makePost(
         id: 'second-chunk',
         authorUid: 'uid-10',
-        privacy: PostPrivacy.friends,
+        privacy: PostPrivacy.followers,
         createdAt: DateTime.utc(2026, 2, 1),
       ));
 
@@ -432,19 +432,19 @@ void main() {
       await repo.create(_makePost(
         id: 'old',
         authorUid: 'uidB',
-        privacy: PostPrivacy.friends,
+        privacy: PostPrivacy.followers,
         createdAt: DateTime.utc(2026, 1, 1),
       ));
       await repo.create(_makePost(
         id: 'new',
         authorUid: 'uidC',
-        privacy: PostPrivacy.friends,
+        privacy: PostPrivacy.followers,
         createdAt: DateTime.utc(2026, 3, 1),
       ));
       await repo.create(_makePost(
         id: 'mid',
         authorUid: 'uidB',
-        privacy: PostPrivacy.friends,
+        privacy: PostPrivacy.followers,
         createdAt: DateTime.utc(2026, 2, 1),
       ));
 

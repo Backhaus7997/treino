@@ -10,7 +10,7 @@ import 'package:treino/features/gyms/domain/gym.dart' show kNoGymId;
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
-const _emptyMessage = 'Aún no hay posts de tus amigos';
+const _emptyMessage = 'Todavía no hay posts de a quienes seguís';
 
 UserPublicProfile profile({
   required String uid,
@@ -145,7 +145,7 @@ void main() {
     expect(find.byKey(const Key('suggested_users_section')), findsOneWidget);
   });
 
-  testWidgets('renders an eager row for each supplied suggestion', (
+  testWidgets('renders suggestions in a horizontal carousel', (
     tester,
   ) async {
     final suggestions = [
@@ -158,12 +158,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    for (final suggestion in suggestions) {
+    final listView = tester.widget<ListView>(find.byType(ListView));
+    expect(listView.scrollDirection, Axis.horizontal);
+    for (final suggestion in suggestions.take(2)) {
       expect(
         find.byKey(Key('suggested_user_${suggestion.uid}')),
         findsOneWidget,
       );
     }
-    expect(find.byType(ListView), findsNothing);
   });
 }

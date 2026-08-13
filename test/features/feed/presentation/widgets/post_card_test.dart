@@ -75,7 +75,7 @@ Post makePost({
   String? authorGymId,
   String text = 'Gran sesión hoy',
   RoutineTag? routineTag,
-  PostPrivacy privacy = PostPrivacy.friends,
+  PostPrivacy privacy = PostPrivacy.followers,
   DateTime? createdAt,
   WorkoutStats? workoutStats,
 }) =>

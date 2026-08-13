@@ -57,6 +57,13 @@ scripts/node_modules/
 scripts/rules_test/node_modules/
 scripts/.env
 
+# Dumps de migración — NUNCA commitear.
+# Son copias crudas de datos reales de producción: el snapshot de `friendships`
+# es el grafo social entero (quién sigue a quién, con uids), y el manifiesto de
+# apply lista las aristas escritas. Viven en disco sólo mientras dura la
+# migración; son el mecanismo de reversibilidad, no un artefacto del repo.
+functions/scripts/migrations/
+
 # Firebase Hosting deploy cache (local only — regenerated on each deploy)
 .firebase/
 

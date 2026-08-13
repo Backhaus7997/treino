@@ -12,7 +12,7 @@ Post _makePost(String id) => Post(
       authorGymId: null,
       text: 'Hola',
       routineTag: null,
-      privacy: PostPrivacy.friends,
+      privacy: PostPrivacy.followers,
       createdAt: DateTime.utc(2026, 5, 14, 10, 0, 0),
     );
 

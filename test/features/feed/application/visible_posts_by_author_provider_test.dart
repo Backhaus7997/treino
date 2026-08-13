@@ -3,7 +3,7 @@
 // Enforces the Option X privacy model on the "ACTIVIDAD" tab of another
 // user's public profile:
 //   - public → visible to everyone
-//   - friends → visible if the viewer is an accepted follower
+//   - friends → visible si el VIEWER SIGUE al target (dirigido, no simétrico)
 //   - gym → visible if the viewer shares the target's gym
 // The viewer sees their OWN posts unconditionally (isSelf fast path).
 
@@ -14,9 +14,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/feed/application/post_providers.dart';
-import 'package:treino/features/feed/application/public_profile_providers.dart';
-import 'package:treino/features/feed/domain/friendship.dart';
-import 'package:treino/features/feed/domain/friendship_status.dart';
+import 'package:treino/features/feed/application/follow_providers.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/profile/application/user_providers.dart'
@@ -54,7 +52,15 @@ Future<void> _seedPost(
 ProviderContainer _makeContainer({
   required FakeFirebaseFirestore firestore,
   required String viewerUid,
-  Friendship? friendshipWithTarget,
+
+  /// UIDs que el VIEWER sigue, ya aceptados. Es la arista SALIENTE: lo único
+  /// que da acceso al contenido del otro.
+  List<String> viewerFollows = const [],
+
+  /// UIDs que siguen al viewer. Se overridea aparte justamente para poder
+  /// escribir el caso que el modelo viejo NO PODÍA REPRESENTAR: que el target
+  /// siga al viewer sin que el viewer lo siga a él.
+  Map<String, List<String>> othersFollow = const {},
   UserPublicProfile? viewerProfile,
 }) {
   final container = ProviderContainer(
@@ -63,8 +69,10 @@ ProviderContainer _makeContainer({
       authStateChangesProvider.overrideWith(
         (_) => Stream.value(_userWithUid(viewerUid)),
       ),
-      friendshipByPairProvider.overrideWith((ref, pair) async* {
-        yield friendshipWithTarget;
+      followingProvider.overrideWith((ref, uid) async* {
+        yield uid == viewerUid
+            ? viewerFollows
+            : (othersFollow[uid] ?? const []);
       }),
       // Override the viewer's public profile so we can control their gymId.
       // Other uids fall through to the fake Firestore (empty by default).
@@ -101,47 +109,8 @@ void main() {
       expect(posts.map((p) => p.id), ['p-pub']);
     });
 
-    test('friends posts are hidden when viewer is not accepted', () async {
-      final firestore = FakeFirebaseFirestore();
-      await _seedPost(firestore,
-          id: 'p-friends', authorUid: target, privacy: 'friends');
-
-      final container = _makeContainer(
-        firestore: firestore,
-        viewerUid: viewer,
-        friendshipWithTarget: null,
-      );
-
-      final posts =
-          await container.read(visiblePostsByAuthorProvider(target).future);
-      expect(posts, isEmpty);
-    });
-
-    test('friends posts are hidden when friendship is pending', () async {
-      final firestore = FakeFirebaseFirestore();
-      await _seedPost(firestore,
-          id: 'p-friends', authorUid: target, privacy: 'friends');
-
-      final container = _makeContainer(
-        firestore: firestore,
-        viewerUid: viewer,
-        friendshipWithTarget: Friendship(
-          id: '${target}_$viewer',
-          uidA: target,
-          uidB: viewer,
-          status: FriendshipStatus.pending,
-          requesterId: viewer,
-          members: const [target, viewer],
-          createdAt: DateTime.utc(2026, 1, 1),
-        ),
-      );
-
-      final posts =
-          await container.read(visiblePostsByAuthorProvider(target).future);
-      expect(posts, isEmpty);
-    });
-
-    test('friends posts are visible when viewer is an accepted follower',
+    // SCENARIO-814 — el viewer NO sigue al target.
+    test('el tier seguidores se oculta si el viewer no sigue al target',
         () async {
       final firestore = FakeFirebaseFirestore();
       await _seedPost(firestore,
@@ -150,20 +119,72 @@ void main() {
       final container = _makeContainer(
         firestore: firestore,
         viewerUid: viewer,
-        friendshipWithTarget: Friendship(
-          id: '${target}_$viewer',
-          uidA: target,
-          uidB: viewer,
-          status: FriendshipStatus.accepted,
-          requesterId: viewer,
-          members: const [target, viewer],
-          createdAt: DateTime.utc(2026, 1, 1),
-        ),
+        viewerFollows: const [],
+      );
+
+      final posts =
+          await container.read(visiblePostsByAuthorProvider(target).future);
+      expect(posts, isEmpty);
+    });
+
+    // SCENARIO-814 — EL CASO QUE EL MODELO VIEJO NO PODÍA REPRESENTAR.
+    //
+    // Con `friendships` había UN documento por par, así que "el target me sigue"
+    // y "yo sigo al target" eran el MISMO hecho: este test no se podía ni
+    // escribir. Ahora son dos aristas distintas y sólo la SALIENTE da acceso.
+    test(
+        'el tier seguidores se oculta si el target sigue al viewer pero no al revés',
+        () async {
+      final firestore = FakeFirebaseFirestore();
+      await _seedPost(firestore,
+          id: 'p-friends', authorUid: target, privacy: 'friends');
+
+      final container = _makeContainer(
+        firestore: firestore,
+        viewerUid: viewer,
+        viewerFollows: const [], // el viewer NO sigue al target
+        othersFollow: const {
+          target: [viewer], // ...pero el target SÍ sigue al viewer
+        },
+      );
+
+      final posts =
+          await container.read(visiblePostsByAuthorProvider(target).future);
+      expect(posts, isEmpty,
+          reason: 'que el autor me siga no me da acceso a su contenido');
+    });
+
+    // SCENARIO-814
+    test('el tier seguidores se ve cuando el viewer SIGUE al target', () async {
+      final firestore = FakeFirebaseFirestore();
+      await _seedPost(firestore,
+          id: 'p-friends', authorUid: target, privacy: 'friends');
+
+      final container = _makeContainer(
+        firestore: firestore,
+        viewerUid: viewer,
+        viewerFollows: const [target],
       );
 
       final posts =
           await container.read(visiblePostsByAuthorProvider(target).future);
       expect(posts.map((p) => p.id), ['p-friends']);
+    });
+
+    test('seguir a OTRA persona no abre el contenido del target', () async {
+      final firestore = FakeFirebaseFirestore();
+      await _seedPost(firestore,
+          id: 'p-friends', authorUid: target, privacy: 'friends');
+
+      final container = _makeContainer(
+        firestore: firestore,
+        viewerUid: viewer,
+        viewerFollows: const ['alguien-mas'],
+      );
+
+      final posts =
+          await container.read(visiblePostsByAuthorProvider(target).future);
+      expect(posts, isEmpty);
     });
 
     test('gym posts are visible only when viewer shares the target gym',

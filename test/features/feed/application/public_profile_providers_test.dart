@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/feed/application/public_profile_providers.dart';
-import 'package:treino/features/feed/domain/friendship_status.dart';
+import 'package:treino/features/feed/domain/follow_status.dart';
 import 'package:treino/features/feed/domain/post_privacy.dart';
 import 'package:treino/features/profile/application/user_providers.dart'
     show firestoreProvider;
@@ -22,81 +22,25 @@ User _userWithUid(String uid) {
   return u;
 }
 
-void main() {
-  // ────────────────────────────────────────────────────────────────────
-  // friendshipByPairProvider
-  // ────────────────────────────────────────────────────────────────────
-
-  group('friendshipByPairProvider', () {
-    test('SCENARIO-197: returns existing friendship doc for the pair',
-        () async {
-      final firestore = FakeFirebaseFirestore();
-      await firestore.collection('friendships').doc('a_b').set({
-        'id': 'a_b',
-        'uidA': 'a',
-        'uidB': 'b',
-        'status': FriendshipStatus.accepted.toJson(),
-        'requesterId': 'a',
-        'members': ['a', 'b'],
-        'createdAt': Timestamp.now(),
-      });
-
-      final container = ProviderContainer(overrides: [
-        firestoreProvider.overrideWithValue(firestore),
-        authStateChangesProvider
-            .overrideWith((_) => Stream.value(_userWithUid('a'))),
-      ]);
-      addTearDown(container.dispose);
-
-      final result = await container.read(
-        friendshipByPairProvider(
-          (viewerUid: 'a', targetUid: 'b'),
-        ).future,
-      );
-
-      expect(result, isNotNull);
-      expect(result!.status, equals(FriendshipStatus.accepted));
-    });
-
-    test('SCENARIO-198: returns null when no doc exists for the pair',
-        () async {
-      final firestore = FakeFirebaseFirestore();
-
-      final container = ProviderContainer(overrides: [
-        firestoreProvider.overrideWithValue(firestore),
-        authStateChangesProvider
-            .overrideWith((_) => Stream.value(_userWithUid('a'))),
-      ]);
-      addTearDown(container.dispose);
-
-      final result = await container.read(
-        friendshipByPairProvider(
-          (viewerUid: 'a', targetUid: 'z'),
-        ).future,
-      );
-
-      expect(result, isNull);
-    });
-
-    test('SCENARIO-199: returns null when unauthenticated', () async {
-      final firestore = FakeFirebaseFirestore();
-
-      final container = ProviderContainer(overrides: [
-        firestoreProvider.overrideWithValue(firestore),
-        authStateChangesProvider.overrideWith((_) => Stream.value(null)),
-      ]);
-      addTearDown(container.dispose);
-
-      final result = await container.read(
-        friendshipByPairProvider(
-          (viewerUid: 'a', targetUid: 'b'),
-        ).future,
-      );
-
-      expect(result, isNull);
-    });
+/// Siembra una arista dirigida en `follows`. El doc id NO se ordena.
+Future<void> _seedEdge(
+  FakeFirebaseFirestore firestore,
+  String follower,
+  String followee,
+  FollowStatus status,
+) async {
+  final id = '${follower}_$followee';
+  await firestore.collection('follows').doc(id).set({
+    'id': id,
+    'followerUid': follower,
+    'followeeUid': followee,
+    'status': status.toJson(),
+    'members': [follower, followee],
+    'createdAt': Timestamp.now(),
   });
+}
 
+void main() {
   // ────────────────────────────────────────────────────────────────────
   // firstPostByAuthorProvider
   // ────────────────────────────────────────────────────────────────────
@@ -297,7 +241,8 @@ void main() {
       expect(view.followingCount, isNull);
     });
 
-    test('SCENARIO-203: composes userPublicProfile + friendship; isSelf=false',
+    test(
+        'SCENARIO-203: compone userPublicProfile + las DOS aristas; isSelf=false',
         () async {
       final firestore = FakeFirebaseFirestore();
       // Seed userPublicProfiles (NOT posts) — REQ-UPP-020
@@ -308,15 +253,9 @@ void main() {
         'avatarUrl': 'https://x.com/y.jpg',
         'gymId': 'la-fuerza',
       });
-      await firestore.collection('friendships').doc('target_viewer').set({
-        'id': 'target_viewer',
-        'uidA': 'target',
-        'uidB': 'viewer',
-        'status': FriendshipStatus.accepted.toJson(),
-        'requesterId': 'viewer',
-        'members': ['target', 'viewer'],
-        'createdAt': Timestamp.now(),
-      });
+      // Par mutuo: las DOS aristas.
+      await _seedEdge(firestore, 'viewer', 'target', FollowStatus.accepted);
+      await _seedEdge(firestore, 'target', 'viewer', FollowStatus.accepted);
 
       final container = ProviderContainer(overrides: [
         firestoreProvider.overrideWithValue(firestore),
@@ -334,9 +273,78 @@ void main() {
       expect(view.authorDisplayName, equals('Tincho'));
       expect(view.authorAvatarUrl, equals('https://x.com/y.jpg'));
       expect(view.authorGymId, equals('la-fuerza'));
-      expect(view.friendship, isNotNull);
-      expect(view.friendship!.status, equals(FriendshipStatus.accepted));
+      expect(view.outgoingFollow, isNotNull);
+      expect(view.outgoingFollow!.status, equals(FollowStatus.accepted));
+      expect(view.incomingFollow, isNotNull);
+      expect(view.incomingFollow!.status, equals(FollowStatus.accepted));
       expect(view.isSelf, isFalse);
+    });
+
+    // SCENARIO-822 — LA PRUEBA DE QUE SON DOS LISTENERS Y NO UNO.
+    //
+    // Sólo existe la arista ENTRANTE: el del perfil sigue al que mira, pero no
+    // al revés. Si el notifier compusiera un solo documento —como hacía con
+    // `friendshipByPairProvider`— este caso saldría idéntico al mutuo, y el
+    // perfil mostraría "SIGUIENDO" sobre alguien a quien no seguís.
+    test('SCENARIO-822: sólo la arista entrante → outgoing null, incoming no',
+        () async {
+      final firestore = FakeFirebaseFirestore();
+      await firestore.collection('userPublicProfiles').doc('target').set({
+        'uid': 'target',
+        'displayName': 'Tincho',
+        'displayNameLowercase': 'tincho',
+        'avatarUrl': null,
+        'gymId': null,
+      });
+      await _seedEdge(firestore, 'target', 'viewer', FollowStatus.accepted);
+
+      final container = ProviderContainer(overrides: [
+        firestoreProvider.overrideWithValue(firestore),
+        userPublicProfileRepositoryProvider.overrideWithValue(
+          UserPublicProfileRepository(firestore: firestore),
+        ),
+        authStateChangesProvider
+            .overrideWith((_) => Stream.value(_userWithUid('viewer'))),
+      ]);
+      addTearDown(container.dispose);
+
+      final view =
+          await container.read(publicProfileViewProvider('target').future);
+
+      expect(view.outgoingFollow, isNull,
+          reason: 'el viewer no sigue al target');
+      expect(view.incomingFollow, isNotNull,
+          reason: 'el target sí sigue al viewer');
+    });
+
+    // SCENARIO-822 — el espejo del anterior.
+    test('SCENARIO-822: sólo la arista saliente → incoming null, outgoing no',
+        () async {
+      final firestore = FakeFirebaseFirestore();
+      await firestore.collection('userPublicProfiles').doc('target').set({
+        'uid': 'target',
+        'displayName': 'Tincho',
+        'displayNameLowercase': 'tincho',
+        'avatarUrl': null,
+        'gymId': null,
+      });
+      await _seedEdge(firestore, 'viewer', 'target', FollowStatus.pending);
+
+      final container = ProviderContainer(overrides: [
+        firestoreProvider.overrideWithValue(firestore),
+        userPublicProfileRepositoryProvider.overrideWithValue(
+          UserPublicProfileRepository(firestore: firestore),
+        ),
+        authStateChangesProvider
+            .overrideWith((_) => Stream.value(_userWithUid('viewer'))),
+      ]);
+      addTearDown(container.dispose);
+
+      final view =
+          await container.read(publicProfileViewProvider('target').future);
+
+      expect(view.outgoingFollow!.status, equals(FollowStatus.pending));
+      expect(view.incomingFollow, isNull);
     });
 
     test(
@@ -361,11 +369,12 @@ void main() {
       expect(view.authorDisplayName, equals('Anónimo'));
       expect(view.authorAvatarUrl, isNull);
       expect(view.authorGymId, isNull);
-      expect(view.friendship, isNull);
+      expect(view.outgoingFollow, isNull);
+      expect(view.incomingFollow, isNull);
       expect(view.isSelf, isFalse);
     });
 
-    test('SCENARIO-205: self-visit → isSelf=true and friendship is null',
+    test('SCENARIO-205: self-visit → isSelf=true y las dos aristas en null',
         () async {
       final firestore = FakeFirebaseFirestore();
       // Seed userPublicProfiles for self (NOT posts) — REQ-UPP-020
@@ -391,7 +400,8 @@ void main() {
 
       expect(view.isSelf, isTrue);
       expect(view.authorDisplayName, equals('Yo'));
-      expect(view.friendship, isNull);
+      expect(view.outgoingFollow, isNull);
+      expect(view.incomingFollow, isNull);
     });
   });
 }

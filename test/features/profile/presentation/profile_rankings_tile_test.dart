@@ -22,7 +22,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
-import 'package:treino/features/feed/application/friendship_providers.dart';
+import 'package:treino/features/feed/application/follow_providers.dart';
 import 'package:treino/features/profile/application/profile_stats_providers.dart';
 import 'package:treino/features/profile/application/ranking_optin_controller_provider.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
@@ -126,8 +126,8 @@ void main() {
       authNotifierProvider.overrideWith(_StubAuthNotifier.new),
       authStateChangesProvider.overrideWith((_) => Stream.value(mockUser)),
       userProfileProvider.overrideWith((_) => Stream.value(_testProfile())),
-      pendingRequestCountProvider(_uid).overrideWith((_) => 0),
-      pendingRequestsStreamProvider(_uid).overrideWith((_) => Stream.value([])),
+      pendingFollowRequestCountProvider(_uid).overrideWith((_) => 0),
+      pendingReceivedStreamProvider(_uid).overrideWith((_) => Stream.value([])),
       userSessionStatsProvider.overrideWith((_) async => const UserSessionStats(
           totalSessions: 0, totalVolumeKg: 0, streak: 0)),
       userPublicProfileProvider(_uid).overrideWith(

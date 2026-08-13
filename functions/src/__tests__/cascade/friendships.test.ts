@@ -1,10 +1,16 @@
 /**
- * Integration tests for the friendships cascade module.
- * Run against Firebase Local Emulator (Firestore).
+ * Integration tests del cascade del grafo social (borrado de cuenta).
+ * Corre contra el Firebase Local Emulator (Firestore).
  *
- * SCENARIOS covered:
- *   SCENARIO-538 — Friendship documents are swept (REQ-ACCDEL-CF-005)
- *   SCENARIO-539 — No friendships is a no-op (REQ-ACCDEL-CF-005)
+ * `follow-model` PR3a: la colección barrida pasa de `friendships` a `follows`
+ * (ADR-FOLLOW-002). Se conserva UNA SOLA query gracias a `members`, que es el
+ * argumento fuerte a favor de mantener ese campo (LD-01): sin él el barrido
+ * pasaría a 2 queries + deduplicación, y el borrado de cuenta es justo donde un
+ * doc que se escapa es un problema de compliance, no de UX.
+ *
+ * SCENARIOS cubiertos:
+ *   SCENARIO-538 — los documentos del grafo social se barren (REQ-ACCDEL-CF-005)
+ *   SCENARIO-539 — cero documentos es un no-op (REQ-ACCDEL-CF-005)
  */
 
 import * as admin from "firebase-admin";
@@ -16,7 +22,7 @@ process.env.GCLOUD_PROJECT = "treino-dev";
 let testApp: admin.app.App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp({ projectId: "treino-dev" }, "friendships-cascade-test");
+  testApp = admin.initializeApp({ projectId: "treino-dev" }, "follows-cascade-test");
 });
 
 afterAll(async () => {
@@ -24,73 +30,94 @@ afterAll(async () => {
 });
 
 // Import the module under test — will fail until implementation exists
-import { sweepFriendships } from "../../cascade/friendships";
+import { sweepFollows } from "../../cascade/friendships";
 
 const db = () => admin.firestore(testApp);
 
-async function seedFriendships(uid: string, count: number): Promise<string[]> {
+const edgeId = (follower: string, followee: string) => `${follower}_${followee}`;
+
+function edgeBody(follower: string, followee: string) {
+  return {
+    id: edgeId(follower, followee),
+    followerUid: follower,
+    followeeUid: followee,
+    status: "accepted",
+    members: [follower, followee],
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+}
+
+/** Siembra [count] aristas SALIENTES de [uid]. */
+async function seedOutgoing(uid: string, count: number): Promise<string[]> {
   const batch = db().batch();
   const ids: string[] = [];
   for (let i = 0; i < count; i++) {
-    const otherId = `other-user-${i}`;
-    const docId = `friendship-${uid}-${i}`;
-    ids.push(docId);
-    batch.set(db().collection("friendships").doc(docId), {
-      members: [uid, otherId],
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    const other = `other-user-${i}`;
+    const id = edgeId(uid, other);
+    ids.push(id);
+    batch.set(db().collection("follows").doc(id), edgeBody(uid, other));
   }
   await batch.commit();
   return ids;
 }
 
-async function cleanupFriendships(docIds: string[]): Promise<void> {
+async function cleanup(docIds: string[]): Promise<void> {
   const batch = db().batch();
   for (const id of docIds) {
-    batch.delete(db().collection("friendships").doc(id));
+    batch.delete(db().collection("follows").doc(id));
   }
   await batch.commit().catch(() => undefined);
 }
 
-describe("SCENARIO-538: friendship documents are swept", () => {
-  const uid = "friendships-cascade-538";
+describe("SCENARIO-538: las aristas del usuario se barren", () => {
+  const uid = "follows-cascade-538";
   let docIds: string[] = [];
 
   beforeEach(async () => {
-    docIds = await seedFriendships(uid, 3);
+    docIds = await seedOutgoing(uid, 3);
   });
-  afterEach(() => cleanupFriendships(docIds));
+  afterEach(() => cleanup(docIds));
 
-  it("SCENARIO-538: deletes all 3 friendship docs where uid is a member", async () => {
-    await sweepFriendships(testApp, uid);
+  it("SCENARIO-538: borra las 3 aristas donde el uid es miembro", async () => {
+    await sweepFollows(testApp, uid);
 
     for (const id of docIds) {
-      const snap = await db().collection("friendships").doc(id).get();
+      const snap = await db().collection("follows").doc(id).get();
       expect(snap.exists).toBe(false);
     }
   });
 
-  it("SCENARIO-538: does not delete friendship docs for other users", async () => {
-    const otherUid = "other-user-not-deleted";
-    const otherId = "friendship-other-only";
-    await db().collection("friendships").doc(otherId).set({
-      members: ["user-a", "user-b"],
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+  it("SCENARIO-538: barre las DOS direcciones con una sola query", async () => {
+    // El modelo dirigido duplica los documentos por par: al borrar una cuenta
+    // hay que llevarse tanto a quién seguía como quién lo seguía. `members`
+    // contiene los dos uids en las dos direcciones, así que un solo
+    // `array-contains` las alcanza a ambas — si el barrido consultara por
+    // `followerUid` se dejaría vivos a todos los seguidores del borrado.
+    const inbound = edgeId("inbound-follower", uid);
+    await db().collection("follows").doc(inbound).set(edgeBody("inbound-follower", uid));
 
-    await sweepFriendships(testApp, uid);
+    await sweepFollows(testApp, uid);
 
-    const snap = await db().collection("friendships").doc(otherId).get();
+    const snap = await db().collection("follows").doc(inbound).get();
+    expect(snap.exists).toBe(false);
+  });
+
+  it("SCENARIO-538: no borra aristas de terceros", async () => {
+    const otherId = edgeId("user-a", "user-b");
+    await db().collection("follows").doc(otherId).set(edgeBody("user-a", "user-b"));
+
+    await sweepFollows(testApp, uid);
+
+    const snap = await db().collection("follows").doc(otherId).get();
     expect(snap.exists).toBe(true);
-    await db().collection("friendships").doc(otherId).delete();
-    void otherUid;
+    await db().collection("follows").doc(otherId).delete();
   });
 });
 
-describe("SCENARIO-539: no friendships is a no-op", () => {
-  const uid = "friendships-cascade-539";
+describe("SCENARIO-539: cero aristas es un no-op", () => {
+  const uid = "follows-cascade-539";
 
-  it("SCENARIO-539: no error thrown when user has zero friendship docs", async () => {
-    await expect(sweepFriendships(testApp, uid)).resolves.not.toThrow();
+  it("SCENARIO-539: no tira error cuando el usuario no tiene ninguna arista", async () => {
+    await expect(sweepFollows(testApp, uid)).resolves.not.toThrow();
   });
 });

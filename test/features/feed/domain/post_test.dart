@@ -42,7 +42,7 @@ void main() {
         authorGymId: 'gym1',
         text: 'No routine',
         routineTag: null,
-        privacy: PostPrivacy.friends,
+        privacy: PostPrivacy.followers,
         createdAt: createdAt,
       );
 
@@ -88,7 +88,7 @@ void main() {
         authorGymId: 'gym-alpha',
         text: 'Full roundtrip test',
         routineTag: const RoutineTag(routineId: 'r1', routineName: 'Push Day'),
-        privacy: PostPrivacy.friends,
+        privacy: PostPrivacy.followers,
         createdAt: createdAt,
       );
 

@@ -612,6 +612,68 @@ class AppL10nEs extends AppL10n {
   String get workoutPostAutoCompleteText => '¡Terminé mi entreno! 💪';
 
   @override
+  String get wellbeingCheckInTitle => '¿CÓMO TE SENTISTE?';
+
+  @override
+  String get wellbeingCheckInOptional => 'Opcional. Podés saltearlo.';
+
+  @override
+  String get wellbeingFeelingVeryBad => 'Muy mal';
+
+  @override
+  String get wellbeingFeelingBad => 'Mal';
+
+  @override
+  String get wellbeingFeelingNeutral => 'Normal';
+
+  @override
+  String get wellbeingFeelingGood => 'Bien';
+
+  @override
+  String get wellbeingFeelingGreat => 'Muy bien';
+
+  @override
+  String get wellbeingPainQuestion => '¿Tuviste dolor o molestia?';
+
+  @override
+  String get wellbeingPainYes => 'SÍ';
+
+  @override
+  String get wellbeingPainNo => 'NO';
+
+  @override
+  String get wellbeingPainAreasQuestion => '¿En qué zona?';
+
+  @override
+  String get wellbeingPainAreasHint => 'Podés marcar más de una.';
+
+  @override
+  String get wellbeingNoteLabel => 'Nota (opcional)';
+
+  @override
+  String get wellbeingNoteHint => 'Algo que quieras recordar de hoy';
+
+  @override
+  String get wellbeingMedicalDisclaimer =>
+      'Si el dolor persiste, consultá a un profesional de la salud.';
+
+  @override
+  String get wellbeingSaveButton => 'GUARDAR';
+
+  @override
+  String get wellbeingSkipButton => 'AHORA NO';
+
+  @override
+  String get wellbeingSavedLabel => 'REGISTRADO';
+
+  @override
+  String get wellbeingEditButton => 'Editar';
+
+  @override
+  String get wellbeingSaveError =>
+      'No pudimos guardar tu registro. Probá de nuevo.';
+
+  @override
   String get shareWorkoutComposerTitle => 'COMPARTIR ENTRENO';
 
   @override
@@ -1385,7 +1447,7 @@ class AppL10nEs extends AppL10n {
   String get profileCuentaTitle => 'CUENTA';
 
   @override
-  String get profileCuentaSolicitudesTitle => 'Solicitudes de amistad';
+  String get profileCuentaSolicitudesTitle => 'Solicitudes de seguidores';
 
   @override
   String profileCuentaSolicitudesSubtitle(int count) {
@@ -1694,6 +1756,17 @@ class AppL10nEs extends AppL10n {
   String get routineEditorDialogConfirm => '';
 
   @override
+  String get routineEditorCopyPrescriptionTitle => '¿Copiar sets?';
+
+  @override
+  String routineEditorCopyPrescriptionBody(String sourceExercise) {
+    return 'Se reemplazarán los sets de este ejercicio por los de «$sourceExercise».';
+  }
+
+  @override
+  String get routineEditorSlotMenuCopyPrevious => 'Copiar sets del anterior';
+
+  @override
   String get routineEditorSlotMenuReplace => 'Cambiar ejercicio';
 
   @override
@@ -1710,6 +1783,30 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get routineEditorAddSet => '+ Agregar set';
+
+  @override
+  String get routineEditorFillKgA11y =>
+      'Replicar el peso del primer set en todos';
+
+  @override
+  String get routineEditorFillKgApplied => 'Peso replicado en todos los sets.';
+
+  @override
+  String get routineEditorFillKgEmpty =>
+      'Introduce el peso del primer set para poder replicarlo.';
+
+  @override
+  String get routineEditorFillKgUndo => 'Deshacer';
+
+  @override
+  String routineEditorKgStepIncreaseA11y(String amount) {
+    return 'Sumar $amount kilos al peso';
+  }
+
+  @override
+  String routineEditorKgStepDecreaseA11y(String amount) {
+    return 'Restar $amount kilos al peso';
+  }
 
   @override
   String get routineEditorMeasureReps => 'Reps';
@@ -1865,11 +1962,11 @@ class AppL10nEs extends AppL10n {
   String get feedCreatePostA11y => 'Crear publicación';
 
   @override
-  String get feedFriendRequestsA11y => 'Solicitudes de amistad';
+  String get feedFriendRequestsA11y => 'Solicitudes de seguidores';
 
   @override
   String feedFriendRequestsWithCountA11y(int count) {
-    return 'Solicitudes de amistad, $count pendientes';
+    return 'Solicitudes de seguidores, $count pendientes';
   }
 
   @override
@@ -2408,7 +2505,7 @@ class AppL10nEs extends AppL10n {
   String get feedRequestSentSuccess => 'Solicitud enviada.';
 
   @override
-  String get feedRequestAcceptedSuccess => 'Ahora son amigos.';
+  String get feedRequestAcceptedSuccess => 'Solicitud aceptada.';
 
   @override
   String get feedFriendActionError =>
@@ -2766,7 +2863,10 @@ class AppL10nEs extends AppL10n {
 
   @override
   String dashboardAlertBannerSummary(
-      int vencidos, int solicitudes, int inactivos) {
+    int vencidos,
+    int solicitudes,
+    int inactivos,
+  ) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,
@@ -3228,7 +3328,7 @@ class AppL10nEs extends AppL10n {
   String get postPrivacySelectorTitle => 'VISIBILIDAD';
 
   @override
-  String get postPrivacyFriends => 'AMIGOS';
+  String get postPrivacyFriends => 'SEGUIDORES';
 
   @override
   String get postPrivacyGym => 'MI GYM';
@@ -3265,8 +3365,8 @@ class AppL10nEs extends AppL10n {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count solicitudes de amistad pendientes',
-      one: '1 solicitud de amistad pendiente',
+      other: '$count solicitudes de seguidor pendientes',
+      one: '1 solicitud de seguidor pendiente',
     );
     return '$_temp0';
   }
@@ -3284,6 +3384,86 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get postDetailUnavailable => 'Este post ya no está disponible.';
+
+  @override
+  String feedUnfollowConfirmTitle(String name) {
+    return '¿Dejar de seguir a $name?';
+  }
+
+  @override
+  String get feedUnfollowConfirmAction => 'DEJAR DE SEGUIR';
+
+  @override
+  String get feedUnfollowDismiss => 'CANCELAR';
+
+  @override
+  String feedCancelRequestConfirmTitle(String name) {
+    return '¿Cancelar la solicitud a $name?';
+  }
+
+  @override
+  String get feedCancelRequestConfirmAction => 'CANCELAR SOLICITUD';
+
+  @override
+  String get feedCancelRequestDismiss => 'VOLVER';
+
+  @override
+  String get feedFollowButtonFollowA11y => 'Seguir a esta persona';
+
+  @override
+  String get feedFollowButtonFollowingA11y =>
+      'Siguiendo. Tocá para dejar de seguir';
+
+  @override
+  String get feedFollowButtonRequestedA11y =>
+      'Solicitud enviada. Tocá para cancelarla';
+
+  @override
+  String get feedFollowButtonAcceptA11y => 'Aceptar la solicitud de seguidor';
+
+  @override
+  String get feedFollowStartedSuccess => 'Ahora seguís a esta persona.';
+
+  @override
+  String get feedSegmentFollowing => 'SEGUIDORES';
+
+  @override
+  String get feedEmptyFollowing => 'Aún no hay posts de a quienes seguís';
+
+  @override
+  String get chatBlockedComposerNotice =>
+      'Para escribirle, esta persona tiene que seguirte.';
+
+  @override
+  String get chatBlockedComposerHintA11y => 'No podés escribir en este chat';
+
+  @override
+  String get followListTabFollowers => 'SEGUIDORES';
+
+  @override
+  String get followListTabFollowing => 'SIGUIENDO';
+
+  @override
+  String get followListEmptyFollowers => 'Todavía no tiene seguidores';
+
+  @override
+  String get followListEmptyFollowersSelf => 'Todavía no tienes seguidores';
+
+  @override
+  String get followListEmptyFollowing => 'Todavía no sigue a nadie';
+
+  @override
+  String get followListEmptyFollowingSelf => 'Todavía no sigues a nadie';
+
+  @override
+  String get followListLoadError =>
+      'No pudimos cargar la lista. Inténtalo de nuevo.';
+
+  @override
+  String get followListOpenFollowersA11y => 'Ver seguidores';
+
+  @override
+  String get followListOpenFollowingA11y => 'Ver seguidos';
 
   @override
   String get onboardingCardDismiss => 'ENTENDIDO';
@@ -4027,6 +4207,68 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get workoutPostAutoCompleteText => '¡Terminé mi entreno! 💪';
+
+  @override
+  String get wellbeingCheckInTitle => '¿CÓMO TE SENTISTE?';
+
+  @override
+  String get wellbeingCheckInOptional => 'Opcional. Podés saltearlo.';
+
+  @override
+  String get wellbeingFeelingVeryBad => 'Muy mal';
+
+  @override
+  String get wellbeingFeelingBad => 'Mal';
+
+  @override
+  String get wellbeingFeelingNeutral => 'Normal';
+
+  @override
+  String get wellbeingFeelingGood => 'Bien';
+
+  @override
+  String get wellbeingFeelingGreat => 'Muy bien';
+
+  @override
+  String get wellbeingPainQuestion => '¿Tuviste dolor o molestia?';
+
+  @override
+  String get wellbeingPainYes => 'SÍ';
+
+  @override
+  String get wellbeingPainNo => 'NO';
+
+  @override
+  String get wellbeingPainAreasQuestion => '¿En qué zona?';
+
+  @override
+  String get wellbeingPainAreasHint => 'Podés marcar más de una.';
+
+  @override
+  String get wellbeingNoteLabel => 'Nota (opcional)';
+
+  @override
+  String get wellbeingNoteHint => 'Algo que quieras recordar de hoy';
+
+  @override
+  String get wellbeingMedicalDisclaimer =>
+      'Si el dolor persiste, consultá a un profesional de la salud.';
+
+  @override
+  String get wellbeingSaveButton => 'GUARDAR';
+
+  @override
+  String get wellbeingSkipButton => 'AHORA NO';
+
+  @override
+  String get wellbeingSavedLabel => 'REGISTRADO';
+
+  @override
+  String get wellbeingEditButton => 'Editar';
+
+  @override
+  String get wellbeingSaveError =>
+      'No pudimos guardar tu registro. Probá de nuevo.';
 
   @override
   String get shareWorkoutComposerTitle => 'COMPARTIR ENTRENO';
@@ -4802,7 +5044,7 @@ class AppL10nEsAr extends AppL10nEs {
   String get profileCuentaTitle => 'CUENTA';
 
   @override
-  String get profileCuentaSolicitudesTitle => 'Solicitudes de amistad';
+  String get profileCuentaSolicitudesTitle => 'Solicitudes de seguidores';
 
   @override
   String profileCuentaSolicitudesSubtitle(int count) {
@@ -5111,6 +5353,17 @@ class AppL10nEsAr extends AppL10nEs {
   String get routineEditorDialogConfirm => 'Confirmar';
 
   @override
+  String get routineEditorCopyPrescriptionTitle => '¿Copiar sets?';
+
+  @override
+  String routineEditorCopyPrescriptionBody(String sourceExercise) {
+    return 'Se van a reemplazar los sets de este ejercicio por los de «$sourceExercise».';
+  }
+
+  @override
+  String get routineEditorSlotMenuCopyPrevious => 'Copiar sets del anterior';
+
+  @override
   String get routineEditorSlotMenuReplace => 'Cambiar ejercicio';
 
   @override
@@ -5127,6 +5380,30 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get routineEditorAddSet => '+ Agregar set';
+
+  @override
+  String get routineEditorFillKgA11y =>
+      'Replicar el peso del primer set en todos';
+
+  @override
+  String get routineEditorFillKgApplied => 'Peso replicado en todos los sets.';
+
+  @override
+  String get routineEditorFillKgEmpty =>
+      'Cargá el peso del primer set para poder replicarlo.';
+
+  @override
+  String get routineEditorFillKgUndo => 'Deshacer';
+
+  @override
+  String routineEditorKgStepIncreaseA11y(String amount) {
+    return 'Sumar $amount kilos al peso';
+  }
+
+  @override
+  String routineEditorKgStepDecreaseA11y(String amount) {
+    return 'Restar $amount kilos al peso';
+  }
 
   @override
   String get routineEditorMeasureReps => 'Reps';
@@ -5284,11 +5561,11 @@ class AppL10nEsAr extends AppL10nEs {
   String get feedCreatePostA11y => 'Crear publicación';
 
   @override
-  String get feedFriendRequestsA11y => 'Solicitudes de amistad';
+  String get feedFriendRequestsA11y => 'Solicitudes de seguidores';
 
   @override
   String feedFriendRequestsWithCountA11y(int count) {
-    return 'Solicitudes de amistad, $count pendientes';
+    return 'Solicitudes de seguidores, $count pendientes';
   }
 
   @override
@@ -5824,7 +6101,7 @@ class AppL10nEsAr extends AppL10nEs {
   String get feedRequestSentSuccess => 'Solicitud enviada.';
 
   @override
-  String get feedRequestAcceptedSuccess => 'Ahora son amigos.';
+  String get feedRequestAcceptedSuccess => 'Solicitud aceptada.';
 
   @override
   String get feedFriendActionError =>
@@ -6181,7 +6458,10 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String dashboardAlertBannerSummary(
-      int vencidos, int solicitudes, int inactivos) {
+    int vencidos,
+    int solicitudes,
+    int inactivos,
+  ) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,
@@ -6642,7 +6922,7 @@ class AppL10nEsAr extends AppL10nEs {
   String get postPrivacySelectorTitle => 'VISIBILIDAD';
 
   @override
-  String get postPrivacyFriends => 'AMIGOS';
+  String get postPrivacyFriends => 'SEGUIDORES';
 
   @override
   String get postPrivacyGym => 'MI GYM';
@@ -6679,8 +6959,8 @@ class AppL10nEsAr extends AppL10nEs {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count solicitudes de amistad pendientes',
-      one: '1 solicitud de amistad pendiente',
+      other: '$count solicitudes de seguidor pendientes',
+      one: '1 solicitud de seguidor pendiente',
     );
     return '$_temp0';
   }
@@ -6698,6 +6978,86 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get postDetailUnavailable => 'Este post ya no está disponible.';
+
+  @override
+  String feedUnfollowConfirmTitle(String name) {
+    return '¿Dejar de seguir a $name?';
+  }
+
+  @override
+  String get feedUnfollowConfirmAction => 'DEJAR DE SEGUIR';
+
+  @override
+  String get feedUnfollowDismiss => 'CANCELAR';
+
+  @override
+  String feedCancelRequestConfirmTitle(String name) {
+    return '¿Cancelar la solicitud a $name?';
+  }
+
+  @override
+  String get feedCancelRequestConfirmAction => 'CANCELAR SOLICITUD';
+
+  @override
+  String get feedCancelRequestDismiss => 'VOLVER';
+
+  @override
+  String get feedFollowButtonFollowA11y => 'Seguir a esta persona';
+
+  @override
+  String get feedFollowButtonFollowingA11y =>
+      'Siguiendo. Tocá para dejar de seguir';
+
+  @override
+  String get feedFollowButtonRequestedA11y =>
+      'Solicitud enviada. Tocá para cancelarla';
+
+  @override
+  String get feedFollowButtonAcceptA11y => 'Aceptar la solicitud de seguidor';
+
+  @override
+  String get feedFollowStartedSuccess => 'Ahora seguís a esta persona.';
+
+  @override
+  String get feedSegmentFollowing => 'SEGUIDORES';
+
+  @override
+  String get feedEmptyFollowing => 'Todavía no hay posts de a quienes seguís';
+
+  @override
+  String get chatBlockedComposerNotice =>
+      'Para escribirle, esta persona tiene que seguirte.';
+
+  @override
+  String get chatBlockedComposerHintA11y => 'No podés escribir en este chat';
+
+  @override
+  String get followListTabFollowers => 'SEGUIDORES';
+
+  @override
+  String get followListTabFollowing => 'SIGUIENDO';
+
+  @override
+  String get followListEmptyFollowers => 'Todavía no tiene seguidores';
+
+  @override
+  String get followListEmptyFollowersSelf => 'Todavía no tenés seguidores';
+
+  @override
+  String get followListEmptyFollowing => 'Todavía no sigue a nadie';
+
+  @override
+  String get followListEmptyFollowingSelf => 'Todavía no seguís a nadie';
+
+  @override
+  String get followListLoadError =>
+      'No pudimos cargar la lista. Intentá de nuevo.';
+
+  @override
+  String get followListOpenFollowersA11y => 'Ver seguidores';
+
+  @override
+  String get followListOpenFollowingA11y => 'Ver seguidos';
 
   @override
   String get onboardingCardDismiss => 'ENTENDIDO';

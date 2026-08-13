@@ -82,6 +82,31 @@ void main() {
       await tester.tap(find.byIcon(TreinoIcon.bell), warnIfMissed: false);
       expect(taps, 1);
     });
+
+    // H3: a failed links read must not silently hide the badge — the bell shows
+    // an error affordance (announced via a11y) instead of a false empty "0".
+    testWidgets('links error → bell announces the error and still opens',
+        (tester) async {
+      final handle = tester.ensureSemantics();
+      var taps = 0;
+      await tester.pumpWidget(_wrap(
+        BellWithBadgeTestHarness(
+          badgeCount: 0,
+          showError: true,
+          onTap: () => taps++,
+        ),
+      ));
+
+      // Announced as an error, NOT "0 solicitudes pendientes", and still opens.
+      expect(
+        find.bySemanticsLabel('Hubo un problema. Intentá de nuevo.'),
+        findsOneWidget,
+      );
+      expect(find.text('0'), findsNothing);
+      await tester.tap(find.byIcon(TreinoIcon.bell), warnIfMissed: false);
+      expect(taps, 1);
+      handle.dispose();
+    });
   });
 
   group('pending-requests modal (#393)', () {
@@ -206,6 +231,29 @@ void main() {
             'just acted, they did not come to browse',
       );
       expect(find.text('BASE'), findsOneWidget);
+      expect(find.text('No tenés solicitudes pendientes.'), findsNothing);
+    });
+
+    // H3: a failed read must show a retry, NOT the "no requests" empty state —
+    // which would hide a real pending request behind a false empty.
+    testWidgets('links error → sheet shows a retry, not the empty state',
+        (tester) async {
+      await tester.pumpWidget(ProviderScope(
+        overrides: [
+          trainerLinksStreamProvider.overrideWith(
+            (ref) => Stream<List<TrainerLink>>.error(Exception('boom')),
+          ),
+          userPublicProfileProvider.overrideWith(
+            (ref, uid) => Stream<UserPublicProfile?>.value(null),
+          ),
+        ],
+        child: _wrap(const PendingRequestsSheetTestHarness()),
+      ));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.text('Hubo un problema. Intentá de nuevo.'), findsOneWidget);
+      expect(find.text('Reintentar'), findsOneWidget);
       expect(find.text('No tenés solicitudes pendientes.'), findsNothing);
     });
   });

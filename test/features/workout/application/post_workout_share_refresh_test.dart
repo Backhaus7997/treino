@@ -1,7 +1,7 @@
 // Regresión (reporte directo de Martín, 2026-07-28): al compartir un entreno
 // terminado, el post NO aparecía en el feed AMIGOS hasta reiniciar la app.
 //
-// Causa raíz: `shareWorkout` invalidaba sólo el WRAPPER (`myFriendsFeedProvider`),
+// Causa raíz: `shareWorkout` invalidaba sólo el WRAPPER (`myFollowingFeedProvider`),
 // pero el resultado del query vive en la family `feedForFriendsProvider` (no
 // autoDispose). `ref.invalidate` NO cascada a las dependencias (QA-498, #497):
 // el wrapper re-corría su body, volvía a watchear la MISMA instancia de la
@@ -17,7 +17,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/feed/application/feed_screen_providers.dart';
-import 'package:treino/features/feed/application/friendship_providers.dart';
+import 'package:treino/features/feed/application/follow_providers.dart';
 import 'package:treino/features/feed/application/post_providers.dart';
 import 'package:treino/features/feed/data/post_repository.dart';
 import 'package:treino/features/feed/domain/post.dart';
@@ -60,7 +60,7 @@ class _InMemoryPostRepository extends Fake implements PostRepository {
     feedForFriendsCalls++;
     final posts = store
         .where((p) =>
-            p.privacy == PostPrivacy.friends &&
+            p.privacy == PostPrivacy.followers &&
             friendUids.contains(p.authorUid))
         .toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -107,7 +107,7 @@ void main() {
         userProfileProvider.overrideWith(
           (ref) => Stream.value(_makeProfile()),
         ),
-        acceptedFriendsProvider('u1').overrideWith(
+        followingProvider('u1').overrideWith(
           (ref) => Stream.value(const ['u2']),
         ),
         postRepositoryProvider.overrideWithValue(repo),
@@ -116,7 +116,7 @@ void main() {
     addTearDown(container.dispose);
     // Mantiene vivos el feed y el notifier como lo hace la app montada
     // (el feed queda watcheado por la pantalla; el notifier, por el summary).
-    container.listen(myFriendsFeedProvider, (_, __) {});
+    container.listen(myFollowingFeedProvider, (_, __) {});
     container.listen(postWorkoutNotifierProvider, (_, __) {});
     return container;
   }
@@ -129,7 +129,7 @@ void main() {
 
       // 1. El feed ya cargó ANTES de compartir (el caso real: el usuario
       //    visitó el feed, entrenó, y comparte al terminar).
-      final before = await container.read(myFriendsFeedProvider.future);
+      final before = await container.read(myFollowingFeedProvider.future);
       expect(before, isEmpty);
 
       // 2. Comparte el entreno terminado.
@@ -137,11 +137,11 @@ void main() {
             _makeSession(),
             text: '¡Terminé mi entreno! 💪',
             exerciseCount: 3,
-            privacy: PostPrivacy.friends,
+            privacy: PostPrivacy.followers,
           );
 
       // 3. Sin reiniciar: el feed AMIGOS debe exponer el post nuevo.
-      final after = await container.read(myFriendsFeedProvider.future);
+      final after = await container.read(myFollowingFeedProvider.future);
       expect(
         after.map((p) => p.text),
         contains('¡Terminé mi entreno! 💪'),
@@ -156,17 +156,17 @@ void main() {
         'family no cambie (misma lista de amigos)', () async {
       final container = makeContainer();
 
-      await container.read(myFriendsFeedProvider.future);
+      await container.read(myFollowingFeedProvider.future);
       expect(repo.feedForFriendsCalls, 1);
 
       await container.read(postWorkoutNotifierProvider.notifier).shareWorkout(
             _makeSession(),
             text: 'Entreno compartido',
             exerciseCount: 3,
-            privacy: PostPrivacy.friends,
+            privacy: PostPrivacy.followers,
           );
 
-      await container.read(myFriendsFeedProvider.future);
+      await container.read(myFollowingFeedProvider.future);
       expect(
         repo.feedForFriendsCalls,
         greaterThanOrEqualTo(2),

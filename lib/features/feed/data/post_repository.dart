@@ -148,7 +148,7 @@ class PostRepository {
         (i + chunkSize).clamp(0, friendUids.length),
       );
       var query = _posts
-          .where('privacy', isEqualTo: PostPrivacy.friends.toJson())
+          .where('privacy', isEqualTo: PostPrivacy.followers.toJson())
           .where('authorUid', whereIn: chunk);
       if (after != null) {
         query = query.where(

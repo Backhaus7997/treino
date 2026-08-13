@@ -6,7 +6,7 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
-import 'package:treino/features/feed/application/friendship_providers.dart';
+import 'package:treino/features/feed/application/follow_providers.dart';
 import 'package:treino/features/profile/application/account_deletion_notifier.dart';
 import 'package:treino/features/profile/application/profile_stats_providers.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
@@ -99,8 +99,8 @@ Widget _buildProfileScreen() {
       authStateChangesProvider.overrideWith((_) => Stream.value(null)),
       authNotifierProvider.overrideWith(() => _notifier),
       userProfileProvider.overrideWith((_) => Stream.value(_profile())),
-      pendingRequestCountProvider('').overrideWith((_) => 0),
-      pendingRequestsStreamProvider('').overrideWith((_) => Stream.value([])),
+      pendingFollowRequestCountProvider('').overrideWith((_) => 0),
+      pendingReceivedStreamProvider('').overrideWith((_) => Stream.value([])),
       userSessionStatsProvider.overrideWith(
         (_) async => const UserSessionStats(
             totalSessions: 0, totalVolumeKg: 0, streak: 0),

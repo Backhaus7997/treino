@@ -597,6 +597,68 @@ class AppL10nEn extends AppL10n {
   String get workoutPostAutoCompleteText => '';
 
   @override
+  String get wellbeingCheckInTitle => 'HOW DID YOU FEEL?';
+
+  @override
+  String get wellbeingCheckInOptional => 'Optional. You can skip it.';
+
+  @override
+  String get wellbeingFeelingVeryBad => 'Very bad';
+
+  @override
+  String get wellbeingFeelingBad => 'Bad';
+
+  @override
+  String get wellbeingFeelingNeutral => 'OK';
+
+  @override
+  String get wellbeingFeelingGood => 'Good';
+
+  @override
+  String get wellbeingFeelingGreat => 'Great';
+
+  @override
+  String get wellbeingPainQuestion => 'Any pain or discomfort?';
+
+  @override
+  String get wellbeingPainYes => 'YES';
+
+  @override
+  String get wellbeingPainNo => 'NO';
+
+  @override
+  String get wellbeingPainAreasQuestion => 'Where?';
+
+  @override
+  String get wellbeingPainAreasHint => 'You can pick more than one.';
+
+  @override
+  String get wellbeingNoteLabel => 'Note (optional)';
+
+  @override
+  String get wellbeingNoteHint => 'Anything you want to remember about today';
+
+  @override
+  String get wellbeingMedicalDisclaimer =>
+      'If the pain persists, see a health professional.';
+
+  @override
+  String get wellbeingSaveButton => 'SAVE';
+
+  @override
+  String get wellbeingSkipButton => 'NOT NOW';
+
+  @override
+  String get wellbeingSavedLabel => 'LOGGED';
+
+  @override
+  String get wellbeingEditButton => 'Edit';
+
+  @override
+  String get wellbeingSaveError =>
+      'We couldn\'t save your check-in. Try again.';
+
+  @override
   String get shareWorkoutComposerTitle => 'SHARE WORKOUT';
 
   @override
@@ -1351,7 +1413,7 @@ class AppL10nEn extends AppL10n {
   String get profileCuentaTitle => 'CUENTA';
 
   @override
-  String get profileCuentaSolicitudesTitle => 'Solicitudes de amistad';
+  String get profileCuentaSolicitudesTitle => 'Solicitudes de seguidores';
 
   @override
   String profileCuentaSolicitudesSubtitle(int count) {
@@ -1644,6 +1706,17 @@ class AppL10nEn extends AppL10n {
   String get routineEditorDialogConfirm => '';
 
   @override
+  String get routineEditorCopyPrescriptionTitle => 'Copy sets?';
+
+  @override
+  String routineEditorCopyPrescriptionBody(String sourceExercise) {
+    return 'This exercise\'s sets will be replaced with the ones from “$sourceExercise”.';
+  }
+
+  @override
+  String get routineEditorSlotMenuCopyPrevious => 'Copy sets from previous';
+
+  @override
   String get routineEditorSlotMenuReplace => 'Change exercise';
 
   @override
@@ -1660,6 +1733,30 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get routineEditorAddSet => '+ Add set';
+
+  @override
+  String get routineEditorFillKgA11y =>
+      'Apply the first set\'s weight to every set';
+
+  @override
+  String get routineEditorFillKgApplied => 'Weight applied to every set.';
+
+  @override
+  String get routineEditorFillKgEmpty =>
+      'Enter the first set\'s weight so it can be applied.';
+
+  @override
+  String get routineEditorFillKgUndo => 'Undo';
+
+  @override
+  String routineEditorKgStepIncreaseA11y(String amount) {
+    return 'Add $amount kilos to the weight';
+  }
+
+  @override
+  String routineEditorKgStepDecreaseA11y(String amount) {
+    return 'Take $amount kilos off the weight';
+  }
 
   @override
   String get routineEditorMeasureReps => 'Reps';
@@ -1814,11 +1911,11 @@ class AppL10nEn extends AppL10n {
   String get feedCreatePostA11y => 'Create post';
 
   @override
-  String get feedFriendRequestsA11y => 'Friend requests';
+  String get feedFriendRequestsA11y => 'Follower requests';
 
   @override
   String feedFriendRequestsWithCountA11y(int count) {
-    return 'Friend requests, $count pending';
+    return 'Follower requests, $count pending';
   }
 
   @override
@@ -2356,7 +2453,7 @@ class AppL10nEn extends AppL10n {
   String get feedRequestSentSuccess => 'Request sent.';
 
   @override
-  String get feedRequestAcceptedSuccess => 'You\'re now friends.';
+  String get feedRequestAcceptedSuccess => 'Request accepted.';
 
   @override
   String get feedFriendActionError =>
@@ -2710,7 +2807,10 @@ class AppL10nEn extends AppL10n {
 
   @override
   String dashboardAlertBannerSummary(
-      int vencidos, int solicitudes, int inactivos) {
+    int vencidos,
+    int solicitudes,
+    int inactivos,
+  ) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,
@@ -3167,7 +3267,7 @@ class AppL10nEn extends AppL10n {
   String get postPrivacySelectorTitle => 'VISIBILITY';
 
   @override
-  String get postPrivacyFriends => 'FRIENDS';
+  String get postPrivacyFriends => 'FOLLOWERS';
 
   @override
   String get postPrivacyGym => 'MY GYM';
@@ -3205,8 +3305,8 @@ class AppL10nEn extends AppL10n {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count pending friend requests',
-      one: '1 pending friend request',
+      other: '$count pending follower requests',
+      one: '1 pending follower request',
     );
     return '$_temp0';
   }
@@ -3224,6 +3324,83 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get postDetailUnavailable => 'This post is no longer available.';
+
+  @override
+  String feedUnfollowConfirmTitle(String name) {
+    return 'Unfollow $name?';
+  }
+
+  @override
+  String get feedUnfollowConfirmAction => 'UNFOLLOW';
+
+  @override
+  String get feedUnfollowDismiss => 'CANCEL';
+
+  @override
+  String feedCancelRequestConfirmTitle(String name) {
+    return 'Cancel your request to $name?';
+  }
+
+  @override
+  String get feedCancelRequestConfirmAction => 'CANCEL REQUEST';
+
+  @override
+  String get feedCancelRequestDismiss => 'BACK';
+
+  @override
+  String get feedFollowButtonFollowA11y => 'Follow this person';
+
+  @override
+  String get feedFollowButtonFollowingA11y => 'Following. Tap to unfollow';
+
+  @override
+  String get feedFollowButtonRequestedA11y => 'Request sent. Tap to cancel it';
+
+  @override
+  String get feedFollowButtonAcceptA11y => 'Accept follower request';
+
+  @override
+  String get feedFollowStartedSuccess => 'You\'re now following this person.';
+
+  @override
+  String get feedSegmentFollowing => 'FOLLOWERS';
+
+  @override
+  String get feedEmptyFollowing => 'No posts yet from people you follow';
+
+  @override
+  String get chatBlockedComposerNotice =>
+      'To message them, this person needs to follow you.';
+
+  @override
+  String get chatBlockedComposerHintA11y => 'You can\'t write in this chat';
+
+  @override
+  String get followListTabFollowers => 'FOLLOWERS';
+
+  @override
+  String get followListTabFollowing => 'FOLLOWING';
+
+  @override
+  String get followListEmptyFollowers => 'No followers yet';
+
+  @override
+  String get followListEmptyFollowersSelf => 'You have no followers yet';
+
+  @override
+  String get followListEmptyFollowing => 'Not following anyone yet';
+
+  @override
+  String get followListEmptyFollowingSelf => 'You\'re not following anyone yet';
+
+  @override
+  String get followListLoadError => 'We couldn\'t load the list. Try again.';
+
+  @override
+  String get followListOpenFollowersA11y => 'View followers';
+
+  @override
+  String get followListOpenFollowingA11y => 'View following';
 
   @override
   String get onboardingCardDismiss => 'GOT IT';

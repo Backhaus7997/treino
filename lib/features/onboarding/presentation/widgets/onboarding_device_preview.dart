@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../app/theme/tokens/primitives.dart';
 import '../onboarding_sample_data.dart';
 
 /// A real app screen, shrunk into a floating mini-device.
@@ -55,15 +56,17 @@ class OnboardingDevicePreview extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(9),
         decoration: BoxDecoration(
-          // Deliberately NOT an AppPalette colour, and the one exception to the
-          // "no literal colours" rule in this feature: the bezel is the phone's
+          // Deliberately NOT an AppPalette colour: the bezel is the phone's
           // physical chassis, not app UI, so it stays white in both themes.
-          // The handoff calls this out explicitly.
+          // The handoff calls this out explicitly. Its shadow follows the same
+          // rule and lives in AppDecorativePalettes for the same reason —
+          // decorative and theme-invariant, not a semantic token.
           color: Colors.white,
           borderRadius: BorderRadius.circular(34),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF0F1513).withValues(alpha: 0.14),
+              color: AppDecorativePalettes.deviceFrameShadow
+                  .withValues(alpha: 0.14),
               blurRadius: 44,
               offset: const Offset(0, 22),
             ),

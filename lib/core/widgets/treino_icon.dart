@@ -28,6 +28,11 @@ class TreinoIcon {
   static const IconData mapPin = PhosphorIconsRegular.mapPin;
   static const IconData bell = PhosphorIconsRegular.bell;
 
+  /// Rayo de atención — caja de ícono mint del alert banner del dashboard
+  /// Coach Hub web (Fase 2, WU-02). Alias de [specialty] (mismo glyph
+  /// `lightning`, distinto significado semántico según contexto de uso).
+  static const IconData alertAttention = specialty;
+
   // Rankings (per-gym leaderboards — rachas/volumen/lifts).
   static const IconData ranking = PhosphorIconsRegular.trophy;
 
@@ -186,10 +191,25 @@ class TreinoIcon {
   static const IconData sidebarReportes = PhosphorIconsRegular.chartLine;
   static const IconData sidebarChat = chat;
   static const IconData sidebarAjustes = PhosphorIconsRegular.gear;
+  // Perfil público (Fase 11) — alias semántico de [globe] (misma familia
+  // usada por Coach Discovery en mobile).
+  static const IconData sidebarPerfilPublico = globe;
 
   // Alumno detail — Archivos tab (upload/download/trash/image ya existen arriba)
   static const IconData file = PhosphorIconsRegular.file;
   static const IconData filePdf = PhosphorIconsRegular.filePdf;
+
+  // Coach Hub Web — Kit de componentes (Fase 1, EmptyState)
+  static const IconData emptyState = PhosphorIconsRegular.empty;
+
+  // Coach Hub Web — Kit de componentes (Fase 1, CoachHubDataTable)
+  // Indicador de columna ordenada (ascendente/descendente); la rotación de
+  // 180° la aplica el consumidor via AnimatedRotation sobre sortAscending.
+  static const IconData sortAscending = PhosphorIconsRegular.sortAscending;
+  // Indicador de columna ordenable sin orden activo (caret doble).
+  static const IconData sortable = PhosphorIconsRegular.caretUpDown;
+  // Ícono del estado de error (tabla, dialogs, etc.).
+  static const IconData errorState = PhosphorIconsRegular.warningCircle;
 
   // Coach Hub — Alumnos roster view-mode toggle (Tabla / Cards).
   static const IconData viewTable = PhosphorIconsRegular.rows;

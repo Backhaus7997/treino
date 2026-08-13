@@ -52,7 +52,7 @@ class _CountingPostRepository extends Fake implements PostRepository {
     feedForFriendsCalls++;
     final posts = store
         .where((p) =>
-            p.privacy == PostPrivacy.friends &&
+            p.privacy == PostPrivacy.followers &&
             friendUids.contains(p.authorUid))
         .toList();
     return PostPage(posts: posts, nextCursor: null, hasMore: false);

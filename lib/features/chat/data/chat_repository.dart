@@ -7,6 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart'
         Query,
         Timestamp;
 
+import '../../../core/utils/firestore_write.dart';
 import '../domain/chat.dart';
 import '../domain/media_type.dart';
 import '../domain/message.dart';
@@ -77,7 +78,7 @@ class ChatRepository {
       'members': members,
       'createdAt': FieldValue.serverTimestamp(),
       if (linkId != null) 'linkId': linkId,
-    });
+    }).boundedWrite;
     final created = await ref.get();
     return _chatFromDocOrPending(created, membersFallback: members);
   }
@@ -194,7 +195,7 @@ class ChatRepository {
   }) =>
       _chats
           .doc(chatId)
-          .update({'lastRead.$uid': FieldValue.serverTimestamp()});
+          .update({'lastRead.$uid': FieldValue.serverTimestamp()}).boundedWrite;
 
   // ─── watchChatsForUser ──────────────────────────────────────────────────
   //
@@ -212,6 +213,14 @@ class ChatRepository {
       return snap.docs.map(_chatFromDoc).whereType<Chat>().toList();
     });
   }
+
+  // ─── watchById ──────────────────────────────────────────────────────────
+  //
+  // Un chat puntual, en vivo. Lo consume el gate de escritura de ChatScreen,
+  // que necesita saber si el doc lleva `linkId` (chat de Coach) para no
+  // bloquearle el composer al entrenador.
+  Stream<Chat?> watchById(String chatId) =>
+      _chats.doc(chatId).snapshots().map(_chatFromDoc);
 
   // ─── Private helpers ────────────────────────────────────────────────────
 

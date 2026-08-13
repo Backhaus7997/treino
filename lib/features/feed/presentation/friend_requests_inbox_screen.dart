@@ -9,7 +9,7 @@ import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../auth/application/auth_providers.dart';
-import '../application/friendship_providers.dart';
+import '../application/follow_providers.dart';
 import 'widgets/friend_request_inbox_tile.dart';
 
 /// Inbox screen listing pending friend requests received by the current user.
@@ -19,7 +19,11 @@ import 'widgets/friend_request_inbox_tile.dart';
 ///
 /// Subscriptions:
 /// - [authStateChangesProvider] → myUid (null = anonymous race)
-/// - [pendingRequestsStreamProvider(myUid)] → [AsyncValue<List<Friendship>>]
+/// - [pendingReceivedStreamProvider(myUid)] → [AsyncValue<List<Follow>>]
+///
+/// El filtro de "recibidas" ahora es SERVER-SIDE: con arista dirigida la query
+/// es `followeeUid == yo && status == pending`. El modelo viejo traía todas las
+/// pendientes del par y descartaba en el cliente las propias.
 class FriendRequestsInboxScreen extends ConsumerWidget {
   const FriendRequestsInboxScreen({super.key});
 
@@ -28,7 +32,7 @@ class FriendRequestsInboxScreen extends ConsumerWidget {
     final palette = AppPalette.of(context);
     final myUid = ref.watch(authStateChangesProvider).valueOrNull?.uid;
 
-    final requestsAsync = ref.watch(pendingRequestsStreamProvider(myUid ?? ''));
+    final requestsAsync = ref.watch(pendingReceivedStreamProvider(myUid ?? ''));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -81,7 +85,7 @@ class FriendRequestsInboxScreen extends ConsumerWidget {
                   itemCount: list.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (_, i) => FriendRequestInboxTile(
-                    friendship: list[i],
+                    follow: list[i],
                     viewerUid: myUid ?? '',
                   ),
                 );
