@@ -55,6 +55,8 @@ class UserRepository {
     'trainerLongitude', // DEPRECATED
     'trainerMonthlyRate',
     'paymentAlias',
+    // Años de experiencia (#388) — self-attested, editable desde el form PF.
+    'trainerExperienceYears',
     // Multi-location (Fase 6 Etapa 0)
     'trainerLocations',
     'trainerGeohashes',
@@ -62,6 +64,8 @@ class UserRepository {
     // ADR-RV-005: CF-write-only — do not add averageRating or reviewCount here.
     // Those fields are written exclusively by the reviewAggregate Cloud Function
     // and must never be propagated by client dual-write.
+    // Same contract for athleteCount (#388): written exclusively by the
+    // linkAggregate Cloud Function (count of active trainer_links).
   };
 
   CollectionReference<Map<String, Object?>> get _users =>
@@ -208,6 +212,9 @@ class UserRepository {
     if (partial.containsKey('paymentAlias')) {
       result['paymentAlias'] = partial['paymentAlias'];
     }
+    if (partial.containsKey('trainerExperienceYears')) {
+      result['trainerExperienceYears'] = partial['trainerExperienceYears'];
+    }
     // ── Multi-location (Fase 6 Etapa 0) ──────────────────────────────────
     if (partial.containsKey('trainerLocations')) {
       result['trainerLocations'] = partial['trainerLocations'];
@@ -255,9 +262,16 @@ class UserRepository {
   /// Creates the `users/{uid}` doc if missing, with `displayName: null`.
   /// Atomically also creates `userPublicProfiles/{uid}` in the same batch.
   /// REQ-UPP-009.
+  ///
+  /// [termsAcceptedAt] (QA-AUTH-001, issue #434): only the email signup flow
+  /// passes this — the checkbox gate lives in `register_screen.dart`, and by
+  /// the time `AuthService.signUpWithEmail` reaches this call the user has
+  /// already accepted. `null` leaves the field unset, matching a legacy
+  /// pre-feature account.
   Future<UserProfile> getOrCreate({
     required String uid,
     required String email,
+    DateTime? termsAcceptedAt,
   }) async {
     final existing = await get(uid);
     if (existing != null) return existing;
@@ -269,6 +283,7 @@ class UserRepository {
       role: UserRole.athlete,
       createdAt: now,
       updatedAt: now,
+      termsAcceptedAt: termsAcceptedAt,
     );
 
     final batch = _firestore.batch();

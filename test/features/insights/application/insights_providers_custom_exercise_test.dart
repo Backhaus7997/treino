@@ -60,7 +60,11 @@ void main() {
       sessionRepositoryProvider.overrideWithValue(repo),
       // Catálogo público vacío → 'e-custom' sólo resoluble por el slot.
       exercisesProvider.overrideWith((ref) async => const <Exercise>[]),
+      // [#442] targets siguen leyendo routineByIdProvider (rutina más
+      // reciente); la resolución de sets custom pasa por el resolver
+      // compartido, que lee visibleRoutineByIdProvider.
       routineByIdProvider('r1').overrideWith((ref) async => routine),
+      visibleRoutineByIdProvider('r1').overrideWith((ref) async => routine),
     ]);
     addTearDown(container.dispose);
 

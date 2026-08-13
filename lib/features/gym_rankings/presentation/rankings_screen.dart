@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/motion/treino_fade_slide_in.dart';
+import '../../../core/widgets/motion/treino_state_switcher.dart';
+import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../l10n/app_l10n.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../gyms/domain/gym.dart' show kNoGymId;
 import '../../profile/application/ranking_optin_controller_provider.dart';
@@ -18,12 +24,12 @@ import '../domain/ranking_dimension.dart';
 /// sub-split squat/bench/deadlift) for the current athlete's gym.
 ///
 /// Placement: `/profile/rankings` is RETIRED as a pushed route and now
-/// redirects to `/workout?tab=rankings` (design `sdd/rankings-v2/design`
-/// AD-3, Phase 3 cleanup). The PRIMARY placement is the second page of the
-/// athlete Entrenar tab (`WorkoutScreen`'s `_RankingsPage`, AD-1/AD-2). This
-/// class is no longer mounted by the router — it is kept as a widget-test
-/// harness (`rankings_screen_test.dart`) that exercises the same
-/// [RankingsBody] both hosts render, so gating/body logic is verified once.
+/// redirects to `/feed?tab=rankings`. The PRIMARY placement is the second
+/// page of the FEED tab (`FeedScreen`'s `_RankingsPage` — relocated there
+/// from the athlete Entrenar tab). This class is no longer mounted by the
+/// router — it is kept as a widget-test harness
+/// (`rankings_screen_test.dart`) that exercises the same [RankingsBody] both
+/// hosts render, so gating/body logic is verified once.
 class RankingsScreen extends StatelessWidget {
   const RankingsScreen({super.key});
 
@@ -33,7 +39,7 @@ class RankingsScreen extends StatelessWidget {
 
 /// The rankings surface body — gym resolution, opt-in gate, leaderboards,
 /// and the slim page header (design AD-7). Composed directly by
-/// [RankingsScreen] (pushed-route placement) and by `WorkoutScreen`'s
+/// [RankingsScreen] (pushed-route placement) and by `FeedScreen`'s
 /// `_RankingsPage` (tab placement, the primary one as of this slice).
 ///
 /// The screen resolves the athlete's `gymId` from [userProfileProvider] —
@@ -525,56 +531,144 @@ class _DimensionSection extends StatelessWidget {
           ),
           const SizedBox(height: 12),
         ],
-        async.when(
-          loading: () => _LoadingBlock(palette: palette),
-          error: (_, __) => _ErrorBlock(palette: palette),
-          data: (profiles) {
-            if (profiles.isEmpty) {
-              return _EmptyLeaderboard(emptyKey: emptyKey, palette: palette);
-            }
-            return _LeaderboardList(
-              profiles: profiles,
-              myUid: myUid,
-              dimension: dimension,
-              palette: palette,
-            );
-          },
+        TreinoStateSwitcher(
+          childKey: ValueKey(async.when(
+            loading: () => 'loading',
+            error: (_, __) => 'error',
+            data: (profiles) =>
+                rankableEntries(dimension, profiles).isEmpty ? 'empty' : 'data',
+          )),
+          child: async.when(
+            loading: () => _LoadingBlock(palette: palette),
+            error: (_, __) => _ErrorBlock(palette: palette),
+            data: (profiles) {
+              // QA-GYM-506: filtrar ANTES de decidir vacío-vs-tabla, para que un
+              // board donde nadie registró el lift caiga en el estado vacío en
+              // vez de renderizar una tarjeta con cero filas.
+              final entries = rankableEntries(dimension, profiles);
+              if (entries.isEmpty) {
+                return _EmptyLeaderboard(
+                  emptyKey: emptyKey,
+                  palette: palette,
+                  dimension: dimension,
+                );
+              }
+              return _LeaderboardList(
+                entries: entries,
+                myUid: myUid,
+                palette: palette,
+              );
+            },
+          ),
         ),
       ],
     );
   }
 }
 
+/// QA-GYM-101: standard competition ranking ("1224"). [descValues] are the
+/// leaderboard metric of each row, already sorted descending. Rows tied on the
+/// metric share a rank (1, 1, 3); the next distinct value resumes at its
+/// 1-based position. Replaces index+1, which split ties by an invisible,
+/// arbitrary criterion (the Firestore doc id = uid).
+List<int> competitionRanks(List<num> descValues) {
+  final ranks = <int>[];
+  for (var i = 0; i < descValues.length; i++) {
+    if (i > 0 && descValues[i] == descValues[i - 1]) {
+      ranks.add(ranks[i - 1]);
+    } else {
+      ranks.add(i + 1);
+    }
+  }
+  return ranks;
+}
+
+/// QA-GYM-506: the value [profile] is ranked by on [dimension], or `null` when
+/// the athlete has NO value to rank there at all.
+///
+/// `best<Lift>Kg` is `null` for an athlete who opted into rankings but never
+/// registered that lift — "no aplica", not "0 kg". The old `?? 0` invented a
+/// real-looking PR and, worse, parked every such athlete in a fabricated tie at
+/// the bottom of the board. `racha`/`lifetimeVolumeKg` keep their 0 floor: no
+/// streak IS a 0-day streak, and no volume IS 0 kg lifted.
+num? rankingMetricValue(RankingDimension dimension, UserPublicProfile profile) {
+  switch (dimension) {
+    case RankingDimension.streak:
+      return profile.racha ?? 0;
+    case RankingDimension.volume:
+      return profile.lifetimeVolumeKg;
+    case RankingDimension.squat:
+      return profile.bestSquatKg;
+    case RankingDimension.bench:
+      return profile.bestBenchKg;
+    case RankingDimension.deadlift:
+      return profile.bestDeadliftKg;
+  }
+}
+
+/// One leaderboard row: a profile paired with the metric it ranks on. Built by
+/// [rankableEntries] so the metric is resolved once and can never be `null`
+/// downstream.
+typedef RankedEntry = ({UserPublicProfile profile, num value});
+
+/// QA-GYM-506: drops the profiles with no value on [dimension], preserving the
+/// server-side order of the rest.
+///
+/// [UserPublicProfileRepository.leaderboard] already excludes them in the
+/// query; this is the client-side half of the same rule, so a stale cache, a
+/// doc written before that filter existed, or a provider override in a test
+/// still cannot fabricate a PR nobody lifted.
+List<RankedEntry> rankableEntries(
+  RankingDimension dimension,
+  List<UserPublicProfile> profiles,
+) {
+  final entries = <RankedEntry>[];
+  for (final profile in profiles) {
+    final value = rankingMetricValue(dimension, profile);
+    if (value == null) continue;
+    entries.add((profile: profile, value: value));
+  }
+  return entries;
+}
+
 class _LeaderboardList extends StatelessWidget {
   const _LeaderboardList({
-    required this.profiles,
+    required this.entries,
     required this.myUid,
-    required this.dimension,
     required this.palette,
   });
 
-  final List<UserPublicProfile> profiles;
+  final List<RankedEntry> entries;
   final String myUid;
-  final RankingDimension dimension;
   final AppPalette palette;
 
-  num _metricValue(UserPublicProfile profile) {
-    switch (dimension) {
-      case RankingDimension.streak:
-        return profile.racha ?? 0;
-      case RankingDimension.volume:
-        return profile.lifetimeVolumeKg;
-      case RankingDimension.squat:
-        return profile.bestSquatKg ?? 0;
-      case RankingDimension.bench:
-        return profile.bestBenchKg ?? 0;
-      case RankingDimension.deadlift:
-        return profile.bestDeadliftKg ?? 0;
-    }
+  Widget _row(int i, List<int> ranks) {
+    final row = _LeaderboardRow(
+      rank: ranks[i],
+      profile: entries[i].profile,
+      value: entries[i].value,
+      isMe: entries[i].profile.uid == myUid,
+      palette: palette,
+    );
+    // Cap explícito en 8 (mismo patrón que feed_screen.dart
+    // _feedPostList): hasta 20 filas x 3 secciones visibles sin cap
+    // arrancarían hasta ~60 AnimationControllers one-shot al entrar a la
+    // pantalla, la mayoría por debajo del fold — y por el cap de
+    // AppMotion.stagger (maxItems 8) las filas 8+ ya comparten el mismo
+    // delay y aparecen igual como bloque, así que el stagger no comunicaba
+    // nada extra ahí.
+    if (i >= 8) return row;
+    return TreinoFadeSlideIn(
+      delay: AppMotion.stagger(i),
+      distance: AppMotion.slideSm,
+      child: row,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    // QA-GYM-101: puestos con empates compartidos (1, 1, 3) en vez de índice+1.
+    final ranks = competitionRanks([for (final e in entries) e.value]);
     return Container(
       decoration: BoxDecoration(
         color: palette.bgCard,
@@ -583,17 +677,11 @@ class _LeaderboardList extends StatelessWidget {
       ),
       child: Column(
         children: [
-          for (var i = 0; i < profiles.length; i++) ...[
+          for (var i = 0; i < entries.length; i++) ...[
             if (i > 0)
               Divider(
                   height: 1, color: palette.border, indent: 14, endIndent: 14),
-            _LeaderboardRow(
-              rank: i + 1,
-              profile: profiles[i],
-              value: _metricValue(profiles[i]),
-              isMe: profiles[i].uid == myUid,
-              palette: palette,
-            ),
+            _row(i, ranks),
           ],
         ],
       ),
@@ -618,46 +706,68 @@ class _LeaderboardRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      key: Key('rankings_row_${profile.uid}'),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: isMe ? palette.accent.withValues(alpha: 0.08) : null,
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 28,
-            child: Text(
-              '$rank',
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 15,
-                color: palette.textMuted,
+    final l10n = AppL10n.of(context);
+    final displayName = profile.displayName ?? '—';
+
+    return Semantics(
+      // `container: true` es necesario: sin él este Semantics no forma un nodo
+      // propio y los Text hijos (puesto, nombre, métrica) aportan los suyos,
+      // dejando el label de la fila sin nodo buscable.
+      container: true,
+      button: true,
+      // La fila NO es un avatar: muestra puesto, nombre y métrica, y al tocarla
+      // abre el perfil. El label describe esa ACCIÓN — reusar a11yAvatarLabel
+      // haría que un lector de pantalla anuncie una foto que no está ahí.
+      label: isMe
+          ? l10n.a11yHomeAvatarButton
+          : l10n.a11yRankingRowButton(displayName),
+      child: TreinoTappable(
+        // PublicProfileScreen already models `isSelf`: navigating for every
+        // row keeps the leaderboard consistent and lets owners see the same
+        // public-profile surface without duplicating a special-case route.
+        onTap: () => context.go('/feed/profile/${profile.uid}'),
+        child: Container(
+          key: Key('rankings_row_${profile.uid}'),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: isMe ? palette.accent.withValues(alpha: 0.08) : null,
+          ),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 28,
+                child: Text(
+                  '$rank',
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    color: palette.textMuted,
+                  ),
+                ),
               ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              profile.displayName ?? '—',
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.barlow(
-                fontWeight: isMe ? FontWeight.w700 : FontWeight.w400,
-                fontSize: 14,
-                color: isMe ? palette.accent : palette.textPrimary,
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  displayName,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.barlow(
+                    fontWeight: isMe ? FontWeight.w700 : FontWeight.w400,
+                    fontSize: 14,
+                    color: isMe ? palette.accent : palette.textPrimary,
+                  ),
+                ),
               ),
-            ),
+              Text(
+                _formatValue(value),
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                  color: isMe ? palette.accent : palette.textPrimary,
+                ),
+              ),
+            ],
           ),
-          Text(
-            _formatValue(value),
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 16,
-              color: isMe ? palette.accent : palette.textPrimary,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -669,10 +779,31 @@ class _LeaderboardRow extends StatelessWidget {
 }
 
 class _EmptyLeaderboard extends StatelessWidget {
-  const _EmptyLeaderboard({required this.emptyKey, required this.palette});
+  const _EmptyLeaderboard({
+    required this.emptyKey,
+    required this.palette,
+    required this.dimension,
+  });
 
   final Key emptyKey;
   final AppPalette palette;
+  final RankingDimension dimension;
+
+  /// QA-GYM-506: a lift board now empties out whenever nobody REGISTERED the
+  /// movement, which is a different thing from nobody having joined the
+  /// rankings — telling an athlete "nadie se sumó" while five gym mates are
+  /// opted in on the Rachas board right above would be plainly false.
+  String get _message {
+    switch (dimension) {
+      case RankingDimension.streak:
+      case RankingDimension.volume:
+        return 'Todavía nadie de tu gym se sumó a este ranking.';
+      case RankingDimension.squat:
+      case RankingDimension.bench:
+      case RankingDimension.deadlift:
+        return 'Todavía nadie de tu gym registró este levantamiento.';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -685,7 +816,7 @@ class _EmptyLeaderboard extends StatelessWidget {
         border: Border.all(color: palette.border),
       ),
       child: Text(
-        'Todavía nadie de tu gym se sumó a este ranking.',
+        _message,
         textAlign: TextAlign.center,
         style: GoogleFonts.barlow(
           fontWeight: FontWeight.w400,

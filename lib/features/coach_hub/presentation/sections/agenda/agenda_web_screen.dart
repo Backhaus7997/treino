@@ -12,6 +12,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 import '../../../../../app/theme/app_palette.dart';
+import '../../../../../core/utils/appointment_window.dart';
 import '../../../../workout/application/session_providers.dart'
     show currentUidProvider;
 import 'agenda_web_calendar.dart';
@@ -52,13 +53,10 @@ class _AgendaWebScreenState extends ConsumerState<AgendaWebScreen> {
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now().toUtc();
-    _rangeFrom = DateTime.utc(
-      now.year,
-      now.month - 1 < 1 ? 1 : now.month - 1,
-      1,
-    );
-    _rangeTo = DateTime.utc(now.year + 1, now.month, 1);
+    // QA-COA-007: ventana rodante compartida, sin el clamp de enero roto.
+    final window = rollingAppointmentWindow(DateTime.now().toUtc());
+    _rangeFrom = window.from;
+    _rangeTo = window.to;
   }
 
   Future<void> _openNewSessionDialog(BuildContext context) async {

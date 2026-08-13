@@ -140,8 +140,7 @@ void main() {
   });
 
   // ── workout-49 — updateSet throws on empty id ──────────────────────────────
-  group('workout-49: SessionNotifier.updateSet rejects empty SetLog id',
-      () {
+  group('workout-49: SessionNotifier.updateSet rejects empty SetLog id', () {
     test('throws StateError and does NOT write to Firestore', () async {
       final repo = MockSessionRepository();
       when(() => repo.create(

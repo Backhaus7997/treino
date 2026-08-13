@@ -98,6 +98,24 @@ abstract class AppL10n {
     Locale('es', 'AR')
   ];
 
+  /// No description provided for @notFoundTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Página no encontrada'**
+  String get notFoundTitle;
+
+  /// No description provided for @notFoundBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'La ruta que buscás no existe o el enlace es inválido.'**
+  String get notFoundBody;
+
+  /// No description provided for @notFoundCta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Volver al inicio'**
+  String get notFoundCta;
+
   /// Home first-run empty-state title for an athlete with no routine (usability finding 6).
   ///
   /// In es_AR, this message translates to:
@@ -121,6 +139,120 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Buscar entrenador'**
   String get homeAthleteFirstRunFindTrainerCta;
+
+  /// Home 'Esta Semana' card section title (skeleton, error and loaded states).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ESTA SEMANA'**
+  String get homeEstaSemanaTitle;
+
+  /// Home 'Esta Semana' card error message shown when weekly insights fail to load.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar tus insights.'**
+  String get homeEstaSemanaLoadError;
+
+  /// Home 'Esta Semana' card header pill label when the athlete has an active streak.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'RACHA ACTUAL'**
+  String get homeEstaSemanaHeaderPill;
+
+  /// Home 'Esta Semana' card header pill label in the empty state (no sessions yet).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PRIMER PASO'**
+  String get homeEstaSemanaHeaderPillEmpty;
+
+  /// No description provided for @homeEstaSemanaWeekMonth.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SEM {week} · {month}'**
+  String homeEstaSemanaWeekMonth(int week, String month);
+
+  /// No description provided for @homeEstaSemanaStreakUnit.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =1{DÍA} other{DÍAS}}'**
+  String homeEstaSemanaStreakUnit(int count);
+
+  /// Home 'Esta Semana' card streak subtext shown when the athlete already trained today.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No rompas la racha — entrenaste hoy.'**
+  String get homeEstaSemanaStreakSubtextTrained;
+
+  /// Home 'Esta Semana' card streak subtext shown when the athlete hasn't trained today yet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No rompas la racha — entrená hoy.'**
+  String get homeEstaSemanaStreakSubtextPending;
+
+  /// Home 'Esta Semana' card period card label for the current week count.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SEMANA'**
+  String get homeEstaSemanaPeriodWeek;
+
+  /// Home 'Esta Semana' card period card label for the current month count.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MES'**
+  String get homeEstaSemanaPeriodMonth;
+
+  /// No description provided for @homeEstaSemanaPeriodUnit.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =1{entreno} other{entrenos}}'**
+  String homeEstaSemanaPeriodUnit(int count);
+
+  /// Home 'Esta Semana' card empty-state title for an athlete with zero sessions.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TU RACHA\nEMPIEZA ACÁ'**
+  String get homeEstaSemanaEmptyTitle;
+
+  /// Home 'Esta Semana' card empty-state body copy encouraging the first workout.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cada entrenamiento alimenta tu racha. Hacé el primero y empezá a construir tu progreso.'**
+  String get homeEstaSemanaEmptyBody;
+
+  /// Home 'Esta Semana' card empty-state CTA button navigating to routines.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'EXPLORAR RUTINAS  →'**
+  String get homeEstaSemanaEmptyCta;
+
+  /// Home 'Esta Semana' card CTA button navigating to the insights hub (/home/insights). The whole card was already tappable but carried no visible affordance, so the destination was undiscoverable.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VER INSIGHTS  →'**
+  String get homeEstaSemanaInsightsCta;
+
+  /// Home 'Esta Semana' card header pill label when the athlete has history but zero sessions this week (#551).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'A RETOMAR'**
+  String get homeEstaSemanaHeaderPillResume;
+
+  /// Home 'Esta Semana' card resume-state title for an athlete with past sessions but none this week.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TU RACHA\nTE ESPERA'**
+  String get homeEstaSemanaResumeTitle;
+
+  /// Home 'Esta Semana' card resume-state body copy encouraging a returning athlete to train again.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ya tenés historial construido. Esta semana todavía está en cero — retomá hoy y seguí sumando progreso.'**
+  String get homeEstaSemanaResumeBody;
+
+  /// Home 'Esta Semana' card resume-state CTA button navigating to routines.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VOLVER A ENTRENAR  →'**
+  String get homeEstaSemanaResumeCta;
 
   /// No description provided for @authSplashTagline.
   ///
@@ -824,6 +956,30 @@ abstract class AppL10n {
   /// **'Reserva cancelada por el entrenador.'**
   String get agendaBookingCancelledByCoach;
 
+  /// No description provided for @agendaBlockedDayTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Día bloqueado'**
+  String get agendaBlockedDayTitle;
+
+  /// No description provided for @agendaBlockedDayBodySingle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'El {date} está marcado como bloqueado en tus horarios. ¿Querés cargar la sesión igual?'**
+  String agendaBlockedDayBodySingle(String date);
+
+  /// No description provided for @agendaBlockedDayBodyRecurring.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count} de las fechas caen en días bloqueados. ¿Continuar igual?'**
+  String agendaBlockedDayBodyRecurring(int count);
+
+  /// No description provided for @agendaBlockedDayConfirm.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cargar igual'**
+  String get agendaBlockedDayConfirm;
+
   /// No description provided for @agendaSlotFreeLabel.
   ///
   /// In es_AR, this message translates to:
@@ -841,6 +997,90 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Reservado por {athleteName}'**
   String agendaSlotBookedByLabel(String athleteName);
+
+  /// No description provided for @agendaCobrarCta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'COBRAR'**
+  String get agendaCobrarCta;
+
+  /// No description provided for @agendaCobradoLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cobrado'**
+  String get agendaCobradoLabel;
+
+  /// No description provided for @agendaCobrarMontoLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MONTO (ARS)'**
+  String get agendaCobrarMontoLabel;
+
+  /// No description provided for @agendaCobrarConceptoLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CONCEPTO'**
+  String get agendaCobrarConceptoLabel;
+
+  /// No description provided for @agendaCobrarVenceElLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VENCE EL (OPCIONAL)'**
+  String get agendaCobrarVenceElLabel;
+
+  /// No description provided for @agendaCobrarVenceElHint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sin fecha de vencimiento'**
+  String get agendaCobrarVenceElHint;
+
+  /// No description provided for @agendaCobrarVenceElQuitar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Quitar fecha de vencimiento'**
+  String get agendaCobrarVenceElQuitar;
+
+  /// No description provided for @agendaCobrarConfirmCta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CONFIRMAR COBRO'**
+  String get agendaCobrarConfirmCta;
+
+  /// No description provided for @agendaCobrarCompletaCampos.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Completá todos los campos.'**
+  String get agendaCobrarCompletaCampos;
+
+  /// No description provided for @agendaCobrarMontoInvalido.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ingresá un monto válido.'**
+  String get agendaCobrarMontoInvalido;
+
+  /// No description provided for @agendaCobrarSuccess.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Turno cobrado.'**
+  String get agendaCobrarSuccess;
+
+  /// No description provided for @agendaCobrarError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos registrar el cobro. Probá de nuevo.'**
+  String get agendaCobrarError;
+
+  /// No description provided for @agendaCobrarConceptoDefault.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sesión {date}'**
+  String agendaCobrarConceptoDefault(String date);
+
+  /// No description provided for @agendaCobrarTarifaReferencia.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tarifa de referencia: {amount}'**
+  String agendaCobrarTarifaReferencia(String amount);
 
   /// No description provided for @workoutSummaryHeaderCompleted.
   ///
@@ -865,6 +1105,18 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'VOLUMEN'**
   String get workoutStatVolume;
+
+  /// No description provided for @workoutStatDurationMin.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DURACIÓN MIN'**
+  String get workoutStatDurationMin;
+
+  /// No description provided for @workoutStatVolumeKg.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VOLUMEN KG'**
+  String get workoutStatVolumeKg;
 
   /// No description provided for @workoutStatSets.
   ///
@@ -950,6 +1202,186 @@ abstract class AppL10n {
   /// **'¡Terminé mi entreno! 💪'**
   String get workoutPostAutoCompleteText;
 
+  /// Title of the skippable post-session check-in step, and of the sheet it opens. Asks how the athlete felt — subjective, never a performance metric.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿CÓMO TE SENTISTE?'**
+  String get wellbeingCheckInTitle;
+
+  /// Reassures that the check-in is skippable at no cost. The post-session moment is when the user wants to leave.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Opcional. Podés saltearlo.'**
+  String get wellbeingCheckInOptional;
+
+  /// No description provided for @wellbeingFeelingVeryBad.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Muy mal'**
+  String get wellbeingFeelingVeryBad;
+
+  /// No description provided for @wellbeingFeelingBad.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Mal'**
+  String get wellbeingFeelingBad;
+
+  /// No description provided for @wellbeingFeelingNeutral.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Normal'**
+  String get wellbeingFeelingNeutral;
+
+  /// No description provided for @wellbeingFeelingGood.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Bien'**
+  String get wellbeingFeelingGood;
+
+  /// No description provided for @wellbeingFeelingGreat.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Muy bien'**
+  String get wellbeingFeelingGreat;
+
+  /// No description provided for @wellbeingPainQuestion.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Tuviste dolor o molestia?'**
+  String get wellbeingPainQuestion;
+
+  /// No description provided for @wellbeingPainYes.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SÍ'**
+  String get wellbeingPainYes;
+
+  /// No description provided for @wellbeingPainNo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'NO'**
+  String get wellbeingPainNo;
+
+  /// No description provided for @wellbeingPainAreasQuestion.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿En qué zona?'**
+  String get wellbeingPainAreasQuestion;
+
+  /// No description provided for @wellbeingPainAreasHint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Podés marcar más de una.'**
+  String get wellbeingPainAreasHint;
+
+  /// No description provided for @wellbeingNoteLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Nota (opcional)'**
+  String get wellbeingNoteLabel;
+
+  /// No description provided for @wellbeingNoteHint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Algo que quieras recordar de hoy'**
+  String get wellbeingNoteHint;
+
+  /// Neutral note shown only when the athlete reports pain. The app records, it never interprets: this copy must not diagnose, recommend or condition any app behaviour on the answer.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Si el dolor persiste, consultá a un profesional de la salud.'**
+  String get wellbeingMedicalDisclaimer;
+
+  /// No description provided for @wellbeingSaveButton.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'GUARDAR'**
+  String get wellbeingSaveButton;
+
+  /// No description provided for @wellbeingSkipButton.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'AHORA NO'**
+  String get wellbeingSkipButton;
+
+  /// No description provided for @wellbeingSavedLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'REGISTRADO'**
+  String get wellbeingSavedLabel;
+
+  /// No description provided for @wellbeingEditButton.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Editar'**
+  String get wellbeingEditButton;
+
+  /// No description provided for @wellbeingSaveError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos guardar tu registro. Probá de nuevo.'**
+  String get wellbeingSaveError;
+
+  /// Header title of the share-a-workout composer screen, opened from the COMPARTIR button of the post-workout summary.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'COMPARTIR ENTRENO'**
+  String get shareWorkoutComposerTitle;
+
+  /// Placeholder of the composer's text field. The field is pre-filled with workoutPostAutoCompleteText, so this only shows if the athlete clears it.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Cómo estuvo tu entreno?'**
+  String get shareWorkoutComposerHint;
+
+  /// Composer's confirm action — publishes the workout post to the feed.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PUBLICAR'**
+  String get shareWorkoutComposerPublish;
+
+  /// Composer action that opens the image picker to attach one optional photo to the workout post.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'AGREGAR FOTO'**
+  String get shareWorkoutComposerAddPhoto;
+
+  /// Accessibility label of the control that detaches the photo already attached in the composer.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Quitar foto'**
+  String get shareWorkoutComposerRemovePhoto;
+
+  /// Inline error shown in the composer when the picked photo cannot be read or exceeds the size limit.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos usar esa foto. Probá con otra.'**
+  String get shareWorkoutComposerPhotoError;
+
+  /// Section header above the workout detail preview inside the composer — what the rest of the users will see attached to the post.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TU ENTRENO'**
+  String get shareWorkoutComposerPreviewTitle;
+
+  /// Feed card control that expands the shared workout detail (exercises with sets/reps/weight plus the muscle distribution mini-chart).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VER DETALLE'**
+  String get postCardWorkoutDetailShow;
+
+  /// Feed card control that collapses the shared workout detail back.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'OCULTAR DETALLE'**
+  String get postCardWorkoutDetailHide;
+
+  /// Note at the end of an expanded workout detail whose exercise list was capped when the post was shared.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Se muestran los primeros {count} ejercicios.'**
+  String postCardWorkoutDetailTruncated(int count);
+
   /// No description provided for @workoutHistorialHeading.
   ///
   /// In es_AR, this message translates to:
@@ -1034,6 +1466,18 @@ abstract class AppL10n {
   /// **'VOLUMEN'**
   String get workoutDetailStatVolume;
 
+  /// No description provided for @workoutDetailStatDurationMin.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DURACIÓN MIN'**
+  String get workoutDetailStatDurationMin;
+
+  /// No description provided for @workoutDetailStatVolumeKg.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VOLUMEN KG'**
+  String get workoutDetailStatVolumeKg;
+
   /// No description provided for @workoutDetailStatPrsToday.
   ///
   /// In es_AR, this message translates to:
@@ -1093,6 +1537,12 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'No pudimos crear la rutina. Reintentá.'**
   String get workoutSelfEditorError;
+
+  /// No description provided for @workoutDiscardError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos descartar la sesión. Probá de nuevo.'**
+  String get workoutDiscardError;
 
   /// No description provided for @workoutSelfEditorPermissionDenied.
   ///
@@ -1231,6 +1681,114 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'No pudimos eliminar la rutina. Reintentá.'**
   String get workoutMisRutinasArchiveError;
+
+  /// Chip pinned on trainer-assigned routine cards in the unified RUTINAS list (workout tab + /profile/routines mirror). Same pill anatomy as workoutMisRutinasActiveChip, highlight color. Workout-area redesign slice 1.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DE TU COACH'**
+  String get workoutRutinasCoachChip;
+
+  /// Badge on PLANTILLAS grid cards for templates published to the community catalogue by ANY trainer (not the athlete's own coach, which uses workoutRutinasCoachChip). Accent color. Workout-area redesign slice 3.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ENTRENADOR'**
+  String get workoutPlantillasTrainerChip;
+
+  /// Section header of the community ratings block in the detail of a published trainer template. Workout-area redesign slice 3.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CALIFICACIONES'**
+  String get templateRatingsTitle;
+
+  /// Shown instead of the average when a published template has zero ratings.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía nadie calificó esta plantilla. ¡Sé el primero!'**
+  String get templateRatingsNoneYet;
+
+  /// How many people rated the template, next to the average score.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =1{1 calificación} other{{count} calificaciones}}'**
+  String templateRatingsCount(int count);
+
+  /// Label above the rate CTA when the user has not rated this template yet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Qué te pareció?'**
+  String get templateRatingsMineEmpty;
+
+  /// Label above the user's own rating when they already rated this template.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu calificación'**
+  String get templateRatingsMineLabel;
+
+  /// Button that opens the rating sheet for the first time.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CALIFICAR'**
+  String get templateRatingsRateCta;
+
+  /// Button that opens the rating sheet to edit the user's existing rating.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'EDITAR'**
+  String get templateRatingsEditCta;
+
+  /// Empty state of the comment list when nobody left a written comment (ratings without text do not appear here).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no hay comentarios.'**
+  String get templateRatingsEmpty;
+
+  /// Error state of the comment list in the published-template detail.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar los comentarios.'**
+  String get templateRatingsError;
+
+  /// Title of the rating bottom sheet when creating a new rating.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Calificá esta plantilla'**
+  String get templateRatingSheetTitle;
+
+  /// Title of the rating bottom sheet when editing an existing rating.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Editá tu calificación'**
+  String get templateRatingSheetTitleEdit;
+
+  /// Hint of the optional comment field in the template rating sheet, max 500 chars.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Contá cómo te fue con esta plantilla (opcional)'**
+  String get templateRatingSheetCommentHint;
+
+  /// Cancel button of the template rating sheet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CANCELAR'**
+  String get templateRatingSheetCancel;
+
+  /// Submit button of the template rating sheet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ENVIAR'**
+  String get templateRatingSheetSubmit;
+
+  /// SnackBar shown after a rating is saved.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¡Gracias por calificar!'**
+  String get templateRatingSheetSuccess;
+
+  /// SnackBar shown when saving a rating fails.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos guardar tu calificación.'**
+  String get templateRatingSheetError;
 
   /// No description provided for @workoutSplitFallback.
   ///
@@ -1373,7 +1931,7 @@ abstract class AppL10n {
   /// No description provided for @eliminarCuentaSheetBodySuffix.
   ///
   /// In es_AR, this message translates to:
-  /// **'. Vamos a eliminar tu cuenta, tu perfil, tu historial de entrenamientos y tu foto. Tus posts van a quedar como \"Usuario eliminado\".'**
+  /// **'. Vamos a eliminar tu cuenta, tu perfil, tu historial de entrenamientos, tus posts y tu foto.'**
   String get eliminarCuentaSheetBodySuffix;
 
   /// No description provided for @eliminarCuentaSheetDeleteCta.
@@ -1616,12 +2174,6 @@ abstract class AppL10n {
   /// **'+ Cobro'**
   String get dashboardCobroTrailingLabel;
 
-  /// No description provided for @dashboardInvitarAlumnoLabel.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'+ INVITAR ALUMNO'**
-  String get dashboardInvitarAlumnoLabel;
-
   /// No description provided for @dashboardAsignarRutinaLabel.
   ///
   /// In es_AR, this message translates to:
@@ -1669,6 +2221,24 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Ej: Clase de verano'**
   String get dashboardConceptoHint;
+
+  /// No description provided for @dashboardVenceElLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VENCE EL (OPCIONAL)'**
+  String get dashboardVenceElLabel;
+
+  /// No description provided for @dashboardVenceElHint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sin fecha de vencimiento'**
+  String get dashboardVenceElHint;
+
+  /// No description provided for @dashboardVenceElQuitar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Quitar fecha de vencimiento'**
+  String get dashboardVenceElQuitar;
 
   /// No description provided for @dashboardSeleccionaAlumnoHint.
   ///
@@ -1790,6 +2360,12 @@ abstract class AppL10n {
   /// **'No pudimos cargar tus próximos turnos.'**
   String get dashboardErrorTurnos;
 
+  /// Error state of the trainer dashboard 'Resumen del día' card when the appointments stream fails, instead of silently showing 0/0/0.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar el resumen del día.'**
+  String get dashboardErrorResumen;
+
   /// No description provided for @dashboardSinTurnosProximos.
   ///
   /// In es_AR, this message translates to:
@@ -1801,6 +2377,54 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Nadie entrenó hoy todavía.'**
   String get dashboardNadieEntreno;
+
+  /// Empty state of the SEGUIMIENTO section in the mobile athlete detail, when the trainer has no FollowUpEntry for this athlete yet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no dejaste seguimiento de este alumno.'**
+  String get athleteDetailSeguimientoEmpty;
+
+  /// Error state of the SEGUIMIENTO section when the FollowUpEntry query fails.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar el seguimiento.'**
+  String get athleteDetailSeguimientoLoadError;
+
+  /// Title of the bottom sheet opened from the 'Dejar feedback' link in the trainer dashboard's ENTRENARON HOY section.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Dejar feedback'**
+  String get dashboardFeedbackSheetTitle;
+
+  /// Prompt above the list of athletes who trained today, in the leave-feedback sheet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿A quién le querés dejar feedback?'**
+  String get dashboardFeedbackPickAthlete;
+
+  /// Placeholder of the multiline text field where the trainer writes the feedback note.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Escribí tu devolución del entrenamiento…'**
+  String get dashboardFeedbackComposerHint;
+
+  /// Primary action of the leave-feedback sheet: persists the note as a FollowUpEntry.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Guardar'**
+  String get dashboardFeedbackSave;
+
+  /// SnackBar confirmation shown after the feedback note is saved.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Feedback guardado'**
+  String get dashboardFeedbackSaved;
+
+  /// Inline error shown in the leave-feedback sheet when the Firestore write fails.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos guardar el feedback. Probá de nuevo.'**
+  String get dashboardFeedbackSaveError;
 
   /// No description provided for @dashboardErrorActividad.
   ///
@@ -1832,11 +2456,17 @@ abstract class AppL10n {
   /// **'HOLA'**
   String get dashboardHolaSinNombre;
 
-  /// No description provided for @dashboardInvitarProximamente.
+  /// Semantics label for the trainer dashboard header avatar, which opens the professional-profile editor. Distinct from a11yHomeAvatarButton (athlete home), which opens a read-only public profile.
   ///
   /// In es_AR, this message translates to:
-  /// **'Invitar alumno — próximamente.'**
-  String get dashboardInvitarProximamente;
+  /// **'Editar tu perfil profesional'**
+  String get a11yDashboardAvatarButton;
+
+  /// Empty state of the pending-requests sheet, shown when the trainer opens the header bell with no incoming link requests.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No tenés solicitudes pendientes.'**
+  String get dashboardSolicitudesPendientesEmpty;
 
   /// No description provided for @dashboardSolicitudesPendientesTitle.
   ///
@@ -2093,7 +2723,7 @@ abstract class AppL10n {
   /// No description provided for @profileCuentaSolicitudesTitle.
   ///
   /// In es_AR, this message translates to:
-  /// **'Solicitudes de amistad'**
+  /// **'Solicitudes de seguidores'**
   String get profileCuentaSolicitudesTitle;
 
   /// No description provided for @profileCuentaSolicitudesSubtitle.
@@ -2135,7 +2765,7 @@ abstract class AppL10n {
   /// No description provided for @profileCuentaRutinasSubtitle.
   ///
   /// In es_AR, this message translates to:
-  /// **'{count} activas'**
+  /// **'{count, plural, =1{1 activa} other{{count} activas}}'**
   String profileCuentaRutinasSubtitle(int count);
 
   /// No description provided for @chatListTitle.
@@ -2618,6 +3248,24 @@ abstract class AppL10n {
   /// **'Confirmar'**
   String get routineEditorDialogConfirm;
 
+  /// No description provided for @routineEditorCopyPrescriptionTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Copiar sets?'**
+  String get routineEditorCopyPrescriptionTitle;
+
+  /// Confirmation body for the slot-menu shortcut that copies the previous exercise's prescription into this one.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Se van a reemplazar los sets de este ejercicio por los de «{sourceExercise}».'**
+  String routineEditorCopyPrescriptionBody(String sourceExercise);
+
+  /// No description provided for @routineEditorSlotMenuCopyPrevious.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Copiar sets del anterior'**
+  String get routineEditorSlotMenuCopyPrevious;
+
   /// No description provided for @routineEditorSlotMenuReplace.
   ///
   /// In es_AR, this message translates to:
@@ -2653,6 +3301,42 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'+ Agregar set'**
   String get routineEditorAddSet;
+
+  /// Screen-reader label for the KG column header, which doubles as the bulk-fill affordance.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Replicar el peso del primer set en todos'**
+  String get routineEditorFillKgA11y;
+
+  /// No description provided for @routineEditorFillKgApplied.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Peso replicado en todos los sets.'**
+  String get routineEditorFillKgApplied;
+
+  /// No description provided for @routineEditorFillKgEmpty.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cargá el peso del primer set para poder replicarlo.'**
+  String get routineEditorFillKgEmpty;
+
+  /// No description provided for @routineEditorFillKgUndo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Deshacer'**
+  String get routineEditorFillKgUndo;
+
+  /// Screen-reader label for a KG stepper button that adds weight to the set being edited.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sumar {amount} kilos al peso'**
+  String routineEditorKgStepIncreaseA11y(String amount);
+
+  /// Screen-reader label for a KG stepper button that takes weight off the set being edited.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Restar {amount} kilos al peso'**
+  String routineEditorKgStepDecreaseA11y(String amount);
 
   /// No description provided for @routineEditorMeasureReps.
   ///
@@ -2792,23 +3476,17 @@ abstract class AppL10n {
   /// **'COMPLETADO'**
   String get routineDetailCompleted;
 
-  /// No description provided for @routineDetailWeekLocked.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'SEMANA BLOQUEADA'**
-  String get routineDetailWeekLocked;
-
-  /// No description provided for @routineDetailDayLocked.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'DÍA BLOQUEADO'**
-  String get routineDetailDayLocked;
-
   /// No description provided for @routineDetailStart.
   ///
   /// In es_AR, this message translates to:
   /// **'EMPEZAR'**
   String get routineDetailStart;
+
+  /// No description provided for @routineDetailRepeat.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'REPETIR'**
+  String get routineDetailRepeat;
 
   /// No description provided for @routineEditorDeleteScopeTitle.
   ///
@@ -2951,13 +3629,13 @@ abstract class AppL10n {
   /// Accessibility label for the icon-only friend-requests inbox action in the feed header bell icon (navigation finding: friend-requests inbox was unreachable from the feed/social surface).
   ///
   /// In es_AR, this message translates to:
-  /// **'Solicitudes de amistad'**
+  /// **'Solicitudes de seguidores'**
   String get feedFriendRequestsA11y;
 
   /// Accessibility label for the feed header friend-requests bell icon when there are pending requests; announces the badge count to screen readers.
   ///
   /// In es_AR, this message translates to:
-  /// **'Solicitudes de amistad, {count} pendientes'**
+  /// **'Solicitudes de seguidores, {count} pendientes'**
   String feedFriendRequestsWithCountA11y(int count);
 
   /// Semantics liveRegion/label for the create-post submit spinner state while a post is being published (finding 12 create_post_screen PUBLICAR spinner branch).
@@ -2984,11 +3662,47 @@ abstract class AppL10n {
   /// **'Foto de perfil de {name}'**
   String a11yAvatarLabel(String name);
 
+  /// Semantics label for a leaderboard row in gym rankings. The row is a button that opens that athlete's public profile. Describes the ACTION, not the visuals — the row shows rank, name and metric, so reusing an avatar label would announce something the row is not.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver el perfil de {name}'**
+  String a11yRankingRowButton(String name);
+
+  /// Localized accessible name for the like reaction in a feed post's reaction row.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Me gusta'**
+  String get a11yReactionLike;
+
+  /// Localized accessible name for the fire reaction in a feed post's reaction row.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Fuego'**
+  String get a11yReactionFire;
+
+  /// Localized accessible name for the applause reaction in a feed post's reaction row.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Aplausos'**
+  String get a11yReactionClap;
+
+  /// Localized reaction count announced after the reaction name in a feed post's reaction row.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =0{sin reacciones} =1{1 reacción} other{{count} reacciones}}'**
+  String a11yReactionCount(num count);
+
   /// Non-parametric avatar Semantics label used when the display name is unavailable/null (findings 4,6,7,16,18,19).
   ///
   /// In es_AR, this message translates to:
   /// **'Foto de perfil'**
   String get a11yAvatarLabelGeneric;
+
+  /// Semantics label for the tappable avatar in the athlete HomeHeader. The avatar is a button that opens the user's own public profile, so the label states the ACTION rather than describing the image (a11yAvatarLabel covers the non-interactive case).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver tu perfil'**
+  String get a11yHomeAvatarButton;
 
   /// Semantics label for the bell-with-badge in the trainer home header that currently conveys the pending count purely visually (finding 18). Fix agents add the @homePendingRequestsA11y placeholder metadata (count: int).
   ///
@@ -3536,6 +4250,24 @@ abstract class AppL10n {
   /// **'Inactivo'**
   String get coachHubAlumnosStatusInactive;
 
+  /// Coach Hub web alumnos section — view-mode toggle, table layout.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tabla'**
+  String get coachHubAlumnosViewTable;
+
+  /// Coach Hub web alumnos section — view-mode toggle, cards layout.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cards'**
+  String get coachHubAlumnosViewCards;
+
+  /// Coach Hub web alumnos section — pending debt amount shown on a row/card.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Debe {amount}'**
+  String coachHubAlumnosDebtAmount(String amount);
+
   /// Coach Hub web alumno detail — title of the Notas privadas tab body.
   ///
   /// In es_AR, this message translates to:
@@ -3740,11 +4472,95 @@ abstract class AppL10n {
   /// **'Completá las reps de los sets antes de guardar.'**
   String get routineEditorMissingReps;
 
+  /// No description provided for @routineEditorDuplicateExercise.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ese ejercicio ya está en el día. Elegí otro.'**
+  String get routineEditorDuplicateExercise;
+
   /// Success snackbar after publishing a post (finding 25). Shown via the root ScaffoldMessenger since the compose screen pops on success.
   ///
   /// In es_AR, this message translates to:
   /// **'Post publicado.'**
   String get feedPostPublishedSuccess;
+
+  /// Semantics label for the post card overflow (3-dot) menu button, shown only on the viewer's own posts.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Opciones del post'**
+  String get postCardMenuA11y;
+
+  /// No description provided for @coachHubAlumnosRowActionsA11y.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Opciones del alumno'**
+  String get coachHubAlumnosRowActionsA11y;
+
+  /// Edit action in the post card overflow menu.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Editar'**
+  String get postCardMenuEdit;
+
+  /// Delete action in the post card overflow menu.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Eliminar'**
+  String get postCardMenuDelete;
+
+  /// Title of the confirmation dialog shown before deleting a post.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Eliminar este post?'**
+  String get postCardDeleteConfirmTitle;
+
+  /// Body of the confirmation dialog shown before deleting a post.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esta acción no se puede deshacer.'**
+  String get postCardDeleteConfirmBody;
+
+  /// Success snackbar after deleting a post.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Post eliminado.'**
+  String get postCardDeleteSuccess;
+
+  /// Error snackbar when deleting a post fails.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos eliminar el post. Probá de nuevo.'**
+  String get postCardDeleteError;
+
+  /// Header title of the compose screen when editing an existing post (vs. NUEVO POST when creating).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'EDITAR POST'**
+  String get createPostEditTitle;
+
+  /// Submit button label in the compose screen header when editing an existing post (vs. PUBLICAR when creating).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'GUARDAR'**
+  String get createPostSaveChanges;
+
+  /// Semantics label for the submit button when editing an existing post.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Guardar cambios'**
+  String get createPostSaveChangesA11y;
+
+  /// Semantics label for the submit button while an edit is being saved.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Guardando…'**
+  String get createPostSavingA11y;
+
+  /// Success snackbar shown after successfully editing an existing post.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cambios guardados.'**
+  String get feedPostUpdatedSuccess;
 
   /// Success feedback when a friend/follow request is sent from the public profile follow button (findings 25/26).
   ///
@@ -3755,7 +4571,7 @@ abstract class AppL10n {
   /// Success feedback when a friend request is accepted (finding 25). Used by the public profile accept action and optionally the inbox accept.
   ///
   /// In es_AR, this message translates to:
-  /// **'Ahora son amigos.'**
+  /// **'Solicitud aceptada.'**
   String get feedRequestAcceptedSuccess;
 
   /// Error snackbar for friendship mutations (accept/reject/request/unfriend) that currently swallow errors, in the inbox tile and public profile follow button (findings 11/26).
@@ -4040,6 +4856,12 @@ abstract class AppL10n {
   /// **'{count, plural, =0{Sin sesiones en las últimas 8 semanas} =1{1 sesión en las últimas 8 semanas} other{{count} sesiones en las últimas 8 semanas}}'**
   String progressionFrequency(int count);
 
+  /// Frecuencia stat label scoped to the active chart period selected in the period selector (#555).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =0{Sin sesiones en este período} =1{1 sesión en este período} other{{count} sesiones en este período}}'**
+  String progressionFrequencyPeriod(int count);
+
   /// Hint shown when only 1 data point exists — no trend line can be drawn.
   ///
   /// In es_AR, this message translates to:
@@ -4226,6 +5048,12 @@ abstract class AppL10n {
   /// **'BUENAS, {name}'**
   String dashboardGreeting(String name);
 
+  /// Greeting prefix rendered before the trainer's name (styled separately) in the Coach Hub dashboard WelcomeCard. Trailing space is intentional.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'BUENAS, '**
+  String get dashboardGreetingPrefix;
+
   /// Dashboard WelcomeCard summary line combining sessions today, pending requests, and overdue payments.
   ///
   /// In es_AR, this message translates to:
@@ -4235,7 +5063,7 @@ abstract class AppL10n {
   /// Quick action button label in the Coach Hub web dashboard WelcomeCard to navigate to the alumnos section.
   ///
   /// In es_AR, this message translates to:
-  /// **'+ Nuevo alumno'**
+  /// **'Nuevo alumno'**
   String get dashboardQuickActionNuevoAlumno;
 
   /// Quick action button label in the Coach Hub web dashboard WelcomeCard to navigate to routine creation.
@@ -4479,6 +5307,186 @@ abstract class AppL10n {
   /// **'DISTRIBUCIÓN MUSCULAR'**
   String get muscleDistributionScreenTitle;
 
+  /// Error state for the MuscleDistributionScreen's provider load failure. Paired with coachRetryLabel for the retry CTA — same convention as monthlyReportLoadError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar tu distribución muscular. Probá de nuevo.'**
+  String get muscleDistributionLoadError;
+
+  /// Error state for the FrequentExercisesScreen's exerciseFrequencyProvider load failure. Paired with coachRetryLabel for the retry CTA — same convention as muscleDistributionLoadError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar tus ejercicios frecuentes. Probá de nuevo.'**
+  String get frequentExercisesLoadError;
+
+  /// Header title for the athlete-side ExerciseProgressionScreen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'EVOLUCIÓN POR EJERCICIO'**
+  String get exerciseProgressionScreenTitle;
+
+  /// Tile title on InsightsScreen navigating to ExerciseProgressionScreen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Evolución por ejercicio'**
+  String get insightsTileExerciseProgressionTitle;
+
+  /// Tile subtitle for the Exercise Progression stats-hub entry.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu progreso en cada ejercicio + records'**
+  String get insightsTileExerciseProgressionSubtitle;
+
+  /// Hint of the exercise-progression picker search field. The search runs over the exercises the ATHLETE HAS LOGGED, never the catalogue — see the exercise-progression ADR.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Buscar ejercicio…'**
+  String get progressionSearchHint;
+
+  /// Shown when the picker search matches none of the athletes logged exercises. Wording says tuyo on purpose: an exercise that exists in the catalogue but was never trained has no progression and is intentionally absent.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ningún ejercicio tuyo coincide con la búsqueda.'**
+  String get progressionSearchNoResults;
+
+  /// Tile title on InsightsScreen navigating to AnthropometryScreen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Medidas'**
+  String get insightsTileMeasurementsTitle;
+
+  /// Tile subtitle for the Anthropometry stats-hub entry.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Peso y medidas corporales en el tiempo'**
+  String get insightsTileMeasurementsSubtitle;
+
+  /// Header title for the dedicated MeasurementsScreen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MEDIDAS'**
+  String get measurementsScreenTitle;
+
+  /// Notes field hint in LogMeasurementScreen.selfLog mode — replaces the trainer-mode "Observaciones del entrenador…" copy.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Notas (opcional)…'**
+  String get measurementsSelfLogNotesHint;
+
+  /// Label/tooltip for the "+" affordance on MEDIDAS that opens the athlete self-log form.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cargar medición'**
+  String get measurementsAddSelfLog;
+
+  /// Title of the card in MeasurementsScreen showing the athlete's own weight + height, read from UserProfile (captured at onboarding Step 4) so they don't re-enter them.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TUS DATOS'**
+  String get measurementsProfileCardTitle;
+
+  /// Small hint under the profile-data card explaining where the weight/height come from and where to edit them.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Los cargaste al registrarte. Editalos desde tu perfil.'**
+  String get measurementsProfileCardHint;
+
+  /// Label for the body-weight value in the profile-data card.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Peso'**
+  String get measurementsWeightLabel;
+
+  /// Label for the height value in the profile-data card.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Altura'**
+  String get measurementsHeightLabel;
+
+  /// Shown below the profile-data card when the athlete has ZERO measurements. Talks about EVOLUTION over time (the chart), not about having no data at all — the profile card above already shows the athlete's weight/height. Both the athlete (self-log, via the + action in this screen's header) and a linked trainer can create measurements — see `match /measurements` in firestore.rules, whose create rule allows `athleteId == uid` OR a trainer-role author.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no hay mediciones cargadas. Tocá + para registrar la primera y seguir tu evolución.'**
+  String get measurementsEmptyState;
+
+  /// Shown when the athlete has exactly ONE measurement. MeasurementProgressChart requires >= 2 points — distinct from the zero case, which is why it is a separate string.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Con una sola medición no hay progreso que mostrar. Falta al menos una más.'**
+  String get measurementsNeedsMoreData;
+
+  /// [#439] Section label above MeasurementHistoryList on both mobile surfaces (athlete MEDIDAS screen and trainer ANTROPOMETRÍA section).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'HISTORIAL'**
+  String get measurementsHistoryTitle;
+
+  /// [#439] Tooltip/a11y label of the per-row edit action in MeasurementHistoryList. Only rendered on rows authored by the current uid (the update rule pins recordedBy).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Editar medición'**
+  String get measurementHistoryEditTooltip;
+
+  /// [#439] Tooltip/a11y label of the per-row delete action in MeasurementHistoryList. Only rendered on rows authored by the current uid (the delete rule pins recordedBy).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Eliminar medición'**
+  String get measurementHistoryDeleteTooltip;
+
+  /// [#439] Footer toggle of MeasurementHistoryList when more rows exist than the collapsed cap. {count} is the TOTAL number of measurements.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver todas ({count})'**
+  String measurementHistoryShowAll(int count);
+
+  /// [#439] Footer toggle of MeasurementHistoryList when expanded — collapses back to the capped list.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver menos'**
+  String get measurementHistoryShowLess;
+
+  /// [#439] Title of the delete-confirmation AlertDialog for a measurement (same pattern as athleteDetailPlanDeleteTitle).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Eliminar medición?'**
+  String get measurementDeleteConfirmTitle;
+
+  /// [#439] Body of the delete-confirmation dialog. {date} is the pre-formatted recordedAt day label (e.g. '3 jul 2026').
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Se eliminará la medición del {date}. Esta acción no se puede deshacer.'**
+  String measurementDeleteConfirmBody(String date);
+
+  /// [#439] Destructive confirm button of the measurement delete dialog. Cancel reuses commonCancel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Eliminar'**
+  String get measurementDeleteConfirmAction;
+
+  /// [#439] Snackbar after a measurement was deleted successfully.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Medición eliminada'**
+  String get measurementDeleteSuccess;
+
+  /// [#439] Snackbar when the measurement delete fails (network/rules).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos eliminar la medición. Probá de nuevo.'**
+  String get measurementDeleteError;
+
+  /// [#439] Read-only tag on the TRAINER's history rows the athlete self-logged: the trainer cannot edit/delete them (rules pin recordedBy), the tag explains why there are no actions.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Auto-registro'**
+  String get measurementHistorySelfLoggedTag;
+
+  /// [#439] Read-only tag on the ATHLETE's history rows a trainer recorded: the athlete cannot edit/delete them (rules pin recordedBy), the tag explains why there are no actions.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cargada por tu entrenador'**
+  String get measurementHistoryTrainerLoggedTag;
+
   /// [stats-hub] Tile title on InsightsScreen navigating to FrequentExercisesScreen (athlete's own uid).
   ///
   /// In es_AR, this message translates to:
@@ -4520,6 +5528,642 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'VOLUMEN POR GRUPO'**
   String get volumeByGroupScreenTitle;
+
+  /// [stats-hub] Empty state of the VolumeByGroupScreen card when the athlete has no target (no assigned routine). QA #371.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Necesitás una rutina asignada para ver tu volumen objetivo.'**
+  String get volumeByGroupEmptyTarget;
+
+  /// [#510] Section eyebrow above the MeasurementProgressChart. Mirrors performanceChartSectionLabel in the sibling performance chart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PROGRESO'**
+  String get measurementChartSectionLabel;
+
+  /// [#510] Elapsed span between the first and last plotted measurement when it is under a week. Rendered next to the delta in the chart header.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'({count} {count, plural, =1{día} other{días}})'**
+  String measurementChartSpanDays(int count);
+
+  /// [#510] Elapsed span between the first and last plotted measurement, rounded to weeks once it reaches 7 days.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'({count} {count, plural, =1{semana} other{semanas}})'**
+  String measurementChartSpanWeeks(int count);
+
+  /// [#510] Chip label for the body-weight series in MeasurementProgressChart. Shorter than the log-form label (measurementLogFieldWeight) because the unit is shown separately.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Peso'**
+  String get measurementChartMetricWeight;
+
+  /// [#510] Chip label for the body-fat percentage series in MeasurementProgressChart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'% Graso'**
+  String get measurementChartMetricBodyFat;
+
+  /// [#510] Chip label for the muscle-mass series in MeasurementProgressChart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Masa muscular'**
+  String get measurementChartMetricMuscleMass;
+
+  /// [#510] Chip label for the waist circumference series in MeasurementProgressChart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cintura'**
+  String get measurementChartMetricWaist;
+
+  /// [#510] Chip label for the chest circumference series in MeasurementProgressChart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Pecho'**
+  String get measurementChartMetricChest;
+
+  /// [#510] Chip label for the hips circumference series in MeasurementProgressChart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cadera'**
+  String get measurementChartMetricHips;
+
+  /// [#510] Chip label for the shoulders circumference series in MeasurementProgressChart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Hombros'**
+  String get measurementChartMetricShoulders;
+
+  /// [#510] Chip label for the glutes circumference series in MeasurementProgressChart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Glúteos'**
+  String get measurementChartMetricGlutes;
+
+  /// [#510] Chip label for the biceps series in MeasurementProgressChart. The plotted value is the average of the left/right entries.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Bíceps'**
+  String get measurementChartMetricBiceps;
+
+  /// [#510] Chip label for the flexed-biceps series in MeasurementProgressChart. Abbreviated on purpose — chips are laid out in a single horizontal scroll row.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Bíceps flex'**
+  String get measurementChartMetricBicepsFlexed;
+
+  /// [#510] Chip label for the forearm series in MeasurementProgressChart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Antebrazo'**
+  String get measurementChartMetricForearm;
+
+  /// [#510] Chip label for the upper-thigh series in MeasurementProgressChart. Abbreviated on purpose — chips are laid out in a single horizontal scroll row.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Muslo sup'**
+  String get measurementChartMetricUpperThigh;
+
+  /// [#510] Chip label for the mid-thigh series in MeasurementProgressChart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Muslo medio'**
+  String get measurementChartMetricMidThigh;
+
+  /// [#510] Chip label for the calf series in MeasurementProgressChart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Gemelo'**
+  String get measurementChartMetricCalf;
+
+  /// [#510] Header title of LogMeasurementScreen when creating a new measurement. Kept separate from measurementsAddSelfLog (the "+" affordance on MEDIDAS) so the screen title and the button can diverge per locale.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cargar medición'**
+  String get measurementLogTitleCreate;
+
+  /// [#510] Header title of LogMeasurementScreen in edit mode (#439). Kept separate from measurementHistoryEditTooltip, which labels the row's edit icon.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Editar medición'**
+  String get measurementLogTitleEdit;
+
+  /// [#510] Snackbar shown when saving is attempted with no authenticated uid. Mirrors performanceLogNoSession.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No hay sesión activa. No se puede guardar.'**
+  String get measurementLogNoSession;
+
+  /// [#510] Snackbar after a new measurement was created successfully.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Medición guardada'**
+  String get measurementLogSaveSuccess;
+
+  /// [#510] Snackbar after an existing measurement was edited successfully (#439).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Medición actualizada'**
+  String get measurementLogUpdateSuccess;
+
+  /// [#510] Snackbar when the measurement create/update write fails (network/rules). Mirrors performanceLogSaveError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos guardar la medición. Probá de nuevo.'**
+  String get measurementLogSaveError;
+
+  /// [#510] Pinned primary button of LogMeasurementScreen in create mode.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'GUARDAR MEDICIÓN'**
+  String get measurementLogSaveCta;
+
+  /// [#510] Pinned primary button of LogMeasurementScreen in edit mode (#439).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'GUARDAR CAMBIOS'**
+  String get measurementLogUpdateCta;
+
+  /// [#510] Section eyebrow above the weight / body-fat / muscle-mass fields.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'COMPOSICIÓN CORPORAL'**
+  String get measurementLogSectionBodyComposition;
+
+  /// [#510] Section eyebrow above the free-text notes field of LogMeasurementScreen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'NOTAS'**
+  String get measurementLogSectionNotes;
+
+  /// [#510] Notes field hint in trainer mode. Self-log mode uses measurementsSelfLogNotesHint instead.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Observaciones del entrenador…'**
+  String get measurementLogNotesHint;
+
+  /// [#510] Body-weight field label in LogMeasurementScreen. Carries its unit inline, unlike the circumference fields which render `cm` as a suffix.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Peso (kg)'**
+  String get measurementLogFieldWeight;
+
+  /// [#510] Body-fat percentage field label in LogMeasurementScreen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Grasa (%)'**
+  String get measurementLogFieldBodyFat;
+
+  /// [#510] Muscle-mass field label in LogMeasurementScreen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Masa muscular (kg)'**
+  String get measurementLogFieldMuscleMass;
+
+  /// [#510] Header of the collapsible circumferences section in LogMeasurementScreen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CIRCUNFERENCIAS'**
+  String get measurementLogCircumferencesTitle;
+
+  /// [#510] Subtitle under the circumferences header clarifying that every field in the section is optional.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Opcional. Cargá las que quieras.'**
+  String get measurementLogCircumferencesHint;
+
+  /// [#510] Sub-group eyebrow for the trunk circumferences (shoulders, chest, waist, hips, glutes).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TRONCO'**
+  String get measurementLogGroupTrunk;
+
+  /// [#510] Sub-group eyebrow for the upper-body bilateral circumferences (biceps, flexed biceps, forearm).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TREN SUPERIOR'**
+  String get measurementLogGroupUpperBody;
+
+  /// [#510] Sub-group eyebrow for the lower-body bilateral circumferences (upper thigh, mid thigh, calf).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TREN INFERIOR'**
+  String get measurementLogGroupLowerBody;
+
+  /// [#510] Shoulders circumference field label in LogMeasurementScreen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Hombros'**
+  String get measurementLogFieldShoulders;
+
+  /// [#510] Chest circumference field label in LogMeasurementScreen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Pecho'**
+  String get measurementLogFieldChest;
+
+  /// [#510] Waist circumference field label in LogMeasurementScreen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cintura'**
+  String get measurementLogFieldWaist;
+
+  /// [#510] Hips circumference field label in LogMeasurementScreen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cadera'**
+  String get measurementLogFieldHips;
+
+  /// [#510] Glutes circumference field label in LogMeasurementScreen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Glúteos'**
+  String get measurementLogFieldGlutes;
+
+  /// [#510] Biceps bilateral field label in LogMeasurementScreen (one input per side).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Bíceps'**
+  String get measurementLogFieldBiceps;
+
+  /// [#510] Flexed-biceps bilateral field label in LogMeasurementScreen (one input per side).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Bíceps (flex)'**
+  String get measurementLogFieldBicepsFlexed;
+
+  /// [#510] Forearm bilateral field label in LogMeasurementScreen (one input per side).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Antebrazo'**
+  String get measurementLogFieldForearm;
+
+  /// [#510] Upper-thigh bilateral field label in LogMeasurementScreen (one input per side).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Muslo superior'**
+  String get measurementLogFieldUpperThigh;
+
+  /// [#510] Mid-thigh bilateral field label in LogMeasurementScreen (one input per side).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Muslo medio'**
+  String get measurementLogFieldMidThigh;
+
+  /// [#510] Calf bilateral field label in LogMeasurementScreen (one input per side).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Gemelo'**
+  String get measurementLogFieldCalf;
+
+  /// [#510] Hint of the LEFT-side input of a bilateral circumference pair. `I` = izquierda; translate to the local initial for "left".
+  ///
+  /// In es_AR, this message translates to:
+  /// **'I (cm)'**
+  String get measurementLogBilateralLeftHint;
+
+  /// [#510] Hint of the RIGHT-side input of a bilateral circumference pair. `D` = derecha; translate to the local initial for "right".
+  ///
+  /// In es_AR, this message translates to:
+  /// **'D (cm)'**
+  String get measurementLogBilateralRightHint;
+
+  /// [#510] ReviewBottomSheet title when the athlete already has a review for this link and is editing it.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Editá tu reseña'**
+  String get reviewSheetTitleEdit;
+
+  /// [#510] ReviewBottomSheet title when opened by the automatic 30-day prompt (ReviewTriggerVariant.thirtyDay).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ya llevás un mes entrenando con {trainerName}. ¿Cómo va?'**
+  String reviewSheetTitleThirtyDay(String trainerName);
+
+  /// [#510] Default ReviewBottomSheet title (opened from the profile CTA or after a link terminates).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Cómo fue tu experiencia con {trainerName}?'**
+  String reviewSheetTitleStandard(String trainerName);
+
+  /// [#510] Hint of the optional free-text comment field in ReviewBottomSheet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Contanos cómo fue (opcional)'**
+  String get reviewSheetCommentHint;
+
+  /// [#510] Dismiss action of ReviewBottomSheet. Uppercase by design — commonCancel is sentence case and cannot be reused here.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CANCELAR'**
+  String get reviewSheetCancel;
+
+  /// [#510] Primary submit action of ReviewBottomSheet, enabled only once a star rating is picked.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ENVIAR'**
+  String get reviewSheetSubmit;
+
+  /// [#510] Snackbar when the review write fails. Counterpart of reviewSnackBarSuccess; there is no auto-retry.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos guardar tu reseña. Probá de nuevo.'**
+  String get reviewSnackBarError;
+
+  /// [#510] ReviewCta label on the trainer's public profile when the athlete has NOT reviewed this link yet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DEJAR UNA RESEÑA'**
+  String get reviewCtaCreate;
+
+  /// [#510] ReviewCta label when a review already exists for the link — tapping reopens the sheet prefilled.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'EDITAR MI RESEÑA'**
+  String get reviewCtaEdit;
+
+  /// [#510] Stands in for the trainer's display name in the review sheet title when the public profile has not resolved yet. Reads naturally inside reviewSheetTitleStandard / reviewSheetTitleThirtyDay.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'tu Personal Trainer'**
+  String get reviewTrainerFallbackName;
+
+  /// [#510] Header of TrainerReviewsSection on the trainer's public profile.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'RESEÑAS'**
+  String get reviewsSectionTitle;
+
+  /// [#510] Empty state of TrainerReviewsSection when the trainer has no reviews.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sin reseñas todavía'**
+  String get reviewsSectionEmpty;
+
+  /// [#510] Author name fallback in ReviewTile when the public profile is missing (deleted account, ADR-RV-009).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Usuario eliminado'**
+  String get reviewTileDeletedUser;
+
+  /// [#510] Relative date in ReviewTile for a review posted less than a day ago.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'hoy'**
+  String get reviewTileDateToday;
+
+  /// [#510] Relative date in ReviewTile for reviews between 1 and 29 days old.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'hace {count} {count, plural, =1{día} other{días}}'**
+  String reviewTileDateDaysAgo(int count);
+
+  /// [#510] Relative date in ReviewTile for reviews between 1 and 11 months old. Beyond a year the tile falls back to a numeric DD/MM/YYYY date.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'hace {count} {count, plural, =1{mes} other{meses}}'**
+  String reviewTileDateMonthsAgo(int count);
+
+  /// Section label above the privacy pills in the shared PostPrivacySelector, used by the manual post composer and the share-workout composer.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VISIBILIDAD'**
+  String get postPrivacySelectorTitle;
+
+  /// PostPrivacySelector pill for posts visible only to the author's friends. Doubles as the pill's Semantics label.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SEGUIDORES'**
+  String get postPrivacyFriends;
+
+  /// PostPrivacySelector pill for posts visible to the author's gym. Disabled when the athlete has no gym.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MI GYM'**
+  String get postPrivacyGym;
+
+  /// PostPrivacySelector pill for posts visible to everyone.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PÚBLICO'**
+  String get postPrivacyPublic;
+
+  /// Hint shown under the PostPrivacySelector pills when the athlete has no gym, explaining why MI GYM is disabled.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Asociate a un gym para postear acá'**
+  String get postPrivacyNoGymHint;
+
+  /// Section heading for same-gym people suggested below the empty Friends feed.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PERSONAS DE TU GYM'**
+  String get suggestedUsersTitle;
+
+  /// Fallback display name for a suggested public profile without a name.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Anónimo'**
+  String get suggestedUserAnonymous;
+
+  /// Semantics label for a suggested-user row that opens that person's public profile.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver el perfil de {name}'**
+  String a11ySuggestedUserButton(String name);
+
+  /// Título de la pantalla de historial de notificaciones.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'NOTIFICACIONES'**
+  String get notificationHistoryTitle;
+
+  /// Estado vacío del historial de notificaciones.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no tenés notificaciones'**
+  String get notificationHistoryEmpty;
+
+  /// Estado de error del historial de notificaciones.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar tus notificaciones.'**
+  String get notificationHistoryError;
+
+  /// Acceso compacto a solicitudes de amistad pendientes.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =1{1 solicitud de seguidor pendiente} other{{count} solicitudes de seguidor pendientes}}'**
+  String notificationPendingRequests(int count);
+
+  /// Etiqueta accesible de la campanita de notificaciones del feed.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Abrir notificaciones'**
+  String get notificationBellA11y;
+
+  /// Etiqueta accesible de la campanita con su badge combinado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Abrir notificaciones, {count} pendientes'**
+  String notificationBellWithCountA11y(int count);
+
+  /// Título de la pantalla de post individual del feed.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PUBLICACIÓN'**
+  String get postDetailTitle;
+
+  /// Estado seguro mostrado cuando el post no existe, fue borrado o no se puede leer.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Este post ya no está disponible.'**
+  String get postDetailUnavailable;
+
+  /// Título del sheet de confirmación para dejar de seguir.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Dejar de seguir a {name}?'**
+  String feedUnfollowConfirmTitle(String name);
+
+  /// Botón que confirma dejar de seguir.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DEJAR DE SEGUIR'**
+  String get feedUnfollowConfirmAction;
+
+  /// Botón que descarta el sheet de dejar de seguir.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CANCELAR'**
+  String get feedUnfollowDismiss;
+
+  /// Título del sheet para cancelar una solicitud enviada.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Cancelar la solicitud a {name}?'**
+  String feedCancelRequestConfirmTitle(String name);
+
+  /// Botón que confirma cancelar la solicitud enviada.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CANCELAR SOLICITUD'**
+  String get feedCancelRequestConfirmAction;
+
+  /// Botón que descarta el sheet de cancelar solicitud. Dice VOLVER y no CANCELAR para no chocar con el botón que SÍ cancela la solicitud.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VOLVER'**
+  String get feedCancelRequestDismiss;
+
+  /// Semantics del pill en estado SEGUIR.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Seguir a esta persona'**
+  String get feedFollowButtonFollowA11y;
+
+  /// Semantics del pill en estado SIGUIENDO.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Siguiendo. Tocá para dejar de seguir'**
+  String get feedFollowButtonFollowingA11y;
+
+  /// Semantics del pill en estado SOLICITUD ENVIADA.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Solicitud enviada. Tocá para cancelarla'**
+  String get feedFollowButtonRequestedA11y;
+
+  /// Semantics del pill en estado ACEPTAR.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Aceptar la solicitud de seguidor'**
+  String get feedFollowButtonAcceptA11y;
+
+  /// Confirmación al seguir a una cuenta pública (auto-aceptada).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ahora seguís a esta persona.'**
+  String get feedFollowStartedSuccess;
+
+  /// Pill del segmento del feed que muestra posts de a quienes seguís.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SEGUIDORES'**
+  String get feedSegmentFollowing;
+
+  /// Estado vacío del feed SEGUIDORES.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no hay posts de a quienes seguís'**
+  String get feedEmptyFollowing;
+
+  /// Aviso persistente sobre el composer cuando el destinatario no sigue al usuario y por lo tanto el servidor deniega el envío (REQ-FOLLOW-021).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Para escribirle, esta persona tiene que seguirte.'**
+  String get chatBlockedComposerNotice;
+
+  /// Semantics del composer deshabilitado por falta de permiso.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No podés escribir en este chat'**
+  String get chatBlockedComposerHintA11y;
+
+  /// Pill de la lista de seguidores en la pantalla de seguidores/seguidos.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SEGUIDORES'**
+  String get followListTabFollowers;
+
+  /// Pill de la lista de seguidos en la pantalla de seguidores/seguidos.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SIGUIENDO'**
+  String get followListTabFollowing;
+
+  /// Estado vacío de la lista de seguidores de otra persona.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no tiene seguidores'**
+  String get followListEmptyFollowers;
+
+  /// Estado vacío de la lista de seguidores propia.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no tenés seguidores'**
+  String get followListEmptyFollowersSelf;
+
+  /// Estado vacío de la lista de seguidos de otra persona.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no sigue a nadie'**
+  String get followListEmptyFollowing;
+
+  /// Estado vacío de la lista de seguidos propia.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no seguís a nadie'**
+  String get followListEmptyFollowingSelf;
+
+  /// Error al cargar la lista de seguidores o seguidos.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar la lista. Intentá de nuevo.'**
+  String get followListLoadError;
+
+  /// Semantics del contador de SEGUIDORES del perfil, que abre la lista.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver seguidores'**
+  String get followListOpenFollowersA11y;
+
+  /// Semantics del contador de SIGUIENDO del perfil, que abre la lista.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver seguidos'**
+  String get followListOpenFollowingA11y;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

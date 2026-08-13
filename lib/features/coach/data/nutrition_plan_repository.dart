@@ -2,6 +2,7 @@ import 'dart:developer' as developer;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../../core/utils/firestore_write.dart';
 import '../domain/nutrition_plan.dart';
 
 /// Repository of PF-authored nutrition plans (Coach Hub web).
@@ -43,7 +44,7 @@ class NutritionPlanRepository {
   Future<void> save(NutritionPlan plan) async {
     final id = _docId(plan.trainerId, plan.athleteId);
     final withNow = plan.copyWith(id: id, updatedAt: DateTime.now());
-    await _collection.doc(id).set(withNow.toJson());
+    await _collection.doc(id).set(withNow.toJson()).boundedWrite;
   }
 
   Future<void> delete(String trainerId, String athleteId) async {

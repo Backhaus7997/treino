@@ -243,14 +243,13 @@ void main() {
   group('createUserOwned', () {
     test(
         'SCENARIO-USR-005: sets source=user-created, createdBy=uid, '
-        'visibility from draft (private by default), status=active',
-        () async {
+        'visibility from draft (private by default), status=active', () async {
       // Explicit private draft — REQ-USR-012 was reopened; the repo now
       // respects `draft.visibility` clamped to {private,public} rather than
       // hardcoding private. A draft without an explicit value is treated
       // as private by the repo (see `createUserOwned` clamp).
-      final draft = _minimalDraft()
-          .copyWith(visibility: RoutineVisibility.private);
+      final draft =
+          _minimalDraft().copyWith(visibility: RoutineVisibility.private);
 
       final saved = await repo.createUserOwned(uid: 'athlete-a', draft: draft);
 
@@ -267,8 +266,8 @@ void main() {
         () async {
       // The athlete may opt in at create time to share the routine on their
       // public profile. `_ShareOnProfileTile` sets visibility to public.
-      final draft = _minimalDraft()
-          .copyWith(visibility: RoutineVisibility.public);
+      final draft =
+          _minimalDraft().copyWith(visibility: RoutineVisibility.public);
 
       final saved = await repo.createUserOwned(uid: 'athlete-a', draft: draft);
 
@@ -284,8 +283,8 @@ void main() {
       // downgrade to `private` before write — the rule would reject
       // `shared` anyway, but this keeps the failure to a client error
       // rather than a permission-denied surprise.
-      final draft = _minimalDraft()
-          .copyWith(visibility: RoutineVisibility.shared);
+      final draft =
+          _minimalDraft().copyWith(visibility: RoutineVisibility.shared);
 
       final saved = await repo.createUserOwned(uid: 'athlete-a', draft: draft);
 

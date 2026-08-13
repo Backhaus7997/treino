@@ -24,10 +24,10 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:treino/features/feed/data/friendship_repository.dart';
+import 'package:treino/features/feed/data/follow_repository.dart';
+import 'package:treino/features/feed/domain/follow.dart';
 import 'package:treino/features/feed/data/post_repository.dart';
-import 'package:treino/features/feed/domain/friendship.dart';
-import 'package:treino/features/feed/domain/friendship_status.dart';
+import 'package:treino/features/feed/domain/follow_status.dart';
 import 'package:treino/features/feed/domain/post.dart';
 import 'package:treino/features/feed/domain/post_privacy.dart';
 import 'package:treino/features/feed/application/search_users_provider.dart';
@@ -45,7 +45,7 @@ Post _makePost({
   String authorDisplayName = 'Test User',
   String? authorGymId,
   String text = 'Test post',
-  PostPrivacy privacy = PostPrivacy.friends,
+  PostPrivacy privacy = PostPrivacy.followers,
   DateTime? createdAt,
 }) {
   return Post(
@@ -61,20 +61,17 @@ Post _makePost({
   );
 }
 
-Friendship _makeFriendship({
-  required String id,
-  required String uidA,
-  required String uidB,
-  required String requesterId,
-  FriendshipStatus status = FriendshipStatus.pending,
+Follow _edge(
+  String follower,
+  String followee, {
+  FollowStatus status = FollowStatus.pending,
 }) {
-  return Friendship(
-    id: id,
-    uidA: uidA,
-    uidB: uidB,
+  return Follow(
+    id: Follow.edgeId(follower, followee),
+    followerUid: follower,
+    followeeUid: followee,
     status: status,
-    requesterId: requesterId,
-    members: [uidA, uidB],
+    members: [follower, followee],
     createdAt: DateTime.utc(2026, 1, 1),
   );
 }
@@ -111,20 +108,21 @@ void main() {
         await repo.create(_makePost(
           id: 'post-$uid',
           authorUid: uid,
-          privacy: PostPrivacy.friends,
+          privacy: PostPrivacy.followers,
           createdAt: DateTime.utc(2026, 1, 1).add(Duration(days: i)),
         ));
       }
 
       final result = await repo.feedForFriends(friendUids);
+      final posts = result.posts;
 
       // All 11 friends-privacy posts are aggregated across both chunks.
-      expect(result.length, equals(11));
+      expect(posts.length, equals(11));
 
       // The merged list is globally newest-first (client re-sort across the
       // chunk boundary). The newest post is by friend-10 (2nd chunk), the
       // oldest by friend-00 (1st chunk).
-      final times = result.map((p) => p.createdAt).toList();
+      final times = posts.map((p) => p.createdAt).toList();
       for (var i = 0; i < times.length - 1; i++) {
         expect(
           times[i].isAfter(times[i + 1]) ||
@@ -133,9 +131,9 @@ void main() {
           reason: 'result must be sorted newest-first across chunk boundaries',
         );
       }
-      expect(result.first.authorUid, equals('friend-10'),
+      expect(posts.first.authorUid, equals('friend-10'),
           reason: 'newest post (2nd chunk) must lead the merged list');
-      expect(result.last.authorUid, equals('friend-00'),
+      expect(posts.last.authorUid, equals('friend-00'),
           reason: 'oldest post (1st chunk) must trail the merged list');
     });
 
@@ -145,12 +143,12 @@ void main() {
       await repo.create(_makePost(
         id: 'should-not-appear',
         authorUid: 'someone',
-        privacy: PostPrivacy.friends,
+        privacy: PostPrivacy.followers,
       ));
 
       final result = await repo.feedForFriends(const <String>[]);
 
-      expect(result, isEmpty);
+      expect(result.posts, isEmpty);
     });
   });
 
@@ -186,8 +184,7 @@ void main() {
           reason: 'an empty input id must be replaced by a generated doc id');
 
       // The persisted Firestore doc carries the denormalized gym id.
-      final snap =
-          await firestore.collection('posts').doc(persisted.id).get();
+      final snap = await firestore.collection('posts').doc(persisted.id).get();
       expect(snap.data()!['authorGymId'], equals('smart-fit-palermo'));
     });
 
@@ -207,7 +204,8 @@ void main() {
       final persisted = await repo.create(input);
 
       expect(persisted.authorGymId, equals('megatlon-recoleta'),
-          reason: 'explicit authorGymId must not be overwritten by the user doc');
+          reason:
+              'explicit authorGymId must not be overwritten by the user doc');
     });
 
     test('leaves authorGymId null when input is null and user doc has no gymId',
@@ -236,59 +234,43 @@ void main() {
   // maintain-follow-counters.test.ts.
 
   // ===========================================================================
-  // feed-42 — acceptedFriendsOf returns the OTHER member, excludes pending
+  // feed-42 — followingOf devuelve los SEGUIDOS y excluye los pending
   // ===========================================================================
-  group('feed-42 — acceptedFriendsOf returns peers and excludes pending', () {
+  group('feed-42 — followingOf devuelve los seguidos y excluye pending', () {
     late FakeFirebaseFirestore firestore;
-    late FriendshipRepository repo;
+    late FollowRepository repo;
 
     setUp(() {
       firestore = FakeFirebaseFirestore();
-      repo = FriendshipRepository(firestore: firestore);
+      repo = FollowRepository(firestore: firestore);
     });
 
-    test(
-        'returns ["u2","u3"] (the non-self members) and excludes a pending '
-        'friendship with u4', () async {
-      // Accepted: u1 ↔ u2
-      await firestore.collection('friendships').doc('u1_u2').set(
-            _makeFriendship(
-              id: 'u1_u2',
-              uidA: 'u1',
-              uidB: 'u2',
-              requesterId: 'u1',
-              status: FriendshipStatus.accepted,
-            ).toJson(),
-          );
-      // Accepted: u1 ↔ u3 (requested by u3 → exercises firstWhere on the OTHER)
-      await firestore.collection('friendships').doc('u1_u3').set(
-            _makeFriendship(
-              id: 'u1_u3',
-              uidA: 'u1',
-              uidB: 'u3',
-              requesterId: 'u3',
-              status: FriendshipStatus.accepted,
-            ).toJson(),
-          );
-      // Pending: u1 ↔ u4 (must be excluded — status filter)
-      await firestore.collection('friendships').doc('u1_u4').set(
-            _makeFriendship(
-              id: 'u1_u4',
-              uidA: 'u1',
-              uidB: 'u4',
-              requesterId: 'u4',
-              status: FriendshipStatus.pending,
-            ).toJson(),
-          );
+    Future<void> seed(Follow edge) =>
+        firestore.collection('follows').doc(edge.id).set(edge.toJson());
 
-      final friends = await repo.acceptedFriendsOf('u1');
+    test('devuelve ["u2","u3"] (los SEGUIDOS) y excluye la pendiente con u4',
+        () async {
+      // El caso original probaba `acceptedFriendsOf`, que devolvía "el otro
+      // miembro" de cada doc del par — o sea los DOS lados de la relación
+      // mezclados. Su sucesor `followingOf` devuelve sólo a quienes u1 sigue,
+      // que es la diferencia semántica del cambio de modelo.
+      await seed(_edge('u1', 'u2', status: FollowStatus.accepted));
+      await seed(_edge('u1', 'u3', status: FollowStatus.accepted));
+      // Pendiente: no cuenta como seguido todavía.
+      await seed(_edge('u1', 'u4'));
+      // Y ésta es la que el modelo viejo NO podía distinguir: u5 sigue a u1,
+      // pero u1 no sigue a u5. Con `acceptedFriendsOf` u5 habría aparecido.
+      await seed(_edge('u5', 'u1', status: FollowStatus.accepted));
 
-      expect(friends, containsAll(<String>['u2', 'u3']));
-      expect(friends.length, equals(2));
-      expect(friends, isNot(contains('u4')),
-          reason: 'pending friendship must not appear in accepted peers');
-      expect(friends, isNot(contains('u1')),
-          reason: 'the queried uid is never its own peer');
+      final following = await repo.followingOf('u1');
+
+      expect(following, containsAll(<String>['u2', 'u3']));
+      expect(following.length, equals(2));
+      expect(following, isNot(contains('u4')),
+          reason: 'una arista pendiente no es un seguido');
+      expect(following, isNot(contains('u5')),
+          reason: 'que u5 me siga no lo convierte en alguien que yo sigo');
+      expect(following, isNot(contains('u1')));
     });
   });
 
@@ -303,8 +285,7 @@ void main() {
       mockRepo = MockUserPublicProfileRepository();
     });
 
-    test(
-        "'  Tincho ' is normalized to 'tincho' before reaching the repository",
+    test("'  Tincho ' is normalized to 'tincho' before reaching the repository",
         () async {
       when(() => mockRepo.searchByDisplayName('tincho'))
           .thenAnswer((_) async => <UserPublicProfile>[]);

@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/chat/data/chat_repository.dart';
@@ -59,6 +60,130 @@ void main() {
       final fromB = await repo.getOrCreate(selfId: uidB, otherId: uidA);
       expect(fromA.chatId, fromB.chatId);
       expect(fromA.members, fromB.members);
+    });
+
+    // QA H8: pausar un vínculo es un hold temporal, no un corte. Antes solo un
+    // link 'active' estampaba el linkId, así que crear el chat con un alumno
+    // pausado sin chat previo fallaba contra las rules (que exigían 'active').
+    // Ahora 'paused' también cuenta.
+    Future<void> seedLink(String id, String status) => firestore
+        .collection('trainer_links')
+        .doc(id)
+        .set({'trainerId': uidA, 'athleteId': uidB, 'status': status});
+
+    test('vínculo paused → getOrCreate estampa el linkId', () async {
+      await seedLink('link-paused', 'paused');
+
+      await repo.getOrCreate(selfId: uidA, otherId: uidB);
+
+      final snap = await firestore.collection('chats').doc('aaa_bbb').get();
+      expect(snap.data()!['linkId'], 'link-paused');
+    });
+
+    test('vínculo active → getOrCreate estampa el linkId (regresión)',
+        () async {
+      await seedLink('link-active', 'active');
+
+      await repo.getOrCreate(selfId: uidA, otherId: uidB);
+
+      final snap = await firestore.collection('chats').doc('aaa_bbb').get();
+      expect(snap.data()!['linkId'], 'link-active');
+    });
+
+    test('vínculo terminated → NO estampa linkId (no cuenta como vigente)',
+        () async {
+      await seedLink('link-terminated', 'terminated');
+
+      await repo.getOrCreate(selfId: uidA, otherId: uidB);
+
+      final snap = await firestore.collection('chats').doc('aaa_bbb').get();
+      expect(snap.data()!.containsKey('linkId'), isFalse);
+    });
+  });
+
+  // ─── getOrCreate — createdAt sin resolver (#501) ─────────────────────────
+  //
+  // `createdAt` es un serverTimestamp: queda en null en la cache local hasta
+  // que el server acusa recibo del write. Offline eso puede no pasar nunca en
+  // toda la sesión. Los streams se dan el lujo de descartar ese doc
+  // (`whereType`) porque el próximo snapshot lo trae resuelto; getOrCreate es
+  // one-shot y no tiene próximo snapshot: si descarta, el usuario se queda sin
+  // chat.
+  //
+  // FakeFirebaseFirestore resuelve el serverTimestamp al instante, así que el
+  // estado pendiente se simula escribiendo el doc SIN createdAt — que es
+  // exactamente lo que ve el cliente offline.
+
+  group('getOrCreate — createdAt pendiente / offline (#501)', () {
+    test('no lanza con un doc existente sin createdAt resuelto', () async {
+      await firestore.collection('chats').doc('aaa_bbb').set({
+        'chatId': 'aaa_bbb',
+        'members': ['aaa', 'bbb'],
+      });
+
+      final chat = await repo.getOrCreate(selfId: uidA, otherId: uidB);
+
+      expect(chat.chatId, 'aaa_bbb');
+      expect(chat.members, ['aaa', 'bbb']);
+    });
+
+    test('degrada createdAt al reloj local mientras el server no confirma',
+        () async {
+      final before = DateTime.now().toUtc();
+      await firestore.collection('chats').doc('aaa_bbb').set({
+        'chatId': 'aaa_bbb',
+        'members': ['aaa', 'bbb'],
+      });
+
+      final chat = await repo.getOrCreate(selfId: uidA, otherId: uidB);
+
+      expect(chat.createdAt.isBefore(before), isFalse);
+      expect(
+        chat.createdAt.isAfter(DateTime.now().toUtc().add(
+              const Duration(seconds: 1),
+            )),
+        isFalse,
+      );
+    });
+
+    test('conserva el resto del doc pendiente (lastMessage*)', () async {
+      await firestore.collection('chats').doc('aaa_bbb').set({
+        'chatId': 'aaa_bbb',
+        'members': ['aaa', 'bbb'],
+        'lastMessageText': 'hola',
+        'lastMessageSenderId': 'bbb',
+        'lastMessageAt': Timestamp.fromDate(DateTime.utc(2026, 5, 21)),
+      });
+
+      final chat = await repo.getOrCreate(selfId: uidA, otherId: uidB);
+
+      expect(chat.lastMessageText, 'hola');
+      expect(chat.lastMessageSenderId, 'bbb');
+      expect(chat.lastMessageAt, DateTime.utc(2026, 5, 21));
+    });
+
+    test('no re-crea el doc pendiente: sigue siendo idempotente', () async {
+      await firestore.collection('chats').doc('aaa_bbb').set({
+        'chatId': 'aaa_bbb',
+        'members': ['aaa', 'bbb'],
+      });
+
+      await repo.getOrCreate(selfId: uidA, otherId: uidB);
+
+      final snap = await firestore.collection('chats').doc('aaa_bbb').get();
+      expect(snap.data()!['createdAt'], isNull);
+      expect((await firestore.collection('chats').get()).docs.length, 1);
+    });
+
+    test('members cae al par ordenado si el doc pendiente no los trajo',
+        () async {
+      await firestore.collection('chats').doc('aaa_bbb').set({
+        'chatId': 'aaa_bbb',
+      });
+
+      final chat = await repo.getOrCreate(selfId: uidB, otherId: uidA);
+
+      expect(chat.members, ['aaa', 'bbb']);
     });
   });
 

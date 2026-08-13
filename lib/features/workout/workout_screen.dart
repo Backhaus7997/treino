@@ -4,34 +4,32 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/theme/app_motion.dart';
 import '../../app/theme/app_palette.dart';
 import '../../core/widgets/motion/treino_fade_slide_in.dart';
-import '../gym_rankings/presentation/rankings_screen.dart' show RankingsBody;
 import '../profile/application/user_providers.dart';
 import '../profile/domain/user_role.dart';
 import 'presentation/widgets/historial_section.dart';
-import 'presentation/widgets/mi_plan_section.dart';
-import 'presentation/widgets/mis_rutinas_section.dart';
-import 'presentation/widgets/plantillas_section.dart';
-import 'presentation/widgets/trainer_templates_section.dart';
+import 'presentation/widgets/plantillas_tab.dart';
+import 'presentation/widgets/rutinas_section.dart';
 import 'trainer_workout_view.dart';
 
 /// Role-aware workout screen.
 ///
-/// - Athlete → 2-page swipeable Entrenar tab: "Tu entreno" (page 0, existing
-///   body) + "Rankings" (page 1, relocated from `/profile/rankings` — spec
-///   `gym-rankings` — Rankings Placement, design `sdd/rankings-v2/design`
-///   AD-1/AD-2).
+/// - Athlete → 2-page swipeable Entrenar tab (workout redesign slice 2):
+///   "Tu entreno" (page 0 — unified routines + history) + "Plantillas"
+///   (page 1 — the full template grid, coach-shared + catalog). Same
+///   segmented-pill pattern the tab had in the rankings era; rankings itself
+///   now lives in the FEED tab (`/feed?tab=rankings`) — see [FeedScreen].
 /// - Trainer → [TrainerWorkoutView] dedicated to plan creation. Trainers
 ///   should not see athlete-mode controls (no EMPEZAR, no historial propio,
-///   no rankings page); their WORKOUT surface is exclusively for assigning
+///   no template grid); their WORKOUT surface is exclusively for assigning
 ///   routines.
 /// - Loading → empty surface (matches [HomeScreen] / [CoachScreen] pattern).
 class WorkoutScreen extends ConsumerWidget {
   const WorkoutScreen({super.key, this.initialTab});
 
-  /// Optional initial sub-tab — accepts `'rankings'`. Read from the
-  /// `?tab=` query param by the `/workout` route builder (design AD-2,
-  /// mirrors `CoachScreen.initialTab` → `TrainerCoachView`). Ignored for the
-  /// trainer view.
+  /// Optional initial sub-tab — accepts `'plantillas'`. Read from the
+  /// `?tab=` query param by the `/workout` route builder (mirrors
+  /// `CoachScreen.initialTab` / `FeedScreen.initialTab`). Unknown values
+  /// fall back to page 0. Ignored for the trainer view.
   final String? initialTab;
 
   @override
@@ -49,25 +47,35 @@ class WorkoutScreen extends ConsumerWidget {
 }
 
 /// Athlete workout — fixed 2-page [DefaultTabController] + swipeable
-/// [TabBarView] (design AD-1). ALL state-branching (loading/no-gym/opted-out/
-/// leaderboards) lives INSIDE page 1 (`_RankingsPage`) — the child list
-/// itself never branches, so page identity/order never changes across
-/// rebuilds. Page 0 keeps its provider subscriptions alive via
-/// [AutomaticKeepAliveClientMixin] while swiped away; page 1's Firestore
-/// leaderboard listeners are `autoDispose` and release on swipe-away.
+/// [TabBarView] (same structure the rankings-era tab used). BOTH pages keep
+/// their provider subscriptions alive via [AutomaticKeepAliveClientMixin]
+/// while swiped away — swapping tabs must not tear down streams (the coach
+/// cards would pop in late on every visit). Everything (autoDispose chains
+/// included) is released together when the athlete leaves the `/workout`
+/// route, matching the lifetime the old single-page sections had.
 class _AthleteWorkout extends StatelessWidget {
   const _AthleteWorkout({this.initialTab});
 
   final String? initialTab;
 
-  static const _labels = <String>['TU ENTRENO', 'RANKINGS'];
+  static const _labels = <String>['TU ENTRENO', 'PLANTILLAS'];
 
-  static int _resolveInitialIndex(String? tab) => tab == 'rankings' ? 1 : 0;
+  static int _resolveInitialIndex(String? tab) => tab == 'plantillas' ? 1 : 0;
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final theme = Theme.of(context);
+    final textScaler = MediaQuery.textScalerOf(context);
+    final labelStyle = theme.textTheme.labelLarge?.copyWith(
+      fontWeight: FontWeight.w700,
+      letterSpacing: 0.5,
+    );
+    final scaledLabelHeight = textScaler.scale(labelStyle?.fontSize ?? 14) *
+        (labelStyle?.height ?? 1.2);
+    final tabHeight =
+        scaledLabelHeight + 20 < 40 ? 40.0 : scaledLabelHeight + 20;
+    final scrollTabs = textScaler.scale(1) > 1.3;
 
     return DefaultTabController(
       length: _labels.length,
@@ -87,6 +95,8 @@ class _AthleteWorkout extends StatelessWidget {
               ),
             ),
             child: TabBar(
+              isScrollable: scrollTabs,
+              tabAlignment: scrollTabs ? TabAlignment.start : TabAlignment.fill,
               dividerColor: Colors.transparent,
               indicatorSize: TabBarIndicatorSize.tab,
               indicator: BoxDecoration(
@@ -96,19 +106,27 @@ class _AthleteWorkout extends StatelessWidget {
               splashBorderRadius: BorderRadius.circular(20),
               labelColor: palette.bg,
               unselectedLabelColor: palette.textMuted,
-              labelStyle: theme.textTheme.labelLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.5,
-              ),
-              tabs: [for (final l in _labels) Tab(text: l, height: 40)],
+              labelStyle: labelStyle,
+              tabs: [
+                for (final label in _labels)
+                  Tab(
+                    height: tabHeight,
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      softWrap: false,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+              ],
             ),
           ),
           const SizedBox(height: 8),
           const Expanded(
             child: TabBarView(
-              // Swipeable per spec `gym-rankings` — Rankings Placement
-              // ("reachable by horizontal swipe and/or a top tab control").
-              children: [_TuEntrenoPage(), _RankingsPage()],
+              // Swipeable on purpose — same gesture language the tab had in
+              // the rankings era.
+              children: [_TuEntrenoPage(), PlantillasTab()],
             ),
           ),
         ],
@@ -117,10 +135,10 @@ class _AthleteWorkout extends StatelessWidget {
   }
 }
 
-/// Page 0 — original [WorkoutScreen] body extracted intact, now wrapped with
-/// [AutomaticKeepAliveClientMixin] so its section providers (MiPlan/
-/// TrainerTemplates/MisRutinas/Plantillas/Historial) are NOT rebuilt when
-/// swiping to page 1 and back (design AD-1 rebuild-safety).
+/// Page 0 — unified RUTINAS list (workout redesign slice 1: former "Mi plan"
+/// + "Mis rutinas" merged, coach plans pinned with their own chip) + session
+/// history. Wrapped with [AutomaticKeepAliveClientMixin] so its section
+/// providers are NOT rebuilt when swiping to PLANTILLAS and back.
 class _TuEntrenoPage extends StatefulWidget {
   const _TuEntrenoPage();
 
@@ -138,7 +156,13 @@ class _TuEntrenoPageState extends State<_TuEntrenoPage>
     super.build(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: ListView(
+      // SingleChildScrollView + Column (no ListView(children:)): un ListView,
+      // aunque construya sus widgets eager, sigue siendo un viewport — los
+      // Elements/State de los TreinoFadeSlideIn que salen del cacheExtent se
+      // desmontan y re-animan al volver a scrollear. Column dentro de
+      // SingleChildScrollView scrollea como una sola unidad, sin reciclar
+      // Elements por ítem (ver doc de TreinoFadeSlideIn).
+      child: SingleChildScrollView(
         // + bottom inset: the floating bar overlays the body (extendBody),
         // so the last item needs room to scroll out from behind it.
         padding: EdgeInsets.fromLTRB(
@@ -148,58 +172,21 @@ class _TuEntrenoPageState extends State<_TuEntrenoPage>
           20 + MediaQuery.paddingOf(context).bottom,
         ),
         physics: const AlwaysScrollableScrollPhysics(),
-        children: [
-          TreinoFadeSlideIn(
-            delay: AppMotion.stagger(0),
-            child: const MiPlanSection(),
-          ),
-          const SizedBox(height: 12),
-          // Trainer-shared templates surface — invisible if the athlete has
-          // no active link or the trainer hasn't opted in. Sits between
-          // "Mi plan" (their assigned routine) and "Plantillas" (catalog)
-          // because conceptually it's still "stuff your trainer made for
-          // you", just non-assigned.
-          TreinoFadeSlideIn(
-            delay: AppMotion.stagger(1),
-            child: const TrainerTemplatesSection(),
-          ),
-          const SizedBox(height: 12),
-          // Athlete-authored routines (athlete-self-routines SDD).
-          // Belongs after TrainerTemplates because both are "my plans"
-          // (trainer-sourced first, then self-made), then the public
-          // catalog Plantillas, then Historial.
-          TreinoFadeSlideIn(
-            delay: AppMotion.stagger(2),
-            child: const MisRutinasSection(),
-          ),
-          const SizedBox(height: 12),
-          TreinoFadeSlideIn(
-            delay: AppMotion.stagger(3),
-            child: const PlantillasSection(),
-          ),
-          const SizedBox(height: 12),
-          TreinoFadeSlideIn(
-            delay: AppMotion.stagger(4),
-            child: const HistorialSection(),
-          ),
-        ],
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TreinoFadeSlideIn(
+              delay: AppMotion.stagger(0),
+              child: const RutinasSection(),
+            ),
+            const SizedBox(height: 12),
+            TreinoFadeSlideIn(
+              delay: AppMotion.stagger(1),
+              child: const HistorialSection(),
+            ),
+          ],
+        ),
       ),
     );
-  }
-}
-
-/// Page 1 — thin host that composes the Phase 1 gating wrapper
-/// ([RankingsBody], relocated from `RankingsScreen`) — a self-contained
-/// widget that owns its own header (design AD-7: slim `RANKINGS` title +
-/// disable affordance, replacing the old back-button header now that this
-/// is a tab page, not a pushed route) and all state-branching (no-gym /
-/// opted-out / leaderboards). NOT kept alive — its leaderboard listeners are
-/// `autoDispose` and release on swipe-away (design AD-1).
-class _RankingsPage extends StatelessWidget {
-  const _RankingsPage();
-
-  @override
-  Widget build(BuildContext context) {
-    return const RankingsBody();
   }
 }

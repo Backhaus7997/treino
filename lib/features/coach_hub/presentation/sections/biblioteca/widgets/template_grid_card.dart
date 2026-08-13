@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach_hub/presentation/sections/biblioteca/widgets/template_format.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
@@ -38,7 +39,7 @@ class TemplateGridCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
 
-    return GestureDetector(
+    return TreinoTappable(
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(

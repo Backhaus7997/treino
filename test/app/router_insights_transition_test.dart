@@ -1,13 +1,16 @@
-// TREINO Motion PR3 — smoke de navegación de las 5 rutas de insights que
-// migraron de `builder:` (default de plataforma) a `pageBuilder: _report(...)`
-// (CustomTransitionPage con fade + subida sutil, duración AppMotion.slow).
+// Smoke de navegación de las 5 rutas de insights, que usan
+// `pageBuilder: _report(...)` — ahora una CupertinoPageRoute (slide nativo +
+// gesto de swipe-back) con un fade encima. El swipe-back se había perdido
+// cuando _report era un CustomTransitionPage (TREINO Motion PR3); se restauró
+// extendiendo CupertinoPageRoute (opción B).
 //
-// Verifica que cada ruta monta su pantalla a través de la transición custom
-// sin excepciones, y que el pop (reverse transition con curva exit) vuelve
-// bien. No valida el "feel" — eso es de los widget tests de los motion
-// widgets y del ojo humano en device.
+// Verifica que cada ruta monta su pantalla a través de la transición sin
+// excepciones, que el pop vuelve bien, y que la transición nativa de Cupertino
+// (que aporta el back-gesture) está presente — un CustomTransitionPage NO
+// produciría un CupertinoPageTransition.
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -127,7 +130,20 @@ void main() {
       expect(find.byType(entry.value), findsOneWidget,
           reason: '${entry.key} debe montar ${entry.value}');
 
-      // Pop: reverse transition (reverseTransitionDuration + curva exit).
+      // Swipe-back: la ruta es una CupertinoPageRoute (opción B) → produce un
+      // CupertinoPageTransition, que trae el back-gesture. El viejo _report
+      // (CustomTransitionPage) no lo producía.
+      expect(find.byType(CupertinoPageTransition), findsWidgets,
+          reason: '${entry.key} debe usar la transición nativa de Cupertino '
+              '(swipe-back)');
+      final route = ModalRoute.of(tester.element(find.byType(entry.value)))!;
+      expect(route, isA<CupertinoRouteTransitionMixin>(),
+          reason: '${entry.key} debe ser una ruta Cupertino con back-gesture');
+      expect((route as CupertinoRouteTransitionMixin).popGestureEnabled, isTrue,
+          reason: 'el gesto de volver-deslizando debe estar habilitado en '
+              '${entry.key}');
+
+      // Pop: reverse transition.
       router.pop();
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 160));

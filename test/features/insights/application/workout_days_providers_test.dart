@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:treino/core/utils/argentina_time.dart';
 import 'package:treino/features/insights/application/workout_days_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/data/session_repository.dart';
@@ -38,15 +39,18 @@ void main() {
     test('marks exactly the trained days of the selected month', () async {
       final repo = MockSessionRepository();
       when(() => repo.listByUid('u1')).thenAnswer((_) async => [
+            // [#379] Real UTC instants at NOON → unambiguous Argentina days
+            // (Jun 1 / Jun 30); day-boundary LOCAL midnights would shift −3h
+            // into the previous day/month under toArgentina.
             makeSession(
               id: 's1',
-              startedAt: DateTime(2026, 6, 1),
+              startedAt: DateTime.utc(2026, 6, 1, 12),
               status: SessionStatus.finished,
               wasFullyCompleted: true,
             ),
             makeSession(
               id: 's2',
-              startedAt: DateTime(2026, 6, 30),
+              startedAt: DateTime.utc(2026, 6, 30, 12),
               status: SessionStatus.finished,
               wasFullyCompleted: true,
             ),
@@ -79,8 +83,13 @@ void main() {
     test('streak value comes from computeStreak over the FULL session list',
         () async {
       final repo = MockSessionRepository();
-      final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
+      // computeStreak buckets by the Argentina calendar day (#411). Anchor to
+      // `argentinaNow()` and build UTC-flagged noon instants (= 09:00 ART, same
+      // ART day under any runner, never crosses midnight) — mirroring real data
+      // (always UTC-flagged via TimestampConverter). A device-local midnight
+      // fixture would flake near the ART day boundary.
+      final nowArt = argentinaNow();
+      final today = DateTime.utc(nowArt.year, nowArt.month, nowArt.day, 12);
       when(() => repo.listByUid('u1')).thenAnswer((_) async => [
             makeSession(
                 id: 's1',
@@ -102,7 +111,7 @@ void main() {
 
       final result = await container.read(
         athleteWorkoutDaysProvider(
-          (uid: 'u1', month: DateTime(today.year, today.month)),
+          (uid: 'u1', month: DateTime(nowArt.year, nowArt.month)),
         ).future,
       );
 

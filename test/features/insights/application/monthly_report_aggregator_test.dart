@@ -24,15 +24,19 @@ Session _session(
 
 void main() {
   group('aggregateMonthlyReport', () {
-    test('buckets sessions into their calendar month (local time)', () {
-      // 'now' anchors the last-12-months window: Jan 2026.
+    test('buckets sessions into their calendar month (Argentina time)', () {
+      // [#379] Bucketing is by the ARGENTINA calendar month
+      // (toArgentina(startedAt)), so sessions are stored as real UTC instants at
+      // NOON — day-1 LOCAL midnight would shift −3h into the previous month and
+      // mis-bucket. `now` only anchors the 12-month window (field read), so it
+      // stays a plain local value.
       final now = DateTime(2026, 1, 15);
       final sessions = [
-        _session('s1', DateTime(2025, 6, 10),
+        _session('s1', DateTime.utc(2025, 6, 10, 12),
             durationMin: 40, totalVolumeKg: 1000),
-        _session('s2', DateTime(2025, 6, 20),
+        _session('s2', DateTime.utc(2025, 6, 20, 12),
             durationMin: 30, totalVolumeKg: 500),
-        _session('s3', DateTime(2025, 7, 1), durationMin: 50),
+        _session('s3', DateTime.utc(2025, 7, 1, 12), durationMin: 50),
       ];
       final setsCountBySessionId = {'s1': 12, 's2': 8, 's3': 10};
 
@@ -98,7 +102,8 @@ void main() {
     test('handles year rollover (Jan back to previous December)', () {
       final now = DateTime(2026, 1, 20);
       final sessions = [
-        _session('s1', DateTime(2025, 2, 1)),
+        // UTC noon → Argentina Feb 1 (day-1 local midnight would slip to Jan).
+        _session('s1', DateTime.utc(2025, 2, 1, 12)),
       ];
 
       final report = aggregateMonthlyReport(
@@ -121,8 +126,10 @@ void main() {
     test('current partial month includes sessions up to "now"', () {
       final now = DateTime(2026, 6, 15);
       final sessions = [
-        _session('s1', DateTime(2026, 6, 1), durationMin: 20),
-        _session('s2', DateTime(2026, 6, 30), durationMin: 20),
+        // UTC noon → both land in Argentina June (day-1/day-30 midnights would
+        // slip to May 31 / June 30 respectively under the −3h shift).
+        _session('s1', DateTime.utc(2026, 6, 1, 12), durationMin: 20),
+        _session('s2', DateTime.utc(2026, 6, 30, 12), durationMin: 20),
       ];
 
       final report = aggregateMonthlyReport(
@@ -184,11 +191,13 @@ void main() {
 
     test('daily duration report returns every day in selected month', () {
       final month = DateTime(2026, 6, 1);
+      // UTC instants → Argentina days: s1/s2 on Jun 1 (09:00 / 15:00 ART), s3 on
+      // Jun 2, s4 on Jul 1. Day-1 LOCAL midnight would spill to the prior day.
       final sessions = [
-        _session('s1', DateTime(2026, 6, 1), durationMin: 40),
-        _session('s2', DateTime(2026, 6, 1, 18), durationMin: 25),
-        _session('s3', DateTime(2026, 6, 2), durationMin: 50),
-        _session('s4', DateTime(2026, 7, 1), durationMin: 90),
+        _session('s1', DateTime.utc(2026, 6, 1, 12), durationMin: 40),
+        _session('s2', DateTime.utc(2026, 6, 1, 18), durationMin: 25),
+        _session('s3', DateTime.utc(2026, 6, 2, 12), durationMin: 50),
+        _session('s4', DateTime.utc(2026, 7, 1, 12), durationMin: 90),
       ];
 
       final points = aggregateDailyDurationReport(

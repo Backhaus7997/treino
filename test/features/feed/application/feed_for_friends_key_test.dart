@@ -12,7 +12,7 @@ Post _makePost(String id) => Post(
       authorGymId: null,
       text: 'Hola',
       routineTag: null,
-      privacy: PostPrivacy.friends,
+      privacy: PostPrivacy.followers,
       createdAt: DateTime.utc(2026, 5, 14, 10, 0, 0),
     );
 
@@ -65,10 +65,10 @@ void main() {
       final keyFromFirstEmission = friendUidsKey(['u2', 'u3']);
       final keyFromSecondEmission = friendUidsKey(['u3', 'u2']);
 
-      final first =
-          await container.read(feedForFriendsProvider(keyFromFirstEmission).future);
-      final second =
-          await container.read(feedForFriendsProvider(keyFromSecondEmission).future);
+      final first = await container
+          .read(feedForFriendsProvider(keyFromFirstEmission).future);
+      final second = await container
+          .read(feedForFriendsProvider(keyFromSecondEmission).future);
 
       expect(first, equals(posts));
       expect(second, equals(posts));

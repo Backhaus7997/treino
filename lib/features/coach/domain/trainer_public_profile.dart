@@ -45,6 +45,16 @@ class TrainerPublicProfile with _$TrainerPublicProfile {
     // ADR-RV-005: MUST NOT appear in UserRepository._trainerPublicFields.
     double? averageRating,
     @Default(0) int reviewCount,
+    // ── Stats reales del perfil público (#388) ─────────────────────────────
+    // `trainerExperienceYears` es self-attested: lo edita el PF en su form y
+    // llega acá vía el dual-write de UserRepository (como trainerBio).
+    // `athleteCount` es un agregado derivado (count de trainer_links activos),
+    // escrito exclusivamente por el linkAggregate Cloud Function — mismo
+    // contrato que averageRating/reviewCount: MUST NOT aparecer en
+    // UserRepository._trainerPublicFields ni ser escribible por el cliente
+    // (pin en firestore.rules). Null ⇒ nunca computado → la UI muestra "—".
+    int? trainerExperienceYears,
+    int? athleteCount,
   }) = _TrainerPublicProfile;
 
   factory TrainerPublicProfile.fromJson(Map<String, Object?> json) =>

@@ -133,6 +133,7 @@ List<String> geohashNeighbors5x5(String geohash) {
   for (final cell in ring1) {
     grid.addAll(geohashNeighbors(cell));
   }
-  grid.remove(geohash); // center is prepended by the caller, as with geohashNeighbors
+  grid.remove(
+      geohash); // center is prepended by the caller, as with geohashNeighbors
   return grid.toList();
 }

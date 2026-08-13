@@ -49,9 +49,8 @@ ExerciseProgressionChartLabels _chartLabels() => ExerciseProgressionChartLabels(
       bestSessionVolumeLabel: 'Volumen',
       volumeUnit: 'kg·reps',
       weightUnit: 'kg',
-      frequencyLabel: (n) => n == 1
-          ? '1 sesión en las últimas 8 semanas'
-          : '$n sesiones en las últimas 8 semanas',
+      frequencyLabel: (n) =>
+          n == 1 ? '1 sesión en este período' : '$n sesiones en este período',
       singlePointHint: 'Necesitás al menos 2 sesiones para ver la evolución.',
       emptyHint: 'Sin datos suficientes para este ejercicio.',
     );

@@ -86,8 +86,7 @@ void main() {
     );
   }
 
-  testWidgets(
-      'reps field is prefilled with the planned reps on a pending row',
+  testWidgets('reps field is prefilled with the planned reps on a pending row',
       (tester) async {
     await tester.pumpWidget(
       _wrap(
@@ -106,13 +105,13 @@ void main() {
 
     // Two TextFields in the current row: reps (first, left) + weight
     // (second, right). Reps prefilled with the planned value.
-    final fields = tester.widgetList<TextField>(find.byType(TextField)).toList();
+    final fields =
+        tester.widgetList<TextField>(find.byType(TextField)).toList();
     expect(fields.length, greaterThanOrEqualTo(2));
     expect(fields.first.controller?.text, '10');
   });
 
-  testWidgets(
-      'editing reps before check → the check logs the EDITED value',
+  testWidgets('editing reps before check → the check logs the EDITED value',
       (tester) async {
     SetLog? logged;
     await tester.pumpWidget(
@@ -172,8 +171,7 @@ void main() {
     expect(logged!.reps, 15);
   });
 
-  testWidgets(
-      'clearing reps → check is a no-op (no zero-rep set logged)',
+  testWidgets('clearing reps → check is a no-op (no zero-rep set logged)',
       (tester) async {
     SetLog? logged;
     late _CapturingNotifier notifier;
@@ -203,8 +201,7 @@ void main() {
     expect(notifier.logCallCount, 0);
   });
 
-  testWidgets(
-      'reps field rejects non-digit input via digitsOnly formatter',
+  testWidgets('reps field rejects non-digit input via digitsOnly formatter',
       (tester) async {
     await tester.pumpWidget(
       _wrap(
@@ -226,22 +223,18 @@ void main() {
     // empty, and "1a2b3" resolves to "123".
     await tester.enterText(find.byType(TextField).first, 'abc');
     await tester.pump();
-    final fields = tester
-        .widgetList<TextField>(find.byType(TextField))
-        .toList();
+    final fields =
+        tester.widgetList<TextField>(find.byType(TextField)).toList();
     expect(fields.first.controller?.text, '');
 
     await tester.enterText(find.byType(TextField).first, '1a2b3');
     await tester.pump();
-    final updated = tester
-        .widgetList<TextField>(find.byType(TextField))
-        .toList();
+    final updated =
+        tester.widgetList<TextField>(find.byType(TextField)).toList();
     expect(updated.first.controller?.text, '123');
   });
 
-  testWidgets(
-      'reps field caps at 3 digits (max 999)',
-      (tester) async {
+  testWidgets('reps field caps at 3 digits (max 999)', (tester) async {
     await tester.pumpWidget(
       _wrap(
         const SessionPlayerScreen(init: _kInit),
@@ -259,9 +252,8 @@ void main() {
 
     await tester.enterText(find.byType(TextField).first, '9999');
     await tester.pump();
-    final fields = tester
-        .widgetList<TextField>(find.byType(TextField))
-        .toList();
+    final fields =
+        tester.widgetList<TextField>(find.byType(TextField)).toList();
     expect(fields.first.controller?.text, '999');
   });
 }

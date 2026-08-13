@@ -16,12 +16,16 @@ Widget _wrap(Widget child) => MaterialApp(
 TrainerPublicProfile _profile({
   double? averageRating,
   int reviewCount = 0,
+  int? trainerExperienceYears,
+  int? athleteCount,
 }) =>
     TrainerPublicProfile(
       uid: 'trainer-1',
       displayName: 'Carlos Trainer',
       averageRating: averageRating,
       reviewCount: reviewCount,
+      trainerExperienceYears: trainerExperienceYears,
+      athleteCount: athleteCount,
     );
 
 void main() {
@@ -74,6 +78,56 @@ void main() {
       ));
 
       expect(find.text('—'), findsWidgets);
+    });
+  });
+
+  group('TrainerStatsRow — #388 AÑOS EXP y ALUMNOS reales', () {
+    testWidgets(
+        '#388: trainerExperienceYears y athleteCount cargados → muestra los '
+        'valores reales y NINGÚN "—"', (tester) async {
+      await tester.pumpWidget(_wrap(
+        TrainerStatsRow(
+          profile: _profile(
+            averageRating: 4.7,
+            reviewCount: 3,
+            trainerExperienceYears: 5,
+            athleteCount: 2,
+          ),
+        ),
+      ));
+
+      // AÑOS EXP = 5, ALUMNOS = 2 (el caso del seed de coach.lautaro).
+      expect(find.text('5'), findsOneWidget);
+      expect(find.text('2'), findsOneWidget);
+      expect(find.text('—'), findsNothing);
+    });
+
+    testWidgets('#388: athleteCount == 0 computado → muestra "0", no "—"',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        TrainerStatsRow(
+          profile: _profile(athleteCount: 0),
+        ),
+      ));
+
+      // 0 alumnos es dato real (CF ya computó); "—" queda solo para RESEÑAS
+      // (sin reviews) y AÑOS EXP (sin cargar).
+      expect(find.text('0'), findsOneWidget);
+      expect(find.text('—'), findsNWidgets(2));
+    });
+
+    testWidgets(
+        '#388: sin datos cargados/computados → fallback "—" en EXP y ALUMNOS',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        TrainerStatsRow(
+          profile: _profile(averageRating: 4.7, reviewCount: 3),
+        ),
+      ));
+
+      // RESEÑAS resuelve 4.7; EXP y ALUMNOS null → dos placeholders.
+      expect(find.text('4.7'), findsOneWidget);
+      expect(find.text('—'), findsNWidgets(2));
     });
   });
 }

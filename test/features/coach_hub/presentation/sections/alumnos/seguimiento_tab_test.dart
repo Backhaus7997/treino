@@ -141,16 +141,14 @@ List<Override> _baseOverrides({
 }) =>
     [
       currentUidProvider.overrideWithValue(_trainerUid),
-      trainerLinksStreamProvider
-          .overrideWith((ref) => Stream.value([_link()])),
+      trainerLinksStreamProvider.overrideWith((ref) => Stream.value([_link()])),
       userPublicProfilesBatchProvider
           .overrideWith((ref, key) => {_athleteUid: _profile()}),
       userPublicProfileProvider
           .overrideWith((ref, id) => Stream.value(_profile())),
       pagosPorCobrarProvider
           .overrideWith((ref) => const AsyncData(<CobroPendiente>[])),
-      finishedTodayByUidProvider
-          .overrideWith((ref, uid) => const <Session>[]),
+      finishedTodayByUidProvider.overrideWith((ref, uid) => const <Session>[]),
       measurementsForAthleteProvider
           .overrideWith((ref, id) => Stream.value(const <Measurement>[])),
       performanceTestsForAthleteProvider
@@ -158,8 +156,7 @@ List<Override> _baseOverrides({
       gymsProvider.overrideWith((ref) => const <Gym>[]),
       athleteBillingProvider.overrideWith((ref, id) => Stream.value(null)),
       sessionsByUidProvider.overrideWith((ref, id) => const <Session>[]),
-      assignedRoutinesProvider
-          .overrideWith((ref, id) => const <Routine>[]),
+      assignedRoutinesProvider.overrideWith((ref, id) => const <Routine>[]),
       athleteNoteProvider(
         (trainerId: _trainerUid, athleteId: _athleteUid),
       ).overrideWith((ref) => const Stream.empty()),
@@ -171,8 +168,7 @@ List<Override> _baseOverrides({
       followUpEntriesProvider(
         (trainerId: _trainerUid, athleteId: _athleteUid),
       ).overrideWith((ref) => Stream.value(entries)),
-      if (repo != null)
-        followUpEntryRepositoryProvider.overrideWithValue(repo),
+      if (repo != null) followUpEntryRepositoryProvider.overrideWithValue(repo),
     ];
 
 Widget _wrap(List<Override> overrides) => ProviderScope(
@@ -220,8 +216,7 @@ void main() {
     );
   });
 
-  testWidgets(
-      'populated list renderiza cada entrada con tag chip y texto',
+  testWidgets('populated list renderiza cada entrada con tag chip y texto',
       (tester) async {
     final entries = [
       _entry(
@@ -248,8 +243,7 @@ void main() {
     expect(find.text('MOLESTIA'), findsOneWidget);
   });
 
-  testWidgets(
-      'tap en trash → confirm dialog → repository.delete llamado',
+  testWidgets('tap en trash → confirm dialog → repository.delete llamado',
       (tester) async {
     final e = _entry(
       id: 'e1',
@@ -275,8 +269,7 @@ void main() {
     expect(repo.deletedIds, ['e1']);
   });
 
-  testWidgets(
-      'cancelar el confirm dialog NO llama repository.delete',
+  testWidgets('cancelar el confirm dialog NO llama repository.delete',
       (tester) async {
     final e = _entry(
       id: 'e1',

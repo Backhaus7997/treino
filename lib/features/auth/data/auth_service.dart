@@ -61,6 +61,11 @@ class AuthService {
         await _userRepository.getOrCreate(
           uid: user.uid,
           email: email,
+          // Only signUpWithEmail reaches this line with the Register Terms
+          // checkbox already accepted (register_screen.dart gates the call
+          // that leads here) — so the signup itself IS the email flow's
+          // consent event (QA-AUTH-001, issue #434).
+          termsAcceptedAt: DateTime.now().toUtc(),
         );
       } catch (firestoreError) {
         // Rollback: best-effort delete the orphan Auth user.

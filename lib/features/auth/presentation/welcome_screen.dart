@@ -6,7 +6,9 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_background.dart';
+import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../application/auth_providers.dart';
 import '../domain/auth_failure.dart';
 import '../../../l10n/app_l10n.dart';
@@ -14,6 +16,7 @@ import '../../profile/application/account_deletion_notifier.dart';
 import 'widgets/auth_failure_banner.dart';
 import 'widgets/auth_pill_button.dart';
 import 'widgets/auth_secondary_button.dart';
+import 'widgets/terms_notice_text.dart';
 import 'widgets/treino_logo.dart';
 
 /// Identifies which social provider button is currently awaiting its OAuth
@@ -37,7 +40,12 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     final authState = ref.watch(authNotifierProvider);
-    final isLoading = authState.isLoading;
+    // El spinner del botón tapeado sigue girando después de un OAuth exitoso:
+    // la pantalla queda montada hasta que `authRedirect` resuelve el perfil, y
+    // un botón que vuelve a su glifo en ese hueco lee como que el tap no hizo
+    // nada (issue #499). Estando logueado en una ruta pública el único
+    // desenlace es el redirect.
+    final isLoading = authState.isLoading || authState.valueOrNull != null;
     final failure = authState.hasError && authState.error is AuthFailure
         ? authState.error as AuthFailure
         : null;
@@ -81,170 +89,181 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       // ── Top block: eyebrow + logo + headline + body ──────
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 48),
-                          Row(
-                            children: [
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: BoxDecoration(
-                                  color: palette.accent,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              // Flexible + ellipsis so the eyebrow never
-                              // overflows on narrow screens or with large OS
-                              // text scaling.
-                              Flexible(
-                                child: Text(
-                                  l10n.authWelcomeEyebrow,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: GoogleFonts.barlowCondensed(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    letterSpacing: 1.5,
+                      TreinoFadeSlideIn(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 48),
+                            Row(
+                              children: [
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(
                                     color: palette.accent,
+                                    shape: BoxShape.circle,
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 18),
-                          const TreinoLogo(size: 120),
-                          const SizedBox(height: 24),
-                          // Headline with a left accent bar. A left Border on a
-                          // DecoratedBox spans the child's height automatically
-                          // — no IntrinsicHeight needed (replaces the old nested
-                          // IntrinsicHeight + full-height Container, F2).
-                          DecoratedBox(
-                            decoration: BoxDecoration(
-                              border: Border(
-                                left:
-                                    BorderSide(width: 3, color: palette.accent),
-                              ),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.only(left: 14),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  _headlineLine(
-                                    palette,
-                                    light: 'MOVÉS ',
-                                    bold: 'EL HIERRO.',
+                                const SizedBox(width: 8),
+                                // Flexible + ellipsis so the eyebrow never
+                                // overflows on narrow screens or with large OS
+                                // text scaling.
+                                Flexible(
+                                  child: Text(
+                                    l10n.authWelcomeEyebrow,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: GoogleFonts.barlowCondensed(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: 1.5,
+                                      color: palette.accent,
+                                    ),
                                   ),
-                                  _headlineLine(
-                                    palette,
-                                    light: 'NOSOTROS ',
-                                    bold: 'EL RESTO.',
-                                  ),
-                                ],
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 18),
+                            const TreinoLogo(size: 120),
+                            const SizedBox(height: 24),
+                            // Headline with a left accent bar. A left Border on a
+                            // DecoratedBox spans the child's height automatically
+                            // — no IntrinsicHeight needed (replaces the old nested
+                            // IntrinsicHeight + full-height Container, F2).
+                            DecoratedBox(
+                              decoration: BoxDecoration(
+                                border: Border(
+                                  left: BorderSide(
+                                      width: 3, color: palette.accent),
+                                ),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.only(left: 14),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _headlineLine(
+                                      palette,
+                                      light: 'MOVÉS ',
+                                      bold: 'EL HIERRO.',
+                                    ),
+                                    _headlineLine(
+                                      palette,
+                                      light: 'NOSOTROS ',
+                                      bold: 'EL RESTO.',
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 14),
-                          Text(
-                            l10n.authWelcomeBody,
-                            style: GoogleFonts.barlow(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w400,
-                              color: palette.textMuted,
-                              height: 1.5,
+                            const SizedBox(height: 14),
+                            Text(
+                              l10n.authWelcomeBody,
+                              style: GoogleFonts.barlow(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w400,
+                                color: palette.textMuted,
+                                height: 1.5,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                       // ── Bottom block: CTA + social + sign-in link ────────
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // Surface social sign-in failures (and OAuth
-                          // cancellations) — previously swallowed silently.
-                          if (failure != null) ...[
-                            AuthFailureBanner(failure: failure),
-                            const SizedBox(height: 12),
-                          ],
-                          AuthPillButton(
-                            label: l10n.authWelcomeCta,
-                            onPressed:
-                                isLoading ? null : () => context.push('/register'),
-                            showArrow: false,
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: AuthSecondaryButton(
-                                  icon: FontAwesomeIcons.google,
-                                  // Swap the brand glyph for a spinner while
-                                  // this provider's OAuth round-trip is in
-                                  // flight, so the screen is not frozen with no
-                                  // feedback.
-                                  iconWidget: isLoading &&
-                                          _pendingProvider ==
-                                              _SocialProvider.google
-                                      ? _buttonSpinner(palette)
-                                      : SvgPicture.asset(
-                                          'assets/logo/google_g.svg',
-                                          width: 18,
-                                          height: 18,
-                                        ),
-                                  label: l10n.authGoogleLabel,
-                                  onPressed:
-                                      isLoading ? null : _signInWithGoogle,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: AuthSecondaryButton(
-                                  icon: FontAwesomeIcons.apple,
-                                  iconWidget: isLoading &&
-                                          _pendingProvider ==
-                                              _SocialProvider.apple
-                                      ? _buttonSpinner(palette)
-                                      : null,
-                                  label: l10n.authAppleLabel,
-                                  onPressed:
-                                      isLoading ? null : _signInWithApple,
-                                ),
-                              ),
+                      TreinoFadeSlideIn(
+                        delay: AppMotion.stagger(1),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // Surface social sign-in failures (and OAuth
+                            // cancellations) — previously swallowed silently.
+                            if (failure != null) ...[
+                              AuthFailureBanner(failure: failure),
+                              const SizedBox(height: 12),
                             ],
-                          ),
-                          const SizedBox(height: 18),
-                          // Wrap (not a min-size Row) so the line flows to a
-                          // second line instead of overflowing when the text is
-                          // long, the screen is narrow, or the font is scaled.
-                          Wrap(
-                            alignment: WrapAlignment.center,
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            children: [
-                              Text(
-                                '${l10n.authWelcomeHaveAccount} · ',
-                                style: GoogleFonts.barlow(
-                                  fontSize: 14,
-                                  color: palette.textMuted,
-                                ),
-                              ),
-                              GestureDetector(
-                                onTap: () => context.push('/login'),
-                                child: Text(
-                                  l10n.authWelcomeSignIn,
-                                  style: GoogleFonts.barlow(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: palette.accent,
+                            AuthPillButton(
+                              label: l10n.authWelcomeCta,
+                              onPressed: isLoading
+                                  ? null
+                                  : () => context.push('/register'),
+                              showArrow: false,
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: AuthSecondaryButton(
+                                    icon: FontAwesomeIcons.google,
+                                    // Swap the brand glyph for a spinner while
+                                    // this provider's OAuth round-trip is in
+                                    // flight, so the screen is not frozen with no
+                                    // feedback.
+                                    iconWidget: isLoading &&
+                                            _pendingProvider ==
+                                                _SocialProvider.google
+                                        ? _buttonSpinner(palette)
+                                        : SvgPicture.asset(
+                                            'assets/logo/google_g.svg',
+                                            width: 18,
+                                            height: 18,
+                                          ),
+                                    label: l10n.authGoogleLabel,
+                                    onPressed:
+                                        isLoading ? null : _signInWithGoogle,
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 20),
-                        ],
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: AuthSecondaryButton(
+                                    icon: FontAwesomeIcons.apple,
+                                    iconWidget: isLoading &&
+                                            _pendingProvider ==
+                                                _SocialProvider.apple
+                                        ? _buttonSpinner(palette)
+                                        : null,
+                                    label: l10n.authAppleLabel,
+                                    onPressed:
+                                        isLoading ? null : _signInWithApple,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            // QA-AUTH-001 (issue #434): Google/Apple create a
+                            // TREINO account just like Register — the user must
+                            // be told before tapping the social button.
+                            const TermsNoticeText(),
+                            const SizedBox(height: 18),
+                            // Wrap (not a min-size Row) so the line flows to a
+                            // second line instead of overflowing when the text is
+                            // long, the screen is narrow, or the font is scaled.
+                            Wrap(
+                              alignment: WrapAlignment.center,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                Text(
+                                  '${l10n.authWelcomeHaveAccount} · ',
+                                  style: GoogleFonts.barlow(
+                                    fontSize: 14,
+                                    color: palette.textMuted,
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: () => context.push('/login'),
+                                  child: Text(
+                                    l10n.authWelcomeSignIn,
+                                    style: GoogleFonts.barlow(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: palette.accent,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 20),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -270,25 +289,26 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
     );
   }
 
+  // La navegación post-OAuth NO vive acá: la resuelve `authRedirect`
+  // (app/router.dart). Ni bien authNotifier emite el user, RouterRefreshNotifier
+  // re-dispara el redirect; ese gate se bloquea mientras userProfileProvider
+  // carga y recién con el snapshot real manda a /profile-setup (alta nueva por
+  // OAuth) o a /home (usuario existente). El viejo `context.go('/home')` manual
+  // corría una carrera contra ese stream: adelantaba el redirect, HomeScreen
+  // alcanzaba a pintar y el gate rebotaba a /profile-setup — flicker visible en
+  // el 100% de los registros nuevos (issue #499). Mismo criterio que ya se
+  // aplicó en ProfileSetupFlow (audit F3).
+
   Future<void> _signInWithGoogle() async {
-    // No intent gating on Welcome — both new and existing users land in /home.
+    // No intent gating on Welcome — el mismo botón sirve para alta y para
+    // login; el destino lo decide el redirect según el perfil que llegue.
     setState(() => _pendingProvider = _SocialProvider.google);
     await ref.read(authNotifierProvider.notifier).signInWithGoogle();
-    if (!mounted) return;
-    final s = ref.read(authNotifierProvider);
-    if (s.hasValue && s.valueOrNull != null) {
-      context.go('/home');
-    }
   }
 
   Future<void> _signInWithApple() async {
     setState(() => _pendingProvider = _SocialProvider.apple);
     await ref.read(authNotifierProvider.notifier).signInWithApple();
-    if (!mounted) return;
-    final s = ref.read(authNotifierProvider);
-    if (s.hasValue && s.valueOrNull != null) {
-      context.go('/home');
-    }
   }
 
   Widget _headlineLine(AppPalette palette,

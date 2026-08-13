@@ -5,15 +5,20 @@
 library;
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/firebase_storage_video_player.dart';
+import 'package:treino/features/chat/application/chat_media_send_controller.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/chat/domain/media_type.dart';
 import 'package:treino/features/chat/domain/message.dart';
 import 'package:treino/features/chat/presentation/chat_screen.dart';
+import 'package:treino/features/profile/application/user_providers.dart'
+    show firestoreProvider;
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
@@ -61,6 +66,15 @@ Message _videoMsg({String text = ''}) => Message(
       mediaType: MediaType.video,
       createdAt: DateTime.utc(2026, 5, 21),
     );
+
+/// Issue #435: el estado de upload ya no vive en el State de la pantalla —
+/// viene de [chatMediaSendControllerProvider]. Stub con un envío "en vuelo"
+/// para verificar el cableado de la UI.
+class _UploadingStubController extends ChatMediaSendController {
+  @override
+  ChatMediaSendState build(String chatId) =>
+      const ChatMediaSendState(uploading: true, progress: 0.4);
+}
 
 void main() {
   group('_Bubble branching', () {
@@ -168,9 +182,22 @@ void main() {
 
     testWidgets('tap attach button opens bottom sheet with Foto/Video options',
         (tester) async {
+      // REQ-FOLLOW-021: adjuntar es enviar, así que necesita el mismo permiso
+      // que el resto del composer — la arista ENTRANTE `follows/bbb_aaa`.
+      final firestore = FakeFirebaseFirestore();
+      await firestore.collection('follows').doc('bbb_aaa').set({
+        'id': 'bbb_aaa',
+        'followerUid': 'bbb',
+        'followeeUid': 'aaa',
+        'status': 'accepted',
+        'members': ['bbb', 'aaa'],
+        'createdAt': Timestamp.now(),
+      });
+
       await tester.pumpWidget(_wrap(
         const ChatScreen(chatId: 'aaa_bbb', otherUid: 'bbb'),
         overrides: [
+          firestoreProvider.overrideWithValue(firestore),
           currentUidProvider.overrideWith((_) => 'aaa'),
           messagesProvider('aaa_bbb').overrideWith(
             (_) => Stream.value(const <Message>[]),
@@ -188,6 +215,42 @@ void main() {
       // Bottom sheet shows Foto and Video options.
       expect(find.text('Foto'), findsAtLeastNWidgets(1));
       expect(find.text('Video'), findsAtLeastNWidgets(1));
+    });
+  });
+
+  group('upload state wiring (issue #435)', () {
+    testWidgets(
+        'progress bar y composer deshabilitado vienen del provider, no del '
+        'State local', (tester) async {
+      await tester.pumpWidget(_wrap(
+        const ChatScreen(chatId: 'aaa_bbb', otherUid: 'bbb'),
+        overrides: [
+          currentUidProvider.overrideWith((_) => 'aaa'),
+          messagesProvider('aaa_bbb').overrideWith(
+            (_) => Stream.value(const <Message>[]),
+          ),
+          userPublicProfileProvider('bbb').overrideWith(
+            (_) => Stream.value(_pub('bbb', 'Coach Joe')),
+          ),
+          chatMediaSendControllerProvider
+              .overrideWith(_UploadingStubController.new),
+        ],
+      ));
+      // pump (no pumpAndSettle): el spinner del botón send es una animación
+      // indeterminada que nunca settlea mientras sending == true.
+      await tester.pump();
+      await tester.pump();
+
+      final bar = tester.widget<LinearProgressIndicator>(
+        find.byType(LinearProgressIndicator),
+      );
+      expect(bar.value, closeTo(0.4, 1e-9));
+
+      final field = tester.widget<TextField>(find.byType(TextField));
+      expect(field.enabled, isFalse,
+          reason: 'Composer bloqueado mientras el envío de media está '
+              'en vuelo — aunque lo haya iniciado una instancia anterior '
+              'de la pantalla');
     });
   });
 }

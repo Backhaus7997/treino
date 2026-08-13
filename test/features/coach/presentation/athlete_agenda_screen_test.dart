@@ -430,7 +430,8 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expect(find.text('Tu PF todavía no configuró horarios.'), findsOneWidget);
+        expect(
+            find.text('Tu PF todavía no configuró horarios.'), findsOneWidget);
       },
     );
   });
@@ -519,8 +520,7 @@ void main() {
         await tester.pumpAndSettle();
 
         // Confirm in dialog
-        await tester.tap(find.widgetWithText(
-            ElevatedButton, 'Confirmar'));
+        await tester.tap(find.widgetWithText(ElevatedButton, 'Confirmar'));
         await tester.pumpAndSettle();
 
         expect(bookedSlot, equals(slot));

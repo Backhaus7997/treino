@@ -31,6 +31,8 @@ _$TrainerPublicProfileImpl _$$TrainerPublicProfileImplFromJson(
       trainerOffersOnline: json['trainerOffersOnline'] as bool? ?? false,
       averageRating: (json['averageRating'] as num?)?.toDouble(),
       reviewCount: (json['reviewCount'] as num?)?.toInt() ?? 0,
+      trainerExperienceYears: (json['trainerExperienceYears'] as num?)?.toInt(),
+      athleteCount: (json['athleteCount'] as num?)?.toInt(),
     );
 
 Map<String, dynamic> _$$TrainerPublicProfileImplToJson(
@@ -53,4 +55,6 @@ Map<String, dynamic> _$$TrainerPublicProfileImplToJson(
       'trainerOffersOnline': instance.trainerOffersOnline,
       'averageRating': instance.averageRating,
       'reviewCount': instance.reviewCount,
+      'trainerExperienceYears': instance.trainerExperienceYears,
+      'athleteCount': instance.athleteCount,
     };

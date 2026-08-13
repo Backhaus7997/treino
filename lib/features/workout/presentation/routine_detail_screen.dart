@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/utils/kg_format.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../core/analytics/analytics_service.dart';
@@ -12,8 +13,6 @@ import '../../../l10n/app_l10n.dart';
 import '../../profile/application/user_providers.dart' show userProfileProvider;
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../profile/domain/user_role.dart';
-import '../application/plan_gating.dart';
-import '../application/plan_progress.dart' show CompletedKey;
 import '../application/routine_providers.dart';
 import '../application/session_providers.dart'
     show currentUidProvider, lastWeightByExerciseProvider, planProgressProvider;
@@ -22,10 +21,12 @@ import '../domain/routine_day.dart';
 import '../domain/routine_day_duration.dart';
 import '../domain/routine_slot.dart';
 import '../domain/routine_source.dart';
+import '../domain/routine_visibility.dart';
 import 'widgets/exercise_slot_row.dart';
 import 'widgets/stat_tile.dart';
+import 'widgets/template_ratings_section.dart';
 
-/// RoutineDetailScreen — ConsumerStatefulWidget that observes routineByIdProvider.
+/// RoutineDetailScreen — ConsumerStatefulWidget that observes routineByIdStreamProvider.
 /// selectedDayIndex is local state (ADR-RD-3).
 /// No Scaffold, AppBackground, or SafeArea — provided by _ShellScaffold (REQ-RDT-011).
 class RoutineDetailScreen extends ConsumerStatefulWidget {
@@ -34,9 +35,24 @@ class RoutineDetailScreen extends ConsumerStatefulWidget {
     required this.routineId,
     this.initialDayNumber,
     this.initialWeekIndex,
+    this.coachAthleteId,
   });
 
   final String routineId;
+
+  /// Non-null ONLY when this screen is shown in the coach (PF) read-only
+  /// context, reached from the TOP-LEVEL route
+  /// `/coach/athlete/:athleteId/plan/:routineId` (OUTSIDE the ShellRoute).
+  /// It carries the athlete's uid and switches two behaviours that would
+  /// otherwise assume the athlete's in-shell placement (issue #410):
+  ///  1. Tapping an exercise pushes the top-level (out-of-shell) exercise
+  ///     mirror instead of the in-shell `/workout/exercise/:id` — pushing the
+  ///     in-shell route from here rebuilds the shell branch and lands blank
+  ///     (the root cause #399's symptom fix left open).
+  ///  2. The back fallback lands on `/coach/athlete/:id` instead of the
+  ///     athlete's `/workout` tab.
+  /// Null for the athlete's own in-shell usage → behaviour unchanged.
+  final String? coachAthleteId;
 
   /// 1-based RoutineDay.dayNumber to pre-select on first render. Out-of-range
   /// values are clamped to the valid day range by the build method's
@@ -72,7 +88,7 @@ class _RoutineDetailScreenState extends ConsumerState<RoutineDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final routineAsync = ref.watch(routineByIdProvider(widget.routineId));
+    final routineAsync = ref.watch(routineByIdStreamProvider(widget.routineId));
 
     // Stack so the hero image can extend edge-to-edge from the top of the
     // safe area while the back button floats over it. Non-data states still
@@ -133,9 +149,19 @@ class _RoutineDetailScreenState extends ConsumerState<RoutineDetailScreen> {
                     // `exerciseId` drifted from the catalogue.
                     final nameParam =
                         'name=${Uri.encodeQueryComponent(slot.exerciseName)}';
+                    // In the coach read-only context this screen is OUTSIDE the
+                    // shell, so the exercise detail must be pushed on the
+                    // top-level (out-of-shell) mirror — pushing the in-shell
+                    // `/workout/exercise/:id` from here rebuilds the shell branch
+                    // and lands blank (issue #410 Bug 1).
+                    final base = widget.coachAthleteId != null
+                        ? '/coach/athlete/${widget.coachAthleteId}'
+                            '/plan/${widget.routineId}'
+                            '/exercise/${slot.exerciseId}'
+                        : '/workout/exercise/${slot.exerciseId}';
                     final target = ownerId != null && ownerId.isNotEmpty
-                        ? '/workout/exercise/${slot.exerciseId}?ownerId=$ownerId&$nameParam'
-                        : '/workout/exercise/${slot.exerciseId}?$nameParam';
+                        ? '$base?ownerId=$ownerId&$nameParam'
+                        : '$base?$nameParam';
                     context.push(target);
                   },
                 );
@@ -144,12 +170,20 @@ class _RoutineDetailScreenState extends ConsumerState<RoutineDetailScreen> {
               error: (_, __) => _ErrorState(
                 message: AppL10n.of(context).routineDetailLoadError,
                 onRetry: () =>
-                    ref.invalidate(routineByIdProvider(widget.routineId)),
+                    ref.invalidate(routineByIdStreamProvider(widget.routineId)),
               ),
             ),
           ),
         ),
-        const Positioned(top: 0, left: 0, child: _BackBar()),
+        Positioned(
+          top: 0,
+          left: 0,
+          child: _BackBar(
+            fallbackRoute: widget.coachAthleteId != null
+                ? '/coach/athlete/${widget.coachAthleteId}'
+                : '/workout',
+          ),
+        ),
         // Edit affordance only for the owner of a user-created routine —
         // trainer-assigned plans and system templates render read-only.
         // Sits opposite the back button, same chip treatment for parity.
@@ -168,7 +202,13 @@ class _RoutineDetailScreenState extends ConsumerState<RoutineDetailScreen> {
 /// states (REQ-RDT-016 strengthened). Now floats over the hero image with a
 /// translucent chip so it stays legible on bright photos.
 class _BackBar extends StatelessWidget {
-  const _BackBar();
+  const _BackBar({required this.fallbackRoute});
+
+  /// Where to land when there is nothing to pop (deep-link / OS state
+  /// restoration). The athlete's own usage passes `/workout`; the coach
+  /// read-only context passes `/coach/athlete/:id` so the PF doesn't get
+  /// dumped on the athlete's Entrenar tab (issue #410 Bug 2).
+  final String fallbackRoute;
 
   @override
   Widget build(BuildContext context) {
@@ -187,7 +227,7 @@ class _BackBar extends StatelessWidget {
             tooltip: l10n.commonBack,
             icon: Icon(TreinoIcon.back, color: palette.textPrimary),
             onPressed: () =>
-                context.canPop() ? context.pop() : context.go('/workout'),
+                context.canPop() ? context.pop() : context.go(fallbackRoute),
           ),
         ),
       ),
@@ -370,6 +410,47 @@ class _RoutineDetailContent extends ConsumerWidget {
     return exerciseWidgets;
   }
 
+  /// Whether the start/repeat ACTION renders for the current viewer.
+  ///
+  /// Single source of truth. The action now lives OUTSIDE the scroll (#641),
+  /// so the parent has to know up front whether to give it a slot in the
+  /// [Column] at all — otherwise a read-only viewer gets an empty strip of
+  /// chrome stealing height from the exercise list. Deciding it here, instead
+  /// of letting each action widget return `SizedBox.shrink()` on its own, is
+  /// what keeps the reserved space and the bar from ever disagreeing.
+  ///
+  /// The `userCreated` guard applies at EVERY plan length. It used to be gated
+  /// behind `!isPeriodized`, inherited verbatim from the pre-#641 split where
+  /// `_StartSessionCTABar` carried the check and `_PeriodizedCTABar` simply
+  /// never had it. Nothing justified the asymmetry: a plan reaches the
+  /// "RUTINAS PÚBLICAS" tab through `publicRoutinesByUserProvider`, which
+  /// filters on `visibility` alone and has never looked at `numWeeks`, and the
+  /// editor lets an athlete author >1 week AND share on profile at once. So the
+  /// periodized case was not merely reachable — it was the LESS protected of
+  /// the two, which is backwards: `planProgressProvider` is keyed
+  /// `(uid: viewer, routineId: theirs)`, so a periodized start pollutes the
+  /// viewer's plan progress on top of their session history.
+  bool _startActionVisible(WidgetRef ref) {
+    // Trainers coach — they don't train in-app, so the plan view is read-only.
+    final role = ref.watch(
+      userProfileProvider.select((async) => async.valueOrNull?.role),
+    );
+    if (role == UserRole.trainer) return false;
+
+    // Read-only view of someone else's public user-created routine (surfaced
+    // from the "RUTINAS PÚBLICAS" tab of another user's public profile).
+    // Starting it would log a session under the VIEWER's uid against a routine
+    // they neither own nor can edit — history and plan progress accruing
+    // against a plan whose author can rewrite or unshare it at any time.
+    // Trainer templates are the legitimately public-and-startable kind and stay
+    // untouched: this only ever fires on `userCreated`.
+    if (routine.source == RoutineSource.userCreated) {
+      final currentUid = ref.watch(currentUidProvider);
+      if (currentUid != null && currentUid != routine.createdBy) return false;
+    }
+    return true;
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // REQ-PERIOD-042 HARD INVARIANT: when numWeeks == 1, render the
@@ -381,86 +462,152 @@ class _RoutineDetailContent extends ConsumerWidget {
 
     final l10n = AppL10n.of(context);
 
-    return CustomScrollView(
-      slivers: [
-        SliverToBoxAdapter(
-          child: _HeroStrip(
-            routine: routine,
-            badgeText:
-                '${(routine.split ?? l10n.workoutSplitFallback).toUpperCase()} · ${l10n.routineDetailDayLabel(day.dayNumber)}',
-            titleText: day.name.toUpperCase(),
-          ),
-        ),
-        SliverPadding(
-          padding: EdgeInsets.fromLTRB(
-            20,
-            0,
-            20,
-            MediaQuery.paddingOf(context).bottom,
-          ),
-          sliver: SliverList(
-            delegate: SliverChildListDelegate([
-              const SizedBox(height: 20),
-              _StatRow(
-                tiles: [
-                  StatTile(
-                    label: l10n.routineDetailStatExercises,
-                    value: '${day.slots.length}',
-                  ),
-                  StatTile(
-                    label: l10n.routineDetailStatSets,
-                    value: '${_totalSets(day)}',
-                  ),
-                  StatTile(
-                    label: l10n.routineDetailStatMinutes,
-                    value: _minutesValue(day, selectedWeekIndex),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              // ── Periodized: week selector above the day selector ────────────
-              if (isPeriodized) ...[
-                _WeekSelector(
-                  numWeeks: routine.numWeeks,
-                  selectedIndex: viewedWeek,
-                  onSelect: onSelectWeek,
-                ),
-                const SizedBox(height: 12),
-              ],
-              if (routine.days.length > 1) ...[
-                _DaySelector(
-                  days: routine.days,
-                  selectedIndex: selectedDayIndex,
-                  onSelect: onSelectDay,
-                ),
-                const SizedBox(height: 20),
-              ],
-              _SectionHeader(text: l10n.routineDetailStatExercises),
-              const SizedBox(height: 12),
-              if (day.slots.isEmpty)
-                _EmptyState(message: l10n.routineDetailNoExercisesThisDay)
-              else
-                // REQ-WPRES-020: filter by presence when periodized.
-                // REQ-WPRES-028: zero present slots → show info message.
-                ..._buildPresenceFilteredSection(
-                  viewedWeek,
-                  isPeriodized,
-                  emptyWeekMessage: l10n.routineDetailNoExercisesThisWeek,
-                ),
-              const SizedBox(height: 20),
-              // CTA bar — periodized vs single-week
-              if (isPeriodized)
-                _PeriodizedCTABar(
+    final showStartAction = _startActionVisible(ref);
+
+    return Column(
+      children: [
+        Expanded(
+          child: CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(
+                child: _HeroStrip(
                   routine: routine,
-                  day: day,
-                  viewedWeek: viewedWeek,
-                )
-              else
-                _StartSessionCTABar(routine: routine, day: day),
-              const SizedBox(height: 18),
-            ]),
+                  badgeText:
+                      '${(routine.split ?? l10n.workoutSplitFallback).toUpperCase()} · ${l10n.routineDetailDayLabel(day.dayNumber)}',
+                  titleText: day.name.toUpperCase(),
+                ),
+              ),
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  0,
+                  20,
+                  // With the action pinned below, the Column already reserves
+                  // the bottom chrome — inseting the scroll on top of it would
+                  // double-count. Without it (read-only viewer, no bar) the
+                  // scroll still has to clear the shell's floating nav bar
+                  // itself.
+                  showStartAction ? 0 : MediaQuery.paddingOf(context).bottom,
+                ),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
+                    const SizedBox(height: 20),
+                    _StatRow(
+                      tiles: [
+                        StatTile(
+                          label: l10n.routineDetailStatExercises,
+                          value: '${day.slots.length}',
+                        ),
+                        StatTile(
+                          label: l10n.routineDetailStatSets,
+                          value: '${_totalSets(day)}',
+                        ),
+                        StatTile(
+                          label: l10n.routineDetailStatMinutes,
+                          value: _minutesValue(day, selectedWeekIndex),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                    // ── Periodized: week selector above the day selector ────
+                    if (isPeriodized) ...[
+                      _WeekSelector(
+                        numWeeks: routine.numWeeks,
+                        selectedIndex: viewedWeek,
+                        onSelect: onSelectWeek,
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    if (routine.days.length > 1) ...[
+                      _DaySelector(
+                        days: routine.days,
+                        selectedIndex: selectedDayIndex,
+                        onSelect: onSelectDay,
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+                    _SectionHeader(text: l10n.routineDetailStatExercises),
+                    const SizedBox(height: 12),
+                    if (day.slots.isEmpty)
+                      _EmptyState(
+                        message: l10n.routineDetailNoExercisesThisDay,
+                      )
+                    else
+                      // REQ-WPRES-020: filter by presence when periodized.
+                      // REQ-WPRES-028: zero present slots → show info message.
+                      ..._buildPresenceFilteredSection(
+                        viewedWeek,
+                        isPeriodized,
+                        emptyWeekMessage: l10n.routineDetailNoExercisesThisWeek,
+                      ),
+                    // Completion SIGNAL stays with the content while the
+                    // ACTION is pinned below (#641). That split is what the
+                    // periodized contract already asked for: completion only
+                    // ever changes the signal and the action's LABEL, never
+                    // the action's availability (AD-1/AD-2). Pinning the
+                    // banner too would nail ~56px of terminal-state chrome to
+                    // the bottom of a screen whose whole problem was vertical
+                    // budget.
+                    if (isPeriodized) ...[
+                      const SizedBox(height: 20),
+                      _PeriodizedCompletionSignal(
+                        routine: routine,
+                        day: day,
+                        viewedWeek: viewedWeek,
+                      ),
+                    ],
+                    // Community reputation — published trainer templates only.
+                    // It sits at the end on purpose: whoever opened the
+                    // template came to train, and the ratings are what they
+                    // check before (or after) deciding.
+                    if (routine.source == RoutineSource.trainerTemplate &&
+                        routine.visibility == RoutineVisibility.public) ...[
+                      const SizedBox(height: 20),
+                      TemplateRatingsSection(routine: routine),
+                    ],
+                    const SizedBox(height: 18),
+                  ]),
+                ),
+              ),
+            ],
           ),
         ),
+        // ── Pinned start action (#641) ──────────────────────────────────────
+        // 5/5 usability participants failed to reach EMPEZAR while it lived at
+        // the end of the exercise list, below a 320px hero and every slot of
+        // the day. It is the ONLY action of this screen, so reaching it must
+        // never depend on scrolling.
+        //
+        // Column + Expanded (not Stack + Positioned) on purpose: the scroll
+        // viewport ends exactly where the bar begins, so the bar occupies
+        // whatever the button naturally measures — including at large text
+        // scale, where it grows. A Stack would need that height hardcoded or
+        // measured over an extra frame, and either one silently clips the last
+        // exercise as soon as the user bumps their font size. Same shape
+        // AthleteDetailScreen already uses for its bottom actions.
+        if (showStartAction)
+          Padding(
+            // Bottom inset: in-shell, Scaffold publishes the floating nav
+            // bar's height through MediaQuery.padding.bottom (see
+            // `_ShellScaffold`, `extendBody: true`), so this lifts the action
+            // clear of it. In the out-of-shell coach context (#399/#410)
+            // `_immersive`'s SafeArea already consumed that padding and the
+            // same expression resolves to 0 — correct in BOTH mounts without
+            // branching on which one we are in.
+            padding: EdgeInsets.fromLTRB(
+              20,
+              12,
+              20,
+              12 + MediaQuery.paddingOf(context).bottom,
+            ),
+            child: isPeriodized
+                ? _PeriodizedStartAction(
+                    routine: routine,
+                    day: day,
+                    viewedWeek: viewedWeek,
+                  )
+                : _StartSessionAction(routine: routine, day: day),
+          ),
       ],
     );
   }
@@ -569,10 +716,7 @@ class _SlotRowWithLastWeight extends ConsumerWidget {
 }
 
 /// "15 kg" para enteros, "17.5 kg" para fraccionarios.
-String _formatWeight(double kg) {
-  final text = kg == kg.roundToDouble() ? kg.toStringAsFixed(0) : kg.toString();
-  return '$text kg';
-}
+String _formatWeight(double kg) => '${formatWeightKg(kg)} kg';
 
 class _HeroStrip extends ConsumerWidget {
   const _HeroStrip({
@@ -715,8 +859,15 @@ class _AssignedByChip extends ConsumerWidget {
     final profileAsync = ref.watch(userPublicProfileProvider(assignedBy));
 
     final label = profileAsync.when(
-      data: (profile) =>
-          '${l10n.coachAssignedByPrefix}${profile?.displayName ?? '?'}',
+      // A missing/blank profile is the same story as a failed read — we know a
+      // PF assigned the plan, we just can't name them. Fall back to the generic
+      // copy instead of rendering "Asignado por ?", which reads as a glitch.
+      data: (profile) {
+        final name = profile?.displayName;
+        return (name == null || name.trim().isEmpty)
+            ? l10n.coachAssignedByError
+            : '${l10n.coachAssignedByPrefix}$name';
+      },
       loading: () => l10n.coachAssignedByLoading,
       error: (_, __) => l10n.coachAssignedByError,
     );
@@ -890,13 +1041,21 @@ class _WeekSelector extends StatelessWidget {
   }
 }
 
-/// Start CTA for periodized plans (numWeeks > 1). Reads [planProgressProvider]
-/// to determine the active (week, day) and to show gating affordances for the
-/// currently viewed (week, day) combination.
+/// Completion SIGNAL for periodized plans (numWeeks > 1) — banner XOR chip,
+/// at most one. Purely informational: it never gates, disables or hides the
+/// action, which lives pinned at the bottom of the screen since #641
+/// (periodized-plan-repeat, AD-1/AD-2).
 ///
-/// REQ-PERIOD-033/034/035/036/037/042.
-class _PeriodizedCTABar extends ConsumerWidget {
-  const _PeriodizedCTABar({
+/// Split out of the old `_PeriodizedCTABar` when the action was pinned. The
+/// signal belongs WITH the content it describes; nailing a ~56px terminal-state
+/// banner to the bottom chrome would eat the vertical budget that #641 exists
+/// to recover. The contract is unchanged: completion only ever changes this
+/// signal and the action's LABEL.
+///
+/// A failed progress fetch renders nothing here and, crucially, does not touch
+/// the action (#497).
+class _PeriodizedCompletionSignal extends ConsumerWidget {
+  const _PeriodizedCompletionSignal({
     required this.routine,
     required this.day,
     required this.viewedWeek,
@@ -917,192 +1076,195 @@ class _PeriodizedCTABar extends ConsumerWidget {
     if (role == UserRole.trainer) return const SizedBox.shrink();
 
     final uid = ref.watch(currentUidProvider) ?? '';
-    // dayNumbers is kept locally for gating function calls below.
-    // planProgressProvider resolves dayNumbers/numWeeks internally via
-    // routineByIdProvider — key uses only String fields for structural equality.
-    final dayNumbers =
-        routine.days.map((d) => d.dayNumber).toList(growable: false);
-    final progressAsync = ref.watch(
-      planProgressProvider((uid: uid, routineId: routine.id)),
-    );
+    final progress = ref
+        .watch(planProgressProvider((uid: uid, routineId: routine.id)))
+        .valueOrNull;
 
-    return progressAsync.when(
-      loading: () => const SizedBox(height: 56),
-      error: (_, __) => const SizedBox.shrink(),
-      data: (progress) {
-        final palette = AppPalette.of(context);
-        final l10n = AppL10n.of(context);
+    // null == progress unknown (still loading, or the fetch failed). No
+    // signal — never a placeholder. Unlike the old inline version there is
+    // nothing to reserve height for here: this widget sits in the scroll, so
+    // it can appear when progress lands without shifting the action, which
+    // now has its own fixed slot in the Column.
+    if (progress == null) return const SizedBox.shrink();
 
-        // Plan-complete banner (REQ-PERIOD-037, SCENARIO-036).
-        if (progress.planComplete) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 18),
-            child: Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: palette.accent.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: palette.accent),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(TreinoIcon.check, size: 20, color: palette.accent),
-                  const SizedBox(width: 10),
-                  Text(
-                    l10n.routineDetailPlanComplete,
-                    style: GoogleFonts.barlowCondensed(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                      letterSpacing: 1.2,
-                      color: palette.accent,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
+    // Plan-scoped wins over day-scoped (banner XOR chip): "PLAN COMPLETADO"
+    // stacked above "COMPLETADO" would say the same fact twice.
+    if (progress.planComplete) return const _PlanCompleteBanner();
+    if (progress.completed.contains((week: viewedWeek, day: day.dayNumber))) {
+      return const _CompletedDayChip();
+    }
+    return const SizedBox.shrink();
+  }
+}
 
-        // REQ-WPRES-022: compute requiredPairs so gating functions know which
-        // (week, day) combos have zero present slots (auto-satisfied).
-        // Mirrors planProgressProvider's requiredPairs computation so gating
-        // here stays consistent with the progress derivation.
-        final requiredPairs = <CompletedKey>{};
-        for (var w = 0; w < routine.numWeeks; w++) {
-          for (final d in routine.days) {
-            final hasPresent = d.slots.any((s) => s.isPresentInWeek(w));
-            if (hasPresent) {
-              requiredPairs.add((week: w, day: d.dayNumber));
-            }
-          }
-        }
+/// Pinned start/repeat ACTION for periodized plans (numWeeks > 1).
+///
+/// Unconditional by contract. Neither a completion state (AD-2) nor a failed
+/// progress fetch (#497) removes, disables or hides it — plan progress only
+/// decides the LABEL. Starting a workout needs the routine and the day the
+/// parent already resolved, nothing else.
+///
+/// The earlier design let `error` return `SizedBox.shrink()` on the assumption
+/// the failure was transient — it was not: [routineByIdProvider] cached the
+/// AsyncError for the container's lifetime, so the screen's only control
+/// vanished until the app restarted. Unknown progress degrades to "label
+/// EMPEZAR", never to "no way to train".
+///
+/// "Unconditional" is scoped to PROGRESS, not to the viewer. Who may see this
+/// at all — trainer role, or someone else's public user-created plan — is
+/// decided by the parent (`_RoutineDetailContent._startActionVisible`) so the
+/// pinned slot and its occupant can never disagree. Reading this widget alone
+/// and concluding "always rendered" is precisely the mistake that let the
+/// ownership guard skip periodized plans for as long as it did.
+class _PeriodizedStartAction extends ConsumerWidget {
+  const _PeriodizedStartAction({
+    required this.routine,
+    required this.day,
+    required this.viewedWeek,
+  });
 
-        final viewedDay = day.dayNumber;
-        final weekLocked = !isWeekUnlocked(
-          viewedWeek,
-          progress.completed,
-          dayNumbers,
-          requiredPairs: requiredPairs,
-        );
-        final dayLocked = !isDayUnlocked(
-          viewedWeek,
-          viewedDay,
-          progress.completed,
-          dayNumbers,
-          requiredPairs: requiredPairs,
-        );
-        final alreadyDone = progress.completed.contains((
-          week: viewedWeek,
-          day: viewedDay,
-        ));
+  final Routine routine;
+  final RoutineDay day;
 
-        // Already completed this (week, day).
-        if (alreadyDone) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 18),
-            child: Container(
-              height: 56,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: palette.bgCard,
-                borderRadius: BorderRadius.circular(9999),
-                border: Border.all(color: palette.border),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(TreinoIcon.check, size: 16, color: palette.accent),
-                  const SizedBox(width: 8),
-                  Text(
-                    l10n.routineDetailCompleted,
-                    style: GoogleFonts.barlowCondensed(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                      letterSpacing: 1.2,
-                      color: palette.accent,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
+  /// 0-based week currently displayed by the parent screen.
+  final int viewedWeek;
 
-        // Locked (week or day not yet unlocked).
-        if (weekLocked || dayLocked) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 18),
-            child: Container(
-              height: 56,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: palette.bgCard,
-                borderRadius: BorderRadius.circular(9999),
-                border: Border.all(color: palette.border),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(TreinoIcon.lock, size: 16, color: palette.textMuted),
-                  const SizedBox(width: 8),
-                  Text(
-                    weekLocked
-                        ? l10n.routineDetailWeekLocked
-                        : l10n.routineDetailDayLocked,
-                    style: GoogleFonts.barlowCondensed(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                      letterSpacing: 1.2,
-                      color: palette.textMuted,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final uid = ref.watch(currentUidProvider) ?? '';
+    final progress = ref
+        .watch(planProgressProvider((uid: uid, routineId: routine.id)))
+        .valueOrNull;
 
-        // Startable — show active CTA with the correct week.
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 18),
-          child: Row(
-            children: [
-              Expanded(
-                child: ElevatedButton(
-                  // By this point alreadyDone, weekLocked, and dayLocked have
-                  // all early-returned above, so this day is always startable.
-                  onPressed: () {
-                    ref.read(analyticsServiceProvider).logRoutineStarted(
-                          routineId: routine.id,
-                          routineName: routine.name,
-                        );
-                    context.push(
-                      '/workout/session/${routine.id}/${day.dayNumber}?week=$viewedWeek',
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: palette.accent,
-                    minimumSize: const Size.fromHeight(56),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(9999),
-                    ),
-                  ),
-                  child: Text(
-                    l10n.routineDetailStart,
-                    style: GoogleFonts.barlowCondensed(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                      letterSpacing: 1.0,
-                      color: palette.bg,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+    // Startable or repeatable, the route composed is identical
+    // (SCENARIO-REPEAT-004); only the label changes (AD-5). Unknown progress
+    // falls back to EMPEZAR, never REPETIR.
+    final isRepeat = progress != null &&
+        progress.completed.contains((week: viewedWeek, day: day.dayNumber));
+
+    return _StartActionButton(
+      label: isRepeat
+          ? AppL10n.of(context).routineDetailRepeat
+          : AppL10n.of(context).routineDetailStart,
+      onPressed: () {
+        ref.read(analyticsServiceProvider).logRoutineStarted(
+              routineId: routine.id,
+              routineName: routine.name,
+            );
+        context.push(
+          '/workout/session/${routine.id}/${day.dayNumber}?week=$viewedWeek',
         );
       },
+    );
+  }
+}
+
+/// The accent pill both start actions render. Extracted so the single-week and
+/// periodized paths cannot drift in height — the pinned bar's footprint is
+/// whatever this measures, and the scroll above it is sized by the Column from
+/// exactly that.
+class _StartActionButton extends StatelessWidget {
+  const _StartActionButton({required this.label, required this.onPressed});
+
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: palette.accent,
+          minimumSize: const Size.fromHeight(56),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(9999),
+          ),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.barlowCondensed(
+            fontWeight: FontWeight.w700,
+            fontSize: 16,
+            letterSpacing: 1.0,
+            color: palette.bg,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Informational banner shown when every required (week, day) in the plan is
+/// complete. Purely a SIGNAL — never withholds the action below it (AD-1/AD-2).
+class _PlanCompleteBanner extends StatelessWidget {
+  const _PlanCompleteBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: palette.accent.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: palette.accent),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(TreinoIcon.check, size: 20, color: palette.accent),
+          const SizedBox(width: 10),
+          Text(
+            AppL10n.of(context).routineDetailPlanComplete,
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: 16,
+              letterSpacing: 1.2,
+              color: palette.accent,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Chip shown when the viewed (week, day) is already completed but the plan
+/// as a whole is not. Purely a SIGNAL — never withholds the action below it
+/// (AD-1/AD-2).
+class _CompletedDayChip extends StatelessWidget {
+  const _CompletedDayChip();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Container(
+      height: 56,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        borderRadius: BorderRadius.circular(9999),
+        border: Border.all(color: palette.border),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(TreinoIcon.check, size: 16, color: palette.accent),
+          const SizedBox(width: 8),
+          Text(
+            AppL10n.of(context).routineDetailCompleted,
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+              letterSpacing: 1.2,
+              color: palette.accent,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1146,67 +1308,31 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-class _StartSessionCTABar extends ConsumerWidget {
-  const _StartSessionCTABar({required this.routine, required this.day});
+/// Pinned start ACTION for single-week routines (numWeeks == 1).
+///
+/// Visibility for the current viewer — trainer role, or someone else's public
+/// user-created routine — is decided by the parent
+/// (`_RoutineDetailContent._startActionVisible`) rather than here, so the
+/// pinned slot in the Column and its occupant can never disagree: a guard that
+/// lived in this widget would shrink the button to nothing while the parent
+/// still reserved the bar's height (#641).
+class _StartSessionAction extends ConsumerWidget {
+  const _StartSessionAction({required this.routine, required this.day});
 
   final Routine routine;
   final RoutineDay day;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Trainers coach — they don't train in-app. Hide "EMPEZAR" for them so the
-    // plan view is read-only; athletes still get the start CTA.
-    final role = ref.watch(
-      userProfileProvider.select((async) => async.valueOrNull?.role),
-    );
-    if (role == UserRole.trainer) return const SizedBox.shrink();
-    // Read-only view of someone else's public user-created routine
-    // (surfaced from the "RUTINAS PÚBLICAS" tab of another user's public
-    // profile). Starting a session against another athlete's routine would
-    // log it against them, so hide the CTA. Trainer-assigned plans and
-    // trainer templates still show EMPEZAR — those flows predate this
-    // check and are intentional.
-    if (routine.source == RoutineSource.userCreated) {
-      final currentUid = ref.watch(currentUidProvider);
-      if (currentUid != null && currentUid != routine.createdBy) {
-        return const SizedBox.shrink();
-      }
-    }
-    final palette = AppPalette.of(context);
-    final l10n = AppL10n.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 18),
-      child: Row(
-        children: [
-          Expanded(
-            child: ElevatedButton(
-              onPressed: () {
-                ref.read(analyticsServiceProvider).logRoutineStarted(
-                      routineId: routine.id,
-                      routineName: routine.name,
-                    );
-                context.push('/workout/session/${routine.id}/${day.dayNumber}');
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: palette.accent,
-                minimumSize: const Size.fromHeight(56),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(9999),
-                ),
-              ),
-              child: Text(
-                l10n.routineDetailStart,
-                style: GoogleFonts.barlowCondensed(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 16,
-                  letterSpacing: 1.0,
-                  color: palette.bg,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+    return _StartActionButton(
+      label: AppL10n.of(context).routineDetailStart,
+      onPressed: () {
+        ref.read(analyticsServiceProvider).logRoutineStarted(
+              routineId: routine.id,
+              routineName: routine.name,
+            );
+        context.push('/workout/session/${routine.id}/${day.dayNumber}');
+      },
     );
   }
 }

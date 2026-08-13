@@ -1,7 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../../core/utils/firestore_write.dart';
+import '../../payments/domain/payment.dart';
 import '../domain/agenda_exceptions.dart';
 import '../domain/appointment.dart';
+import '../domain/wall_clock.dart';
 
 /// Firestore-backed repository for booking and managing appointments.
 ///
@@ -34,10 +37,20 @@ class AppointmentRepository {
     required String athleteDisplayName,
     required DateTime startsAt,
     required int durationMin,
+    DateTime? now,
   }) async {
+    // QA-COA-003: startsAt is wall-clock UTC (ADR-7), so compare against a
+    // wall-clock "now", not a real UTC instant (+3h in ART). Inject [now] in
+    // tests; defaults to nowWall().
+    final reference = now ?? nowWall();
+    final startsAtWall = startsAt.toUtc();
+    // QA-COA-003: reject sessions in the past. The picker guards this in the
+    // UI (new_session_sheet.dart), but the data-layer contract must too.
+    if (!startsAtWall.isAfter(reference)) {
+      throw const BookingInThePastException();
+    }
     // REQ-COACH-AGENDA-009: booking horizon is 28 days. Guard before any read.
-    if (startsAt.toUtc().difference(DateTime.now().toUtc()) >
-        const Duration(days: 28)) {
+    if (startsAtWall.difference(reference) > const Duration(days: 28)) {
       throw const BookingTooFarAheadException();
     }
 
@@ -129,7 +142,7 @@ class AppointmentRepository {
       noteBefore:
           (trimmedNote == null || trimmedNote.isEmpty) ? null : trimmedNote,
     );
-    await docRef.set(appt.toJson());
+    await docRef.set(appt.toJson()).boundedWrite;
     return appt;
   }
 
@@ -194,7 +207,7 @@ class AppointmentRepository {
     }
 
     if (count > 0) {
-      await batch.commit();
+      await batch.commit().boundedWrite;
     }
     return count;
   }
@@ -210,8 +223,11 @@ class AppointmentRepository {
     required Appointment appointment,
     required String actorUid,
     String? reason,
+    DateTime? now,
   }) async {
-    final remaining = appointment.startsAt.difference(DateTime.now().toUtc());
+    // QA-COA-003: startsAt is wall-clock UTC (ADR-7); compare against wall-clock
+    // "now" so the 24h gate isn't 3h short in ART. Inject [now] in tests.
+    final remaining = appointment.startsAt.difference(now ?? nowWall());
     if (remaining < const Duration(hours: 24)) {
       throw CancellationTooLateException(appointment.id);
     }
@@ -228,7 +244,7 @@ class AppointmentRepository {
       'cancelledAt': FieldValue.serverTimestamp(),
       'cancelledBy': actorUid,
       'cancellationLog': FieldValue.arrayUnion([logEntry]),
-    });
+    }).boundedWrite;
   }
 
   // ─── cancelFutureSeries ─────────────────────────────────────────────────────
@@ -243,8 +259,15 @@ class AppointmentRepository {
     required String trainerId,
     required String actorUid,
     String? reason,
+    DateTime? now,
   }) async {
-    final realNow = DateTime.now().toUtc();
+    // QA-COA-003: the >24h gate compares each occurrence's wall-clock startsAt
+    // (ADR-7) against a wall-clock "now", not a real UTC instant (+3h in ART).
+    // Inject [now] in tests.
+    final reference = now ?? nowWall();
+    // The cancellation-log timestamp stays a TRUE UTC instant (like cancel()):
+    // it records WHEN the cancel happened, not a wall-clock comparison.
+    final atMs = DateTime.now().toUtc().millisecondsSinceEpoch;
 
     // Query only this series (equality on recurringId + trainerId + status),
     // not the trainer's entire forward booking set. Needs a composite index on
@@ -267,7 +290,7 @@ class AppointmentRepository {
       // Only the occurrences the rule will accept (>24h ahead). The batch is
       // atomic, so a single <24h write would reject the whole commit — a small
       // safety margin absorbs the client→server latency near the boundary.
-      if (appt.startsAt.difference(realNow) <=
+      if (appt.startsAt.difference(reference) <=
           const Duration(hours: 24, minutes: 2)) {
         continue;
       }
@@ -278,7 +301,7 @@ class AppointmentRepository {
         'cancellationLog': FieldValue.arrayUnion([
           <String, Object?>{
             'byUid': actorUid,
-            'atMs': realNow.millisecondsSinceEpoch,
+            'atMs': atMs,
             if (reason != null) 'reason': reason,
           },
         ]),
@@ -286,13 +309,13 @@ class AppointmentRepository {
       count++;
       opsInBatch++;
       if (opsInBatch == maxBatchOps) {
-        await batch.commit();
+        await batch.commit().boundedWrite;
         batch = _firestore.batch();
         opsInBatch = 0;
       }
     }
     if (opsInBatch > 0) {
-      await batch.commit();
+      await batch.commit().boundedWrite;
     }
     return count;
   }
@@ -310,7 +333,167 @@ class AppointmentRepository {
     await _appointments.doc(appointmentId).update({
       'noteBefore': noteBefore,
       'noteAfter': noteAfter,
+    }).boundedWrite;
+  }
+
+  // ─── markBilled ───────────────────────────────────────────────────────────
+  //
+  // Slice 2a (Agenda→cobro bridge, per-turno). Standalone helper that just
+  // links an appointment to an already-created Payment id. Prefer
+  // [billAppointment] for the normal "create Payment + link it" flow — that
+  // one wraps BOTH writes in a single Firestore transaction so they can never
+  // diverge (see its doc comment). This method exists for direct unit tests
+  // of the "mark" half in isolation and for a manual re-link if ever needed.
+  // firestore.rules enforces set-once on `paymentId` (Path 3 of the
+  // appointments update rule) — a second call with a DIFFERENT paymentId on an
+  // already-billed doc will be rejected server-side.
+
+  Future<void> markBilled({
+    required String appointmentId,
+    required String paymentId,
+  }) async {
+    await _appointments.doc(appointmentId).update({'paymentId': paymentId});
+  }
+
+  // ─── billAppointment ──────────────────────────────────────────────────────
+  //
+  // MONEY-CRITICAL (Slice 2a): creates [payment] and links it to [appointment]
+  // atomically via a single Firestore transaction — either BOTH writes land or
+  // NEITHER does. This avoids the "Payment created but appointment left
+  // unmarked" half-done state that two independent awaited calls could leave
+  // behind on a mid-flow failure (which would risk a second trainer re-billing
+  // the same session).
+  //
+  // Re-reads the appointment doc inside the transaction (not the possibly
+  // stale [appointment] passed in) to close a double-submit / stale-dialog
+  // race: throws [AppointmentAlreadyBilledException] if `paymentId` is
+  // already set, and [AppointmentNotConfirmedException] if the live status
+  // isn't `confirmed` anymore (e.g. cancelled concurrently). Returns the new
+  // Payment's id.
+  //
+  // The Payment's own id is generated client-side (`_firestore.collection
+  // ('payments').doc()` — a local auto-id, no network round trip) so it can
+  // be embedded in both writes before the transaction ever starts.
+
+  Future<String> billAppointment({
+    required Appointment appointment,
+    required Payment payment,
+  }) async {
+    assert(
+      payment.trainerId == appointment.trainerId,
+      'billAppointment: payment.trainerId must match appointment.trainerId',
+    );
+    assert(
+      payment.athleteId == appointment.athleteId,
+      'billAppointment: payment.athleteId must match appointment.athleteId',
+    );
+
+    final appointmentRef = _appointments.doc(appointment.id);
+    final paymentRef = _firestore.collection('payments').doc();
+    final paymentToWrite = payment.copyWith(id: paymentRef.id);
+
+    await _firestore.runTransaction<void>((txn) async {
+      final snap = await txn.get(appointmentRef);
+      if (!snap.exists) {
+        throw AppointmentNotFoundException(appointment.id);
+      }
+      final data = snap.data()!;
+      if (data['paymentId'] != null) {
+        throw AppointmentAlreadyBilledException(appointment.id);
+      }
+      if (data['status'] != 'confirmed') {
+        throw AppointmentNotConfirmedException(appointment.id);
+      }
+
+      txn.set(paymentRef, paymentToWrite.toJson());
+      txn.update(appointmentRef, {'paymentId': paymentRef.id});
     });
+
+    return paymentRef.id;
+  }
+
+  // ─── billAppointments ─────────────────────────────────────────────────────
+  //
+  // MONEY-CRITICAL (Slice 2b, batch billing from the agenda): creates ONE
+  // [payment] and links it to EVERY appointment in [appointments] atomically
+  // via a single Firestore transaction — either ALL writes land or NONE does.
+  // Mirrors [billAppointment]'s atomicity contract, generalized to N docs.
+  //
+  // Firestore transactions require ALL reads before ANY write (the SDK
+  // throws if `txn.get()` is called after `txn.set()`/`txn.update()`), so
+  // this method does two full passes over [appointments] inside the
+  // transaction: (1) re-read every appointment's LIVE doc (never the
+  // possibly-stale objects in [appointments]) and validate ALL of them
+  // in-memory — confirmed, not yet billed, and belonging to the same
+  // athlete+trainer as [payment]; (2) only if EVERY appointment passes, write
+  // the Payment + link all N appointments to it. Throwing during the
+  // validation pass (before any write call) means the transaction commits
+  // NOTHING — a single bad turno aborts the whole lote, matching the
+  // single-turno guarantee.
+  //
+  // Throws [AppointmentNotFoundException], [AppointmentAlreadyBilledException],
+  // [AppointmentNotConfirmedException], or [AppointmentAthleteMismatchException]
+  // — whichever the FIRST invalid appointment in iteration order hits.
+  // Returns the new Payment's id.
+
+  Future<String> billAppointments({
+    required List<Appointment> appointments,
+    required Payment payment,
+  }) async {
+    assert(appointments.isNotEmpty,
+        'billAppointments: appointments must not be empty');
+    assert(
+      appointments.every((a) => a.trainerId == payment.trainerId),
+      'billAppointments: every appointment.trainerId must match payment.trainerId',
+    );
+    assert(
+      appointments.every((a) => a.athleteId == payment.athleteId),
+      'billAppointments: every appointment.athleteId must match payment.athleteId '
+      '(a batch bills exactly one athlete)',
+    );
+
+    final appointmentRefs = [
+      for (final appt in appointments) _appointments.doc(appt.id),
+    ];
+    final paymentRef = _firestore.collection('payments').doc();
+    final paymentToWrite = payment.copyWith(id: paymentRef.id);
+
+    await _firestore.runTransaction<void>((txn) async {
+      // ── Pass 1: ALL reads first (Firestore transaction requirement) ──────
+      final snaps = <DocumentSnapshot<Map<String, Object?>>>[];
+      for (final ref in appointmentRefs) {
+        snaps.add(await txn.get(ref));
+      }
+
+      // ── Pass 2: validate ALL in-memory before writing ANY ────────────────
+      for (var i = 0; i < snaps.length; i++) {
+        final snap = snaps[i];
+        final appointmentId = appointments[i].id;
+
+        if (!snap.exists) {
+          throw AppointmentNotFoundException(appointmentId);
+        }
+        final data = snap.data()!;
+        if (data['paymentId'] != null) {
+          throw AppointmentAlreadyBilledException(appointmentId);
+        }
+        if (data['status'] != 'confirmed') {
+          throw AppointmentNotConfirmedException(appointmentId);
+        }
+        if (data['athleteId'] != payment.athleteId ||
+            data['trainerId'] != payment.trainerId) {
+          throw AppointmentAthleteMismatchException(appointmentId);
+        }
+      }
+
+      // ── Writes: every appointment validated → safe to commit the lote ────
+      txn.set(paymentRef, paymentToWrite.toJson());
+      for (final ref in appointmentRefs) {
+        txn.update(ref, {'paymentId': paymentRef.id});
+      }
+    });
+
+    return paymentRef.id;
   }
 
   // ─── watchForAthlete ──────────────────────────────────────────────────────

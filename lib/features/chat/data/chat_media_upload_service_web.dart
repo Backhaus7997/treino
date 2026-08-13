@@ -118,7 +118,8 @@ class ChatMediaUploadServiceWeb extends ChatMediaUploadService {
   /// `application/octet-stream`, so this must never return that on web.
   String _resolveContentType(String ext, XFile xfile, MediaType mediaType) {
     final mime = xfile.mimeType;
-    if (mime != null && (mime.startsWith('image/') || mime.startsWith('video/'))) {
+    if (mime != null &&
+        (mime.startsWith('image/') || mime.startsWith('video/'))) {
       return mime;
     }
     final fromExt = contentTypeForExt(ext);

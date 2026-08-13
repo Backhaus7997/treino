@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/motion/treino_state_switcher.dart';
+import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../application/custom_exercise_providers.dart';
@@ -80,52 +82,62 @@ class _CustomExerciseEditorScreenState
     // the user overwrite or duplicate an exercise.
     if (widget.isEditing && uid.isNotEmpty) {
       final listAsync = ref.watch(customExercisesForTrainerStreamProvider(uid));
-      return listAsync.when(
-        loading: () => _StatusScaffold(
-          palette: palette,
-          l10n: l10n,
-          child: Center(
-            child: CircularProgressIndicator(color: palette.accent),
-          ),
-        ),
-        error: (_, __) => _StatusScaffold(
-          palette: palette,
-          l10n: l10n,
-          child: _ErrorState(
+      return TreinoStateSwitcher(
+        childKey: ValueKey(listAsync.when(
+          loading: () => 'loading',
+          error: (_, __) => 'error',
+          data: (list) =>
+              list.where((e) => e.id == widget.exerciseId).firstOrNull == null
+                  ? 'notfound'
+                  : 'form',
+        )),
+        child: listAsync.when(
+          loading: () => _StatusScaffold(
             palette: palette,
-            // coachErrorLabel/coachRetryLabel are blank in the English locale,
-            // which left the error state with no visible text or button label
-            // (Nielsen #1). Route through keys that are populated in both
-            // locales so the message and retry CTA are always visible.
-            message: l10n.coachHubSectionLoadError,
-            retryLabel: l10n.plantillasRetryLabel,
-            onRetry: () =>
-                ref.invalidate(customExercisesForTrainerStreamProvider(uid)),
+            l10n: l10n,
+            child: Center(
+              child: CircularProgressIndicator(color: palette.accent),
+            ),
           ),
-        ),
-        data: (list) {
-          final existing =
-              list.where((e) => e.id == widget.exerciseId).firstOrNull;
-          if (existing == null) {
-            return _StatusScaffold(
+          error: (_, __) => _StatusScaffold(
+            palette: palette,
+            l10n: l10n,
+            child: _ErrorState(
               palette: palette,
-              l10n: l10n,
-              child: _ErrorState(
+              // coachErrorLabel/coachRetryLabel are blank in the English locale,
+              // which left the error state with no visible text or button label
+              // (Nielsen #1). Route through keys that are populated in both
+              // locales so the message and retry CTA are always visible.
+              message: l10n.coachHubSectionLoadError,
+              retryLabel: l10n.plantillasRetryLabel,
+              onRetry: () =>
+                  ref.invalidate(customExercisesForTrainerStreamProvider(uid)),
+            ),
+          ),
+          data: (list) {
+            final existing =
+                list.where((e) => e.id == widget.exerciseId).firstOrNull;
+            if (existing == null) {
+              return _StatusScaffold(
                 palette: palette,
-                // Previously reused workoutSelfEditorNotFound, authored for the
-                // ROUTINE editor ("Esta rutina ya no existe…") — wrong domain
-                // on an exercise editor, and blank in the English locale. Use a
-                // neutral key populated in both locales so the not-found state
-                // is visible and not falsely about routines.
-                message: l10n.coachHubSectionLoadError,
-                retryLabel: l10n.commonBack,
-                onRetry: () => context.pop(),
-              ),
-            );
-          }
-          _hydrate(existing);
-          return _buildForm(context, palette, l10n, existing);
-        },
+                l10n: l10n,
+                child: _ErrorState(
+                  palette: palette,
+                  // Previously reused workoutSelfEditorNotFound, authored for the
+                  // ROUTINE editor ("Esta rutina ya no existe…") — wrong domain
+                  // on an exercise editor, and blank in the English locale. Use a
+                  // neutral key populated in both locales so the not-found state
+                  // is visible and not falsely about routines.
+                  message: l10n.coachHubSectionLoadError,
+                  retryLabel: l10n.commonBack,
+                  onRetry: () => context.pop(),
+                ),
+              );
+            }
+            _hydrate(existing);
+            return _buildForm(context, palette, l10n, existing);
+          },
+        ),
       );
     }
 
@@ -147,9 +159,8 @@ class _CustomExerciseEditorScreenState
               Semantics(
                 button: true,
                 label: l10n.commonBack,
-                child: GestureDetector(
+                child: TreinoTappable(
                   onTap: () => context.pop(),
-                  behavior: HitTestBehavior.opaque,
                   child: ConstrainedBox(
                     constraints:
                         const BoxConstraints(minWidth: 44, minHeight: 44),
@@ -512,9 +523,8 @@ class _StatusScaffold extends StatelessWidget {
               Semantics(
                 button: true,
                 label: l10n.commonBack,
-                child: GestureDetector(
+                child: TreinoTappable(
                   onTap: () => context.pop(),
-                  behavior: HitTestBehavior.opaque,
                   child: ConstrainedBox(
                     constraints:
                         const BoxConstraints(minWidth: 44, minHeight: 44),

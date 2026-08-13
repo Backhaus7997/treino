@@ -92,6 +92,33 @@ class MeasurementRepository {
         );
   }
 
+  // ─── watchSelfLoggedForAthlete ──────────────────────────────────────────
+
+  /// [athlete-self-measurements] Live stream de las mediciones que el atleta
+  /// [athleteId] se cargó A SÍ MISMO (`recordedBy == athleteId`).
+  ///
+  /// Es la mitad NUEVA de la vista del entrenador (Q2): la query del PF filtra
+  /// por `recordedBy == trainerUid` ([watchForTrainerAthlete]) y por
+  /// construcción NO ve lo self-logged (`recordedBy == athleteId`). Esta query,
+  /// en cambio, matchea SÓLO lo self-logged, así que TODOS sus docs satisfacen
+  /// la rama-3 de la regla de lectura (vínculo activo + consentimiento) y la
+  /// lista es probable-como-legible.
+  ///
+  /// NO fusionar con [watchForTrainerAthlete] en un `where('athleteId')` a
+  /// secas: eso también matchearía los docs de un PF ANTERIOR
+  /// (`recordedBy == oldTrainer`), que fallan las 3 ramas de lectura para el PF
+  /// nuevo → Firestore deniega la lista ENTERA (design R4). Dos igualdades → sin
+  /// índice compuesto.
+  Stream<List<Measurement>> watchSelfLoggedForAthlete(String athleteId) {
+    return _collection
+        .where('athleteId', isEqualTo: athleteId)
+        .where('recordedBy', isEqualTo: athleteId)
+        .snapshots()
+        .map(
+          (snap) => snap.docs.map(_fromDoc).whereType<Measurement>().toList(),
+        );
+  }
+
   // ─── Private helpers ────────────────────────────────────────────────────
 
   Measurement? _fromDoc(DocumentSnapshot<Map<String, Object?>> snap) {

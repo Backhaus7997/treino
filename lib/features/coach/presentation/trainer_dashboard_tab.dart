@@ -6,7 +6,9 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../l10n/app_l10n.dart';
+import '../../../core/utils/appointment_window.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../coach_hub/presentation/sections/pagos/widgets/thousands_input_formatter.dart';
 import '../../payments/application/pagos_por_cobrar_provider.dart';
 import '../../payments/application/payment_providers.dart';
 import '../../payments/domain/athlete_billing.dart';
@@ -17,10 +19,13 @@ import '../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../application/agenda_providers.dart';
 import '../application/dashboard_day_counts.dart';
+import '../application/follow_up_entry_providers.dart';
 import '../application/recent_activity_provider.dart';
 import '../application/trained_today_provider.dart';
 import '../application/trainer_link_providers.dart';
 import '../domain/appointment.dart';
+import '../domain/follow_up_entry.dart' show FollowUpTag;
+import '../domain/wall_clock.dart';
 
 // Re-export so the mobile test (trainer_dashboard_day_counts_test.dart) that
 // imports dashboardDayCounts/DashboardDayCounts from this file keeps compiling
@@ -55,12 +60,18 @@ class TrainerDashboardTab extends ConsumerWidget {
       // floating bar's height must be added back — otherwise the last row
       // (CTA buttons) can never scroll out from behind the translucent bar.
       padding: EdgeInsets.fromLTRB(
-          20, 14, 20, 24 + MediaQuery.paddingOf(context).bottom),
+        20,
+        14,
+        20,
+        24 + MediaQuery.paddingOf(context).bottom,
+      ),
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
         const _DashboardHeader(),
         const SizedBox(height: 18),
-        const _SolicitudesPendientesSection(),
+        // #393: pending requests are NOT shown inline here anymore — they live
+        // in the bell modal (_showPendingRequestsSheet) so they don't clutter
+        // the dashboard.
         const _ResumenDelDiaCard(),
         const SizedBox(height: 20),
         _SectionHeader(
@@ -74,6 +85,7 @@ class TrainerDashboardTab extends ConsumerWidget {
         _SectionHeader(
           label: AppL10n.of(context).dashboardEntrenaronHoySectionLabel,
           trailingLabel: AppL10n.of(context).dashboardDejarFeedbackLabel,
+          trailingOnTap: () => _showDejarFeedbackSheet(context),
         ),
         const SizedBox(height: 8),
         const _EntrenaronHoyList(),
@@ -109,6 +121,9 @@ class _DashboardHeader extends ConsumerWidget {
     final pendingCount = (linksAsync.valueOrNull ?? const [])
         .where((l) => l.status == TrainerLinkStatus.pending)
         .length;
+    // A failed links read must not silently hide the badge: flag it so the bell
+    // shows an error dot (and its sheet a retry) instead of a false empty "0".
+    final linksHasError = linksAsync.hasError && !linksAsync.hasValue;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -130,8 +145,9 @@ class _DashboardHeader extends ConsumerWidget {
               child: Text(
                 firstName.isEmpty
                     ? AppL10n.of(context).dashboardHolaSinNombre
-                    : AppL10n.of(context)
-                        .dashboardHolaConNombre(firstName.toUpperCase()),
+                    : AppL10n.of(
+                        context,
+                      ).dashboardHolaConNombre(firstName.toUpperCase()),
                 style: GoogleFonts.barlowCondensed(
                   fontWeight: FontWeight.w700,
                   fontSize: 28,
@@ -140,11 +156,69 @@ class _DashboardHeader extends ConsumerWidget {
                 ),
               ),
             ),
-            _BellWithBadge(badgeCount: pendingCount, palette: palette),
-            const SizedBox(width: 12),
-            _AvatarInitials(
-              initials: initials.isEmpty ? '·' : initials,
+            _BellWithBadge(
+              badgeCount: pendingCount,
+              showError: linksHasError,
               palette: palette,
+              onTap: () => _showPendingRequestsSheet(context),
+            ),
+            const SizedBox(width: 12),
+            // Shortcut straight to the professional-profile EDITOR, not to the
+            // PERFIL tab: from the dashboard the useful destination is the
+            // form, not the tab root the trainer would then have to tap
+            // through.
+            //
+            // `push`, not `go`: ProfileEditTrainerScreen ends its edit-mode
+            // save with `context.pop()` (ADR-TPO-006). Navigating with `go`
+            // would leave nothing to pop and strand the trainer on the form
+            // after saving.
+            //
+            // No `?mode=onboarding` — that param is for the first-run gate;
+            // any other value defaults to edit mode, which is what we want.
+            //
+            // Wrapped HERE and not inside _AvatarInitials: that widget is also
+            // used for athlete rows in ENTRENARON HOY and in the feedback
+            // picker, where it must stay inert.
+            Semantics(
+              button: true,
+              // `container: true` is what makes this its OWN semantics node.
+              // Without it the annotation merges into the enclosing node and
+              // the whole header — date, greeting, bell label and this one —
+              // is announced as a single blob.
+              container: true,
+              label: AppL10n.of(context).a11yDashboardAvatarButton,
+              child: GestureDetector(
+                onTap: () => context.push('/profile/edit-trainer'),
+                behavior: HitTestBehavior.opaque,
+                // The avatar itself is 36px — under the 44pt minimum touch
+                // target. `opaque` makes the whole padded box tappable.
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    minWidth: 44,
+                    minHeight: 44,
+                  ),
+                  child: Center(
+                    // The initials render as a Text that would otherwise merge
+                    // into the label and be read out as "Editar tu perfil
+                    // profesional MP". They are decorative — derived from the
+                    // display name the trainer already knows is theirs.
+                    //
+                    // Excluded HERE, wrapping only the decorative subtree, and
+                    // NOT via `excludeSemantics: true` on the Semantics above:
+                    // that flag drops the semantics of EVERY descendant,
+                    // including the tap action the GestureDetector contributes.
+                    // The node was still announced as a button but VoiceOver's
+                    // double-tap had no action to fire. Same shape as
+                    // _BellWithBadge.
+                    child: ExcludeSemantics(
+                      child: _AvatarInitials(
+                        initials: initials.isEmpty ? '·' : initials,
+                        palette: palette,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ),
           ],
         ),
@@ -154,47 +228,123 @@ class _DashboardHeader extends ConsumerWidget {
 }
 
 class _BellWithBadge extends StatelessWidget {
-  const _BellWithBadge({required this.badgeCount, required this.palette});
+  const _BellWithBadge({
+    required this.badgeCount,
+    required this.palette,
+    required this.onTap,
+    this.showError = false,
+  });
   final int badgeCount;
   final AppPalette palette;
+
+  /// Fires when tapped. Only wired when [badgeCount] > 0 — a zero badge has no
+  /// pending requests to show, so the bell stays inert (#393).
+  final VoidCallback onTap;
+
+  /// The links stream failed: show an amber dot (not a count) so the trainer
+  /// knows to tap, instead of a badge silently hidden as if there were none.
+  final bool showError;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
+    // #393: the bell was a bare Icon with no tap handler. It opens a modal
+    // sheet listing the pending link requests (accept/decline).
+    //
+    // It used to be gated on `badgeCount > 0` and sat INERT at zero, which
+    // read as broken — a trainer with no requests tapped it and nothing
+    // happened, with no way to tell that from a bug. It is always tappable
+    // now; the sheet owns the empty state.
     return Semantics(
-      label: l10n.homePendingRequestsA11y(badgeCount),
-      child: ExcludeSemantics(
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Icon(TreinoIcon.bell, size: 22, color: palette.textPrimary),
-            if (badgeCount > 0)
-              Positioned(
-                right: -4,
-                top: -4,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: palette.accent,
-                    borderRadius: BorderRadius.circular(9999),
-                    border: Border.all(color: palette.bg, width: 1),
+      label: showError
+          ? l10n.agendaGenericError
+          : l10n.homePendingRequestsA11y(badgeCount),
+      button: true,
+      // Without `container: true` this annotation merged into the enclosing
+      // header node, so the pending count was announced glued to the date and
+      // the greeting ("MARTES 28 JULIO HOLA, MATEO 0 solicitudes pendientes")
+      // instead of as its own control.
+      container: true,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: ExcludeSemantics(
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Icon(TreinoIcon.bell, size: 22, color: palette.textPrimary),
+              if (showError)
+                // Amber dot: the count is unknown (read failed), so show an
+                // attention marker that invites a tap rather than a false count.
+                Positioned(
+                  right: -3,
+                  top: -3,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: palette.warning,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: palette.bg, width: 1),
+                    ),
                   ),
-                  child: Text(
-                    badgeCount > 9 ? '9+' : '$badgeCount',
-                    style: GoogleFonts.barlowCondensed(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 10,
-                      color: palette.bg,
+                )
+              else if (badgeCount > 0)
+                Positioned(
+                  right: -4,
+                  top: -4,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 1,
+                    ),
+                    decoration: BoxDecoration(
+                      color: palette.accent,
+                      borderRadius: BorderRadius.circular(9999),
+                      border: Border.all(color: palette.bg, width: 1),
+                    ),
+                    child: Text(
+                      badgeCount > 9 ? '9+' : '$badgeCount',
+                      style: GoogleFonts.barlowCondensed(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 10,
+                        color: palette.bg,
+                      ),
                     ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
+}
+
+/// Test-only harness that renders `_BellWithBadge` directly, so the #393
+/// tap/inert behaviour is unit-testable without the full dashboard's provider
+/// graph (mirrors [AddSueltoSheetTestHarness]).
+///
+/// @visibleForTesting
+class BellWithBadgeTestHarness extends StatelessWidget {
+  const BellWithBadgeTestHarness({
+    super.key,
+    required this.badgeCount,
+    required this.onTap,
+    this.showError = false,
+  });
+
+  final int badgeCount;
+  final VoidCallback onTap;
+  final bool showError;
+
+  @override
+  Widget build(BuildContext context) => _BellWithBadge(
+        badgeCount: badgeCount,
+        showError: showError,
+        palette: AppPalette.of(context),
+        onTap: onTap,
+      );
 }
 
 class _AvatarInitials extends StatelessWidget {
@@ -226,35 +376,7 @@ class _AvatarInitials extends StatelessWidget {
   }
 }
 
-// ── Solicitudes pendientes (only when count > 0) ──────────────────────────────
-
-class _SolicitudesPendientesSection extends ConsumerWidget {
-  const _SolicitudesPendientesSection();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final linksAsync = ref.watch(trainerLinksStreamProvider);
-    final pending = (linksAsync.valueOrNull ?? const <TrainerLink>[])
-        .where((l) => l.status == TrainerLinkStatus.pending)
-        .toList();
-    if (pending.isEmpty) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _SectionHeader(
-            label: AppL10n.of(context)
-                .dashboardSolicitudesPendientesTitle(pending.length)),
-        const SizedBox(height: 8),
-        for (final link in pending) ...[
-          _PendingRequestCard(link: link),
-          const SizedBox(height: 8),
-        ],
-        const SizedBox(height: 12),
-      ],
-    );
-  }
-}
+// ── Pending request card (used by the bell modal, #393) ───────────────────────
 
 class _PendingRequestCard extends ConsumerStatefulWidget {
   const _PendingRequestCard({required this.link});
@@ -272,6 +394,17 @@ class _PendingRequestCardState extends ConsumerState<_PendingRequestCard> {
   // on error so the trainer can retry.
   bool _busy = false;
 
+  // El catch resetea _busy Y muestra feedback (hallazgo H5): antes solo
+  // reseteaba el flag, así que un fallo (permission-denied, rules) dejaba al PF
+  // creyendo que aceptó/rechazó cuando no pasó nada. `_showError` chequea
+  // mounted porque corre después del await.
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
   Future<void> _decline() async {
     if (_busy) return;
     setState(() => _busy = true);
@@ -279,6 +412,7 @@ class _PendingRequestCardState extends ConsumerState<_PendingRequestCard> {
       await ref.read(trainerLinkRepositoryProvider).decline(widget.link.id);
     } catch (_) {
       if (mounted) setState(() => _busy = false);
+      _showError('No pudimos rechazar la solicitud. Probá de nuevo.');
     }
   }
 
@@ -292,6 +426,7 @@ class _PendingRequestCardState extends ConsumerState<_PendingRequestCard> {
           .logLinkAccepted(linkId: widget.link.id);
     } catch (_) {
       if (mounted) setState(() => _busy = false);
+      _showError('No pudimos aceptar la solicitud. Probá de nuevo.');
     }
   }
 
@@ -299,8 +434,9 @@ class _PendingRequestCardState extends ConsumerState<_PendingRequestCard> {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    final profileAsync =
-        ref.watch(userPublicProfileProvider(widget.link.athleteId));
+    final profileAsync = ref.watch(
+      userPublicProfileProvider(widget.link.athleteId),
+    );
     final name =
         profileAsync.valueOrNull?.displayName ?? l10n.dashboardAlumnoFallback;
     final initials = _initials(name);
@@ -386,6 +522,506 @@ class _PendingRequestCardState extends ConsumerState<_PendingRequestCard> {
   }
 }
 
+// ── Pending-requests modal (opened from the header bell, #393) ────────────────
+
+/// #393: the header bell opens this sheet listing the trainer's pending link
+/// requests (accept/decline). There is no separate requests screen and no
+/// in-app notification centre (only push FCM), so this modal is the single
+/// place the trainer reviews them. (The requests used to also render inline in
+/// the dashboard, but that duplicated the modal and cluttered the home.)
+/// Opens the "Dejar feedback" sheet from the ENTRENARON HOY section header.
+///
+/// The link had NO handler until now: `_SectionHeader` renders a trailing
+/// label with `trailingOnTap == null` in `textMuted`, so it sat there looking
+/// deliberately inert. The mockup (docs/app-trainer/screens/dashboard) shows
+/// it in accent — an active link — but never designed a destination screen,
+/// so the surface below is new. It writes a [FollowUpEntry] tagged
+/// `entrenamiento`, the same private trainer→athlete note the Coach Hub (web)
+/// already creates; only the mobile UI was missing.
+void _showDejarFeedbackSheet(BuildContext context) {
+  final palette = AppPalette.of(context);
+  showModalBottomSheet<void>(
+    context: context,
+    useRootNavigator: true,
+    backgroundColor: palette.bgCard,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (_) => const _DejarFeedbackSheet(),
+  );
+}
+
+/// Two-step sheet: pick an athlete who trained today, then write the note.
+///
+/// Athletes come from [trainedTodayProvider] — the SAME source the section
+/// lists — so the sheet can never offer someone the trainer isn't looking at.
+class _DejarFeedbackSheet extends ConsumerStatefulWidget {
+  const _DejarFeedbackSheet();
+
+  @override
+  ConsumerState<_DejarFeedbackSheet> createState() =>
+      _DejarFeedbackSheetState();
+}
+
+class _DejarFeedbackSheetState extends ConsumerState<_DejarFeedbackSheet> {
+  final _controller = TextEditingController();
+  String? _athleteId;
+  String? _athleteName;
+  bool _saving = false;
+  bool _failed = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final trainerId = ref.read(currentUidProvider) ?? '';
+    final text = _controller.text.trim();
+    if (trainerId.isEmpty || _athleteId == null || text.isEmpty) return;
+
+    setState(() {
+      _saving = true;
+      _failed = false;
+    });
+
+    try {
+      await ref.read(followUpEntryRepositoryProvider).add(
+            trainerId: trainerId,
+            athleteId: _athleteId!,
+            text: text,
+            tag: FollowUpTag.entrenamiento,
+          );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _failed = true;
+      });
+      return;
+    }
+
+    if (!mounted) return;
+    final l10n = AppL10n.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    Navigator.of(context).pop();
+    messenger.showSnackBar(
+      SnackBar(content: Text(l10n.dashboardFeedbackSaved)),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+
+    return SafeArea(
+      child: Padding(
+        // viewInsets so the composer stays above the keyboard.
+        padding: EdgeInsets.fromLTRB(
+          20,
+          16,
+          20,
+          16 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                if (_athleteId != null)
+                  GestureDetector(
+                    onTap: () => setState(() {
+                      _athleteId = null;
+                      _athleteName = null;
+                      _failed = false;
+                    }),
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 10),
+                      child: Icon(
+                        TreinoIcon.back,
+                        size: 20,
+                        color: palette.textPrimary,
+                      ),
+                    ),
+                  ),
+                Expanded(
+                  child: Text(
+                    _athleteName ?? l10n.dashboardFeedbackSheetTitle,
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 20,
+                      letterSpacing: 1.0,
+                      color: palette.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (_athleteId == null)
+              _FeedbackAthletePicker(
+                onPick: (id, name) => setState(() {
+                  _athleteId = id;
+                  _athleteName = name;
+                }),
+              )
+            else ...[
+              TextField(
+                controller: _controller,
+                autofocus: true,
+                minLines: 3,
+                maxLines: 6,
+                enabled: !_saving,
+                onChanged: (_) => setState(() {}),
+                style: GoogleFonts.barlow(
+                  fontSize: 14,
+                  color: palette.textPrimary,
+                ),
+                decoration: InputDecoration(
+                  hintText: l10n.dashboardFeedbackComposerHint,
+                  hintStyle: GoogleFonts.barlow(
+                    fontSize: 14,
+                    color: palette.textMuted,
+                  ),
+                  filled: true,
+                  fillColor: palette.bg,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(color: palette.border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(color: palette.border),
+                  ),
+                ),
+              ),
+              if (_failed) ...[
+                const SizedBox(height: 10),
+                Text(
+                  l10n.dashboardFeedbackSaveError,
+                  style: GoogleFonts.barlow(
+                    fontSize: 13,
+                    color: palette.danger,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  // Disabled on empty text — an empty FollowUpEntry is noise
+                  // in the athlete's history, not a saved note.
+                  onPressed:
+                      _saving || _controller.text.trim().isEmpty ? null : _save,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: palette.accent,
+                    foregroundColor: palette.bg,
+                    minimumSize: const Size.fromHeight(48),
+                    shape: const StadiumBorder(),
+                  ),
+                  child: _saving
+                      ? SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: palette.bg,
+                          ),
+                        )
+                      : Text(
+                          l10n.dashboardFeedbackSave,
+                          style: GoogleFonts.barlowCondensed(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Step 1 — the athletes who trained today, reusing [trainedTodayProvider].
+class _FeedbackAthletePicker extends ConsumerWidget {
+  const _FeedbackAthletePicker({required this.onPick});
+
+  final void Function(String athleteId, String displayName) onPick;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    final todayAsync = ref.watch(trainedTodayProvider);
+
+    if (todayAsync.isLoading && !todayAsync.hasValue) {
+      return _PlaceholderCard(
+        palette: palette,
+        message: l10n.dashboardCargando,
+      );
+    }
+    if (todayAsync.hasError && !todayAsync.hasValue) {
+      return _PlaceholderCard(
+        palette: palette,
+        message: l10n.dashboardErrorActividad,
+      );
+    }
+
+    final entries = todayAsync.valueOrNull ?? const <TrainedTodayEntry>[];
+    if (entries.isEmpty) {
+      return _PlaceholderCard(
+        palette: palette,
+        message: l10n.dashboardNadieEntreno,
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          l10n.dashboardFeedbackPickAthlete,
+          style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+        ),
+        const SizedBox(height: 10),
+        // Bounded so a trainer with many athletes still gets a sheet that
+        // fits — the list scrolls instead of pushing the header off-screen.
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 320),
+          child: ListView.separated(
+            shrinkWrap: true,
+            itemCount: entries.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 8),
+            itemBuilder: (_, i) =>
+                _FeedbackAthleteTile(entry: entries[i], onPick: onPick),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FeedbackAthleteTile extends ConsumerWidget {
+  const _FeedbackAthleteTile({required this.entry, required this.onPick});
+
+  final TrainedTodayEntry entry;
+  final void Function(String athleteId, String displayName) onPick;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    // Same name-resolution contract as _EntrenaronHoyRow: a raw uid is not a
+    // name, so it falls back to the generic label.
+    final profileAsync = ref.watch(userPublicProfileProvider(entry.athleteId));
+    final rawName = profileAsync.valueOrNull?.displayName ?? '';
+    final showName = rawName.isEmpty || _looksLikeUid(rawName)
+        ? AppL10n.of(context).dashboardAlumnoFallback
+        : rawName;
+
+    return InkWell(
+      onTap: () => onPick(entry.athleteId, showName),
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: palette.bg,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: palette.border),
+        ),
+        child: Row(
+          children: [
+            _AvatarInitials(initials: _initials(showName), palette: palette),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                showName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.barlow(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: palette.textPrimary,
+                ),
+              ),
+            ),
+            Icon(TreinoIcon.forward, size: 14, color: palette.textMuted),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Test-only harness that renders the "Dejar feedback" sheet content directly,
+/// so the picker → composer → save flow is testable without driving the
+/// bottom-sheet plumbing (mirrors [PendingRequestsSheetTestHarness]).
+///
+/// @visibleForTesting
+class DejarFeedbackSheetTestHarness extends StatelessWidget {
+  const DejarFeedbackSheetTestHarness({super.key});
+
+  @override
+  Widget build(BuildContext context) => const _DejarFeedbackSheet();
+}
+
+void _showPendingRequestsSheet(BuildContext context) {
+  final palette = AppPalette.of(context);
+  showModalBottomSheet<void>(
+    context: context,
+    useRootNavigator: true,
+    backgroundColor: palette.bgCard,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (_) => const _PendingRequestsSheet(),
+  );
+}
+
+class _PendingRequestsSheet extends ConsumerStatefulWidget {
+  const _PendingRequestsSheet();
+
+  @override
+  ConsumerState<_PendingRequestsSheet> createState() =>
+      _PendingRequestsSheetState();
+}
+
+class _PendingRequestsSheetState extends ConsumerState<_PendingRequestsSheet> {
+  /// Latches once the sheet has shown at least one request.
+  ///
+  /// It distinguishes the two ways of ending up with an empty list, which need
+  /// OPPOSITE behaviour:
+  /// - opened with none → show the empty state and STAY (the bell is now
+  ///   always tappable, so this is a legitimate way to open the sheet);
+  /// - opened with some and the last one was just accepted/declined →
+  ///   auto-close, so the sheet does not sit there with nothing in it.
+  ///
+  /// Written during build without setState on purpose: it never needs to
+  /// trigger a rebuild of its own — the stream already rebuilds us, and this
+  /// only records what that rebuild showed.
+  bool _hadAny = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    final linksAsync = ref.watch(trainerLinksStreamProvider);
+
+    // A failed read must not read as "no requests": show a retry, not the empty
+    // state (nor a "(0)" title) that would hide a pending request behind a lie.
+    // Early return keeps it clear of the had-some-then-none auto-close below.
+    if (linksAsync.hasError && !linksAsync.hasValue) {
+      return Padding(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: 20 + MediaQuery.paddingOf(context).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l10n.agendaGenericError,
+              style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+            ),
+            const SizedBox(height: 10),
+            TextButton(
+              onPressed: () => ref.invalidate(trainerLinksStreamProvider),
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(0, 36),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: Text(
+                l10n.coachRetryLabel,
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  letterSpacing: 0.8,
+                  color: palette.accent,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final pending = (linksAsync.valueOrNull ?? const <TrainerLink>[])
+        .where((l) => l.status == TrainerLinkStatus.pending)
+        .toList();
+
+    if (pending.isNotEmpty) _hadAny = true;
+
+    if (pending.isEmpty && _hadAny) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) Navigator.of(context).maybePop();
+      });
+    }
+
+    return SingleChildScrollView(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: 20 + MediaQuery.paddingOf(context).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l10n.dashboardSolicitudesPendientesTitle(pending.length),
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 18,
+                letterSpacing: 1.2,
+                color: palette.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (pending.isEmpty)
+              Text(
+                l10n.dashboardSolicitudesPendientesEmpty,
+                style: GoogleFonts.barlow(
+                  fontSize: 13,
+                  color: palette.textMuted,
+                ),
+              ),
+            for (final link in pending) ...[
+              _PendingRequestCard(link: link),
+              const SizedBox(height: 8),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Test-only harness that renders the #393 pending-requests modal content
+/// directly, so its list behaviour is testable without driving the bell +
+/// bottom-sheet plumbing (mirrors [AddSueltoSheetTestHarness]).
+///
+/// @visibleForTesting
+class PendingRequestsSheetTestHarness extends StatelessWidget {
+  const PendingRequestsSheetTestHarness({super.key});
+
+  @override
+  Widget build(BuildContext context) => const _PendingRequestsSheet();
+}
+
 // ── Resumen del día (3 stat columns) ──────────────────────────────────────────
 
 class _ResumenDelDiaCard extends ConsumerWidget {
@@ -394,18 +1030,42 @@ class _ResumenDelDiaCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final trainerId = ref.watch(currentUidProvider) ?? '';
     final apptAsync = trainerId.isEmpty
         ? const AsyncValue<List<Appointment>>.data(<Appointment>[])
         : ref.watch(
-            trainerAppointmentsStreamProvider(_appointmentsKey(trainerId)));
+            trainerAppointmentsStreamProvider(_appointmentsKey(trainerId)),
+          );
 
-    final all = apptAsync.valueOrNull ?? const <Appointment>[];
-    final now = DateTime.now().toUtc();
-    final counts = dashboardDayCounts(all, now);
-    final pending = counts.pending;
-    final done = counts.done;
-    final cancelled = counts.cancelled;
+    // Distinguir loading/error de un día genuinamente en cero (QA H3): antes
+    // `apptAsync.valueOrNull ?? []` colapsaba AMBOS a 0/0/0, así que un
+    // permission-denied (p.ej. App Check no registrado) se leía como
+    // "0 pendientes, 0 hechas, 0 canceladas" — un día tranquilo, no un fallo.
+    // El hermano _ProximasSesionesList ya distinguía los estados con el mismo
+    // provider; esto lo empareja. Loading muestra "—"; error, un mensaje.
+    final Widget body = apptAsync.when(
+      loading: () =>
+          _statsRow(context, palette, pending: '—', done: '—', cancelled: '—'),
+      error: (_, __) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Text(
+          l10n.dashboardErrorResumen,
+          style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+        ),
+      ),
+      data: (all) {
+        // QA-HOME-001: startsAt is Argentina wall-clock, so "now" must be too.
+        final counts = dashboardDayCounts(all, argentinaNow());
+        return _statsRow(
+          context,
+          palette,
+          pending: '${counts.pending}',
+          done: '${counts.done}',
+          cancelled: '${counts.cancelled}',
+        );
+      },
+    );
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
@@ -418,7 +1078,7 @@ class _ResumenDelDiaCard extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            AppL10n.of(context).dashboardResumenDelDiaTitle,
+            l10n.dashboardResumenDelDiaTitle,
             style: GoogleFonts.barlowCondensed(
               fontWeight: FontWeight.w700,
               fontSize: 11,
@@ -427,32 +1087,43 @@ class _ResumenDelDiaCard extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              _StatColumn(
-                value: '$pending',
-                label: AppL10n.of(context).dashboardStatPendientes,
-                color: palette.accent,
-                palette: palette,
-              ),
-              _Divider(palette: palette),
-              _StatColumn(
-                value: '$done',
-                label: AppL10n.of(context).dashboardStatCompletadas,
-                color: palette.textPrimary,
-                palette: palette,
-              ),
-              _Divider(palette: palette),
-              _StatColumn(
-                value: '$cancelled',
-                label: AppL10n.of(context).dashboardStatCanceladas,
-                color: palette.danger,
-                palette: palette,
-              ),
-            ],
-          ),
+          body,
         ],
       ),
+    );
+  }
+
+  Widget _statsRow(
+    BuildContext context,
+    AppPalette palette, {
+    required String pending,
+    required String done,
+    required String cancelled,
+  }) {
+    final l10n = AppL10n.of(context);
+    return Row(
+      children: [
+        _StatColumn(
+          value: pending,
+          label: l10n.dashboardStatPendientes,
+          color: palette.accent,
+          palette: palette,
+        ),
+        _Divider(palette: palette),
+        _StatColumn(
+          value: done,
+          label: l10n.dashboardStatCompletadas,
+          color: palette.textPrimary,
+          palette: palette,
+        ),
+        _Divider(palette: palette),
+        _StatColumn(
+          value: cancelled,
+          label: l10n.dashboardStatCanceladas,
+          color: palette.danger,
+          palette: palette,
+        ),
+      ],
     );
   }
 }
@@ -587,26 +1258,31 @@ class _ProximasSesionesList extends ConsumerWidget {
     final trainerId = ref.watch(currentUidProvider) ?? '';
     if (trainerId.isEmpty) {
       return _PlaceholderCard(
-          palette: palette, message: l10n.dashboardIniciaSesion);
+        palette: palette,
+        message: l10n.dashboardIniciaSesion,
+      );
     }
-    final apptAsync = ref
-        .watch(trainerAppointmentsStreamProvider(_appointmentsKey(trainerId)));
+    final apptAsync = ref.watch(
+      trainerAppointmentsStreamProvider(_appointmentsKey(trainerId)),
+    );
 
     return apptAsync.when(
-      loading: () => _PlaceholderCard(
-        palette: palette,
-        message: l10n.dashboardCargando,
-      ),
+      loading: () =>
+          _PlaceholderCard(palette: palette, message: l10n.dashboardCargando),
       error: (_, __) => _PlaceholderCard(
         palette: palette,
         message: l10n.dashboardErrorTurnos,
       ),
       data: (all) {
-        final now = DateTime.now().toUtc();
+        // QA-HOME-001: startsAt is Argentina wall-clock; compare against ART
+        // wall-clock "now" so the next few hours aren't dropped.
+        final now = argentinaNow();
         final upcoming = all
-            .where((a) =>
-                a.status == AppointmentStatus.confirmed &&
-                a.startsAt.isAfter(now))
+            .where(
+              (a) =>
+                  a.status == AppointmentStatus.confirmed &&
+                  a.startsAt.isAfter(now),
+            )
             .toList()
           ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
         final next3 = upcoming.take(3).toList();
@@ -652,8 +1328,9 @@ class _ProximaSesionRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
-    final profileAsync =
-        ref.watch(userPublicProfileProvider(appointment.athleteId));
+    final profileAsync = ref.watch(
+      userPublicProfileProvider(appointment.athleteId),
+    );
     final athleteName =
         profileAsync.valueOrNull?.displayName ?? appointment.athleteDisplayName;
     final showName = _looksLikeUid(athleteName)
@@ -741,7 +1418,9 @@ class _EntrenaronHoyList extends ConsumerWidget {
 
     if (todayAsync.isLoading && !todayAsync.hasValue) {
       return _PlaceholderCard(
-          palette: palette, message: l10n.dashboardCargando);
+        palette: palette,
+        message: l10n.dashboardCargando,
+      );
     }
     if (todayAsync.hasError && !todayAsync.hasValue) {
       return _PlaceholderCard(
@@ -822,7 +1501,12 @@ class _EntrenaronHoyRow extends ConsumerWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${session.routineName} · ${_formatTime(session.finishedAt!)}',
+                    // finishedAt is a real UTC instant — localize before
+                    // formatting (#380). NOTE: _formatTime is shared with
+                    // appointment.startsAt (ADR-7 wall-clock, line ~690) which
+                    // must stay raw — so convert HERE at the call site, never
+                    // inside _formatTime.
+                    '${session.routineName} · ${_formatTime(session.finishedAt!.toLocal())}',
                     style: GoogleFonts.barlow(
                       fontWeight: FontWeight.w400,
                       fontSize: 12,
@@ -862,7 +1546,9 @@ class _ActividadRecienteList extends ConsumerWidget {
 
     if (activityAsync.isLoading && !activityAsync.hasValue) {
       return _PlaceholderCard(
-          palette: palette, message: l10n.dashboardCargando);
+        palette: palette,
+        message: l10n.dashboardCargando,
+      );
     }
     if (activityAsync.hasError && !activityAsync.hasValue) {
       return _PlaceholderCard(
@@ -998,9 +1684,7 @@ class _PagosPorCobrarSection extends ConsumerWidget {
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
-        builder: (_) => _AddSueltoSheet(
-          trainerId: trainerId,
-        ),
+        builder: (_) => _AddSueltoSheet(trainerId: trainerId),
       );
     }
 
@@ -1031,7 +1715,9 @@ class _PagosPorCobrarList extends ConsumerWidget {
 
     if (cobrosAsync.isLoading && !cobrosAsync.hasValue) {
       return _PlaceholderCard(
-          palette: palette, message: l10n.dashboardCargando);
+        palette: palette,
+        message: l10n.dashboardCargando,
+      );
     }
     if (cobrosAsync.hasError && !cobrosAsync.hasValue) {
       return _PlaceholderCard(
@@ -1124,21 +1810,22 @@ class _CobroPendienteRow extends ConsumerWidget {
           ),
           content: Text(
             '${cobro.concept} — \$${_formatAmount(cobro.amountArs)}',
-            style: GoogleFonts.barlow(
-              fontSize: 14,
-              color: palette.textMuted,
-            ),
+            style: GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text(l10n.dashboardCancelarLabel,
-                  style: TextStyle(color: palette.textMuted)),
+              child: Text(
+                l10n.dashboardCancelarLabel,
+                style: TextStyle(color: palette.textMuted),
+              ),
             ),
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(true),
-              child: Text(l10n.dashboardCobradoLabel,
-                  style: TextStyle(color: palette.accent)),
+              child: Text(
+                l10n.dashboardCobradoLabel,
+                style: TextStyle(color: palette.accent),
+              ),
             ),
           ],
         ),
@@ -1159,29 +1846,33 @@ class _CobroPendienteRow extends ConsumerWidget {
             final periodKey = cobro.cadence == BillingCadence.mensual
                 ? '${now2.year}-${now2.month.toString().padLeft(2, '0')}'
                 : isoWeekPeriodKey(now2);
-            await repo.add(Payment(
-              id: '',
-              trainerId: trainerId,
-              athleteId: cobro.athleteId,
-              amountArs: cobro.amountArs,
-              concept: cobro.concept,
-              status: PaymentStatus.paid,
-              periodKey: periodKey,
-              createdAt: now,
-              paidAt: now,
-            ));
+            await repo.add(
+              Payment(
+                id: '',
+                trainerId: trainerId,
+                athleteId: cobro.athleteId,
+                amountArs: cobro.amountArs,
+                concept: cobro.concept,
+                status: PaymentStatus.paid,
+                periodKey: periodKey,
+                createdAt: now,
+                paidAt: now,
+              ),
+            );
 
           case BillingCadence.porSesion:
-            await repo.add(Payment(
-              id: '',
-              trainerId: trainerId,
-              athleteId: cobro.athleteId,
-              amountArs: cobro.amountArs,
-              concept: cobro.concept,
-              status: PaymentStatus.paid,
-              createdAt: now,
-              paidAt: now,
-            ));
+            await repo.add(
+              Payment(
+                id: '',
+                trainerId: trainerId,
+                athleteId: cobro.athleteId,
+                amountArs: cobro.amountArs,
+                concept: cobro.concept,
+                status: PaymentStatus.paid,
+                createdAt: now,
+                paidAt: now,
+              ),
+            );
 
           case BillingCadence.suelto:
             // Flip all pending one-off charges atomically: a mid-loop failure
@@ -1197,9 +1888,9 @@ class _CobroPendienteRow extends ConsumerWidget {
         }
       } catch (_) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.dashboardCobroError)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(l10n.dashboardCobroError)));
         }
       }
     }
@@ -1284,6 +1975,12 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
   String? _selectedAthleteId;
   final _amountController = TextEditingController();
   final _conceptController = TextEditingController();
+
+  /// ART calendar day the charge is due (optional). Only y/m/d are meaningful;
+  /// [_submit] expands it to 23:59:59 ART so "vence el 15" is not overdue at
+  /// 00:01 of the 15th. `null` → no dueAt (valid: the charge never shows in
+  /// Vencidos via dueAt and the overdue-reminder CF skips it).
+  DateTime? _dueDate;
   bool _saving = false;
 
   @override
@@ -1337,10 +2034,7 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
           if (activeLinks.isEmpty)
             Text(
               l10n.dashboardSinAlumnosActivos,
-              style: GoogleFonts.barlow(
-                fontSize: 13,
-                color: palette.textMuted,
-              ),
+              style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
             )
           else
             _AthleteDropdown(
@@ -1363,10 +2057,8 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
           TextField(
             controller: _amountController,
             keyboardType: TextInputType.number,
-            style: GoogleFonts.barlow(
-              fontSize: 14,
-              color: palette.textPrimary,
-            ),
+            inputFormatters: [ThousandsSeparatorInputFormatter()],
+            style: GoogleFonts.barlow(fontSize: 14, color: palette.textPrimary),
             decoration: InputDecoration(
               hintText: l10n.dashboardMontoHint,
               hintStyle: GoogleFonts.barlow(
@@ -1402,10 +2094,7 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
           const SizedBox(height: 8),
           TextField(
             controller: _conceptController,
-            style: GoogleFonts.barlow(
-              fontSize: 14,
-              color: palette.textPrimary,
-            ),
+            style: GoogleFonts.barlow(fontSize: 14, color: palette.textPrimary),
             decoration: InputDecoration(
               hintText: l10n.dashboardConceptoHint,
               hintStyle: GoogleFonts.barlow(
@@ -1425,6 +2114,65 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide(color: palette.accent, width: 1.5),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            l10n.dashboardVenceElLabel,
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: 11,
+              letterSpacing: 1.2,
+              color: palette.textMuted,
+            ),
+          ),
+          const SizedBox(height: 8),
+          InkWell(
+            onTap: _pickDueDate,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              decoration: BoxDecoration(
+                color: palette.bg,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: palette.border),
+              ),
+              child: Row(
+                children: [
+                  Icon(TreinoIcon.calendar, size: 16, color: palette.textMuted),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _dueDate == null
+                          ? l10n.dashboardVenceElHint
+                          : _formatDueDate(_dueDate!),
+                      style: GoogleFonts.barlow(
+                        fontSize: 14,
+                        color: _dueDate == null
+                            ? palette.textMuted
+                            : palette.textPrimary,
+                      ),
+                    ),
+                  ),
+                  if (_dueDate != null)
+                    Semantics(
+                      button: true,
+                      label: l10n.dashboardVenceElQuitar,
+                      child: GestureDetector(
+                        onTap: () => setState(() => _dueDate = null),
+                        behavior: HitTestBehavior.opaque,
+                        child: Padding(
+                          padding: const EdgeInsets.all(2),
+                          child: Icon(
+                            TreinoIcon.close,
+                            size: 16,
+                            color: palette.textMuted,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
@@ -1466,6 +2214,28 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
     );
   }
 
+  /// dd/MM/yyyy — same idiom as payment_format.dart's fmtFecha.
+  static String _formatDueDate(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')}/'
+      '${d.month.toString().padLeft(2, '0')}/${d.year}';
+
+  Future<void> _pickDueDate() async {
+    // "Today" as an ART calendar day: between 21:00–23:59 ART the UTC day is
+    // already tomorrow, so a UTC-derived floor would block picking today.
+    final todayArt = argentinaNow();
+    final floor = DateTime(todayArt.year, todayArt.month, todayArt.day);
+    final initial = _dueDate ?? floor;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial.isBefore(floor) ? floor : initial,
+      firstDate: floor,
+      lastDate: floor.add(const Duration(days: 365)),
+    );
+    if (picked != null && mounted) {
+      setState(() => _dueDate = picked);
+    }
+  }
+
   Future<void> _submit() async {
     final l10n = AppL10n.of(context);
     final athleteId = _selectedAthleteId;
@@ -1473,17 +2243,17 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
     final concept = _conceptController.text.trim();
 
     if (athleteId == null || amountText.isEmpty || concept.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.dashboardCompletaCampos)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.dashboardCompletaCampos)));
       return;
     }
 
-    final amount = int.tryParse(amountText);
+    final amount = parseGroupedInt(amountText);
     if (amount == null || amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.dashboardMontoInvalido)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.dashboardMontoInvalido)));
       return;
     }
 
@@ -1491,15 +2261,34 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
 
     try {
       final now = DateTime.now().toUtc();
-      await ref.read(paymentRepositoryProvider).add(Payment(
-            id: '',
-            trainerId: widget.trainerId,
-            athleteId: athleteId,
-            amountArs: amount,
-            concept: concept,
-            status: PaymentStatus.pending,
-            createdAt: now,
-          ));
+      // dueAt = end of the chosen ART calendar day, as a UTC instant — the
+      // same normalization the old generateDuePayments CF used
+      // (23:59:59 ART == +3h in UTC). Keeps "vence el 15" from reading as
+      // overdue at 00:01 ART of the 15th in the Vencidos bucket and in the
+      // notifyOverduePayments reminder CF.
+      final dueDate = _dueDate;
+      final dueAt = dueDate == null
+          ? null
+          : DateTime.utc(
+              dueDate.year,
+              dueDate.month,
+              dueDate.day,
+              23,
+              59,
+              59,
+            ).add(argentinaUtcOffset);
+      await ref.read(paymentRepositoryProvider).add(
+            Payment(
+              id: '',
+              trainerId: widget.trainerId,
+              athleteId: athleteId,
+              amountArs: amount,
+              concept: concept,
+              status: PaymentStatus.pending,
+              createdAt: now,
+              dueAt: dueAt,
+            ),
+          );
 
       if (mounted) {
         Navigator.of(context).pop();
@@ -1510,12 +2299,25 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
     } catch (_) {
       if (mounted) {
         setState(() => _saving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.dashboardGuardarError)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.dashboardGuardarError)));
       }
     }
   }
+}
+
+/// Test-only harness that renders `_AddSueltoSheet` directly, bypassing the
+/// dashboard + bottom-sheet plumbing. Exported for widget tests only.
+///
+/// @visibleForTesting
+class AddSueltoSheetTestHarness extends StatelessWidget {
+  const AddSueltoSheetTestHarness({super.key, required this.trainerId});
+
+  final String trainerId;
+
+  @override
+  Widget build(BuildContext context) => _AddSueltoSheet(trainerId: trainerId);
 }
 
 /// Dropdown widget to pick an active athlete by name.
@@ -1560,8 +2362,9 @@ class _AthleteDropdown extends ConsumerWidget {
         ),
       ),
       items: links.map((link) {
-        final profileAsync =
-            ref.watch(userPublicProfileProvider(link.athleteId));
+        final profileAsync = ref.watch(
+          userPublicProfileProvider(link.athleteId),
+        );
         final rawName = profileAsync.valueOrNull?.displayName ?? '';
         final showName = rawName.isEmpty || _looksLikeUid(rawName)
             ? '${l10n.dashboardAlumnoFallback} (${link.athleteId.substring(0, 6)})'
@@ -1614,58 +2417,32 @@ class _BottomActions extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    return Row(
-      children: [
-        Expanded(
-          child: OutlinedButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(l10n.dashboardInvitarProximamente),
-                ),
-              );
-            },
-            style: OutlinedButton.styleFrom(
-              side: BorderSide(color: palette.border, width: 1),
-              foregroundColor: palette.textPrimary,
-              minimumSize: const Size.fromHeight(48),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(9999),
-              ),
-            ),
-            child: Text(
-              l10n.dashboardInvitarAlumnoLabel,
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
-                letterSpacing: 0.8,
-              ),
-            ),
+    // "Invitar alumno" removed (#397): the trainer↔athlete link is
+    // athlete-initiated only (trainer_link_repository.dart product convention),
+    // there is no invite infra, and the web equivalent was already removed. The
+    // stub only showed a "próximamente" SnackBar, so it's dropped rather than
+    // left as a dead CTA. "Asignar rutina" now spans the full width.
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: () => context.go('/coach?tab=alumnos'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: palette.accent,
+          foregroundColor: palette.bg,
+          minimumSize: const Size.fromHeight(48),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(9999),
           ),
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: ElevatedButton(
-            onPressed: () => context.go('/coach?tab=alumnos'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: palette.accent,
-              foregroundColor: palette.bg,
-              minimumSize: const Size.fromHeight(48),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(9999),
-              ),
-            ),
-            child: Text(
-              l10n.dashboardAsignarRutinaLabel,
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
-                letterSpacing: 0.8,
-              ),
-            ),
+        child: Text(
+          l10n.dashboardAsignarRutinaLabel,
+          style: GoogleFonts.barlowCondensed(
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
+            letterSpacing: 0.8,
           ),
         ),
-      ],
+      ),
     );
   }
 }
@@ -1731,7 +2508,9 @@ String _formatTime(DateTime dt) {
 }
 
 String _formatDateLabel(AppL10n l10n, DateTime dt) {
-  final now = DateTime.now().toUtc();
+  // QA-COA-003: dt is wall-clock UTC (ADR-7); use wall-clock "now" so a session
+  // tomorrow isn't labelled "Hoy" between 21:00-23:59 ART.
+  final now = nowWall();
   final isToday = _isSameLocalDay(dt, now);
   final isTomorrow = _isSameLocalDay(dt, now.add(const Duration(days: 1)));
   if (isToday) return l10n.dashboardDateToday;
@@ -1772,12 +2551,11 @@ bool _looksLikeUid(String s) {
 }
 
 TrainerAppointmentsKey _appointmentsKey(String trainerId) {
-  final now = DateTime.now().toUtc();
-  final from = DateTime.utc(now.year, now.month - 1 < 1 ? 1 : now.month - 1, 1);
-  final to = DateTime.utc(now.year + 1, now.month, 1);
+  // QA-HOME-009: misma ventana rodante que la agenda (helper compartido).
+  final window = rollingAppointmentWindow(DateTime.now().toUtc());
   return TrainerAppointmentsKey(
     trainerId: trainerId,
-    fromDate: from,
-    toDate: to,
+    fromDate: window.from,
+    toDate: window.to,
   );
 }

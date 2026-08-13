@@ -3,6 +3,7 @@ import 'dart:developer' as developer;
 import 'package:cloud_firestore/cloud_firestore.dart'
     show CollectionReference, DocumentSnapshot, FirebaseFirestore, SetOptions;
 
+import '../../../core/utils/firestore_write.dart';
 import '../domain/athlete_billing.dart';
 
 class BillingRepository {
@@ -19,7 +20,10 @@ class BillingRepository {
 
   Future<void> setConfig(AthleteBilling billing) async {
     final id = _docId(billing.trainerId, billing.athleteId);
-    await _collection.doc(id).set(billing.toJson(), SetOptions(merge: true));
+    await _collection
+        .doc(id)
+        .set(billing.toJson(), SetOptions(merge: true))
+        .boundedWrite;
   }
 
   Stream<AthleteBilling?> watch(String trainerId, String athleteId) {

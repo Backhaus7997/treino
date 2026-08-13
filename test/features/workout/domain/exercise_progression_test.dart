@@ -21,7 +21,7 @@ void main() {
             achievedAt: now,
           ),
         ],
-        frequencyLast8Weeks: 3,
+        frequencySessionCount: 3,
       );
 
       // Typed access — no casting
@@ -33,8 +33,8 @@ void main() {
       expect(
           progression.bestSessionVolumeSeries, isA<List<ProgressionPoint>>());
       expect(progression.personalRecords, isA<List<PersonalRecord>>());
-      expect(progression.frequencyLast8Weeks, isA<int>());
-      expect(progression.frequencyLast8Weeks, 3);
+      expect(progression.frequencySessionCount, isA<int>());
+      expect(progression.frequencySessionCount, 3);
       expect(progression.heaviestWeightSeries.first.value, 90.0);
       expect(progression.oneRepMaxSeries.first.value, 103.0);
       expect(progression.bestSetVolumeSeries.first.value, 450.0);
@@ -53,7 +53,7 @@ void main() {
       expect(empty.bestSetVolumeSeries, isEmpty);
       expect(empty.bestSessionVolumeSeries, isEmpty);
       expect(empty.personalRecords, isEmpty);
-      expect(empty.frequencyLast8Weeks, 0);
+      expect(empty.frequencySessionCount, 0);
     });
 
     test('ProgressionPoint preserves date and value', () {
@@ -94,11 +94,11 @@ void main() {
         bestSetVolumeSeries: const [],
         bestSessionVolumeSeries: const [],
         personalRecords: const [],
-        frequencyLast8Weeks: 2,
+        frequencySessionCount: 2,
       );
-      final updated = original.copyWith(frequencyLast8Weeks: 5);
-      expect(updated.frequencyLast8Weeks, 5);
-      expect(original.frequencyLast8Weeks, 2); // immutable
+      final updated = original.copyWith(frequencySessionCount: 5);
+      expect(updated.frequencySessionCount, 5);
+      expect(original.frequencySessionCount, 2); // immutable
     });
   });
 }

@@ -105,11 +105,13 @@ export async function notifyOnChatMessageHandler(
     app,
     {
       uids: recipients,
+      kind: "chat-message",
       notification: {
         title: "TREINO", // i18n: Fase 6 Etapa 2
         body,
       },
       data: { deepLink, senderId },
+      actorUid: senderId,
     },
     messaging,
   );

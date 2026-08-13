@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../../../app/theme/app_palette.dart';
+import '../../../../../../core/widgets/exercise_asset_image.dart';
 import '../../../../../workout/application/exercise_providers.dart';
 import '../../../../../workout/application/session_providers.dart'
     show currentUidProvider;
@@ -132,9 +133,27 @@ class _ExerciseDetailDialog extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 16),
-            // ── Video (omitted when videoUrl is null) ─────────────────────
+            // ── Video, or the still photo as fallback ─────────────────────
+            // The thumbnail is a frame of the video, so showing both would be
+            // redundant: prefer the video when present, else the still photo.
             if (exercise.videoUrl != null) ...[
               ExerciseVideoPlayer(videoUrl: exercise.videoUrl),
+              const SizedBox(height: 16),
+            ] else if (exercise.thumbnailUrl != null &&
+                exercise.thumbnailUrl!.isNotEmpty) ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: ExerciseAssetImage(
+                    exerciseId: exercise.id,
+                    muscleGroup: exercise.muscleGroup,
+                    thumbnailUrl: exercise.thumbnailUrl,
+                    fit: BoxFit.cover,
+                    fallback: const SizedBox.shrink(),
+                  ),
+                ),
+              ),
               const SizedBox(height: 16),
             ],
             // ── Technique instructions ────────────────────────────────────

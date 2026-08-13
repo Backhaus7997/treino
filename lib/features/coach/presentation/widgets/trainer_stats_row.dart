@@ -10,7 +10,11 @@ import '../../../coach/domain/trainer_public_profile.dart';
 /// formatted to 1 decimal place (ADR-RV-011). Null averageRating OR
 /// reviewCount == 0 → shows placeholder "—".
 ///
-/// Experience and Students slots remain deferred (placeholder "—").
+/// AÑOS EXP shows [TrainerPublicProfile.trainerExperienceYears] (self-attested
+/// from the trainer profile form, dual-write) and ALUMNOS shows
+/// [TrainerPublicProfile.athleteCount] (active trainer_links count, written by
+/// the linkAggregate Cloud Function). Null → "—" placeholder — only for
+/// trainers without the data loaded/computed yet (#388).
 ///
 /// REQ-COACH-DISC-UI-015, REQ-RV-DISPLAY-004. Fase 6 Etapa 7.
 class TrainerStatsRow extends StatelessWidget {
@@ -25,6 +29,10 @@ class TrainerStatsRow extends StatelessWidget {
     final ratingValue = profile.reviewCount > 0 && profile.averageRating != null
         ? profile.averageRating!.toStringAsFixed(1)
         : l10n.coachStatsPlaceholder;
+    final experienceValue = profile.trainerExperienceYears?.toString() ??
+        l10n.coachStatsPlaceholder;
+    final studentsValue =
+        profile.athleteCount?.toString() ?? l10n.coachStatsPlaceholder;
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -35,11 +43,11 @@ class TrainerStatsRow extends StatelessWidget {
         ),
         StatTile(
           label: l10n.coachStatsExperienceLabel,
-          value: l10n.coachStatsPlaceholder,
+          value: experienceValue,
         ),
         StatTile(
           label: l10n.coachStatsStudentsLabel,
-          value: l10n.coachStatsPlaceholder,
+          value: studentsValue,
         ),
       ],
     );

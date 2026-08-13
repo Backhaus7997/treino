@@ -43,6 +43,7 @@ _$AppointmentImpl _$$AppointmentImplFromJson(Map<String, dynamic> json) =>
       noteBefore: json['noteBefore'] as String?,
       noteAfter: json['noteAfter'] as String?,
       recurringId: json['recurringId'] as String?,
+      paymentId: json['paymentId'] as String?,
     );
 
 Map<String, dynamic> _$$AppointmentImplToJson(_$AppointmentImpl instance) =>
@@ -62,6 +63,7 @@ Map<String, dynamic> _$$AppointmentImplToJson(_$AppointmentImpl instance) =>
       'noteBefore': instance.noteBefore,
       'noteAfter': instance.noteAfter,
       'recurringId': instance.recurringId,
+      'paymentId': instance.paymentId,
     };
 
 const _$AppointmentStatusEnumMap = {

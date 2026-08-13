@@ -45,6 +45,20 @@ Widget _wrapWithOverrides(Widget w, List<Override> overrides) => ProviderScope(
       ),
     );
 
+/// A tall viewport mounts every slot so composition asserts see them all.
+///
+/// Needed since #641 pinned the start action to the bottom: the exercise list
+/// lost that height from its viewport, and on the default 800x600 surface the
+/// 4th slot of a 4-slot day falls outside the sliver's build range entirely —
+/// so not even `skipOffstage: false` reaches it. Same helper the sibling
+/// `exercise_detail_screen_test.dart` uses for the same reason.
+void _useTallViewport(WidgetTester tester) {
+  tester.view.physicalSize = const Size(800, 2400);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+}
+
 RoutineSlot _makeSlot({
   String exerciseId = 'bench-press',
   String exerciseName = 'Bench Press',
@@ -87,6 +101,7 @@ Routine _makeRoutine({
   String? imageUrl,
   String? assignedBy,
   String? createdBy,
+  int numWeeks = 1,
 }) =>
     Routine(
       id: id,
@@ -97,6 +112,7 @@ Routine _makeRoutine({
       imageUrl: imageUrl,
       assignedBy: assignedBy,
       createdBy: createdBy,
+      numWeeks: numWeeks,
     );
 
 void main() {
@@ -107,7 +123,9 @@ void main() {
       final routine = _makeRoutine();
       await tester.pumpWidget(
         _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-          routineByIdProvider('test-id').overrideWith((ref) async => routine),
+          routineByIdStreamProvider(
+            'test-id',
+          ).overrideWith((ref) => Stream.value(routine)),
         ]),
       );
       await tester.pump();
@@ -130,11 +148,16 @@ void main() {
         );
         await tester.pumpWidget(
           _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-            routineByIdProvider('test-id').overrideWith((ref) async => routine),
+            routineByIdStreamProvider(
+              'test-id',
+            ).overrideWith((ref) => Stream.value(routine)),
           ]),
         );
         await tester.pump(const Duration(milliseconds: 50));
-        expect(find.byType(ExerciseSlotRow), findsNWidgets(2));
+        expect(
+          find.byType(ExerciseSlotRow, skipOffstage: false),
+          findsNWidgets(2),
+        );
       },
     );
 
@@ -143,9 +166,11 @@ void main() {
       (tester) async {
         await tester.pumpWidget(
           _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-            routineByIdProvider(
+            // Never-closed, never-emitting controller keeps the provider in
+            // AsyncLoading forever — mirrors the old Completer().future.
+            routineByIdStreamProvider(
               'test-id',
-            ).overrideWith((ref) => Completer<Routine?>().future),
+            ).overrideWith((ref) => StreamController<Routine?>().stream),
           ]),
         );
         await tester.pump();
@@ -158,9 +183,9 @@ void main() {
       (tester) async {
         await tester.pumpWidget(
           _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-            routineByIdProvider(
+            routineByIdStreamProvider(
               'test-id',
-            ).overrideWith((ref) async => throw Exception('boom')),
+            ).overrideWith((ref) => Stream.error(Exception('boom'))),
           ]),
         );
         await tester.pump(const Duration(milliseconds: 50));
@@ -175,7 +200,9 @@ void main() {
       (tester) async {
         await tester.pumpWidget(
           _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-            routineByIdProvider('test-id').overrideWith((ref) async => null),
+            routineByIdStreamProvider(
+              'test-id',
+            ).overrideWith((ref) => Stream.value(null)),
           ]),
         );
         await tester.pump(const Duration(milliseconds: 50));
@@ -191,9 +218,9 @@ void main() {
     ) async {
       await tester.pumpWidget(
         _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-          routineByIdProvider(
+          routineByIdStreamProvider(
             'test-id',
-          ).overrideWith((ref) async => _makeRoutine(id: 'test-id')),
+          ).overrideWith((ref) => Stream.value(_makeRoutine(id: 'test-id'))),
         ]),
       );
       await tester.pump(const Duration(milliseconds: 50));
@@ -212,9 +239,10 @@ void main() {
     testWidgets('SCENARIO-080: badge shows "PPL · DÍA 1"', (tester) async {
       await tester.pumpWidget(
         _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-          routineByIdProvider('test-id').overrideWith(
-            (ref) async =>
-                _makeRoutine(split: 'PPL', days: [_makeDay(dayNumber: 1)]),
+          routineByIdStreamProvider('test-id').overrideWith(
+            (ref) => Stream.value(
+              _makeRoutine(split: 'PPL', days: [_makeDay(dayNumber: 1)]),
+            ),
           ),
         ]),
       );
@@ -225,8 +253,8 @@ void main() {
     testWidgets('SCENARIO-081: day name rendered in uppercase', (tester) async {
       await tester.pumpWidget(
         _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-          routineByIdProvider('test-id').overrideWith(
-            (ref) async => _makeRoutine(days: [_makeDay(name: 'Push')]),
+          routineByIdStreamProvider('test-id').overrideWith(
+            (ref) => Stream.value(_makeRoutine(days: [_makeDay(name: 'Push')])),
           ),
         ]),
       );
@@ -247,9 +275,9 @@ void main() {
         );
         await tester.pumpWidget(
           _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-            routineByIdProvider(
+            routineByIdStreamProvider(
               'test-id',
-            ).overrideWith((ref) async => _makeRoutine(days: [day])),
+            ).overrideWith((ref) => Stream.value(_makeRoutine(days: [day]))),
           ]),
         );
         await tester.pump(const Duration(milliseconds: 50));
@@ -265,9 +293,9 @@ void main() {
       final day = _makeDay(estimatedMinutes: null);
       await tester.pumpWidget(
         _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-          routineByIdProvider(
+          routineByIdStreamProvider(
             'test-id',
-          ).overrideWith((ref) async => _makeRoutine(days: [day])),
+          ).overrideWith((ref) => Stream.value(_makeRoutine(days: [day]))),
         ]),
       );
       await tester.pump(const Duration(milliseconds: 50));
@@ -284,9 +312,10 @@ void main() {
     ) async {
       await tester.pumpWidget(
         _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-          routineByIdProvider(
+          routineByIdStreamProvider(
             'test-id',
-          ).overrideWith((ref) async => _makeRoutine(days: [_makeDay()])),
+          ).overrideWith(
+              (ref) => Stream.value(_makeRoutine(days: [_makeDay()]))),
         ]),
       );
       await tester.pump(const Duration(milliseconds: 50));
@@ -306,7 +335,9 @@ void main() {
         );
         await tester.pumpWidget(
           _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-            routineByIdProvider('test-id').overrideWith((ref) async => routine),
+            routineByIdStreamProvider(
+              'test-id',
+            ).overrideWith((ref) => Stream.value(routine)),
           ]),
         );
         await tester.pump(const Duration(milliseconds: 50));
@@ -320,12 +351,13 @@ void main() {
     testWidgets(
       'SCENARIO-086: EJERCICIOS header + 4 ExerciseSlotRow for 4-slot day',
       (tester) async {
+        _useTallViewport(tester);
         final day = _makeDay(slots: List.generate(4, (_) => _makeSlot()));
         await tester.pumpWidget(
           _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-            routineByIdProvider(
+            routineByIdStreamProvider(
               'test-id',
-            ).overrideWith((ref) async => _makeRoutine(days: [day])),
+            ).overrideWith((ref) => Stream.value(_makeRoutine(days: [day]))),
           ]),
         );
         await tester.pump(const Duration(milliseconds: 50));
@@ -343,9 +375,9 @@ void main() {
       final day = _makeDay(slots: []);
       await tester.pumpWidget(
         _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-          routineByIdProvider(
+          routineByIdStreamProvider(
             'test-id',
-          ).overrideWith((ref) async => _makeRoutine(days: [day])),
+          ).overrideWith((ref) => Stream.value(_makeRoutine(days: [day]))),
         ]),
       );
       await tester.pump(const Duration(milliseconds: 50));
@@ -365,14 +397,18 @@ void main() {
         );
         await tester.pumpWidget(
           _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-            routineByIdProvider(
+            routineByIdStreamProvider(
               'test-id',
-            ).overrideWith((ref) async => _makeRoutine(days: [day])),
+            ).overrideWith((ref) => Stream.value(_makeRoutine(days: [day]))),
           ]),
         );
         await tester.pump(const Duration(milliseconds: 50));
         // The block header appears exactly once for the two grouped slots.
-        expect(find.text('SUPERSERIE'), findsOneWidget);
+        // `skipOffstage: false`: the start action is pinned to the bottom
+        // since #641, so the exercise list sits in a shorter viewport and the
+        // block scrolls below the fold in the test surface. This asserts list
+        // COMPOSITION, not what happens to be on screen.
+        expect(find.text('SUPERSERIE', skipOffstage: false), findsOneWidget);
         // Both exercises still render as their normal cards inside the block.
         expect(
           find.byType(ExerciseSlotRow, skipOffstage: false),
@@ -393,9 +429,9 @@ void main() {
         );
         await tester.pumpWidget(
           _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-            routineByIdProvider(
+            routineByIdStreamProvider(
               'test-id',
-            ).overrideWith((ref) async => _makeRoutine(days: [day])),
+            ).overrideWith((ref) => Stream.value(_makeRoutine(days: [day]))),
           ]),
         );
         await tester.pump(const Duration(milliseconds: 50));
@@ -411,6 +447,7 @@ void main() {
       'SCENARIO-562: mixed day (standalone + superset) keeps every slot '
       'rendered as an ExerciseSlotRow',
       (tester) async {
+        _useTallViewport(tester);
         final day = _makeDay(
           slots: [
             _makeSlot(exerciseId: 'warmup'), // standalone #1
@@ -421,13 +458,13 @@ void main() {
         );
         await tester.pumpWidget(
           _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-            routineByIdProvider(
+            routineByIdStreamProvider(
               'test-id',
-            ).overrideWith((ref) async => _makeRoutine(days: [day])),
+            ).overrideWith((ref) => Stream.value(_makeRoutine(days: [day]))),
           ]),
         );
         await tester.pump(const Duration(milliseconds: 50));
-        expect(find.text('SUPERSERIE'), findsOneWidget);
+        expect(find.text('SUPERSERIE', skipOffstage: false), findsOneWidget);
         expect(
           find.byType(ExerciseSlotRow, skipOffstage: false),
           findsNWidgets(4),
@@ -440,9 +477,9 @@ void main() {
       (tester) async {
         await tester.pumpWidget(
           _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-            routineByIdProvider(
+            routineByIdStreamProvider(
               'test-id',
-            ).overrideWith((ref) async => _makeRoutine()),
+            ).overrideWith((ref) => Stream.value(_makeRoutine())),
           ]),
         );
         await tester.pump(const Duration(milliseconds: 50));
@@ -463,9 +500,9 @@ void main() {
       (tester) async {
         await tester.pumpWidget(
           _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-            routineByIdProvider(
+            routineByIdStreamProvider(
               'test-id',
-            ).overrideWith((ref) async => _makeRoutine()),
+            ).overrideWith((ref) => Stream.value(_makeRoutine())),
             userProfileProvider.overrideWith(
               (ref) => Stream.value(_profile(UserRole.trainer)),
             ),
@@ -481,9 +518,9 @@ void main() {
     testWidgets('SCENARIO-565: athlete role shows EMPEZAR', (tester) async {
       await tester.pumpWidget(
         _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-          routineByIdProvider(
+          routineByIdStreamProvider(
             'test-id',
-          ).overrideWith((ref) async => _makeRoutine()),
+          ).overrideWith((ref) => Stream.value(_makeRoutine())),
           userProfileProvider.overrideWith(
             (ref) => Stream.value(_profile(UserRole.athlete)),
           ),
@@ -491,6 +528,126 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('EMPEZAR'), findsOneWidget);
+    });
+
+    // ── #641 — reaching the start action must never depend on scrolling ────
+    //
+    // 5/5 usability participants failed to reach EMPEZAR while it lived at the
+    // end of the exercise list, under a 320px hero and every slot of the day.
+    // These assert the property that actually broke, which `skipOffstage:
+    // false` would happily hide: the action is ON SCREEN, unscrolled, on a day
+    // long enough to have buried it before.
+    group('#641 — pinned start action', () {
+      Widget longDayScreen({int numWeeks = 1}) => _wrapWithOverrides(
+            const RoutineDetailScreen(routineId: 'test-id'),
+            [
+              routineByIdStreamProvider('test-id').overrideWith(
+                (ref) => Stream.value(
+                  _makeRoutine(
+                    days: [
+                      _makeDay(slots: List.generate(12, (_) => _makeSlot())),
+                    ],
+                    numWeeks: numWeeks,
+                  ),
+                ),
+              ),
+              userProfileProvider.overrideWith(
+                (ref) => Stream.value(_profile(UserRole.athlete)),
+              ),
+            ],
+          );
+
+      testWidgets('single-week: the action is on screen without scrolling', (
+        tester,
+      ) async {
+        await tester.pumpWidget(longDayScreen());
+        await tester.pumpAndSettle();
+
+        // No `skipOffstage: false` on purpose — being on stage IS the assert.
+        final action = find.widgetWithText(ElevatedButton, 'EMPEZAR');
+        expect(action, findsOneWidget);
+
+        final actionRect = tester.getRect(action);
+        final screenRect = tester.getRect(find.byType(MaterialApp));
+        expect(
+          screenRect.contains(actionRect.topLeft) &&
+              screenRect.contains(actionRect.bottomRight - const Offset(1, 1)),
+          isTrue,
+          reason: 'the action must sit inside the viewport, unscrolled',
+        );
+      });
+
+      testWidgets(
+        'periodized: the action is on screen without scrolling even while '
+        'plan progress is unresolved',
+        (tester) async {
+          await tester.pumpWidget(longDayScreen(numWeeks: 3));
+          await tester.pump(const Duration(milliseconds: 50));
+
+          // Unknown progress degrades to the EMPEZAR label, never to a blank
+          // reserved slot (#497) and never to REPETIR.
+          expect(
+            find.widgetWithText(ElevatedButton, 'EMPEZAR'),
+            findsOneWidget,
+          );
+          expect(find.text('REPETIR'), findsNothing);
+        },
+      );
+
+      testWidgets(
+        'the list area and the action are disjoint — nothing can scroll '
+        'underneath the bar',
+        (tester) async {
+          await tester.pumpWidget(longDayScreen());
+          await tester.pumpAndSettle();
+
+          // The guarantee of Column + Expanded: the scroll viewport ENDS where
+          // the bar begins, so no exercise can ever end up behind it. A Stack +
+          // Positioned bar would satisfy every other assert in this group and
+          // still fail here whenever the reserved bottom inset drifts out of
+          // sync with the bar's real height — which is exactly what happens at
+          // large text scale.
+          final viewport = tester.getRect(find.byType(CustomScrollView));
+          final action =
+              tester.getRect(find.widgetWithText(ElevatedButton, 'EMPEZAR'));
+          expect(
+            viewport.overlaps(action),
+            isFalse,
+            reason: 'the pinned action must never overlap the exercise list',
+          );
+        },
+      );
+
+      testWidgets(
+        'at large text scale the bar grows and the list yields — they stay '
+        'disjoint and the action stays on screen',
+        (tester) async {
+          tester.platformDispatcher.textScaleFactorTestValue = 2.0;
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+          await tester.pumpWidget(longDayScreen());
+          await tester.pumpAndSettle();
+
+          final action = find.widgetWithText(ElevatedButton, 'EMPEZAR');
+          expect(action, findsOneWidget);
+
+          final actionRect = tester.getRect(action);
+          final viewport = tester.getRect(find.byType(CustomScrollView));
+          final screen = tester.getRect(find.byType(MaterialApp));
+
+          expect(
+            viewport.overlaps(actionRect),
+            isFalse,
+            reason: 'a taller button must take height FROM the list, not '
+                'overlap it — the failure mode of a hardcoded bottom inset',
+          );
+          expect(
+            actionRect.bottom,
+            lessThanOrEqualTo(screen.bottom),
+            reason: 'the action must not be pushed off the bottom edge',
+          );
+        },
+      );
     });
 
     testWidgets(
@@ -519,8 +676,10 @@ void main() {
         await tester.pumpWidget(
           ProviderScope(
             overrides: [
-              routineByIdProvider('test-id').overrideWith(
-                (ref) async => _makeRoutine(days: [_makeDay(dayNumber: 4)]),
+              routineByIdStreamProvider('test-id').overrideWith(
+                (ref) => Stream.value(
+                  _makeRoutine(days: [_makeDay(dayNumber: 4)]),
+                ),
               ),
               analyticsServiceProvider.overrideWithValue(analytics),
             ],
@@ -565,11 +724,13 @@ void main() {
         await tester.pumpWidget(
           ProviderScope(
             overrides: [
-              routineByIdProvider('test-id').overrideWith(
-                (ref) async => _makeRoutine(
-                  days: [
-                    _makeDay(slots: [_makeSlot(exerciseId: 'bench-press')]),
-                  ],
+              routineByIdStreamProvider('test-id').overrideWith(
+                (ref) => Stream.value(
+                  _makeRoutine(
+                    days: [
+                      _makeDay(slots: [_makeSlot(exerciseId: 'bench-press')]),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -617,13 +778,15 @@ void main() {
         await tester.pumpWidget(
           ProviderScope(
             overrides: [
-              routineByIdProvider('test-id').overrideWith(
-                (ref) async => _makeRoutine(
-                  assignedBy: null,
-                  createdBy: 'athlete-123',
-                  days: [
-                    _makeDay(slots: [_makeSlot(exerciseId: 'my-custom-ex')]),
-                  ],
+              routineByIdStreamProvider('test-id').overrideWith(
+                (ref) => Stream.value(
+                  _makeRoutine(
+                    assignedBy: null,
+                    createdBy: 'athlete-123',
+                    days: [
+                      _makeDay(slots: [_makeSlot(exerciseId: 'my-custom-ex')]),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -645,14 +808,150 @@ void main() {
       },
     );
 
+    // ── Issue #410 — coach read-only plan detail (out-of-shell context) ──────
+    //
+    // In the coach (PF) context RoutineDetailScreen lives at the TOP-LEVEL
+    // route `/coach/athlete/:id/plan/:routineId` (OUTSIDE the ShellRoute),
+    // signalled by `coachAthleteId`. Two behaviours must stay out of the shell
+    // / athlete tab, else they land blank / on the wrong tab — the root cause
+    // that #399's symptom fix left open:
+    //   Bug 1 — tapping an exercise must push the TOP-LEVEL exercise mirror,
+    //           not the in-shell `/workout/exercise/:id`.
+    //   Bug 2 — the back fallback (deep-link / OS state restoration) must land
+    //           on the athlete detail, not the athlete `/workout` tab.
+    testWidgets(
+      'REGRESSION-410 Bug 1: coach-context slot tap pushes the TOP-LEVEL '
+      'exercise route (not the in-shell one) and renders the destination',
+      (tester) async {
+        String? pushedLocation;
+        String? capturedOwnerId;
+        final router = GoRouter(
+          initialLocation: '/coach/athlete/athlete-1/plan/test-id',
+          routes: [
+            GoRoute(
+              path: '/coach/athlete/:athleteId/plan/:routineId',
+              builder: (ctx, state) => RoutineDetailScreen(
+                routineId: state.pathParameters['routineId']!,
+                coachAthleteId: state.pathParameters['athleteId'],
+              ),
+            ),
+            GoRoute(
+              path:
+                  '/coach/athlete/:athleteId/plan/:routineId/exercise/:exerciseId',
+              builder: (ctx, state) {
+                pushedLocation = state.matchedLocation;
+                capturedOwnerId = state.uri.queryParameters['ownerId'];
+                return const Text('COACH EXERCISE');
+              },
+            ),
+            // In-shell mirror — MUST NOT be the one taken from a coach context.
+            GoRoute(
+              path: '/workout/exercise/:exerciseId',
+              builder: (_, __) => const Text('IN-SHELL EXERCISE'),
+            ),
+          ],
+        );
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              routineByIdStreamProvider('test-id').overrideWith(
+                (ref) => Stream.value(
+                  _makeRoutine(
+                    assignedBy: 'trainer-1',
+                    days: [
+                      _makeDay(slots: [_makeSlot(exerciseId: 'bench-press')]),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+            child: MaterialApp.router(
+              theme: AppTheme.dark(),
+              localizationsDelegates: AppL10n.localizationsDelegates,
+              supportedLocales: AppL10n.supportedLocales,
+              locale: const Locale('es', 'AR'),
+              routerConfig: router,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byType(ExerciseSlotRow).first);
+        await tester.pumpAndSettle();
+
+        expect(find.text('COACH EXERCISE'), findsOneWidget);
+        expect(find.text('IN-SHELL EXERCISE'), findsNothing);
+        expect(
+          pushedLocation,
+          equals('/coach/athlete/athlete-1/plan/test-id/exercise/bench-press'),
+        );
+        // ownerId (assignedBy) still flows through in the coach context.
+        expect(capturedOwnerId, equals('trainer-1'));
+      },
+    );
+
+    testWidgets(
+      'REGRESSION-410 Bug 2: coach-context back fallback lands on the athlete '
+      'detail, not the athlete /workout tab',
+      (tester) async {
+        String? backLocation;
+        final router = GoRouter(
+          initialLocation: '/coach/athlete/athlete-1/plan/test-id',
+          routes: [
+            GoRoute(
+              path: '/coach/athlete/:athleteId/plan/:routineId',
+              builder: (ctx, state) => RoutineDetailScreen(
+                routineId: state.pathParameters['routineId']!,
+                coachAthleteId: state.pathParameters['athleteId'],
+              ),
+            ),
+            GoRoute(
+              path: '/coach/athlete/:athleteId',
+              builder: (ctx, state) {
+                backLocation = state.matchedLocation;
+                return const Text('ATHLETE DETAIL');
+              },
+            ),
+            // Athlete tab — MUST NOT be where a coach-context back lands.
+            GoRoute(
+              path: '/workout',
+              builder: (_, __) => const Text('WORKOUT TAB'),
+            ),
+          ],
+        );
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              routineByIdStreamProvider('test-id')
+                  .overrideWith((ref) => Stream.value(_makeRoutine())),
+            ],
+            child: MaterialApp.router(
+              theme: AppTheme.dark(),
+              localizationsDelegates: AppL10n.localizationsDelegates,
+              supportedLocales: AppL10n.supportedLocales,
+              locale: const Locale('es', 'AR'),
+              routerConfig: router,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        // Initial location → nothing to pop → back uses the fallback route.
+        await tester.tap(find.byIcon(TreinoIcon.back));
+        await tester.pumpAndSettle();
+
+        expect(find.text('ATHLETE DETAIL'), findsOneWidget);
+        expect(find.text('WORKOUT TAB'), findsNothing);
+        expect(backLocation, equals('/coach/athlete/athlete-1'));
+      },
+    );
+
     testWidgets(
       'SCENARIO-094: no Scaffold/AppBackground/SafeArea inside screen subtree',
       (tester) async {
         await tester.pumpWidget(
           _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-            routineByIdProvider(
+            routineByIdStreamProvider(
               'test-id',
-            ).overrideWith((ref) async => _makeRoutine()),
+            ).overrideWith((ref) => Stream.value(_makeRoutine())),
           ]),
         );
         await tester.pump(const Duration(milliseconds: 50));
@@ -680,9 +979,9 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            routineByIdProvider(
+            routineByIdStreamProvider(
               'test-id',
-            ).overrideWith((ref) async => _makeRoutine(id: 'test-id')),
+            ).overrideWith((ref) => Stream.value(_makeRoutine(id: 'test-id'))),
           ],
           child: MaterialApp.router(
             theme: AppTheme.dark(),
@@ -718,9 +1017,9 @@ void main() {
               initialDayNumber: 3,
             ),
             [
-              routineByIdProvider(
+              routineByIdStreamProvider(
                 'test-id',
-              ).overrideWith((ref) async => routine),
+              ).overrideWith((ref) => Stream.value(routine)),
             ],
           ),
         );
@@ -752,9 +1051,9 @@ void main() {
               initialDayNumber: 99,
             ),
             [
-              routineByIdProvider(
+              routineByIdStreamProvider(
                 'test-id',
-              ).overrideWith((ref) async => routine),
+              ).overrideWith((ref) => Stream.value(routine)),
             ],
           ),
         );
@@ -775,7 +1074,9 @@ void main() {
         );
         await tester.pumpWidget(
           _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-            routineByIdProvider('test-id').overrideWith((ref) async => routine),
+            routineByIdStreamProvider(
+              'test-id',
+            ).overrideWith((ref) => Stream.value(routine)),
           ]),
         );
         await tester.pumpAndSettle();
@@ -828,16 +1129,16 @@ void main() {
         );
         await tester.pumpWidget(
           _wrapWithOverrides(RoutineDetailScreen(routineId: routine.id), [
-            routineByIdProvider(
+            routineByIdStreamProvider(
               routine.id,
-            ).overrideWith((ref) async => routine),
+            ).overrideWith((ref) => Stream.value(routine)),
           ]),
         );
         await tester.pump(const Duration(milliseconds: 50));
 
         // Both slots must render — no filtering on single-week plan
         expect(
-          find.byType(ExerciseSlotRow),
+          find.byType(ExerciseSlotRow, skipOffstage: false),
           findsNWidgets(2),
           reason: 'Single-week plan: all slots rendered, no filter',
         );

@@ -7,11 +7,15 @@ import 'package:mocktail/mocktail.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/auth/data/auth_service.dart';
 import 'package:treino/features/auth/domain/auth_failure.dart';
+import 'package:treino/features/notifications/application/notification_providers.dart';
+import 'package:treino/features/notifications/data/fcm_service.dart';
 
 // --- Mocks ---
 class MockAuthService extends Mock implements AuthService {}
 
 class MockUser extends Mock implements User {}
+
+class MockFcmService extends Mock implements FcmService {}
 
 // ---------------------------------------------------------------------------
 // Helper: builds a ProviderContainer with overrides for authServiceProvider
@@ -20,11 +24,14 @@ class MockUser extends Mock implements User {}
 ProviderContainer buildContainer({
   required MockAuthService mockService,
   required Stream<User?> authStream,
+  MockFcmService? mockFcmService,
 }) {
   return ProviderContainer(
     overrides: [
       authServiceProvider.overrideWithValue(mockService),
       authStateChangesProvider.overrideWith((_) => authStream),
+      if (mockFcmService != null)
+        fcmServiceProvider.overrideWithValue(mockFcmService),
     ],
   );
 }
@@ -313,12 +320,13 @@ void main() {
   // signOut
   // ---------------------------------------------------------------------------
   group('AuthNotifier.signOut', () {
-    test('scenario 12.2 — signOut transitions state to AsyncData(null)',
-        () async {
+    test('cleans FCM token before closing the authenticated session', () async {
       final streamController = StreamController<User?>();
+      final mockFcmService = MockFcmService();
       final container = buildContainer(
         mockService: mockService,
         authStream: streamController.stream,
+        mockFcmService: mockFcmService,
       );
       addTearDown(() {
         container.dispose();
@@ -326,17 +334,49 @@ void main() {
       });
 
       // Start logged in
+      when(() => mockUser.uid).thenReturn('uid-sign-out');
       streamController.add(mockUser);
       await container.read(authNotifierProvider.future);
 
-      when(() => mockService.signOut()).thenAnswer((_) async {
-        streamController.add(null);
-      });
+      when(() => mockFcmService.dispose('uid-sign-out'))
+          .thenAnswer((_) async {});
+      when(() => mockService.signOut()).thenAnswer((_) async {});
 
       await container.read(authNotifierProvider.notifier).signOut();
 
       final state = container.read(authNotifierProvider);
       expect(state.valueOrNull, isNull);
+      verifyInOrder([
+        () => mockFcmService.dispose('uid-sign-out'),
+        () => mockService.signOut(),
+      ]);
+    });
+
+    test('still closes the session when FCM cleanup fails', () async {
+      final streamController = StreamController<User?>();
+      final mockFcmService = MockFcmService();
+      final container = buildContainer(
+        mockService: mockService,
+        authStream: streamController.stream,
+        mockFcmService: mockFcmService,
+      );
+      addTearDown(() {
+        container.dispose();
+        streamController.close();
+      });
+
+      when(() => mockUser.uid).thenReturn('uid-cleanup-fails');
+      streamController.add(mockUser);
+      await container.read(authNotifierProvider.future);
+
+      when(() => mockFcmService.dispose('uid-cleanup-fails'))
+          .thenThrow(Exception('offline'));
+      when(() => mockService.signOut()).thenAnswer((_) async {});
+
+      await container.read(authNotifierProvider.notifier).signOut();
+
+      verify(() => mockService.signOut()).called(1);
+      expect(container.read(authNotifierProvider).valueOrNull, isNull);
     });
   });
 

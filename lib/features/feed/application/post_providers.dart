@@ -4,20 +4,70 @@ import '../../auth/application/auth_providers.dart';
 import '../../profile/application/user_providers.dart' show firestoreProvider;
 import '../../profile/application/user_public_profile_providers.dart';
 import '../data/post_repository.dart';
-import '../domain/friendship_status.dart';
 import '../domain/post.dart';
+import '../domain/post_page.dart';
 import '../domain/post_privacy.dart';
-import 'public_profile_providers.dart';
+import 'feed_pagination_notifier.dart';
+import 'follow_providers.dart';
 
 final postRepositoryProvider = Provider<PostRepository>(
   (ref) => PostRepository(firestore: ref.watch(firestoreProvider)),
 );
 
+/// A live post document keyed by its stable Firestore document id.
+///
+/// The family key is deliberately a [String], never a `List`, for the same
+/// value-equality/cache-stability reason documented on
+/// [feedForFriendsProvider].
+final postByIdProvider =
+    StreamProvider.autoDispose.family<Post?, String>((ref, postId) {
+  return ref.watch(postRepositoryProvider).watchById(postId);
+});
+
+const publicFeedPaginationKey = 'public';
+const _friendsFeedPaginationPrefix = 'friends:';
+const _gymFeedPaginationPrefix = 'gym:';
+
+String friendsFeedPaginationKey(String friendUidsKey) =>
+    '$_friendsFeedPaginationPrefix$friendUidsKey';
+
+String gymFeedPaginationKey(String gymId) => '$_gymFeedPaginationPrefix$gymId';
+
+/// Maps stable string query keys to the matching repository query.
+class PostFeedPaginationNotifier extends FeedPaginationNotifier {
+  @override
+  Future<PostPage> fetchPage(String queryKey, {DateTime? after}) {
+    final repository = ref.read(postRepositoryProvider);
+    if (queryKey == publicFeedPaginationKey) {
+      return repository.feedPublic(after: after);
+    }
+    if (queryKey.startsWith(_friendsFeedPaginationPrefix)) {
+      final serializedUids =
+          queryKey.substring(_friendsFeedPaginationPrefix.length);
+      final friendUids =
+          serializedUids.isEmpty ? const <String>[] : serializedUids.split(' ');
+      return repository.feedForFriends(friendUids, after: after);
+    }
+    if (queryKey.startsWith(_gymFeedPaginationPrefix)) {
+      final gymId = queryKey.substring(_gymFeedPaginationPrefix.length);
+      return repository.feedForGym(gymId, after: after);
+    }
+    throw ArgumentError.value(queryKey, 'queryKey', 'Unknown feed query');
+  }
+}
+
+final feedPaginationProvider = AsyncNotifierProvider.family<
+    PostFeedPaginationNotifier, FeedPaginationState, String>(
+  PostFeedPaginationNotifier.new,
+);
+
 /// All public posts, ordered newest-first (createdAt desc) server-side.
 /// Requires the posts (privacy, createdAt desc) composite index in
 /// firestore.indexes.json.
-final feedPublicProvider = FutureProvider<List<Post>>((ref) {
-  return ref.watch(postRepositoryProvider).feedPublic();
+final feedPublicProvider = FutureProvider<List<Post>>((ref) async {
+  final state =
+      await ref.watch(feedPaginationProvider(publicFeedPaginationKey).future);
+  return PaginatedPostList(state);
 });
 
 /// Friends-privacy posts for the given set of friend UIDs.
@@ -32,10 +82,11 @@ final feedPublicProvider = FutureProvider<List<Post>>((ref) {
 ///
 /// Use [friendUidsKey] to build the key from a UID list.
 final feedForFriendsProvider =
-    FutureProvider.family<List<Post>, String>((ref, friendUidsKey) {
-  final friendUids =
-      friendUidsKey.isEmpty ? const <String>[] : friendUidsKey.split(' ');
-  return ref.watch(postRepositoryProvider).feedForFriends(friendUids);
+    FutureProvider.family<List<Post>, String>((ref, friendUidsKey) async {
+  final state = await ref.watch(
+    feedPaginationProvider(friendsFeedPaginationKey(friendUidsKey)).future,
+  );
+  return PaginatedPostList(state);
 });
 
 /// Builds a stable, value-equal key for [feedForFriendsProvider] from a list of
@@ -45,8 +96,11 @@ String friendUidsKey(List<String> friendUids) =>
 
 /// Gym-privacy posts for the given gym ID.
 final feedForGymProvider =
-    FutureProvider.family<List<Post>, String>((ref, gymId) {
-  return ref.watch(postRepositoryProvider).feedForGym(gymId);
+    FutureProvider.family<List<Post>, String>((ref, gymId) async {
+  final state = await ref.watch(
+    feedPaginationProvider(gymFeedPaginationKey(gymId)).future,
+  );
+  return PaginatedPostList(state);
 });
 
 /// All posts authored by a given UID.
@@ -63,71 +117,63 @@ final postsByAuthorProvider =
 });
 
 /// Posts authored by [targetUid], visible to the current viewer per each
-/// post's [PostPrivacy] rule (Option X):
+/// post's [PostPrivacy] tier:
 /// - `public` → always visible
-/// - `friends` → visible if the viewer is an accepted follower OR is self
-/// - `gym` → visible if viewer.gymId == target.authorGymId OR is self
+/// - `friends` → visible si el VIEWER SIGUE al target, o es él mismo
+/// - `gym` → visible if viewer.gymId == target.gymId OR is self
 ///
-/// Returned newest-first (post_repository.byAuthor returns unordered, we
-/// sort here). Empty list when viewer is unauthenticated. Powers the
-/// "ACTIVIDAD" tab of another user's public profile screen.
+/// Returned newest-first. Empty list when the viewer is unauthenticated.
+/// Powers the "ACTIVIDAD" tab of another user's public profile screen.
 ///
-/// Client-side filter is safe here because the volume is bounded by uid —
-/// no user is expected to have thousands of own posts, and the alternative
-/// (three separate parallel queries per privacy tier) would issue more reads
-/// than needed while adding complexity to reconcile the timelines.
+/// QA-FEED-001: privacy is now enforced by firestore.rules. A non-author
+/// viewer may only READ the tiers the rule allows, so this queries per tier —
+/// the old fetch-all-then-filter (`byAuthor`) would be rejected server-side
+/// because it pulls rows the viewer isn't allowed to read. Each tier is fetched
+/// only when the relationship that authorizes it holds, so every query returns
+/// only readable rows.
 final visiblePostsByAuthorProvider =
     FutureProvider.autoDispose.family<List<Post>, String>(
   (ref, targetUid) async {
     final viewerAuth = await ref.watch(authStateChangesProvider.future);
     if (viewerAuth == null) return const [];
     final viewerUid = viewerAuth.uid;
-    final isSelf = viewerUid == targetUid;
+    final repo = ref.watch(postRepositoryProvider);
 
-    final all =
-        await ref.watch(postsByAuthorProvider(targetUid).future);
-    if (all.isEmpty) return const [];
-
-    // Fast paths: viewer is the target user OR every post is public.
-    if (isSelf) {
-      final sorted = List<Post>.of(all)
+    // Self: the read rule lets the author read every tier of their own posts.
+    if (viewerUid == targetUid) {
+      final all = await ref.watch(postsByAuthorProvider(targetUid).future);
+      return List<Post>.of(all)
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      return sorted;
     }
 
-    // Relationship signals — only fetched when there is at least one
-    // non-public post; keeps the common case cheap.
-    final needsRelationships =
-        all.any((p) => p.privacy != PostPrivacy.public);
-    var isAcceptedFriend = false;
-    String? viewerGymId;
-    if (needsRelationships) {
-      final friendship = await ref.watch(
-        friendshipByPairProvider(
-          (viewerUid: viewerUid, targetUid: targetUid),
-        ).future,
-      );
-      isAcceptedFriend = friendship?.status == FriendshipStatus.accepted;
-      final viewerProfile =
-          await ref.watch(userPublicProfileProvider(viewerUid).future);
-      viewerGymId = viewerProfile?.gymId;
+    final visible = <Post>[
+      ...await repo.byAuthorAndPrivacy(targetUid, PostPrivacy.public),
+    ];
+
+    // Tier seguidores — REQ-FOLLOW-010: la pregunta es "¿YO sigo al autor?",
+    // no "¿existe una relación entre los dos?". Sólo la arista SALIENTE da
+    // acceso: que el autor me siga a mí no me deja ver su contenido.
+    //
+    // Espeja exactamente el gate de las rules (`postFollowerAccepted`), y eso
+    // no es opcional: la query se emite sólo cuando la relación que la autoriza
+    // se cumple, porque si el cliente pidiera filas que la regla deniega,
+    // Firestore rechaza el QUERY ENTERO, no las filas de más.
+    final following = await ref.watch(followingProvider(viewerUid).future);
+    if (following.contains(targetUid)) {
+      visible.addAll(
+          await repo.byAuthorAndPrivacy(targetUid, PostPrivacy.followers));
     }
 
-    final visible = <Post>[];
-    for (final post in all) {
-      switch (post.privacy) {
-        case PostPrivacy.public:
-          visible.add(post);
-        case PostPrivacy.friends:
-          if (isAcceptedFriend) visible.add(post);
-        case PostPrivacy.gym:
-          if (viewerGymId != null &&
-              post.authorGymId != null &&
-              viewerGymId == post.authorGymId) {
-            visible.add(post);
-          }
-      }
+    // Gym tier — queried constrained to the viewer's own gym, so every returned
+    // row satisfies the read rule (viewer.gymId == post.authorGymId). Matches
+    // the rule per-post, which keys on each post's authorGymId, not the target's
+    // current gym.
+    final viewerGymId =
+        (await ref.watch(userPublicProfileProvider(viewerUid).future))?.gymId;
+    if (viewerGymId != null) {
+      visible.addAll(await repo.byAuthorGymTier(targetUid, viewerGymId));
     }
+
     visible.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return visible;
   },

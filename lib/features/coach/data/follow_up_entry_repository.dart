@@ -2,6 +2,7 @@ import 'dart:developer' as developer;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../../core/utils/firestore_write.dart';
 import '../domain/follow_up_entry.dart';
 
 /// Repository de entradas de seguimiento privadas del PF sobre un alumno.
@@ -41,7 +42,7 @@ class FollowUpEntryRepository {
       tag: tag,
       recordedAt: now,
     );
-    await _collection.doc(id).set(entry.toJson());
+    await _collection.doc(id).set(entry.toJson()).boundedWrite;
     return entry;
   }
 
@@ -62,11 +63,11 @@ class FollowUpEntryRepository {
   /// `trainerId`, `athleteId`, `recordedAt` no cambien — el caller pasa el
   /// mismo doc con los nuevos valores.
   Future<void> update(FollowUpEntry entry) async {
-    await _collection.doc(entry.id).set(entry.toJson());
+    await _collection.doc(entry.id).set(entry.toJson()).boundedWrite;
   }
 
   Future<void> delete(String id) async {
-    await _collection.doc(id).delete();
+    await _collection.doc(id).delete().boundedWrite;
   }
 
   FollowUpEntry? _fromDoc(QueryDocumentSnapshot<Map<String, Object?>> snap) {

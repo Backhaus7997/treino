@@ -54,7 +54,7 @@ class WeeklyInsights {
   final int streak;
 
   /// Cantidad de sesiones finished en el mes calendario actual.
-  /// Se basa en el mes de `startedAt.toLocal()`, no en ventana de 30 días.
+  /// Se basa en el mes de `toArgentina(startedAt)`, no en ventana de 30 días.
   final int monthSessionsCount;
 
   /// `true` si el usuario completó AL MENOS un entrenamiento alguna vez

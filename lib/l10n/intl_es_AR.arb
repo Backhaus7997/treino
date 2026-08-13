@@ -1,4 +1,7 @@
 {
+  "notFoundTitle": "Página no encontrada",
+  "notFoundBody": "La ruta que buscás no existe o el enlace es inválido.",
+  "notFoundCta": "Volver al inicio",
   "homeAthleteFirstRunTitle": "Arrancá tu entrenamiento",
   "@homeAthleteFirstRunTitle": {"description": "Home first-run empty-state title for an athlete with no routine (usability finding 6)."},
   "homeAthleteFirstRunBody": "Creá tu primera rutina o buscá un entrenador para empezar.",
@@ -7,6 +10,65 @@
   "@homeAthleteFirstRunCreateCta": {"description": "Home first-run primary CTA to create a routine (finding 6)."},
   "homeAthleteFirstRunFindTrainerCta": "Buscar entrenador",
   "@homeAthleteFirstRunFindTrainerCta": {"description": "Home first-run secondary CTA to browse trainers (finding 6)."},
+  "homeEstaSemanaTitle": "ESTA SEMANA",
+  "@homeEstaSemanaTitle": {"description": "Home 'Esta Semana' card section title (skeleton, error and loaded states)."},
+  "homeEstaSemanaLoadError": "No pudimos cargar tus insights.",
+  "@homeEstaSemanaLoadError": {"description": "Home 'Esta Semana' card error message shown when weekly insights fail to load."},
+  "homeEstaSemanaHeaderPill": "RACHA ACTUAL",
+  "@homeEstaSemanaHeaderPill": {"description": "Home 'Esta Semana' card header pill label when the athlete has an active streak."},
+  "homeEstaSemanaHeaderPillEmpty": "PRIMER PASO",
+  "@homeEstaSemanaHeaderPillEmpty": {"description": "Home 'Esta Semana' card header pill label in the empty state (no sessions yet)."},
+  "homeEstaSemanaWeekMonth": "SEM {week} · {month}",
+  "@homeEstaSemanaWeekMonth": {
+    "placeholders": {
+      "week": {
+        "type": "int"
+      },
+      "month": {
+        "type": "String"
+      }
+    }
+  },
+  "homeEstaSemanaStreakUnit": "{count, plural, =1{DÍA} other{DÍAS}}",
+  "@homeEstaSemanaStreakUnit": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeEstaSemanaStreakSubtextTrained": "No rompas la racha — entrenaste hoy.",
+  "@homeEstaSemanaStreakSubtextTrained": {"description": "Home 'Esta Semana' card streak subtext shown when the athlete already trained today."},
+  "homeEstaSemanaStreakSubtextPending": "No rompas la racha — entrená hoy.",
+  "@homeEstaSemanaStreakSubtextPending": {"description": "Home 'Esta Semana' card streak subtext shown when the athlete hasn't trained today yet."},
+  "homeEstaSemanaPeriodWeek": "SEMANA",
+  "@homeEstaSemanaPeriodWeek": {"description": "Home 'Esta Semana' card period card label for the current week count."},
+  "homeEstaSemanaPeriodMonth": "MES",
+  "@homeEstaSemanaPeriodMonth": {"description": "Home 'Esta Semana' card period card label for the current month count."},
+  "homeEstaSemanaPeriodUnit": "{count, plural, =1{entreno} other{entrenos}}",
+  "@homeEstaSemanaPeriodUnit": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeEstaSemanaEmptyTitle": "TU RACHA\nEMPIEZA ACÁ",
+  "@homeEstaSemanaEmptyTitle": {"description": "Home 'Esta Semana' card empty-state title for an athlete with zero sessions."},
+  "homeEstaSemanaEmptyBody": "Cada entrenamiento alimenta tu racha. Hacé el primero y empezá a construir tu progreso.",
+  "@homeEstaSemanaEmptyBody": {"description": "Home 'Esta Semana' card empty-state body copy encouraging the first workout."},
+  "homeEstaSemanaEmptyCta": "EXPLORAR RUTINAS  →",
+  "@homeEstaSemanaEmptyCta": {"description": "Home 'Esta Semana' card empty-state CTA button navigating to routines."},
+  "homeEstaSemanaInsightsCta": "VER INSIGHTS  →",
+  "@homeEstaSemanaInsightsCta": {"description": "Home 'Esta Semana' card CTA button navigating to the insights hub (/home/insights). The whole card was already tappable but carried no visible affordance, so the destination was undiscoverable."},
+  "homeEstaSemanaHeaderPillResume": "A RETOMAR",
+  "@homeEstaSemanaHeaderPillResume": {"description": "Home 'Esta Semana' card header pill label when the athlete has history but zero sessions this week (#551)."},
+  "homeEstaSemanaResumeTitle": "TU RACHA\nTE ESPERA",
+  "@homeEstaSemanaResumeTitle": {"description": "Home 'Esta Semana' card resume-state title for an athlete with past sessions but none this week."},
+  "homeEstaSemanaResumeBody": "Ya tenés historial construido. Esta semana todavía está en cero — retomá hoy y seguí sumando progreso.",
+  "@homeEstaSemanaResumeBody": {"description": "Home 'Esta Semana' card resume-state body copy encouraging a returning athlete to train again."},
+  "homeEstaSemanaResumeCta": "VOLVER A ENTRENAR  →",
+  "@homeEstaSemanaResumeCta": {"description": "Home 'Esta Semana' card resume-state CTA button navigating to routines."},
   "@@locale": "es_AR",
   "authSplashTagline": "ENTRENÁ. COMPARTÍ. CRECÉ.",
   "authWelcomeEyebrow": "ENTRENAMIENTO · GYM · COACH",
@@ -135,6 +197,24 @@
   "agendaRuleDeleteConfirm": "¿Borrar este horario? Las reservas existentes se mantienen.",
   "agendaRuleInvalidWindow": "La hora de fin debe ser posterior al inicio y dejar espacio para al menos un turno.",
   "agendaBookingCancelledByCoach": "Reserva cancelada por el entrenador.",
+  "agendaBlockedDayTitle": "Día bloqueado",
+  "agendaBlockedDayBodySingle": "El {date} está marcado como bloqueado en tus horarios. ¿Querés cargar la sesión igual?",
+  "@agendaBlockedDayBodySingle": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "agendaBlockedDayBodyRecurring": "{count} de las fechas caen en días bloqueados. ¿Continuar igual?",
+  "@agendaBlockedDayBodyRecurring": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "agendaBlockedDayConfirm": "Cargar igual",
   "agendaSlotFreeLabel": "Disponible",
   "agendaSlotBlockedLabel": "Bloqueado",
   "agendaSlotBookedByLabel": "Reservado por {athleteName}",
@@ -145,10 +225,40 @@
       }
     }
   },
+  "agendaCobrarCta": "COBRAR",
+  "agendaCobradoLabel": "Cobrado",
+  "agendaCobrarMontoLabel": "MONTO (ARS)",
+  "agendaCobrarConceptoLabel": "CONCEPTO",
+  "agendaCobrarVenceElLabel": "VENCE EL (OPCIONAL)",
+  "agendaCobrarVenceElHint": "Sin fecha de vencimiento",
+  "agendaCobrarVenceElQuitar": "Quitar fecha de vencimiento",
+  "agendaCobrarConfirmCta": "CONFIRMAR COBRO",
+  "agendaCobrarCompletaCampos": "Completá todos los campos.",
+  "agendaCobrarMontoInvalido": "Ingresá un monto válido.",
+  "agendaCobrarSuccess": "Turno cobrado.",
+  "agendaCobrarError": "No pudimos registrar el cobro. Probá de nuevo.",
+  "agendaCobrarConceptoDefault": "Sesión {date}",
+  "@agendaCobrarConceptoDefault": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "agendaCobrarTarifaReferencia": "Tarifa de referencia: {amount}",
+  "@agendaCobrarTarifaReferencia": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
   "workoutSummaryHeaderCompleted": "BUEN ENTRENO",
   "workoutSummaryHeaderAbandoned": "SESIÓN INTERRUMPIDA",
   "workoutStatDuration": "DURACIÓN",
   "workoutStatVolume": "VOLUMEN",
+  "workoutStatDurationMin": "DURACIÓN MIN",
+  "workoutStatVolumeKg": "VOLUMEN KG",
   "workoutStatSets": "SETS",
   "workoutStatPrsToday": "PRs HOY",
   "workoutStatPrsTodayStub": "—",
@@ -163,6 +273,80 @@
   "workoutSnackShareSuccess": "¡Post compartido!",
   "workoutSnackShareError": "No pudimos compartir tu post. Intentá de nuevo.",
   "workoutPostAutoCompleteText": "¡Terminé mi entreno! 💪",
+  "wellbeingCheckInTitle": "¿CÓMO TE SENTISTE?",
+  "@wellbeingCheckInTitle": {
+    "description": "Title of the skippable post-session check-in step, and of the sheet it opens. Asks how the athlete felt — subjective, never a performance metric."
+  },
+  "wellbeingCheckInOptional": "Opcional. Podés saltearlo.",
+  "@wellbeingCheckInOptional": {
+    "description": "Reassures that the check-in is skippable at no cost. The post-session moment is when the user wants to leave."
+  },
+  "wellbeingFeelingVeryBad": "Muy mal",
+  "wellbeingFeelingBad": "Mal",
+  "wellbeingFeelingNeutral": "Normal",
+  "wellbeingFeelingGood": "Bien",
+  "wellbeingFeelingGreat": "Muy bien",
+  "wellbeingPainQuestion": "¿Tuviste dolor o molestia?",
+  "wellbeingPainYes": "SÍ",
+  "wellbeingPainNo": "NO",
+  "wellbeingPainAreasQuestion": "¿En qué zona?",
+  "wellbeingPainAreasHint": "Podés marcar más de una.",
+  "wellbeingNoteLabel": "Nota (opcional)",
+  "wellbeingNoteHint": "Algo que quieras recordar de hoy",
+  "wellbeingMedicalDisclaimer": "Si el dolor persiste, consultá a un profesional de la salud.",
+  "@wellbeingMedicalDisclaimer": {
+    "description": "Neutral note shown only when the athlete reports pain. The app records, it never interprets: this copy must not diagnose, recommend or condition any app behaviour on the answer."
+  },
+  "wellbeingSaveButton": "GUARDAR",
+  "wellbeingSkipButton": "AHORA NO",
+  "wellbeingSavedLabel": "REGISTRADO",
+  "wellbeingEditButton": "Editar",
+  "wellbeingSaveError": "No pudimos guardar tu registro. Probá de nuevo.",
+  "shareWorkoutComposerTitle": "COMPARTIR ENTRENO",
+  "@shareWorkoutComposerTitle": {
+    "description": "Header title of the share-a-workout composer screen, opened from the COMPARTIR button of the post-workout summary."
+  },
+  "shareWorkoutComposerHint": "¿Cómo estuvo tu entreno?",
+  "@shareWorkoutComposerHint": {
+    "description": "Placeholder of the composer's text field. The field is pre-filled with workoutPostAutoCompleteText, so this only shows if the athlete clears it."
+  },
+  "shareWorkoutComposerPublish": "PUBLICAR",
+  "@shareWorkoutComposerPublish": {
+    "description": "Composer's confirm action — publishes the workout post to the feed."
+  },
+  "shareWorkoutComposerAddPhoto": "AGREGAR FOTO",
+  "@shareWorkoutComposerAddPhoto": {
+    "description": "Composer action that opens the image picker to attach one optional photo to the workout post."
+  },
+  "shareWorkoutComposerRemovePhoto": "Quitar foto",
+  "@shareWorkoutComposerRemovePhoto": {
+    "description": "Accessibility label of the control that detaches the photo already attached in the composer."
+  },
+  "shareWorkoutComposerPhotoError": "No pudimos usar esa foto. Probá con otra.",
+  "@shareWorkoutComposerPhotoError": {
+    "description": "Inline error shown in the composer when the picked photo cannot be read or exceeds the size limit."
+  },
+  "shareWorkoutComposerPreviewTitle": "TU ENTRENO",
+  "@shareWorkoutComposerPreviewTitle": {
+    "description": "Section header above the workout detail preview inside the composer — what the rest of the users will see attached to the post."
+  },
+  "postCardWorkoutDetailShow": "VER DETALLE",
+  "@postCardWorkoutDetailShow": {
+    "description": "Feed card control that expands the shared workout detail (exercises with sets/reps/weight plus the muscle distribution mini-chart)."
+  },
+  "postCardWorkoutDetailHide": "OCULTAR DETALLE",
+  "@postCardWorkoutDetailHide": {
+    "description": "Feed card control that collapses the shared workout detail back."
+  },
+  "postCardWorkoutDetailTruncated": "Se muestran los primeros {count} ejercicios.",
+  "@postCardWorkoutDetailTruncated": {
+    "description": "Note at the end of an expanded workout detail whose exercise list was capped when the post was shared.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "workoutHistorialHeading": "HISTORIAL",
   "workoutHistorialEmptyMessage": "Todavía no entrenaste.",
   "workoutHistorialEmptyCta": "Empezar entrenamiento",
@@ -184,6 +368,8 @@
   "workoutDetailStatDuration": "DURACIÓN",
   "workoutDetailStatSets": "SETS",
   "workoutDetailStatVolume": "VOLUMEN",
+  "workoutDetailStatDurationMin": "DURACIÓN MIN",
+  "workoutDetailStatVolumeKg": "VOLUMEN KG",
   "workoutDetailStatPrsToday": "PRS HOY",
   "workoutDetailPrBadge": "PR",
   "workoutSelfEditorTitle": "Nueva rutina",
@@ -194,6 +380,7 @@
   "workoutSelfEditorUpdateSuccess": "Rutina actualizada",
   "workoutSelfEditorNotFound": "Esta rutina ya no existe. Volvé y actualizá la lista.",
   "workoutSelfEditorError": "No pudimos crear la rutina. Reintentá.",
+  "workoutDiscardError": "No pudimos descartar la sesión. Probá de nuevo.",
   "workoutSelfEditorPermissionDenied": "No tenés permisos para hacer esto. Recargá la app.",
   "workoutEditStubToast": "Pronto vas a poder editar el contenido. Por ahora podés archivar y crear de nuevo.",
   "workoutSelfEditorCapReached": "Llegaste al máximo de 10 rutinas activas.",
@@ -217,6 +404,81 @@
   "workoutMisRutinasConfirmConfirm": "ELIMINAR",
   "workoutMisRutinasArchiveSuccess": "Rutina eliminada",
   "workoutMisRutinasArchiveError": "No pudimos eliminar la rutina. Reintentá.",
+  "workoutRutinasCoachChip": "DE TU COACH",
+  "@workoutRutinasCoachChip": {
+    "description": "Chip pinned on trainer-assigned routine cards in the unified RUTINAS list (workout tab + /profile/routines mirror). Same pill anatomy as workoutMisRutinasActiveChip, highlight color. Workout-area redesign slice 1."
+  },
+  "workoutPlantillasTrainerChip": "ENTRENADOR",
+  "@workoutPlantillasTrainerChip": {
+    "description": "Badge on PLANTILLAS grid cards for templates published to the community catalogue by ANY trainer (not the athlete's own coach, which uses workoutRutinasCoachChip). Accent color. Workout-area redesign slice 3."
+  },
+  "templateRatingsTitle": "CALIFICACIONES",
+  "@templateRatingsTitle": {
+    "description": "Section header of the community ratings block in the detail of a published trainer template. Workout-area redesign slice 3."
+  },
+  "templateRatingsNoneYet": "Todavía nadie calificó esta plantilla. ¡Sé el primero!",
+  "@templateRatingsNoneYet": {
+    "description": "Shown instead of the average when a published template has zero ratings."
+  },
+  "templateRatingsCount": "{count, plural, =1{1 calificación} other{{count} calificaciones}}",
+  "@templateRatingsCount": {
+    "description": "How many people rated the template, next to the average score.",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "templateRatingsMineEmpty": "¿Qué te pareció?",
+  "@templateRatingsMineEmpty": {
+    "description": "Label above the rate CTA when the user has not rated this template yet."
+  },
+  "templateRatingsMineLabel": "Tu calificación",
+  "@templateRatingsMineLabel": {
+    "description": "Label above the user's own rating when they already rated this template."
+  },
+  "templateRatingsRateCta": "CALIFICAR",
+  "@templateRatingsRateCta": {
+    "description": "Button that opens the rating sheet for the first time."
+  },
+  "templateRatingsEditCta": "EDITAR",
+  "@templateRatingsEditCta": {
+    "description": "Button that opens the rating sheet to edit the user's existing rating."
+  },
+  "templateRatingsEmpty": "Todavía no hay comentarios.",
+  "@templateRatingsEmpty": {
+    "description": "Empty state of the comment list when nobody left a written comment (ratings without text do not appear here)."
+  },
+  "templateRatingsError": "No pudimos cargar los comentarios.",
+  "@templateRatingsError": {
+    "description": "Error state of the comment list in the published-template detail."
+  },
+  "templateRatingSheetTitle": "Calificá esta plantilla",
+  "@templateRatingSheetTitle": {
+    "description": "Title of the rating bottom sheet when creating a new rating."
+  },
+  "templateRatingSheetTitleEdit": "Editá tu calificación",
+  "@templateRatingSheetTitleEdit": {
+    "description": "Title of the rating bottom sheet when editing an existing rating."
+  },
+  "templateRatingSheetCommentHint": "Contá cómo te fue con esta plantilla (opcional)",
+  "@templateRatingSheetCommentHint": {
+    "description": "Hint of the optional comment field in the template rating sheet, max 500 chars."
+  },
+  "templateRatingSheetCancel": "CANCELAR",
+  "@templateRatingSheetCancel": {
+    "description": "Cancel button of the template rating sheet."
+  },
+  "templateRatingSheetSubmit": "ENVIAR",
+  "@templateRatingSheetSubmit": {
+    "description": "Submit button of the template rating sheet."
+  },
+  "templateRatingSheetSuccess": "¡Gracias por calificar!",
+  "@templateRatingSheetSuccess": {
+    "description": "SnackBar shown after a rating is saved."
+  },
+  "templateRatingSheetError": "No pudimos guardar tu calificación.",
+  "@templateRatingSheetError": {
+    "description": "SnackBar shown when saving a rating fails."
+  },
   "workoutSplitFallback": "Sin split",
   "workoutPickerMuscleFilter": "Músculos",
   "workoutPickerEquipmentFilter": "Equipamiento",
@@ -255,7 +517,7 @@
   "eliminarCuentaSheetTitle": "Eliminar cuenta",
   "eliminarCuentaSheetBodyPrefix": "Esta acción es ",
   "eliminarCuentaSheetBodyBold": "irreversible",
-  "eliminarCuentaSheetBodySuffix": ". Vamos a eliminar tu cuenta, tu perfil, tu historial de entrenamientos y tu foto. Tus posts van a quedar como \"Usuario eliminado\".",
+  "eliminarCuentaSheetBodySuffix": ". Vamos a eliminar tu cuenta, tu perfil, tu historial de entrenamientos, tus posts y tu foto.",
   "eliminarCuentaSheetDeleteCta": "ELIMINAR",
   "eliminarCuentaSheetCancelCta": "CANCELAR",
   "eliminarCuentaSheetLoadingLabel": "Eliminando tu cuenta...",
@@ -296,7 +558,6 @@
   "dashboardAceptarLabel": "ACEPTAR",
   "dashboardPagosPorCobrarTitle": "PAGOS POR COBRAR",
   "dashboardCobroTrailingLabel": "+ Cobro",
-  "dashboardInvitarAlumnoLabel": "+ INVITAR ALUMNO",
   "dashboardAsignarRutinaLabel": "+ ASIGNAR RUTINA",
   "dashboardCobroSueltoTitle": "COBRO SUELTO",
   "dashboardAlumnoLabel": "ALUMNO",
@@ -305,6 +566,9 @@
   "dashboardAgregarCobroLabel": "AGREGAR COBRO",
   "dashboardMontoHint": "Ej: 5000",
   "dashboardConceptoHint": "Ej: Clase de verano",
+  "dashboardVenceElLabel": "VENCE EL (OPCIONAL)",
+  "dashboardVenceElHint": "Sin fecha de vencimiento",
+  "dashboardVenceElQuitar": "Quitar fecha de vencimiento",
   "dashboardSeleccionaAlumnoHint": "Seleccioná un alumno",
   "dashboardSinAlumnosActivos": "No tenés alumnos activos.",
   "dashboardMarcarCobradoTitle": "¿Marcar como cobrado?",
@@ -325,14 +589,57 @@
   "dashboardIniciaSesion": "Iniciá sesión para ver tus próximos turnos.",
   "dashboardCargando": "Cargando…",
   "dashboardErrorTurnos": "No pudimos cargar tus próximos turnos.",
+  "dashboardErrorResumen": "No pudimos cargar el resumen del día.",
+  "@dashboardErrorResumen": {
+    "description": "Error state of the trainer dashboard 'Resumen del día' card when the appointments stream fails, instead of silently showing 0/0/0."
+  },
   "dashboardSinTurnosProximos": "No tenés turnos próximos confirmados.",
   "dashboardNadieEntreno": "Nadie entrenó hoy todavía.",
+  "athleteDetailSeguimientoEmpty": "Todavía no dejaste seguimiento de este alumno.",
+  "@athleteDetailSeguimientoEmpty": {
+    "description": "Empty state of the SEGUIMIENTO section in the mobile athlete detail, when the trainer has no FollowUpEntry for this athlete yet."
+  },
+  "athleteDetailSeguimientoLoadError": "No pudimos cargar el seguimiento.",
+  "@athleteDetailSeguimientoLoadError": {
+    "description": "Error state of the SEGUIMIENTO section when the FollowUpEntry query fails."
+  },
+  "dashboardFeedbackSheetTitle": "Dejar feedback",
+  "@dashboardFeedbackSheetTitle": {
+    "description": "Title of the bottom sheet opened from the 'Dejar feedback' link in the trainer dashboard's ENTRENARON HOY section."
+  },
+  "dashboardFeedbackPickAthlete": "¿A quién le querés dejar feedback?",
+  "@dashboardFeedbackPickAthlete": {
+    "description": "Prompt above the list of athletes who trained today, in the leave-feedback sheet."
+  },
+  "dashboardFeedbackComposerHint": "Escribí tu devolución del entrenamiento…",
+  "@dashboardFeedbackComposerHint": {
+    "description": "Placeholder of the multiline text field where the trainer writes the feedback note."
+  },
+  "dashboardFeedbackSave": "Guardar",
+  "@dashboardFeedbackSave": {
+    "description": "Primary action of the leave-feedback sheet: persists the note as a FollowUpEntry."
+  },
+  "dashboardFeedbackSaved": "Feedback guardado",
+  "@dashboardFeedbackSaved": {
+    "description": "SnackBar confirmation shown after the feedback note is saved."
+  },
+  "dashboardFeedbackSaveError": "No pudimos guardar el feedback. Probá de nuevo.",
+  "@dashboardFeedbackSaveError": {
+    "description": "Inline error shown in the leave-feedback sheet when the Firestore write fails."
+  },
   "dashboardErrorActividad": "No pudimos cargar la actividad de hoy.",
   "dashboardSinActividadReciente": "Sin actividad en los últimos días.",
   "dashboardSinCobros": "Sin cobros pendientes.",
   "dashboardErrorCobros": "No pudimos cargar los cobros.",
   "dashboardHolaSinNombre": "HOLA",
-  "dashboardInvitarProximamente": "Invitar alumno — próximamente.",
+  "a11yDashboardAvatarButton": "Editar tu perfil profesional",
+  "@a11yDashboardAvatarButton": {
+    "description": "Semantics label for the trainer dashboard header avatar, which opens the professional-profile editor. Distinct from a11yHomeAvatarButton (athlete home), which opens a read-only public profile."
+  },
+  "dashboardSolicitudesPendientesEmpty": "No tenés solicitudes pendientes.",
+  "@dashboardSolicitudesPendientesEmpty": {
+    "description": "Empty state of the pending-requests sheet, shown when the trainer opens the header bell with no incoming link requests."
+  },
   "dashboardSolicitudesPendientesTitle": "SOLICITUDES PENDIENTES ({count})",
   "@dashboardSolicitudesPendientesTitle": {
     "placeholders": {
@@ -397,7 +704,7 @@
   "checkInError": "No pudimos registrar tu check-in. Probá de nuevo.",
   "profileCuentaTitle": "CUENTA",
   "@profileCuentaTitle": {},
-  "profileCuentaSolicitudesTitle": "Solicitudes de amistad",
+  "profileCuentaSolicitudesTitle": "Solicitudes de seguidores",
   "@profileCuentaSolicitudesTitle": {},
   "profileCuentaSolicitudesSubtitle": "{count} nuevas",
   "@profileCuentaSolicitudesSubtitle": {
@@ -417,7 +724,7 @@
   "@profileCuentaNoGym": {},
   "profileCuentaMisRutinasTitle": "Mis rutinas",
   "@profileCuentaMisRutinasTitle": {},
-  "profileCuentaRutinasSubtitle": "{count} activas",
+  "profileCuentaRutinasSubtitle": "{count, plural, =1{1 activa} other{{count} activas}}",
   "@profileCuentaRutinasSubtitle": {
     "placeholders": {
       "count": {
@@ -645,6 +952,19 @@
   "@routineEditorDialogCancel": {},
   "routineEditorDialogConfirm": "Confirmar",
   "@routineEditorDialogConfirm": {},
+  "routineEditorCopyPrescriptionTitle": "¿Copiar sets?",
+  "@routineEditorCopyPrescriptionTitle": {},
+  "routineEditorCopyPrescriptionBody": "Se van a reemplazar los sets de este ejercicio por los de «{sourceExercise}».",
+  "@routineEditorCopyPrescriptionBody": {
+    "description": "Confirmation body for the slot-menu shortcut that copies the previous exercise's prescription into this one.",
+    "placeholders": {
+      "sourceExercise": {
+        "type": "String"
+      }
+    }
+  },
+  "routineEditorSlotMenuCopyPrevious": "Copiar sets del anterior",
+  "@routineEditorSlotMenuCopyPrevious": {},
   "routineEditorSlotMenuReplace": "Cambiar ejercicio",
   "@routineEditorSlotMenuReplace": {},
   "routineEditorSlotMenuMoveUp": "Subir",
@@ -657,6 +977,36 @@
   "@routineEditorRestLabel": {},
   "routineEditorAddSet": "+ Agregar set",
   "@routineEditorAddSet": {},
+  "routineEditorFillKgA11y": "Replicar el peso del primer set en todos",
+  "@routineEditorFillKgA11y": {
+    "description": "Screen-reader label for the KG column header, which doubles as the bulk-fill affordance."
+  },
+  "routineEditorFillKgApplied": "Peso replicado en todos los sets.",
+  "@routineEditorFillKgApplied": {},
+  "routineEditorFillKgEmpty": "Cargá el peso del primer set para poder replicarlo.",
+  "@routineEditorFillKgEmpty": {},
+  "routineEditorFillKgUndo": "Deshacer",
+  "@routineEditorFillKgUndo": {},
+  "routineEditorKgStepIncreaseA11y": "Sumar {amount} kilos al peso",
+  "@routineEditorKgStepIncreaseA11y": {
+    "description": "Screen-reader label for a KG stepper button that adds weight to the set being edited.",
+    "placeholders": {
+      "amount": {
+        "type": "String",
+        "example": "2.5"
+      }
+    }
+  },
+  "routineEditorKgStepDecreaseA11y": "Restar {amount} kilos al peso",
+  "@routineEditorKgStepDecreaseA11y": {
+    "description": "Screen-reader label for a KG stepper button that takes weight off the set being edited.",
+    "placeholders": {
+      "amount": {
+        "type": "String",
+        "example": "2.5"
+      }
+    }
+  },
   "routineEditorMeasureReps": "Reps",
   "@routineEditorMeasureReps": {},
   "routineEditorMeasureTime": "Tiempo",
@@ -723,12 +1073,10 @@
   "@routineDetailPlanComplete": {},
   "routineDetailCompleted": "COMPLETADO",
   "@routineDetailCompleted": {},
-  "routineDetailWeekLocked": "SEMANA BLOQUEADA",
-  "@routineDetailWeekLocked": {},
-  "routineDetailDayLocked": "DÍA BLOQUEADO",
-  "@routineDetailDayLocked": {},
   "routineDetailStart": "EMPEZAR",
   "@routineDetailStart": {},
+  "routineDetailRepeat": "REPETIR",
+  "@routineDetailRepeat": {},
   "routineEditorDeleteScopeTitle": "¿Eliminar solo de esta semana o de todas?",
   "@routineEditorDeleteScopeTitle": {},
   "routineEditorScopeOnlyThisWeek": "Solo esta semana",
@@ -799,11 +1147,11 @@
   "@feedCreatePostA11y": {
     "description": "Accessibility label for the icon-only create-post '+' action in the feed header (finding 11 feed_screen create GestureDetector)."
   },
-  "feedFriendRequestsA11y": "Solicitudes de amistad",
+  "feedFriendRequestsA11y": "Solicitudes de seguidores",
   "@feedFriendRequestsA11y": {
     "description": "Accessibility label for the icon-only friend-requests inbox action in the feed header bell icon (navigation finding: friend-requests inbox was unreachable from the feed/social surface)."
   },
-  "feedFriendRequestsWithCountA11y": "Solicitudes de amistad, {count} pendientes",
+  "feedFriendRequestsWithCountA11y": "Solicitudes de seguidores, {count} pendientes",
   "@feedFriendRequestsWithCountA11y": {
     "description": "Accessibility label for the feed header friend-requests bell icon when there are pending requests; announces the badge count to screen readers.",
     "placeholders": {
@@ -833,9 +1181,43 @@
       }
     }
   },
+  "a11yRankingRowButton": "Ver el perfil de {name}",
+  "@a11yRankingRowButton": {
+    "description": "Semantics label for a leaderboard row in gym rankings. The row is a button that opens that athlete's public profile. Describes the ACTION, not the visuals — the row shows rank, name and metric, so reusing an avatar label would announce something the row is not.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "a11yReactionLike": "Me gusta",
+  "@a11yReactionLike": {
+    "description": "Localized accessible name for the like reaction in a feed post's reaction row."
+  },
+  "a11yReactionFire": "Fuego",
+  "@a11yReactionFire": {
+    "description": "Localized accessible name for the fire reaction in a feed post's reaction row."
+  },
+  "a11yReactionClap": "Aplausos",
+  "@a11yReactionClap": {
+    "description": "Localized accessible name for the applause reaction in a feed post's reaction row."
+  },
+  "a11yReactionCount": "{count, plural, =0{sin reacciones} =1{1 reacción} other{{count} reacciones}}",
+  "@a11yReactionCount": {
+    "description": "Localized reaction count announced after the reaction name in a feed post's reaction row.",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
   "a11yAvatarLabelGeneric": "Foto de perfil",
   "@a11yAvatarLabelGeneric": {
     "description": "Non-parametric avatar Semantics label used when the display name is unavailable/null (findings 4,6,7,16,18,19)."
+  },
+  "a11yHomeAvatarButton": "Ver tu perfil",
+  "@a11yHomeAvatarButton": {
+    "description": "Semantics label for the tappable avatar in the athlete HomeHeader. The avatar is a button that opens the user's own public profile, so the label states the ACTION rather than describing the image (a11yAvatarLabel covers the non-interactive case)."
   },
   "homePendingRequestsA11y": "{count} solicitudes pendientes",
   "@homePendingRequestsA11y": {
@@ -1250,6 +1632,23 @@
   "@coachHubAlumnosStatusInactive": {
     "description": "Coach Hub web alumnos section — status badge for inactive athletes."
   },
+  "coachHubAlumnosViewTable": "Tabla",
+  "@coachHubAlumnosViewTable": {
+    "description": "Coach Hub web alumnos section — view-mode toggle, table layout."
+  },
+  "coachHubAlumnosViewCards": "Cards",
+  "@coachHubAlumnosViewCards": {
+    "description": "Coach Hub web alumnos section — view-mode toggle, cards layout."
+  },
+  "coachHubAlumnosDebtAmount": "Debe {amount}",
+  "@coachHubAlumnosDebtAmount": {
+    "description": "Coach Hub web alumnos section — pending debt amount shown on a row/card.",
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
   "coachHubAlumnoDetailNotasTitle": "Notas privadas",
   "@coachHubAlumnoDetailNotasTitle": {
     "description": "Coach Hub web alumno detail — title of the Notas privadas tab body."
@@ -1400,6 +1799,7 @@
     }
   },
   "routineEditorMissingReps": "Completá las reps de los sets antes de guardar.",
+  "routineEditorDuplicateExercise": "Ese ejercicio ya está en el día. Elegí otro.",
   "@routineEditorMissingReps": {
     "description": "Inline validation hint when a visible set is missing a valid reps/duration value in a single-week self-routine (finding 19). routineEditorIncompleteSetsFeedback already covers the named-exercise multi-week case."
   },
@@ -1407,11 +1807,60 @@
   "@feedPostPublishedSuccess": {
     "description": "Success snackbar after publishing a post (finding 25). Shown via the root ScaffoldMessenger since the compose screen pops on success."
   },
+  "postCardMenuA11y": "Opciones del post",
+  "coachHubAlumnosRowActionsA11y": "Opciones del alumno",
+  "@postCardMenuA11y": {
+    "description": "Semantics label for the post card overflow (3-dot) menu button, shown only on the viewer's own posts."
+  },
+  "postCardMenuEdit": "Editar",
+  "@postCardMenuEdit": {
+    "description": "Edit action in the post card overflow menu."
+  },
+  "postCardMenuDelete": "Eliminar",
+  "@postCardMenuDelete": {
+    "description": "Delete action in the post card overflow menu."
+  },
+  "postCardDeleteConfirmTitle": "¿Eliminar este post?",
+  "@postCardDeleteConfirmTitle": {
+    "description": "Title of the confirmation dialog shown before deleting a post."
+  },
+  "postCardDeleteConfirmBody": "Esta acción no se puede deshacer.",
+  "@postCardDeleteConfirmBody": {
+    "description": "Body of the confirmation dialog shown before deleting a post."
+  },
+  "postCardDeleteSuccess": "Post eliminado.",
+  "@postCardDeleteSuccess": {
+    "description": "Success snackbar after deleting a post."
+  },
+  "postCardDeleteError": "No pudimos eliminar el post. Probá de nuevo.",
+  "@postCardDeleteError": {
+    "description": "Error snackbar when deleting a post fails."
+  },
+  "createPostEditTitle": "EDITAR POST",
+  "@createPostEditTitle": {
+    "description": "Header title of the compose screen when editing an existing post (vs. NUEVO POST when creating)."
+  },
+  "createPostSaveChanges": "GUARDAR",
+  "@createPostSaveChanges": {
+    "description": "Submit button label in the compose screen header when editing an existing post (vs. PUBLICAR when creating)."
+  },
+  "createPostSaveChangesA11y": "Guardar cambios",
+  "@createPostSaveChangesA11y": {
+    "description": "Semantics label for the submit button when editing an existing post."
+  },
+  "createPostSavingA11y": "Guardando…",
+  "@createPostSavingA11y": {
+    "description": "Semantics label for the submit button while an edit is being saved."
+  },
+  "feedPostUpdatedSuccess": "Cambios guardados.",
+  "@feedPostUpdatedSuccess": {
+    "description": "Success snackbar shown after successfully editing an existing post."
+  },
   "feedRequestSentSuccess": "Solicitud enviada.",
   "@feedRequestSentSuccess": {
     "description": "Success feedback when a friend/follow request is sent from the public profile follow button (findings 25/26)."
   },
-  "feedRequestAcceptedSuccess": "Ahora son amigos.",
+  "feedRequestAcceptedSuccess": "Solicitud aceptada.",
   "@feedRequestAcceptedSuccess": {
     "description": "Success feedback when a friend request is accepted (finding 25). Used by the public profile accept action and optionally the inbox accept."
   },
@@ -1600,6 +2049,15 @@
       }
     }
   },
+  "progressionFrequencyPeriod": "{count, plural, =0{Sin sesiones en este período} =1{1 sesión en este período} other{{count} sesiones en este período}}",
+  "@progressionFrequencyPeriod": {
+    "description": "Frecuencia stat label scoped to the active chart period selected in the period selector (#555).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "progressionSinglePointHint": "Necesitás al menos 2 sesiones para ver la evolución.",
   "@progressionSinglePointHint": {
     "description": "Hint shown when only 1 data point exists — no trend line can be drawn."
@@ -1732,6 +2190,10 @@
       "name": { "type": "String" }
     }
   },
+  "dashboardGreetingPrefix": "BUENAS, ",
+  "@dashboardGreetingPrefix": {
+    "description": "Greeting prefix rendered before the trainer's name (styled separately) in the Coach Hub dashboard WelcomeCard. Trailing space is intentional."
+  },
   "dashboardSummaryLine": "Tenés {sessions} sesiones hoy, {paraRevisar} para revisar, {pagos} pagos pendientes",
   "@dashboardSummaryLine": {
     "description": "Dashboard WelcomeCard summary line combining sessions today, pending requests, and overdue payments.",
@@ -1741,7 +2203,7 @@
       "pagos": { "type": "int" }
     }
   },
-  "dashboardQuickActionNuevoAlumno": "+ Nuevo alumno",
+  "dashboardQuickActionNuevoAlumno": "Nuevo alumno",
   "@dashboardQuickActionNuevoAlumno": {
     "description": "Quick action button label in the Coach Hub web dashboard WelcomeCard to navigate to the alumnos section."
   },
@@ -1924,6 +2386,136 @@
   "@muscleDistributionScreenTitle": {
     "description": "[stats-hub] Header title for the dedicated MuscleDistributionScreen."
   },
+  "muscleDistributionLoadError": "No pudimos cargar tu distribución muscular. Probá de nuevo.",
+  "frequentExercisesLoadError": "No pudimos cargar tus ejercicios frecuentes. Probá de nuevo.",
+  "@frequentExercisesLoadError": {
+    "description": "Error state for the FrequentExercisesScreen's exerciseFrequencyProvider load failure. Paired with coachRetryLabel for the retry CTA — same convention as muscleDistributionLoadError."
+  },
+  "exerciseProgressionScreenTitle": "EVOLUCIÓN POR EJERCICIO",
+  "@exerciseProgressionScreenTitle": {
+    "description": "Header title for the athlete-side ExerciseProgressionScreen."
+  },
+  "insightsTileExerciseProgressionTitle": "Evolución por ejercicio",
+  "@insightsTileExerciseProgressionTitle": {
+    "description": "Tile title on InsightsScreen navigating to ExerciseProgressionScreen."
+  },
+  "insightsTileExerciseProgressionSubtitle": "Tu progreso en cada ejercicio + records",
+  "@insightsTileExerciseProgressionSubtitle": {
+    "description": "Tile subtitle for the Exercise Progression stats-hub entry."
+  },
+  "progressionSearchHint": "Buscar ejercicio…",
+  "@progressionSearchHint": {
+    "description": "Hint of the exercise-progression picker search field. The search runs over the exercises the ATHLETE HAS LOGGED, never the catalogue — see the exercise-progression ADR."
+  },
+  "progressionSearchNoResults": "Ningún ejercicio tuyo coincide con la búsqueda.",
+  "@progressionSearchNoResults": {
+    "description": "Shown when the picker search matches none of the athletes logged exercises. Wording says tuyo on purpose: an exercise that exists in the catalogue but was never trained has no progression and is intentionally absent."
+  },
+  "@muscleDistributionLoadError": {
+    "description": "Error state for the MuscleDistributionScreen's provider load failure. Paired with coachRetryLabel for the retry CTA — same convention as monthlyReportLoadError."
+  },
+  "insightsTileMeasurementsTitle": "Medidas",
+  "@insightsTileMeasurementsTitle": {
+    "description": "Tile title on InsightsScreen navigating to AnthropometryScreen."
+  },
+  "insightsTileMeasurementsSubtitle": "Peso y medidas corporales en el tiempo",
+  "@insightsTileMeasurementsSubtitle": {
+    "description": "Tile subtitle for the Anthropometry stats-hub entry."
+  },
+  "measurementsScreenTitle": "MEDIDAS",
+  "measurementsSelfLogNotesHint": "Notas (opcional)…",
+  "@measurementsSelfLogNotesHint": {
+    "description": "Notes field hint in LogMeasurementScreen.selfLog mode — replaces the trainer-mode \"Observaciones del entrenador…\" copy."
+  },
+  "measurementsAddSelfLog": "Cargar medición",
+  "@measurementsAddSelfLog": {
+    "description": "Label/tooltip for the \"+\" affordance on MEDIDAS that opens the athlete self-log form."
+  },
+  "@measurementsScreenTitle": {
+    "description": "Header title for the dedicated MeasurementsScreen."
+  },
+  "measurementsProfileCardTitle": "TUS DATOS",
+  "@measurementsProfileCardTitle": {
+    "description": "Title of the card in MeasurementsScreen showing the athlete's own weight + height, read from UserProfile (captured at onboarding Step 4) so they don't re-enter them."
+  },
+  "measurementsProfileCardHint": "Los cargaste al registrarte. Editalos desde tu perfil.",
+  "@measurementsProfileCardHint": {
+    "description": "Small hint under the profile-data card explaining where the weight/height come from and where to edit them."
+  },
+  "measurementsWeightLabel": "Peso",
+  "@measurementsWeightLabel": {
+    "description": "Label for the body-weight value in the profile-data card."
+  },
+  "measurementsHeightLabel": "Altura",
+  "@measurementsHeightLabel": {
+    "description": "Label for the height value in the profile-data card."
+  },
+  "measurementsEmptyState": "Todavía no hay mediciones cargadas. Tocá + para registrar la primera y seguir tu evolución.",
+  "@measurementsEmptyState": {
+    "description": "Shown below the profile-data card when the athlete has ZERO measurements. Talks about EVOLUTION over time (the chart), not about having no data at all — the profile card above already shows the athlete's weight/height. Both the athlete (self-log, via the + action in this screen's header) and a linked trainer can create measurements — see `match /measurements` in firestore.rules, whose create rule allows `athleteId == uid` OR a trainer-role author."
+  },
+  "measurementsNeedsMoreData": "Con una sola medición no hay progreso que mostrar. Falta al menos una más.",
+  "@measurementsNeedsMoreData": {
+    "description": "Shown when the athlete has exactly ONE measurement. MeasurementProgressChart requires >= 2 points — distinct from the zero case, which is why it is a separate string."
+  },
+  "measurementsHistoryTitle": "HISTORIAL",
+  "@measurementsHistoryTitle": {
+    "description": "[#439] Section label above MeasurementHistoryList on both mobile surfaces (athlete MEDIDAS screen and trainer ANTROPOMETRÍA section)."
+  },
+  "measurementHistoryEditTooltip": "Editar medición",
+  "@measurementHistoryEditTooltip": {
+    "description": "[#439] Tooltip/a11y label of the per-row edit action in MeasurementHistoryList. Only rendered on rows authored by the current uid (the update rule pins recordedBy)."
+  },
+  "measurementHistoryDeleteTooltip": "Eliminar medición",
+  "@measurementHistoryDeleteTooltip": {
+    "description": "[#439] Tooltip/a11y label of the per-row delete action in MeasurementHistoryList. Only rendered on rows authored by the current uid (the delete rule pins recordedBy)."
+  },
+  "measurementHistoryShowAll": "Ver todas ({count})",
+  "@measurementHistoryShowAll": {
+    "description": "[#439] Footer toggle of MeasurementHistoryList when more rows exist than the collapsed cap. {count} is the TOTAL number of measurements.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "measurementHistoryShowLess": "Ver menos",
+  "@measurementHistoryShowLess": {
+    "description": "[#439] Footer toggle of MeasurementHistoryList when expanded — collapses back to the capped list."
+  },
+  "measurementDeleteConfirmTitle": "¿Eliminar medición?",
+  "@measurementDeleteConfirmTitle": {
+    "description": "[#439] Title of the delete-confirmation AlertDialog for a measurement (same pattern as athleteDetailPlanDeleteTitle)."
+  },
+  "measurementDeleteConfirmBody": "Se eliminará la medición del {date}. Esta acción no se puede deshacer.",
+  "@measurementDeleteConfirmBody": {
+    "description": "[#439] Body of the delete-confirmation dialog. {date} is the pre-formatted recordedAt day label (e.g. '3 jul 2026').",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "measurementDeleteConfirmAction": "Eliminar",
+  "@measurementDeleteConfirmAction": {
+    "description": "[#439] Destructive confirm button of the measurement delete dialog. Cancel reuses commonCancel."
+  },
+  "measurementDeleteSuccess": "Medición eliminada",
+  "@measurementDeleteSuccess": {
+    "description": "[#439] Snackbar after a measurement was deleted successfully."
+  },
+  "measurementDeleteError": "No pudimos eliminar la medición. Probá de nuevo.",
+  "@measurementDeleteError": {
+    "description": "[#439] Snackbar when the measurement delete fails (network/rules)."
+  },
+  "measurementHistorySelfLoggedTag": "Auto-registro",
+  "@measurementHistorySelfLoggedTag": {
+    "description": "[#439] Read-only tag on the TRAINER's history rows the athlete self-logged: the trainer cannot edit/delete them (rules pin recordedBy), the tag explains why there are no actions."
+  },
+  "measurementHistoryTrainerLoggedTag": "Cargada por tu entrenador",
+  "@measurementHistoryTrainerLoggedTag": {
+    "description": "[#439] Read-only tag on the ATHLETE's history rows a trainer recorded: the athlete cannot edit/delete them (rules pin recordedBy), the tag explains why there are no actions."
+  },
   "insightsTileFrequentExercisesTitle": "Ejercicios frecuentes",
   "@insightsTileFrequentExercisesTitle": {
     "description": "[stats-hub] Tile title on InsightsScreen navigating to FrequentExercisesScreen (athlete's own uid)."
@@ -1951,5 +2543,400 @@
   "volumeByGroupScreenTitle": "VOLUMEN POR GRUPO",
   "@volumeByGroupScreenTitle": {
     "description": "[stats-hub] Header title for the dedicated VolumeByGroupScreen."
-  }
+  },
+  "volumeByGroupEmptyTarget": "Necesitás una rutina asignada para ver tu volumen objetivo.",
+  "@volumeByGroupEmptyTarget": {
+    "description": "[stats-hub] Empty state of the VolumeByGroupScreen card when the athlete has no target (no assigned routine). QA #371."
+  },
+  "measurementChartSectionLabel": "PROGRESO",
+  "@measurementChartSectionLabel": {
+    "description": "[#510] Section eyebrow above the MeasurementProgressChart. Mirrors performanceChartSectionLabel in the sibling performance chart."
+  },
+  "measurementChartSpanDays": "({count} {count, plural, =1{día} other{días}})",
+  "@measurementChartSpanDays": {
+    "description": "[#510] Elapsed span between the first and last plotted measurement when it is under a week. Rendered next to the delta in the chart header.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "measurementChartSpanWeeks": "({count} {count, plural, =1{semana} other{semanas}})",
+  "@measurementChartSpanWeeks": {
+    "description": "[#510] Elapsed span between the first and last plotted measurement, rounded to weeks once it reaches 7 days.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "measurementChartMetricWeight": "Peso",
+  "@measurementChartMetricWeight": {
+    "description": "[#510] Chip label for the body-weight series in MeasurementProgressChart. Shorter than the log-form label (measurementLogFieldWeight) because the unit is shown separately."
+  },
+  "measurementChartMetricBodyFat": "% Graso",
+  "@measurementChartMetricBodyFat": {
+    "description": "[#510] Chip label for the body-fat percentage series in MeasurementProgressChart."
+  },
+  "measurementChartMetricMuscleMass": "Masa muscular",
+  "@measurementChartMetricMuscleMass": {
+    "description": "[#510] Chip label for the muscle-mass series in MeasurementProgressChart."
+  },
+  "measurementChartMetricWaist": "Cintura",
+  "@measurementChartMetricWaist": {
+    "description": "[#510] Chip label for the waist circumference series in MeasurementProgressChart."
+  },
+  "measurementChartMetricChest": "Pecho",
+  "@measurementChartMetricChest": {
+    "description": "[#510] Chip label for the chest circumference series in MeasurementProgressChart."
+  },
+  "measurementChartMetricHips": "Cadera",
+  "@measurementChartMetricHips": {
+    "description": "[#510] Chip label for the hips circumference series in MeasurementProgressChart."
+  },
+  "measurementChartMetricShoulders": "Hombros",
+  "@measurementChartMetricShoulders": {
+    "description": "[#510] Chip label for the shoulders circumference series in MeasurementProgressChart."
+  },
+  "measurementChartMetricGlutes": "Glúteos",
+  "@measurementChartMetricGlutes": {
+    "description": "[#510] Chip label for the glutes circumference series in MeasurementProgressChart."
+  },
+  "measurementChartMetricBiceps": "Bíceps",
+  "@measurementChartMetricBiceps": {
+    "description": "[#510] Chip label for the biceps series in MeasurementProgressChart. The plotted value is the average of the left/right entries."
+  },
+  "measurementChartMetricBicepsFlexed": "Bíceps flex",
+  "@measurementChartMetricBicepsFlexed": {
+    "description": "[#510] Chip label for the flexed-biceps series in MeasurementProgressChart. Abbreviated on purpose — chips are laid out in a single horizontal scroll row."
+  },
+  "measurementChartMetricForearm": "Antebrazo",
+  "@measurementChartMetricForearm": {
+    "description": "[#510] Chip label for the forearm series in MeasurementProgressChart."
+  },
+  "measurementChartMetricUpperThigh": "Muslo sup",
+  "@measurementChartMetricUpperThigh": {
+    "description": "[#510] Chip label for the upper-thigh series in MeasurementProgressChart. Abbreviated on purpose — chips are laid out in a single horizontal scroll row."
+  },
+  "measurementChartMetricMidThigh": "Muslo medio",
+  "@measurementChartMetricMidThigh": {
+    "description": "[#510] Chip label for the mid-thigh series in MeasurementProgressChart."
+  },
+  "measurementChartMetricCalf": "Gemelo",
+  "@measurementChartMetricCalf": {
+    "description": "[#510] Chip label for the calf series in MeasurementProgressChart."
+  },
+  "measurementLogTitleCreate": "Cargar medición",
+  "@measurementLogTitleCreate": {
+    "description": "[#510] Header title of LogMeasurementScreen when creating a new measurement. Kept separate from measurementsAddSelfLog (the \"+\" affordance on MEDIDAS) so the screen title and the button can diverge per locale."
+  },
+  "measurementLogTitleEdit": "Editar medición",
+  "@measurementLogTitleEdit": {
+    "description": "[#510] Header title of LogMeasurementScreen in edit mode (#439). Kept separate from measurementHistoryEditTooltip, which labels the row's edit icon."
+  },
+  "measurementLogNoSession": "No hay sesión activa. No se puede guardar.",
+  "@measurementLogNoSession": {
+    "description": "[#510] Snackbar shown when saving is attempted with no authenticated uid. Mirrors performanceLogNoSession."
+  },
+  "measurementLogSaveSuccess": "Medición guardada",
+  "@measurementLogSaveSuccess": {
+    "description": "[#510] Snackbar after a new measurement was created successfully."
+  },
+  "measurementLogUpdateSuccess": "Medición actualizada",
+  "@measurementLogUpdateSuccess": {
+    "description": "[#510] Snackbar after an existing measurement was edited successfully (#439)."
+  },
+  "measurementLogSaveError": "No pudimos guardar la medición. Probá de nuevo.",
+  "@measurementLogSaveError": {
+    "description": "[#510] Snackbar when the measurement create/update write fails (network/rules). Mirrors performanceLogSaveError."
+  },
+  "measurementLogSaveCta": "GUARDAR MEDICIÓN",
+  "@measurementLogSaveCta": {
+    "description": "[#510] Pinned primary button of LogMeasurementScreen in create mode."
+  },
+  "measurementLogUpdateCta": "GUARDAR CAMBIOS",
+  "@measurementLogUpdateCta": {
+    "description": "[#510] Pinned primary button of LogMeasurementScreen in edit mode (#439)."
+  },
+  "measurementLogSectionBodyComposition": "COMPOSICIÓN CORPORAL",
+  "@measurementLogSectionBodyComposition": {
+    "description": "[#510] Section eyebrow above the weight / body-fat / muscle-mass fields."
+  },
+  "measurementLogSectionNotes": "NOTAS",
+  "@measurementLogSectionNotes": {
+    "description": "[#510] Section eyebrow above the free-text notes field of LogMeasurementScreen."
+  },
+  "measurementLogNotesHint": "Observaciones del entrenador…",
+  "@measurementLogNotesHint": {
+    "description": "[#510] Notes field hint in trainer mode. Self-log mode uses measurementsSelfLogNotesHint instead."
+  },
+  "measurementLogFieldWeight": "Peso (kg)",
+  "@measurementLogFieldWeight": {
+    "description": "[#510] Body-weight field label in LogMeasurementScreen. Carries its unit inline, unlike the circumference fields which render `cm` as a suffix."
+  },
+  "measurementLogFieldBodyFat": "Grasa (%)",
+  "@measurementLogFieldBodyFat": {
+    "description": "[#510] Body-fat percentage field label in LogMeasurementScreen."
+  },
+  "measurementLogFieldMuscleMass": "Masa muscular (kg)",
+  "@measurementLogFieldMuscleMass": {
+    "description": "[#510] Muscle-mass field label in LogMeasurementScreen."
+  },
+  "measurementLogCircumferencesTitle": "CIRCUNFERENCIAS",
+  "@measurementLogCircumferencesTitle": {
+    "description": "[#510] Header of the collapsible circumferences section in LogMeasurementScreen."
+  },
+  "measurementLogCircumferencesHint": "Opcional. Cargá las que quieras.",
+  "@measurementLogCircumferencesHint": {
+    "description": "[#510] Subtitle under the circumferences header clarifying that every field in the section is optional."
+  },
+  "measurementLogGroupTrunk": "TRONCO",
+  "@measurementLogGroupTrunk": {
+    "description": "[#510] Sub-group eyebrow for the trunk circumferences (shoulders, chest, waist, hips, glutes)."
+  },
+  "measurementLogGroupUpperBody": "TREN SUPERIOR",
+  "@measurementLogGroupUpperBody": {
+    "description": "[#510] Sub-group eyebrow for the upper-body bilateral circumferences (biceps, flexed biceps, forearm)."
+  },
+  "measurementLogGroupLowerBody": "TREN INFERIOR",
+  "@measurementLogGroupLowerBody": {
+    "description": "[#510] Sub-group eyebrow for the lower-body bilateral circumferences (upper thigh, mid thigh, calf)."
+  },
+  "measurementLogFieldShoulders": "Hombros",
+  "@measurementLogFieldShoulders": {
+    "description": "[#510] Shoulders circumference field label in LogMeasurementScreen."
+  },
+  "measurementLogFieldChest": "Pecho",
+  "@measurementLogFieldChest": {
+    "description": "[#510] Chest circumference field label in LogMeasurementScreen."
+  },
+  "measurementLogFieldWaist": "Cintura",
+  "@measurementLogFieldWaist": {
+    "description": "[#510] Waist circumference field label in LogMeasurementScreen."
+  },
+  "measurementLogFieldHips": "Cadera",
+  "@measurementLogFieldHips": {
+    "description": "[#510] Hips circumference field label in LogMeasurementScreen."
+  },
+  "measurementLogFieldGlutes": "Glúteos",
+  "@measurementLogFieldGlutes": {
+    "description": "[#510] Glutes circumference field label in LogMeasurementScreen."
+  },
+  "measurementLogFieldBiceps": "Bíceps",
+  "@measurementLogFieldBiceps": {
+    "description": "[#510] Biceps bilateral field label in LogMeasurementScreen (one input per side)."
+  },
+  "measurementLogFieldBicepsFlexed": "Bíceps (flex)",
+  "@measurementLogFieldBicepsFlexed": {
+    "description": "[#510] Flexed-biceps bilateral field label in LogMeasurementScreen (one input per side)."
+  },
+  "measurementLogFieldForearm": "Antebrazo",
+  "@measurementLogFieldForearm": {
+    "description": "[#510] Forearm bilateral field label in LogMeasurementScreen (one input per side)."
+  },
+  "measurementLogFieldUpperThigh": "Muslo superior",
+  "@measurementLogFieldUpperThigh": {
+    "description": "[#510] Upper-thigh bilateral field label in LogMeasurementScreen (one input per side)."
+  },
+  "measurementLogFieldMidThigh": "Muslo medio",
+  "@measurementLogFieldMidThigh": {
+    "description": "[#510] Mid-thigh bilateral field label in LogMeasurementScreen (one input per side)."
+  },
+  "measurementLogFieldCalf": "Gemelo",
+  "@measurementLogFieldCalf": {
+    "description": "[#510] Calf bilateral field label in LogMeasurementScreen (one input per side)."
+  },
+  "measurementLogBilateralLeftHint": "I (cm)",
+  "@measurementLogBilateralLeftHint": {
+    "description": "[#510] Hint of the LEFT-side input of a bilateral circumference pair. `I` = izquierda; translate to the local initial for \"left\"."
+  },
+  "measurementLogBilateralRightHint": "D (cm)",
+  "@measurementLogBilateralRightHint": {
+    "description": "[#510] Hint of the RIGHT-side input of a bilateral circumference pair. `D` = derecha; translate to the local initial for \"right\"."
+  },
+  "reviewSheetTitleEdit": "Editá tu reseña",
+  "@reviewSheetTitleEdit": {
+    "description": "[#510] ReviewBottomSheet title when the athlete already has a review for this link and is editing it."
+  },
+  "reviewSheetTitleThirtyDay": "Ya llevás un mes entrenando con {trainerName}. ¿Cómo va?",
+  "@reviewSheetTitleThirtyDay": {
+    "description": "[#510] ReviewBottomSheet title when opened by the automatic 30-day prompt (ReviewTriggerVariant.thirtyDay).",
+    "placeholders": {
+      "trainerName": {
+        "type": "String"
+      }
+    }
+  },
+  "reviewSheetTitleStandard": "¿Cómo fue tu experiencia con {trainerName}?",
+  "@reviewSheetTitleStandard": {
+    "description": "[#510] Default ReviewBottomSheet title (opened from the profile CTA or after a link terminates).",
+    "placeholders": {
+      "trainerName": {
+        "type": "String"
+      }
+    }
+  },
+  "reviewSheetCommentHint": "Contanos cómo fue (opcional)",
+  "@reviewSheetCommentHint": {
+    "description": "[#510] Hint of the optional free-text comment field in ReviewBottomSheet."
+  },
+  "reviewSheetCancel": "CANCELAR",
+  "@reviewSheetCancel": {
+    "description": "[#510] Dismiss action of ReviewBottomSheet. Uppercase by design — commonCancel is sentence case and cannot be reused here."
+  },
+  "reviewSheetSubmit": "ENVIAR",
+  "@reviewSheetSubmit": {
+    "description": "[#510] Primary submit action of ReviewBottomSheet, enabled only once a star rating is picked."
+  },
+  "reviewSnackBarError": "No pudimos guardar tu reseña. Probá de nuevo.",
+  "@reviewSnackBarError": {
+    "description": "[#510] Snackbar when the review write fails. Counterpart of reviewSnackBarSuccess; there is no auto-retry."
+  },
+  "reviewCtaCreate": "DEJAR UNA RESEÑA",
+  "@reviewCtaCreate": {
+    "description": "[#510] ReviewCta label on the trainer's public profile when the athlete has NOT reviewed this link yet."
+  },
+  "reviewCtaEdit": "EDITAR MI RESEÑA",
+  "@reviewCtaEdit": {
+    "description": "[#510] ReviewCta label when a review already exists for the link — tapping reopens the sheet prefilled."
+  },
+  "reviewTrainerFallbackName": "tu Personal Trainer",
+  "@reviewTrainerFallbackName": {
+    "description": "[#510] Stands in for the trainer's display name in the review sheet title when the public profile has not resolved yet. Reads naturally inside reviewSheetTitleStandard / reviewSheetTitleThirtyDay."
+  },
+  "reviewsSectionTitle": "RESEÑAS",
+  "@reviewsSectionTitle": {
+    "description": "[#510] Header of TrainerReviewsSection on the trainer's public profile."
+  },
+  "reviewsSectionEmpty": "Sin reseñas todavía",
+  "@reviewsSectionEmpty": {
+    "description": "[#510] Empty state of TrainerReviewsSection when the trainer has no reviews."
+  },
+  "reviewTileDeletedUser": "Usuario eliminado",
+  "@reviewTileDeletedUser": {
+    "description": "[#510] Author name fallback in ReviewTile when the public profile is missing (deleted account, ADR-RV-009)."
+  },
+  "reviewTileDateToday": "hoy",
+  "@reviewTileDateToday": {
+    "description": "[#510] Relative date in ReviewTile for a review posted less than a day ago."
+  },
+  "reviewTileDateDaysAgo": "hace {count} {count, plural, =1{día} other{días}}",
+  "@reviewTileDateDaysAgo": {
+    "description": "[#510] Relative date in ReviewTile for reviews between 1 and 29 days old.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reviewTileDateMonthsAgo": "hace {count} {count, plural, =1{mes} other{meses}}",
+  "@reviewTileDateMonthsAgo": {
+    "description": "[#510] Relative date in ReviewTile for reviews between 1 and 11 months old. Beyond a year the tile falls back to a numeric DD/MM/YYYY date.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "postPrivacySelectorTitle": "VISIBILIDAD",
+  "@postPrivacySelectorTitle": {
+    "description": "Section label above the privacy pills in the shared PostPrivacySelector, used by the manual post composer and the share-workout composer."
+  },
+  "postPrivacyFriends": "SEGUIDORES",
+  "@postPrivacyFriends": {
+    "description": "PostPrivacySelector pill for posts visible only to the author's friends. Doubles as the pill's Semantics label."
+  },
+  "postPrivacyGym": "MI GYM",
+  "@postPrivacyGym": {
+    "description": "PostPrivacySelector pill for posts visible to the author's gym. Disabled when the athlete has no gym."
+  },
+  "postPrivacyPublic": "PÚBLICO",
+  "@postPrivacyPublic": {
+    "description": "PostPrivacySelector pill for posts visible to everyone."
+  },
+  "postPrivacyNoGymHint": "Asociate a un gym para postear acá",
+  "@postPrivacyNoGymHint": {
+    "description": "Hint shown under the PostPrivacySelector pills when the athlete has no gym, explaining why MI GYM is disabled."
+  },
+  "suggestedUsersTitle": "PERSONAS DE TU GYM",
+  "@suggestedUsersTitle": {
+    "description": "Section heading for same-gym people suggested below the empty Friends feed."
+  },
+  "suggestedUserAnonymous": "Anónimo",
+  "@suggestedUserAnonymous": {
+    "description": "Fallback display name for a suggested public profile without a name."
+  },
+  "a11ySuggestedUserButton": "Ver el perfil de {name}",
+  "@a11ySuggestedUserButton": {
+    "description": "Semantics label for a suggested-user row that opens that person's public profile.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "notificationHistoryTitle": "NOTIFICACIONES",
+  "@notificationHistoryTitle": {"description": "Título de la pantalla de historial de notificaciones."},
+  "notificationHistoryEmpty": "Todavía no tenés notificaciones",
+  "@notificationHistoryEmpty": {"description": "Estado vacío del historial de notificaciones."},
+  "notificationHistoryError": "No pudimos cargar tus notificaciones.",
+  "@notificationHistoryError": {"description": "Estado de error del historial de notificaciones."},
+  "notificationPendingRequests": "{count, plural, =1{1 solicitud de seguidor pendiente} other{{count} solicitudes de seguidor pendientes}}",
+  "@notificationPendingRequests": {"description": "Acceso compacto a solicitudes de amistad pendientes.", "placeholders": {"count": {"type": "int"}}},
+  "notificationBellA11y": "Abrir notificaciones",
+  "@notificationBellA11y": {"description": "Etiqueta accesible de la campanita de notificaciones del feed."},
+  "notificationBellWithCountA11y": "Abrir notificaciones, {count} pendientes",
+  "@notificationBellWithCountA11y": {"description": "Etiqueta accesible de la campanita con su badge combinado.", "placeholders": {"count": {"type": "int"}}},
+  "postDetailTitle": "PUBLICACIÓN",
+  "@postDetailTitle": {"description": "Título de la pantalla de post individual del feed."},
+  "postDetailUnavailable": "Este post ya no está disponible.",
+  "@postDetailUnavailable": {"description": "Estado seguro mostrado cuando el post no existe, fue borrado o no se puede leer."},
+  "feedUnfollowConfirmTitle": "¿Dejar de seguir a {name}?",
+  "@feedUnfollowConfirmTitle": {"description": "Título del sheet de confirmación para dejar de seguir.", "placeholders": {"name": {"type": "String"}}},
+  "feedUnfollowConfirmAction": "DEJAR DE SEGUIR",
+  "@feedUnfollowConfirmAction": {"description": "Botón que confirma dejar de seguir."},
+  "feedUnfollowDismiss": "CANCELAR",
+  "@feedUnfollowDismiss": {"description": "Botón que descarta el sheet de dejar de seguir."},
+  "feedCancelRequestConfirmTitle": "¿Cancelar la solicitud a {name}?",
+  "@feedCancelRequestConfirmTitle": {"description": "Título del sheet para cancelar una solicitud enviada.", "placeholders": {"name": {"type": "String"}}},
+  "feedCancelRequestConfirmAction": "CANCELAR SOLICITUD",
+  "@feedCancelRequestConfirmAction": {"description": "Botón que confirma cancelar la solicitud enviada."},
+  "feedCancelRequestDismiss": "VOLVER",
+  "@feedCancelRequestDismiss": {"description": "Botón que descarta el sheet de cancelar solicitud. Dice VOLVER y no CANCELAR para no chocar con el botón que SÍ cancela la solicitud."},
+  "feedFollowButtonFollowA11y": "Seguir a esta persona",
+  "@feedFollowButtonFollowA11y": {"description": "Semantics del pill en estado SEGUIR."},
+  "feedFollowButtonFollowingA11y": "Siguiendo. Tocá para dejar de seguir",
+  "@feedFollowButtonFollowingA11y": {"description": "Semantics del pill en estado SIGUIENDO."},
+  "feedFollowButtonRequestedA11y": "Solicitud enviada. Tocá para cancelarla",
+  "@feedFollowButtonRequestedA11y": {"description": "Semantics del pill en estado SOLICITUD ENVIADA."},
+  "feedFollowButtonAcceptA11y": "Aceptar la solicitud de seguidor",
+  "@feedFollowButtonAcceptA11y": {"description": "Semantics del pill en estado ACEPTAR."},
+  "feedFollowStartedSuccess": "Ahora seguís a esta persona.",
+  "@feedFollowStartedSuccess": {"description": "Confirmación al seguir a una cuenta pública (auto-aceptada)."},
+  "feedSegmentFollowing": "SEGUIDORES",
+  "@feedSegmentFollowing": {"description": "Pill del segmento del feed que muestra posts de a quienes seguís."},
+  "feedEmptyFollowing": "Todavía no hay posts de a quienes seguís",
+  "@feedEmptyFollowing": {"description": "Estado vacío del feed SEGUIDORES."},
+  "chatBlockedComposerNotice": "Para escribirle, esta persona tiene que seguirte.",
+  "@chatBlockedComposerNotice": {"description": "Aviso persistente sobre el composer cuando el destinatario no sigue al usuario y por lo tanto el servidor deniega el envío (REQ-FOLLOW-021)."},
+  "chatBlockedComposerHintA11y": "No podés escribir en este chat",
+  "@chatBlockedComposerHintA11y": {"description": "Semantics del composer deshabilitado por falta de permiso."},
+  "followListTabFollowers": "SEGUIDORES",
+  "@followListTabFollowers": {"description": "Pill de la lista de seguidores en la pantalla de seguidores/seguidos."},
+  "followListTabFollowing": "SIGUIENDO",
+  "@followListTabFollowing": {"description": "Pill de la lista de seguidos en la pantalla de seguidores/seguidos."},
+  "followListEmptyFollowers": "Todavía no tiene seguidores",
+  "@followListEmptyFollowers": {"description": "Estado vacío de la lista de seguidores de otra persona."},
+  "followListEmptyFollowersSelf": "Todavía no tenés seguidores",
+  "@followListEmptyFollowersSelf": {"description": "Estado vacío de la lista de seguidores propia."},
+  "followListEmptyFollowing": "Todavía no sigue a nadie",
+  "@followListEmptyFollowing": {"description": "Estado vacío de la lista de seguidos de otra persona."},
+  "followListEmptyFollowingSelf": "Todavía no seguís a nadie",
+  "@followListEmptyFollowingSelf": {"description": "Estado vacío de la lista de seguidos propia."},
+  "followListLoadError": "No pudimos cargar la lista. Intentá de nuevo.",
+  "@followListLoadError": {"description": "Error al cargar la lista de seguidores o seguidos."},
+  "followListOpenFollowersA11y": "Ver seguidores",
+  "@followListOpenFollowersA11y": {"description": "Semantics del contador de SEGUIDORES del perfil, que abre la lista."},
+  "followListOpenFollowingA11y": "Ver seguidos",
+  "@followListOpenFollowingA11y": {"description": "Semantics del contador de SIGUIENDO del perfil, que abre la lista."}
 }

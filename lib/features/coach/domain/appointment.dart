@@ -54,6 +54,12 @@ class Appointment with _$Appointment {
     // shot by the trainer. All occurrences of the same series share this id,
     // enabling "cancel all future" without a separate series document.
     String? recurringId,
+    // Agenda→cobro bridge (Slice 2a, per-turno granularity). null → not
+    // billed yet; non-null → the id of the `Payment` doc that covers this
+    // session. Set exactly once via AppointmentRepository.billAppointment /
+    // markBilled — never cleared client-side (see firestore.rules set-once
+    // guard on this field).
+    String? paymentId,
   }) = _Appointment;
 
   factory Appointment.fromJson(Map<String, Object?> json) =>

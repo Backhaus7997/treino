@@ -312,4 +312,83 @@ void main() {
     expect(result.displayName, equals('Ana'));
     expect(result.gymId, equals('g1'));
   });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // QA-GYM-506: leaderboard drops athletes with NO value on the metric.
+  //
+  // `orderBy` only skips documents where the field is ABSENT — an explicit
+  // `null` (what clearRankingMetrics and the opt-in backfill write for a lift
+  // the athlete never performed) still matches and sorts to the tail of the
+  // board, where the client rendered it as a fabricated "0 kg".
+  // ──────────────────────────────────────────────────────────────────────────
+  group('QA-GYM-506: leaderboard null-metric exclusion', () {
+    Future<void> seed(
+      String uid, {
+      required String displayName,
+      num? bestSquatKg,
+      int? racha,
+    }) =>
+        firestore.collection('userPublicProfiles').doc(uid).set({
+          'uid': uid,
+          'displayName': displayName,
+          'gymId': 'g1',
+          'rankingOptIn': true,
+          'lifetimeVolumeKg': 0,
+          'racha': racha,
+          'bestSquatKg': bestSquatKg,
+          'bestBenchKg': null,
+          'bestDeadliftKg': null,
+        });
+
+    test(
+        'an opted-in athlete with bestSquatKg == null is excluded instead of '
+        'ranking as 0 kg', () async {
+      await seed('u1', displayName: 'Ana', bestSquatKg: 120);
+      await seed('u2', displayName: 'Lu', bestSquatKg: 100);
+      await seed('u3', displayName: 'Coti'); // nunca registró sentadilla
+      await seed('u4', displayName: 'Nico');
+      await seed('u5', displayName: 'Sofi');
+
+      final result =
+          await repo.leaderboard(gymId: 'g1', metricField: 'bestSquatKg');
+
+      expect(result.map((p) => p.uid), equals(['u1', 'u2']));
+    });
+
+    test(
+        'a gym where nobody registered the lift yields an EMPTY leaderboard, '
+        'not a podium of zeros', () async {
+      await seed('u1', displayName: 'Ana');
+      await seed('u2', displayName: 'Lu');
+
+      final result =
+          await repo.leaderboard(gymId: 'g1', metricField: 'bestSquatKg');
+
+      expect(result, isEmpty);
+    });
+
+    test('the same exclusion applies to bench and deadlift', () async {
+      await seed('u1', displayName: 'Ana');
+
+      expect(
+        await repo.leaderboard(gymId: 'g1', metricField: 'bestBenchKg'),
+        isEmpty,
+      );
+      expect(
+        await repo.leaderboard(gymId: 'g1', metricField: 'bestDeadliftKg'),
+        isEmpty,
+      );
+    });
+
+    test(
+        'racha keeps its 0 floor — no streak IS a 0-day streak, unlike a lift '
+        'never performed', () async {
+      await seed('u1', displayName: 'Ana', racha: 5);
+      await seed('u2', displayName: 'Lu');
+
+      final result = await repo.leaderboard(gymId: 'g1', metricField: 'racha');
+
+      expect(result.map((p) => p.uid), containsAll(['u1', 'u2']));
+    });
+  });
 }

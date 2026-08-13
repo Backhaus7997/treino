@@ -13,6 +13,11 @@ import '../../../app/theme/app_motion.dart';
 ///   composición, sin repaint del subtree (docs/performance.md).
 /// - Layout top-aligned: pantallas de alto distinto no "saltan" al centro
 ///   durante el cross-fade (el default de [AnimatedSwitcher] centra).
+/// - **Sin taps fantasma**: [FadeTransition] anima opacity, que NO afecta
+///   hit-testing — el child saliente seguiría siendo tapeable durante los
+///   240ms del fade-out si no se lo protegiera. El `layoutBuilder` envuelve
+///   cada child saliente en [IgnorePointer] para que solo el child entrante
+///   (el `currentChild`) reciba gestos mientras dura el cross-fade.
 ///
 /// **El caller DEBE diferenciar los estados con keys distintas** (p. ej.
 /// `ValueKey('loading')` vs `ValueKey('data')`) vía [childKey] o poniendo la
@@ -44,7 +49,8 @@ class TreinoStateSwitcher extends StatelessWidget {
     return Stack(
       alignment: Alignment.topCenter,
       children: <Widget>[
-        ...previousChildren,
+        for (final previousChild in previousChildren)
+          IgnorePointer(child: previousChild),
         if (currentChild != null) currentChild,
       ],
     );

@@ -72,6 +72,18 @@ flutter analyze
 
 ## 3. Correr la app
 
+### Gimnasios (Google Places) — sin setup
+
+La feature de gimnasios usa Google Places con un **client key restringido** que
+va **committeado en el código** (`lib/features/gyms/application/places_providers.dart`).
+No es un secreto: un client key viaja en el binario de la app de todos modos, así
+que la protección real es la **restricción** de la key en Google Cloud Console
+(API restriction = "Places API (New)"), no esconderla. Por eso `flutter run` y los
+builds andan **sin ningún setup extra**.
+
+> Para rotar la key sin recompilar el default, se puede pisar en build-time con
+> `--dart-define=PLACES_CLIENT_KEY=<key>`.
+
 ### iOS (simulador)
 ```bash
 open -a Simulator              # bootea un simulator si no hay

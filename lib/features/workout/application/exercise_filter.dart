@@ -17,6 +17,10 @@ import '../domain/equipment_type.dart';
 import '../domain/exercise.dart';
 import '../domain/muscle_group.dart';
 
+/// Whitespace runs — tokenizes multi-word queries. Hoisted because the
+/// predicate runs once per candidate exercise per keystroke.
+final _whitespace = RegExp(r'\s+');
+
 /// Lowercases and strips Spanish diacritics so the search field tolerates
 /// accent and case typos: "elevacion" matches "Elevación", "BICEPS" matches
 /// "Bíceps". Applied to both the query and the candidate text before matching.
@@ -35,6 +39,21 @@ String foldSearch(String input) {
   return buf.toString();
 }
 
+/// True when every whitespace-separated token of [query] appears somewhere
+/// in [candidate], case/diacritic-insensitively via [foldSearch] — the order
+/// and the words in between don't matter: "press banca" matches
+/// "Press de Banca (Barra)" despite the missing "de".
+///
+/// Blank queries match everything; one-word queries behave exactly like a
+/// folded substring match. Both inputs are folded here, so callers pass raw
+/// strings (folding is idempotent — pre-folded input is also fine).
+bool matchesAllTokens(String candidate, String query) {
+  final q = foldSearch(query).trim();
+  if (q.isEmpty) return true;
+  final folded = foldSearch(candidate);
+  return q.split(_whitespace).every(folded.contains);
+}
+
 /// Returns `true` when [e] satisfies all active filters simultaneously
 /// (AND across filter dimensions, OR within each dimension).
 ///
@@ -43,8 +62,11 @@ String foldSearch(String input) {
 /// fields (`_query`, `_muscleFilters`, `_equipmentFilters`) promoted to named
 /// parameters so the predicate is pure and testable.
 ///
-/// Rules preserved verbatim from the original:
-/// - Query: diacritic-tolerant name OR alias substring match.
+/// Rules:
+/// - Query: diacritic-tolerant, tokenized on whitespace — an exercise matches
+///   when EVERY token appears in the folded name (any order), or when every
+///   token appears within a single folded alias. One-word queries behave
+///   exactly like the original substring match.
 /// - Muscles: primary OR secondary match against filter set; empty set = pass.
 /// - Equipment: OR within set; **empty set = pass all (including null)**;
 ///   **non-empty set = EXCLUDE exercises with null equipment** (ADR-RER-05).
@@ -56,8 +78,10 @@ bool exerciseMatchesFilters(
 }) {
   final q = foldSearch(query).trim();
   if (q.isNotEmpty) {
-    final nameMatch = foldSearch(e.name).contains(q);
-    final aliasMatch = e.aliases.any((a) => foldSearch(a).contains(q));
+    // Tokenized AND-match via [matchesAllTokens] (shared with the progression
+    // search). Aliases match when ALL tokens hit the same alias.
+    final nameMatch = matchesAllTokens(e.name, query);
+    final aliasMatch = e.aliases.any((a) => matchesAllTokens(a, query));
     if (!nameMatch && !aliasMatch) return false;
   }
   // OR within muscle filter, AND across filter types. An exercise matches if

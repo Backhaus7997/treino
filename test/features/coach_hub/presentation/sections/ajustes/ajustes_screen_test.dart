@@ -83,6 +83,9 @@ void main() {
       await tester.tap(find.text('Notificaciones'));
       await tester.pump();
       await tester.pump(); // deja emitir el StreamProvider de prefs
+      // TreinoStateSwitcher cross-fadea entre tabs (AppMotion.base): deja
+      // asentar la transición antes de comprobar que el tab viejo se fue.
+      await tester.pumpAndSettle();
 
       // Ya no es placeholder: muestra la matriz real.
       expect(find.text('NOTIFICACIONES'), findsOneWidget);

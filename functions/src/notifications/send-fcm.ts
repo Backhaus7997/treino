@@ -9,7 +9,12 @@
  *   - Stale token cleanup on `messaging/registration-token-not-registered` and
  *     `messaging/invalid-registration-token` per BatchResponse inspection.
  *   - Empty or absent `fcmTokens` arrays are skipped silently with a log line.
+ *   - History persistence and FCM dispatch are independent effects: either may
+ *     fail without preventing the other from being attempted.
  *   - Body length enforcement lives in the per-trigger CFs, NOT here.
+ *
+ * TODO(notification-retention): configure Firestore TTL or scheduled cleanup
+ * before `users/{uid}/notifications` reaches production-scale volume.
  *
  * REQ-PN-CF-001. Fase 6 Etapa 2.
  */
@@ -23,10 +28,24 @@ const STALE_TOKEN_CODES = new Set([
   "messaging/invalid-registration-token",
 ]);
 
+/** Stable discriminators persisted in notification history and sent to FCM. */
+export type NotificationKind =
+  | "appointment"
+  | "chat-message"
+  | "friend-accepted"
+  | "friend-follow"
+  | "friend-request"
+  | "link-change"
+  | "overdue-payment"
+  | "reaction"
+  | "review";
+
 /** Input shape accepted by sendFcm. */
 export interface SendFcmInput {
   /** Recipient user IDs. fcmTokens are read from users/{uid} per uid. */
   uids: string[];
+  /** Stable event discriminator used by history renderers and FCM clients. */
+  kind: NotificationKind;
   /** FCM notification payload (title + body). */
   notification: {
     title: string;
@@ -34,6 +53,8 @@ export interface SendFcmInput {
   };
   /** Arbitrary string key-value pairs forwarded as the FCM data payload. */
   data: Record<string, string>;
+  /** User who caused the event, when the source event has one. */
+  actorUid?: string;
 }
 
 /** Aggregated send result returned by sendFcm. */
@@ -55,7 +76,7 @@ export async function sendFcm(
   input: SendFcmInput,
   messaging?: admin.messaging.Messaging,
 ): Promise<SendFcmResult> {
-  const { uids, notification, data } = input;
+  const { uids, kind, notification, data, actorUid } = input;
 
   // Short-circuit: no recipients.
   if (uids.length === 0) {
@@ -65,6 +86,31 @@ export async function sendFcm(
   const db = admin.firestore(app);
   const msg = messaging ?? admin.messaging(app);
 
+  // Start history persistence before reading tokens. It is deliberately
+  // isolated from FCM: no-token users still get history, and history failures
+  // are warned but never reject sendFcm.
+  const historyWrite = Promise.all(
+    uids.map(async (uid) => {
+      const historyData: Record<string, unknown> = {
+        kind,
+        title: notification.title,
+        body: notification.body,
+        deepLink: data.deepLink,
+        createdAt: FieldValue.serverTimestamp(),
+      };
+      if (actorUid) historyData.actorUid = actorUid;
+
+      await db
+        .collection("users")
+        .doc(uid)
+        .collection("notifications")
+        .add(historyData);
+    }),
+  ).catch((error: unknown) => {
+    logger.warn("sendFcm: failed to persist notification history", { error });
+  });
+
+  try {
   // 1. Read fcmTokens per uid in parallel.
   //    Build a flat list of { token, ownerUid } preserving the mapping for stale cleanup.
   type TokenEntry = { token: string; ownerUid: string };
@@ -100,7 +146,7 @@ export async function sendFcm(
   const batchResponse = await msg.sendEachForMulticast({
     tokens,
     notification,
-    data,
+    data: { ...data, kind },
   });
 
   // 4. Inspect per-token errors; remove stale tokens from Firestore.
@@ -142,4 +188,7 @@ export async function sendFcm(
     successCount: batchResponse.successCount,
     failureCount: batchResponse.failureCount,
   };
+  } finally {
+    await historyWrite;
+  }
 }

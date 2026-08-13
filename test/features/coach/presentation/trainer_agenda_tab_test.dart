@@ -148,7 +148,8 @@ void main() {
         await tester.pump();
         // Old full-screen empty-state copy is no longer rendered.
         expect(
-          find.text('Todavía no configuraste tus horarios de trabajo. Agregá uno para que tus alumnos puedan reservar.'),
+          find.text(
+              'Todavía no configuraste tus horarios de trabajo. Agregá uno para que tus alumnos puedan reservar.'),
           findsNothing,
         );
         // Calendar is always present (no more rules-empty gating).
@@ -252,6 +253,35 @@ void main() {
   // ── SCENARIO-517 / 518: cancel booking 24h gate ───────────────────────────
   // These are tested via the TrainerDayDetailSheet widget tests below
   // (see trainer_day_detail_sheet integration in this group).
+
+  // ── H3: a failed stream must not read as an empty (bookable) day ───────────
+  //
+  // The DayTimeline grid is tap-to-create. Folding a stream error to an empty
+  // grid let the trainer book over an agenda that failed to load. On error it
+  // now shows a retry instead; the calendar stays for navigation.
+  group('H3 — timeline surfaces appointment-stream errors', () {
+    testWidgets(
+      'stream error → DayTimeline shows retry, calendar still renders',
+      (tester) async {
+        await tester.pumpWidget(
+          _wrap(
+            const TrainerAgendaTab(trainerId: 'trainer-1'),
+            overrides: _overridesWithApptError(),
+          ),
+        );
+
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 50));
+
+        // Error + Reintentar replace the empty grid...
+        expect(
+            find.text('Hubo un problema. Intentá de nuevo.'), findsOneWidget);
+        expect(find.text('Reintentar'), findsOneWidget);
+        // ...while the calendar still renders for navigation.
+        expect(find.byType(TableCalendar<dynamic>), findsOneWidget);
+      },
+    );
+  });
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -302,6 +332,31 @@ List<Override> _overridesWithRulesAndAppointments(
       fromDate: _kFrom,
       toDate: _kTo,
     )).overrideWith((ref) => Stream.value(appointments)),
+    availabilityRepositoryProvider.overrideWithValue(
+      _FakeAvailabilityRepository(),
+    ),
+    appointmentRepositoryProvider.overrideWithValue(
+      _FakeAppointmentRepository(),
+    ),
+  ];
+}
+
+/// Availability + overrides succeed (empty); the APPOINTMENTS stream fails
+/// outright — the scenario H3 guards against (permission-denied / offline).
+List<Override> _overridesWithApptError() {
+  return [
+    availabilityRulesStreamProvider('trainer-1').overrideWith(
+      (ref) => Stream.value([]),
+    ),
+    overridesStreamProvider(OverridesKey(
+      trainerId: 'trainer-1',
+      fromDate: _kFrom,
+      toDate: _kTo,
+    )).overrideWith((ref) => Stream.value([])),
+    trainerAppointmentsStreamProvider.overrideWith(
+      (ref, key) =>
+          Stream<List<Appointment>>.error(Exception('appointments failed')),
+    ),
     availabilityRepositoryProvider.overrideWithValue(
       _FakeAvailabilityRepository(),
     ),

@@ -59,7 +59,8 @@ Future<void> main() async {
   runApp(
     ProviderScope(
       overrides: [
-        sharedPreferencesProvider.overrideWith((_) async => prefs),
+        // Synchronous by contract — see sharedPreferencesOverride (#543).
+        sharedPreferencesOverride(prefs),
       ],
       child: const CoachHubApp(),
     ),

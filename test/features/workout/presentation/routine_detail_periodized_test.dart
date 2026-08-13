@@ -28,6 +28,8 @@ import 'package:treino/features/workout/application/session_providers.dart'
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_day.dart';
 import 'package:treino/features/workout/domain/routine_slot.dart';
+import 'package:treino/features/workout/domain/routine_source.dart';
+import 'package:treino/features/workout/domain/routine_visibility.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
 import 'package:treino/features/workout/presentation/routine_detail_screen.dart';
@@ -111,6 +113,12 @@ Routine _singleWeekRoutine({List<RoutineDay>? days}) => Routine(
 /// Wraps under ProviderScope with required overrides.
 /// Uses sessionsByUidProvider (String key, structural equality) so
 /// planProgressProvider can compute without key-equality problems.
+///
+/// Both routine providers are overridden: the screen's own build() watches
+/// [routineByIdStreamProvider] (issue #401 fix — auto-refresh after edit),
+/// while [planProgressProvider] (read internally by the periodized CTA bar
+/// for week/day completion) still chains through the original one-shot
+/// [routineByIdProvider].
 Widget _wrap(
   Widget w, {
   required Routine routine,
@@ -118,6 +126,8 @@ Widget _wrap(
 }) {
   return ProviderScope(
     overrides: [
+      routineByIdStreamProvider(routine.id)
+          .overrideWith((ref) => Stream.value(routine)),
       routineByIdProvider(routine.id).overrideWith((ref) async => routine),
       currentUidProvider.overrideWithValue(_uid),
       userProfileProvider
@@ -135,13 +145,14 @@ Widget _wrap(
 }
 
 /// Pumps until async providers settle.
-/// planProgressProvider chains routineByIdProvider → sessionsByUidProvider
-/// → derivePlanProgress, so we need enough pumps for all three futures to
-/// resolve plus the stream to emit the user profile.
+/// planProgressProvider chains routineByIdProvider (via routine.id passed in
+/// separately for progress calc) → sessionsByUidProvider → derivePlanProgress;
+/// the detail screen itself watches routineByIdStreamProvider. Enough pumps
+/// for all of those plus the userProfileProvider stream to emit.
 Future<void> _settle(WidgetTester tester) async {
   // Round 1 – drain the initial microtask queue.
   await tester.pump();
-  // Round 2 – routineByIdProvider future resolves.
+  // Round 2 – routineByIdStreamProvider's first stream event resolves.
   await tester.pump(const Duration(milliseconds: 50));
   // Round 3 – sessionsByUidProvider resolves inside planProgressProvider.
   await tester.pump(const Duration(milliseconds: 50));
@@ -221,7 +232,15 @@ void main() {
         routine: routine,
       ));
       await _settle(tester);
-      expect(find.byType(ExerciseSlotRow), findsNWidgets(2));
+      // `skipOffstage: false`: the start action is pinned to the bottom since
+      // #641, so the exercise list runs in a shorter viewport and the second
+      // slot sits below the fold on the test surface. The assert is about list
+      // COMPOSITION (every slot rendered, no presence filter), not about what
+      // happens to be on screen.
+      expect(
+        find.byType(ExerciseSlotRow, skipOffstage: false),
+        findsNWidgets(2),
+      );
     });
 
     // Fix 3 — REQ-PERIOD-042 "ANY day startable" on single-week plan
@@ -331,8 +350,9 @@ void main() {
     });
 
     testWidgets(
-        'SCENARIO-036: plan-complete banner shown when all weeks/days done',
-        (tester) async {
+        'SCENARIO-REPEAT-001: plan-complete banner shown when all weeks/days '
+        'done, AND REPETIR remains available (device repro, extends '
+        'SCENARIO-036)', (tester) async {
       final routine = _multiWeekRoutine(
         numWeeks: 2,
         days: [_day(1), _day(2)],
@@ -353,11 +373,35 @@ void main() {
 
       // Plan-complete banner is in the CTA area below the fold.
       expect(find.text('PLAN COMPLETADO', skipOffstage: false), findsOneWidget);
+      // AD-2: the banner is a signal, never a lock — REPETIR must still be
+      // there and enabled. This is the true device repro path: before this
+      // change, the widget early-returned the banner with no button at all.
+      expect(
+        find.text('REPETIR', skipOffstage: false),
+        findsOneWidget,
+        reason: 'A complete plan must still offer an action (AD-2) — the '
+            'device repro this change fixes.',
+      );
+      // AD-1: banner XOR chip. Exact match on 'COMPLETADO' does not collide
+      // with 'PLAN COMPLETADO' (find.text is an exact match, not substring).
+      expect(
+        find.text('COMPLETADO', skipOffstage: false),
+        findsNothing,
+        reason: 'Banner XOR chip (AD-1) — PLAN COMPLETADO already states '
+            'the day-level fact; stacking COMPLETADO would say it twice.',
+      );
+      final btn = tester.widget<ElevatedButton>(find
+          .ancestor(
+            of: find.text('REPETIR', skipOffstage: false),
+            matching: find.byType(ElevatedButton, skipOffstage: false),
+          )
+          .first);
+      expect(btn.onPressed, isNotNull);
     });
 
     testWidgets(
-        'SCENARIO-035: completed day shows COMPLETADO state (not EMPEZAR)',
-        (tester) async {
+        'SCENARIO-REPEAT-003: completed day shows COMPLETADO + REPETIR '
+        '(renegotiates SCENARIO-035, plan incomplete)', (tester) async {
       final routine = _multiWeekRoutine(
         numWeeks: 2,
         days: [_day(1), _day(2)],
@@ -373,9 +417,98 @@ void main() {
       ));
       await _settle(tester);
 
-      // Day 1 is done → COMPLETADO (not EMPEZAR). CTA is below the fold.
+      // Day 1 is done → COMPLETADO chip + REPETIR button, never EMPEZAR.
       expect(find.text('COMPLETADO', skipOffstage: false), findsOneWidget);
-      expect(find.text('EMPEZAR', skipOffstage: false), findsNothing);
+      expect(find.text('REPETIR', skipOffstage: false), findsOneWidget);
+      expect(
+        find.text('EMPEZAR', skipOffstage: false),
+        findsNothing,
+        reason: 'Completion relabels the action to REPETIR — it never '
+            'removes it (AD-2). This is NOT "there is no action".',
+      );
+      final btn = tester.widget<ElevatedButton>(find
+          .ancestor(
+            of: find.text('REPETIR', skipOffstage: false),
+            matching: find.byType(ElevatedButton, skipOffstage: false),
+          )
+          .first);
+      expect(btn.onPressed, isNotNull,
+          reason: 'Completion is a signal, never a hard lock (AD-2).');
+    });
+  });
+
+  // ── T-4 — AD-2 invariant: completion never removes the action ──────────
+  // Replaces the 14 plan_gating.dart tests deleted in Phase 2 (AD-3): those
+  // asserted a function returned a literal; these assert the action EXISTS
+  // and is enabled, which is strictly stronger.
+  group('AD-2 invariant — completion never removes the action', () {
+    testWidgets('fresh day (no completions): enabled action button renders',
+        (tester) async {
+      final routine = _multiWeekRoutine(numWeeks: 2, days: [_day(1), _day(2)]);
+      await tester.pumpWidget(_wrap(
+        RoutineDetailScreen(routineId: routine.id),
+        routine: routine,
+      ));
+      await _settle(tester);
+
+      final btn = tester.widget<ElevatedButton>(find
+          .ancestor(
+            of: find.text('EMPEZAR', skipOffstage: false),
+            matching: find.byType(ElevatedButton, skipOffstage: false),
+          )
+          .first);
+      expect(btn.onPressed, isNotNull);
+    });
+
+    testWidgets(
+        'day already done (plan incomplete): enabled action button renders',
+        (tester) async {
+      final routine = _multiWeekRoutine(numWeeks: 2, days: [_day(1), _day(2)]);
+      final sessions = [
+        _doneSession(routineId: routine.id, week: 0, day: 1),
+      ];
+      await tester.pumpWidget(_wrap(
+        RoutineDetailScreen(routineId: routine.id),
+        routine: routine,
+        sessions: sessions,
+      ));
+      await _settle(tester);
+
+      final btn = tester.widget<ElevatedButton>(find
+          .ancestor(
+            of: find.text('REPETIR', skipOffstage: false),
+            matching: find.byType(ElevatedButton, skipOffstage: false),
+          )
+          .first);
+      expect(btn.onPressed, isNotNull);
+    });
+
+    testWidgets(
+        'plan complete: enabled action button renders (not just the banner)',
+        (tester) async {
+      final routine = _multiWeekRoutine(numWeeks: 2, days: [_day(1), _day(2)]);
+      final sessions = [
+        _doneSession(routineId: routine.id, week: 0, day: 1),
+        _doneSession(routineId: routine.id, week: 0, day: 2),
+        _doneSession(routineId: routine.id, week: 1, day: 1),
+        _doneSession(routineId: routine.id, week: 1, day: 2),
+      ];
+      await tester.pumpWidget(_wrap(
+        RoutineDetailScreen(routineId: routine.id),
+        routine: routine,
+        sessions: sessions,
+      ));
+      await _settle(tester);
+
+      final btn = tester.widget<ElevatedButton>(find
+          .ancestor(
+            of: find.text('REPETIR', skipOffstage: false),
+            matching: find.byType(ElevatedButton, skipOffstage: false),
+          )
+          .first);
+      expect(btn.onPressed, isNotNull,
+          reason: 'AD-2: completion is a signal, never a hard lock — this '
+              'replaces the 14 plan_gating.dart tests deleted by AD-3.');
     });
   });
 
@@ -399,8 +532,13 @@ void main() {
       ));
       await _settle(tester);
 
-      // Both slots must render — no filtering on single-week plan
-      expect(find.byType(ExerciseSlotRow), findsNWidgets(2));
+      // Both slots must render — no filtering on single-week plan.
+      // `skipOffstage: false` since #641 pinned the start action (see the
+      // SCENARIO-038 note above).
+      expect(
+        find.byType(ExerciseSlotRow, skipOffstage: false),
+        findsNWidgets(2),
+      );
     });
   });
 
@@ -530,6 +668,203 @@ void main() {
           reason: 'Info message shown when no slots present in this week');
       expect(find.byType(ExerciseSlotRow), findsNothing,
           reason: 'No ExerciseSlotRow when day has zero present slots');
+    });
+
+    testWidgets(
+        'SCENARIO-REPEAT-002: plan complete + viewed day auto-satisfied '
+        '(zero present slots that week) → EMPEZAR, not REPETIR',
+        (tester) async {
+      final slotA = slotPresentAllWeeks(exerciseId: 'slotA');
+      final slotB = slotPresentOnlyWeek2(exerciseId: 'slotB');
+      final routine = Routine(
+        id: 'routine-3w-repeat-002',
+        name: 'Plan 3 semanas',
+        level: ExperienceLevel.intermediate,
+        days: [
+          RoutineDay(dayNumber: 1, name: 'Push', slots: [slotA]),
+          RoutineDay(dayNumber: 2, name: 'Pull', slots: [slotB]),
+        ],
+        numWeeks: 3,
+      );
+      // Every REQUIRED (week, day) pair done: day1 is present every week
+      // (0,1,2); day2 is present ONLY week index 2 (activeWeeks: [2]) → the
+      // (week 0, day 2) pair is auto-satisfied (REQ-WPRES-022) and never
+      // enters `completed`.
+      final sessions = [
+        _doneSession(routineId: routine.id, week: 0, day: 1),
+        _doneSession(routineId: routine.id, week: 1, day: 1),
+        _doneSession(routineId: routine.id, week: 2, day: 1),
+        _doneSession(routineId: routine.id, week: 2, day: 2),
+      ];
+      await tester.pumpWidget(_wrap(
+        RoutineDetailScreen(routineId: routine.id),
+        routine: routine,
+        sessions: sessions,
+      ));
+      await _settle(tester);
+
+      // View day 2 of week 0 — auto-satisfied, never completed, while the
+      // plan as a whole is complete.
+      await tester.tap(find.text('DÍA 2', skipOffstage: false));
+      await _settle(tester);
+
+      expect(find.text('PLAN COMPLETADO', skipOffstage: false), findsOneWidget,
+          reason: 'planComplete is true — every required pair is satisfied.');
+      expect(
+        find.text('EMPEZAR', skipOffstage: false),
+        findsOneWidget,
+        reason: 'This (week, day) was never in `completed` (zero present '
+            'slots this week, REQ-WPRES-022) — the label rule is keyed off '
+            'the DAY, not the plan (AD-5).',
+      );
+      expect(find.text('REPETIR', skipOffstage: false), findsNothing);
+      final btn = tester.widget<ElevatedButton>(find
+          .ancestor(
+            of: find.text('EMPEZAR', skipOffstage: false),
+            matching: find.byType(ElevatedButton, skipOffstage: false),
+          )
+          .first);
+      expect(btn.onPressed, isNotNull);
+    });
+  });
+
+  // ── user-created ownership guard applies at EVERY plan length ─────────────
+  //
+  // `_startActionVisible` used to gate the `userCreated` check behind
+  // `!isPeriodized`. That asymmetry was inherited verbatim from the pre-#641
+  // CTA split, where `_StartSessionCTABar` carried the guard and
+  // `_PeriodizedCTABar` simply never had it — no product decision was ever
+  // made to let strangers start someone's periodized plan.
+  //
+  // The hole was reachable: `publicRoutinesByUserProvider` selects for the
+  // "RUTINAS PÚBLICAS" tab on `visibility` alone and has never looked at
+  // `numWeeks`, and the editor lets an athlete author >1 week AND share on
+  // profile at the same time. Starting such a plan writes the session under the
+  // VIEWER's uid (`SessionNotifier._buildFresh` reads `currentUidProvider`)
+  // against a routine they neither own nor can edit — and, unique to the
+  // periodized path, accrues plan progress too, since `planProgressProvider` is
+  // keyed `(uid: viewer, routineId: theirs)`.
+  //
+  // This is a deliberate BEHAVIOUR change (who may start a session), which is
+  // why it was kept out of #641's scope and landed on its own.
+  group('userCreated ownership guard at every plan length', () {
+    const otherUid = 'other-athlete';
+
+    Routine sharedUserRoutine({
+      required int numWeeks,
+      required String createdBy,
+    }) =>
+        Routine(
+          id: 'routine-shared-$numWeeks-$createdBy',
+          name: 'Plan compartido',
+          level: ExperienceLevel.intermediate,
+          days: [_day(1), _day(2)],
+          source: RoutineSource.userCreated,
+          visibility: RoutineVisibility.public,
+          createdBy: createdBy,
+          numWeeks: numWeeks,
+        );
+
+    testWidgets(
+        'periodized + userCreated + public + viewer != createdBy → no start '
+        'action (the regression this group exists for)', (tester) async {
+      final routine = sharedUserRoutine(numWeeks: 3, createdBy: otherUid);
+      await tester.pumpWidget(_wrap(
+        RoutineDetailScreen(routineId: routine.id),
+        routine: routine,
+      ));
+      await _settle(tester);
+
+      // The screen itself must have rendered — otherwise "no EMPEZAR" would
+      // pass for the wrong reason (a blank/error state) and the guard would go
+      // untested.
+      expect(
+        find.byType(ExerciseSlotRow, skipOffstage: false),
+        findsWidgets,
+        reason: 'The plan is still fully READABLE — the guard removes the '
+            'action, not the content.',
+      );
+      // EMPEZAR and REPETIR are the only two labels `_StartActionButton` ever
+      // renders, so asserting both absent covers the action in every progress
+      // state.
+      expect(
+        find.text('EMPEZAR', skipOffstage: false),
+        findsNothing,
+        reason: 'Starting would log a session under the viewer against another '
+            "athlete's plan — exactly what the single-week guard prevents.",
+      );
+      expect(find.text('REPETIR', skipOffstage: false), findsNothing);
+    });
+
+    testWidgets(
+        'periodized + userCreated + public + viewer == createdBy → start '
+        'action still shown', (tester) async {
+      final routine = sharedUserRoutine(numWeeks: 3, createdBy: _uid);
+      await tester.pumpWidget(_wrap(
+        RoutineDetailScreen(routineId: routine.id),
+        routine: routine,
+      ));
+      await _settle(tester);
+
+      // Positive control: the guard discriminates on OWNERSHIP. Without this,
+      // a change that hid the action for every periodized plan would pass the
+      // test above.
+      expect(
+        find.text('EMPEZAR', skipOffstage: false),
+        findsOneWidget,
+        reason: 'Sharing your own plan must not lock you out of training it.',
+      );
+      final btn = tester.widget<ElevatedButton>(find
+          .ancestor(
+            of: find.text('EMPEZAR', skipOffstage: false),
+            matching: find.byType(ElevatedButton, skipOffstage: false),
+          )
+          .first);
+      expect(btn.onPressed, isNotNull);
+    });
+
+    testWidgets(
+        'single-week + userCreated + public + viewer != createdBy → no start '
+        'action (pre-existing behaviour the periodized path is aligned to)',
+        (tester) async {
+      final routine = sharedUserRoutine(numWeeks: 1, createdBy: otherUid);
+      await tester.pumpWidget(_wrap(
+        RoutineDetailScreen(routineId: routine.id),
+        routine: routine,
+      ));
+      await _settle(tester);
+
+      expect(find.text('EMPEZAR', skipOffstage: false), findsNothing);
+      expect(find.text('REPETIR', skipOffstage: false), findsNothing);
+    });
+
+    testWidgets(
+        'periodized + non-userCreated + public + viewer != createdBy → start '
+        'action shown (the guard is scoped to userCreated)', (tester) async {
+      // `system` rather than `trainerTemplate` on purpose: a public
+      // trainerTemplate additionally mounts `TemplateRatingsSection`, whose
+      // Firebase-backed providers would have to be stubbed here for reasons
+      // that have nothing to do with the guard. Both are non-userCreated
+      // sources carrying a foreign `createdBy`, so either one proves the same
+      // thing — the guard widened across plan LENGTHS, never past
+      // `userCreated` into the publicly-startable catalogue.
+      final routine = Routine(
+        id: 'routine-system-3w',
+        name: 'Plantilla del sistema',
+        level: ExperienceLevel.intermediate,
+        days: [_day(1), _day(2)],
+        source: RoutineSource.system,
+        visibility: RoutineVisibility.public,
+        createdBy: otherUid,
+        numWeeks: 3,
+      );
+      await tester.pumpWidget(_wrap(
+        RoutineDetailScreen(routineId: routine.id),
+        routine: routine,
+      ));
+      await _settle(tester);
+
+      expect(find.text('EMPEZAR', skipOffstage: false), findsOneWidget);
     });
   });
 }

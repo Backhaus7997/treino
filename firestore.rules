@@ -3,21 +3,85 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ── Shared value guards (QA #508) ────────────────────────────────────────
+    // Generic optional-field validators, visible to every nested match. Unlike
+    // the domain helpers further down (postSameGym, reactionPostReadable,
+    // …) these carry no collection knowledge, so they live at the top scope
+    // instead of being duplicated per block.
+    //
+    // They take the VALUE, not the field name — always call them as
+    // `optNumInRange(request.resource.data.get('weightKg', null), 0, 500)`.
+    // Reading through `get(field, null)` collapses "key absent" and "key
+    // present but null" into the same null, which matters because
+    // json_serializable emits EVERY optional key with an explicit null (no
+    // `includeIfNull: false` on these models) — a present-null key is the
+    // NORMAL wire shape, not an anomaly, so the guards must accept it and
+    // constrain only non-null values.
+
+    // Optional number within an inclusive [minV, maxV] range.
+    function optNumInRange(v, minV, maxV) {
+      return v == null || (v is number && v >= minV && v <= maxV);
+    }
+
+    // Optional number that must be strictly positive, capped at maxV.
+    function optPositiveNum(v, maxV) {
+      return v == null || (v is number && v > 0 && v <= maxV);
+    }
+
+    // Optional string no longer than maxLen.
+    function optStrMaxLen(v, maxLen) {
+      return v == null || (v is string && v.size() <= maxLen);
+    }
+
+    // ── Grafo social dirigido (change `follow-model`) ─────────────────────────
+    // Domain helper a top scope A PROPÓSITO, y es la única excepción a la regla
+    // de arriba: lo consumen dos bloques `match` que no se contienen entre sí
+    // (`/posts` — con su subcolección `/reactions` — y `/chats` — con su
+    // subcolección `/messages`). Duplicarlo sería garantizar que en algún
+    // momento las dos copias digan cosas distintas sobre quién ve qué.
+    //
+    // `follows/{followerUid}_{followeeUid}` — el doc id NO se ordena. Ahí vive
+    // toda la asimetría del modelo: `{A}_{B}` y `{B}_{A}` son documentos
+    // DISTINTOS, así que "A sigue a B pero B no a A" se representa, y "¿f sigue
+    // a t?" se resuelve con un lookup directo por doc id — sin queries, sin
+    // índices, mismo costo que el `exists`+`get` sobre `friendships` que
+    // reemplaza. Si el id se ordenara, las dos direcciones colisionarían en el
+    // mismo doc y volveríamos exactamente al problema que este change arregla.
+    function followAccepted(f, t) {
+      let id = f + '_' + t;
+      return exists(/databases/$(database)/documents/follows/$(id))
+          && get(/databases/$(database)/documents/follows/$(id)).data.status == 'accepted';
+    }
+
     match /users/{uid} {
       // Owner-only read.
       allow read: if request.auth != null
                   && request.auth.uid == uid;
 
-      // Create: only the authenticated user can create their own doc,
-      // role MUST be one of the two valid values, and uid MUST match doc id.
+      // Create: only the authenticated user can create their own doc, uid MUST
+      // match doc id, and self-registration is ALWAYS 'athlete'. The 'trainer'
+      // role is intrinsic (AGENTS.md rule 3) and provisioned exclusively via the
+      // Admin SDK, which bypasses these rules — so the client must never be able
+      // to mint a trainer. QA-SEC-001: allowing role in ['athlete','trainer']
+      // here let any client self-assign trainer (privilege escalation) and, since
+      // update pins role immutable, it was permanent.
       allow create: if request.auth != null
                     && request.auth.uid == uid
                     && request.resource.data.uid == uid
-                    && request.resource.data.role in ['athlete', 'trainer'];
+                    && request.resource.data.role == 'athlete';
 
       // Update: only the owner can update, and the four immutable fields
       // MUST equal their previous values. Trainers via Admin SDK only;
       // email changes via FirebaseAuth re-verification flow.
+      //
+      // Paywall Fase 7 PR1 (design §5.1): `subscription` (whole map) and
+      // `weightedLoad` are CF-write-only. Follows the `payments` field-pin
+      // idiom (firestore.rules ~1112-1134) — pinned equal-to-existing via
+      // get(...,null) so absence on both sides is a no-op match. The owner
+      // can still freely update every OTHER field on their own doc; only
+      // these two paywall fields are locked out. Admin SDK (CFs) bypass
+      // rules entirely, so createPreapproval/mpWebhook/downgrade/reactivation
+      // CFs write them normally.
       allow update: if request.auth != null
                     && request.auth.uid == uid
                     // uid: identity — must equal doc id forever.
@@ -27,10 +91,30 @@ service cloud.firestore {
                     // email: must use FirebaseAuth.updateEmail re-verification.
                     && request.resource.data.email == resource.data.email
                     // createdAt: audit field — preserves analytics integrity.
-                    && request.resource.data.createdAt == resource.data.createdAt;
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    // subscription/weightedLoad: CF-write-only (paywall Fase 7).
+                    && request.resource.data.get('subscription', null) == resource.data.get('subscription', null)
+                    && request.resource.data.get('weightedLoad', null) == resource.data.get('weightedLoad', null)
+                    // Notification inbox read cursor: owner-writeable, timestamp-only.
+                    && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['notificationsLastSeenAt'])
+                        || request.resource.data.notificationsLastSeenAt is timestamp);
 
       // Delete denied — account deletion goes through privileged Cloud Function.
       allow delete: if false;
+
+      match /notifications/{notificationId} {
+        // History is private to the owning user.
+        allow read: if request.auth != null
+                    && request.auth.uid == uid;
+
+        // Only notification Cloud Functions may create or mutate history.
+        // Admin SDK writes bypass Firestore Security Rules.
+        allow create, update: if false;
+
+        // Owners may remove individual history entries.
+        allow delete: if request.auth != null
+                      && request.auth.uid == uid;
+      }
     }
 
     match /exercises/{exerciseId} {
@@ -46,8 +130,25 @@ service cloud.firestore {
       // explícito caen en este branch). Si la rutina es privada
       // (`visibility: 'private'`), solo `assignedBy` (PF) o `assignedTo`
       // (atleta) pueden leerla. REQ-COACH-FOUNDATIONS-006.
+      //
+      // ⚠️  `resource == null` NO es opcional — es el guard de existencia.
+      // En un `get` sobre un doc INEXISTENTE, `resource` es null, y cualquier
+      // desreferencia de `resource.data` (p. ej. `'visibility' in resource.data`)
+      // hace fallar la EVALUACIÓN de la regla → la lectura vuelve como
+      // PERMISSION_DENIED, no como un snapshot vacío. Sin este short-circuit,
+      // `getById()` de una rutina borrada TIRA EXCEPCIÓN en vez de devolver
+      // null, y el `if (!snap.exists)` del cliente es código muerto que nunca
+      // se ejecuta. Eso rompió los radares de distribución muscular: una sola
+      // sesión vieja apuntando a una rutina borrada dejaba el gráfico entero
+      // en blanco.
+      // El único dato que expone es "este id no existe" vs "existe pero es
+      // privado" — los auto-ids de Firestore son de 20 chars aleatorios, así
+      // que no habilita enumeración.
+      // Sólo aplica a `get`: en un `list` (query) `resource` es cada doc
+      // candidato y nunca es null, así que las queries no se ven afectadas.
       allow read: if request.auth != null
-                  && (!('visibility' in resource.data)
+                  && (resource == null
+                      || !('visibility' in resource.data)
                       || resource.data.visibility == 'public'
                       || resource.data.visibility == 'shared'
                       || request.auth.uid == resource.data.assignedTo
@@ -72,6 +173,13 @@ service cloud.firestore {
       // REQ-COACH-PLANS-005..010, SCENARIO-438..443.
       allow create: if request.auth != null
                     && request.resource.data.assignedBy == request.auth.uid
+                    // Community rating aggregates are CF-write-only (Fase W3):
+                    // a create must not seed forged starting values — a trainer
+                    // could otherwise mint a template pre-loaded with a 5.0
+                    // average before publishing it. The client never emits
+                    // these keys (Routine uses @JsonKey(includeToJson: false)).
+                    && !('ratingAvg' in request.resource.data)
+                    && !('ratingsCount' in request.resource.data)
                     && (
                       // Trainer-assigned plan for a specific athlete.
                       (request.resource.data.source == 'trainer-assigned'
@@ -104,6 +212,10 @@ service cloud.firestore {
                     && request.resource.data.visibility in ['private', 'public']
                     && !('assignedBy' in request.resource.data)              // must be absent (REQ-USR-004)
                     && !('assignedTo' in request.resource.data)              // must be absent (REQ-USR-004)
+                    // Rating aggregates are CF-write-only (Fase W3) — same
+                    // absence guard as branch 1.
+                    && !('ratingAvg' in request.resource.data)
+                    && !('ratingsCount' in request.resource.data)
                     && request.resource.data.createdAt is timestamp;
 
       // UPDATE path 1 (narrow): owner flips only `status` — archive / restore.
@@ -153,11 +265,16 @@ service cloud.firestore {
                     && !('assignedBy' in request.resource.data)
                     && !('assignedTo' in request.resource.data)
                     // Only content fields may appear in the written document.
+                    // ratingAvg/ratingsCount: defensively listed (same as the
+                    // trainer-template path) so a doc that ever gained CF
+                    // aggregates cannot brick its owner's edits; the
+                    // affectedKeys allowlist below still excludes them.
                     && request.resource.data.keys().hasOnly(
                          // + numWeeks (periodization, Model B) — mirror RoutineRepository.
                          ['name', 'level', 'days',
                           'source', 'createdBy', 'visibility', 'createdAt', 'status',
-                          'split', 'estimatedMinutesPerDay', 'imageUrl', 'numWeeks'])
+                          'split', 'estimatedMinutesPerDay', 'imageUrl', 'numWeeks',
+                          'ratingAvg', 'ratingsCount'])
                     // The diff must touch ONLY content fields (name/level/days/
                     // numWeeks/visibility).
                     && request.resource.data.diff(resource.data).affectedKeys()
@@ -195,12 +312,17 @@ service cloud.firestore {
                     && (!('createdAt' in resource.data)
                         || request.resource.data.createdAt == resource.data.createdAt)
                     // Only content fields may appear in the written document.
+                    // ratingAvg/ratingsCount: defensively listed (same as the
+                    // trainer-template path) so a doc that ever gained CF
+                    // aggregates cannot brick the trainer's edits; the
+                    // affectedKeys allowlist below still excludes them.
                     && request.resource.data.keys().hasOnly(
                          // + numWeeks (periodization, Model B) — mirror RoutineRepository.
                          ['name', 'split', 'level', 'days',
                           'source', 'assignedBy', 'assignedTo', 'visibility',
                           'status', 'createdBy', 'createdAt',
-                          'estimatedMinutesPerDay', 'imageUrl', 'numWeeks'])
+                          'estimatedMinutesPerDay', 'imageUrl', 'numWeeks',
+                          'ratingAvg', 'ratingsCount'])
                     // The diff must touch ONLY content fields.
                     && request.resource.data.diff(resource.data).affectedKeys()
                          // + numWeeks (periodization) — repo always sends it.
@@ -238,16 +360,44 @@ service cloud.firestore {
                     && (!('createdAt' in resource.data)
                         || request.resource.data.createdAt == resource.data.createdAt)
                     // Only content fields may appear in the written document.
+                    // ratingAvg/ratingsCount ARE listed: request.resource.data
+                    // is the POST-state of the doc, so once the
+                    // templateRatingAggregate CF wrote aggregates onto a
+                    // published template, every content edit would fail this
+                    // hasOnly without them. They stay un-editable because the
+                    // affectedKeys() allowlist below does NOT include them.
                     && request.resource.data.keys().hasOnly(
                          // + numWeeks (periodization, Model B) — mirror RoutineRepository.
                          ['name', 'split', 'level', 'days',
                           'source', 'assignedBy', 'assignedTo', 'visibility',
                           'status', 'createdBy', 'createdAt',
-                          'estimatedMinutesPerDay', 'imageUrl', 'numWeeks'])
+                          'estimatedMinutesPerDay', 'imageUrl', 'numWeeks',
+                          'ratingAvg', 'ratingsCount'])
                     // The diff must touch ONLY content fields.
                     && request.resource.data.diff(resource.data).affectedKeys()
                          // + numWeeks (periodization) — repo always sends it.
                          .hasOnly(['name', 'split', 'level', 'days', 'numWeeks']);
+
+      // UPDATE path 5 (narrow, Fase W3): the owning trainer publishes /
+      // unpublishes their template — flips ONLY `visibility` between
+      // 'private' and 'public'. Mirrors the "status flip" idiom of UPDATE
+      // path 1. 'shared' is NOT accepted here (trainer-assigned concept),
+      // and the visibility-only diff means content edits, aggregate forgery,
+      // or ownership changes can never ride along on this path. Any
+      // authenticated user can then read the published doc via the existing
+      // `visibility == 'public'` branch of the read rule above.
+      // The role gate mirrors the "any athlete-role user forges X" guards
+      // used across the file: CREATE branch 1 predates role checks, so an
+      // athlete CAN hold a private forged `trainer-template` doc — without
+      // this gate, path 5 would let them publish it into the community
+      // catalogue (and collect ratings on it).
+      allow update: if request.auth != null
+                    && request.auth.uid == resource.data.assignedBy
+                    && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
+                    && resource.data.source == 'trainer-template'
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                         == ['visibility'].toSet()
+                    && request.resource.data.visibility in ['private', 'public'];
 
       // DELETE (narrow): the owning trainer may delete their OWN
       // `trainer-template` docs (library cleanup) and `trainer-assigned`
@@ -256,6 +406,69 @@ service cloud.firestore {
       allow delete: if request.auth != null
                     && resource.data.source in ['trainer-template', 'trainer-assigned']
                     && request.auth.uid == resource.data.assignedBy;
+    }
+
+    // Community ratings on published trainer templates (Fase W3).
+    // One doc per rater — the doc id IS the rater's uid (upsert semantics,
+    // mirroring /reviews' deterministic-id idiom). Aggregated into the parent
+    // routine's `ratingAvg`/`ratingsCount` by the `templateRatingAggregate`
+    // CF (Admin SDK — bypasses these rules); the client NEVER writes those
+    // aggregate fields.
+    match /routines/{routineId}/ratings/{userId} {
+      function ratedRoutine() {
+        return get(/databases/$(database)/documents/routines/$(routineId)).data;
+      }
+
+      // The parent must be a community-published trainer template, and the
+      // template's own author cannot rate their work (anti self-boosting).
+      // A missing parent doc makes get() fail the evaluation → deny, so
+      // ratings can never be attached to nonexistent routines.
+      function parentIsRateable() {
+        return ratedRoutine().source == 'trainer-template'
+               && ratedRoutine().visibility == 'public'
+               && ratedRoutine().assignedBy != request.auth.uid;
+      }
+
+      // Payload shape shared by create/update. Mirrors /reviews: rating is a
+      // 1..5 int, comment absent/null or ≤500 chars.
+      function ratingPayloadOk() {
+        return request.resource.data.keys().hasOnly(
+                 ['userId', 'rating', 'comment', 'createdAt', 'updatedAt'])
+               && request.resource.data.userId == userId
+               && request.resource.data.rating is int
+               && request.resource.data.rating >= 1
+               && request.resource.data.rating <= 5
+               // optStrMaxLen (shared guard, QA #508) — the `is string`
+               // check matters: `.size()` is also defined for lists/maps,
+               // so a bare size check would accept a List/Map comment that
+               // later explodes the `as String?` cast in every client
+               // reading this template's ratings.
+               && optStrMaxLen(request.resource.data.get('comment', null), 500)
+               && request.resource.data.createdAt is timestamp
+               && request.resource.data.updatedAt is timestamp;
+      }
+
+      // Read: any authenticated user — same openness as /reviews. Ratings on
+      // a template someone unpublished stay technically readable by id, but
+      // routine auto-ids are 20 random chars (no enumeration), matching the
+      // privacy stance documented on the routines read rule.
+      allow read: if request.auth != null;
+
+      allow create: if request.auth != null
+                    && request.auth.uid == userId
+                    && parentIsRateable()
+                    && ratingPayloadOk();
+
+      // Editing my own rating keeps identity + createdAt pinned; requires
+      // the template to still be published (an unpublished template freezes
+      // its ratings until the trainer republishes).
+      allow update: if request.auth != null
+                    && request.auth.uid == userId
+                    && parentIsRateable()
+                    && ratingPayloadOk()
+                    && request.resource.data.createdAt == resource.data.createdAt;
+
+      allow delete: if false;
     }
 
     // Vínculo PF ↔ atleta (Fase 5 Etapa 1, REQ-COACH-FOUNDATIONS-004).
@@ -289,40 +502,204 @@ service cloud.firestore {
       // request cambia el campo (`request.resource.data.sharedWithTrainer !=
       // resource.data.sharedWithTrainer`), el auth.uid debe ser el atleta.
       // El PF nunca puede flippear el flag.
+      //
+      // Paywall Fase 7 PR1 (design §5.2, entitlement half only): `entitlement`,
+      // `blockedAt`, `blockedReason` son CF-write-only — pinneados
+      // equal-to-existing via get(...,null) (mismo idioma que `payments`,
+      // firestore.rules ~1112-1134). Solo el downgrade CF y
+      // acceptTrainerLink/reactivation CF (Admin SDK, bypasea rules) los
+      // escriben. El lock CF-only de promoción status (reemplazar el accept()
+      // client-side por el acceptTrainerLink CF) queda para PR4 — hacerlo acá
+      // rompería el accept() actual antes de que su reemplazo exista. NOTA
+      // QA-SEC-002 (abajo): eso NO impide el gate más angosto que sí agregamos —
+      // impedir que el ATLETA promueva el link a active/paused — que preserva el
+      // accept() del trainer y no depende del CF.
       allow update: if request.auth != null
                     && (request.auth.uid == resource.data.trainerId
                         || request.auth.uid == resource.data.athleteId)
+                    // QA-SEC-002: only the trainer may promote a link INTO a
+                    // reviewable state (active/paused). The athlete creates the
+                    // pending request and may terminate it, but must never
+                    // self-promote — otherwise it forges an active/paused link
+                    // and fabricates reviews against any trainer (reviews create
+                    // gates on link.status in ['active','paused']). The trainer's
+                    // accept()/pause()/resume() still work; the acceptTrainerLink
+                    // CF (Admin SDK) bypasses rules. This is narrower than the
+                    // CF-only pending→active lock deferred to PR4: it preserves
+                    // the current client accept() (performed by the trainer), so
+                    // it does not break that flow ahead of the CF.
+                    && (request.resource.data.status == resource.data.status
+                        || !(request.resource.data.status in ['active', 'paused'])
+                        || request.auth.uid == resource.data.trainerId)
                     && request.resource.data.trainerId == resource.data.trainerId
                     && request.resource.data.athleteId == resource.data.athleteId
                     && request.resource.data.requestedAt == resource.data.requestedAt
                     && (request.resource.data.sharedWithTrainer == resource.data.sharedWithTrainer
-                        || request.auth.uid == resource.data.athleteId);
+                        || request.auth.uid == resource.data.athleteId)
+                    && request.resource.data.get('entitlement', null) == resource.data.get('entitlement', null)
+                    && request.resource.data.get('blockedAt', null) == resource.data.get('blockedAt', null)
+                    && request.resource.data.get('blockedReason', null) == resource.data.get('blockedReason', null);
 
       // Delete denegado — terminate vía update status='terminated'.
       allow delete: if false;
     }
 
     match /posts/{postId} {
-      // Any authenticated user can read posts (friends-privacy is soft / client-side).
-      // REQ-PFM-009
-      allow read: if request.auth != null;
+      // QA-FEED-001: post privacy is enforced SERVER-SIDE (was client-side only,
+      // REQ-PFM-009 — any authenticated user could read every post via the SDK).
+      // A post is readable when it is public, is the caller's own, is a
+      // 'friends' post whose author the CALLER FOLLOWS, or is a 'gym' post whose
+      // authorGymId matches the caller's gym. The client feed queries are
+      // already scoped to match (feedForFollowing by followee uids, feedForGym
+      // by gym, profile by privacy tier), so these per-doc get()s only fire for
+      // rows the query already narrowed to.
+      //
+      // REQ-FOLLOW-010: el tier dejó de preguntar "¿hay una amistad aceptada
+      // entre los dos?" y pregunta "¿el LECTOR sigue al AUTOR?". La dirección
+      // importa: que el autor me siga a mí no me da acceso a su contenido.
+      // El literal 'friends' de `privacy` NO se toca (LD-05) — el rename del
+      // tier es sólo del cliente y viaja por @JsonValue, así que los posts ya
+      // escritos siguen siendo válidos y las allowlists de create/update quedan
+      // byte-idénticas.
+      function postFollowerAccepted(authorUid) {
+        return followAccepted(request.auth.uid, authorUid);
+      }
+      function postSameGym(authorGymId) {
+        return authorGymId != null
+            && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.gymId == authorGymId;
+      }
+
+      allow read: if request.auth != null
+                  && (
+                    resource == null
+                    || resource.data.privacy == 'public'
+                    || request.auth.uid == resource.data.authorUid
+                    || (resource.data.privacy == 'friends'
+                        && postFollowerAccepted(resource.data.authorUid))
+                    || (resource.data.privacy == 'gym'
+                        && postSameGym(resource.data.get('authorGymId', null)))
+                  );
 
       // Create: only the owner of the post — authorUid must equal caller uid.
       // SCENARIO-130: non-owner create is blocked.
+      //
+      // Shape hardening (share-composer PR1): allowlist de keys + bounds de
+      // los campos abusables. OJO: `string.size()` en rules NO cuenta
+      // caracteres user-visible — '💪'.repeat(280) mide > 280 (verificado
+      // contra el emulador, ver post-create-shape-rules.test.ts), así que un
+      // bound de 280 rompería posts legítimos con tildes/emoji. El cap de UX
+      // (280 caracteres, kMaxPostChars) vive en el cliente; acá va 280 × 4 =
+      // 1120 como techo anti-abuso (4 es el peso máximo de un code point en
+      // UTF-8 — cubre tildes, CJK y emoji simples), mismo split cliente-corto
+      // / rules-holgadas que el `text.size() < 5000` de chats.
+      // `photoUrl` ≤ 600 vía optStrMaxLen (json_serializable emite la key
+      // presente-con-null en posts sin foto — el helper la acepta);
+      // `workoutSnapshot` solo se valida en su capa externa (map con
+      // exercises list ≤ 30, espejo de kMaxSnapshotExercises) — la forma
+      // anidada de cada set NO se valida (sin precedente en este archivo;
+      // el límite de 1 MiB por doc es el backstop).
       allow create: if request.auth != null
-                    && request.auth.uid == request.resource.data.authorUid;
+                    && request.auth.uid == request.resource.data.authorUid
+                    && request.resource.data.keys().hasOnly([
+                         'id', 'authorUid', 'authorDisplayName',
+                         'authorAvatarUrl', 'authorGymId', 'text',
+                         'routineTag', 'privacy', 'createdAt', 'workoutStats',
+                         'photoUrl', 'workoutSnapshot'
+                       ])
+                    && request.resource.data.text is string
+                    && request.resource.data.text.size() <= 1120
+                    && request.resource.data.privacy in ['friends', 'gym', 'public']
+                    && optStrMaxLen(request.resource.data.get('photoUrl', null), 600)
+                    && (request.resource.data.get('workoutSnapshot', null) == null
+                        || (request.resource.data.workoutSnapshot is map
+                            && request.resource.data.workoutSnapshot.get('exercises', null) is list
+                            && request.resource.data.workoutSnapshot.exercises.size() <= 30));
 
-      // Update and delete: only the original author.
-      allow update, delete: if request.auth != null
-                            && request.auth.uid == resource.data.authorUid;
+      // Update: only the original author, mismos bounds de shape que create —
+      // sin esto el hardening del create es cosmético (el dueño podría inflar
+      // `text` o meter keys nuevas vía update). En updates,
+      // `request.resource.data` es el doc FINAL mergeado, así que las mismas
+      // condiciones valen: docs legacy traen un subset de las keys permitidas
+      // y pasan hasOnly igual.
+      //
+      // Campos inmutables pineados equal-to-existing (idioma get(...,null),
+      // como `payments`): PostRepository.update solo edita text/privacy/
+      // routineTag y su doc declara authorUid/authorGymId/author*/createdAt/id
+      // inmutables — sin el pin, el dueño podía REASIGNAR authorUid y plantar
+      // un post falso atribuido a otra persona en el feed de los amigos de la
+      // víctima (o inyectar en el feed de otro gym vía authorGymId).
+      allow update: if request.auth != null
+                    && request.auth.uid == resource.data.authorUid
+                    && request.resource.data.authorUid == resource.data.authorUid
+                    && request.resource.data.get('authorGymId', null) == resource.data.get('authorGymId', null)
+                    && request.resource.data.get('authorDisplayName', null) == resource.data.get('authorDisplayName', null)
+                    && request.resource.data.get('authorAvatarUrl', null) == resource.data.get('authorAvatarUrl', null)
+                    && request.resource.data.get('id', null) == resource.data.get('id', null)
+                    && request.resource.data.get('createdAt', null) == resource.data.get('createdAt', null)
+                    && request.resource.data.get('reactionCounts', null) == resource.data.get('reactionCounts', null)
+                    && request.resource.data.keys().hasOnly([
+                         'id', 'authorUid', 'authorDisplayName',
+                         'authorAvatarUrl', 'authorGymId', 'text',
+                         'routineTag', 'privacy', 'createdAt', 'workoutStats',
+                         'photoUrl', 'workoutSnapshot', 'reactionCounts'
+                       ])
+                    && request.resource.data.text is string
+                    && request.resource.data.text.size() <= 1120
+                    && request.resource.data.privacy in ['friends', 'gym', 'public']
+                    && optStrMaxLen(request.resource.data.get('photoUrl', null), 600)
+                    && (request.resource.data.get('workoutSnapshot', null) == null
+                        || (request.resource.data.workoutSnapshot is map
+                            && request.resource.data.workoutSnapshot.get('exercises', null) is list
+                            && request.resource.data.workoutSnapshot.exercises.size() <= 30));
+
+      // Delete: only the original author.
+      allow delete: if request.auth != null
+                    && request.auth.uid == resource.data.authorUid;
+
+      // One reaction per user and post: the reaction document id IS the
+      // reactor uid. `reactionCounts` on the parent is maintained exclusively
+      // by the Admin SDK Cloud Function and is therefore never writable here.
+      match /reactions/{reactorUid} {
+        function reactionPost() {
+          return get(/databases/$(database)/documents/posts/$(postId)).data;
+        }
+
+        function reactionPostReadable() {
+          let post = reactionPost();
+          return post.privacy == 'public'
+                 || request.auth.uid == post.authorUid
+                 || (post.privacy == 'friends'
+                     && postFollowerAccepted(post.authorUid))
+                 || (post.privacy == 'gym'
+                     && postSameGym(post.get('authorGymId', null)));
+        }
+
+        function reactionPayloadOk() {
+          return request.resource.data.keys().hasOnly(['type', 'createdAt'])
+                 && request.resource.data.type in ['like', 'fire', 'clap']
+                 && request.resource.data.createdAt is timestamp;
+        }
+
+        allow read: if request.auth != null
+                    && reactionPostReadable();
+
+        allow create, update: if request.auth != null
+                              && request.auth.uid == reactorUid
+                              && reactionPostReadable()
+                              && reactionPayloadOk();
+
+        allow delete: if request.auth != null
+                      && request.auth.uid == reactorUid;
+      }
     }
 
     // Public identity documents — one per user, public-readable by any
-    // authenticated user, writable only by the owner. Contains ONLY the 15
+    // authenticated user, writable only by the owner. Contains ONLY the
     // known fields (uid, displayName, displayNameLowercase, avatarUrl,
-    // gymId, gymName, workoutsCount, racha, followersCount, followingCount,
-    // sharedTemplatesWithAthletes, rankingOptIn, lifetimeVolumeKg,
-    // bestSquatKg, bestBenchKg, bestDeadliftKg).
+    // gymId, gymName, workoutsCount, racha, rachaUpdatedAt, followersCount,
+    // followingCount, sharedTemplatesWithAthletes, rankingOptIn,
+    // isProfilePublic, lifetimeVolumeKg, bestSquatKg, bestBenchKg,
+    // bestDeadliftKg).
     // REQ-UPP-014, REQ-UPP-015. GAP-1, GAP-2, GAP-3 from design Section C.
     //
     // rankings-integrity Phase 2 (PR#2) hardening — AD-3, AD-4, AD-6, AD-8:
@@ -380,11 +757,24 @@ service cloud.firestore {
                     && request.resource.data.keys().hasOnly([
                          'uid', 'displayName', 'displayNameLowercase',
                          'avatarUrl', 'gymId', 'gymName', 'workoutsCount',
-                         'racha', 'followersCount', 'followingCount',
+                         'racha', 'rachaUpdatedAt', 'followersCount',
+                         'followingCount',
                          'sharedTemplatesWithAthletes', 'rankingOptIn',
+                         'isProfilePublic',
                          'lifetimeVolumeKg', 'bestSquatKg', 'bestBenchKg',
                          'bestDeadliftKg'
                        ])
+                    // #552: freshness stamp for `racha`, always derived by
+                    // UserPublicProfileRepository.updateCounters (server
+                    // timestamp) — timestamp when present.
+                    && (!('rachaUpdatedAt' in request.resource.data)
+                        || request.resource.data.rachaUpdatedAt is timestamp)
+                    // #563: Instagram-style privacy flag, flipped by
+                    // UserPublicProfileRepository.setProfilePublic — bool
+                    // when present. Docs without the field read as public
+                    // (`.get('isProfilePublic', true)` in follows).
+                    && (!('isProfilePublic' in request.resource.data)
+                        || request.resource.data.isProfilePublic is bool)
                     && (!('gymId' in request.resource.data)
                         || request.resource.data.gymId
                            == getAfter(/databases/$(database)/documents/users/$(uid)).data.gymId)
@@ -413,11 +803,22 @@ service cloud.firestore {
                     && request.resource.data.keys().hasOnly([
                          'uid', 'displayName', 'displayNameLowercase',
                          'avatarUrl', 'gymId', 'gymName', 'workoutsCount',
-                         'racha', 'followersCount', 'followingCount',
+                         'racha', 'rachaUpdatedAt', 'followersCount',
+                         'followingCount',
                          'sharedTemplatesWithAthletes', 'rankingOptIn',
+                         'isProfilePublic',
                          'lifetimeVolumeKg', 'bestSquatKg', 'bestBenchKg',
                          'bestDeadliftKg'
                        ])
+                    // #552: freshness stamp for `racha` — timestamp when
+                    // present (always serverTimestamp() derived in
+                    // UserPublicProfileRepository.updateCounters).
+                    && (!('rachaUpdatedAt' in request.resource.data)
+                        || request.resource.data.rachaUpdatedAt is timestamp)
+                    // #563: Instagram-style privacy flag — bool when
+                    // present. See the create-branch comment above.
+                    && (!('isProfilePublic' in request.resource.data)
+                        || request.resource.data.isProfilePublic is bool)
                     // gymId Integrity (AD-4): when the write touches gymId,
                     // it must equal the athlete's own private gymId.
                     // getAfter(), not get() — see the create-branch comment
@@ -523,6 +924,11 @@ service cloud.firestore {
     // verbatim, without the opt-in-disable exception clause (no analogous
     // disable flow exists for reviews).
     //
+    // #388 extends the same pin to `athleteCount`: derived aggregate (count
+    // of active trainer_links) written exclusively by the `linkAggregate`
+    // Cloud Function. Without the pin a trainer could forge their own
+    // student count on the discovery sales surface.
+    //
     // Deliberately NO keys().hasOnly() allowlist here (AD-3 divergence from
     // the trainer-reviews spec's "Out-of-allowlist field" scenario — see
     // tasks.md 2.7): TrainerPublicProfileRepository's write path is a
@@ -540,7 +946,8 @@ service cloud.firestore {
                     && request.auth.uid == uid
                     && request.resource.data.uid == uid
                     && request.resource.data.get('averageRating', null) == null
-                    && request.resource.data.get('reviewCount', null) == null;
+                    && request.resource.data.get('reviewCount', null) == null
+                    && request.resource.data.get('athleteCount', null) == null;
 
       // Only the owner can update; uid in body must not change (SCENARIO-418).
       // averageRating/reviewCount must be absent or unchanged from the
@@ -549,7 +956,8 @@ service cloud.firestore {
                     && request.auth.uid == uid
                     && request.resource.data.uid == resource.data.uid
                     && request.resource.data.get('averageRating', null) == resource.data.get('averageRating', null)
-                    && request.resource.data.get('reviewCount', null) == resource.data.get('reviewCount', null);
+                    && request.resource.data.get('reviewCount', null) == resource.data.get('reviewCount', null)
+                    && request.resource.data.get('athleteCount', null) == resource.data.get('athleteCount', null);
 
       // Delete denied — managed exclusively via privileged server-side operations.
       allow delete: if false;
@@ -593,8 +1001,14 @@ service cloud.firestore {
                     && request.resource.data.name is string
                     && request.resource.data.name.size() > 0
                     && request.resource.data.name.size() <= 100
+                    // QA-SEC-003: geographic range guard (mirrors the
+                    // google-places create branch) — coordinates must be valid.
                     && request.resource.data.lat is number
+                    && request.resource.data.lat >= -90
+                    && request.resource.data.lat <= 90
                     && request.resource.data.lng is number
+                    && request.resource.data.lng >= -180
+                    && request.resource.data.lng <= 180
                     && request.resource.data.geohash is string;
 
       allow create: if request.auth != null
@@ -604,27 +1018,65 @@ service cloud.firestore {
                     && request.resource.data.name is string
                     && request.resource.data.name.size() > 0
                     && request.resource.data.name.size() <= 100
+                    // QA-SEC-003: geographic range guard — a resolved place must
+                    // land on Earth. Blocks garbage coordinates polluting the
+                    // world-readable catalog / distance math.
                     && request.resource.data.lat is number
-                    && request.resource.data.lng is number;
+                    && request.resource.data.lat >= -90
+                    && request.resource.data.lat <= 90
+                    && request.resource.data.lng is number
+                    && request.resource.data.lng >= -180
+                    && request.resource.data.lng <= 180;
 
       // Client-side resolve can race two concurrent selectors of the same
       // never-before-seen placeId; the read-through cache in
-      // ResolveGymPlaceService only calls upsert() on a cache miss, so this
-      // update branch is a narrow, same-shape re-assertion (not an arbitrary
-      // edit surface) — it never changes an existing doc's `source`.
+      // ResolveGymPlaceService only calls upsert() on a cache miss, so the
+      // ONLY legitimate update is that race re-upserting the SAME Place
+      // Details for an already-resolved placeId.
+      //
+      // QA-SEC-003: `gyms` is world-readable and drives gym association and
+      // leaderboards, so the resolved identity fields MUST be pinned to their
+      // existing values. The previous type-only check let ANY authenticated
+      // user overwrite name/lat/lng of any existing gym — catalog vandalism.
+      // Pinning name/lat/lng/source/id equal-to-existing still lets the
+      // same-shape race write through (identical values are a no-op match)
+      // while denying every value change. Mirrors the field-pin idiom used by
+      // userPublicProfiles ranking metrics and trainerPublicProfiles
+      // averageRating/reviewCount above.
       allow update: if request.auth != null
                     && resource.data.source == 'google-places'
-                    && request.resource.data.source == 'google-places'
+                    && request.resource.data.source == resource.data.source
                     && request.resource.data.id == gymId
-                    && request.resource.data.name is string
-                    && request.resource.data.name.size() > 0
-                    && request.resource.data.lat is number
-                    && request.resource.data.lng is number;
+                    && request.resource.data.name == resource.data.name
+                    && request.resource.data.lat == resource.data.lat
+                    && request.resource.data.lng == resource.data.lng;
 
       allow delete: if false;
     }
 
     match /friendships/{friendshipId} {
+      // FREEZE (M-03b, ADR-FOLLOW-015, REQ-FOLLOW-017) — change `follow-model`.
+      //
+      // `friendships` migra a `follows` (arista dirigida). El script de
+      // migración SOLO crea (`batch.create()`, nunca pisa ni borra), así que
+      // un borrado de una friendship ya migrada, ocurrido con una build vieja
+      // DESPUÉS de la migración, no se propagaba: las dos aristas migradas
+      // sobrevivían al origen y el usuario creía haber revocado el acceso sin
+      // haberlo hecho — phantom access (LD-04), la peor falla posible en un
+      // cambio de privacidad.
+      //
+      // El freeze se adelanta a ANTES de la migración (M-03b, antes de M-04)
+      // en vez de ir pegado al flip del gate de lectura (M-07, la versión
+      // anterior de este plan): cerrar la ventana de raíz, en vez de
+      // detectarla con reconciliación de borrados. Deploy de este bloque es
+      // manual — 2.8b — y tiene que preceder al primer `--apply` de la
+      // migración.
+      //
+      // `create`/`update`/`delete` pasan a `if false`. `read` se CONSERVA sin
+      // tocar (ADR-FOLLOW-012): hace falta para el rollback — la
+      // reversibilidad la da el dato intacto, no el código — y para que una
+      // build vieja que solo lee su lista de amigos no se rompa.
+      //
       // Read: only members of the friendship — OR doc does not exist (returns
       // empty snapshot without leaking data). The `resource == null` branch is
       // required for `getByPair()` to gracefully resolve "no friendship yet"
@@ -635,54 +1087,136 @@ service cloud.firestore {
                   && (resource == null
                       || request.auth.uid in resource.data.members);
 
-      // Create: only by the requester, requester in members. Status may be:
-      //   - 'pending' (default flow; owner of the target profile must accept)
-      //   - 'accepted' ONLY IF the target user's public profile has
-      //     `isProfilePublic` truthy at write time (Instagram-style public
-      //     account: no approval required). Enforced via a get() lookup on
-      //     `userPublicProfiles/{otherUid}`.
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // Grafo social DIRIGIDO — reemplaza a `friendships` (change `follow-model`).
+    //
+    // Doc id = '{followerUid}_{followeeUid}', SIN ordenar. Que el id sea
+    // determinístico a partir de la dirección es lo que permite que el gate de
+    // lectura de posts resuelva "¿el lector sigue al autor?" con un lookup
+    // directo por doc id — sin queries, sin índices y con un solo get().
+    //
+    // ADITIVO: en este punto de la migración (M-03) nada lo lee todavía. El
+    // flip del gate de posts ocurre en un PR posterior, y nunca se hace OR
+    // entre `friendships` y `follows`: un OR durante la transición significaría
+    // que dejar de seguir no revoca el acceso, porque el doc legacy `accepted`
+    // seguiría resolviendo true. Es la peor falla posible en un cambio de
+    // privacidad, así que se prohíbe por diseño.
+    match /follows/{followId} {
+      // `resource == null` permite preguntar "¿lo sigo?" y que la respuesta
+      // legítima "no" resuelva en vez de tirar permission-denied.
       //
-      // IMPORTANT: pre-existing profile docs written before the privacy
-      // feature landed do NOT have the `isProfilePublic` field. We treat a
-      // missing field as `true` (public by default — matches
-      // `UserPublicProfile.isProfilePublic` freezed default) via
-      // `.get('isProfilePublic', true)`. Without this fallback every legacy
-      // account would fail auto-accept even though its owner never opted out.
+      // ⚠️ LAS RULES NO SE EVALÚAN DOCUMENTO POR DOCUMENTO EN UNA QUERY.
       //
-      // NOTE on rule cost: the `get()` in the accepted branch runs only when
-      // the client tries to auto-accept. The pending branch (majority path)
-      // stays free of extra reads.
+      // Firestore analiza la query contra la regla y exige poder PROBAR que la
+      // regla se cumple usando SOLO las cláusulas `where`, sin leer un solo
+      // documento. Un campo que el `where` no menciona queda indefinido, y
+      // referenciarlo tira `Property X is undefined on object. for 'list'` —
+      // la query se rechaza entera aunque todos los documentos reales
+      // cumplieran la regla.
+      //
+      // Por eso hay cuatro disyunciones que a nivel de documento son
+      // redundantes entre sí (`members == [followerUid, followeeUid]` está
+      // garantizado por el `create` de abajo): existen para que el planner
+      // pueda probar la regla desde el `where` de CADA query que la app hace.
+      //
+      //   query                                    disyunción que la prueba
+      //   ─────────────────────────────────────    ────────────────────────
+      //   doc id (`getEdge`/`watchEdge`)           members
+      //   members array-contains uid (`allOf`)     members
+      //   followerUid == uid  (`followingOf`)      followerUid
+      //   followeeUid == uid  (`pendingReceivedFor`) followeeUid
+      //   status == 'accepted' de un tercero       status  ← listas ajenas
+      //
+      // Las tres primeras NO son nuevas funcionalmente: sin ellas
+      // `followingOf` y `pendingReceivedFor` quedaban denegadas —el feed
+      // SEGUIDORES y el inbox de solicitudes rotos— porque la regla vieja
+      // sólo nombraba `members`. El test de `read` cubría únicamente lecturas
+      // por doc id, así que el agujero pasó verde.
+      //
+      // `error || true == true` en el lenguaje de rules: las disyunciones que
+      // el planner no puede resolver dan error y NO envenenan el OR mientras
+      // alguna otra sea probablemente verdadera.
+      //
+      // La última disyunción (`status == 'accepted'`) es la que abre las
+      // listas de SEGUIDORES/SEGUIDOS de cualquiera a cualquier autenticado.
+      // Llega hasta ahí y ni un paso más: una solicitud `pending` sigue
+      // siendo asunto de los dos involucrados, y una query sin el filtro de
+      // status no se puede probar, así que se cae entera en vez de filtrar.
+      allow read: if request.auth != null
+                  && (resource == null
+                      || request.auth.uid in resource.data.members
+                      || request.auth.uid == resource.data.followerUid
+                      || request.auth.uid == resource.data.followeeUid
+                      || resource.data.status == 'accepted');
+
+      // Create: solo el follower crea su propia arista.
+      //
+      // El status puede ser 'accepted' SOLO si el destinatario tiene el perfil
+      // público (auto-accept estilo Instagram). Los perfiles anteriores a la
+      // feature de privacidad no tienen el campo: `.get(..., true)` los trata
+      // como públicos, porque tratarlos como privados le rompería el
+      // auto-accept a cuentas que nunca pidieron serlo.
+      //
+      // El get() apunta a un uid CONOCIDO (`followeeUid`). En `friendships`
+      // había que probar uidA y si no uidB: de ≤2 get() a exactamente 1.
       allow create: if request.auth != null
-                    && request.auth.uid == request.resource.data.requesterId
-                    && request.auth.uid in request.resource.data.members
+                    && request.auth.uid == request.resource.data.followerUid
+                    && followId == request.resource.data.followerUid + '_'
+                                   + request.resource.data.followeeUid
+                    && request.resource.data.followerUid
+                       != request.resource.data.followeeUid
+                    && request.resource.data.id == followId
+                    && request.resource.data.keys().hasOnly(
+                         ['id', 'followerUid', 'followeeUid', 'status',
+                          'members', 'createdAt'])
+                    && request.resource.data.members ==
+                         [request.resource.data.followerUid,
+                          request.resource.data.followeeUid]
+                    && request.resource.data.createdAt is timestamp
                     && (
                       request.resource.data.status == 'pending'
-                      ||
-                      (request.resource.data.status == 'accepted'
-                        // The "other" member is whichever of uidA/uidB
-                        // isn't the requester. Instead of computing it,
-                        // just check that ONE of the two members has a
-                        // public profile AND isn't the requester itself.
-                        && (
-                          (request.resource.data.uidA != request.auth.uid
-                            && get(/databases/$(database)/documents/userPublicProfiles/$(request.resource.data.uidA)).data.get('isProfilePublic', true) == true)
-                          ||
-                          (request.resource.data.uidB != request.auth.uid
-                            && get(/databases/$(database)/documents/userPublicProfiles/$(request.resource.data.uidB)).data.get('isProfilePublic', true) == true)
-                        )
-                      )
+                      || (request.resource.data.status == 'accepted'
+                          && get(/databases/$(database)/documents/userPublicProfiles/$(request.resource.data.followeeUid))
+                               .data.get('isProfilePublic', true) == true)
                     );
 
-      // Update: only the non-requester member may update (accept transition only).
-      // SCENARIO-132: requester self-accept blocked.
+      // Update: SOLO el followee, y SOLO para aceptar (pending → accepted).
+      //
+      // El self-accept deja de ser un check que alguien puede borrar sin querer
+      // y pasa a ser estructural: solo el followee puede escribir, y el doc id
+      // fija quién es cada uno.
+      //
+      // Lleva la MISMA allowlist que el create y pinea `id`. No es simetría
+      // cosmética: el update es la única escritura que hace un usuario distinto
+      // del creador del doc. Sin hasOnly, aceptar una solicitud sería una vía
+      // para inyectar campos que las rules no validan; sin el pin de `id`, para
+      // desincronizar `id` del doc id. Los dos productos violan la verificación
+      // de la migración, o sea que la escritura legítima podría fabricar un
+      // documento que el propio change rechaza después.
       allow update: if request.auth != null
-                    && request.auth.uid in resource.data.members
-                    && request.auth.uid != resource.data.requesterId
+                    && request.auth.uid == resource.data.followeeUid
+                    && request.resource.data.keys().hasOnly(
+                         ['id', 'followerUid', 'followeeUid', 'status',
+                          'members', 'createdAt'])
+                    && request.resource.data.id == followId
+                    && resource.data.status == 'pending'
                     && request.resource.data.status == 'accepted'
-                    && request.resource.data.requesterId == resource.data.requesterId
-                    && request.resource.data.members == resource.data.members;
+                    && request.resource.data.followerUid
+                       == resource.data.followerUid
+                    && request.resource.data.followeeUid
+                       == resource.data.followeeUid
+                    && request.resource.data.members == resource.data.members
+                    && request.resource.data.createdAt
+                       == resource.data.createdAt;
 
-      // Delete: either member may remove the friendship.
+      // Delete: cualquiera de los dos miembros. Es la misma operación para
+      // dejar de seguir, cancelar una solicitud enviada y rechazar una
+      // recibida — y también lo que va a habilitar "quitar seguidor".
+      // Borra UNA dirección: la inversa es otro documento y no se toca.
       allow delete: if request.auth != null
                     && request.auth.uid in resource.data.members;
     }
@@ -696,6 +1230,77 @@ service cloud.firestore {
     //   - update: caller en members. members/createdAt inmutables.
     //   - delete: denied.
     match /chats/{chatId} {
+      // QA-CHAT-004: a chat may only be opened between two users who have a real
+      // relationship. Sin este gate cualquier autenticado podía abrir un chat
+      // con —y escribirle a— cualquiera.
+      //
+      // REQ-FOLLOW-012 / LD-08 / ADR-FOLLOW-005 — la rama social pasó a ser
+      // DIRECCIONAL: abrir un chat es poder mandar el primer mensaje, así que
+      // lo que habilita es que el DESTINATARIO siga a quien lo abre
+      // (`follows/{otro}_{yo}` aceptada). Reemplaza al `exists`+`get` sobre
+      // `friendships/{chatId}`, que era simétrico por construcción — el doc id
+      // de `friendships` es el par ordenado, o sea el MISMO documento para las
+      // dos direcciones.
+      //
+      // Costo sin cambios: un lookup direccional cuesta exactamente lo mismo
+      // (`exists`+`get` = 2) que el simétrico que reemplaza. El peor caso
+      // (social falla → se evalúa trainer) sigue en ≤6 sobre el techo de 10.
+      //
+      // `members[0] < members[1]` y `chatId == members[0]+'_'+members[1]` ya los
+      // garantiza el propio `allow create` de abajo, y `members` es inmutable en
+      // el `update`, así que derivar "el otro" del array es exacto y no hace
+      // falta partir el chatId ni agregar ningún dato.
+      //
+      // La rama trainer_link queda SIN CAMBIOS: el link se verifica acá (no se
+      // confía), y SEC-002 garantiza que un link activo fue aceptado por el
+      // trainer, así que ninguna de las dos partes puede fraguar uno.
+      //
+      // ⚠ LAS DOS RAMAS SON EXCLUYENTES, NO UN `||` — y eso es de SEGURIDAD, no
+      // de estilo. Con `followAccepted(...) || ('linkId' in data && ...)`, un
+      // chat social hacía true la primera rama y el `linkId` del payload
+      // **nunca se validaba**: quedaba persistido un linkId inventado. Como
+      // `senderMayPost` (abajo) escapa por la mera PRESENCIA de la clave, eso
+      // le regalaba al que lo plantó escritura permanente, sobreviviendo al
+      // unfollow. O sea: el gate direccional entero quedaba decorativo, que es
+      // exactamente lo que REQ-FOLLOW-012 dice que no puede pasar.
+      //
+      // Con el ternario, la INVARIANTE que sostiene a `senderMayPost` es:
+      // **un doc de chat sólo lleva `linkId` si nombra un link válido.** Se
+      // paga en la escritura (acá y en el pin del `update`), no en cada
+      // mensaje, así que el chat del Coach sigue costando 1 sola llamada.
+      //
+      // Efecto lateral bueno: el peor caso de `chats/create` baja de ≤6 a 4,
+      // porque ya no se evalúan las dos ramas en cadena.
+      function chatCreateOk(members, data) {
+        let me = request.auth.uid;
+        let other = members[0] == me ? members[1] : members[0];
+        return ('linkId' in data) ? (
+          exists(/databases/$(database)/documents/trainer_links/$(data.linkId))
+          // QA H8: 'paused' cuenta como vínculo vigente para chatear (pausar es
+          // un hold temporal, no un corte). Espeja el filtro cliente en
+          // ChatRepository._activeLinkIdBetween.
+          && get(/databases/$(database)/documents/trainer_links/$(data.linkId)).data.status in ['active', 'paused']
+          && get(/databases/$(database)/documents/trainer_links/$(data.linkId)).data.trainerId in members
+          && get(/databases/$(database)/documents/trainer_links/$(data.linkId)).data.athleteId in members
+        ) : followAccepted(other, me);
+      }
+
+      // Mismo permiso que `senderMayPost`, pero sobre un chat que YA existe, así
+      // que sale de `resource.data` y NO paga el `get()` del chat. Igual que
+      // allá, `'linkId' in resource.data` va primero para que el Coach no pague
+      // ninguna llamada de acceso — y acá esa clave ya es confiable, porque
+      // `chatCreateOk` la valida al crear y el `update` la tiene pineada.
+      //
+      // Costo: 0 llamadas en un chat de Coach, 2 en uno social, y sólo cuando el
+      // update toca algo más que `lastRead`.
+      function chatWriterOk(uid) {
+        let other = resource.data.members[0] == uid
+          ? resource.data.members[1]
+          : resource.data.members[0];
+        return 'linkId' in resource.data
+            || followAccepted(other, uid);
+      }
+
       allow read: if request.auth != null
                   && (resource == null
                       || request.auth.uid in resource.data.members);
@@ -704,23 +1309,56 @@ service cloud.firestore {
                     && request.resource.data.members.size() == 2
                     && request.auth.uid in request.resource.data.members
                     && request.resource.data.members[0] < request.resource.data.members[1]
-                    && chatId == request.resource.data.members[0] + '_' + request.resource.data.members[1];
+                    && chatId == request.resource.data.members[0] + '_' + request.resource.data.members[1]
+                    && chatCreateOk(
+                        request.resource.data.members, request.resource.data);
 
       // REQ-CHATUNREAD-008: members may update the chat (preview fields on
       // send) but a member may only touch THEIR OWN key inside lastRead — a
       // user cannot forge/clear another member's read state. members and
       // createdAt remain immutable. get('lastRead', {}) is null-safe for
       // legacy docs that predate the field.
+      //
+      // ⚠ `linkId` PINEADO: es la segunda mitad de la invariante que sostiene a
+      // `senderMayPost`. Sin este pin, esta regla —que no tiene allowlist de
+      // claves— dejaba que cualquier miembro le agregara `linkId` a un chat
+      // social con un update de una línea, y se auto-otorgara escritura
+      // permanente que sobrevive al unfollow. El idioma `get(...,null)` hace
+      // que "ausente en los dos lados" matchee, así que los chats sociales
+      // (que no tienen la clave) no se ven afectados, y además impide BORRAR
+      // el linkId de un chat de Coach.
       allow update: if request.auth != null
                     && request.auth.uid in resource.data.members
                     && request.resource.data.members == resource.data.members
                     && request.resource.data.createdAt == resource.data.createdAt
+                    && request.resource.data.get('linkId', null)
+                       == resource.data.get('linkId', null)
                     && (
                          !request.resource.data.keys().hasAny(['lastRead'])
                          || request.resource.data.get('lastRead', {})
                               .diff(resource.data.get('lastRead', {}))
                               .affectedKeys()
                               .hasOnly([request.auth.uid])
+                       )
+                    // REQ-FOLLOW-012 — el PREVIEW sigue al mismo permiso que el
+                    // mensaje. Sin esto el gate de `messages/create` se rodea
+                    // por el costado: el lado bloqueado no logra escribir el
+                    // mensaje, pero sí `lastMessageText`, que es el texto que la
+                    // otra persona ve en su lista de chats, con badge de
+                    // no-leído. "No te puede escribir" sería falso.
+                    //
+                    // Es una ALLOWLIST, no una lista de campos de preview
+                    // enumerados: cualquier campo que se agregue mañana al doc
+                    // queda denegado por defecto en vez de colarse.
+                    //
+                    // `lastRead` queda AFUERA de la restricción a propósito
+                    // (design §3.3.4): el lado sin escritura tiene que poder
+                    // marcar como leído, o el badge de no-leídos se le clava
+                    // para siempre. Ese caso no paga ninguna llamada de acceso.
+                    && (
+                         request.resource.data.diff(resource.data)
+                           .affectedKeys().hasOnly(['lastRead'])
+                         || chatWriterOk(request.auth.uid)
                        );
 
       allow delete: if false;
@@ -728,6 +1366,36 @@ service cloud.firestore {
       // Messages sub-collection. Mensajes inmutables en MVP — sin edit/delete.
       // read/create gated por members del chat parent.
       match /messages/{messageId} {
+        // REQ-FOLLOW-012 — GATE NUEVO. Hoy esta subcolección gateaba SÓLO por
+        // membresía, o sea que el permiso se evaluaba una única vez, al crear el
+        // chat: eliminar la relación NO cortaba un chat que ya existía. La
+        // asimetría que pide la decisión del dueño es DENTRO del mismo chat
+        // (uno escribe, el otro no), y una regla que corre una sola vez no puede
+        // producir dos permisos distintos para el mismo documento. Por eso el
+        // gate se evalúa por mensaje.
+        //
+        // ABSORBE el check de membresía en vez de sumarse a él: reusa el mismo
+        // `get(chats/{chatId})` que la regla vieja ya hacía para sacar
+        // `members`. Por eso el costo no se duplica.
+        //
+        // Orden de las ramas DELIBERADO: `'linkId' in chat` va PRIMERO para que
+        // un chat de Coach no pague ninguna llamada de acceso extra (1, igual
+        // que hoy) y quede exactamente como está —membresía, sin re-verificar
+        // que el link siga activo—, porque apretar el Coach no es parte de este
+        // change. Un chat social paga 3 sobre el techo de 10.
+        function senderMayPost(uid) {
+          let chat = get(/databases/$(database)/documents/chats/$(chatId)).data;
+          let other = chat.members[0] == uid ? chat.members[1] : chat.members[0];
+          return uid in chat.members
+              && (
+                   'linkId' in chat
+                   || followAccepted(other, uid)
+                 );
+        }
+
+        // Lectura: membresía, SIN CAMBIOS. El lado que perdió la escritura
+        // conserva la conversación entera — bloquear también la lectura sería
+        // borrarle historia que ya recibió.
         allow read: if request.auth != null
                     && request.auth.uid in
                         get(/databases/$(database)/documents/chats/$(chatId)).data.members;
@@ -735,11 +1403,11 @@ service cloud.firestore {
         // REQ-CHATMEDIA-006: validity is OR-based — text OR (mediaUrl + mediaType).
         // A message is valid if it carries non-empty text OR a mediaUrl string
         // together with a mediaType string (e.g. 'image' / 'video').
-        // senderId, membership, and createdAt checks are unchanged.
+        // senderId y createdAt sin cambios; la membresía ahora vive adentro de
+        // senderMayPost.
         allow create: if request.auth != null
                       && request.auth.uid == request.resource.data.senderId
-                      && request.auth.uid in
-                          get(/databases/$(database)/documents/chats/$(chatId)).data.members
+                      && senderMayPost(request.auth.uid)
                       && (
                            (request.resource.data.text is string
                             && request.resource.data.text.size() > 0)
@@ -816,7 +1484,25 @@ service cloud.firestore {
 
     // Daily check-in sub-collection (Fase 4 Etapa 6, REQ-WRC-004).
     // Doc id is the local date key 'YYYY-MM-DD' — one doc per day per user,
-    // providing natural dedup. Location-adjacent data: owner-only R/W.
+    // providing natural dedup: a second check-in the same day OVERWRITES the
+    // first. That is the design, not an accident.
+    //
+    // First real consumer (#643 slice 1): the post-session wellbeing check-in
+    // (lib/features/checkins/) — how the athlete felt, pain yes/no + zone in
+    // the MuscleGroup vocabulary, and an optional free note. Owner-only R/W
+    // was already the right stance and stays untouched: this is the most
+    // sensitive data the app stores. It is never mirrored to
+    // userPublicProfiles and never shared with a trainer — sharing it would
+    // need its own explicit opt-in and its own issue.
+    //
+    // ⚠️ The path was originally reserved for a location-adjacent GYM
+    // check-in (see the still-orphaned checkIn* l10n keys, "¿ESTÁS EN EL GYM
+    // HOY?"). That feature has no client code. If it ever lands it must NOT
+    // reuse this document: same uid + same date would collide.
+    //
+    // Deliberately NO shape validation: slices 2-3 of #643 still add fields,
+    // and a `hasOnly` here would reproduce the forward-compat trap documented
+    // in #635.
     match /users/{uid}/checkIns/{date} {
       allow read, write: if request.auth != null
                          && request.auth.uid == uid;
@@ -908,13 +1594,26 @@ service cloud.firestore {
          && request.resource.data.status == 'confirmed'
          && request.resource.data.athleteId == request.auth.uid)
         ||
-        // Path 3: trainer edits coaching notes on their own appointment.
+        // Path 3: trainer edits coaching notes OR links a Payment on their own
+        // appointment (Slice 2a, Agenda→cobro bridge, money-critical).
         // status / athleteId / trainerId / startsAt stay immutable.
+        // `paymentId` is SET-ONCE: null → a NON-EMPTY STRING (first bill), or
+        // re-assert the SAME value (a notes edit that leaves the charge alone).
+        // A client can never overwrite it with a different Payment id, clear it
+        // back to null, nor forge an empty / non-string value.
+        // NOTE: we deliberately do NOT exists()-check the Payment here —
+        // billAppointment creates the Payment and sets paymentId in the SAME
+        // Firestore transaction, and rules exists() reads pre-commit state, so
+        // an exists() check would reject the legitimate atomic flow.
         (request.auth.uid == resource.data.trainerId
          && request.resource.data.status == resource.data.status
          && request.resource.data.athleteId == resource.data.athleteId
          && request.resource.data.trainerId == resource.data.trainerId
-         && request.resource.data.startsAt == resource.data.startsAt)
+         && request.resource.data.startsAt == resource.data.startsAt
+         && ((resource.data.get('paymentId', null) == null
+              && request.resource.data.get('paymentId', null) is string
+              && request.resource.data.get('paymentId', null).size() > 0)
+             || request.resource.data.get('paymentId', null) == resource.data.get('paymentId', null)))
       );
       allow delete: if false;
     }
@@ -924,26 +1623,129 @@ service cloud.firestore {
     // profile via trainerMonthlyRate. A future subscribe flow may
     // reintroduce a plan catalog with its own rules block.
 
-    // Body measurements / anthropometry. Owned by the TRAINER who recorded them
-    // (recordedBy). The athlete gets read-only of their own. No one else.
+    // Body measurements / anthropometry. Written by the TRAINER who recorded
+    // them (recordedBy) OR self-logged by the athlete about themselves
+    // (athlete-self-measurements). The athlete always reads their own; a
+    // linked+consented trainer reads the athlete's self-logged ones.
     match /measurements/{measurementId} {
+      // QA #508 — value type/range validation, following the payments /
+      // athlete_billing idiom (QA-PAY-007). Before this, `measurements` only
+      // validated athleteId/recordedBy: no value field was checked at all, so a
+      // modified client could persist a negative weight, a string where a
+      // number belongs, or an unbounded `notes` blob.
+      //
+      // Shared by create AND update: MeasurementRepository.add and .update both
+      // write the FULL model via `set(m.toJson())` (no merge), so
+      // request.resource.data is the complete document on both paths and a
+      // single guard covers both — no need for the diff()/affectedKeys() split
+      // athlete_billing requires for its merge writes.
+      //
+      // Bounds MIRROR the client validator (`parsed < 0 || parsed >
+      // _kMaxMetricValue`, _kMaxMetricValue = 500 in log_measurement_screen.dart)
+      // instead of inventing physiological per-field ranges. The hole being
+      // closed is a modified client SKIPPING that form validator, so the rule
+      // enforces exactly what the legit form already enforces — a tighter bound
+      // would reject values the real UI happily accepts. Every numeric field
+      // shares one validator there, hence one uniform [0, 500] here.
+      //
+      // Optional fields are read via get(field, null): json_serializable emits
+      // every optional key with an explicit null, and an all-null-but-one doc
+      // is the normal shape (the form saves whatever subset was filled in).
+      //
+      // `id` is type-checked but deliberately NOT pinned to the doc id (unlike
+      // payments). MeasurementRepository._fromDoc rebuilds the model with
+      // `{...data, 'id': snap.id}`, so the body copy is never read — pinning it
+      // would add a field-PRESENCE requirement that protects nothing observable
+      // while rejecting the legitimately id-less docs that
+      // scripts/rules_test/measurements-self-log.test.js writes.
+      //
+      // ⚠️  COUPLING WARNING — the hasOnly list below is the exact key set of
+      // Measurement.toJson() (measurement.g.dart). Adding a field to the Dart
+      // model without adding it here makes EVERY write to this collection fail.
+      function measurementShapeOk(d) {
+        return d.keys().hasOnly([
+                 'id', 'athleteId', 'recordedBy', 'recordedAt',
+                 'weightKg', 'fatPercentage', 'muscleMassKg',
+                 'shouldersCm', 'chestCm', 'waistCm', 'hipsCm', 'glutesCm',
+                 'bicepsLCm', 'bicepsRCm', 'bicepsFlexedLCm', 'bicepsFlexedRCm',
+                 'forearmLCm', 'forearmRCm',
+                 'upperThighLCm', 'upperThighRCm', 'midThighLCm', 'midThighRCm',
+                 'calfLCm', 'calfRCm',
+                 'notes'
+               ])
+               && optStrMaxLen(d.get('id', null), 128)
+               && d.get('recordedAt', null) is timestamp
+               && optNumInRange(d.get('weightKg', null), 0, 500)
+               && optNumInRange(d.get('fatPercentage', null), 0, 500)
+               && optNumInRange(d.get('muscleMassKg', null), 0, 500)
+               && optNumInRange(d.get('shouldersCm', null), 0, 500)
+               && optNumInRange(d.get('chestCm', null), 0, 500)
+               && optNumInRange(d.get('waistCm', null), 0, 500)
+               && optNumInRange(d.get('hipsCm', null), 0, 500)
+               && optNumInRange(d.get('glutesCm', null), 0, 500)
+               && optNumInRange(d.get('bicepsLCm', null), 0, 500)
+               && optNumInRange(d.get('bicepsRCm', null), 0, 500)
+               && optNumInRange(d.get('bicepsFlexedLCm', null), 0, 500)
+               && optNumInRange(d.get('bicepsFlexedRCm', null), 0, 500)
+               && optNumInRange(d.get('forearmLCm', null), 0, 500)
+               && optNumInRange(d.get('forearmRCm', null), 0, 500)
+               && optNumInRange(d.get('upperThighLCm', null), 0, 500)
+               && optNumInRange(d.get('upperThighRCm', null), 0, 500)
+               && optNumInRange(d.get('midThighLCm', null), 0, 500)
+               && optNumInRange(d.get('midThighRCm', null), 0, 500)
+               && optNumInRange(d.get('calfLCm', null), 0, 500)
+               && optNumInRange(d.get('calfRCm', null), 0, 500)
+               && optStrMaxLen(d.get('notes', null), 2000);
+      }
+
+      // READ branches, cheapest first so get()s only run for the trainer path:
+      //   1. author (trainer OR self-logging athlete) — pure field compare.
+      //   2. subject athlete — own vantage — pure field compare.
+      //   3. [athlete-self-measurements] a SELF-LOGGED doc
+      //      (recordedBy == athleteId) is readable by a trainer ONLY when BOTH
+      //      fixed-path share docs name them: session_shares (live link, kept
+      //      by the syncSessionShareOnTrainerLink CF → follows the CURRENT
+      //      trainer) AND profile_shares (the athlete's own consent toggle,
+      //      the same surface that shares weight/height). Both are keyed by
+      //      athleteId, so a trainer's athleteId-scoped list resolves them ONCE
+      //      (cached), not per-doc — the same idiom already live for setLogs
+      //      (~:852). This is NOT gated on the dead `sharedWithTrainer` bool
+      //      (design.md ADR-ASM-2). Ordering is load-bearing: branches 1/2
+      //      short-circuit before any get().
       allow read: if request.auth != null
                   && (request.auth.uid == resource.data.recordedBy
-                      || request.auth.uid == resource.data.athleteId);
-      // rules-hardening Slice C (AD-1 option b) — Coach-Collection Create
-      // Requires Trainer Role: closes the "any athlete-role user forges a
-      // measurement naming themselves recordedBy" vector. Role-check only,
-      // NOT a trainer_links relationship check — see design.md AD-1 /
-      // engram obs #413.
+                      || request.auth.uid == resource.data.athleteId
+                      || (resource.data.recordedBy == resource.data.athleteId
+                          && exists(/databases/$(database)/documents/session_shares/$(resource.data.athleteId))
+                          && get(/databases/$(database)/documents/session_shares/$(resource.data.athleteId)).data.trainerId == request.auth.uid
+                          && exists(/databases/$(database)/documents/profile_shares/$(resource.data.athleteId))
+                          && get(/databases/$(database)/documents/profile_shares/$(resource.data.athleteId)).data.trainerId == request.auth.uid));
+      // CREATE — dual OR-branch (mirrors the appointments athlete-self-book /
+      // trainer+role pattern). `recordedBy == uid` + athleteId shape checks are
+      // a SHARED precondition of both branches, so a self-logged doc is always
+      // recordedBy == athleteId == uid. The `||` short-circuits on the
+      // athlete-self branch, so a self-logging athlete never triggers the role
+      // get(); a forger naming ANOTHER athleteId always falls through to the
+      // role check and is denied (AD-1 forge vector stays closed).
       allow create: if request.auth != null
                     && request.resource.data.recordedBy == request.auth.uid
-                    && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
                     && request.resource.data.athleteId is string
-                    && request.resource.data.athleteId.size() > 0;
+                    && request.resource.data.athleteId.size() > 0
+                    // QA #508 — value shape. Placed BEFORE the branch below so
+                    // a malformed doc is rejected without paying for the role
+                    // get() on the trainer path.
+                    && measurementShapeOk(request.resource.data)
+                    && (
+                         // Athlete-self branch: may log ONLY about themselves.
+                         request.resource.data.athleteId == request.auth.uid
+                         // Trainer branch (unchanged from rules-hardening Slice C).
+                         || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
+                       );
       allow update: if request.auth != null
                     && resource.data.recordedBy == request.auth.uid
                     && request.resource.data.recordedBy == resource.data.recordedBy
-                    && request.resource.data.athleteId == resource.data.athleteId;
+                    && request.resource.data.athleteId == resource.data.athleteId
+                    && measurementShapeOk(request.resource.data);
       allow delete: if request.auth != null
                     && resource.data.recordedBy == request.auth.uid;
     }
@@ -951,6 +1753,63 @@ service cloud.firestore {
     // Performance tests / physical assessments. Owned by the TRAINER who recorded
     // them (recordedBy). The athlete gets read-only of their own. No one else.
     match /performance_tests/{testId} {
+      // QA #508 — value type/range validation. Same rationale as the
+      // measurements guard above (both collections were left unvalidated by
+      // rules-hardening Slice C, which only added the role gate), and likewise
+      // shared by create and update: PerformanceTestRepository.add and .update
+      // both `set(t.toJson())` the full model, no merge.
+      //
+      // Bounds mirror this screen's OWN validator, which differs from the
+      // measurements one: log_performance_test_screen.dart rejects
+      // `parsed <= 0` and sets NO ceiling. So the floor here is strictly
+      // positive — note that includes sitAndReachCm, which is conventionally a
+      // SIGNED metric but which the form already refuses to take negative; the
+      // rule deliberately tracks the app's contract, not the textbook one.
+      // The 100000 ceiling is the part the client lacks: it exists purely to
+      // block absurd magnitudes (same spirit as payments' amountArs cap) and
+      // sits ~25x above the largest plausible value in the set (cooperMeters,
+      // ~4000 m for a world-class 12-minute test), so it cannot reject real data.
+      //
+      // `id` is type-checked but NOT pinned to the doc id — same reasoning as
+      // the measurements guard above (PerformanceTestRepository._fromDoc also
+      // rebuilds the model with the snapshot id, so the body copy is inert).
+      //
+      // ⚠️  COUPLING WARNING — the hasOnly list below is the exact key set of
+      // PerformanceTest.toJson() (performance_test.g.dart). Adding a field to
+      // the Dart model without adding it here makes EVERY write fail.
+      function performanceTestShapeOk(d) {
+        return d.keys().hasOnly([
+                 'id', 'athleteId', 'recordedBy', 'recordedAt',
+                 'cmjCm', 'squatJumpCm', 'abalakovCm', 'broadJumpCm',
+                 'sprint10mS', 'sprint20mS', 'sprint30mS', 'sprint40mS',
+                 'squat1rmKg', 'benchPress1rmKg', 'deadlift1rmKg',
+                 'overheadPress1rmKg', 'pullUp1rmKg',
+                 'vo2maxMlKgMin', 'courseNavetteLevel', 'cooperMeters',
+                 'sitAndReachCm',
+                 'notes'
+               ])
+               && optStrMaxLen(d.get('id', null), 128)
+               && d.get('recordedAt', null) is timestamp
+               && optPositiveNum(d.get('cmjCm', null), 100000)
+               && optPositiveNum(d.get('squatJumpCm', null), 100000)
+               && optPositiveNum(d.get('abalakovCm', null), 100000)
+               && optPositiveNum(d.get('broadJumpCm', null), 100000)
+               && optPositiveNum(d.get('sprint10mS', null), 100000)
+               && optPositiveNum(d.get('sprint20mS', null), 100000)
+               && optPositiveNum(d.get('sprint30mS', null), 100000)
+               && optPositiveNum(d.get('sprint40mS', null), 100000)
+               && optPositiveNum(d.get('squat1rmKg', null), 100000)
+               && optPositiveNum(d.get('benchPress1rmKg', null), 100000)
+               && optPositiveNum(d.get('deadlift1rmKg', null), 100000)
+               && optPositiveNum(d.get('overheadPress1rmKg', null), 100000)
+               && optPositiveNum(d.get('pullUp1rmKg', null), 100000)
+               && optPositiveNum(d.get('vo2maxMlKgMin', null), 100000)
+               && optPositiveNum(d.get('courseNavetteLevel', null), 100000)
+               && optPositiveNum(d.get('cooperMeters', null), 100000)
+               && optPositiveNum(d.get('sitAndReachCm', null), 100000)
+               && optStrMaxLen(d.get('notes', null), 2000);
+      }
+
       allow read: if request.auth != null
                   && (request.auth.uid == resource.data.recordedBy
                       || request.auth.uid == resource.data.athleteId);
@@ -963,11 +1822,13 @@ service cloud.firestore {
                     && request.resource.data.recordedBy == request.auth.uid
                     && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
                     && request.resource.data.athleteId is string
-                    && request.resource.data.athleteId.size() > 0;
+                    && request.resource.data.athleteId.size() > 0
+                    && performanceTestShapeOk(request.resource.data);
       allow update: if request.auth != null
                     && resource.data.recordedBy == request.auth.uid
                     && request.resource.data.recordedBy == resource.data.recordedBy
-                    && request.resource.data.athleteId == resource.data.athleteId;
+                    && request.resource.data.athleteId == resource.data.athleteId
+                    && performanceTestShapeOk(request.resource.data);
       allow delete: if request.auth != null
                     && resource.data.recordedBy == request.auth.uid;
     }
@@ -987,12 +1848,44 @@ service cloud.firestore {
       // unaffected (SCENARIO-CC-06e regression test). Role-check only, NOT
       // a trainer_links relationship check — see design.md AD-1 / engram
       // obs #413.
-      allow create, update: if request.auth != null
+      // QA-PAY-007 (#447): the combined create+update block is split so each
+      // side can validate the money fields at the right strictness.
+      //
+      // CREATE — strict shape: the model is exactly {trainerId, athleteId,
+      // amountArs, cadence, updatedAt} (AthleteBilling.toJson) and the doc id
+      // is deterministic `${trainerId}_${athleteId}`, so both are enforced.
+      allow create: if request.auth != null
                   && request.resource.data.trainerId == request.auth.uid
-                  && (resource != null
-                      || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer')
+                  && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
                   && request.resource.data.athleteId is string
-                  && request.resource.data.athleteId.size() > 0;
+                  && request.resource.data.athleteId.size() > 0
+                  && docId == request.resource.data.trainerId + '_' + request.resource.data.athleteId
+                  && request.resource.data.keys().hasOnly([
+                       'trainerId', 'athleteId', 'amountArs', 'cadence', 'updatedAt'
+                     ])
+                  && request.resource.data.amountArs is int
+                  && request.resource.data.amountArs > 0
+                  && request.resource.data.amountArs <= 100000000
+                  && request.resource.data.cadence in ['mensual', 'semanal', 'por_sesion', 'suelto']
+                  && request.resource.data.updatedAt is timestamp;
+      // UPDATE — diff-based instead of keys().hasOnly(): setConfig writes via
+      // set(merge:true), so request.resource.data is the POST-merge doc. A
+      // legacy doc carrying a zombie field (e.g. pre-model monthlyRate) would
+      // never pass a strict hasOnly again even though the client didn't touch
+      // that field. affectedKeys() gates what the write CHANGES (identity
+      // fields trainerId/athleteId immutable by omission) while the final
+      // money values are still validated.
+      allow update: if request.auth != null
+                  && resource.data.trainerId == request.auth.uid
+                  && request.resource.data.trainerId == request.auth.uid
+                  && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                       'amountArs', 'cadence', 'updatedAt'
+                     ])
+                  && request.resource.data.amountArs is int
+                  && request.resource.data.amountArs > 0
+                  && request.resource.data.amountArs <= 100000000
+                  && request.resource.data.cadence in ['mensual', 'semanal', 'por_sesion', 'suelto']
+                  && request.resource.data.updatedAt is timestamp;
       allow delete: if request.auth != null && resource.data.trainerId == request.auth.uid;
     }
 
@@ -1008,10 +1901,33 @@ service cloud.firestore {
       allow read: if request.auth != null
                   && (resource == null
                       || request.auth.uid == resource.data.trainerId);
-      allow create, update: if request.auth != null
+      // Create y update SEPARADOS (QA-2026-07-30 C1). Antes iban combinados
+      // validando SOLO el post-image, con dos agujeros que el docId
+      // determinístico `{trainerId}_{athleteId}` (enumerable) hacía triviales:
+      //   1) Squat: un atacante creaba el doc en el docId de OTRO PF con su
+      //      propio trainerId, dejando a la víctima sin poder escribir su nota
+      //      (su update fallaba porque resource.data.trainerId != su uid).
+      //   2) Hijack: como update no fijaba el trainerId previo, un tercero
+      //      reasignaba trainerId con set(merge:true) preservando `note`, y
+      //      después leía la nota privada (la read gate mira resource.data.
+      //      trainerId, el mismo campo que el update dejaba reescribir).
+      // Fix (mismo patrón que follow_up_entries / nutrition_plans): en create
+      // ligar el docId al uid firmante; en update fijar la identidad al
+      // pre-image para que trainerId/athleteId sean inmutables.
+      allow create: if request.auth != null
                   && request.resource.data.trainerId == request.auth.uid
                   && request.resource.data.athleteId is string
-                  && request.resource.data.athleteId.size() > 0;
+                  && request.resource.data.athleteId.size() > 0
+                  && docId == request.resource.data.trainerId + '_'
+                              + request.resource.data.athleteId
+                  && request.resource.data.note is string
+                  && request.resource.data.note.size() < 5000;
+      allow update: if request.auth != null
+                  && resource.data.trainerId == request.auth.uid
+                  && request.resource.data.trainerId == resource.data.trainerId
+                  && request.resource.data.athleteId == resource.data.athleteId
+                  && request.resource.data.note is string
+                  && request.resource.data.note.size() < 5000;
       allow delete: if request.auth != null && resource.data.trainerId == request.auth.uid;
     }
 
@@ -1104,11 +2020,46 @@ service cloud.firestore {
       // payment debt naming themselves trainer" vector. Role-check only,
       // NOT a trainer_links relationship check — see design.md AD-1 /
       // engram obs #413.
+      // QA-PAY-007 (#447): create now validates the money fields — before
+      // this, a legit-role trainer with a modified client could write
+      // amountArs negative/zero/decimal/string (poisoning the totals both
+      // sides see), unbounded concept, or arbitrary status/periodKey.
+      // Calibrated against every real writer: PaymentRepository.add and
+      // AppointmentRepository.billAppointment(s) both stamp id == doc id;
+      // paidPaymentFor legitimately creates already-paid records (status
+      // 'paid' + paidAt); the cita/vencimiento flows legitimately set dueAt
+      // at create (REQ-VENC-13 pins it immutable AFTER create, and only the
+      // CF may touch lastOverdueNotifiedAt — pinned null here).
+      // periodKey: null (porSesión/suelto) | 'YYYY-MM' (mensual) |
+      // 'YYYY-Www' (ISO week, semanal) — the two formats
+      // pagosPorCobrarProvider computes.
       allow create: if request.auth != null
                   && request.resource.data.trainerId == request.auth.uid
                   && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
                   && request.resource.data.athleteId is string
-                  && request.resource.data.athleteId.size() > 0;
+                  && request.resource.data.athleteId.size() > 0
+                  && request.resource.data.keys().hasOnly([
+                       'id', 'trainerId', 'athleteId', 'amountArs', 'concept',
+                       'status', 'periodKey', 'createdAt', 'paidAt', 'dueAt',
+                       'lastOverdueNotifiedAt'
+                     ])
+                  && request.resource.data.id == paymentId
+                  && request.resource.data.amountArs is int
+                  && request.resource.data.amountArs > 0
+                  && request.resource.data.amountArs <= 100000000
+                  && request.resource.data.concept is string
+                  && request.resource.data.concept.size() > 0
+                  && request.resource.data.concept.size() <= 200
+                  && request.resource.data.status in ['pending', 'paid']
+                  && (request.resource.data.get('periodKey', null) == null
+                      || (request.resource.data.periodKey is string
+                          && request.resource.data.periodKey.matches('^[0-9]{4}-(W[0-9]{2}|[0-9]{2})$')))
+                  && request.resource.data.createdAt is timestamp
+                  && (request.resource.data.get('paidAt', null) == null
+                      || request.resource.data.paidAt is timestamp)
+                  && (request.resource.data.get('dueAt', null) == null
+                      || request.resource.data.dueAt is timestamp)
+                  && request.resource.data.get('lastOverdueNotifiedAt', null) == null;
       // REQ-VENC-13: tightened update rule — field-level protection.
       // Follows the `reviews` rule pattern (keys().hasOnly + per-field equality).
       // Audited: markPaid/markManyPaid send only {status, paidAt} — still pass.

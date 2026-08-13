@@ -1,4 +1,4 @@
-import 'dart:developer' as developer;
+import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,13 +6,17 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../../../../app/theme/app_palette.dart';
+import '../../../../../../core/widgets/motion/treino_state_switcher.dart';
+import '../../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../../../core/widgets/treino_icon.dart';
+import '../../../../../chat/application/chat_media_send_controller.dart';
 import '../../../../../chat/application/chat_providers.dart';
 import '../../../../../chat/domain/media_type.dart';
 import '../../../../../chat/domain/message.dart';
 import '../../../../../profile/application/user_public_profile_providers.dart';
 import '../../../../../workout/application/session_providers.dart'
     show currentUidProvider;
+import 'avatar_color.dart';
 import 'chat_message_bubble.dart';
 
 /// Panel derecho del split-pane: header con el otro user + lista invertida
@@ -26,9 +30,31 @@ import 'chat_message_bubble.dart';
 /// Videos se renderean inline en la burbuja usando el mismo
 /// `FirebaseStorageVideoPlayer` que mobile, para mantener UX consistente.
 class ChatDetailPane extends ConsumerStatefulWidget {
-  const ChatDetailPane({super.key, required this.chatId});
+  const ChatDetailPane({
+    super.key,
+    required this.chatId,
+    this.peerUid,
+    this.peerNameInitial,
+  });
 
   final String chatId;
+
+  /// Peer's uid when the caller already knows it (e.g. the alumno-detail
+  /// Chat tab, which is fixed to one athlete). When provided, [_Header]
+  /// uses it directly instead of scanning [chatsForCurrentUserProvider] —
+  /// skips a cold stream hop that otherwise causes a placeholder flash
+  /// ("Usuario eliminado" → "…" → real name) the first time this pane
+  /// mounts. `null` preserves the original chat-derived resolution (global
+  /// chat section, which doesn't know the peer up front).
+  final String? peerUid;
+
+  /// Peer's already-resolved display name when the caller has it warm
+  /// (e.g. from the athlete-detail header's own profile watch). Used as
+  /// the header's fallback/initial text WHILE [userPublicProfileProvider]
+  /// is loading, instead of the generic '…' / 'Usuario eliminado'
+  /// placeholders. The live profile value is preferred once it resolves
+  /// with a non-empty `displayName` — this is only a warm-start hint.
+  final String? peerNameInitial;
 
   @override
   ConsumerState<ChatDetailPane> createState() => _ChatDetailPaneState();
@@ -37,8 +63,13 @@ class ChatDetailPane extends ConsumerStatefulWidget {
 class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
   final _composerCtrl = TextEditingController();
   bool _sending = false;
-  bool _uploading = false;
-  double _uploadProgress = 0;
+
+  // Upload state (progress + composer disabled) vive en
+  // chatMediaSendControllerProvider(chatId): sobrevive al dispose del pane y
+  // a los cambios de chat vía didUpdateWidget (issue #435).
+
+  bool get _mediaSendInFlight =>
+      ref.read(chatMediaSendControllerProvider(widget.chatId)).uploading;
 
   @override
   void initState() {
@@ -79,7 +110,7 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
 
   Future<void> _send() async {
     final text = _composerCtrl.text.trim();
-    if (text.isEmpty || _sending) return;
+    if (text.isEmpty || _sending || _mediaSendInFlight) return;
     final uid = ref.read(currentUidProvider);
     if (uid == null) return;
     setState(() => _sending = true);
@@ -108,7 +139,7 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
   /// [_pickAndSendMedia] con el [MediaType] elegido. Mismo patrón que el
   /// chat mobile — un solo entrypoint desde el composer.
   Future<void> _openAttachMenu() async {
-    if (_uploading || _sending) return;
+    if (_sending || _mediaSendInFlight) return;
     final palette = AppPalette.of(context);
     final choice = await showModalBottomSheet<MediaType>(
       context: context,
@@ -146,9 +177,13 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
   /// Corre el pick + upload + send de una media (foto o video). Handler
   /// agnóstico usado por el menú del composer.
   Future<void> _pickAndSendMedia(MediaType mediaType) async {
-    if (_uploading || _sending) return;
+    if (_sending || _mediaSendInFlight) return;
     final uid = ref.read(currentUidProvider);
     if (uid == null) return;
+    // Capturado ANTES del picker: didUpdateWidget puede cambiar widget.chatId
+    // sin desmontar el pane — el adjunto debe aterrizar en el chat donde el
+    // PF lo eligió, no en el que quedó visible (issue #435).
+    final chatId = widget.chatId;
 
     final picker = ImagePicker();
     // On web, imageQuality is ignored by the platform but harmless — mobile
@@ -165,55 +200,17 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
     }
     if (file == null || !mounted) return;
 
-    setState(() {
-      _uploading = true;
-      _uploadProgress = 0;
-    });
-
-    try {
-      final uploadService = ref.read(chatMediaUploadServiceProvider);
-      final mediaUrl = await uploadService.upload(
-        file.path,
-        chatId: widget.chatId,
-        mediaType: mediaType,
-        onProgress: (fraction) {
-          if (mounted) setState(() => _uploadProgress = fraction);
-        },
-      );
-
-      if (!mounted) return;
-
-      await ref.read(chatRepositoryProvider).sendMessage(
-            chatId: widget.chatId,
+    // Fire-and-forget A PROPÓSITO (issue #435): el controller vive en el
+    // ProviderContainer y completa upload+send aunque el pane muera o cambie
+    // de chat. Errores, cleanup de huérfanos y aviso al usuario (snackbar
+    // por el ScaffoldMessenger root) son responsabilidad del controller.
+    unawaited(
+      ref.read(chatMediaSendControllerProvider(chatId).notifier).sendMedia(
+            localPath: file.path,
             senderId: uid,
-            mediaUrl: mediaUrl,
             mediaType: mediaType,
-          );
-    } catch (e, st) {
-      developer.log(
-        'chat web media upload/send failed',
-        name: 'chat',
-        error: e,
-        stackTrace: st,
-      );
-      if (mounted) {
-        final label = mediaType == MediaType.image ? 'la foto' : 'el video';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'No pudimos enviar $label. Reintentá.', // i18n: Fase W2
-            ),
           ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _uploading = false;
-          _uploadProgress = 0;
-        });
-      }
-    }
+    );
   }
 
   @override
@@ -221,46 +218,58 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
     final palette = AppPalette.of(context);
     final currentUid = ref.watch(currentUidProvider);
     final messagesAsync = ref.watch(messagesProvider(widget.chatId));
+    final mediaSend = ref.watch(chatMediaSendControllerProvider(widget.chatId));
 
     return Container(
       color: palette.bg,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _Header(chatId: widget.chatId),
-          const Divider(height: 1),
+          _Header(
+            chatId: widget.chatId,
+            peerUid: widget.peerUid,
+            peerNameInitial: widget.peerNameInitial,
+          ),
+          Divider(height: 1, color: palette.border),
           Expanded(
-            child: messagesAsync.when(
-              loading: () => Center(
-                child: CircularProgressIndicator(color: palette.accent),
-              ),
-              error: (_, __) => Center(
-                child: Text(
-                  'No pudimos cargar los mensajes.', // i18n: Fase W2
-                  style: GoogleFonts.barlow(
-                    fontWeight: FontWeight.w400,
-                    fontSize: 13,
-                    color: palette.textMuted,
+            child: TreinoStateSwitcher(
+              childKey: ValueKey(messagesAsync.when(
+                loading: () => 'loading',
+                error: (_, __) => 'error',
+                data: (_) => 'data',
+              )),
+              child: messagesAsync.when(
+                loading: () => Center(
+                  child: CircularProgressIndicator(color: palette.accent),
+                ),
+                error: (_, __) => Center(
+                  child: Text(
+                    'No pudimos cargar los mensajes.', // i18n: Fase W2
+                    style: GoogleFonts.barlow(
+                      fontWeight: FontWeight.w400,
+                      fontSize: 13,
+                      color: palette.textMuted,
+                    ),
                   ),
                 ),
-              ),
-              data: (messages) => _MessagesList(
-                messages: messages,
-                currentUid: currentUid ?? '',
+                data: (messages) => _MessagesList(
+                  messages: messages,
+                  currentUid: currentUid ?? '',
+                ),
               ),
             ),
           ),
-          const Divider(height: 1),
-          if (_uploading)
+          Divider(height: 1, color: palette.border),
+          if (mediaSend.uploading)
             LinearProgressIndicator(
-              value: _uploadProgress > 0 ? _uploadProgress : null,
+              value: mediaSend.progress > 0 ? mediaSend.progress : null,
               minHeight: 2,
               color: palette.accent,
               backgroundColor: palette.bgCard,
             ),
           _Composer(
             controller: _composerCtrl,
-            sending: _sending || _uploading,
+            sending: _sending || mediaSend.uploading,
             onSend: _send,
             onAttach: _openAttachMenu,
             palette: palette,
@@ -275,30 +284,67 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
 /// Resuelve `otherUid` desde el chat document para evitar duplicar la
 /// lógica con el row de la lista (cada uno hace su `_otherUidOf`).
 class _Header extends ConsumerWidget {
-  const _Header({required this.chatId});
+  const _Header({required this.chatId, this.peerUid, this.peerNameInitial});
   final String chatId;
+
+  /// See [ChatDetailPane.peerUid].
+  final String? peerUid;
+
+  /// See [ChatDetailPane.peerNameInitial].
+  final String? peerNameInitial;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final uid = ref.watch(currentUidProvider);
-    final chatsAsync = ref.watch(chatsForCurrentUserProvider);
-    final otherUid = chatsAsync.maybeWhen(
-      data: (chats) {
-        for (final c in chats) {
-          if (c.chatId != chatId) continue;
-          final others = c.members.where((m) => m != uid).toList();
-          if (others.isNotEmpty) return others.first;
-          return c.members.isNotEmpty ? c.members.first : null;
-        }
-        return null;
-      },
-      orElse: () => null,
-    );
+
+    // Cuando el caller YA conoce el peer (alumno-detail Chat tab) usamos ese
+    // uid directo — evita el hop frío por `chatsForCurrentUserProvider`, que
+    // no está warm ahí (issue: name flash). Sin `peerUid` (sección de chat
+    // global, que no sabe el peer de antemano) se preserva la derivación
+    // original desde el chat.
+    String? otherUid = peerUid;
+    if (otherUid == null) {
+      final chatsAsync = ref.watch(chatsForCurrentUserProvider);
+      // `valueOrNull` preserva la lista previa durante reloads/errores
+      // transitorios → el header no parpadea a "Usuario eliminado" al cambiar
+      // de chat (mismo bug que la lista).
+      for (final c in (chatsAsync.valueOrNull ?? const [])) {
+        if (c.chatId != chatId) continue;
+        final others = c.members.where((m) => m != uid).toList();
+        otherUid = others.isNotEmpty
+            ? others.first
+            : (c.members.isNotEmpty ? c.members.first : null);
+        break;
+      }
+    }
 
     final pubAsync = otherUid != null
         ? ref.watch(userPublicProfileProvider(otherUid))
         : const AsyncValue.data(null);
+
+    // Nombre a mostrar mientras el perfil vivo está loading/ausente. Con
+    // `peerNameInitial` (ya resuelto por el caller, p.ej. el header del
+    // alumno-detail) lo mostramos de entrada en vez de '…' /
+    // 'Usuario eliminado' — el perfil vivo puede estar más fresco, así que
+    // sólo pisa el initial cuando resuelve con un `displayName` no vacío.
+    //
+    // `_usableName` normaliza '' como "ausente" (igual que `null`) en TODOS
+    // los puntos de uso (nombre y avatar) — antes de este fix, `''` se
+    // trataba de forma inconsistente: a veces "ausente" (`isNotEmpty`) y a
+    // veces se dejaba pasar (`?? '…'` sólo atrapa `null`). Nota: esto es una
+    // normalización deliberada vs. el comportamiento pre-fix, donde un
+    // `displayName` vivo == '' en el chat global (peerNameInitial null)
+    // renderaba el header en blanco — un bug latente, no un comportamiento
+    // a preservar. Con la normalización, ese caso ahora cae en 'Usuario
+    // eliminado', que es más sensato que un header vacío.
+    final resolvedName = pubAsync.maybeWhen(
+      data: (p) =>
+          _usableName(p?.displayName) ??
+          _usableName(peerNameInitial) ??
+          'Usuario eliminado', // i18n: Fase W2
+      orElse: () => _usableName(peerNameInitial) ?? '…', // i18n: Fase W2
+    );
 
     return Container(
       color: palette.bgCard,
@@ -307,7 +353,8 @@ class _Header extends ConsumerWidget {
         children: [
           CircleAvatar(
             radius: 18,
-            backgroundColor: palette.bg,
+            // Mockup: avatar de color por usuario (inicial blanca).
+            backgroundColor: avatarColorFor(otherUid ?? ''),
             backgroundImage: pubAsync.maybeWhen(
               data: (p) => (p?.avatarUrl != null && p!.avatarUrl!.isNotEmpty)
                   ? NetworkImage(p.avatarUrl!)
@@ -318,26 +365,38 @@ class _Header extends ConsumerWidget {
               data: (p) =>
                   (p?.avatarUrl == null || (p?.avatarUrl ?? '').isEmpty)
                       ? Text(
-                          (p?.displayName ?? '?').isNotEmpty
-                              ? (p?.displayName ?? '?')[0].toUpperCase()
-                              : '?',
+                          _avatarInitial(p?.displayName),
                           style: GoogleFonts.barlowCondensed(
                             fontWeight: FontWeight.w700,
                             fontSize: 14,
-                            color: palette.textMuted,
+                            color: Colors.white,
                           ),
                         )
                       : null,
-              orElse: () => const SizedBox.shrink(),
+              // Loading/error SIN `peerNameInitial` usable (sección de chat
+              // global, o alumno-detail con initial vacío): preserva el
+              // círculo vacío — mismo criterio "ausente" que el nombre
+              // (`_usableName`), así avatar y nombre nunca se contradicen
+              // (nombre '…' con avatar en blanco, nunca con una letra).
+              // Loading/error CON `peerNameInitial` usable (alumno-detail
+              // Chat tab): la letra debe verse desde el primer frame, igual
+              // que el nombre — evita el mismo flash que motivó este fix.
+              orElse: () => _usableName(peerNameInitial) == null
+                  ? const SizedBox.shrink()
+                  : Text(
+                      _avatarInitial(null),
+                      style: GoogleFonts.barlowCondensed(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: Colors.white,
+                      ),
+                    ),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              pubAsync.maybeWhen(
-                data: (p) => p?.displayName ?? 'Usuario eliminado',
-                orElse: () => '…',
-              ),
+              resolvedName,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: GoogleFonts.barlow(
@@ -351,6 +410,25 @@ class _Header extends ConsumerWidget {
       ),
     );
   }
+
+  /// Letra del avatar: prioriza el `displayName` VIVO del perfil, cae a
+  /// [peerNameInitial] (warm-start del caller) y por último a `'?'`. Mismo
+  /// orden de prioridad y misma regla de "ausente" (vía [_usableName]) que
+  /// [resolvedName] en `build` — avatar y nombre nunca deberían disentir.
+  String _avatarInitial(String? liveDisplayName) {
+    final name = _usableName(liveDisplayName) ?? _usableName(peerNameInitial);
+    // `.characters.first` en vez de `name[0]`: grapheme-cluster safe para
+    // emoji/caracteres astrales en el displayName (mismo patrón que
+    // `_computeInitials` en `lib/features/home/widgets/home_header.dart`).
+    return name != null ? name.characters.first.toUpperCase() : '?';
+  }
+
+  /// Normaliza `''` como "ausente" (igual que `null`) — único punto de
+  /// verdad para la regla de emptiness usada por [resolvedName] y
+  /// [_avatarInitial], así el nombre y la letra del avatar nunca disienten
+  /// sobre si un valor cuenta como "hay dato" o no.
+  static String? _usableName(String? s) =>
+      (s != null && s.isNotEmpty) ? s : null;
 }
 
 class _MessagesList extends StatelessWidget {
@@ -448,25 +526,33 @@ class _Composer extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          // Botón "Adjuntar" — V2 habilitado (foto). Se deshabilita mientras
-          // hay upload o send en curso para evitar dobles envíos.
+          // Botón "Adjuntar" — mockup: círculo con "+". Se deshabilita
+          // mientras hay upload o send en curso para evitar dobles envíos.
           Tooltip(
-            message: 'Adjuntar foto', // i18n: Fase W2
-            child: IconButton(
+            message: 'Adjuntar foto o video', // i18n: Fase W2
+            child: TreinoTappable(
               key: const Key('chat_composer_attach_button'),
-              icon: Icon(
-                TreinoIcon.attach,
-                size: 20,
-                color: sending
-                    ? palette.textMuted.withValues(alpha: 0.4)
-                    : palette.accent,
+              onTap: sending ? null : onAttach,
+              child: Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: palette.bg,
+                  border: Border.all(color: palette.border),
+                ),
+                child: Icon(
+                  Icons.add,
+                  size: 22,
+                  color: sending
+                      ? palette.textMuted.withValues(alpha: 0.4)
+                      : palette.accent,
+                ),
               ),
-              onPressed: sending ? null : onAttach,
-              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-              padding: EdgeInsets.zero,
             ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 8),
           Expanded(
             child: TextField(
               key: const Key('chat_composer_field'),
@@ -507,26 +593,33 @@ class _Composer extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 6),
-          IconButton(
+          const SizedBox(width: 8),
+          // Botón enviar — mockup: cuadro mint sólido con el avión en el
+          // color de fondo. Redondeado, no un IconButton suelto.
+          TreinoTappable(
             key: const Key('chat_send_button'),
-            icon: sending
-                ? SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: palette.accent,
-                    ),
-                  )
-                : Icon(
-                    TreinoIcon.send,
-                    size: 20,
-                    color: palette.accent,
-                  ),
-            onPressed: sending ? null : onSend,
-            constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-            padding: EdgeInsets.zero,
+            onTap: sending ? null : onSend,
+            child: Container(
+              width: 44,
+              height: 44,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: sending
+                    ? palette.accent.withValues(alpha: 0.5)
+                    : palette.accent,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: sending
+                  ? SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: palette.bg,
+                      ),
+                    )
+                  : Icon(TreinoIcon.send, size: 20, color: palette.bg),
+            ),
           ),
         ],
       ),

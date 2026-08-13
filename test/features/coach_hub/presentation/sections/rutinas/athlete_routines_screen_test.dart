@@ -27,6 +27,7 @@ Routine _routine({
   int days = 1,
   int numWeeks = 1,
   RoutineStatus status = RoutineStatus.active,
+  bool presenceMasked = false, // true → activeWeeks populated (Fase 4c)
 }) =>
     Routine(
       id: id,
@@ -43,7 +44,7 @@ Routine _routine({
           RoutineDay(
             dayNumber: i + 1,
             name: 'Día ${i + 1}',
-            slots: const [
+            slots: [
               RoutineSlot(
                 exerciseId: 'e',
                 exerciseName: 'Ex',
@@ -52,7 +53,8 @@ Routine _routine({
                 targetRepsMin: 8,
                 targetRepsMax: 8,
                 restSeconds: 60,
-                sets: [SetSpec(reps: 8)],
+                sets: const [SetSpec(reps: 8)],
+                activeWeeks: presenceMasked ? const [0] : const [],
               ),
             ],
           ),
@@ -156,18 +158,21 @@ void main() {
       expect(find.text('CREATE $_athleteId'), findsOneWidget);
     });
 
-    testWidgets('a periodized routine is view-only (tap does not open editor)',
+    testWidgets(
+        'tapping a routine with a presence mask also opens the editor (Fase 4c parity)',
         (tester) async {
-      await _pump(
-          tester, [_routine(id: 'r9', name: 'Periodizada', numWeeks: 4)]);
+      await _pump(tester, [
+        _routine(
+            id: 'r9', name: 'Periodizada', numWeeks: 2, presenceMasked: true)
+      ]);
 
-      expect(find.text('Editá en la app'), findsOneWidget);
+      // No more "view-only" hint — the editor has full parity now.
+      expect(find.text('Editá en la app'), findsNothing);
 
       await tester.tap(find.text('Periodizada'));
       await tester.pumpAndSettle();
 
-      expect(find.text('EDIT r9'), findsNothing); // stayed on the list
-      expect(find.text('Periodizada'), findsOneWidget);
+      expect(find.text('EDIT r9'), findsOneWidget);
     });
   });
 }

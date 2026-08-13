@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart' as intl;
 
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/workout/domain/exercise_progression.dart';
@@ -27,14 +28,17 @@ ExerciseProgressionChartLabels _labels({
       bestSessionVolumeLabel: bestSessionVolumeLabel,
       volumeUnit: volumeUnit,
       weightUnit: weightUnit,
-      frequencyLabel:
-          frequencyLabel ?? (n) => '$n sesiones en las últimas 8 semanas',
+      frequencyLabel: frequencyLabel ?? (n) => '$n sesiones en este período',
       singlePointHint: singlePointHint,
       emptyHint: emptyHint,
     );
 
 ProgressionPoint _pt(int dayOffset, double value) =>
     ProgressionPoint(date: DateTime(2025, 1, dayOffset), value: value);
+
+// UTC-flagged noon: safe under TZ=UTC CI and the ART calendar frame (#398).
+ProgressionPoint _ptUtc(int month, int day, double value) =>
+    ProgressionPoint(date: DateTime.utc(2026, month, day, 12), value: value);
 
 Widget _wrap(Widget child) => MaterialApp(
       theme: AppTheme.dark(),
@@ -49,7 +53,7 @@ ExerciseProgression _progression({
   List<ProgressionPoint> oneRepMaxSeries = const [],
   List<ProgressionPoint> bestSetVolumeSeries = const [],
   List<ProgressionPoint> bestSessionVolumeSeries = const [],
-  int frequencyLast8Weeks = 0,
+  int frequencySessionCount = 0,
 }) =>
     ExerciseProgression(
       exerciseId: 'squat',
@@ -59,7 +63,7 @@ ExerciseProgression _progression({
       bestSetVolumeSeries: bestSetVolumeSeries,
       bestSessionVolumeSeries: bestSessionVolumeSeries,
       personalRecords: const [],
-      frequencyLast8Weeks: frequencyLast8Weeks,
+      frequencySessionCount: frequencySessionCount,
     );
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -78,7 +82,7 @@ void main() {
           _pt(10, 285.0),
           _pt(15, 475.0)
         ],
-        frequencyLast8Weeks: 3,
+        frequencySessionCount: 3,
       );
 
       await tester.pumpWidget(_wrap(
@@ -106,7 +110,7 @@ void main() {
         oneRepMaxSeries: [_pt(5, 81.7)],
         bestSetVolumeSeries: [_pt(5, 350.0)],
         bestSessionVolumeSeries: [_pt(5, 350.0)],
-        frequencyLast8Weeks: 1,
+        frequencySessionCount: 1,
       );
 
       await tester.pumpWidget(_wrap(
@@ -155,14 +159,13 @@ void main() {
         oneRepMaxSeries: [_pt(5, 93.3), _pt(10, 99.0)],
         bestSetVolumeSeries: [_pt(5, 400.0), _pt(10, 270.0)],
         bestSessionVolumeSeries: [_pt(5, 400.0), _pt(10, 285.0)],
-        frequencyLast8Weeks: 5,
+        frequencySessionCount: 5,
       );
 
       await tester.pumpWidget(_wrap(
         ExerciseProgressionChart(
           progression: progression,
-          labels: _labels(
-              frequencyLabel: (n) => '$n sesiones en las últimas 8 semanas'),
+          labels: _labels(frequencyLabel: (n) => '$n sesiones en este período'),
           localeName: 'es_AR',
         ),
       ));
@@ -235,7 +238,7 @@ void main() {
         oneRepMaxSeries: [_pt(5, 116.6667)],
         bestSetVolumeSeries: [_pt(5, 500.0)],
         bestSessionVolumeSeries: [_pt(5, 500.0)],
-        frequencyLast8Weeks: 1,
+        frequencySessionCount: 1,
       );
 
       await tester.pumpWidget(_wrap(
@@ -264,7 +267,7 @@ void main() {
         oneRepMaxSeries: [_pt(5, 93.3), _pt(10, 99.0)],
         bestSetVolumeSeries: [_pt(5, 400.0), _pt(10, 270.0)],
         bestSessionVolumeSeries: [_pt(5, 400.0), _pt(10, 285.0)],
-        frequencyLast8Weeks: 2,
+        frequencySessionCount: 2,
       );
 
       await tester.pumpWidget(_wrap(
@@ -292,6 +295,87 @@ void main() {
       await tester.tap(find.text('Mejor serie'));
       await tester.pump();
       expect(find.byType(ExerciseProgressionChart), findsOneWidget);
+    });
+
+    // #383 — X axis is point-index-based. Without an explicit interval,
+    // fl_chart samples fractional Xs and value.round() maps neighbouring
+    // samples to the same index → duplicated labels + skipped ones.
+    testWidgets('#383: >4 points renders each visible axis date exactly once',
+        (tester) async {
+      // Issue repro: 6 sessions (19 jun … 17 jul) → label subset {0, 2, 3, 5}.
+      final series = [
+        _ptUtc(6, 19, 60.0),
+        _ptUtc(6, 25, 62.5),
+        _ptUtc(7, 1, 65.0),
+        _ptUtc(7, 7, 67.5),
+        _ptUtc(7, 13, 70.0),
+        _ptUtc(7, 17, 72.5),
+      ];
+      final progression = _progression(
+        heaviestWeightSeries: series,
+        oneRepMaxSeries: series,
+        bestSetVolumeSeries: series,
+        bestSessionVolumeSeries: series,
+        frequencySessionCount: 6,
+      );
+
+      await tester.pumpWidget(_wrap(
+        ExerciseProgressionChart(
+          progression: progression,
+          labels: _labels(),
+          localeName: 'es_AR',
+        ),
+      ));
+      await tester.pump();
+
+      String label(int i) =>
+          intl.DateFormat('d MMM', 'es_AR').format(series[i].date);
+
+      // Broken sampling rendered '1 jul', '7 jul' and '17 jul' twice each.
+      for (final i in [0, 2, 3, 5]) {
+        expect(find.text(label(i)), findsOneWidget,
+            reason: 'axis label for point $i must appear exactly once');
+      }
+      // Indices outside the ≤4-label subset stay off the axis; their points
+      // remain visible as dots with tooltip.
+      for (final i in [1, 4]) {
+        expect(find.text(label(i)), findsNothing,
+            reason: 'point $i is not part of the label subset');
+      }
+    });
+
+    testWidgets('#383: ≤4 points labels every point date exactly once',
+        (tester) async {
+      final series = [
+        _ptUtc(6, 19, 60.0),
+        _ptUtc(6, 25, 62.5),
+        _ptUtc(7, 1, 65.0),
+        _ptUtc(7, 7, 67.5),
+      ];
+      final progression = _progression(
+        heaviestWeightSeries: series,
+        oneRepMaxSeries: series,
+        bestSetVolumeSeries: series,
+        bestSessionVolumeSeries: series,
+        frequencySessionCount: 4,
+      );
+
+      await tester.pumpWidget(_wrap(
+        ExerciseProgressionChart(
+          progression: progression,
+          labels: _labels(),
+          localeName: 'es_AR',
+        ),
+      ));
+      await tester.pump();
+
+      String label(int i) =>
+          intl.DateFormat('d MMM', 'es_AR').format(series[i].date);
+
+      for (var i = 0; i < series.length; i++) {
+        expect(find.text(label(i)), findsOneWidget,
+            reason: 'axis label for point $i must appear exactly once');
+      }
     });
   });
 }

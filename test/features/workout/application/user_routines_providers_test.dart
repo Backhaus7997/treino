@@ -255,8 +255,7 @@ void main() {
       sub.close();
     });
 
-    test(
-        'per-user isolation: routines created by another uid are excluded',
+    test('per-user isolation: routines created by another uid are excluded',
         () async {
       // Regression guard: filter must respect `createdBy`, not just visibility.
       final firestore = FakeFirebaseFirestore();

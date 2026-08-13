@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../profile/application/user_public_profile_providers.dart';
 import '../../application/trainer_link_providers.dart';
@@ -69,41 +70,52 @@ class _AthletePickerSheetContent extends ConsumerWidget {
                 ),
               ),
               Expanded(
-                child: linksAsync.when(
-                  loading: () => Center(
-                    child: CircularProgressIndicator(color: palette.accent),
-                  ),
-                  error: (_, __) => Center(
-                    child: Text(
-                      'No pudimos cargar tus alumnos.',
-                      style: GoogleFonts.barlow(
-                          color: palette.textMuted, fontSize: 14),
+                child: TreinoStateSwitcher(
+                  childKey: ValueKey(linksAsync.when(
+                    loading: () => 'loading',
+                    error: (_, __) => 'error',
+                    data: (links) => links
+                            .where((l) => l.status == TrainerLinkStatus.active)
+                            .isEmpty
+                        ? 'empty'
+                        : 'data',
+                  )),
+                  child: linksAsync.when(
+                    loading: () => Center(
+                      child: CircularProgressIndicator(color: palette.accent),
                     ),
+                    error: (_, __) => Center(
+                      child: Text(
+                        'No pudimos cargar tus alumnos.',
+                        style: GoogleFonts.barlow(
+                            color: palette.textMuted, fontSize: 14),
+                      ),
+                    ),
+                    data: (links) {
+                      final active = links
+                          .where((l) => l.status == TrainerLinkStatus.active)
+                          .toList();
+                      if (active.isEmpty) {
+                        return _EmptyState(palette: palette);
+                      }
+                      return ListView.separated(
+                        controller: scrollController,
+                        padding: const EdgeInsets.only(bottom: 16),
+                        itemCount: active.length,
+                        separatorBuilder: (_, __) =>
+                            Divider(color: palette.border, height: 1),
+                        itemBuilder: (context, index) {
+                          final link = active[index];
+                          return _AthleteTile(
+                            athleteId: link.athleteId,
+                            palette: palette,
+                            onTap: () =>
+                                Navigator.of(context).pop(link.athleteId),
+                          );
+                        },
+                      );
+                    },
                   ),
-                  data: (links) {
-                    final active = links
-                        .where((l) => l.status == TrainerLinkStatus.active)
-                        .toList();
-                    if (active.isEmpty) {
-                      return _EmptyState(palette: palette);
-                    }
-                    return ListView.separated(
-                      controller: scrollController,
-                      padding: const EdgeInsets.only(bottom: 16),
-                      itemCount: active.length,
-                      separatorBuilder: (_, __) =>
-                          Divider(color: palette.border, height: 1),
-                      itemBuilder: (context, index) {
-                        final link = active[index];
-                        return _AthleteTile(
-                          athleteId: link.athleteId,
-                          palette: palette,
-                          onTap: () =>
-                              Navigator.of(context).pop(link.athleteId),
-                        );
-                      },
-                    );
-                  },
                 ),
               ),
               SizedBox(height: MediaQuery.of(context).viewPadding.bottom + 8),

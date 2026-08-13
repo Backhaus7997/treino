@@ -4,12 +4,14 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../profile/application/user_public_profile_providers.dart';
 import '../../application/agenda_providers.dart';
 import '../../application/athlete_note_providers.dart';
 import '../../domain/agenda_exceptions.dart';
 import '../../domain/appointment.dart';
+import '../../domain/wall_clock.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../agenda_formatters.dart';
 
@@ -180,9 +182,10 @@ class _SessionDetailSheetState extends ConsumerState<SessionDetailSheet> {
     final stickyNote = noteAsync.valueOrNull;
     final hasNote = stickyNote != null && stickyNote.note.trim().isNotEmpty;
 
+    // QA-COA-003: startsAt is wall-clock UTC (ADR-7); compare against wall-clock
+    // "now" so the 24h cancel window isn't 3h short in ART.
     final canCancel = !widget.isPast &&
-        appointment.startsAt.difference(DateTime.now().toUtc()) >
-            const Duration(hours: 24);
+        appointment.startsAt.difference(nowWall()) > const Duration(hours: 24);
     final isWithin24h = !widget.isPast && !canCancel;
     final isRecurring = appointment.recurringId != null;
 
@@ -248,7 +251,7 @@ class _SessionDetailSheetState extends ConsumerState<SessionDetailSheet> {
               const SizedBox(height: 16),
 
               // ── Athlete row ────────────────────────────────────────────
-              GestureDetector(
+              TreinoTappable(
                 onTap: () {
                   Navigator.of(context).pop();
                   context.push('/coach/athlete/${appointment.athleteId}');

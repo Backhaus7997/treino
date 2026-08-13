@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/motion/treino_state_switcher.dart';
+import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../gyms/application/gym_providers.dart';
 import '../../gyms/domain/gym.dart';
@@ -318,7 +320,7 @@ class _TogglePill extends StatelessWidget {
       // motivo para que el screen reader no lea solo un botón deshabilitado
       // sin contexto. En estado normal el label lo provee el Text hijo.
       label: disabled ? l10n.coachMapDisabledOnlineA11y : null,
-      child: GestureDetector(
+      child: TreinoTappable(
         onTap: disabled ? null : onTap,
         child: Opacity(
           opacity: disabled ? 0.4 : 1.0,
@@ -371,39 +373,46 @@ class _ListContent extends ConsumerWidget {
       for (final g in gymsAsync.valueOrNull ?? const <Gym>[]) g.id: g,
     };
 
-    return discoveryAsync.when(
-      loading: () => Center(
-        child: CircularProgressIndicator(color: palette.accent),
+    return TreinoStateSwitcher(
+      childKey: ValueKey(discoveryAsync.when(
+        loading: () => 'loading',
+        error: (_, __) => 'error',
+        data: (trainers) => trainers.isEmpty ? 'empty' : 'data',
+      )),
+      child: discoveryAsync.when(
+        loading: () => Center(
+          child: CircularProgressIndicator(color: palette.accent),
+        ),
+        error: (_, __) => _ErrorState(
+          onRetry: () => ref.invalidate(trainerDiscoveryProvider),
+        ),
+        data: (trainers) {
+          if (trainers.isEmpty) {
+            return const _EmptyState();
+          }
+          return ListView.builder(
+            padding: EdgeInsets.fromLTRB(
+                16, 0, 16, MediaQuery.paddingOf(context).bottom),
+            itemCount: trainers.length,
+            itemBuilder: (context, i) {
+              final t = trainers[i];
+              final nearest =
+                  position == null ? null : nearestLocationOf(t, position);
+              final label = _labelFor(nearest, gymsById);
+              final isVirtual = virtualOnly ||
+                  (effectiveLocationsOf(t).isEmpty && t.trainerOffersOnline);
+              return TrainerListTile(
+                profile: t,
+                distanceKm:
+                    position == null ? null : nearestDistanceKm(t, position),
+                onTap: () => context.go('/coach/trainer/${t.uid}'),
+                locationLabel: label,
+                isVirtualOnly: isVirtual,
+              );
+            },
+          );
+        },
       ),
-      error: (_, __) => _ErrorState(
-        onRetry: () => ref.invalidate(trainerDiscoveryProvider),
-      ),
-      data: (trainers) {
-        if (trainers.isEmpty) {
-          return const _EmptyState();
-        }
-        return ListView.builder(
-          padding: EdgeInsets.fromLTRB(
-              16, 0, 16, MediaQuery.paddingOf(context).bottom),
-          itemCount: trainers.length,
-          itemBuilder: (context, i) {
-            final t = trainers[i];
-            final nearest =
-                position == null ? null : nearestLocationOf(t, position);
-            final label = _labelFor(nearest, gymsById);
-            final isVirtual = virtualOnly ||
-                (effectiveLocationsOf(t).isEmpty && t.trainerOffersOnline);
-            return TrainerListTile(
-              profile: t,
-              distanceKm:
-                  position == null ? null : nearestDistanceKm(t, position),
-              onTap: () => context.go('/coach/trainer/${t.uid}'),
-              locationLabel: label,
-              isVirtualOnly: isVirtual,
-            );
-          },
-        );
-      },
     );
   }
 

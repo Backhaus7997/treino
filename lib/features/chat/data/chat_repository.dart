@@ -4,8 +4,10 @@ import 'package:cloud_firestore/cloud_firestore.dart'
         DocumentSnapshot,
         FieldValue,
         FirebaseFirestore,
-        Query;
+        Query,
+        Timestamp;
 
+import '../../../core/utils/firestore_write.dart';
 import '../domain/chat.dart';
 import '../domain/media_type.dart';
 import '../domain/message.dart';
@@ -51,6 +53,9 @@ class ChatRepository {
   //
   // Idempotente. Si el doc ya existe lo devuelve tal cual; si no, lo crea
   // con createdAt:serverTimestamp + members ordenados.
+  //
+  // #501: nunca desreferencia con `!`. `createdAt` es un serverTimestamp y
+  // puede llegar sin resolver — ver [_chatFromDocOrPending].
 
   Future<Chat> getOrCreate({
     required String selfId,
@@ -58,18 +63,56 @@ class ChatRepository {
   }) async {
     final id = chatIdFor(selfId, otherId);
     final ref = _chats.doc(id);
+    final members = [selfId, otherId]..sort();
     final existing = await ref.get();
     if (existing.exists) {
-      return _chatFromDoc(existing)!;
+      return _chatFromDocOrPending(existing, membersFallback: members);
     }
-    final members = [selfId, otherId]..sort();
+    // QA-CHAT-004: firestore.rules only allows the chat when the two members
+    // have a real relationship. A friendship is checked by the doc id; a
+    // coach↔athlete chat instead needs the id of their active trainer_link
+    // stamped on the doc so the rule can verify it. Resolve it once, on create.
+    final linkId = await _activeLinkIdBetween(selfId, otherId);
     await ref.set({
       'chatId': id,
       'members': members,
       'createdAt': FieldValue.serverTimestamp(),
-    });
+      if (linkId != null) 'linkId': linkId,
+    }).boundedWrite;
     final created = await ref.get();
-    return _chatFromDoc(created)!;
+    return _chatFromDocOrPending(created, membersFallback: members);
+  }
+
+  /// Returns the id of the active [TrainerLink] between [self] and [other], or
+  /// null if there is none. Queries are self-constrained (athleteId/trainerId ==
+  /// self) so they satisfy the trainer_links read rule; status and the other
+  /// member are filtered in memory (mirrors TrainerLinkRepository's approach,
+  /// so no composite index is needed).
+  Future<String?> _activeLinkIdBetween(String self, String other) async {
+    Future<String?> scan(Query<Map<String, dynamic>> query) async {
+      final snap = await query.get();
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        // QA H8: 'paused' cuenta como vínculo vigente para chatear. Pausar es
+        // un hold temporal, no un corte: el PF (o el alumno) debe poder
+        // mandar mensaje. Antes solo 'active' pasaba, así que MENSAJE con un
+        // alumno pausado sin chat previo fallaba con permission-denied en loop
+        // (la rule chatRelationshipOk exigía 'active'; ambos se ampliaron).
+        final status = data['status'];
+        if (status != 'active' && status != 'paused') continue;
+        final trainerId = data['trainerId'] as String?;
+        final athleteId = data['athleteId'] as String?;
+        if ((trainerId == self && athleteId == other) ||
+            (trainerId == other && athleteId == self)) {
+          return doc.id;
+        }
+      }
+      return null;
+    }
+
+    final links = _firestore.collection('trainer_links');
+    return await scan(links.where('athleteId', isEqualTo: self)) ??
+        await scan(links.where('trainerId', isEqualTo: self));
   }
 
   // ─── sendMessage ────────────────────────────────────────────────────────
@@ -152,7 +195,7 @@ class ChatRepository {
   }) =>
       _chats
           .doc(chatId)
-          .update({'lastRead.$uid': FieldValue.serverTimestamp()});
+          .update({'lastRead.$uid': FieldValue.serverTimestamp()}).boundedWrite;
 
   // ─── watchChatsForUser ──────────────────────────────────────────────────
   //
@@ -171,6 +214,14 @@ class ChatRepository {
     });
   }
 
+  // ─── watchById ──────────────────────────────────────────────────────────
+  //
+  // Un chat puntual, en vivo. Lo consume el gate de escritura de ChatScreen,
+  // que necesita saber si el doc lleva `linkId` (chat de Coach) para no
+  // bloquearle el composer al entrenador.
+  Stream<Chat?> watchById(String chatId) =>
+      _chats.doc(chatId).snapshots().map(_chatFromDoc);
+
   // ─── Private helpers ────────────────────────────────────────────────────
 
   Chat? _chatFromDoc(DocumentSnapshot<Map<String, Object?>> snap) {
@@ -181,6 +232,35 @@ class ChatRepository {
     // posterior ya tiene el valor real.
     if (data['createdAt'] == null) return null;
     return Chat.fromJson({...data, 'chatId': snap.id});
+  }
+
+  /// Variante one-shot de [_chatFromDoc] que NUNCA devuelve null.
+  ///
+  /// #501: `createdAt` es un serverTimestamp y queda en null en la cache local
+  /// hasta que el server acusa recibo del write — offline eso puede no pasar
+  /// en toda la sesión. Los streams se dan el lujo de descartar ese doc
+  /// (`whereType`) porque el próximo snapshot lo trae resuelto; [getOrCreate]
+  /// es one-shot y no tiene próximo snapshot: si descarta, el usuario se queda
+  /// sin chat ("no pudimos abrir el chat") por un campo que ni se renderiza.
+  ///
+  /// Por eso el pending se degrada a un Chat provisional: mismos datos del
+  /// doc, con `createdAt` aproximado por el reloj local. Lo que el caller
+  /// necesita es el `chatId` (determinístico, ya lo tenemos) para abrir la
+  /// pantalla; el valor real del server llega en la próxima lectura. No se
+  /// espera ni se reintenta a propósito: offline no hay nada que esperar.
+  Chat _chatFromDocOrPending(
+    DocumentSnapshot<Map<String, Object?>> snap, {
+    required List<String> membersFallback,
+  }) {
+    final resolved = _chatFromDoc(snap);
+    if (resolved != null) return resolved;
+    final data = snap.data() ?? const <String, Object?>{};
+    return Chat.fromJson({
+      ...data,
+      'chatId': snap.id,
+      'members': data['members'] ?? membersFallback,
+      'createdAt': Timestamp.fromDate(DateTime.now().toUtc()),
+    });
   }
 
   Message? _messageFromDoc(DocumentSnapshot<Map<String, Object?>> snap) {

@@ -13,6 +13,7 @@ import '../features/coach_hub/presentation/sections/biblioteca/routes.dart';
 import '../features/coach_hub/presentation/sections/chat/routes.dart';
 import '../features/coach_hub/presentation/sections/cuestionario/routes.dart';
 import '../features/coach_hub/presentation/sections/dashboard/routes.dart';
+import '../features/coach_hub/presentation/sections/facturacion_planes/routes.dart';
 import '../features/coach_hub/presentation/sections/habitos/routes.dart';
 import '../features/coach_hub/presentation/sections/invitaciones/routes.dart';
 import '../features/coach_hub/presentation/sections/legacy/routes.dart';
@@ -115,6 +116,7 @@ final List<RouteBase> _signedInRoutes = [
   ...habitosRoutes,
   ...pagosRoutes,
   ...planesRoutes,
+  ...facturacionPlanesRoutes,
   ...reportesRoutes,
   ...chatRoutes,
   ...ajustesRoutes,

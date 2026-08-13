@@ -3,6 +3,7 @@ import 'dart:developer' as developer;
 import 'package:cloud_firestore/cloud_firestore.dart'
     show CollectionReference, DocumentSnapshot, FirebaseFirestore, Timestamp;
 
+import '../../../core/utils/firestore_write.dart';
 import '../domain/payment.dart';
 
 class PaymentRepository {
@@ -17,7 +18,7 @@ class PaymentRepository {
   /// Adds a new payment document with an auto-generated id.
   Future<void> add(Payment payment) async {
     final ref = _collection.doc();
-    await ref.set({...payment.toJson(), 'id': ref.id});
+    await ref.set({...payment.toJson(), 'id': ref.id}).boundedWrite;
   }
 
   /// Marks a payment as paid, setting status and paidAt.
@@ -43,7 +44,7 @@ class PaymentRepository {
         'paidAt': paidAtTs,
       });
     }
-    await batch.commit();
+    await batch.commit().boundedWrite;
   }
 
   /// Live stream of all payments for [trainerId].

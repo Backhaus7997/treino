@@ -427,6 +427,68 @@ test('GYM-PLACES-06: update cannot flip an existing self-service doc to google-p
   );
 });
 
+test('GYM-PLACES-07: update that CHANGES the name of an existing google-places doc is denied (QA-SEC-003 vandalism)', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_7')
+      .set(validGooglePlacesGym('ChIJ_place_7'));
+  });
+
+  // Any OTHER authenticated user must not be able to rewrite the name — this
+  // is the core catalog-vandalism vector the pin closes.
+  const attacker = testEnv.authenticatedContext('attacker');
+  await assertFails(
+    attacker
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_7')
+      .set({ name: 'VANDALIZED' }, { merge: true }),
+  );
+});
+
+test('GYM-PLACES-08: update that CHANGES lat/lng of an existing google-places doc is denied (QA-SEC-003 vandalism)', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_8')
+      .set(validGooglePlacesGym('ChIJ_place_8'));
+  });
+
+  const attacker = testEnv.authenticatedContext('attacker');
+  await assertFails(
+    attacker
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_8')
+      .set({ lat: 0, lng: 0 }, { merge: true }),
+  );
+});
+
+test('GYM-PLACES-09: create is denied when lat is outside geographic range', async () => {
+  const athleteA = testEnv.authenticatedContext('athlete-a');
+  await assertFails(
+    athleteA
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_9')
+      .set({ ...validGooglePlacesGym('ChIJ_place_9'), lat: 999 }),
+  );
+});
+
+test('GYM-PLACES-10: create is denied when lng is outside geographic range', async () => {
+  const athleteA = testEnv.authenticatedContext('athlete-a');
+  await assertFails(
+    athleteA
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_10')
+      .set({ ...validGooglePlacesGym('ChIJ_place_10'), lng: -200 }),
+  );
+});
+
 // ---------------------------------------------------------------------------
 // routines (user-created) — SCENARIO-600..608
 // REQ-USR-004, REQ-USR-008, REQ-USR-009, REQ-USR-012, REQ-USR-013,
@@ -529,6 +591,77 @@ test('SCENARIO-606: non-owner cannot read another user\'s private user-created r
     athleteB.firestore().collection('routines').doc('r-606').get(),
   );
 });
+
+// SCENARIO-609: `get` on a NON-EXISTENT routine resolves to an empty snapshot
+// instead of PERMISSION_DENIED.
+//
+// Regression: the read rule used to dereference `resource.data` with no
+// existence guard. On a missing doc `resource` is null, so the rule evaluation
+// itself errored and the read came back DENIED — meaning `getById()` on a
+// deleted routine THREW instead of returning null, and the client's
+// `if (!snap.exists)` guard was dead code. That blanked the muscle-distribution
+// radars: the providers resolve the routine of every scanned session, so one
+// stale session pointing at a deleted routine failed the whole chart.
+test('SCENARIO-609: reading a non-existent routine returns empty, not denied',
+  async () => {
+    const athleteA = testEnv.authenticatedContext('athlete-a');
+    const snap = await assertSucceeds(
+      athleteA.firestore().collection('routines').doc('r-609-nonexistent').get(),
+    );
+    expect(snap.exists).toBe(false);
+  });
+
+// SCENARIO-610: the existence guard does NOT bypass authentication.
+//
+// `resource == null` is the leftmost disjunct, so the ONLY thing standing
+// between it and an anonymous existence oracle is the `request.auth != null`
+// conjunct. If someone ever reorders or relaxes that, an unauthenticated client
+// could probe which routine ids exist. This is the boundary the new disjunct
+// could actually have broken — SCENARIO-606 already covered "other user's
+// private routine", so re-testing that would add nothing.
+test('SCENARIO-610: UNAUTHENTICATED read of a non-existent routine is denied',
+  async () => {
+    const anon = testEnv.unauthenticatedContext();
+    await assertFails(
+      anon.firestore().collection('routines').doc('r-610-nonexistent').get(),
+    );
+  });
+
+// SCENARIO-611: an EXISTING trainer-template whose owner revoked athlete
+// sharing is still denied.
+//
+// This is the case that justifies RoutineRepository.getByIdIfVisible absorbing
+// `permission-denied` (not just `not-found`): an athlete trains from a
+// trainer-template while `sharedTemplatesWithAthletes == true`; the trainer
+// later flips it to false; the athlete's old sessions reference that routineId
+// forever. The doc EXISTS, so the existence guard does not apply — the read
+// must still be denied, and the client must degrade rather than blank the radar.
+test('SCENARIO-611: trainer-template is denied once sharing is revoked',
+  async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      // NOTE: hoist `ctx.firestore()` — calling it twice inside the same
+      // withSecurityRulesDisabled block throws "Firestore has already been
+      // started and its settings can no longer be changed".
+      const db = ctx.firestore();
+      await db.collection('userPublicProfiles').doc('trainer-x').set({
+        sharedTemplatesWithAthletes: false,
+      });
+      await db.collection('routines').doc('r-611').set({
+        source: 'trainer-template',
+        assignedBy: 'trainer-x',
+        visibility: 'private',
+        name: 'Plantilla del PF',
+        level: 'beginner',
+        days: [],
+        createdAt: new Date(),
+      });
+    });
+
+    const athleteA = testEnv.authenticatedContext('athlete-a');
+    await assertFails(
+      athleteA.firestore().collection('routines').doc('r-611').get(),
+    );
+  });
 
 // SCENARIO-607: owner can flip status active→archived (REQ-USR-013).
 test('SCENARIO-607: owner can update status from active to archived', async () => {

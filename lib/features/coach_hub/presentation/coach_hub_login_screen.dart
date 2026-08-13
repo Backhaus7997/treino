@@ -92,131 +92,131 @@ class _CoachHubLoginScreenState extends ConsumerState<CoachHubLoginScreen> {
             child: Form(
               key: _formKey,
               child: AutofillGroup(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Brand stack
-                  Center(
-                    child: Column(
-                      children: [
-                        Text(
-                          'TREINO',
-                          style: GoogleFonts.barlowCondensed(
-                            color: palette.highlight,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 3,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Brand stack
+                    Center(
+                      child: Column(
+                        children: [
+                          Text(
+                            'TREINO',
+                            style: GoogleFonts.barlowCondensed(
+                              color: palette.highlight,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 3,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'COACH HUB',
-                          style: GoogleFonts.barlowCondensed(
-                            color: palette.textPrimary,
-                            fontSize: 32,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 2,
-                            height: 1,
+                          const SizedBox(height: 4),
+                          Text(
+                            'COACH HUB',
+                            style: GoogleFonts.barlowCondensed(
+                              color: palette.textPrimary,
+                              fontSize: 32,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 2,
+                              height: 1,
+                            ),
                           ),
-                        ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Text(
+                      l10n.coachHubLoginPrompt,
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.barlow(
+                        color: palette.textMuted,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    TextFormField(
+                      controller: _emailController,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      keyboardType: TextInputType.emailAddress,
+                      autofillHints: const [
+                        AutofillHints.username,
+                        AutofillHints.email,
                       ],
+                      style: TextStyle(color: palette.textPrimary),
+                      decoration: _inputDecoration(
+                          palette, l10n.coachHubLoginEmailLabel),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) {
+                          return l10n.coachHubLoginEmailRequired;
+                        }
+                        if (!v.contains('@')) {
+                          return l10n.coachHubLoginEmailInvalid;
+                        }
+                        return null;
+                      },
                     ),
-                  ),
-                  const SizedBox(height: 18),
-                  Text(
-                    l10n.coachHubLoginPrompt,
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.barlow(
-                      color: palette.textMuted,
-                      fontSize: 14,
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _passwordController,
+                      obscureText: true,
+                      autofillHints: const [AutofillHints.password],
+                      style: TextStyle(color: palette.textPrimary),
+                      decoration: _inputDecoration(
+                          palette, l10n.coachHubLoginPasswordLabel),
+                      onFieldSubmitted: (_) => _submit(),
+                      validator: (v) {
+                        if (v == null || v.isEmpty) {
+                          return l10n.coachHubLoginPasswordRequired;
+                        }
+                        return null;
+                      },
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                  TextFormField(
-                    controller: _emailController,
-                    autocorrect: false,
-                    enableSuggestions: false,
-                    keyboardType: TextInputType.emailAddress,
-                    autofillHints: const [
-                      AutofillHints.username,
-                      AutofillHints.email,
+                    if (_error != null) ...[
+                      const SizedBox(height: 14),
+                      Text(
+                        _error!,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: palette.danger, fontSize: 13),
+                      ),
                     ],
-                    style: TextStyle(color: palette.textPrimary),
-                    decoration:
-                        _inputDecoration(palette, l10n.coachHubLoginEmailLabel),
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) {
-                        return l10n.coachHubLoginEmailRequired;
-                      }
-                      if (!v.contains('@')) {
-                        return l10n.coachHubLoginEmailInvalid;
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _passwordController,
-                    obscureText: true,
-                    autofillHints: const [AutofillHints.password],
-                    style: TextStyle(color: palette.textPrimary),
-                    decoration: _inputDecoration(
-                        palette, l10n.coachHubLoginPasswordLabel),
-                    onFieldSubmitted: (_) => _submit(),
-                    validator: (v) {
-                      if (v == null || v.isEmpty) {
-                        return l10n.coachHubLoginPasswordRequired;
-                      }
-                      return null;
-                    },
-                  ),
-                  if (_error != null) ...[
+                    const SizedBox(height: 18),
+                    ElevatedButton(
+                      onPressed: _submitting ? null : _submit,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: palette.accent,
+                        foregroundColor: palette.bg,
+                        minimumSize: const Size.fromHeight(48),
+                        shape: const StadiumBorder(),
+                      ),
+                      child: _submitting
+                          ? SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: palette.bg,
+                              ),
+                            )
+                          : Text(
+                              l10n.coachHubLoginSubmit,
+                              style: GoogleFonts.barlowCondensed(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                                letterSpacing: 1.4,
+                              ),
+                            ),
+                    ),
                     const SizedBox(height: 14),
                     Text(
-                      _error!,
+                      l10n.coachHubLoginFooter,
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: palette.danger, fontSize: 13),
+                      style: GoogleFonts.barlow(
+                        color: palette.textMuted,
+                        fontSize: 12,
+                      ),
                     ),
                   ],
-                  const SizedBox(height: 18),
-                  ElevatedButton(
-                    onPressed: _submitting ? null : _submit,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: palette.accent,
-                      foregroundColor: palette.bg,
-                      minimumSize: const Size.fromHeight(48),
-                      shape: const StadiumBorder(),
-                    ),
-                    child: _submitting
-                        ? SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: palette.bg,
-                            ),
-                          )
-                        : Text(
-                            l10n.coachHubLoginSubmit,
-                            style: GoogleFonts.barlowCondensed(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                              letterSpacing: 1.4,
-                            ),
-                          ),
-                  ),
-                  const SizedBox(height: 14),
-                  Text(
-                    l10n.coachHubLoginFooter,
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.barlow(
-                      color: palette.textMuted,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
+                ),
               ),
             ),
           ),

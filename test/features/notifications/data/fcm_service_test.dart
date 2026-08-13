@@ -24,6 +24,7 @@ void main() {
     // Default stubs — can be overridden per test.
     when(() => repo.saveToken(any(), any())).thenAnswer((_) async {});
     when(() => repo.removeToken(any(), any())).thenAnswer((_) async {});
+    when(() => messaging.deleteToken()).thenAnswer((_) async {});
     when(
       () => messaging.requestPermission(
         alert: any(named: 'alert'),
@@ -207,6 +208,18 @@ void main() {
   });
 
   group('FcmService.dispose', () {
+    test('repeated dispose for the same uid is a no-op', () async {
+      const uid = 'user-idempotent';
+      when(() => messaging.getToken()).thenAnswer((_) async => 'tok-current');
+
+      await service.dispose(uid);
+      await service.dispose(uid);
+
+      verify(() => messaging.getToken()).called(1);
+      verify(() => repo.removeToken(uid, 'tok-current')).called(1);
+      verify(() => messaging.deleteToken()).called(1);
+    });
+
     // SCENARIO-648: dispose calls removeToken with the current token
     test(
       'SCENARIO-648: dispose calls removeToken with current token',
@@ -222,6 +235,27 @@ void main() {
         // getToken called again for dispose
         verify(() => messaging.getToken()).called(2);
         verify(() => repo.removeToken(uid, 'tok-current')).called(1);
+      },
+    );
+
+    // QA-NOT-001: on a forced sign-out (token revoked / password changed on
+    // another device / Admin-SDK disable) the Firestore removeToken is denied
+    // because auth is already null — but the device token must still be
+    // invalidated so the device stops receiving the closed account's pushes.
+    test(
+      'QA-NOT-001: dispose deletes the device token even when removeToken is denied',
+      () async {
+        const uid = 'user-not001';
+        when(() => messaging.getToken()).thenAnswer((_) async => 'tok-current');
+        when(() => messaging.onTokenRefresh)
+            .thenAnswer((_) => const Stream.empty());
+        when(() => repo.removeToken(any(), any()))
+            .thenThrow(Exception('permission-denied'));
+
+        await service.init(uid);
+        await service.dispose(uid);
+
+        verify(() => messaging.deleteToken()).called(1);
       },
     );
 
@@ -270,6 +304,64 @@ void main() {
         verifyNever(() => repo.saveToken(any(), any()));
 
         await refreshController.close();
+      },
+    );
+  });
+
+  // ── QA-502: race entre init/dispose (el lifecycle provider los dispara
+  // fire-and-forget, así que se intercalan en sus huecos `await`) ────────────
+  group('FcmService — race de ciclo de vida (QA-502)', () {
+    setUp(() {
+      when(() => messaging.onTokenRefresh)
+          .thenAnswer((_) => const Stream<String>.empty());
+    });
+
+    test(
+      'un init en vuelo superado por dispose NO resucita el token borrado',
+      () async {
+        // getToken del init queda colgado; el de dispose resuelve enseguida.
+        final initGetToken = Completer<String?>();
+        var calls = 0;
+        when(() => messaging.getToken()).thenAnswer((_) {
+          calls++;
+          return calls == 1
+              ? initGetToken.future
+              : Future<String?>.value('tok-dispose');
+        });
+
+        final initFuture = service.init('A'); // queda esperando getToken
+        await service.dispose('A'); // lo supera: borra el token
+        initGetToken.complete('tok-a'); // el getToken del init resuelve TARDE
+        await initFuture;
+
+        // Sin la guarda de generación, el init reescribía el token que dispose
+        // acababa de borrar (y el device seguía recibiendo pushes de A).
+        verifyNever(() => repo.saveToken('A', 'tok-a'));
+      },
+    );
+
+    test(
+      'un dispose en vuelo superado por un login nuevo NO toca el token del '
+      'usuario nuevo',
+      () async {
+        final disposeGetToken = Completer<String?>();
+        var calls = 0;
+        when(() => messaging.getToken()).thenAnswer((_) {
+          calls++;
+          return calls == 1
+              ? disposeGetToken.future
+              : Future<String?>.value('tok-b');
+        });
+
+        final disposeFuture = service.dispose('A'); // esperando getToken
+        await service.init('B'); // login de B lo supera
+        disposeGetToken.complete('tok-a');
+        await disposeFuture;
+
+        // Ni borra en Firestore con el uid viejo…
+        verifyNever(() => repo.removeToken('A', 'tok-a'));
+        // …ni invalida en el device el token que B acaba de registrar.
+        verifyNever(() => messaging.deleteToken());
       },
     );
   });

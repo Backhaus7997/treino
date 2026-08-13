@@ -140,7 +140,7 @@ void main() {
       expect(
         l10n.coachLocationSheetBody,
         'TREINO usa tu ubicación para mostrarte entrenadores cerca tuyo. '
-            'Tu ubicación no es visible para otros usuarios.',
+        'Tu ubicación no es visible para otros usuarios.',
       );
     });
     testWidgets('coachLocationSheetAccept verbatim', (tester) async {
