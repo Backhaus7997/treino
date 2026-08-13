@@ -148,8 +148,9 @@ void main() {
       await tester.pumpAndSettle();
 
       // With 0 vencidos, 0 solicitudes, 0 inactivos → "Todo al día".
+      // WU-02: el título del banner se muestra en CAPS (Barlow Condensed 700).
       expect(
-        find.textContaining('Todo al día'),
+        find.textContaining('TODO AL DÍA'),
         findsOneWidget,
       );
     });
@@ -239,7 +240,11 @@ void main() {
 
       // 3 active, 1 paused → tile shows '3'
       // The label is present:
-      expect(find.textContaining('ALUMNOS ACTIVOS'), findsOneWidget);
+      expect(
+          find.byWidgetPredicate((w) =>
+              w is Text &&
+              (w.data ?? '').toUpperCase().contains('ALUMNOS ACTIVOS')),
+          findsOneWidget);
     });
   });
 
@@ -253,7 +258,11 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('ADHERENCIA PROMEDIO'), findsOneWidget);
+      expect(
+          find.byWidgetPredicate((w) =>
+              w is Text &&
+              (w.data ?? '').toUpperCase().contains('ADHERENCIA PROMEDIO')),
+          findsOneWidget);
     });
   });
 

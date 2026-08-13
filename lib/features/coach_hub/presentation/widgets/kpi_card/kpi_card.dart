@@ -22,9 +22,18 @@ Widget kpiCardPreview() => const KpiCard(
 Widget kpiCardLoadingPreview() =>
     const KpiCard(value: '', label: '', loading: true);
 
-/// KPI Card del kit Coach Hub Web — Fase 1.
+@Preview(name: 'KpiCard — con sublabel', wrapper: coachHubPreviewWrapper)
+Widget kpiCardSublabelPreview() => const KpiCard(
+      value: r'$86.000',
+      label: 'Por cobrar',
+      sublabel: '3 vencidos',
+    );
+
+/// KPI Card del kit Coach Hub Web — Fase 1 (orden mockup alineado en Fase 2,
+/// ADR-D2-04).
 ///
-/// Muestra una métrica clave (value + label + delta opcional) con soporte de:
+/// Muestra una métrica clave (label + value + delta/sublabel opcionales) con
+/// soporte de:
 /// - Estado loading: skeleton shimmer (TreinoShimmer).
 /// - Hover/pressed/focus: vía TreinoInteractiveState (fuente única de verdad).
 /// - Cambio de borde/fondo sin sombra (elevation-free, ADR-SH-006).
@@ -32,6 +41,10 @@ Widget kpiCardLoadingPreview() =>
 ///   Semantics(button: true) — accesible sin mouse.
 /// - Tokens: TreinoKpiCardTokens.of(context) — nunca hex inline.
 /// - Ambos temas dark y light.
+///
+/// Orden visual (label -> value -> delta -> sublabel): `sublabel` es
+/// data-honest (ADR-D2-04) — solo se pasa cuando hay una fuente real detrás,
+/// nunca se inventa para calzar el mockup.
 ///
 /// Uso:
 /// ```dart
@@ -50,6 +63,7 @@ class KpiCard extends StatelessWidget {
     required this.label,
     this.delta,
     this.deltaPositive,
+    this.sublabel,
     this.loading = false,
     this.onTap,
   });
@@ -65,6 +79,12 @@ class KpiCard extends StatelessWidget {
 
   /// `true` = variación positiva (color accent), `false` = negativa (danger).
   final bool? deltaPositive;
+
+  /// Texto secundario opcional debajo del value/delta (ej: "3 vencidos").
+  ///
+  /// Data-honest (ADR-D2-04, Fase 2): solo se pasa cuando hay una fuente de
+  /// dato real detrás — nunca se inventa para calzar el mockup.
+  final String? sublabel;
 
   /// `true` mientras se cargan los datos — muestra skeleton.
   final bool loading;
@@ -89,6 +109,7 @@ class KpiCard extends StatelessWidget {
             label: label,
             delta: delta,
             deltaPositive: deltaPositive,
+            sublabel: sublabel,
             tokens: tokens,
             palette: p,
           );
@@ -135,10 +156,10 @@ class _SkeletonContent extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Skeleton del valor
+          // Skeleton del label (orden mockup: label arriba — ADR-D2-04)
           Container(
-            width: 80,
-            height: 28,
+            width: 120,
+            height: 14,
             decoration: BoxDecoration(
               color: tokens.border,
               borderRadius:
@@ -146,10 +167,10 @@ class _SkeletonContent extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.s8),
-          // Skeleton del label
+          // Skeleton del valor
           Container(
-            width: 120,
-            height: 14,
+            width: 80,
+            height: 28,
             decoration: BoxDecoration(
               color: tokens.border,
               borderRadius:
@@ -169,6 +190,7 @@ class _CardContent extends StatelessWidget {
     required this.label,
     required this.delta,
     required this.deltaPositive,
+    required this.sublabel,
     required this.tokens,
     required this.palette,
   });
@@ -177,6 +199,7 @@ class _CardContent extends StatelessWidget {
   final String label;
   final String? delta;
   final bool? deltaPositive;
+  final String? sublabel;
   final TreinoKpiCardTokens tokens;
   final AppPalette palette;
 
@@ -186,16 +209,7 @@ class _CardContent extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          value,
-          style: TextStyle(
-            fontFamily: AppFonts.barlowCondensed,
-            fontWeight: FontWeight.w700,
-            fontSize: 28,
-            color: tokens.valueColor,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.hairline),
+        // Orden mockup Fase 2 (ADR-D2-04): label -> value -> delta -> sublabel.
         Text(
           label,
           style: TextStyle(
@@ -203,6 +217,16 @@ class _CardContent extends StatelessWidget {
             fontWeight: FontWeight.w400,
             fontSize: 12,
             color: tokens.titleColor,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.hairline),
+        Text(
+          value,
+          style: TextStyle(
+            fontFamily: AppFonts.barlowCondensed,
+            fontWeight: FontWeight.w700,
+            fontSize: 28,
+            color: tokens.valueColor,
           ),
         ),
         if (delta != null) ...[
@@ -216,6 +240,18 @@ class _CardContent extends StatelessWidget {
               color: deltaPositive == true
                   ? tokens.variationPositiveColor
                   : tokens.variationNegativeColor,
+            ),
+          ),
+        ],
+        if (sublabel != null) ...[
+          const SizedBox(height: AppSpacing.hairline),
+          Text(
+            sublabel!,
+            style: TextStyle(
+              fontFamily: AppFonts.barlow,
+              fontWeight: FontWeight.w400,
+              fontSize: 11,
+              color: tokens.titleColor,
             ),
           ),
         ],
