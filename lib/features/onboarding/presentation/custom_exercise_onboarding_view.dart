@@ -116,38 +116,57 @@ class _CustomExerciseOnboardingViewState
   Widget _buildSheet(BuildContext context) {
     final total = widget.slides.length;
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const _Grabber(),
-        Flexible(
-          child: PageView.builder(
-            key: const Key('custom_exercise_onboarding_page_view'),
-            controller: _controller,
-            itemCount: total,
-            onPageChanged: (i) => setState(() => _index = i),
-            itemBuilder: (context, i) => _SheetSlide(
-              content: widget.slides[i],
-              step: widget.stepSemanticsLabel(i + 1, total),
+    // A `PageView` has no intrinsic height — it expands to fill whatever it is
+    // given. Left in a `Flexible` it swallowed the whole 90%-of-screen sheet and
+    // left a dead band between the copy and the dots. So the height is computed
+    // instead: enough for the tallest slide, and never more than the sheet has.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // grabber 22 + gap 14 + dots 6 + gap 14 + actions 52.
+        const chrome = 108.0;
+        // art 150 + gaps 30 + kicker 12 + title ~48 (it wraps to two lines) +
+        // body ~60. Scaled with the text, because the copy is what grows.
+        final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
+        final wanted = 300.0 * textScale;
+        final available = constraints.maxHeight - chrome;
+        final pagerHeight =
+            available > 0 && wanted > available ? available : wanted;
+
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const _Grabber(),
+            SizedBox(
+              height: pagerHeight,
+              child: PageView.builder(
+                key: const Key('custom_exercise_onboarding_page_view'),
+                controller: _controller,
+                itemCount: total,
+                onPageChanged: (i) => setState(() => _index = i),
+                itemBuilder: (context, i) => _SheetSlide(
+                  content: widget.slides[i],
+                  step: widget.stepSemanticsLabel(i + 1, total),
+                ),
+              ),
             ),
-          ),
-        ),
-        const SizedBox(height: 18),
-        _Dots(
-          current: _index,
-          total: total,
-          semanticsLabel: widget.stepSemanticsLabel(_index + 1, total),
-        ),
-        const SizedBox(height: 18),
-        _Actions(
-          showSkip: !_isLast,
-          skipLabel: widget.skipLabel,
-          primaryLabel: _isLast ? widget.finishLabel : widget.nextLabel,
-          onSkip: widget.onSkip,
-          onPrimary: _onPrimary,
-          ctaHeight: 52,
-        ),
-      ],
+            const SizedBox(height: 14),
+            _Dots(
+              current: _index,
+              total: total,
+              semanticsLabel: widget.stepSemanticsLabel(_index + 1, total),
+            ),
+            const SizedBox(height: 14),
+            _Actions(
+              showSkip: !_isLast,
+              skipLabel: widget.skipLabel,
+              primaryLabel: _isLast ? widget.finishLabel : widget.nextLabel,
+              onSkip: widget.onSkip,
+              onPrimary: _onPrimary,
+              ctaHeight: 48,
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -220,13 +239,13 @@ class _SheetSlide extends StatelessWidget {
           // Decorative: it repeats what the headline and body already say, so a
           // screen reader announcing it would only add noise.
           ExcludeSemantics(
-            child: SizedBox(height: 190, child: content.illustration),
+            child: SizedBox(height: 150, child: content.illustration),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
           _Kicker(step),
           const SizedBox(height: 8),
           _Title(content.title),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           _Body(content.body),
         ],
       ),
@@ -295,7 +314,7 @@ class _Kicker extends StatelessWidget {
 }
 
 class _Title extends StatelessWidget {
-  const _Title(this.text, {this.size = 26});
+  const _Title(this.text, {this.size = 22});
 
   final String text;
   final double size;
@@ -318,7 +337,7 @@ class _Title extends StatelessWidget {
 }
 
 class _Body extends StatelessWidget {
-  const _Body(this.text, {this.size = 15});
+  const _Body(this.text, {this.size = 14});
 
   final String text;
   final double size;

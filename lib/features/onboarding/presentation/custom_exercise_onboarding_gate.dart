@@ -147,7 +147,7 @@ class _OnboardingSheet extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
           child: CustomExerciseOnboardingView(
             slides: slides,
             onFinish: onClose,
