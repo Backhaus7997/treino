@@ -6,7 +6,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/onboarding/application/onboarding_providers.dart';
 import 'package:treino/features/onboarding/domain/onboarding_surface.dart';
 import 'package:treino/features/onboarding/presentation/onboarding_gate.dart';
-import 'package:treino/features/onboarding/presentation/onboarding_tour_view.dart';
+import 'package:treino/features/onboarding/presentation/onboarding_flow.dart';
+
+import '../../../helpers/layout_failure.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/data/user_repository.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
@@ -73,7 +75,18 @@ Future<void> _pump(
       ),
     ),
   );
-  await tester.pumpAndSettle();
+  // Repeated pump(), NOT pumpAndSettle(): the trainer's first slide carries a
+  // dot that pulses on an infinite loop by design, and pumpAndSettle waits for
+  // every animation to stop — it would hang here forever. Several frames are
+  // needed because the gate pushes the route from a post-frame callback and the
+  // route then fades in.
+  for (var i = 0; i < 6; i++) {
+    await tester.pump(const Duration(milliseconds: 200));
+  }
+  // The tour renders real screens, so this settles a lot of widgets.
+  // Drain here so every gate test starts clean, failing only on structural
+  // breakage rather than the font artifact — see drainLayoutFailure.
+  expect(drainLayoutFailure(tester), isNull);
 }
 
 void main() {
@@ -85,7 +98,7 @@ void main() {
         profile: _profile(),
       );
 
-      expect(find.byType(OnboardingTourView), findsOneWidget);
+      expect(find.byType(OnboardingFlow), findsOneWidget);
       expect(find.text('TU RESUMEN DEL DÍA'), findsOneWidget);
     });
 
@@ -96,7 +109,7 @@ void main() {
         profile: _profile(role: UserRole.trainer),
       );
 
-      expect(find.text('TU DÍA'), findsOneWidget);
+      expect(find.text('TU DÍA EN UN PANTALLAZO'), findsOneWidget);
       expect(find.text('TU RESUMEN DEL DÍA'), findsNothing);
     });
 
@@ -116,7 +129,7 @@ void main() {
         ),
       );
 
-      expect(find.byType(OnboardingTourView), findsNothing);
+      expect(find.byType(OnboardingFlow), findsNothing);
     });
 
     testWidgets('does NOT run once the surface is marked seen', (tester) async {
@@ -131,7 +144,7 @@ void main() {
         ),
       );
 
-      expect(find.byType(OnboardingTourView), findsNothing);
+      expect(find.byType(OnboardingFlow), findsNothing);
     });
 
     testWidgets('does NOT run while profile setup is incomplete',
@@ -142,7 +155,7 @@ void main() {
         profile: _profile(displayName: null),
       );
 
-      expect(find.byType(OnboardingTourView), findsNothing);
+      expect(find.byType(OnboardingFlow), findsNothing);
     });
 
     testWidgets('COMENZAR closes the tour and leaves the app usable',
@@ -156,10 +169,13 @@ void main() {
 
       for (var i = 0; i < OnboardingSurface.athleteMobile.slides.length; i++) {
         await tester.tap(find.byKey(const Key('onboarding_primary_cta')));
-        await tester.pumpAndSettle();
+        for (var i = 0; i < 6; i++) {
+          await tester.pump(const Duration(milliseconds: 200));
+        }
+        expect(drainLayoutFailure(tester), isNull);
       }
 
-      expect(find.byType(OnboardingTourView), findsNothing);
+      expect(find.byType(OnboardingFlow), findsNothing);
       expect(find.text('PANTALLA-DE-ABAJO'), findsOneWidget,
           reason: 'the screen under the tour was popped along with it');
       expect(repo.updateCount, 1);
@@ -177,9 +193,12 @@ void main() {
       await _pump(tester, repo: repo, profile: _profile());
 
       await tester.tap(find.byKey(const Key('onboarding_skip_button')));
-      await tester.pumpAndSettle();
+      for (var i = 0; i < 6; i++) {
+        await tester.pump(const Duration(milliseconds: 200));
+      }
+      expect(drainLayoutFailure(tester), isNull);
 
-      expect(find.byType(OnboardingTourView), findsNothing);
+      expect(find.byType(OnboardingFlow), findsNothing);
       expect(find.text('PANTALLA-DE-ABAJO'), findsOneWidget);
       expect(repo.updateCount, 1);
     });
@@ -190,9 +209,12 @@ void main() {
       await _pump(tester, repo: repo, profile: _profile());
 
       await tester.tap(find.byKey(const Key('onboarding_skip_button')));
-      await tester.pumpAndSettle();
+      for (var i = 0; i < 6; i++) {
+        await tester.pump(const Duration(milliseconds: 200));
+      }
+      expect(drainLayoutFailure(tester), isNull);
 
-      expect(find.byType(OnboardingTourView), findsNothing);
+      expect(find.byType(OnboardingFlow), findsNothing);
       expect(tester.takeException(), isNull);
     });
 
@@ -211,10 +233,13 @@ void main() {
 
       for (var i = 0; i < 3; i++) {
         controller.add(_profile());
-        await tester.pumpAndSettle();
+        for (var i = 0; i < 6; i++) {
+          await tester.pump(const Duration(milliseconds: 200));
+        }
+        expect(drainLayoutFailure(tester), isNull);
       }
 
-      expect(find.byType(OnboardingTourView), findsOneWidget);
+      expect(find.byType(OnboardingFlow), findsOneWidget);
     });
 
     testWidgets('blocks other prompts while pending, releases after',
@@ -239,12 +264,18 @@ void main() {
           ),
         ),
       );
-      await tester.pumpAndSettle();
+      for (var i = 0; i < 6; i++) {
+        await tester.pump(const Duration(milliseconds: 200));
+      }
+      expect(drainLayoutFailure(tester), isNull);
 
       expect(container.read(onboardingBlocksProvider), isTrue);
 
       await tester.tap(find.byKey(const Key('onboarding_skip_button')));
-      await tester.pumpAndSettle();
+      for (var i = 0; i < 6; i++) {
+        await tester.pump(const Duration(milliseconds: 200));
+      }
+      expect(drainLayoutFailure(tester), isNull);
 
       expect(container.read(onboardingBlocksProvider), isFalse);
     });

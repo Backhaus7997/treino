@@ -4,9 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../profile/application/user_providers.dart';
 import '../application/onboarding_providers.dart';
-import '../domain/onboarding_surface.dart';
-import 'onboarding_card_copy.dart';
-import 'onboarding_tour_view.dart';
+import '../../profile/domain/user_role.dart';
+import 'onboarding_flow.dart';
+import 'athlete_onboarding_slides.dart';
+import 'trainer_onboarding_slides.dart';
 
 /// Invisible widget that runs the welcome tour once, right after login.
 ///
@@ -48,11 +49,11 @@ class _OnboardingGateState extends ConsumerState<OnboardingGate> {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!mounted) return;
         final l10n = AppL10n.of(context);
-        final slides = [
-          for (final module in surface.slides)
-            if (mobileCardContent(module, role, l10n) case final c?) c,
-        ];
-        if (slides.isEmpty) return;
+        // Both roles now have a hi-fi deck. Same shell, different slides —
+        // the schematic tour is gone from the mobile path.
+        final slides = role == UserRole.athlete
+            ? athleteOnboardingSlides
+            : trainerOnboardingSlides;
 
         ref.read(onboardingTourOpenProvider.notifier).state = true;
         try {
@@ -67,16 +68,17 @@ class _OnboardingGateState extends ConsumerState<OnboardingGate> {
               // bar closes popups with `popUntil((r) => r is! PopupRoute)` on
               // tab taps (router.dart), which would dismiss the tour by
               // accident.
-              pageBuilder: (routeContext, __, ___) => OnboardingTourView(
+              pageBuilder: (routeContext, __, ___) => OnboardingFlow(
                 slides: slides,
-                // The DIALOG/route context, never this widget's: the gate lives
-                // in the screen underneath, and popping with its context closed
-                // the SCREEN and left a black window.
+                // The ROUTE context, never this widget's: the gate lives in the
+                // screen underneath, and popping with its context closed the
+                // SCREEN and left a black window.
                 onFinish: () => Navigator.of(routeContext).pop(),
                 onSkip: () => Navigator.of(routeContext).pop(),
                 skipLabel: l10n.onboardingTourSkip,
                 nextLabel: l10n.onboardingTourNext,
                 finishLabel: l10n.onboardingTourFinish,
+                lastStepLabel: 'LISTO', // i18n
                 stepSemanticsLabel: l10n.onboardingTourProgress,
               ),
             ),
