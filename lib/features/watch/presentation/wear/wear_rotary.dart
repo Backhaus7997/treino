@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/services.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 
 /// La corona / bisel giratorio del reloj.
@@ -65,13 +67,9 @@ class WearRotaryScroll extends StatefulWidget {
   State<WearRotaryScroll> createState() => _WearRotaryScrollState();
 }
 
-class _WearRotaryScrollState extends State<WearRotaryScroll> {
-  /// Multiplicador de sensibilidad.
-  ///
-  /// `scaledVerticalScrollFactor` está calibrado para la rueda de un mouse en
-  /// un teléfono, no para la corona de un reloj. Aplicado tal cual, el dueño lo
-  /// describió como *"anda pero lento"*: hay que girar media vuelta para mover
-  /// la lista un renglón.
+class _WearRotaryScrollState extends State<WearRotaryScroll>
+    with SingleTickerProviderStateMixin {
+  /// Cuánto scroll produce una muesca.
   ///
   /// Medido en el SM-L500: cada muesca da `axis = ±1.0`, que por el
   /// `scaledVerticalScrollFactor` son 136 píxeles FÍSICOS = 64 lógicos. En una
@@ -79,17 +77,36 @@ class _WearRotaryScrollState extends State<WearRotaryScroll> {
   /// que el multiplicador tiene que ser CHICO.
   static const double _sensitivity = 1.5;
 
+  /// Qué tan rápido persigue el destino, en unidades de 1/segundo.
+  ///
+  /// Más alto = más pegado a la muesca pero más brusco; más bajo = más suave
+  /// pero se siente flotando. 18 llega al ~95% del destino en unos 165 ms, que
+  /// es el punto donde el gesto se siente conectado y fluido a la vez.
+  static const double _responsiveness = 18;
+
+  /// Con menos de esto ya llegamos: perseguir décimas de píxel sólo gasta
+  /// frames sin que se vea nada.
+  static const double _epsilon = 0.5;
+
+  late final Ticker _ticker = createTicker(_onTick);
+
   StreamSubscription<double>? _sub;
   double _dpr = 1;
 
-  /// Delta acumulado que todavía no se aplicó.
+  /// Adónde queremos llegar. Null = no hay nada pendiente.
   ///
-  /// La corona emite decenas de eventos por segundo. Llamar `jumpTo` en cada
-  /// uno hace que el scroll se sienta TRABADO: cada salto reinicia la posición
-  /// y el render no llega. Se acumulan los eventos y se aplican UNA vez por
-  /// frame, que es lo máximo que la pantalla puede mostrar igual.
-  double _pending = 0;
-  bool _scheduled = false;
+  /// **Acá está la clave de la fluidez.** La versión anterior hacía `jumpTo` con
+  /// el delta de cada muesca: aunque se agrupara por frame, cada muesca seguía
+  /// siendo un ESCALÓN instantáneo de ~96 px. El dueño lo describió como *"a
+  /// tirones"*, y tenía razón — no era un problema de frecuencia, era que no
+  /// había interpolación.
+  ///
+  /// Ahora las muescas se suman a un DESTINO y un ticker desliza hacia él con
+  /// suavizado exponencial. Girar rápido no encola saltos: corre el destino más
+  /// lejos y el deslizamiento se acelera solo.
+  double? _target;
+
+  Duration _lastTick = Duration.zero;
 
   @override
   void initState() {
@@ -109,6 +126,7 @@ class _WearRotaryScrollState extends State<WearRotaryScroll> {
   @override
   void dispose() {
     _sub?.cancel();
+    _ticker.dispose();
     super.dispose();
   }
 
@@ -116,31 +134,56 @@ class _WearRotaryScrollState extends State<WearRotaryScroll> {
     // El filtro va acá y no en la suscripción: en un pager las páginas quedan
     // vivas aunque no se vean, y sin esto el giro movería listas que nadie mira.
     if (!widget.enabled) return;
+
+    final c = widget.controller;
+    if (!c.hasClients) return;
+    final p = c.position;
+
     // `scaledVerticalScrollFactor` viene en píxeles FÍSICOS; el offset de
     // Flutter es en píxeles LÓGICOS. Sin esta división, en el SM-L500
     // (devicePixelRatio 2.125) cada muesca scrollea el doble de lo que debería.
-    _pending += physical / _dpr * _sensitivity;
-    if (_scheduled) return;
-    _scheduled = true;
-    // `addPostFrameCallback` corre después del PRÓXIMO frame — y una pantalla
-    // quieta no produce frames, así que sin `scheduleFrame()` el callback queda
-    // esperando para siempre y la corona no hace absolutamente nada. Fue
-    // exactamente el bug: el log mostraba los eventos llegando y la lista no se
-    // movía.
-    WidgetsBinding.instance.scheduleFrame();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scheduled = false;
-      final delta = _pending;
-      _pending = 0;
-      final c = widget.controller;
-      if (!c.hasClients || delta == 0) return;
-      final p = c.position;
-      final target =
-          (p.pixels + delta).clamp(p.minScrollExtent, p.maxScrollExtent);
-      // `jumpTo` y no `animateTo`: animar cada lote es cancelar la animación
-      // anterior en el frame siguiente. `jumpTo` da el 1:1 que se siente nativo.
+    final delta = physical / _dpr * _sensitivity;
+
+    // Se acumula sobre el destino ANTERIOR, no sobre la posición actual: si no,
+    // girar rápido perdería las muescas que llegan mientras todavía desliza.
+    final base = _target ?? p.pixels;
+    _target = (base + delta).clamp(p.minScrollExtent, p.maxScrollExtent);
+
+    if (!_ticker.isActive) {
+      _lastTick = Duration.zero;
+      _ticker.start();
+    }
+  }
+
+  void _onTick(Duration elapsed) {
+    final c = widget.controller;
+    final target = _target;
+    if (target == null || !c.hasClients) {
+      _stop();
+      return;
+    }
+
+    final dt = (elapsed - _lastTick).inMicroseconds / 1e6;
+    _lastTick = elapsed;
+
+    final current = c.position.pixels;
+    final remaining = target - current;
+    if (remaining.abs() < _epsilon || dt <= 0) {
       c.jumpTo(target);
-    });
+      _stop();
+      return;
+    }
+
+    // Suavizado exponencial con dt: si un frame se atrasa, el deslizamiento
+    // avanza proporcionalmente más y no se siente distinto. Con un factor fijo
+    // por frame, un hipo de render se notaría como un tirón.
+    final t = 1 - math.exp(-_responsiveness * dt);
+    c.jumpTo(current + remaining * t);
+  }
+
+  void _stop() {
+    _target = null;
+    if (_ticker.isActive) _ticker.stop();
   }
 
   @override
