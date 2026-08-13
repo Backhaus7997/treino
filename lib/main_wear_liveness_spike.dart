@@ -57,9 +57,13 @@ import 'package:flutter/services.dart';
 /// Cada cuánto late. 1 s es la granularidad de un descanso real.
 const Duration _tickEvery = Duration(seconds: 1);
 
-/// Duración del descanso de prueba. Más larga que cualquier ventana de medición,
-/// para que al despertar SIEMPRE quede algo por descontar.
-const int _restSeconds = 600;
+/// Duración del descanso de prueba.
+///
+/// El default **tiene que ser MENOR que la ventana de medición**: las primeras
+/// corridas usaron 600 s sobre ventanas de ~500 s, así que el deadline nunca
+/// llegaba a cero y el camino que importa —vencer con la pantalla apagada—
+/// quedaba sin tocar. 90 s es un descanso realista entre series.
+const int _restSeconds = int.fromEnvironment('REST_SECONDS', defaultValue: 90);
 
 /// Interruptor del mecanismo. Es lo que permite poner ROJO por separado sin
 /// tocar el manifest — sacar `foregroundServiceType` del manifest no sirve como

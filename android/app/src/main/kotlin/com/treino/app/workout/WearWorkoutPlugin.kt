@@ -46,6 +46,14 @@ class WearWorkoutPlugin(
      */
     private val restStore = RestStore(context)
 
+    /**
+     * El aviso. Separado del store a propósito: el store resuelve "qué número
+     * mostrar", la alarma resuelve "cuándo avisar". Son problemas distintos y
+     * medido en hardware quedó claro que uno no implica al otro — el descanso
+     * llegó a cero con el número correcto y sin que sonara nada.
+     */
+    private val restAlarm = RestAlarm(context)
+
     fun dispose() {
         channel.setMethodCallHandler(null)
     }
@@ -124,6 +132,7 @@ class WearWorkoutPlugin(
                 val seconds = call.argument<Int>("seconds") ?: 0
                 val d = RestDeadline.startingAt(now, seconds * 1000L)
                 restStore.save(d)
+                restAlarm.schedule(d)
                 result.success(
                     mapOf(
                         "restEndsAtElapsedMs" to d.endsAtElapsedMs,
@@ -155,6 +164,7 @@ class WearWorkoutPlugin(
 
             "cancelRest" -> {
                 restStore.clear()
+                restAlarm.cancel()
                 result.success(mapOf("ok" to true, "nowElapsedMs" to now))
             }
 
