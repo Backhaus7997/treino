@@ -111,7 +111,17 @@ void main() {
       'the app never mounted',
     );
 
-    BuildContext ctx() => tester.element(find.byType(MaterialApp).first);
+    // The context MUST come from below the router, not from the MaterialApp
+    // itself. `MaterialApp.router` inserts go_router's InheritedGoRouter
+    // underneath it — between the Router and the root Navigator — so the
+    // MaterialApp's own element sits ABOVE the thing `context.go` looks up, and
+    // every call fails with "No GoRouter found in context". That is what made
+    // this run finish with zero screenshots: it threw on the first navigation,
+    // before a single `_shoot`.
+    //
+    // The root Navigator is the stable anchor: go_router builds it inside the
+    // InheritedGoRouter, and it survives every navigation below.
+    BuildContext ctx() => tester.element(find.byType(Navigator).first);
 
     // 3 — Insights. Captured first because it is the screen most sensitive to
     // seeded history, so a bad seed fails the run early instead of at the end.
