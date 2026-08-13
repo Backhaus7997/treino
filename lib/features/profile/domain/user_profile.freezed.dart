@@ -121,7 +121,21 @@ mixin _$UserProfile {
 // (`users/{uid}` has no key allowlist; see firestore.rules:65-80).
 // Read via `OnboardingSurface.shouldShow`, written via
 // `OnboardingSurface.markedIn` — never index this map with a raw string.
-  Map<String, int> get onboardingSeen => throw _privateConstructorUsedError;
+  Map<String, int> get onboardingSeen =>
+      throw _privateConstructorUsedError; // ── PLANTILLAS mini-onboarding answers (issue #635) ─────────────────
+// Días, minutos, objetivo y zonas que el atleta declaró la primera vez que
+// entró a PLANTILLAS. Null/ausente ⇒ todavía no lo respondió; no hay
+// backfill ni migración, igual que `onboardingSeen`.
+//
+// PRIVADO: son preferencias del atleta, no parte de su perfil público. No
+// se propagan a `userPublicProfiles` — ese path tiene su propio allowlist
+// explícito de claves en firestore.rules, así que no puede filtrarse solo.
+//
+// `users/{uid}` no tiene guarda `hasOnly` en update (firestore.rules:65-80),
+// así que este campo NO requiere cambio de reglas. El acoplamiento del
+// COUPLING WARNING es de los paths de `routines`, no de este.
+  TemplatePreferences? get templatePreferences =>
+      throw _privateConstructorUsedError;
 
   /// Serializes this UserProfile to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -171,9 +185,11 @@ abstract class $UserProfileCopyWith<$Res> {
       String? activeRoutineId,
       TrainerSubscription? subscription,
       double? weightedLoad,
-      Map<String, int> onboardingSeen});
+      Map<String, int> onboardingSeen,
+      TemplatePreferences? templatePreferences});
 
   $TrainerSubscriptionCopyWith<$Res>? get subscription;
+  $TemplatePreferencesCopyWith<$Res>? get templatePreferences;
 }
 
 /// @nodoc
@@ -223,6 +239,7 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
     Object? subscription = freezed,
     Object? weightedLoad = freezed,
     Object? onboardingSeen = null,
+    Object? templatePreferences = freezed,
   }) {
     return _then(_value.copyWith(
       uid: null == uid
@@ -353,6 +370,10 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
           ? _value.onboardingSeen
           : onboardingSeen // ignore: cast_nullable_to_non_nullable
               as Map<String, int>,
+      templatePreferences: freezed == templatePreferences
+          ? _value.templatePreferences
+          : templatePreferences // ignore: cast_nullable_to_non_nullable
+              as TemplatePreferences?,
     ) as $Val);
   }
 
@@ -367,6 +388,21 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
 
     return $TrainerSubscriptionCopyWith<$Res>(_value.subscription!, (value) {
       return _then(_value.copyWith(subscription: value) as $Val);
+    });
+  }
+
+  /// Create a copy of UserProfile
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $TemplatePreferencesCopyWith<$Res>? get templatePreferences {
+    if (_value.templatePreferences == null) {
+      return null;
+    }
+
+    return $TemplatePreferencesCopyWith<$Res>(_value.templatePreferences!,
+        (value) {
+      return _then(_value.copyWith(templatePreferences: value) as $Val);
     });
   }
 }
@@ -411,10 +447,13 @@ abstract class _$$UserProfileImplCopyWith<$Res>
       String? activeRoutineId,
       TrainerSubscription? subscription,
       double? weightedLoad,
-      Map<String, int> onboardingSeen});
+      Map<String, int> onboardingSeen,
+      TemplatePreferences? templatePreferences});
 
   @override
   $TrainerSubscriptionCopyWith<$Res>? get subscription;
+  @override
+  $TemplatePreferencesCopyWith<$Res>? get templatePreferences;
 }
 
 /// @nodoc
@@ -462,6 +501,7 @@ class __$$UserProfileImplCopyWithImpl<$Res>
     Object? subscription = freezed,
     Object? weightedLoad = freezed,
     Object? onboardingSeen = null,
+    Object? templatePreferences = freezed,
   }) {
     return _then(_$UserProfileImpl(
       uid: null == uid
@@ -592,6 +632,10 @@ class __$$UserProfileImplCopyWithImpl<$Res>
           ? _value._onboardingSeen
           : onboardingSeen // ignore: cast_nullable_to_non_nullable
               as Map<String, int>,
+      templatePreferences: freezed == templatePreferences
+          ? _value.templatePreferences
+          : templatePreferences // ignore: cast_nullable_to_non_nullable
+              as TemplatePreferences?,
     ));
   }
 }
@@ -631,7 +675,8 @@ class _$UserProfileImpl implements _UserProfile {
       this.activeRoutineId,
       this.subscription,
       this.weightedLoad,
-      final Map<String, int> onboardingSeen = const <String, int>{}})
+      final Map<String, int> onboardingSeen = const <String, int>{},
+      this.templatePreferences})
       : _trainerLocations = trainerLocations,
         _trainerGeohashes = trainerGeohashes,
         _onboardingSeen = onboardingSeen;
@@ -810,9 +855,24 @@ class _$UserProfileImpl implements _UserProfile {
     return EqualUnmodifiableMapView(_onboardingSeen);
   }
 
+// ── PLANTILLAS mini-onboarding answers (issue #635) ─────────────────
+// Días, minutos, objetivo y zonas que el atleta declaró la primera vez que
+// entró a PLANTILLAS. Null/ausente ⇒ todavía no lo respondió; no hay
+// backfill ni migración, igual que `onboardingSeen`.
+//
+// PRIVADO: son preferencias del atleta, no parte de su perfil público. No
+// se propagan a `userPublicProfiles` — ese path tiene su propio allowlist
+// explícito de claves en firestore.rules, así que no puede filtrarse solo.
+//
+// `users/{uid}` no tiene guarda `hasOnly` en update (firestore.rules:65-80),
+// así que este campo NO requiere cambio de reglas. El acoplamiento del
+// COUPLING WARNING es de los paths de `routines`, no de este.
+  @override
+  final TemplatePreferences? templatePreferences;
+
   @override
   String toString() {
-    return 'UserProfile(uid: $uid, email: $email, displayName: $displayName, role: $role, createdAt: $createdAt, updatedAt: $updatedAt, gymId: $gymId, bodyWeightKg: $bodyWeightKg, heightCm: $heightCm, gender: $gender, experienceLevel: $experienceLevel, avatarUrl: $avatarUrl, firstName: $firstName, lastName: $lastName, phone: $phone, bornAt: $bornAt, termsAcceptedAt: $termsAcceptedAt, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerMonthlyRate: $trainerMonthlyRate, paymentAlias: $paymentAlias, trainerExperienceYears: $trainerExperienceYears, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerGeohash: $trainerGeohash, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline, activeRoutineId: $activeRoutineId, subscription: $subscription, weightedLoad: $weightedLoad, onboardingSeen: $onboardingSeen)';
+    return 'UserProfile(uid: $uid, email: $email, displayName: $displayName, role: $role, createdAt: $createdAt, updatedAt: $updatedAt, gymId: $gymId, bodyWeightKg: $bodyWeightKg, heightCm: $heightCm, gender: $gender, experienceLevel: $experienceLevel, avatarUrl: $avatarUrl, firstName: $firstName, lastName: $lastName, phone: $phone, bornAt: $bornAt, termsAcceptedAt: $termsAcceptedAt, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerMonthlyRate: $trainerMonthlyRate, paymentAlias: $paymentAlias, trainerExperienceYears: $trainerExperienceYears, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerGeohash: $trainerGeohash, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline, activeRoutineId: $activeRoutineId, subscription: $subscription, weightedLoad: $weightedLoad, onboardingSeen: $onboardingSeen, templatePreferences: $templatePreferences)';
   }
 
   @override
@@ -876,7 +936,9 @@ class _$UserProfileImpl implements _UserProfile {
             (identical(other.weightedLoad, weightedLoad) ||
                 other.weightedLoad == weightedLoad) &&
             const DeepCollectionEquality()
-                .equals(other._onboardingSeen, _onboardingSeen));
+                .equals(other._onboardingSeen, _onboardingSeen) &&
+            (identical(other.templatePreferences, templatePreferences) ||
+                other.templatePreferences == templatePreferences));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -914,7 +976,8 @@ class _$UserProfileImpl implements _UserProfile {
         activeRoutineId,
         subscription,
         weightedLoad,
-        const DeepCollectionEquality().hash(_onboardingSeen)
+        const DeepCollectionEquality().hash(_onboardingSeen),
+        templatePreferences
       ]);
 
   /// Create a copy of UserProfile
@@ -966,7 +1029,8 @@ abstract class _UserProfile implements UserProfile {
       final String? activeRoutineId,
       final TrainerSubscription? subscription,
       final double? weightedLoad,
-      final Map<String, int> onboardingSeen}) = _$UserProfileImpl;
+      final Map<String, int> onboardingSeen,
+      final TemplatePreferences? templatePreferences}) = _$UserProfileImpl;
 
   factory _UserProfile.fromJson(Map<String, dynamic> json) =
       _$UserProfileImpl.fromJson;
@@ -1100,7 +1164,21 @@ abstract class _UserProfile implements UserProfile {
 // Read via `OnboardingSurface.shouldShow`, written via
 // `OnboardingSurface.markedIn` — never index this map with a raw string.
   @override
-  Map<String, int> get onboardingSeen;
+  Map<String, int>
+      get onboardingSeen; // ── PLANTILLAS mini-onboarding answers (issue #635) ─────────────────
+// Días, minutos, objetivo y zonas que el atleta declaró la primera vez que
+// entró a PLANTILLAS. Null/ausente ⇒ todavía no lo respondió; no hay
+// backfill ni migración, igual que `onboardingSeen`.
+//
+// PRIVADO: son preferencias del atleta, no parte de su perfil público. No
+// se propagan a `userPublicProfiles` — ese path tiene su propio allowlist
+// explícito de claves en firestore.rules, así que no puede filtrarse solo.
+//
+// `users/{uid}` no tiene guarda `hasOnly` en update (firestore.rules:65-80),
+// así que este campo NO requiere cambio de reglas. El acoplamiento del
+// COUPLING WARNING es de los paths de `routines`, no de este.
+  @override
+  TemplatePreferences? get templatePreferences;
 
   /// Create a copy of UserProfile
   /// with the given fields replaced by the non-null parameter values.
