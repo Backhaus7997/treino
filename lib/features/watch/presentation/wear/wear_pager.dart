@@ -45,8 +45,10 @@ class WearPageScope extends InheritedWidget {
 /// `windowSwipeToDismiss` está apagado en el tema del flavor `wear`, así que el
 /// sistema ya no cierra nada. Lo hacemos acá, y con la misma semántica que tenía:
 ///
-/// * En la primera página, un arrastre izquierda→derecha **sale de la app**.
-/// * En las demás, ese mismo gesto **vuelve una página**.
+/// * En las páginas 2 y 3, el arrastre izquierda→derecha **vuelve una página**,
+///   y eso lo maneja el `PageView` solo.
+/// * En la PRIMERA, ese mismo arrastre ya no tiene a dónde ir: se convierte en
+///   overscroll, y ahí **sale de la app**.
 ///
 /// O sea que el atleta no aprende un gesto nuevo: significa "atrás", y en la
 /// primera pantalla atrás es salir. Si esto no estuviera, quedaría encerrado.
@@ -64,13 +66,12 @@ class _WearPagerState extends State<WearPager> {
   final _controller = PageController();
   int _page = 0;
 
-  /// Cuánto hay que arrastrar para que cuente como "atrás".
-  ///
-  /// En píxeles lógicos. Bajo, porque en una pantalla de 206 dp un umbral
-  /// generoso se siente como que el gesto no responde.
-  static const double _backThreshold = 40;
+  /// Cuánto hay que arrastrar MÁS ALLÁ del principio para que cuente como
+  /// "salir". En píxeles lógicos.
+  static const double _exitThreshold = 48;
 
-  double _dragX = 0;
+  /// Overscroll acumulado hacia atrás en la primera página.
+  double _overscroll = 0;
 
   @override
   void dispose() {
@@ -78,53 +79,50 @@ class _WearPagerState extends State<WearPager> {
     super.dispose();
   }
 
-  void _onDragUpdate(DragUpdateDetails d) => _dragX += d.delta.dx;
-
-  void _onDragEnd(DragEndDetails _) {
-    final dx = _dragX;
-    _dragX = 0;
-    // Sólo izquierda→derecha. El otro sentido lo maneja el PageView.
-    if (dx < _backThreshold) return;
-    if (_page == 0) {
-      SystemNavigator.pop();
-    } else {
-      _controller.previousPage(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOut,
-      );
+  /// Detecta el intento de "ir atrás" desde la primera página.
+  ///
+  /// **Por overscroll y NO por un `GestureDetector` encima.** La primera versión
+  /// ponía una capa de gestos a pantalla completa con
+  /// `onHorizontalDragUpdate`, y eso GANA la arena de gestos contra el
+  /// `PageView`: el arrastre nunca llegaba al pager y la app dejaba de
+  /// deslizarse de costado. Me robé mi propio gesto.
+  ///
+  /// Escuchar notificaciones no compite con nadie: el `PageView` maneja el
+  /// arrastre normal, y sólo cuando ya no hay a dónde ir aparece el overscroll.
+  bool _onScroll(ScrollNotification n) {
+    if (n.depth != 0) return false; // ignora el scroll VERTICAL de las páginas
+    if (n is OverscrollNotification && _page == 0 && n.overscroll < 0) {
+      _overscroll -= n.overscroll;
+    } else if (n is ScrollEndNotification) {
+      final acumulado = _overscroll;
+      _overscroll = 0;
+      if (_page == 0 && acumulado > _exitThreshold) SystemNavigator.pop();
     }
+    return false;
   }
 
   @override
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        PageView(
-          controller: _controller,
-          // Sin scroll físico hacia atrás: el retroceso lo maneja el gesto de
-          // abajo, para que "atrás" y "salir" sean el MISMO gesto y no dos.
-          onPageChanged: (i) => setState(() => _page = i),
-          children: [
-            for (var i = 0; i < widget.pages.length; i++)
-              WearPageScope(isActive: i == _page, child: widget.pages[i]),
-          ],
-        ),
-        // Capa de gesto que sólo escucha arrastres hacia la derecha. Va
-        // ENCIMA pero es transparente a los toques: `HitTestBehavior
-        // .translucent` deja pasar los taps a la página de abajo, así que los
-        // botones siguen funcionando.
-        Positioned.fill(
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onHorizontalDragUpdate: _onDragUpdate,
-            onHorizontalDragEnd: _onDragEnd,
+        NotificationListener<ScrollNotification>(
+          onNotification: _onScroll,
+          child: PageView(
+            controller: _controller,
+            onPageChanged: (i) => setState(() => _page = i),
+            children: [
+              for (var i = 0; i < widget.pages.length; i++)
+                WearPageScope(isActive: i == _page, child: widget.pages[i]),
+            ],
           ),
         ),
         Positioned(
           left: 0,
           right: 0,
           bottom: 8,
-          child: _PageDots(count: widget.pages.length, current: _page),
+          child: IgnorePointer(
+            child: _PageDots(count: widget.pages.length, current: _page),
+          ),
         ),
       ],
     );

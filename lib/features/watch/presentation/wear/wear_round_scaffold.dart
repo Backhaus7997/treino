@@ -49,10 +49,15 @@ enum WearItemType {
 ///   padding vertical en el contenedor recorta el viewport en vez de correr el
 ///   scroll, y el primer ítem nace cortado contra el bisel sin forma de traerlo
 ///   a la franja ancha.
-/// * **Desvanecido en los bordes**: el recorte del vidrio tiene que leerse como
-///   fundido, no como error. Es lo que hace `ScalingLazyColumn` con escalado y
-///   opacidad progresivos; acá se aproxima con un [ShaderMask], que da el 80%
-///   del efecto con el 5% del código.
+/// ## El desvanecido de los bordes, y por qué NO está
+///
+/// La idea era aproximar el fundido de `ScalingLazyColumn` con un `ShaderMask`.
+/// Se probó y se sacó: un `ShaderMask` fuerza un `saveLayer` **por frame**, y
+/// con tres páginas vivas en un reloj de 32 bits la app se trababa. El dueño lo
+/// reportó como *"muy lenta, se traba"*.
+///
+/// Lindo no vale trabado. Si vuelve, tiene que ser midiendo el costo primero, y
+/// probablemente sólo sobre la página activa.
 class WearRoundScaffold extends StatefulWidget {
   /// Contenido centrado que NO scrollea. Para pantallas de estado: emparejando,
   /// cargando, error.
@@ -78,9 +83,6 @@ class WearRoundScaffold extends StatefulWidget {
   /// vive lo que el atleta lee: a la altura del centro el círculo mide el 100%
   /// del diámetro.
   static const double horizontalInset = 0.052;
-
-  /// Qué fracción del alto ocupa el desvanecido de cada borde.
-  static const double _fade = 0.14;
 
   final List<Widget> children;
   final WearItemType firstItem;
@@ -144,29 +146,7 @@ class _WearRoundScaffoldState extends State<WearRoundScaffold> {
         child: WearRotaryScroll(
           enabled: WearPageScope.isActiveOf(context),
           controller: _controller,
-          // Sin esto, el primer y el último ítem parecen CORTADOS contra el
-          // bisel y el atleta cree que la pantalla se rompió. Con el fundido se
-          // lee como "hay más, seguí scrolleando".
-          child: ShaderMask(
-            shaderCallback: (r) => const LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Color(0x00000000),
-                Color(0xFF000000),
-                Color(0xFF000000),
-                Color(0x00000000),
-              ],
-              stops: [
-                0,
-                WearRoundScaffold._fade,
-                1 - WearRoundScaffold._fade,
-                1,
-              ],
-            ).createShader(r),
-            blendMode: BlendMode.dstIn,
-            child: list,
-          ),
+          child: list,
         ),
       ),
     );
