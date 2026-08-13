@@ -391,6 +391,8 @@
   "coachHubDashboardPauseLinkError": "No pudimos pausar el vínculo.",
   "coachHubDashboardTerminateLinkError": "No pudimos terminar el vínculo.",
   "coachHubDashboardResumeLinkError": "No pudimos reanudar el vínculo.",
+  "coachHubDashboardResumePrecondition": "Este vínculo ya no está disponible.",
+  "coachHubDashboardResumeUnavailable": "Revisá tu conexión y probá de nuevo.",
   "coachHubDashboardAcceptSuccess": "Vínculo aceptado.",
   "coachHubDashboardAcceptError": "No pudimos aceptar el vínculo.",
   "coachHubDashboardAcceptPrecondition": "Esta solicitud ya no está disponible.",

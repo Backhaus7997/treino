@@ -4070,6 +4070,18 @@ abstract class AppL10n {
   /// **'No pudimos reanudar el vínculo.'**
   String get coachHubDashboardResumeLinkError;
 
+  /// Coach Hub web dashboard — snackbar when resumeTrainerLink fails with a non-quota precondition (not-found/permission-denied/failed-precondition): the link is no longer valid, retrying won't help (paywall Fase 7, PR4, slice 3, design D-5).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Este vínculo ya no está disponible.'**
+  String get coachHubDashboardResumePrecondition;
+
+  /// Coach Hub web dashboard — snackbar when resumeTrainerLink fails with a network/unknown error, safe to retry (paywall Fase 7, PR4, slice 3, design D-5).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Revisá tu conexión y probá de nuevo.'**
+  String get coachHubDashboardResumeUnavailable;
+
   /// Coach Hub web dashboard — snackbar after accepting a pending link request.
   ///
   /// In es_AR, this message translates to:

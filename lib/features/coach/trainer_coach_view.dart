@@ -7,10 +7,12 @@ import '../../app/theme/app_palette.dart';
 import '../../core/widgets/motion/treino_state_switcher.dart';
 import '../../core/widgets/treino_icon.dart';
 import '../chat/application/chat_providers.dart';
+import '../coach_hub/presentation/sections/facturacion_planes/plan_limit_paywall.dart';
 import '../profile/application/user_public_profile_providers.dart';
 import '../profile/domain/user_public_profile.dart';
 import '../workout/application/session_providers.dart' show currentUidProvider;
 import 'application/trainer_link_providers.dart';
+import 'data/trainer_link_promotion_service.dart';
 import 'domain/trainer_link.dart';
 import 'domain/trainer_link_status.dart';
 import 'presentation/trainer_agenda_tab.dart';
@@ -197,6 +199,13 @@ class _ActiveAlumnoCard extends ConsumerWidget {
     required String confirmLabel,
     required Color confirmBg,
     required Future<void> Function() action,
+    // Optional hook so callers with a richer error contract (e.g. resume's
+    // LinkPromotionFailure — plan-limit paywall vs. two snackbar variants)
+    // can render their own feedback instead of the generic snackbar below.
+    // NOT typed to LinkPromotionFailure: the catch below stays catch-all
+    // (QA H5 / see comment on the try/catch) and hands whatever it caught to
+    // this hook, which is responsible for its own default branch.
+    Future<void> Function(BuildContext context, Object error)? onFailure,
   }) async {
     final palette = AppPalette.of(context);
     final confirmed = await showDialog<bool>(
@@ -254,8 +263,12 @@ class _ActiveAlumnoCard extends ConsumerWidget {
     // cambia. Ahora falla con un SnackBar y sin fatal.
     try {
       await action();
-    } catch (_) {
+    } catch (e) {
       if (!context.mounted) return;
+      if (onFailure != null) {
+        await onFailure(context, e);
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('No pudimos actualizar el vínculo. Probá de nuevo.'),
@@ -308,8 +321,44 @@ class _ActiveAlumnoCard extends ConsumerWidget {
                         confirmLabel: 'Reanudar',
                         confirmBg: palette.accent,
                         action: () => ref
-                            .read(trainerLinkRepositoryProvider)
+                            .read(trainerLinkPromotionServiceProvider)
                             .resume(link.id),
+                        onFailure: (context, error) async {
+                          if (error is LinkPromotionFailure$PlanLimitReached) {
+                            await showPlanLimitPaywall(
+                              context,
+                              currentTier: error.tier,
+                              reason: error.reason == 'subscription-inactive'
+                                  ? PlanLimitReason.subscriptionInactive
+                                  : PlanLimitReason.planLimit,
+                            );
+                            return;
+                          }
+                          if (!context.mounted) return;
+                          if (error
+                              is LinkPromotionFailure$PromotionPrecondition) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Este vínculo ya no está disponible.',
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+                          // Catch-all (QA H5 — deliberately NOT narrowed to
+                          // LinkPromotionFailure): anything outside the
+                          // sealed hierarchy — a service bug, a platform
+                          // error — must still surface feedback instead of
+                          // leaving the trainer believing nothing happened.
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Revisá tu conexión y probá de nuevo.',
+                              ),
+                            ),
+                          );
+                        },
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: palette.accent,

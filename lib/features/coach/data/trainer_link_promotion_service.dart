@@ -75,11 +75,13 @@ final class LinkPromotionFailure$PromotionUnavailable
       'LinkPromotionFailure\$PromotionUnavailable(cause: $cause)';
 }
 
-/// Thin wrapper around the `acceptTrainerLink` Firebase Callable Function.
+/// Thin wrapper around the `acceptTrainerLink` and `resumeTrainerLink`
+/// Firebase Callable Functions.
 ///
-/// Replaces `TrainerLinkRepository.accept()` — the promotion is now
-/// server-authoritative behind the weighted-load gate (see
-/// `functions/src/subscriptions/accept-trainer-link.ts`).
+/// Replaces `TrainerLinkRepository.accept()`/`.resume()` — both promotions
+/// are now server-authoritative behind the weighted-load gate (see
+/// `functions/src/subscriptions/accept-trainer-link.ts` and
+/// `functions/src/subscriptions/resume-trainer-link.ts`).
 class TrainerLinkPromotionService {
   TrainerLinkPromotionService({required FirebaseFunctions functions})
       : _functions = functions;
@@ -94,6 +96,28 @@ class TrainerLinkPromotionService {
   Future<void> accept(String linkId) async {
     try {
       final callable = _functions.httpsCallable('acceptTrainerLink');
+      await callable.call<Map<String, dynamic>>({'linkId': linkId});
+    } on FirebaseFunctionsException catch (e) {
+      throw _mapException(e);
+    } catch (e) {
+      throw LinkPromotionFailure$PromotionUnavailable(cause: e);
+    }
+  }
+
+  /// Invokes the `resumeTrainerLink` callable with [linkId] as payload.
+  ///
+  /// Replaces `TrainerLinkRepository.resume()` — like [accept], the
+  /// paused → active transition is now server-authoritative behind the
+  /// weighted-load gate (Fase 7, PR4, slice 3 — see
+  /// `functions/src/subscriptions/resume-trainer-link.ts`).
+  ///
+  /// Throws [LinkPromotionFailure] on error. Never throws
+  /// [FirebaseFunctionsException] or any other raw type — callers only need
+  /// to catch the sealed class. Reuses [_mapException]/[_parsePlanLimit]: the
+  /// error contract mirrors `acceptTrainerLink` exactly.
+  Future<void> resume(String linkId) async {
+    try {
+      final callable = _functions.httpsCallable('resumeTrainerLink');
       await callable.call<Map<String, dynamic>>({'linkId': linkId});
     } on FirebaseFunctionsException catch (e) {
       throw _mapException(e);

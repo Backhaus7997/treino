@@ -1502,6 +1502,14 @@
   "@coachHubDashboardResumeLinkError": {
     "description": "Coach Hub web dashboard — snackbar when resume() fails."
   },
+  "coachHubDashboardResumePrecondition": "Este vínculo ya no está disponible.",
+  "@coachHubDashboardResumePrecondition": {
+    "description": "Coach Hub web dashboard — snackbar when resumeTrainerLink fails with a non-quota precondition (not-found/permission-denied/failed-precondition): the link is no longer valid, retrying won't help (paywall Fase 7, PR4, slice 3, design D-5)."
+  },
+  "coachHubDashboardResumeUnavailable": "Revisá tu conexión y probá de nuevo.",
+  "@coachHubDashboardResumeUnavailable": {
+    "description": "Coach Hub web dashboard — snackbar when resumeTrainerLink fails with a network/unknown error, safe to retry (paywall Fase 7, PR4, slice 3, design D-5)."
+  },
   "coachHubDashboardAcceptSuccess": "Vínculo aceptado.",
   "@coachHubDashboardAcceptSuccess": {
     "description": "Coach Hub web dashboard — snackbar after accepting a pending link request."
