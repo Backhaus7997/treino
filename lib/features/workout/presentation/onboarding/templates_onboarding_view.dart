@@ -118,12 +118,41 @@ class _TemplatesOnboardingViewState extends State<TemplatesOnboardingView> {
     });
   }
 
+  /// True while the outgoing step is fading out, before the swap.
+  bool _swapping = false;
+
+  /// Half of the step transition. Out, swap, in.
+  static const _fadeHalf = AppMotion.fast;
+
+  /// Moves to [next] as a FADE-THROUGH, never a cross-fade.
+  ///
+  /// A cross-fade stacks both steps for the duration, so the box takes the
+  /// height of the TALLER one: going from the four full-width durations back to
+  /// the shorter day pills left the old rows ghosting over a tall empty gap
+  /// that only collapsed once the fade ended. Steps here differ too much in
+  /// height for the two of them to ever share the frame.
+  ///
+  /// So: fade the current step out, swap it while nothing is on screen, fade
+  /// the new one in. [AnimatedSize] moves the height during the gap, when there
+  /// is no content to misalign.
+  void _goTo(int next) {
+    if (next == _index || _swapping) return;
+    setState(() => _swapping = true);
+    Future.delayed(AppMotion.resolve(context, _fadeHalf), () {
+      if (!mounted) return;
+      setState(() {
+        _index = next;
+        _swapping = false;
+      });
+    });
+  }
+
   void _onPrimary() {
     if (_isLast) {
       widget.onFinish(_preferences());
       return;
     }
-    setState(() => _index++);
+    _goTo(_index + 1);
   }
 
   /// Steps back one question.
@@ -134,7 +163,7 @@ class _TemplatesOnboardingViewState extends State<TemplatesOnboardingView> {
   /// would be worse than not having one.
   void _onBack() {
     if (_index == 0) return;
-    setState(() => _index--);
+    _goTo(_index - 1);
   }
 
   /// How far the finger has carried the content, in logical pixels.
@@ -185,16 +214,16 @@ class _TemplatesOnboardingViewState extends State<TemplatesOnboardingView> {
     final goingBack = _dragDx > 0;
 
     setState(() {
-      if (committedByDistance || committedByVelocity) {
-        if (goingBack && _canGoPrev) {
-          _index--;
-        } else if (!goingBack && _canGoNext) {
-          _index++;
-        }
-      }
       _dragging = false;
       _dragDx = 0;
     });
+
+    if (!committedByDistance && !committedByVelocity) return;
+    if (goingBack && _canGoPrev) {
+      _goTo(_index - 1);
+    } else if (!goingBack && _canGoNext) {
+      _goTo(_index + 1);
+    }
   }
 
   /// Folds the answers into the persisted shape.
@@ -281,7 +310,10 @@ class _TemplatesOnboardingViewState extends State<TemplatesOnboardingView> {
                   duration: _dragging
                       ? Duration.zero
                       : AppMotion.resolve(context, AppMotion.slow),
-                  stepKey: ValueKey(_index),
+                  // 0 while the outgoing step clears the frame, 1 once the new
+                  // one is in place. See [_goTo].
+                  opacity: _swapping ? 0 : 1,
+                  fadeDuration: AppMotion.resolve(context, _fadeHalf),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
@@ -360,22 +392,30 @@ class _TemplatesOnboardingViewState extends State<TemplatesOnboardingView> {
 ///    is visibly acknowledged. Damped and capped by the caller, because a 1:1
 ///    follow slid the content off its own background.
 ///  - When the step actually changes, the block does NOT fly in from off-screen.
-///    It snaps to centre and CROSS-FADES. A slide-in has to cross the same
-///    empty band that caused the white flash, and at the slower duration asked
-///    for it would be on screen twice as long.
+///    It fades THROUGH: out, swap, in, driven by [opacity] from the caller. A
+///    slide-in has to cross the same empty band that caused the white flash,
+///    and at the slower duration asked for it would be on screen twice as long.
+///
+/// No `AnimatedSwitcher`. That stacks the outgoing and incoming steps for the
+/// whole transition, so the box takes the height of the TALLER one — going from
+/// the four duration rows back to the day pills left the old rows ghosting over
+/// a tall empty gap. One child at a time is the only thing that survives steps
+/// this different in height.
 class _SlidingStep extends StatelessWidget {
   const _SlidingStep({
     required this.offsetX,
     required this.width,
     required this.duration,
-    required this.stepKey,
+    required this.opacity,
+    required this.fadeDuration,
     required this.child,
   });
 
   final double offsetX;
   final double width;
   final Duration duration;
-  final Key stepKey;
+  final double opacity;
+  final Duration fadeDuration;
   final Widget child;
 
   @override
@@ -384,21 +424,11 @@ class _SlidingStep extends StatelessWidget {
       duration: duration,
       curve: AppMotion.standard,
       offset: Offset(width > 0 ? offsetX / width : 0, 0),
-      child: AnimatedSwitcher(
-        duration: AppMotion.resolve(context, AppMotion.slow),
-        switchInCurve: AppMotion.standard,
-        switchOutCurve: AppMotion.exit,
-        // Top-LEFT, not the default centre: the copy is left-aligned and every
-        // step is a different height, so centring makes the outgoing and
-        // incoming text drift against each other mid-fade.
-        layoutBuilder: (currentChild, previousChildren) => Stack(
-          alignment: Alignment.topLeft,
-          children: [
-            ...previousChildren,
-            if (currentChild != null) currentChild,
-          ],
-        ),
-        child: KeyedSubtree(key: stepKey, child: child),
+      child: AnimatedOpacity(
+        opacity: opacity,
+        duration: fadeDuration,
+        curve: AppMotion.standard,
+        child: child,
       ),
     );
   }
