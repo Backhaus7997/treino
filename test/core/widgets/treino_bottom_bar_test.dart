@@ -156,7 +156,7 @@ void main() {
   });
 
   testWidgets(
-      'accessibility text scale keeps every destination readable and tappable',
+      'accessibility text scale keeps every destination reachable on screen',
       (tester) async {
     await tester.pumpWidget(
       _wrap(
@@ -167,16 +167,76 @@ void main() {
     await tester.pump();
 
     expect(tester.takeException(), isNull);
-    for (final label in ['ENTRENAR', 'FEED', 'INICIO', 'COACH', 'PERFIL']) {
-      expect(find.text(label, skipOffstage: false), findsOneWidget);
-      expect(find.bySemanticsLabel(label), findsOneWidget);
-      final text = tester.widget<Text>(
-        find.text(label, skipOffstage: false),
-      );
-      expect(text.maxLines, 1);
-      expect(text.softWrap, isFalse);
+
+    final screen = tester.view.physicalSize / tester.view.devicePixelRatio;
+    for (final label in _labels) {
+      // El destino sigue existiendo y el lector de pantalla lo sigue
+      // anunciando aunque el label visible se haya sacrificado por ancho.
+      final tab = find.bySemanticsLabel(label);
+      expect(tab, findsOneWidget);
+
+      // Y sigue estando DENTRO de la pantalla: el bug de #634 era exactamente
+      // que PERFIL quedaba afuera.
+      final rect = tester.getRect(tab);
+      expect(rect.left, greaterThanOrEqualTo(0));
+      expect(rect.right, lessThanOrEqualTo(screen.width));
     }
+
+    // Achicar el texto le desarmaría al usuario justo lo que pidió, y una
+    // barra de navegación que hay que scrollear no es una barra de navegación.
     expect(find.byType(FittedBox), findsNothing);
-    expect(find.byType(SingleChildScrollView), findsOneWidget);
+    expect(find.byType(SingleChildScrollView), findsNothing);
+  });
+
+  group('TreinoBottomBar — geometría (regresión issue #634)', () {
+    // La barra quedaba corrida tras el primer arranque: medía los labels con la
+    // fuente fallback del sistema (más ancha que Barlow Condensed, que
+    // `google_fonts` todavía no había registrado), decidía que no entraban y
+    // caía a una tira scrolleable de tabs de ancho FIJO. Esos cinco tabs
+    // sumaban más que la pantalla, así que PERFIL quedaba afuera y el resto de
+    // los destinos —INICIO incluido— aparecían corridos hacia la derecha.
+    //
+    // Estos tests miden geometría RENDERIZADA, no la aritmética del layout, y
+    // por eso valen aunque en `flutter_test` la tipografía real nunca cargue:
+    // el reparto en partes iguales no depende de la fuente.
+    for (final currentIndex in [0, 2, 4]) {
+      testWidgets(
+          'los 5 destinos se reparten en partes iguales '
+          '(currentIndex $currentIndex)', (tester) async {
+        tester.view.physicalSize = const Size(430 * 3, 932 * 3);
+        tester.view.devicePixelRatio = 3;
+        addTearDown(tester.view.reset);
+
+        await tester.pumpWidget(
+          _wrap(TreinoBottomBar(currentIndex: currentIndex, onTap: (_) {})),
+        );
+        await tester.pump();
+
+        final rects = [
+          for (final label in _labels)
+            tester.getRect(find.bySemanticsLabel(label)),
+        ];
+
+        // Todos del mismo ancho, pegados uno al lado del otro y adentro de la
+        // pantalla.
+        for (final rect in rects) {
+          expect(
+              rect.width, moreOrLessEquals(rects.first.width, epsilon: 0.01));
+          expect(rect.left, greaterThanOrEqualTo(0));
+          expect(rect.right, lessThanOrEqualTo(430));
+        }
+        for (var i = 1; i < rects.length; i++) {
+          expect(rects[i].left,
+              moreOrLessEquals(rects[i - 1].right, epsilon: 0.01));
+        }
+
+        // Y con cinco tabs iguales, INICIO —el del medio— cae en el centro
+        // exacto de la pantalla. Es la forma más directa de decir "la barra
+        // está centrada".
+        expect(rects[2].center.dx, moreOrLessEquals(215, epsilon: 0.01));
+      });
+    }
   });
 }
+
+const _labels = ['ENTRENAR', 'FEED', 'INICIO', 'COACH', 'PERFIL'];
