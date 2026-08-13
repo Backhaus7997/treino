@@ -107,20 +107,7 @@ mixin _$UserProfile {
 // `weightedLoad` es la carga ponderada denormalizada (activos=1.0,
 // pausados=0.5) que el CF mantiene para que UI/rules lean sin agregar.
   TrainerSubscription? get subscription => throw _privateConstructorUsedError;
-  double? get weightedLoad =>
-      throw _privateConstructorUsedError; // ── Onboarding tour (issue #627) ───────────────────────────────────────
-// Mapa `superficie -> versión del tour ya vista`:
-//   { athleteMobile: 1, trainerMobile: 1, trainerWeb: 1 }
-// Un flag POR SUPERFICIE, no uno global: el PF que ya vio el tour mobile
-// igual tiene que ver el del Coach Hub web. Versionado, así un rediseño
-// futuro lo re-muestra subiendo OnboardingSurface.version, sin migración.
-//
-// Vive acá (Firestore) y no en SharedPreferences para que sea cross-device.
-// Es un campo PRIVADO: NO se propaga a userPublicProfiles ni a
-// trainerPublicProfiles (no está en los subsets de UserRepository), así que
-// los allowlists `hasOnly` de esos docs NO lo necesitan.
-  @OnboardingSeenConverter()
-  OnboardingSeen get onboardingSeen => throw _privateConstructorUsedError;
+  double? get weightedLoad => throw _privateConstructorUsedError;
 
   /// Serializes this UserProfile to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -169,8 +156,7 @@ abstract class $UserProfileCopyWith<$Res> {
       bool trainerOffersOnline,
       String? activeRoutineId,
       TrainerSubscription? subscription,
-      double? weightedLoad,
-      @OnboardingSeenConverter() OnboardingSeen onboardingSeen});
+      double? weightedLoad});
 
   $TrainerSubscriptionCopyWith<$Res>? get subscription;
 }
@@ -221,7 +207,6 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
     Object? activeRoutineId = freezed,
     Object? subscription = freezed,
     Object? weightedLoad = freezed,
-    Object? onboardingSeen = null,
   }) {
     return _then(_value.copyWith(
       uid: null == uid
@@ -348,10 +333,6 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
           ? _value.weightedLoad
           : weightedLoad // ignore: cast_nullable_to_non_nullable
               as double?,
-      onboardingSeen: null == onboardingSeen
-          ? _value.onboardingSeen
-          : onboardingSeen // ignore: cast_nullable_to_non_nullable
-              as OnboardingSeen,
     ) as $Val);
   }
 
@@ -409,8 +390,7 @@ abstract class _$$UserProfileImplCopyWith<$Res>
       bool trainerOffersOnline,
       String? activeRoutineId,
       TrainerSubscription? subscription,
-      double? weightedLoad,
-      @OnboardingSeenConverter() OnboardingSeen onboardingSeen});
+      double? weightedLoad});
 
   @override
   $TrainerSubscriptionCopyWith<$Res>? get subscription;
@@ -460,7 +440,6 @@ class __$$UserProfileImplCopyWithImpl<$Res>
     Object? activeRoutineId = freezed,
     Object? subscription = freezed,
     Object? weightedLoad = freezed,
-    Object? onboardingSeen = null,
   }) {
     return _then(_$UserProfileImpl(
       uid: null == uid
@@ -587,10 +566,6 @@ class __$$UserProfileImplCopyWithImpl<$Res>
           ? _value.weightedLoad
           : weightedLoad // ignore: cast_nullable_to_non_nullable
               as double?,
-      onboardingSeen: null == onboardingSeen
-          ? _value.onboardingSeen
-          : onboardingSeen // ignore: cast_nullable_to_non_nullable
-              as OnboardingSeen,
     ));
   }
 }
@@ -629,8 +604,7 @@ class _$UserProfileImpl implements _UserProfile {
       this.trainerOffersOnline = false,
       this.activeRoutineId,
       this.subscription,
-      this.weightedLoad,
-      @OnboardingSeenConverter() this.onboardingSeen = OnboardingSeen.empty})
+      this.weightedLoad})
       : _trainerLocations = trainerLocations,
         _trainerGeohashes = trainerGeohashes;
 
@@ -773,25 +747,10 @@ class _$UserProfileImpl implements _UserProfile {
   final TrainerSubscription? subscription;
   @override
   final double? weightedLoad;
-// ── Onboarding tour (issue #627) ───────────────────────────────────────
-// Mapa `superficie -> versión del tour ya vista`:
-//   { athleteMobile: 1, trainerMobile: 1, trainerWeb: 1 }
-// Un flag POR SUPERFICIE, no uno global: el PF que ya vio el tour mobile
-// igual tiene que ver el del Coach Hub web. Versionado, así un rediseño
-// futuro lo re-muestra subiendo OnboardingSurface.version, sin migración.
-//
-// Vive acá (Firestore) y no en SharedPreferences para que sea cross-device.
-// Es un campo PRIVADO: NO se propaga a userPublicProfiles ni a
-// trainerPublicProfiles (no está en los subsets de UserRepository), así que
-// los allowlists `hasOnly` de esos docs NO lo necesitan.
-  @override
-  @JsonKey()
-  @OnboardingSeenConverter()
-  final OnboardingSeen onboardingSeen;
 
   @override
   String toString() {
-    return 'UserProfile(uid: $uid, email: $email, displayName: $displayName, role: $role, createdAt: $createdAt, updatedAt: $updatedAt, gymId: $gymId, bodyWeightKg: $bodyWeightKg, heightCm: $heightCm, gender: $gender, experienceLevel: $experienceLevel, avatarUrl: $avatarUrl, firstName: $firstName, lastName: $lastName, phone: $phone, bornAt: $bornAt, termsAcceptedAt: $termsAcceptedAt, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerMonthlyRate: $trainerMonthlyRate, paymentAlias: $paymentAlias, trainerExperienceYears: $trainerExperienceYears, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerGeohash: $trainerGeohash, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline, activeRoutineId: $activeRoutineId, subscription: $subscription, weightedLoad: $weightedLoad, onboardingSeen: $onboardingSeen)';
+    return 'UserProfile(uid: $uid, email: $email, displayName: $displayName, role: $role, createdAt: $createdAt, updatedAt: $updatedAt, gymId: $gymId, bodyWeightKg: $bodyWeightKg, heightCm: $heightCm, gender: $gender, experienceLevel: $experienceLevel, avatarUrl: $avatarUrl, firstName: $firstName, lastName: $lastName, phone: $phone, bornAt: $bornAt, termsAcceptedAt: $termsAcceptedAt, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerMonthlyRate: $trainerMonthlyRate, paymentAlias: $paymentAlias, trainerExperienceYears: $trainerExperienceYears, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerGeohash: $trainerGeohash, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline, activeRoutineId: $activeRoutineId, subscription: $subscription, weightedLoad: $weightedLoad)';
   }
 
   @override
@@ -853,9 +812,7 @@ class _$UserProfileImpl implements _UserProfile {
             (identical(other.subscription, subscription) ||
                 other.subscription == subscription) &&
             (identical(other.weightedLoad, weightedLoad) ||
-                other.weightedLoad == weightedLoad) &&
-            (identical(other.onboardingSeen, onboardingSeen) ||
-                other.onboardingSeen == onboardingSeen));
+                other.weightedLoad == weightedLoad));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -892,8 +849,7 @@ class _$UserProfileImpl implements _UserProfile {
         trainerOffersOnline,
         activeRoutineId,
         subscription,
-        weightedLoad,
-        onboardingSeen
+        weightedLoad
       ]);
 
   /// Create a copy of UserProfile
@@ -914,39 +870,37 @@ class _$UserProfileImpl implements _UserProfile {
 
 abstract class _UserProfile implements UserProfile {
   const factory _UserProfile(
-          {required final String uid,
-          required final String email,
-          required final String? displayName,
-          required final UserRole role,
-          @TimestampConverter() required final DateTime createdAt,
-          @TimestampConverter() required final DateTime updatedAt,
-          final String? gymId,
-          final double? bodyWeightKg,
-          final int? heightCm,
-          final Gender? gender,
-          final ExperienceLevel? experienceLevel,
-          final String? avatarUrl,
-          final String? firstName,
-          final String? lastName,
-          final String? phone,
-          @TimestampConverter() final DateTime? bornAt,
-          @TimestampConverter() final DateTime? termsAcceptedAt,
-          final String? trainerBio,
-          final String? trainerSpecialty,
-          final int? trainerMonthlyRate,
-          final String? paymentAlias,
-          final int? trainerExperienceYears,
-          final double? trainerLatitude,
-          final double? trainerLongitude,
-          final String? trainerGeohash,
-          final List<TrainerLocation> trainerLocations,
-          final List<String> trainerGeohashes,
-          final bool trainerOffersOnline,
-          final String? activeRoutineId,
-          final TrainerSubscription? subscription,
-          final double? weightedLoad,
-          @OnboardingSeenConverter() final OnboardingSeen onboardingSeen}) =
-      _$UserProfileImpl;
+      {required final String uid,
+      required final String email,
+      required final String? displayName,
+      required final UserRole role,
+      @TimestampConverter() required final DateTime createdAt,
+      @TimestampConverter() required final DateTime updatedAt,
+      final String? gymId,
+      final double? bodyWeightKg,
+      final int? heightCm,
+      final Gender? gender,
+      final ExperienceLevel? experienceLevel,
+      final String? avatarUrl,
+      final String? firstName,
+      final String? lastName,
+      final String? phone,
+      @TimestampConverter() final DateTime? bornAt,
+      @TimestampConverter() final DateTime? termsAcceptedAt,
+      final String? trainerBio,
+      final String? trainerSpecialty,
+      final int? trainerMonthlyRate,
+      final String? paymentAlias,
+      final int? trainerExperienceYears,
+      final double? trainerLatitude,
+      final double? trainerLongitude,
+      final String? trainerGeohash,
+      final List<TrainerLocation> trainerLocations,
+      final List<String> trainerGeohashes,
+      final bool trainerOffersOnline,
+      final String? activeRoutineId,
+      final TrainerSubscription? subscription,
+      final double? weightedLoad}) = _$UserProfileImpl;
 
   factory _UserProfile.fromJson(Map<String, dynamic> json) =
       _$UserProfileImpl.fromJson;
@@ -1065,21 +1019,7 @@ abstract class _UserProfile implements UserProfile {
   @override
   TrainerSubscription? get subscription;
   @override
-  double?
-      get weightedLoad; // ── Onboarding tour (issue #627) ───────────────────────────────────────
-// Mapa `superficie -> versión del tour ya vista`:
-//   { athleteMobile: 1, trainerMobile: 1, trainerWeb: 1 }
-// Un flag POR SUPERFICIE, no uno global: el PF que ya vio el tour mobile
-// igual tiene que ver el del Coach Hub web. Versionado, así un rediseño
-// futuro lo re-muestra subiendo OnboardingSurface.version, sin migración.
-//
-// Vive acá (Firestore) y no en SharedPreferences para que sea cross-device.
-// Es un campo PRIVADO: NO se propaga a userPublicProfiles ni a
-// trainerPublicProfiles (no está en los subsets de UserRepository), así que
-// los allowlists `hasOnly` de esos docs NO lo necesitan.
-  @override
-  @OnboardingSeenConverter()
-  OnboardingSeen get onboardingSeen;
+  double? get weightedLoad;
 
   /// Create a copy of UserProfile
   /// with the given fields replaced by the non-null parameter values.

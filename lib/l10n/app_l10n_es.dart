@@ -1338,55 +1338,6 @@ class AppL10nEs extends AppL10n {
       'No pudimos cancelar la cuenta. Probá de nuevo.';
 
   @override
-  String onboardingStepLabel(int current, int total) {
-    return 'PASO $current DE $total';
-  }
-
-  @override
-  String get onboardingSkipCta => 'Saltar';
-
-  @override
-  String get onboardingNextCta => 'SIGUIENTE';
-
-  @override
-  String get onboardingFinishCta => 'EMPEZAR';
-
-  @override
-  String get onboardingSaveError =>
-      'No pudimos guardar que ya viste esto. Puede que te lo mostremos de nuevo.';
-
-  @override
-  String get onboardingAthleteTrainTitle => 'ENTRENÁ';
-
-  @override
-  String get onboardingAthleteTrainBody =>
-      'Todo arranca en la pestaña Entrenar. Ahí vas a encontrar la rutina que te armó tu profe, plantillas listas para copiar, y las rutinas que te creás vos.';
-
-  @override
-  String get onboardingAthleteProgressTitle => 'TU PROGRESO';
-
-  @override
-  String get onboardingAthleteProgressBody =>
-      'Cada serie que cargás queda en tu historial y alimenta tus estadísticas. El volumen, la racha y los récords se calculan solos; las medidas corporales las cargás vos.';
-
-  @override
-  String get onboardingAthleteCoachTitle => 'TU COACH';
-
-  @override
-  String get onboardingAthleteCoachBody =>
-      'En la pestaña Coach buscás y contratás un profe. Tu historial es tuyo: hasta que no compartas una sesión o tu perfil, tu profe no ve nada.';
-
-  @override
-  String get onboardingAthleteCommunityTitle => 'COMUNIDAD';
-
-  @override
-  String get onboardingAthleteCommunityBody =>
-      'El Feed es social: publicás tus entrenamientos sólo si querés. Los rankings de tu gimnasio son opt-in — no aparecés en la tabla hasta que los actives.';
-
-  @override
-  String get onboardingAthleteCommunityRankingsCta => 'Activar rankings';
-
-  @override
   String get reAuthPasswordLabel => 'Contraseña';
 
   @override
@@ -4844,55 +4795,6 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get profileSetupCancelAccountError =>
       'No pudimos cancelar la cuenta. Probá de nuevo.';
-
-  @override
-  String onboardingStepLabel(int current, int total) {
-    return 'PASO $current DE $total';
-  }
-
-  @override
-  String get onboardingSkipCta => 'Saltar';
-
-  @override
-  String get onboardingNextCta => 'SIGUIENTE';
-
-  @override
-  String get onboardingFinishCta => 'EMPEZAR';
-
-  @override
-  String get onboardingSaveError =>
-      'No pudimos guardar que ya viste esto. Puede que te lo mostremos de nuevo.';
-
-  @override
-  String get onboardingAthleteTrainTitle => 'ENTRENÁ';
-
-  @override
-  String get onboardingAthleteTrainBody =>
-      'Todo arranca en la pestaña Entrenar. Ahí vas a encontrar la rutina que te armó tu profe, plantillas listas para copiar, y las rutinas que te creás vos.';
-
-  @override
-  String get onboardingAthleteProgressTitle => 'TU PROGRESO';
-
-  @override
-  String get onboardingAthleteProgressBody =>
-      'Cada serie que cargás queda en tu historial y alimenta tus estadísticas. El volumen, la racha y los récords se calculan solos; las medidas corporales las cargás vos.';
-
-  @override
-  String get onboardingAthleteCoachTitle => 'TU COACH';
-
-  @override
-  String get onboardingAthleteCoachBody =>
-      'En la pestaña Coach buscás y contratás un profe. Tu historial es tuyo: hasta que no compartas una sesión o tu perfil, tu profe no ve nada.';
-
-  @override
-  String get onboardingAthleteCommunityTitle => 'COMUNIDAD';
-
-  @override
-  String get onboardingAthleteCommunityBody =>
-      'El Feed es social: publicás tus entrenamientos sólo si querés. Los rankings de tu gimnasio son opt-in — no aparecés en la tabla hasta que los actives.';
-
-  @override
-  String get onboardingAthleteCommunityRankingsCta => 'Activar rankings';
 
   @override
   String get reAuthPasswordLabel => 'Contraseña';

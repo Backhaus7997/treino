@@ -53,10 +53,6 @@ _$UserProfileImpl _$$UserProfileImplFromJson(Map<String, dynamic> json) =>
           : TrainerSubscription.fromJson(
               json['subscription'] as Map<String, dynamic>),
       weightedLoad: (json['weightedLoad'] as num?)?.toDouble(),
-      onboardingSeen: json['onboardingSeen'] == null
-          ? OnboardingSeen.empty
-          : const OnboardingSeenConverter()
-              .fromJson(json['onboardingSeen'] as Map<String, Object?>),
     );
 
 Map<String, dynamic> _$$UserProfileImplToJson(_$UserProfileImpl instance) =>
@@ -95,8 +91,6 @@ Map<String, dynamic> _$$UserProfileImplToJson(_$UserProfileImpl instance) =>
       'activeRoutineId': instance.activeRoutineId,
       'subscription': instance.subscription?.toJson(),
       'weightedLoad': instance.weightedLoad,
-      'onboardingSeen':
-          const OnboardingSeenConverter().toJson(instance.onboardingSeen),
     };
 
 const _$UserRoleEnumMap = {
