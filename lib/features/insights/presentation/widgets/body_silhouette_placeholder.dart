@@ -164,6 +164,30 @@ class _BodyView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Los PNGs de la silueta son 1024x1536. Sin acotar, Flutter los decodifica
+        // a resolución completa: ~6 MB en RAM cada uno, y acá se apilan la base
+        // más hasta 16 máscaras musculares — unos 102 MB para una caja de ~220pt.
+        // Eso pasa el límite por defecto del ImageCache (100 MB), así que además
+        // de la memoria se paga thrash y re-decode cada vez que la pantalla
+        // vuelve a construirse.
+        //
+        // `cacheWidth` decodifica al tamaño en el que realmente se pinta. Es la
+        // regla de imágenes de AGENTS.md §6, que hasta ahora sólo se aplicaba a
+        // las remotas.
+        final dpr = MediaQuery.devicePixelRatioOf(context);
+        // Sin ancho acotado no hay mejor referencia que el nativo del asset.
+        final target =
+            constraints.hasBoundedWidth ? constraints.maxWidth : 1024.0;
+        final cacheWidth = (target * dpr).round().clamp(1, 1024);
+
+        return _stack(context, cacheWidth);
+      },
+    );
+  }
+
+  Widget _stack(BuildContext context, int cacheWidth) {
     return Stack(
       alignment: Alignment.center,
       fit: StackFit.expand,
@@ -176,6 +200,7 @@ class _BodyView extends StatelessWidget {
         Image.asset(
           baseAsset,
           fit: BoxFit.contain,
+          cacheWidth: cacheWidth,
           errorBuilder: (_, __, ___) => Center(
             child: Icon(
               TreinoIcon.tabWorkout,
@@ -198,6 +223,7 @@ class _BodyView extends StatelessWidget {
               child: Image.asset(
                 entry.key,
                 fit: BoxFit.contain,
+                cacheWidth: cacheWidth,
                 // Defensive: if a mask is missing from the bundle, render
                 // nothing rather than killing the whole silhouette.
                 errorBuilder: (_, __, ___) => const SizedBox.shrink(),

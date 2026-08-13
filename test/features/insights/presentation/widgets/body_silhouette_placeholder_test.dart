@@ -16,8 +16,9 @@ Widget _wrap(Widget child) => MaterialApp(
 int _countMasksContaining(WidgetTester tester, String pathFragment) {
   return tester.widgetList<Image>(find.byType(Image)).where((img) {
     final provider = img.image;
-    if (provider is! AssetImage) return false;
-    return provider.assetName.contains(pathFragment);
+    final asset = _assetOf(provider);
+    if (asset == null) return false;
+    return asset.assetName.contains(pathFragment);
   }).length;
 }
 
@@ -191,8 +192,8 @@ void main() {
         );
         for (final img in tester.widgetList<Image>(imgs)) {
           final provider = img.image;
-          if (provider is AssetImage &&
-              provider.assetName.contains(pathFragment)) {
+          final asset = _assetOf(provider);
+          if (asset != null && asset.assetName.contains(pathFragment)) {
             return op.opacity;
           }
         }
@@ -252,4 +253,18 @@ void main() {
       expect(opacityForMask(tester, 'mask_front_chest'), 0.6);
     });
   });
+}
+
+/// Desenvuelve el provider de un [Image] hasta llegar al [AssetImage].
+///
+/// `Image.asset(..., cacheWidth: n)` NO deja un `AssetImage` pelado: lo envuelve
+/// en un `ResizeImage` para decodificar al tamaño en que se pinta. La silueta usa
+/// cacheWidth porque sin él apila ~102 MB de bitmaps (base + 16 máscaras a
+/// 1024x1536) para una caja de ~220pt.
+AssetImage? _assetOf(ImageProvider provider) {
+  if (provider is ResizeImage) {
+    final inner = provider.imageProvider;
+    return inner is AssetImage ? inner : null;
+  }
+  return provider is AssetImage ? provider : null;
 }

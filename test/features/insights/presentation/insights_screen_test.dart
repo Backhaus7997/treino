@@ -29,8 +29,9 @@ class MockSessionRepository extends Mock implements SessionRepository {}
 int _countMasksContaining(WidgetTester tester, String pathFragment) {
   return tester.widgetList<Image>(find.byType(Image)).where((img) {
     final provider = img.image;
-    if (provider is! AssetImage) return false;
-    return provider.assetName.contains(pathFragment);
+    final asset = _assetOf(provider);
+    if (asset == null) return false;
+    return asset.assetName.contains(pathFragment);
   }).length;
 }
 
@@ -853,4 +854,17 @@ const _monthAbbrevEs = [
 DateTime _mondayOfWeek(DateTime day) {
   final daysFromMonday = day.weekday - DateTime.monday;
   return DateTime(day.year, day.month, day.day - daysFromMonday);
+}
+
+/// Desenvuelve el provider de un [Image] hasta llegar al [AssetImage].
+///
+/// `Image.asset(..., cacheWidth: n)` envuelve el provider en un `ResizeImage`
+/// para decodificar al tamaño en que se pinta. La silueta lo usa porque sin él
+/// apila ~102 MB de bitmaps para una caja de ~220pt.
+AssetImage? _assetOf(ImageProvider provider) {
+  if (provider is ResizeImage) {
+    final inner = provider.imageProvider;
+    return inner is AssetImage ? inner : null;
+  }
+  return provider is AssetImage ? provider : null;
 }
