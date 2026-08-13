@@ -206,6 +206,60 @@ void main() {
     });
 
     // -------------------------------------------------------------------------
+    // Pressed: tap-down marca pressed=true; tap-up/cancel lo vuelve false
+    // -------------------------------------------------------------------------
+    testWidgets(
+        'tap down → pressed=true; tap up → pressed=false '
+        '[SCENARIO-CK-IS-09]', (tester) async {
+      TreinoStates? capturedStates;
+      await tester.pumpWidget(_wrap(
+        TreinoInteractiveState(
+          onTap: () {},
+          builder: (ctx, states) {
+            capturedStates = states;
+            return const SizedBox(key: Key('child'), width: 48, height: 48);
+          },
+        ),
+      ));
+      await tester.pump();
+      expect(capturedStates!.pressed, isFalse);
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byKey(const Key('child'))),
+      );
+      await tester.pump();
+      expect(capturedStates!.pressed, isTrue,
+          reason: 'pressed debe ser true durante el tap-down');
+
+      await gesture.up();
+      await tester.pump();
+      expect(capturedStates!.pressed, isFalse,
+          reason: 'pressed debe volver a false al soltar');
+    });
+
+    testWidgets('disabled → pressed ignorado (no gesture registrado)',
+        (tester) async {
+      TreinoStates? capturedStates;
+      await tester.pumpWidget(_wrap(
+        TreinoInteractiveState(
+          onTap: null,
+          builder: (ctx, states) {
+            capturedStates = states;
+            return const SizedBox(key: Key('child'), width: 48, height: 48);
+          },
+        ),
+      ));
+      await tester.pump();
+
+      await tester.startGesture(
+        tester.getCenter(find.byKey(const Key('child'))),
+      );
+      await tester.pump();
+      expect(capturedStates!.pressed, isFalse,
+          reason: 'disabled no debe reportar pressed');
+    });
+
+    // -------------------------------------------------------------------------
     // Dark y light: no crashea en ningún tema
     // -------------------------------------------------------------------------
     testWidgets('smoke dark+light sin crash [SCENARIO-CK-IS-08]',

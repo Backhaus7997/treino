@@ -1,8 +1,12 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/data_table/coach_hub_data_table.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/empty_state/empty_state.dart';
 
 /// Envuelve en MaterialApp con tema dado.
 Widget _wrap(Widget widget, {ThemeData? theme}) => MaterialApp(
@@ -66,6 +70,12 @@ void main() {
       await tester.pump();
       // El indicador de sort debe estar presente en la columna 'Nombre'
       expect(find.byKey(const Key('sort_indicator_name')), findsOneWidget);
+      // El indicador de orden activo usa el ícono semántico TreinoIcon
+      // (no Icons.arrow_upward crudo) — Finding C4.
+      expect(find.byIcon(TreinoIcon.sortAscending), findsOneWidget);
+      // La columna 'Sesiones' es sortable pero no está ordenada: debe
+      // mostrar el ícono semántico de "ordenable" (caret doble).
+      expect(find.byIcon(TreinoIcon.sortable), findsOneWidget);
     });
 
     // -------------------------------------------------------------------------
@@ -139,7 +149,43 @@ void main() {
         ),
       ));
       await tester.pump();
+      // El slot vacío debe embeber el componente compartido TreinoEmptyState
+      // (no una implementación privada) — Finding C3.
+      expect(find.byType(TreinoEmptyState), findsOneWidget);
       expect(find.text('Sin alumnos'), findsOneWidget);
+    });
+
+    // -------------------------------------------------------------------------
+    // Estado vacío: passthrough de icon/description/CTA a TreinoEmptyState
+    // -------------------------------------------------------------------------
+    testWidgets(
+        'rows vacíos con icon/description/CTA → passthrough a '
+        'TreinoEmptyState [SCENARIO-CK-DT-13]', (tester) async {
+      var ctaTapped = false;
+      await tester.pumpWidget(_wrap(
+        CoachHubDataTable(
+          columns: _columns,
+          rows: const [],
+          emptyMessage: 'Sin alumnos',
+          emptyIcon: TreinoIcon.users,
+          emptyDescription: 'Invitá a tu primer alumno.',
+          emptyCtaLabel: 'Invitar',
+          onEmptyCtaTap: () => ctaTapped = true,
+        ),
+      ));
+      await tester.pump();
+
+      final emptyState = tester.widget<TreinoEmptyState>(
+        find.byType(TreinoEmptyState),
+      );
+      expect(emptyState.icon, TreinoIcon.users);
+      expect(emptyState.title, 'Sin alumnos');
+      expect(emptyState.description, 'Invitá a tu primer alumno.');
+      expect(emptyState.ctaLabel, 'Invitar');
+
+      await tester.tap(find.text('Invitar'));
+      await tester.pump();
+      expect(ctaTapped, isTrue);
     });
 
     // -------------------------------------------------------------------------
@@ -159,29 +205,52 @@ void main() {
       ));
       await tester.pump();
       expect(find.text('Error al cargar'), findsOneWidget);
+      // El ícono del estado error usa el ícono semántico TreinoIcon
+      // (no Icons.error_outline crudo) — Finding C4.
+      expect(find.byIcon(TreinoIcon.errorState), findsOneWidget);
+      // Spacing en escala 8/12/14/18/20 — Finding W4 (no padding 32 crudo).
+      final errorPadding = tester.widget<Padding>(
+        find.byKey(const Key('data_table_error_content')),
+      );
+      expect(errorPadding.padding, const EdgeInsets.all(AppSpacing.s20));
       await tester.tap(find.byKey(const Key('data_table_retry')));
       await tester.pump();
       expect(retryCalled, isTrue);
     });
 
     // -------------------------------------------------------------------------
-    // Hover fila: no crashea
+    // Hover fila: decoration usa background de hover (token real)
     // -------------------------------------------------------------------------
-    testWidgets('hover fila → no crashea [SCENARIO-CK-DT-08]', (tester) async {
+    testWidgets(
+        'hover fila con onRowTap → decoration usa background de hover '
+        '[SCENARIO-CK-DT-08]', (tester) async {
       await tester.pumpWidget(_wrap(
         CoachHubDataTable(
           columns: _columns,
           rows: _rows,
+          onRowTap: (_) {},
         ),
       ));
       await tester.pump();
+
+      Color decorationColor() {
+        final container = tester.widget<AnimatedContainer>(
+          find.byKey(const Key('data_table_row_1')),
+        );
+        return (container.decoration! as BoxDecoration).color!;
+      }
+
+      final normalColor = decorationColor();
 
       final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
       await gesture.addPointer(location: Offset.zero);
       addTearDown(gesture.removePointer);
       await gesture.moveTo(tester.getCenter(find.text('Ana García')));
       await tester.pump();
-      expect(find.text('Ana García'), findsOneWidget);
+
+      final hoverColor = decorationColor();
+      expect(hoverColor, isNot(equals(normalColor)),
+          reason: 'el color de fondo debe cambiar realmente en hover');
     });
 
     // -------------------------------------------------------------------------
@@ -201,6 +270,66 @@ void main() {
       await tester.tap(find.text('Ana García'));
       await tester.pump();
       expect(tappedId, '1');
+    });
+
+    // -------------------------------------------------------------------------
+    // onRowTap: fila focusable, Enter activa, expone Semantics(button)
+    // -------------------------------------------------------------------------
+    testWidgets(
+        'onRowTap → fila focusable, Enter activa, Semantics(button) '
+        '[SCENARIO-CK-DT-11]', (tester) async {
+      final handle = tester.ensureSemantics();
+      String? tappedId;
+      await tester.pumpWidget(_wrap(
+        CoachHubDataTable(
+          columns: _columns,
+          rows: _rows,
+          onRowTap: (id) => tappedId = id,
+        ),
+      ));
+      await tester.pump();
+
+      final semantics = tester.getSemantics(
+        find.byKey(const Key('data_table_row_1')),
+      );
+      expect(semantics.flagsCollection.isButton, isTrue,
+          reason: 'fila con onRowTap debe exponer Semantics(button: true)');
+
+      final focusNode = Focus.of(
+        tester.element(find.byKey(const Key('data_table_row_1'))),
+      );
+      focusNode.requestFocus();
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      expect(tappedId, '1', reason: 'Enter debe activar onRowTap');
+
+      handle.dispose();
+    });
+
+    // -------------------------------------------------------------------------
+    // Sin onRowTap: fila no focusable, sin Semantics(button)
+    // -------------------------------------------------------------------------
+    testWidgets(
+        'sin onRowTap → fila no expone Semantics(button) '
+        '[SCENARIO-CK-DT-12]', (tester) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(_wrap(
+        CoachHubDataTable(
+          columns: _columns,
+          rows: _rows,
+        ),
+      ));
+      await tester.pump();
+
+      final semantics = tester.getSemantics(
+        find.byKey(const Key('data_table_row_1')),
+      );
+      expect(semantics.flagsCollection.isButton, isFalse,
+          reason: 'fila sin onRowTap no debe ser interactiva');
+
+      handle.dispose();
     });
 
     // -------------------------------------------------------------------------
