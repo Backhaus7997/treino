@@ -183,6 +183,22 @@ final class WorkoutCoordinator: ObservableObject {
         currentExerciseIndex = firstUnfinishedIndex(in: workout.exercises, session: stored)
         requestHealthAccess()
         beginWorkoutSession()
+
+        // Y se reconcilia con el historial, en segundo plano.
+        //
+        // Sin esto, restaurar mostraba la pantalla de entreno de una sesion que
+        // podia estar CERRADA hace rato: el reloj no tiene listeners, y este era
+        // el unico camino de entrada que no miraba el historial. Medido el
+        // 2026-08-13: relanzar la app dejo la muñeca en un entreno terminado
+        // media hora antes, y solo se entero cuando algo forzo un sync.
+        //
+        // `sync()` arranca justamente por ahi —`isFinished` primero— asi que
+        // tambien cierra la sesion sola. Y trae lo que el telefono haya cargado
+        // o borrado mientras el reloj no miraba.
+        //
+        // Va en un Task y no con await, igual que en `start()`: el atleta ve su
+        // entreno YA, sin esperar a la red. Si falla, el proximo sync reintenta.
+        Task { await sync() }
     }
 
     /// Le pide permiso a Salud cuando el reloj entra en modo entreno.

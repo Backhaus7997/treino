@@ -429,6 +429,75 @@ void main() {
     expect(await setLogDocs(sessionId), hasLength(2));
   });
 
+  // ─── listSetLogs(): una serie ilegible no se lleva puesta la lista ────────
+
+  test('una serie malformada se saltea en vez de tumbar listSetLogs entero',
+      () async {
+    final sessionId = await createActiveSession();
+
+    await repo.addSetLog(
+      uid: uid,
+      sessionId: sessionId,
+      setLog: buildSetLog(setNumber: 1, completedAt: testNow()),
+    );
+
+    // Un documento al que le falta un campo requerido del modelo. Puede venir
+    // de un cliente viejo, de una escritura a medias, o de un seed a mano.
+    await firestore
+        .collection('users')
+        .doc(uid)
+        .collection('sessions')
+        .doc(sessionId)
+        .collection('setLogs')
+        .doc('roto')
+        .set({
+      'exerciseId': 'bench-press',
+      'exerciseName': 'Bench Press',
+      'setNumber': 2,
+      // falta `reps`, que en SetLog es requerido y no nullable
+      'weightKg': 80.0,
+      'completedAt': Timestamp.fromDate(testNow()),
+    });
+
+    final logs = await repo.listSetLogs(uid: uid, sessionId: sessionId);
+
+    expect(
+      logs,
+      hasLength(1),
+      reason: 'sin el try/catch, SetLog.fromJson tiraba y se llevaba puesta la '
+          'lista entera: el entreno no abría, ni para retomar ni para ver el '
+          'historial. Una serie ilegible es una serie perdida; las demás no.',
+    );
+    expect(logs.single.setNumber, equals(1));
+  });
+
+  test('el id del setLog sale del PATH, no del cuerpo', () async {
+    final sessionId = await createActiveSession();
+
+    // Cuerpo con un id que NO coincide con la ruta: el path es el que manda
+    // (HANDOFF §4.2). Si ganara el cuerpo, un updateSetLog/deleteSetLog
+    // posterior apuntaría a un documento que no existe.
+    await firestore
+        .collection('users')
+        .doc(uid)
+        .collection('sessions')
+        .doc(sessionId)
+        .collection('setLogs')
+        .doc('el-id-real')
+        .set({
+      'id': 'un-id-que-no-es',
+      'exerciseId': 'bench-press',
+      'exerciseName': 'Bench Press',
+      'setNumber': 1,
+      'reps': 10,
+      'weightKg': 80.0,
+      'completedAt': Timestamp.fromDate(testNow()),
+    });
+
+    final logs = await repo.listSetLogs(uid: uid, sessionId: sessionId);
+    expect(logs.single.id, equals('el-id-real'));
+  });
+
   // ─── deleteSetLog() (live-set-editing PR2, AD-2) ─────────────────────────
 
   test(

@@ -87,6 +87,49 @@ ProviderContainer _makeContainer({
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 void main() {
+  // ── Un día sin ejercicios presentes no puede dar un índice negativo ──────
+  //
+  // Los dos paths de build filtran los slots por `isPresentInWeek` (periodización,
+  // REQ-WPRES-021). Un día cuyos slots estén TODOS ausentes en esa semana deja la
+  // lista vacía, y `day.slots.length - 1` daba -1 como `currentExerciseIndex`.
+  test('un día sin slots presentes en la semana no deja el índice en -1',
+      () async {
+    final repo = MockSessionRepository();
+    // El slot existe solo en la semana 0; la sesión va a ser de la semana 1.
+    final routine = makeRoutine(
+      numWeeks: 2,
+      days: [
+        makeDay(slots: [
+          makeSlot(exerciseId: 'e1', activeWeeks: const [0])
+        ])
+      ],
+    );
+
+    // Va por RETOMAR y no por empezar: `_buildFresh` fija el índice en 0 a mano,
+    // así que el -1 solo puede salir de `_buildResume`, que sí lo calcula.
+    final session = makeSession(id: 's7', weekNumber: 1);
+    when(() => repo.getActive('u1')).thenAnswer((_) async => session);
+    when(() => repo.listSetLogs(uid: 'u1', sessionId: 's7'))
+        .thenAnswer((_) async => <SetLog>[]);
+
+    final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
+    addTearDown(container.dispose);
+
+    const init = ResumeSession(sessionId: 's7');
+    final state = await container.read(sessionNotifierProvider(init).future);
+
+    expect(
+      state.day.slots,
+      isEmpty,
+      reason: 'precondición del test: el filtro de presencia deja el día vacío',
+    );
+    expect(
+      state.currentExerciseIndex,
+      greaterThanOrEqualTo(0),
+      reason: 'un índice negativo se usa para indexar la lista de ejercicios',
+    );
+  });
+
   // ── El build de la sesión no puede quedarse colgado ──────────────────────
   //
   // Medido en el simulador el 2026-08-12: el player quedó en el spinner más de

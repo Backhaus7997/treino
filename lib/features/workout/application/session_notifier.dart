@@ -780,7 +780,16 @@ class SessionNotifier
           : slot.effectiveSetsForWeek(weekNumber).length;
       if (count < planned) return i;
     }
-    return day.slots.length - 1;
+    // `length - 1` sobre una lista VACÍA da -1, y ese -1 termina en
+    // `SessionState.currentExerciseIndex`, o sea en un índice negativo sobre la
+    // lista de ejercicios.
+    //
+    // No es hipotético: los dos paths de build filtran los slots por
+    // `isPresentInWeek(weekNumber)` (REQ-WPRES-021), así que un día cuyos slots
+    // estén TODOS ausentes en esa semana —periodización legítima— deja la lista
+    // en cero. Devolver 0 mantiene el índice dentro del dominio; la pantalla ya
+    // sabe dibujar un día sin ejercicios, lo que no sabe es indexar en -1.
+    return day.slots.isEmpty ? 0 : day.slots.length - 1;
   }
 
   int _durationMin(int elapsedSeconds) {

@@ -506,6 +506,27 @@ class SessionRepository {
   SetLog? _setLogFromDoc(DocumentSnapshot<Map<String, Object?>> snap) {
     final data = snap.data();
     if (!snap.exists || data == null) return null;
-    return SetLog.fromJson(data);
+    try {
+      // El id sale del PATH, no del cuerpo (HANDOFF §4.2, la trampa que dejaba
+      // las rutinas reales con id vacío). Los dos clientes hoy lo escriben
+      // adentro y coincide, pero el path es el que manda: si alguna vez no
+      // coincidieran, un `updateSetLog`/`deleteSetLog` por el id del cuerpo
+      // apuntaría a un documento que no existe.
+      //
+      // Y va envuelto por la MISMA razón que `_sessionFromDoc`: una sola serie
+      // malformada no puede tumbar la lista entera. Sin esto, `SetLog.fromJson`
+      // tiraba y se llevaba puesto todo `listSetLogs` — o sea el entreno no
+      // abría, ni para retomar ni para ver el historial. Una serie que no se
+      // puede leer es una serie perdida; todas las demás no tienen por qué
+      // irse con ella.
+      return SetLog.fromJson({...data, 'id': snap.id});
+    } catch (e, st) {
+      developer.log(
+        'SessionRepository: skipped unparseable setLog ${snap.id}',
+        error: e,
+        stackTrace: st,
+      );
+      return null;
+    }
   }
 }
