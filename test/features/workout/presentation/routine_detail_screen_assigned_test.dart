@@ -94,8 +94,8 @@ void main() {
         _wrapWithOverrides(
           const RoutineDetailScreen(routineId: 'r-1'),
           [
-            routineByIdProvider('r-1').overrideWith(
-              (ref) async => routine,
+            routineByIdStreamProvider('r-1').overrideWith(
+              (ref) => Stream.value(routine),
             ),
             userPublicProfileProvider('trainer-1').overrideWith(
               (ref) => Stream.value(_makeProfile('trainer-1', 'Lucas Pérez')),
@@ -121,8 +121,8 @@ void main() {
         _wrapWithOverrides(
           const RoutineDetailScreen(routineId: 'r-2'),
           [
-            routineByIdProvider('r-2').overrideWith(
-              (ref) async => routine,
+            routineByIdStreamProvider('r-2').overrideWith(
+              (ref) => Stream.value(routine),
             ),
           ],
         ),

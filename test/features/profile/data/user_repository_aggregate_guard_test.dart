@@ -105,5 +105,28 @@ void main() {
         expect(snap.exists, isFalse);
       },
     );
+
+    test(
+      '#388: update with athleteCount alone does NOT write to '
+      'trainerPublicProfiles/{uid}',
+      () async {
+        const uid = 'trainer-guard-students';
+        await seedDoc(uid);
+
+        // athleteCount is CF-write-only (linkAggregate) — same contract as
+        // the review aggregates. It must never ride the client dual-write.
+        await repo.update(uid, {'athleteCount': 500});
+
+        final snap =
+            await firestore.collection('trainerPublicProfiles').doc(uid).get();
+
+        expect(
+          snap.exists,
+          isFalse,
+          reason: 'athleteCount must not be in _trainerPublicFields — '
+              'it is written exclusively by the linkAggregate CF (#388)',
+        );
+      },
+    );
   });
 }

@@ -1,16 +1,18 @@
 /**
- * Posts cascade module — anonymizes post author information.
+ * Posts cascade module — deletes posts authored by the given uid.
  *
- * For each post where `authorUid == uid`, sets:
- *   - `authorDisplayName` → 'Usuario eliminado'
- *   - `authorAvatarUrl`   → null
+ * For each post where `authorUid == uid`, the document is permanently
+ * deleted. Posts are flat documents with no subcollections and no
+ * Storage-backed media fields, so deleting the document is sufficient —
+ * there are no orphaned resources to chase.
  *
- * The `authorUid` field is intentionally preserved for referential integrity.
- * Per ADR-ACCDEL-004: anonymize display fields, keep uid for data lineage.
- *
- * Uses batched updates in chunks of 400 (conservative below 500 limit).
- * Idempotent — running twice yields the same anonymized state.
- * REQ-ACCDEL-CF-006 | ADR-ACCDEL-004
+ * Behavior change: this step previously anonymized display fields
+ * (authorDisplayName/authorAvatarUrl) instead of deleting the post. Per
+ * updated product decision, posts are now deleted entirely.
+ * Uses batched deletes in chunks of 400 (conservative below 500 limit).
+ * Idempotent — running twice when no posts remain returns count 0.
+ * REQ-ACCDEL-CF-006 | supersedes ADR-ACCDEL-004 (which anonymized posts;
+ * product decision 2026-07-16 changed this to full deletion).
  */
 
 import * as admin from "firebase-admin";
@@ -18,10 +20,10 @@ import * as admin from "firebase-admin";
 const BATCH_SIZE = 400;
 
 /**
- * Anonymizes all posts authored by the given uid.
- * Returns the count of anonymized documents.
+ * Deletes all posts authored by the given uid.
+ * Returns the count of deleted documents.
  */
-export async function anonymizePosts(
+export async function deletePosts(
   app: admin.app.App,
   uid: string
 ): Promise<{ count: number }> {
@@ -37,22 +39,18 @@ export async function anonymizePosts(
   }
 
   const docs = snapshot.docs;
-  let updated = 0;
+  let deleted = 0;
 
   // Process in chunks of BATCH_SIZE
   for (let i = 0; i < docs.length; i += BATCH_SIZE) {
     const chunk = docs.slice(i, i + BATCH_SIZE);
     const batch = db.batch();
     for (const doc of chunk) {
-      batch.update(doc.ref, {
-        authorDisplayName: "Usuario eliminado",
-        authorAvatarUrl: null,
-        // authorUid intentionally NOT modified — referential integrity (ADR-ACCDEL-004)
-      });
+      batch.delete(doc.ref);
     }
     await batch.commit();
-    updated += chunk.length;
+    deleted += chunk.length;
   }
 
-  return { count: updated };
+  return { count: deleted };
 }

@@ -43,6 +43,12 @@ class TreinoIcon {
   static const IconData clock = PhosphorIconsRegular.clock;
   static const IconData timer = PhosphorIconsRegular.timer;
 
+  // Métricas de sesión (resumen post-entreno). Alias semánticos: el ícono de
+  // PR es un trofeo igual que [ranking], pero un récord personal no es un
+  // ranking — nombrarlos distinto evita que el call site mienta.
+  static const IconData statSets = PhosphorIconsRegular.rows;
+  static const IconData statPr = PhosphorIconsRegular.trophy;
+
   // Comparación mes-a-mes (Monthly Report summary cards).
   static const IconData trendUp = PhosphorIconsRegular.trendUp;
   static const IconData trendDown = PhosphorIconsRegular.trendDown;
@@ -90,6 +96,16 @@ class TreinoIcon {
   static const IconData chevronRight = PhosphorIconsRegular.caretRight;
   static const IconData chevronDown = PhosphorIconsRegular.caretDown;
   static const IconData chevronUp = PhosphorIconsRegular.caretUp;
+  // Reacciones del feed. Cada una tiene su par contorno/relleno: el contorno
+  // es el estado sin reaccionar y el relleno es la reacción propia, que además
+  // se pinta con su color de AppPalette. Pintar solo el contorno no alcanza —
+  // el ícono se lee como un borde de color, no como un emoji encendido.
+  static const IconData reactionLike = PhosphorIconsRegular.heart;
+  static const IconData reactionLikeFill = PhosphorIconsFill.heart;
+  static const IconData reactionFire = PhosphorIconsRegular.flame;
+  static const IconData reactionFireFill = PhosphorIconsFill.flame;
+  static const IconData reactionClap = PhosphorIconsRegular.handsClapping;
+  static const IconData reactionClapFill = PhosphorIconsFill.handsClapping;
   // Hamburger clásico (3 líneas) — toggle de sidebar/menú.
   static const IconData menu = PhosphorIconsRegular.list;
 
@@ -186,4 +202,8 @@ class TreinoIcon {
   static const IconData sortable = PhosphorIconsRegular.caretUpDown;
   // Ícono del estado de error (tabla, dialogs, etc.).
   static const IconData errorState = PhosphorIconsRegular.warningCircle;
+
+  // Coach Hub — Alumnos roster view-mode toggle (Tabla / Cards).
+  static const IconData viewTable = PhosphorIconsRegular.rows;
+  static const IconData viewCards = PhosphorIconsRegular.squaresFour;
 }

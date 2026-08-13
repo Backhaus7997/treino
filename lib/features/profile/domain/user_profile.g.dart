@@ -28,10 +28,13 @@ _$UserProfileImpl _$$UserProfileImplFromJson(Map<String, dynamic> json) =>
       phone: json['phone'] as String?,
       bornAt: _$JsonConverterFromJson<Timestamp, DateTime>(
           json['bornAt'], const TimestampConverter().fromJson),
+      termsAcceptedAt: _$JsonConverterFromJson<Timestamp, DateTime>(
+          json['termsAcceptedAt'], const TimestampConverter().fromJson),
       trainerBio: json['trainerBio'] as String?,
       trainerSpecialty: json['trainerSpecialty'] as String?,
       trainerMonthlyRate: (json['trainerMonthlyRate'] as num?)?.toInt(),
       paymentAlias: json['paymentAlias'] as String?,
+      trainerExperienceYears: (json['trainerExperienceYears'] as num?)?.toInt(),
       trainerLatitude: (json['trainerLatitude'] as num?)?.toDouble(),
       trainerLongitude: (json['trainerLongitude'] as num?)?.toDouble(),
       trainerGeohash: json['trainerGeohash'] as String?,
@@ -45,6 +48,11 @@ _$UserProfileImpl _$$UserProfileImplFromJson(Map<String, dynamic> json) =>
           const <String>[],
       trainerOffersOnline: json['trainerOffersOnline'] as bool? ?? false,
       activeRoutineId: json['activeRoutineId'] as String?,
+      subscription: json['subscription'] == null
+          ? null
+          : TrainerSubscription.fromJson(
+              json['subscription'] as Map<String, dynamic>),
+      weightedLoad: (json['weightedLoad'] as num?)?.toDouble(),
     );
 
 Map<String, dynamic> _$$UserProfileImplToJson(_$UserProfileImpl instance) =>
@@ -66,10 +74,13 @@ Map<String, dynamic> _$$UserProfileImplToJson(_$UserProfileImpl instance) =>
       'phone': instance.phone,
       'bornAt': _$JsonConverterToJson<Timestamp, DateTime>(
           instance.bornAt, const TimestampConverter().toJson),
+      'termsAcceptedAt': _$JsonConverterToJson<Timestamp, DateTime>(
+          instance.termsAcceptedAt, const TimestampConverter().toJson),
       'trainerBio': instance.trainerBio,
       'trainerSpecialty': instance.trainerSpecialty,
       'trainerMonthlyRate': instance.trainerMonthlyRate,
       'paymentAlias': instance.paymentAlias,
+      'trainerExperienceYears': instance.trainerExperienceYears,
       'trainerLatitude': instance.trainerLatitude,
       'trainerLongitude': instance.trainerLongitude,
       'trainerGeohash': instance.trainerGeohash,
@@ -78,6 +89,8 @@ Map<String, dynamic> _$$UserProfileImplToJson(_$UserProfileImpl instance) =>
       'trainerGeohashes': instance.trainerGeohashes,
       'trainerOffersOnline': instance.trainerOffersOnline,
       'activeRoutineId': instance.activeRoutineId,
+      'subscription': instance.subscription?.toJson(),
+      'weightedLoad': instance.weightedLoad,
     };
 
 const _$UserRoleEnumMap = {

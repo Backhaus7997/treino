@@ -91,16 +91,14 @@ class _StubNoteRepo implements AthleteNoteRepository {
 
 List<Override> _baseOverrides({required List<Session> sessions}) => [
       currentUidProvider.overrideWithValue(_trainerUid),
-      trainerLinksStreamProvider
-          .overrideWith((ref) => Stream.value([_link()])),
+      trainerLinksStreamProvider.overrideWith((ref) => Stream.value([_link()])),
       userPublicProfilesBatchProvider
           .overrideWith((ref, key) => {_athleteUid: _profile()}),
       userPublicProfileProvider
           .overrideWith((ref, id) => Stream.value(_profile())),
       pagosPorCobrarProvider
           .overrideWith((ref) => const AsyncData(<CobroPendiente>[])),
-      finishedTodayByUidProvider
-          .overrideWith((ref, uid) => const <Session>[]),
+      finishedTodayByUidProvider.overrideWith((ref, uid) => const <Session>[]),
       measurementsForAthleteProvider
           .overrideWith((ref, id) => Stream.value(const <Measurement>[])),
       performanceTestsForAthleteProvider
@@ -108,8 +106,7 @@ List<Override> _baseOverrides({required List<Session> sessions}) => [
       gymsProvider.overrideWith((ref) => const <Gym>[]),
       athleteBillingProvider.overrideWith((ref, id) => Stream.value(null)),
       sessionsByUidProvider.overrideWith((ref, id) => sessions),
-      assignedRoutinesProvider
-          .overrideWith((ref, id) => const <Routine>[]),
+      assignedRoutinesProvider.overrideWith((ref, id) => const <Routine>[]),
       athleteNoteProvider(
         (trainerId: _trainerUid, athleteId: _athleteUid),
       ).overrideWith((ref) => const Stream.empty()),
@@ -154,8 +151,8 @@ void main() {
     await tester.pumpWidget(_wrap(_baseOverrides(sessions: const [])));
     await _selectHistorialTab(tester);
 
-    expect(find.text('Este alumno todavía no registró sesiones.'),
-        findsOneWidget);
+    expect(
+        find.text('Este alumno todavía no registró sesiones.'), findsOneWidget);
   });
 
   testWidgets(
@@ -190,8 +187,8 @@ void main() {
     await _selectHistorialTab(tester);
 
     // Count header reflects all sessions, not filtered.
-    expect(find.textContaining('Historial completo · 3 sesiones'),
-        findsOneWidget);
+    expect(
+        find.textContaining('Historial completo · 3 sesiones'), findsOneWidget);
 
     // One row per session (routine name unique per session).
     expect(find.text('PPL Push'), findsOneWidget);

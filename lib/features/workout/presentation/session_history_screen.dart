@@ -5,6 +5,9 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_palette.dart';
+import '../../../core/utils/kg_format.dart';
+import '../../../core/widgets/motion/treino_state_switcher.dart';
+import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../application/session_providers.dart';
@@ -64,35 +67,47 @@ class SessionHistoryScreen extends ConsumerWidget {
                 ),
               ),
               Expanded(
-                child: sessionsAsync.when(
-                  loading: () => Center(
-                    child: CircularProgressIndicator(color: palette.accent),
+                child: TreinoStateSwitcher(
+                  childKey: ValueKey(sessionsAsync.when(
+                    loading: () => 'loading',
+                    error: (_, __) => 'error',
+                    data: (all) => all
+                            .where((s) =>
+                                s.status == SessionStatus.finished &&
+                                s.wasFullyCompleted)
+                            .isEmpty
+                        ? 'empty'
+                        : 'data',
+                  )),
+                  child: sessionsAsync.when(
+                    loading: () => Center(
+                      child: CircularProgressIndicator(color: palette.accent),
+                    ),
+                    error: (_, __) => _ErrorState(
+                      onRetry: () => ref.invalidate(sessionsByUidProvider(uid)),
+                    ),
+                    data: (all) {
+                      final completed = all
+                          .where((s) =>
+                              s.status == SessionStatus.finished &&
+                              s.wasFullyCompleted)
+                          .toList();
+                      if (completed.isEmpty) {
+                        return const _EmptyState();
+                      }
+                      return ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        itemCount: completed.length,
+                        separatorBuilder: (_, __) => Divider(
+                          height: 1,
+                          color: palette.textMuted.withValues(alpha: 0.12),
+                        ),
+                        itemBuilder: (_, i) =>
+                            _HistoryCard(session: completed[i]),
+                      );
+                    },
                   ),
-                  error: (_, __) => _ErrorState(
-                    onRetry: () =>
-                        ref.invalidate(sessionsByUidProvider(uid)),
-                  ),
-                  data: (all) {
-                    final completed = all
-                        .where((s) =>
-                            s.status == SessionStatus.finished &&
-                            s.wasFullyCompleted)
-                        .toList();
-                    if (completed.isEmpty) {
-                      return const _EmptyState();
-                    }
-                    return ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      itemCount: completed.length,
-                      separatorBuilder: (_, __) => Divider(
-                        height: 1,
-                        color: palette.textMuted.withValues(alpha: 0.12),
-                      ),
-                      itemBuilder: (_, i) =>
-                          _HistoryCard(session: completed[i]),
-                    );
-                  },
                 ),
               ),
             ],
@@ -115,9 +130,10 @@ class _HistoryCard extends StatelessWidget {
     final palette = AppPalette.of(context);
     final theme = Theme.of(context);
     final l10n = AppL10n.of(context);
-    final formattedDate = formatSessionDate(session.startedAt);
+    // startedAt is a real UTC instant — localize before formatting (#380).
+    final formattedDate = formatSessionDate(session.startedAt.toLocal());
 
-    return InkWell(
+    return TreinoTappable(
       onTap: () => context.push('/workout/historial/${session.id}'),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),
@@ -151,7 +167,7 @@ class _HistoryCard extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Text(
-              '${session.totalVolumeKg}${l10n.workoutHistorialCardKgSuffix}',
+              '${formatVolumeKg(session.totalVolumeKg)}${l10n.workoutHistorialCardKgSuffix}',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: palette.textMuted,
               ),
@@ -194,9 +210,8 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             TextButton(
-              onPressed: () => context.canPop()
-                  ? context.pop()
-                  : context.go('/workout'),
+              onPressed: () =>
+                  context.canPop() ? context.pop() : context.go('/workout'),
               child: Text(AppL10n.of(context).workoutHistorialEmptyCta),
             ),
           ],

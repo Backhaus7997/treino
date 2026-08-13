@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/motion/treino_fade_slide_in.dart';
+import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../auth/application/auth_providers.dart';
@@ -101,9 +103,8 @@ class _ProfileGymScreenState extends ConsumerState<ProfileGymScreen> {
         // Header
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-          child: GestureDetector(
+          child: TreinoTappable(
             onTap: () => context.pop(),
-            behavior: HitTestBehavior.opaque,
             child: Row(
               children: [
                 Icon(TreinoIcon.back, size: 20, color: palette.textPrimary),
@@ -126,29 +127,31 @@ class _ProfileGymScreenState extends ConsumerState<ProfileGymScreen> {
           child: SingleChildScrollView(
             padding: EdgeInsets.fromLTRB(
                 20, 0, 20, MediaQuery.paddingOf(context).bottom),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // gym-selection-v2 AD-11: pinned above the search box,
-                // hidden by construction when currentGymId is null/kNoGymId.
-                PinnedCurrentGym(currentGymId: currentGymId),
-                GymSearchBox(
-                  selectedGymId: _pendingGymId,
-                  onGymIdSelected: (gymId) =>
-                      setState(() => _pendingGymId = gymId ?? kNoGymId),
-                  // gym-selection-v2 AD-10: nearby list backs the
-                  // empty-query state; a nearby tap resolves + persists
-                  // immediately (spec gym-places-search "nearby selection
-                  // path"), so the callback just syncs the pending
-                  // selection the screen already shows as active/highlighted.
-                  emptyQueryContent: NearbyGymsList(
-                    uid: myUid,
-                    currentGymId: currentGymId,
-                    onGymSelected: (gymId) =>
-                        setState(() => _pendingGymId = gymId),
+            child: TreinoFadeSlideIn(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // gym-selection-v2 AD-11: pinned above the search box,
+                  // hidden by construction when currentGymId is null/kNoGymId.
+                  PinnedCurrentGym(currentGymId: currentGymId),
+                  GymSearchBox(
+                    selectedGymId: _pendingGymId,
+                    onGymIdSelected: (gymId) =>
+                        setState(() => _pendingGymId = gymId ?? kNoGymId),
+                    // gym-selection-v2 AD-10: nearby list backs the
+                    // empty-query state; a nearby tap resolves + persists
+                    // immediately (spec gym-places-search "nearby selection
+                    // path"), so the callback just syncs the pending
+                    // selection the screen already shows as active/highlighted.
+                    emptyQueryContent: NearbyGymsList(
+                      uid: myUid,
+                      currentGymId: currentGymId,
+                      onGymSelected: (gymId) =>
+                          setState(() => _pendingGymId = gymId),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

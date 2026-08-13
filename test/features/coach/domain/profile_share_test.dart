@@ -50,7 +50,7 @@ void main() {
     });
 
     test('toJson serializes gender and experienceLevel as wire strings', () {
-      final share = ProfileShare(
+      const share = ProfileShare(
         trainerId: 'tid',
         gender: Gender.nonBinary,
         experienceLevel: ExperienceLevel.advanced,
@@ -61,7 +61,7 @@ void main() {
     });
 
     test('copyWith preserves unmodified fields', () {
-      final share = ProfileShare(
+      const share = ProfileShare(
         trainerId: 'tid',
         heightCm: 180,
         bodyWeightKg: 80.0,

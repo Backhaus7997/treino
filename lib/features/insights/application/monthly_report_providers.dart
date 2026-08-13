@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/utils/argentina_time.dart';
 import '../../workout/application/session_duration.dart';
 import '../../workout/application/session_providers.dart';
 import '../../workout/data/session_repository.dart';
@@ -27,7 +28,7 @@ final athleteMonthlyReportProvider =
       sessions: const [],
       setsCountBySessionId: const {},
       durationMinBySessionId: const {},
-      now: DateTime.now(),
+      now: argentinaNow(),
     );
   }
 
@@ -38,7 +39,7 @@ final athleteMonthlyReportProvider =
     sessions: inputs.sessions,
     setsCountBySessionId: inputs.setsCountBySessionId,
     durationMinBySessionId: inputs.durationMinBySessionId,
-    now: DateTime.now(),
+    now: argentinaNow(),
   );
 });
 

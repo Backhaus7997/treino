@@ -97,8 +97,7 @@ void main() {
     testWidgets('Group C: routineEditorAddOnlyThisWeek verbatim',
         (tester) async {
       final l10n = await _pumpAndGetL10n(tester);
-      expect(
-          l10n.routineEditorAddOnlyThisWeek, 'Agregar solo en esta semana');
+      expect(l10n.routineEditorAddOnlyThisWeek, 'Agregar solo en esta semana');
     });
 
     testWidgets('Group C: routineEditorAddAllWeeks verbatim', (tester) async {

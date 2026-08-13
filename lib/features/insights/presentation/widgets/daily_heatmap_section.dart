@@ -22,6 +22,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/utils/argentina_time.dart';
 import '../../application/day_insights_providers.dart';
 import '../../domain/muscle_group.dart';
 import 'body_silhouette_placeholder.dart';
@@ -73,7 +74,10 @@ class _DailyHeatmapSectionState extends State<DailyHeatmapSection> {
   late DateTime _selectedDay = _todayOnly();
 
   static DateTime _todayOnly() {
-    final now = DateTime.now();
+    // ART wall-clock: the selected day is compared against DayInsights.day,
+    // which the aggregator derives from `toArgentina(...)` — anchor "today" in
+    // the same ART frame so the default selection lands on the Argentina day.
+    final now = argentinaNow();
     return DateTime(now.year, now.month, now.day);
   }
 

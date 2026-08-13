@@ -40,6 +40,15 @@ class Routine with _$Routine {
     // Number of authored weeks. @Default(1) keeps single-week routines intact
     // and retro-compatible with docs that lack this field.
     @Default(1) int numWeeks,
+    // ── Community rating aggregates (Fase W3 — template publishing) ──────────
+    // Written EXCLUSIVELY by the `templateRatingAggregate` Cloud Function.
+    // `includeToJson: false` keeps them out of every client write payload;
+    // firestore.rules additionally rejects them on create and never lists
+    // them in any update affectedKeys allowlist.
+    // ignore: invalid_annotation_target
+    @JsonKey(includeToJson: false) double? ratingAvg,
+    // ignore: invalid_annotation_target
+    @JsonKey(includeToJson: false) int? ratingsCount,
   }) = _Routine;
 
   factory Routine.fromJson(Map<String, Object?> json) =>

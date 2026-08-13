@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/utils/kg_format.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../domain/monthly_report.dart';
 
@@ -99,7 +100,7 @@ class MonthlyReportSummaryCards extends StatelessWidget {
         ),
         _StatCard(
           label: labels.volumeLabel,
-          value: _formatVolume(selectedMonth.volumeKg),
+          value: formatVolumeKg(selectedMonth.volumeKg),
           unit: labels.volumeUnit,
           delta: previousMonth == null
               ? null
@@ -118,9 +119,6 @@ class MonthlyReportSummaryCards extends StatelessWidget {
     );
   }
 }
-
-String _formatVolume(double value) =>
-    value % 1 == 0 ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
 
 String _formatDurationHours(int minutes) {
   final hours = minutes / 60;

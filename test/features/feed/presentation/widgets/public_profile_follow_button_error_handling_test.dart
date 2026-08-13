@@ -3,37 +3,37 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
-import 'package:treino/features/feed/application/friendship_providers.dart'
-    show friendshipRepositoryProvider;
-import 'package:treino/features/feed/data/friendship_repository.dart';
-import 'package:treino/features/feed/domain/friendship.dart';
-import 'package:treino/features/feed/domain/friendship_status.dart';
+import 'package:treino/features/feed/application/follow_providers.dart'
+    show followRepositoryProvider;
+import 'package:treino/features/feed/data/follow_repository.dart';
+import 'package:treino/features/feed/domain/follow.dart';
+import 'package:treino/features/feed/domain/follow_status.dart';
 import 'package:treino/features/feed/presentation/widgets/public_profile_follow_button.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 /// Repository whose write paths always throw, simulating an offline /
 /// permission-denied Firestore write (the bug repro).
-class _ThrowingFriendshipRepository extends FriendshipRepository {
-  _ThrowingFriendshipRepository() : super(firestore: FakeFirebaseFirestore());
+class _ThrowingFollowRepository extends FollowRepository {
+  _ThrowingFollowRepository() : super(firestore: FakeFirebaseFirestore());
 
   @override
-  Future<Friendship> request(
+  Future<Follow> follow(
     String myUid,
-    String otherUid, {
-    bool otherIsPublic = false,
+    String targetUid, {
+    required bool targetIsPublic,
   }) async {
     throw StateError('write failed');
   }
 
   @override
-  Future<void> accept(String friendshipId, String myUid) async {
+  Future<void> acceptRequest(String edgeId, String myUid) async {
     throw StateError('write failed');
   }
 }
 
-Widget _wrap(Widget w, FriendshipRepository repo) => ProviderScope(
+Widget _wrap(Widget w, FollowRepository repo) => ProviderScope(
       overrides: [
-        friendshipRepositoryProvider.overrideWithValue(repo),
+        followRepositoryProvider.overrideWithValue(repo),
       ],
       child: MaterialApp(
         theme: AppTheme.dark(),
@@ -43,12 +43,18 @@ Widget _wrap(Widget w, FriendshipRepository repo) => ProviderScope(
       ),
     );
 
-Friendship _pending({required String requesterId}) => Friendship(
-      id: Friendship.sortedDocId('viewer', 'target'),
-      uidA: 'target',
-      uidB: 'viewer',
-      status: FriendshipStatus.pending,
-      requesterId: requesterId,
+/// Solicitud RECIBIDA: la arista ENTRANTE `follows/{target}_{viewer}` pendiente.
+///
+/// Mapea el viejo `_pending(requesterId: 'target')` — un solo documento por par
+/// donde `requesterId` decía quién había pedido. En el grafo dirigido eso ya no
+/// se desambigua con un campo: la dirección ES el documento, así que "target me
+/// mandó solicitud" es la arista `target → viewer` en `pending`. Los uids NO se
+/// ordenan al armar el id.
+Follow _incomingPending() => Follow(
+      id: Follow.edgeId('target', 'viewer'),
+      followerUid: 'target',
+      followeeUid: 'viewer',
+      status: FollowStatus.pending,
       members: const ['target', 'viewer'],
       createdAt: DateTime.utc(2026, 1, 1),
     );
@@ -56,12 +62,14 @@ Friendship _pending({required String requesterId}) => Friendship(
 void main() {
   group('PublicProfileFollowButton error handling', () {
     testWidgets(
-        'tapping SEGUIR swallows a failing request — no uncaught async error',
+        'tapping SEGUIR swallows a failing follow — no uncaught async error',
         (tester) async {
-      final repo = _ThrowingFriendshipRepository();
+      final repo = _ThrowingFollowRepository();
       await tester.pumpWidget(_wrap(
+        // Sin arista en ninguna de las dos direcciones → el pill ofrece SEGUIR.
         const PublicProfileFollowButton(
-          friendship: null,
+          outgoingFollow: null,
+          incomingFollow: null,
           viewerUid: 'viewer',
           targetUid: 'target',
         ),
@@ -80,10 +88,12 @@ void main() {
     testWidgets(
         'tapping ACEPTAR swallows a failing accept — no uncaught async error',
         (tester) async {
-      final repo = _ThrowingFriendshipRepository();
+      final repo = _ThrowingFollowRepository();
       await tester.pumpWidget(_wrap(
         PublicProfileFollowButton(
-          friendship: _pending(requesterId: 'target'),
+          // ACEPTAR = no hay saliente y la entrante está pendiente.
+          outgoingFollow: null,
+          incomingFollow: _incomingPending(),
           viewerUid: 'viewer',
           targetUid: 'target',
         ),

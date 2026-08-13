@@ -25,6 +25,19 @@ class FcmService {
   final FcmTokenRepository _repo;
 
   StreamSubscription<String>? _refreshSub;
+  String? _disposedUid;
+
+  /// QA-502: monotonic guard against interleaved lifecycle calls.
+  ///
+  /// `fcmLifecycleProvider` dispara [init]/[dispose] fire-and-forget en cada
+  /// emisión de auth, así que un sign-in→sign-out (o sign-out→sign-in) rápido
+  /// los intercala a través de sus huecos `await`. Cada llamada bumpea este
+  /// contador y captura su propio valor; después de cada await se retira si otra
+  /// llamada MÁS NUEVA la superó. Sin esto, un `init('A')` en vuelo resucita el
+  /// token que un `dispose('A')` posterior acababa de borrar, y deja un listener
+  /// de onTokenRefresh atado a 'A' que termina escribiendo el token de OTRO
+  /// usuario en el documento de A.
+  int _generation = 0;
 
   /// Initialises FCM for [uid]:
   /// 1. Calls [getToken] once and persists the result via [FcmTokenRepository].
@@ -45,11 +58,18 @@ class FcmService {
     // from PermissionGate after a permission grant. Cancel any existing
     // subscription first so we never leak a listener or fire saveToken twice
     // on a token refresh. Mirrors the cleanup in dispose().
+    // QA-502: reclamamos esta generación ANTES del primer await.
+    final generation = ++_generation;
+    _disposedUid = null;
+
     await _refreshSub?.cancel();
     _refreshSub = null;
 
     try {
       final token = await _messaging.getToken();
+      // QA-502: un dispose (o un login de otro uid) corrió mientras esperábamos
+      // → NO reescribir el token que ya se borró.
+      if (generation != _generation) return;
       if (token != null) {
         await _repo.saveToken(uid, token);
       }
@@ -62,28 +82,69 @@ class FcmService {
       debugPrint('[fcm] init: unexpected getToken error for $uid — $e');
     }
 
+    // QA-502: si nos superaron, no dejamos un listener atado a un uid viejo.
+    if (generation != _generation) return;
+
     _refreshSub = _messaging.onTokenRefresh.listen((newToken) {
+      // QA-502: cinturón y tiradores — un refresh que llegue entre la
+      // supersesión y el cancel() no debe escribir en el doc del uid viejo.
+      if (generation != _generation) return;
       _repo.saveToken(uid, newToken);
     });
   }
 
   /// Cleans up FCM for [uid] on sign-out:
   /// 1. Cancels the [onTokenRefresh] subscription.
-  /// 2. Best-effort: gets the current token and removes it.
-  ///    Errors are swallowed — user may already be signed out from Firestore.
+  /// 2. Best-effort: gets the current token and removes it from Firestore.
+  ///    Errors are swallowed — on a forced sign-out the user is already
+  ///    unauthenticated and the rule denies the write.
+  /// 3. QA-NOT-001: deletes the registration token on the DEVICE. This is
+  ///    auth-independent, so it still runs when step 2 was denied — after it the
+  ///    device stops receiving pushes addressed to the signed-out account.
   ///
   /// REQ-PN-CLIENT-003, SCENARIO-648, 649, 679.
   Future<void> dispose(String uid) async {
+    // Explicit logout disposes while auth is still valid. The auth lifecycle
+    // then observes `null` and calls dispose for the same uid again. Keep that
+    // second pass a true no-op so it cannot mint/delete another device token
+    // or retry the Firestore write after authentication is gone.
+    if (_disposedUid == uid) return;
+    _disposedUid = uid;
+
+    // QA-502: reclamamos esta generación ANTES del primer await.
+    final generation = ++_generation;
+
     await _refreshSub?.cancel();
     _refreshSub = null;
 
     try {
       final token = await _messaging.getToken();
+      // QA-502: si mientras esperábamos entró un login nuevo, este dispose
+      // quedó viejo → no tocar el token que ya pertenece al usuario nuevo.
+      if (generation != _generation) return;
       if (token != null) {
         await _repo.removeToken(uid, token);
       }
     } catch (e) {
       debugPrint('[fcm] dispose: error removing token for $uid — $e');
+    }
+
+    // QA-NOT-001: invalidate the token device-side regardless of the Firestore
+    // outcome. On forced sign-outs (token revocation, password change on another
+    // device, Admin-SDK disable) auth is already null so removeToken above is
+    // denied and the stale token would keep delivering the closed account's
+    // pushes (including chat content). deleteToken() needs no auth; the next
+    // login mints a fresh token via getToken().
+    //
+    // QA-502: pero SOLO si este dispose sigue siendo el vigente. Si un login
+    // nuevo ya corrió, el token del device es del usuario NUEVO y borrarlo lo
+    // dejaría sin push hasta el próximo refresh.
+    if (generation != _generation) return;
+
+    try {
+      await _messaging.deleteToken();
+    } catch (e) {
+      debugPrint('[fcm] dispose: error deleting device token — $e');
     }
   }
 

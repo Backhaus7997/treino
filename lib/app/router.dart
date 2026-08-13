@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +7,7 @@ import '../core/widgets/treino_bottom_bar.dart';
 import '../features/auth/application/auth_providers.dart';
 import '../features/auth/presentation/forgot_password_screen.dart';
 import '../features/auth/presentation/login_screen.dart';
+import '../features/auth/presentation/profile_unavailable_screen.dart';
 import '../features/auth/presentation/register_screen.dart';
 import '../features/auth/presentation/splash_screen.dart';
 import '../features/auth/presentation/welcome_screen.dart';
@@ -28,19 +30,28 @@ import '../features/workout/presentation/routine_editor_screen.dart';
 import '../features/workout/application/session_init.dart';
 import '../features/workout/presentation/exercise_detail_screen.dart';
 import '../features/workout/presentation/post_workout_summary_screen.dart';
+import '../features/workout/presentation/share_workout_composer_screen.dart';
 import '../features/workout/presentation/session_detail_screen.dart';
 import '../features/workout/presentation/session_history_screen.dart';
 import '../features/workout/presentation/routine_detail_screen.dart';
 import '../features/workout/presentation/session_player_screen.dart';
+import '../features/feed/domain/post.dart';
 import '../features/feed/feed_screen.dart';
 import '../features/feed/presentation/create_post_screen.dart';
 import '../features/feed/presentation/friend_requests_inbox_screen.dart';
+import '../features/feed/presentation/post_detail_screen.dart';
+import '../features/notifications/presentation/notification_history_screen.dart';
 import '../features/profile/application/account_deletion_notifier.dart';
 import '../features/feed/presentation/public_profile_screen.dart';
+import '../features/feed/application/follow_list_providers.dart';
+import '../features/feed/presentation/follow_list_screen.dart';
 import '../features/feed/presentation/search_users_screen.dart';
 import '../features/home/home_screen.dart';
+import 'not_found_screen.dart';
+import '../features/insights/presentation/exercise_progression_screen.dart';
 import '../features/insights/presentation/frequent_exercises_screen.dart';
 import '../features/insights/presentation/insights_screen.dart';
+import '../features/insights/presentation/measurements_screen.dart';
 import '../features/insights/presentation/monthly_report_screen.dart';
 import '../features/insights/presentation/muscle_distribution_screen.dart';
 import '../features/insights/presentation/volume_by_group_screen.dart';
@@ -132,6 +143,25 @@ String? authRedirect(
 
     final profileAsync = read(userProfileProvider);
     if (profileAsync.isLoading) return null;
+
+    // Issue #544: autenticado pero el stream del perfil TERMINÓ EN ERROR
+    // (permission-denied por backend switch / rules regression / cuenta
+    // inaccesible / quota). Sin esta rama el estado era invisible: con valor
+    // retenido por `copyWithPrevious` (snapshot cacheado) el gate de
+    // displayName de abajo no dispara y el usuario queda en skeletons
+    // perpetuos; sin valor retenido caía en /profile-setup, donde el submit
+    // fallaría con el mismo permission-denied. Degradamos explícito:
+    // pantalla con mensaje + reintentar / cerrar sesión.
+    if (profileAsync.hasError) {
+      return location == '/profile-unavailable'
+          ? null // ya está ahí — sin loop
+          : '/profile-unavailable';
+    }
+    // Recovery exit: el reintento resolvió el perfil → salir del estado
+    // degradado. go_router re-evalúa el redirect sobre /home, así que los
+    // gates de abajo (setup incompleto, trainer onboarding) re-aplican solos.
+    if (location == '/profile-unavailable') return '/home';
+
     final profile = profileAsync.valueOrNull;
     if (profile == null || profile.displayName == null) {
       return '/profile-setup';
@@ -185,6 +215,9 @@ GoRouter buildRouter({
     initialLocation: '/splash',
     refreshListenable: refreshListenable,
     redirect: (ctx, state) => authRedirect(read, state.matchedLocation),
+    // QA-NAV-002: una ruta desconocida o un deep-link malformado cae acá en vez
+    // de en la pantalla de error roja default de go_router.
+    errorBuilder: (context, state) => const NotFoundScreen(),
     routes: [
       // Entry routes — full screen, NO bottom bar
       GoRoute(
@@ -213,6 +246,14 @@ GoRouter buildRouter({
       GoRoute(
         path: '/profile-setup',
         pageBuilder: (_, __) => _noAnim(const ProfileSetupFlow()),
+      ),
+
+      // Estado degradado "autenticado pero sin perfil accesible" (#544).
+      // Solo se llega vía la rama hasError de authRedirect. Fullscreen,
+      // sin bottom bar — igual que /profile-setup.
+      GoRoute(
+        path: '/profile-unavailable',
+        pageBuilder: (_, __) => _noAnim(const ProfileUnavailableScreen()),
       ),
 
       // ─── Session player — TOP-LEVEL ROUTES (outside ShellRoute) ───────────
@@ -258,23 +299,44 @@ GoRouter buildRouter({
           final sessionId = state.pathParameters['sessionId']!;
           return PostWorkoutSummaryScreen(sessionId: sessionId);
         },
+        routes: [
+          // Composer del post de entreno — el botón COMPARTIR del resumen
+          // navega acá en vez de publicar de una. Sub-ruta del summary para
+          // que `pop()` vuelva al resumen con la sesión ya cargada (el
+          // provider está cacheado por la misma key).
+          GoRoute(
+            path: 'share',
+            builder: (context, state) {
+              final sessionId = state.pathParameters['sessionId']!;
+              return ShareWorkoutComposerScreen(sessionId: sessionId);
+            },
+          ),
+        ],
       ),
 
       // ─── Historial full list — TOP-LEVEL ROUTE (outside ShellRoute) ───────
       // First-class destination for past sessions, reached from the "Ver todo"
       // affordance in HistorialSection. Declared before the `:sessionId` detail
       // route so the literal `/workout/historial` matches the list, not detail.
+      // TREINO Motion B9: _report (Cupertino nativo + fade) — se abre como un
+      // informe de sesiones pasadas, mismo criterio que el hub de insights.
       GoRoute(
         path: '/workout/historial',
-        builder: (context, state) => const SessionHistoryScreen(),
+        pageBuilder: (_, state) =>
+            _report(state.pageKey, const SessionHistoryScreen()),
       ),
 
       // ─── Historial detail — TOP-LEVEL ROUTE (outside ShellRoute) ──────────
       // Immersive: oculta la bottom bar. Design §11-12.
+      // TREINO Motion B9: _report — el detalle de una sesión pasada es, en
+      // esencia, el mismo tipo de "informe" que el resto de insights.
       GoRoute(
         path: '/workout/historial/:sessionId',
-        builder: (context, state) => SessionDetailScreen(
-          sessionId: state.pathParameters['sessionId']!,
+        pageBuilder: (_, state) => _report(
+          state.pageKey,
+          SessionDetailScreen(
+            sessionId: state.pathParameters['sessionId']!,
+          ),
         ),
       ),
 
@@ -348,6 +410,49 @@ GoRouter buildRouter({
         },
       ),
       GoRoute(
+        // Read-only plan detail reached from the coach's athlete-detail screen.
+        // MUST stay top-level (out of the shell) like its origin
+        // `/coach/athlete/:id` — pushing the in-shell `/workout/routine/:id`
+        // from an out-of-shell route rebuilds the whole shell branch and lands
+        // blank (issue #399). `coachAthleteId` tells RoutineDetailScreen it is
+        // in this out-of-shell context so exercise taps and the back fallback
+        // stay out of the shell / athlete tab (issue #410).
+        path: '/coach/athlete/:athleteId/plan/:routineId',
+        builder: (context, state) {
+          final athleteId = state.pathParameters['athleteId']!;
+          final routineId = state.pathParameters['routineId']!;
+          return _immersive(RoutineDetailScreen(
+            routineId: routineId,
+            coachAthleteId: athleteId,
+          ));
+        },
+      ),
+      GoRoute(
+        // Exercise detail reached from a coach's read-only plan detail. Like
+        // its origin (the plan route above) it MUST stay top-level (out of the
+        // shell): pushing the in-shell `/workout/exercise/:id` from an
+        // out-of-shell route rebuilds the shell branch and lands blank
+        // (issue #410 Bug 1 — the root cause #399's symptom fix left open).
+        // Mirror of the in-shell exercise route; `backFallbackRoute` sends a
+        // state-restoration back to the athlete detail instead of `/workout`.
+        path: '/coach/athlete/:athleteId/plan/:routineId/exercise/:exerciseId',
+        builder: (context, state) {
+          final athleteId = state.pathParameters['athleteId']!;
+          final exerciseId = state.pathParameters['exerciseId']!;
+          final ownerId = state.uri.queryParameters['ownerId'];
+          final exerciseName = state.uri.queryParameters['name'];
+          return _immersive(ExerciseDetailScreen(
+            exerciseId: exerciseId,
+            ownerId: ownerId,
+            exerciseName: exerciseName,
+            // Personal stats/history belong to the athlete being inspected,
+            // never to the signed-in PF.
+            athleteId: athleteId,
+            backFallbackRoute: '/coach/athlete/$athleteId',
+          ));
+        },
+      ),
+      GoRoute(
         // 1-1 chat — full-screen, no nav bar. Reached from the athlete-detail
         // MENSAJE button AND the messages inbox; both push this same route so
         // it always opens full-screen with a proper background.
@@ -388,6 +493,25 @@ GoRouter buildRouter({
         pageBuilder: (_, state) =>
             _report(state.pageKey, _immersive(const _VolumeByGroupRouteHost())),
       ),
+      GoRoute(
+        path: '/home/insights/measurements',
+        pageBuilder: (_, state) =>
+            _report(state.pageKey, _immersive(const _MeasurementsRouteHost())),
+      ),
+      GoRoute(
+        // `?exerciseId=` opcional: preselecciona un ejercicio. Lo usa
+        // "Ejercicios frecuentes" al tocar una fila — hasta ahora esas filas
+        // no navegaban a ningún lado porque este destino no existía.
+        path: '/home/insights/exercise-progression',
+        pageBuilder: (_, state) => _report(
+          state.pageKey,
+          _immersive(
+            _ExerciseProgressionRouteHost(
+              initialExerciseId: state.uri.queryParameters['exerciseId'],
+            ),
+          ),
+        ),
+      ),
 
       // ShellRoute with the existing 5 tabs.
       // Use `pageBuilder` (not `builder`) so the shell itself uses an
@@ -420,14 +544,20 @@ GoRouter buildRouter({
           // Scaffold. All remaining callers push from within the shell.
           GoRoute(
             path: '/workout',
-            // ?tab=rankings deep-links to the second (Rankings) page of the
-            // athlete Entrenar tab — mirrors the /coach builder below
-            // (design `sdd/rankings-v2/design` AD-2). Trainer role ignores
-            // initialTab (WorkoutScreen's own role branch).
-            pageBuilder: (_, state) {
-              final tab = state.uri.queryParameters['tab'];
-              return _noAnim(WorkoutScreen(initialTab: tab));
-            },
+            // Legacy `?tab=rankings` deep-links (rankings lived here as the
+            // Entrenar second page until relocated to the FEED tab) forward
+            // to /feed?tab=rankings — safety net for old bookmarks and
+            // notifications.
+            redirect: (_, state) =>
+                state.uri.queryParameters['tab'] == 'rankings'
+                    ? '/feed?tab=rankings'
+                    : null,
+            // `?tab=plantillas` deep-links to the PLANTILLAS page; unknown
+            // values fall back to page 0 inside the screen (mirrors /feed
+            // and /coach `?tab=` forwarding).
+            pageBuilder: (_, state) => _noAnim(
+              WorkoutScreen(initialTab: state.uri.queryParameters['tab']),
+            ),
             routes: [
               GoRoute(
                 path: 'routine/:routineId',
@@ -474,11 +604,27 @@ GoRouter buildRouter({
           ),
           GoRoute(
             path: '/feed',
-            pageBuilder: (_, __) => _noAnim(const FeedScreen()),
+            // ?tab=rankings deep-links to the second (Rankings) page of the
+            // FEED tab — mirrors the /coach builder below. Rankings
+            // relocated here from the Entrenar tab.
+            pageBuilder: (_, state) {
+              final tab = state.uri.queryParameters['tab'];
+              return _noAnim(FeedScreen(initialTab: tab));
+            },
             routes: [
               GoRoute(
+                path: 'post/:postId',
+                builder: (_, state) => _withBg(
+                  PostDetailScreen(
+                    postId: state.pathParameters['postId']!,
+                  ),
+                ),
+              ),
+              GoRoute(
                 path: 'create',
-                builder: (_, __) => _withBg(const CreatePostScreen()),
+                builder: (_, state) => _withBg(
+                  CreatePostScreen(existingPost: state.extra as Post?),
+                ),
               ),
               GoRoute(
                 path: 'profile/:uid',
@@ -486,10 +632,27 @@ GoRouter buildRouter({
                   final uid = state.pathParameters['uid']!;
                   return _withBg(PublicProfileScreen(targetUid: uid));
                 },
+                routes: [_followListRoute],
               ),
               GoRoute(
                 path: 'search',
                 builder: (_, __) => _withBg(const SearchUsersScreen()),
+              ),
+              GoRoute(
+                path: 'notifications',
+                builder: (_, __) => _withBg(const NotificationHistoryScreen()),
+              ),
+              GoRoute(
+                // Friend-requests inbox reached from the feed header bell.
+                // Mirror of /profile/friend-requests: _ShellScaffold derives
+                // the highlighted tab from the location's path prefix, so the
+                // same screen registered under the ORIGIN branch keeps FEED
+                // highlighted — and pop lands back on /feed — instead of
+                // jumping to PERFIL (issue #387). Same route-mirroring
+                // pattern as the coach plan/exercise routes (issue #410).
+                // ProfileScreen keeps pushing the /profile twin.
+                path: 'friend-requests',
+                builder: (_, __) => _withBg(const FriendRequestsInboxScreen()),
               ),
               // Messages inbox moved to the top-level immersive route
               // /feed/messages (no bottom nav bar).
@@ -498,6 +661,23 @@ GoRouter buildRouter({
           GoRoute(
             path: '/home',
             pageBuilder: (_, __) => _noAnim(const HomeScreen()),
+            routes: [
+              GoRoute(
+                // Public profile reached from the HomeHeader avatar. Mirror
+                // of /feed/profile/:uid: _ShellScaffold derives the
+                // highlighted tab from the location's path prefix, so the
+                // same screen registered under the ORIGIN branch keeps
+                // INICIO highlighted — and pop lands back on /home —
+                // instead of jumping to FEED (issue #387 pattern, same as
+                // the friend-requests and coach plan/exercise twins).
+                path: 'profile/:uid',
+                builder: (context, state) {
+                  final uid = state.pathParameters['uid']!;
+                  return _withBg(PublicProfileScreen(targetUid: uid));
+                },
+                routes: [_followListRoute],
+              ),
+            ],
           ),
           GoRoute(
             path: '/coach',
@@ -564,18 +744,31 @@ GoRouter buildRouter({
                 builder: (_, __) => _withBg(const ProfileRoutinesScreen()),
               ),
               // rankings — RETIRED as a pushed route (rankings-v2 Phase 3,
-              // task 3.4). Rankings relocated to the second page of the
-              // athlete Entrenar tab (design `sdd/rankings-v2/design`
-              // AD-1/AD-3). Kept REGISTERED with a redirect (not
-              // hard-removed) — a safety net for any lingering
-              // `context.push('/profile/rankings')` call or bookmark.
+              // task 3.4). Rankings now live on the second page of the FEED
+              // tab (previously the athlete Entrenar tab). Kept REGISTERED
+              // with a redirect (not hard-removed) — a safety net for any
+              // lingering `context.push('/profile/rankings')` call or
+              // bookmark.
               GoRoute(
                 path: 'rankings',
-                redirect: (_, __) => '/workout?tab=rankings',
+                redirect: (_, __) => '/feed?tab=rankings',
               ),
               GoRoute(
                 path: 'settings/appearance',
                 builder: (_, __) => _withBg(const AppearanceScreen()),
+              ),
+              GoRoute(
+                // Trainer availability editor reached from TrainerProfileView's
+                // "Disponibilidad" row. Mirror of /coach/availability-editor:
+                // registered under the ORIGIN branch so _ShellScaffold's
+                // prefix-derived tab highlight keeps PERFIL — and pop lands
+                // back on /profile — instead of jumping to COACH (issue #387).
+                // TrainerAgendaTab keeps pushing the /coach twin.
+                path: 'availability-editor',
+                builder: (context, state) {
+                  final uid = state.uri.queryParameters['trainerId'] ?? '';
+                  return _withBg(AvailabilityEditorScreen(trainerId: uid));
+                },
               ),
               // /profile/settings GoRoute REMOVED 2026-05-28 — PR#4 pivot.
               // Sign-out and eliminar-cuenta tiles now live directly in
@@ -605,46 +798,57 @@ CustomTransitionPage<void> _noAnim(Widget child) => CustomTransitionPage(
       transitionsBuilder: (_, __, ___, child) => child,
     );
 
-/// Transición "abrir informe" (TREINO Motion PR3) — fade + subida sutil
-/// (4% de la altura), estilo Hevy, para las rutas del hub de insights y sus
-/// reportes. SOLO esas 5 rutas: el resto de la app conserva el default de
-/// plataforma a propósito (CupertinoPage da swipe-back en iOS; decidimos no
-/// perderlo globalmente). Estas pantallas son fullscreen con botón de volver
-/// explícito, así que perder el swipe-back acá es un tradeoff aceptado.
+/// Página "abrir informe" para las 5 rutas del hub de insights y sus reportes:
+/// la transición NATIVA de iOS (slide horizontal) MÁS un fade encima, estilo
+/// Hevy. La clave es que la transición nativa aporta el gesto de **swipe-back**
+/// (deslizar de izquierda a derecha para volver) — un [CustomTransitionPage]
+/// NO puede darlo, porque el back-gesture vive dentro de [CupertinoPageRoute].
+/// Por eso [_ReportPage] extiende esa ruta y sólo le suma el fade: estas
+/// pantallas quedan consistentes con el resto de la app (swipe-back) sin perder
+/// identidad de movimiento. Reduce-motion → sin fade, queda la transición
+/// nativa (igual que cualquier otra ruta `builder:`).
 ///
-/// Curvas: [AppMotion.standard] de ida, [AppMotion.exit] de vuelta (via
-/// `reverseCurve` — se aplica cuando la animación corre en reversa al hacer
-/// pop). Reduce-motion → child directo, sin transición.
-///
-/// [key] DEBE ser `state.pageKey`: a diferencia de `builder:` (que lo asigna
-/// solo), una page custom sin key no se distingue de la page actual y el
-/// `push()` imperativo entre estas rutas no navega. `_noAnim` se salva
-/// porque sus rutas solo se alcanzan con `go()`.
-CustomTransitionPage<void> _report(LocalKey key, Widget child) =>
-    CustomTransitionPage(
-      key: key,
-      child: child,
-      transitionDuration: AppMotion.slow,
-      reverseTransitionDuration: AppMotion.slow,
-      transitionsBuilder: (context, animation, _, child) {
-        if (AppMotion.reduceMotion(context)) return child;
-        final curved = CurvedAnimation(
-          parent: animation,
-          curve: AppMotion.standard,
-          reverseCurve: AppMotion.exit,
-        );
-        return FadeTransition(
-          opacity: curved,
-          child: SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0, 0.04),
-              end: Offset.zero,
-            ).animate(curved),
-            child: child,
-          ),
-        );
-      },
+/// [key] DEBE ser `state.pageKey`: una page custom sin key no se distingue de
+/// la actual y el `push()` imperativo entre estas rutas no navega.
+Page<void> _report(LocalKey key, Widget child) =>
+    _ReportPage(key: key, child: child);
+
+/// [Page] de go_router que crea una [_ReportPageRoute] (CupertinoPageRoute +
+/// fade). Ver [_report].
+class _ReportPage extends Page<void> {
+  const _ReportPage({required LocalKey super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Route<void> createRoute(BuildContext context) => _ReportPageRoute(this);
+}
+
+/// [CupertinoPageRoute] (slide nativo + gesto de swipe-back) con un fade
+/// encima. Ver [_report].
+class _ReportPageRoute extends CupertinoPageRoute<void> {
+  _ReportPageRoute(_ReportPage page)
+      : super(builder: (_) => page.child, settings: page);
+
+  @override
+  Widget buildTransitions(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    // `super` = slide nativo de Cupertino + el back-gesture detector (el gesto
+    // de volver-deslizando queda ADENTRO de `native`). Le ponemos el fade por
+    // fuera: la opacidad no absorbe punteros, así el gesto sigue funcionando.
+    final native =
+        super.buildTransitions(context, animation, secondaryAnimation, child);
+    if (AppMotion.reduceMotion(context)) return native;
+    return FadeTransition(
+      opacity: animation.drive(CurveTween(curve: AppMotion.standard)),
+      child: native,
     );
+  }
+}
 
 /// Wraps any shell sub-route's widget with [AppBackground] so the pushed
 /// route fully covers the tab root content underneath it during/after the
@@ -655,6 +859,27 @@ CustomTransitionPage<void> _report(LocalKey key, Widget child) =>
 /// Use INSIDE the ShellRoute branches' GoRoute builders only; top-level
 /// routes (outside the shell) own their own Scaffold + background.
 Widget _withBg(Widget child) => AppBackground(child: child);
+
+/// Listas de SEGUIDORES / SEGUIDOS, colgada de `profile/:uid`.
+///
+/// Se registra bajo las DOS ramas donde vive el perfil público —`/feed` y
+/// `/home`— porque `_ShellScaffold` deriva la tab resaltada del prefijo de la
+/// ruta: registrarla sólo bajo `/feed` haría saltar la tab a FEED al abrir la
+/// lista desde INICIO, y el pop volvería al lugar equivocado. Mismo patrón de
+/// espejo que `friend-requests` y las rutas de plan/ejercicio de Coach
+/// (issue #387).
+///
+/// Colgarla del perfil en vez de ponerla al lado (`/feed/follows/:uid`) hace
+/// que volver atrás caiga en el perfil del que se salió, sin ruta especial.
+final GoRoute _followListRoute = GoRoute(
+  path: 'follows',
+  builder: (_, state) => _withBg(
+    FollowListScreen(
+      targetUid: state.pathParameters['uid']!,
+      initialKind: followListKindFromTab(state.uri.queryParameters['tab']),
+    ),
+  ),
+);
 
 /// Full-screen immersive wrapper for routes OUTSIDE the ShellRoute whose
 /// screen does NOT own a Scaffold (e.g. MyExercisesScreen / the custom
@@ -691,6 +916,35 @@ class _MuscleDistributionRouteHost extends ConsumerWidget {
   }
 }
 
+/// Resuelve el uid actual y monta [MeasurementsScreen] — mismo patrón que los
+/// demás hosts del hub.
+class _MeasurementsRouteHost extends ConsumerWidget {
+  const _MeasurementsRouteHost();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final uid = ref.watch(currentUidProvider) ?? '';
+    return MeasurementsScreen(uid: uid);
+  }
+}
+
+/// Resuelve el uid actual y monta [ExerciseProgressionScreen], propagando el
+/// `?exerciseId=` de la query si vino.
+class _ExerciseProgressionRouteHost extends ConsumerWidget {
+  const _ExerciseProgressionRouteHost({this.initialExerciseId});
+
+  final String? initialExerciseId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final uid = ref.watch(currentUidProvider) ?? '';
+    return ExerciseProgressionScreen(
+      uid: uid,
+      initialExerciseId: initialExerciseId,
+    );
+  }
+}
+
 /// [stats-hub] Resuelve el uid actual y monta [FrequentExercisesScreen] —
 /// mismo patrón que [_MonthlyReportRouteHost] (obs #445).
 class _FrequentExercisesRouteHost extends ConsumerWidget {
@@ -717,11 +971,29 @@ class _VolumeByGroupRouteHost extends ConsumerWidget {
 
 /// Resuelve athleteId (currentUid) y trainerId (active link) y monta
 /// AthleteAgendaScreen. Loading state mientras se resuelve el link.
+///
+/// QA-NOT-002: role-aware. Los pushes de "Nueva solicitud de sesión" anteriores
+/// al fix del deepLink en notifyOnAppointment apuntan a /coach/agenda; para un
+/// TRAINER este host resolvía el vínculo de atleta (vacío) y mostraba
+/// "Necesitás un vínculo activo con un PF". Ahora un trainer aterriza en su
+/// propia agenda (misma vista que /coach?tab=agenda).
 class _AthleteAgendaRouteHost extends ConsumerWidget {
   const _AthleteAgendaRouteHost();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Gate por rol ANTES de resolver el vínculo: spinner mientras el profile
+    // carga (evita el flash del estado de error de atleta en cold start).
+    final profileAsync = ref.watch(userProfileProvider);
+    if (profileAsync.isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (profileAsync.valueOrNull?.role == UserRole.trainer) {
+      return const CoachScreen(initialTab: 'agenda');
+    }
+
     final athleteId = ref.watch(currentUidProvider) ?? '';
     final linkAsync = ref.watch(currentAthleteLinkProvider);
 
@@ -767,9 +1039,73 @@ class _ShellScaffold extends ConsumerStatefulWidget {
 }
 
 class _ShellScaffoldState extends ConsumerState<_ShellScaffold> {
+  /// Cuánto scroll vertical acumulado hace falta para cambiar de estado.
+  /// Chico dispara con el temblor del dedo; grande se siente trabado.
+  static const double _collapseThreshold = 20;
+  static const double _expandThreshold = 12;
+
+  /// Zona muerta arriba de todo: dentro de ella la barra siempre está
+  /// expandida, sin importar el gesto. Evita que un micro-scroll al tope deje
+  /// la barra compactada con la lista sin empezar.
+  static const double _topRevealZone = 20;
+
+  /// El estado vive en un [ValueNotifier] y no en `setState` a propósito: solo
+  /// se reconstruye la barra. Con `setState` se reconstruiría también el body
+  /// —o sea la pantalla entera— en medio de un scroll, que es exactamente el
+  /// momento en el que menos se puede pagar (`docs/performance.md`).
+  final ValueNotifier<bool> _navCollapsed = ValueNotifier(false);
+
+  @override
+  void dispose() {
+    _navCollapsed.dispose();
+    super.dispose();
+  }
+
   int get _currentIndex {
     final i = _kTabs.indexWhere((t) => widget.location.startsWith(t));
     return i < 0 ? 2 : i;
+  }
+
+  double _dragAccumulator = 0;
+
+  /// Escucha el scroll de CUALQUIER pantalla del shell.
+  ///
+  /// Las `ScrollNotification` burbujean por el árbol de widgets, así que el
+  /// shell se entera del scroll de sus hijos sin que ninguna pantalla tenga
+  /// que avisarle. Por eso no hay ni un provider ni un callback cableado en
+  /// Entrenar / Feed / Inicio / Coach / Perfil: el efecto es de la barra, y la
+  /// barra es del shell.
+  ///
+  /// Filtra por eje VERTICAL. Sin eso, el swipe horizontal entre Feed y
+  /// Rankings (el `TabBarView`) y los carruseles horizontales colapsarían la
+  /// barra, que es justo lo que nadie pidió.
+  bool _handleScroll(ScrollNotification notification) {
+    if (notification.metrics.axis != Axis.vertical) return false;
+    if (notification is! ScrollUpdateNotification) return false;
+
+    final delta = notification.scrollDelta;
+    if (delta == null || delta == 0) return false;
+
+    final metrics = notification.metrics;
+    if (metrics.pixels <= metrics.minScrollExtent + _topRevealZone) {
+      _dragAccumulator = 0;
+      _navCollapsed.value = false;
+      return false;
+    }
+
+    // Cambiar de dirección resetea: la intención nueva no arrastra el saldo
+    // de la anterior.
+    if (delta.isNegative != _dragAccumulator.isNegative) _dragAccumulator = 0;
+    _dragAccumulator += delta;
+
+    if (_dragAccumulator >= _collapseThreshold) {
+      _dragAccumulator = 0;
+      _navCollapsed.value = true;
+    } else if (_dragAccumulator <= -_expandThreshold) {
+      _dragAccumulator = 0;
+      _navCollapsed.value = false;
+    }
+    return false;
   }
 
   @override
@@ -786,29 +1122,40 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold> {
       // (WhatsApp-style). Scaffold still publishes the bar's height through
       // MediaQuery.padding.bottom, so scrollables without an explicit
       // padding inset their last items above the bar automatically.
-      body: AppBackground(
-        child: SafeArea(bottom: false, child: widget.child),
+      body: NotificationListener<ScrollNotification>(
+        onNotification: _handleScroll,
+        child: AppBackground(
+          child: SafeArea(bottom: false, child: widget.child),
+        ),
       ),
-      bottomNavigationBar: TreinoBottomBar(
-        currentIndex: _currentIndex,
-        coachUnreadCount: coachUnreadCount,
-        feedUnreadCount: feedUnreadCount,
-        onTap: (i) {
-          // Pop any open popup (modal bottom sheet, dialog) on the SHELL
-          // navigator so it animates closed when the user switches tabs —
-          // mirrors the auto-dismiss behavior the user expects from the
-          // athlete agenda. We MUST use the shell navigator key here:
-          // showModalBottomSheet defaults to useRootNavigator: false, so
-          // the modal lives on the shell nav, which is BELOW _ShellScaffold
-          // in the tree — unreachable via Navigator.of(context).
-          _shellNavigatorKey.currentState
-              ?.popUntil((route) => route is! PopupRoute);
-          // Defensive: also pop popups on the root navigator (dialogs that
-          // explicitly opted into useRootNavigator: true).
-          Navigator.of(context, rootNavigator: true)
-              .popUntil((route) => route is! PopupRoute);
-          context.go(_kTabs[i]);
-        },
+      bottomNavigationBar: ValueListenableBuilder<bool>(
+        valueListenable: _navCollapsed,
+        builder: (context, collapsed, _) => TreinoBottomBar(
+          currentIndex: _currentIndex,
+          coachUnreadCount: coachUnreadCount,
+          feedUnreadCount: feedUnreadCount,
+          collapsed: collapsed,
+          onTap: (i) {
+            // Pop any open popup (modal bottom sheet, dialog) on the SHELL
+            // navigator so it animates closed when the user switches tabs —
+            // mirrors the auto-dismiss behavior the user expects from the
+            // athlete agenda. We MUST use the shell navigator key here:
+            // showModalBottomSheet defaults to useRootNavigator: false, so
+            // the modal lives on the shell nav, which is BELOW _ShellScaffold
+            // in the tree — unreachable via Navigator.of(context).
+            _shellNavigatorKey.currentState
+                ?.popUntil((route) => route is! PopupRoute);
+            // Defensive: also pop popups on the root navigator (dialogs that
+            // explicitly opted into useRootNavigator: true).
+            Navigator.of(context, rootNavigator: true)
+                .popUntil((route) => route is! PopupRoute);
+            // Cambiar de tab arranca de cero: la pantalla nueva se ve desde
+            // arriba, así que la barra tiene que estar entera.
+            _dragAccumulator = 0;
+            _navCollapsed.value = false;
+            context.go(_kTabs[i]);
+          },
+        ),
       ),
     );
   }

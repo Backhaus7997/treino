@@ -10,7 +10,7 @@ This project uses [AGENTS.md](./AGENTS.md) as the canonical source of rules and 
 - Theme: Mint Magenta default. Use `AppPalette.of(context)` — never HEX literals.
 - Icons: Use `TreinoIcon.X` — never `PhosphorIcons.X` directly.
 - UI implementation: consult `docs/design-decisions.md` for which screen comes from which mockup project, then `docs/design-system.md` for tokens.
-- Out of scope: Ranking, Retos, Missions, Bets, Gamification.
+- Out of scope: Retos, Missions, Bets, Gamification. Rankings **is** in scope (per-gym, opt-in, already implemented — `/workout?tab=rankings`).
 - Workflow for non-trivial changes: `/sdd-new <name>` (gentle-ai SDD).
 - Quality gate before commit: `flutter analyze` 0 issues + `dart format .` + tests passing.
 - Roles: athlete | trainer, immutable. Trainers created manually by team via Firebase Admin SDK.

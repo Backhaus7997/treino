@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
+import 'package:treino/core/utils/argentina_time.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/application/dashboard_day_counts.dart';
@@ -17,8 +18,6 @@ import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/chat/application/chat_providers.dart'
     show totalUnreadCountProvider;
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pagos_buckets_provider.dart';
-import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pagos_kpi_row.dart'
-    show KpiTile;
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/payment_format.dart'
     show fmtArs;
 import 'package:treino/features/feed/presentation/widgets/post_avatar.dart';
@@ -64,6 +63,12 @@ class CoachHubDashboardScreen extends ConsumerWidget {
             final wide =
                 constraints.maxWidth >= 900 && constraints.maxHeight.isFinite;
 
+            // Sin entrada one-shot: el resto de las secciones del hub
+            // (Agenda, Pagos, Biblioteca, Chat, Ajustes, Alumnos) aparecen
+            // instantáneas al click del sidebar, y cada sección monta vía
+            // NoTransitionPage — un TreinoFadeSlideIn acá se re-dispararía
+            // en CADA visita a la superficie más frecuentada del hub, no
+            // solo la primera vez. Mismo motion que sus hermanas.
             final content = _DashboardContent(wide: wide);
 
             if (wide) {
@@ -235,7 +240,9 @@ class _WelcomeCard extends ConsumerWidget {
 
     // Sesiones hoy count via trainerAppointmentsStreamProvider + dashboardDayCounts.
     final uid = ref.watch(currentUidProvider) ?? '';
-    final now = DateTime.now().toUtc();
+    // QA-HOME-001: appointments' startsAt is Argentina wall-clock, so bucket the
+    // "today" query range and the dashboard counts by ART wall-clock too.
+    final now = argentinaNow();
     final todayStart = DateTime.utc(now.year, now.month, now.day);
     final todayEnd = todayStart.add(const Duration(days: 1));
     final appointmentsAsync = ref.watch(
@@ -256,28 +263,54 @@ class _WelcomeCard extends ConsumerWidget {
     final bucketsAsync = ref.watch(pagosBucketsProvider);
     final vencidosCount = bucketsAsync.valueOrNull?.vencidos.length ?? 0;
 
+    // Mockup (welcome-card.png): fondo con glow mint radial en la esquina
+    // izquierda, saludo con el NOMBRE en mint, botones con ícono (el primario
+    // relleno), ring de adherencia a la derecha.
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: palette.border),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            palette.accent.withValues(alpha: 0.12),
+            palette.bgCard,
+            palette.bgCard,
+          ],
+          stops: const [0.0, 0.45, 1.0],
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Greeting
-          Text(
-            l10n.dashboardGreeting(firstName.toUpperCase()),
-            style: GoogleFonts.barlowCondensed(
-              color: palette.textPrimary,
-              fontSize: 28,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.2,
+          // Saludo: "BUENAS, " blanco + el nombre en mint (mockup).
+          RichText(
+            text: TextSpan(
+              children: [
+                TextSpan(
+                  text: l10n.dashboardGreetingPrefix,
+                  style: GoogleFonts.barlowCondensed(
+                    color: palette.textPrimary,
+                    fontSize: 30,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                TextSpan(
+                  text: firstName.toUpperCase(),
+                  style: GoogleFonts.barlowCondensed(
+                    color: palette.accent,
+                    fontSize: 30,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 6),
-          // Summary line
           Text(
             l10n.dashboardSummaryLine(
               sessionCounts.pending,
@@ -286,37 +319,40 @@ class _WelcomeCard extends ConsumerWidget {
             ),
             style: TextStyle(color: palette.textMuted, fontSize: 13),
           ),
-          const SizedBox(height: 16),
-          // Quick actions row + adherencia ring
+          const SizedBox(height: 18),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                  spacing: 10,
+                  runSpacing: 10,
                   children: [
                     _QuickAction(
                       label: l10n.dashboardQuickActionNuevoAlumno,
+                      icon: TreinoIcon.plus,
+                      primary: true,
                       onTap: () => context.go('/alumnos'),
                     ),
                     _QuickAction(
                       label: l10n.dashboardQuickActionCrearRutina,
-                      onTap: () => context.go('/biblioteca'),
+                      icon: TreinoIcon.sidebarRutinas,
+                      onTap: () => context.push('/template-editor'),
                     ),
                     _QuickAction(
                       label: l10n.dashboardQuickActionMensajes(unread),
-                      onTap: () => context.go('/mensajes'),
+                      icon: TreinoIcon.sidebarChat,
+                      onTap: () => context.go('/chat'),
                     ),
                     _QuickAction(
                       label: l10n.dashboardQuickActionImportarPlan,
+                      icon: TreinoIcon.upload,
                       onTap: () => context.push('/upload-plan'),
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: 16),
-              // Adherencia ring — real aggregate (PR2).
               const _AdherenceRing(),
             ],
           ),
@@ -326,29 +362,51 @@ class _WelcomeCard extends ConsumerWidget {
   }
 }
 
-/// A single quick action chip/button.
+/// A single quick action chip/button (mockup: con ícono; el primario relleno
+/// en mint, el resto outline).
 class _QuickAction extends StatelessWidget {
-  const _QuickAction({required this.label, required this.onTap});
+  const _QuickAction({
+    required this.label,
+    required this.onTap,
+    required this.icon,
+    this.primary = false,
+  });
   final String label;
   final VoidCallback onTap;
+  final IconData icon;
+  final bool primary;
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    return OutlinedButton(
-      onPressed: onTap,
-      style: OutlinedButton.styleFrom(
-        foregroundColor: palette.textPrimary,
-        side: BorderSide(color: palette.border),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        shape: const StadiumBorder(),
-      ),
-      child: Text(
-        label,
-        style: GoogleFonts.barlowCondensed(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 1.1,
+    final fg = primary ? palette.bg : palette.textPrimary;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: primary ? palette.accent : Colors.transparent,
+          border: Border.all(
+            color: primary ? palette.accent : palette.border,
+          ),
+          borderRadius: BorderRadius.circular(9999),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 15, color: fg),
+            const SizedBox(width: 7),
+            Text(
+              label,
+              style: GoogleFonts.barlowCondensed(
+                color: fg,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.0,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -377,14 +435,16 @@ class _AdherenceRing extends ConsumerWidget {
       label = l10n.dashboardAdherenceRingPlaceholder; // "--"
       ringValue = 0;
     } else {
-      label = l10n.dashboardAdherenceValue(adherence.round());
-      // Clamp ring value to [0, 1] for CircularProgressIndicator.
+      // Clamp the displayed % to 100: an athlete can log more sessions than
+      // planned (raw value can exceed 100), but "105% de adherencia" reads
+      // as a bug. Same clamp is applied to the KPI card so both agree.
+      label = l10n.dashboardAdherenceValue(adherence.round().clamp(0, 100));
       ringValue = (adherence / 100).clamp(0.0, 1.0);
     }
 
     return SizedBox(
-      width: 72,
-      height: 72,
+      width: 84,
+      height: 84,
       child: Stack(
         alignment: Alignment.center,
         children: [
@@ -401,7 +461,7 @@ class _AdherenceRing extends ConsumerWidget {
             style: TextStyle(
               color:
                   adherence == null ? palette.textMuted : palette.textPrimary,
-              fontSize: 14,
+              fontSize: 11,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -452,32 +512,121 @@ class _KpiStrip extends ConsumerWidget {
     final adherenceValue = adherenceAsync.valueOrNull;
     final adherenceLabel = adherenceValue == null
         ? l10n.dashboardAdherenceRingPlaceholder // "--"
-        : l10n.dashboardAdherenceValue(adherenceValue.round());
+        // Clamp to 100% — matches the adherence ring (raw value can exceed
+        // 100 when an athlete logs more sessions than planned).
+        : l10n.dashboardAdherenceValue(adherenceValue.round().clamp(0, 100));
 
     final isLoading = linksAsync.isLoading || bucketsAsync.isLoading;
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          KpiTile(
+    final palette = AppPalette.of(context);
+    return Row(
+      children: [
+        Expanded(
+          child: _DashboardKpiCard(
             label: l10n.dashboardKpiAlumnosActivos,
             value: isLoading ? '…' : activeCount.toString(),
+            icon: TreinoIcon.sidebarAlumnos,
+            palette: palette,
           ),
-          const SizedBox(width: 12),
-          KpiTile(
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: _DashboardKpiCard(
             label: l10n.dashboardKpiIngresoMes,
             value: bucketsAsync.isLoading ? '…' : fmtArs(ingresoMes),
+            icon: TreinoIcon.trendUp,
+            palette: palette,
           ),
-          const SizedBox(width: 12),
-          KpiTile(
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: _DashboardKpiCard(
             label: l10n.dashboardKpiAdherencia,
             value: adherenceLabel,
+            icon: TreinoIcon.equipCardio,
+            palette: palette,
           ),
-          const SizedBox(width: 12),
-          KpiTile(
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: _DashboardKpiCard(
             label: l10n.dashboardKpiPorCobrar(vencidosCount),
             value: bucketsAsync.isLoading ? '…' : fmtArs(porCobrarTotal),
+            icon: TreinoIcon.sidebarPagos,
+            palette: palette,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// KPI card del dashboard (mockup resto-cards.png): ícono de acento en un
+/// chip mint suave arriba, label chico, valor grande. Más presencia que el
+/// `KpiTile` plano compartido con Pagos.
+class _DashboardKpiCard extends StatelessWidget {
+  const _DashboardKpiCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.palette,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: palette.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 30,
+                height: 30,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: palette.accent.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, size: 16, color: palette.accent),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  label.toUpperCase(),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.barlowCondensed(
+                    color: palette.textMuted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.barlowCondensed(
+              color: palette.textPrimary,
+              fontSize: 26,
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ],
       ),

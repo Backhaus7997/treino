@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/coach/data/appointment_repository.dart';
 import 'package:treino/features/coach/domain/agenda_exceptions.dart';
 import 'package:treino/features/coach/domain/appointment.dart';
+import 'package:treino/features/payments/domain/payment.dart';
 
 void main() {
   late FakeFirebaseFirestore firestore;
@@ -34,6 +35,9 @@ void main() {
           athleteDisplayName: athleteDisplayName,
           startsAt: startsAt,
           durationMin: durationMin,
+          // QA-COA-003: inject a reference just before the fixture so the new
+          // past-guard passes deterministically (fixture date is now in the past).
+          now: DateTime.utc(2026, 6, 30, 9, 0),
         );
 
         expect(appt.id, equals(expectedDocId));
@@ -75,6 +79,8 @@ void main() {
             athleteDisplayName: athleteDisplayName,
             startsAt: startsAt,
             durationMin: durationMin,
+            // QA-COA-003: reference before the fixture so the past-guard passes.
+            now: DateTime.utc(2026, 6, 30, 9, 0),
           ),
           throwsA(isA<SlotAlreadyTakenException>()),
         );
@@ -111,6 +117,8 @@ void main() {
           athleteDisplayName: athleteDisplayName,
           startsAt: startsAt,
           durationMin: durationMin,
+          // QA-COA-003: reference before the fixture so the past-guard passes.
+          now: DateTime.utc(2026, 6, 30, 9, 0),
         );
 
         expect(appt.status, equals(AppointmentStatus.confirmed));
@@ -194,6 +202,8 @@ void main() {
           athleteDisplayName: athleteDisplayName,
           startsAt: startsAt,
           durationMin: durationMin,
+          // QA-COA-003: reference before the fixture so the past-guard passes.
+          now: DateTime.utc(2026, 6, 30, 9, 0),
         );
 
         expect(
@@ -465,5 +475,467 @@ void main() {
         expect(results.single.trainerId, equals(trainerId));
       },
     );
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Slice 2a — Agenda→cobro bridge: billAppointment() + markBilled()
+  // MONEY-CRITICAL: these pin the atomic create-Payment+link-appointment
+  // transaction and its race/guard behavior.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  group('billAppointment()', () {
+    Appointment confirmedAppt(String id) => Appointment(
+          id: id,
+          trainerId: trainerId,
+          athleteId: athleteId,
+          athleteDisplayName: athleteDisplayName,
+          startsAt: startsAt,
+          durationMin: durationMin,
+          status: AppointmentStatus.confirmed,
+        );
+
+    Payment pendingPayment({DateTime? dueAt}) => Payment(
+          id: '',
+          trainerId: trainerId,
+          athleteId: athleteId,
+          amountArs: 5000,
+          concept: 'Sesión 01/07/2026',
+          status: PaymentStatus.pending,
+          createdAt: DateTime.utc(2026, 7, 1),
+          dueAt: dueAt,
+        );
+
+    test(
+      '(a) creates a Payment doc (athleteId from the appointment, status '
+      'pending, correct amount) AND atomically sets appointment.paymentId',
+      () async {
+        final appt = confirmedAppt('appt-bill-1');
+        await firestore
+            .collection('appointments')
+            .doc(appt.id)
+            .set(appt.toJson());
+
+        final paymentId = await repo.billAppointment(
+          appointment: appt,
+          payment: pendingPayment(),
+        );
+
+        expect(paymentId, isNotEmpty);
+
+        final paymentSnap =
+            await firestore.collection('payments').doc(paymentId).get();
+        expect(paymentSnap.exists, isTrue);
+        expect(paymentSnap.data()!['id'], equals(paymentId));
+        expect(paymentSnap.data()!['trainerId'], equals(trainerId));
+        expect(paymentSnap.data()!['athleteId'], equals(athleteId));
+        expect(paymentSnap.data()!['amountArs'], equals(5000));
+        expect(paymentSnap.data()!['status'], equals('pending'));
+
+        final apptSnap =
+            await firestore.collection('appointments').doc(appt.id).get();
+        expect(apptSnap.data()!['paymentId'], equals(paymentId));
+      },
+    );
+
+    test(
+      '(d) propagates an optional dueAt onto the created Payment',
+      () async {
+        final appt = confirmedAppt('appt-bill-2');
+        await firestore
+            .collection('appointments')
+            .doc(appt.id)
+            .set(appt.toJson());
+        final dueAt = DateTime.utc(2026, 7, 15, 23, 59, 59);
+
+        final paymentId = await repo.billAppointment(
+          appointment: appt,
+          payment: pendingPayment(dueAt: dueAt),
+        );
+
+        final paymentSnap =
+            await firestore.collection('payments').doc(paymentId).get();
+        expect(paymentSnap.data()!['dueAt'], isNotNull);
+      },
+    );
+
+    test(
+      '(d) dueAt stays null on the created Payment when not provided',
+      () async {
+        final appt = confirmedAppt('appt-bill-3');
+        await firestore
+            .collection('appointments')
+            .doc(appt.id)
+            .set(appt.toJson());
+
+        final paymentId = await repo.billAppointment(
+          appointment: appt,
+          payment: pendingPayment(),
+        );
+
+        final paymentSnap =
+            await firestore.collection('payments').doc(paymentId).get();
+        expect(paymentSnap.data()!['dueAt'], isNull);
+      },
+    );
+
+    test(
+      '(b) throws AppointmentAlreadyBilledException when paymentId is '
+      'already set — guards re-cobro: no second Payment doc is created and '
+      'the existing paymentId is left untouched',
+      () async {
+        final appt = confirmedAppt('appt-bill-4');
+        await firestore.collection('appointments').doc(appt.id).set({
+          ...appt.toJson(),
+          'paymentId': 'existing-payment-id',
+        });
+
+        await expectLater(
+          repo.billAppointment(
+            appointment: appt,
+            payment: pendingPayment(),
+          ),
+          throwsA(isA<AppointmentAlreadyBilledException>()),
+        );
+
+        final payments = await firestore.collection('payments').get();
+        expect(payments.docs, isEmpty);
+
+        final apptSnap =
+            await firestore.collection('appointments').doc(appt.id).get();
+        expect(apptSnap.data()!['paymentId'], equals('existing-payment-id'));
+      },
+    );
+
+    test(
+      'throws AppointmentNotConfirmedException when the live status is not '
+      'confirmed (e.g. cancelled concurrently after the dialog opened) — no '
+      'Payment doc is created',
+      () async {
+        final appt = confirmedAppt('appt-bill-5');
+        await firestore.collection('appointments').doc(appt.id).set({
+          ...appt.toJson(),
+          'status': 'cancelled',
+        });
+
+        await expectLater(
+          repo.billAppointment(
+            appointment: appt,
+            payment: pendingPayment(),
+          ),
+          throwsA(isA<AppointmentNotConfirmedException>()),
+        );
+
+        final payments = await firestore.collection('payments').get();
+        expect(payments.docs, isEmpty);
+      },
+    );
+
+    test(
+      'throws AppointmentNotFoundException when the appointment doc does '
+      'not exist — no Payment doc is created',
+      () async {
+        final appt = confirmedAppt('appt-bill-does-not-exist');
+        // Deliberately NOT seeded in Firestore.
+
+        await expectLater(
+          repo.billAppointment(
+            appointment: appt,
+            payment: pendingPayment(),
+          ),
+          throwsA(isA<AppointmentNotFoundException>()),
+        );
+
+        final payments = await firestore.collection('payments').get();
+        expect(payments.docs, isEmpty);
+      },
+    );
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Slice 2b — cobro por lote desde la agenda: billAppointments()
+  // MONEY-CRITICAL: pins the atomic create-ONE-Payment+link-N-appointments
+  // transaction — all-or-nothing across the whole lote.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  group('billAppointments()', () {
+    const otherAthleteId = 'athlete2';
+    const otherTrainerId = 'trainer2';
+
+    Appointment confirmedApptAt(
+      String id,
+      DateTime at, {
+      String athlete = athleteId,
+      String trainer = trainerId,
+    }) =>
+        Appointment(
+          id: id,
+          trainerId: trainer,
+          athleteId: athlete,
+          athleteDisplayName: athleteDisplayName,
+          startsAt: at,
+          durationMin: durationMin,
+          status: AppointmentStatus.confirmed,
+        );
+
+    Payment lotePayment({int amountArs = 15000, String? concept}) => Payment(
+          id: '',
+          trainerId: trainerId,
+          athleteId: athleteId,
+          amountArs: amountArs,
+          concept: concept ?? '3 sesiones',
+          status: PaymentStatus.pending,
+          createdAt: DateTime.utc(2026, 7, 1),
+        );
+
+    /// Seeds 3 confirmed same-athlete appointments and returns them.
+    Future<List<Appointment>> seedThree() async {
+      final appts = [
+        confirmedApptAt('lote-1', DateTime.utc(2026, 7, 1, 9, 0)),
+        confirmedApptAt('lote-2', DateTime.utc(2026, 7, 1, 10, 0)),
+        confirmedApptAt('lote-3', DateTime.utc(2026, 7, 1, 11, 0)),
+      ];
+      for (final a in appts) {
+        await firestore.collection('appointments').doc(a.id).set(a.toJson());
+      }
+      return appts;
+    }
+
+    test(
+      'N turnos same-athlete → crea 1 Payment (monto, concepto, athleteId '
+      'correctos) y marca los N turnos con ese paymentId',
+      () async {
+        final appts = await seedThree();
+
+        final paymentId = await repo.billAppointments(
+          appointments: appts,
+          payment: lotePayment(amountArs: 15000, concept: '3 sesiones'),
+        );
+
+        // Exactamente 1 Payment creado.
+        final payments = await firestore.collection('payments').get();
+        expect(payments.docs, hasLength(1));
+        final paymentData = payments.docs.single.data();
+        expect(paymentData['id'], equals(paymentId));
+        expect(paymentData['athleteId'], equals(athleteId));
+        expect(paymentData['trainerId'], equals(trainerId));
+        expect(paymentData['amountArs'], equals(15000));
+        expect(paymentData['concept'], equals('3 sesiones'));
+        expect(paymentData['status'], equals('pending'));
+
+        // Los 3 turnos quedan marcados con el MISMO paymentId.
+        for (final a in appts) {
+          final snap =
+              await firestore.collection('appointments').doc(a.id).get();
+          expect(snap.data()!['paymentId'], equals(paymentId));
+        }
+      },
+    );
+
+    test(
+      'lote que incluye un turno ya cobrado → aborta TODO el lote: no crea '
+      'el Payment ni marca ninguno de los otros turnos',
+      () async {
+        final appts = await seedThree();
+        // El 2do turno ya tiene un paymentId de un cobro previo.
+        await firestore.collection('appointments').doc('lote-2').update({
+          'paymentId': 'payment-previo',
+        });
+
+        await expectLater(
+          repo.billAppointments(appointments: appts, payment: lotePayment()),
+          throwsA(isA<AppointmentAlreadyBilledException>()),
+        );
+
+        // Nada se escribió: ni el Payment...
+        final payments = await firestore.collection('payments').get();
+        expect(payments.docs, isEmpty);
+
+        // ...ni el paymentId de los turnos que SÍ eran válidos (lote-1, lote-3).
+        final snap1 =
+            await firestore.collection('appointments').doc('lote-1').get();
+        expect(snap1.data()!['paymentId'], isNull);
+        final snap3 =
+            await firestore.collection('appointments').doc('lote-3').get();
+        expect(snap3.data()!['paymentId'], isNull);
+
+        // El ya-cobrado conserva su paymentId original (no se pisó).
+        final snap2 =
+            await firestore.collection('appointments').doc('lote-2').get();
+        expect(snap2.data()!['paymentId'], equals('payment-previo'));
+      },
+    );
+
+    test(
+      'lote que incluye un turno no confirmado (cancelado concurrentemente) '
+      '→ aborta TODO el lote, no escribe nada',
+      () async {
+        final appts = await seedThree();
+        await firestore.collection('appointments').doc('lote-3').update({
+          'status': 'cancelled',
+        });
+
+        await expectLater(
+          repo.billAppointments(appointments: appts, payment: lotePayment()),
+          throwsA(isA<AppointmentNotConfirmedException>()),
+        );
+
+        final payments = await firestore.collection('payments').get();
+        expect(payments.docs, isEmpty);
+        final snap1 =
+            await firestore.collection('appointments').doc('lote-1').get();
+        expect(snap1.data()!['paymentId'], isNull);
+      },
+    );
+
+    test(
+      'lote que incluye un turno inexistente → aborta TODO el lote, no '
+      'escribe nada',
+      () async {
+        final appts = await seedThree();
+        final withMissing = [
+          ...appts,
+          confirmedApptAt('lote-does-not-exist', DateTime.utc(2026, 7, 1, 12)),
+        ];
+
+        await expectLater(
+          repo.billAppointments(
+              appointments: withMissing, payment: lotePayment()),
+          throwsA(isA<AppointmentNotFoundException>()),
+        );
+
+        final payments = await firestore.collection('payments').get();
+        expect(payments.docs, isEmpty);
+      },
+    );
+
+    // NOTE on the next 2 tests: billAppointments has TWO independent guards
+    // against a mixed-athlete/mixed-trainer lote —
+    //   (1) a debug-only `assert()` on the Appointment OBJECTS the caller
+    //       passes in (fails fast in dev/tests, compiled OUT of release
+    //       builds), and
+    //   (2) the in-transaction re-validation against the LIVE Firestore doc
+    //       (runs in every build mode — the actual production safety net).
+    // To pin (2) specifically (not just re-trigger (1)), the Appointment
+    // OBJECT passed to billAppointments must itself claim the SAME
+    // athleteId/trainerId as the payment (so the assert passes), while the
+    // Firestore doc seeded at that id disagrees — simulating a caller/UI bug
+    // that would slip straight through in a release build if (2) didn't
+    // exist.
+    test(
+      'lote con un doc LIVE de OTRO alumno, mientras el objeto que pasa el '
+      'caller "miente" y declara el mismo athleteId que el payment (bypassea '
+      'el assert de debug) → la revalidación server-side dentro de la '
+      'transacción lo detecta igual: aborta TODO el lote, no escribe nada',
+      () async {
+        final appts = await seedThree();
+
+        // Doc LIVE en Firestore: pertenece a otro athleteId.
+        final liveForeign = confirmedApptAt(
+          'lote-foreign',
+          DateTime.utc(2026, 7, 1, 13, 0),
+          athlete: otherAthleteId,
+        );
+        await firestore
+            .collection('appointments')
+            .doc(liveForeign.id)
+            .set(liveForeign.toJson());
+
+        // Objeto que pasa el caller para ESE MISMO id: declara el athleteId
+        // del payment (pasa el assert), pero la doc real dice otra cosa.
+        final claimedSameAthlete =
+            confirmedApptAt(liveForeign.id, DateTime.utc(2026, 7, 1, 13, 0));
+
+        await expectLater(
+          repo.billAppointments(
+            appointments: [...appts, claimedSameAthlete],
+            payment: lotePayment(), // payment.athleteId == athleteId
+          ),
+          throwsA(isA<AppointmentAthleteMismatchException>()),
+        );
+
+        final payments = await firestore.collection('payments').get();
+        expect(payments.docs, isEmpty);
+        for (final a in appts) {
+          final snap =
+              await firestore.collection('appointments').doc(a.id).get();
+          expect(snap.data()!['paymentId'], isNull);
+        }
+      },
+    );
+
+    test(
+      'lote con un doc LIVE de OTRO trainer, objeto pasado por el caller '
+      '"miente" y declara el mismo trainerId que el payment (bypassea el '
+      'assert de debug) → la revalidación server-side lo detecta igual: '
+      'aborta TODO el lote, no escribe nada',
+      () async {
+        final appts = await seedThree();
+
+        final liveForeign = confirmedApptAt(
+          'lote-foreign-trainer',
+          DateTime.utc(2026, 7, 1, 13, 0),
+          trainer: otherTrainerId,
+        );
+        await firestore
+            .collection('appointments')
+            .doc(liveForeign.id)
+            .set(liveForeign.toJson());
+
+        final claimedSameTrainer =
+            confirmedApptAt(liveForeign.id, DateTime.utc(2026, 7, 1, 13, 0));
+
+        await expectLater(
+          repo.billAppointments(
+            appointments: [...appts, claimedSameTrainer],
+            payment: lotePayment(), // payment.trainerId == trainerId
+          ),
+          throwsA(isA<AppointmentAthleteMismatchException>()),
+        );
+
+        final payments = await firestore.collection('payments').get();
+        expect(payments.docs, isEmpty);
+      },
+    );
+
+    test('N=1 (lote de un solo turno) funciona igual que el caso general',
+        () async {
+      final appt =
+          confirmedApptAt('lote-single', DateTime.utc(2026, 7, 1, 9, 0));
+      await firestore
+          .collection('appointments')
+          .doc(appt.id)
+          .set(appt.toJson());
+
+      final paymentId = await repo.billAppointments(
+        appointments: [appt],
+        payment: lotePayment(amountArs: 5000, concept: '1 sesión'),
+      );
+
+      final snap =
+          await firestore.collection('appointments').doc(appt.id).get();
+      expect(snap.data()!['paymentId'], equals(paymentId));
+    });
+  });
+
+  group('markBilled()', () {
+    test('(a) sets paymentId on the appointment doc', () async {
+      final appt = Appointment.create(
+        trainerId: trainerId,
+        athleteId: athleteId,
+        athleteDisplayName: athleteDisplayName,
+        startsAt: startsAt,
+        durationMin: durationMin,
+      );
+      await firestore
+          .collection('appointments')
+          .doc(appt.id)
+          .set(appt.toJson());
+
+      await repo.markBilled(appointmentId: appt.id, paymentId: 'payment-xyz');
+
+      final snap =
+          await firestore.collection('appointments').doc(appt.id).get();
+      expect(snap.data()!['paymentId'], equals('payment-xyz'));
+    });
   });
 }

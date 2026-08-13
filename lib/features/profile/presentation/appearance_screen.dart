@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../app/theme/theme_mode_provider.dart';
+import '../../../core/widgets/motion/treino_fade_slide_in.dart';
+import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 
@@ -28,9 +30,8 @@ class AppearanceScreen extends ConsumerWidget {
         // ── Header — matches sibling profile sub-screen pattern ──────────────
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-          child: GestureDetector(
+          child: TreinoTappable(
             onTap: () => context.pop(),
-            behavior: HitTestBehavior.opaque,
             child: Row(
               children: [
                 Icon(TreinoIcon.back, size: 20, color: palette.textPrimary),
@@ -51,52 +52,54 @@ class AppearanceScreen extends ConsumerWidget {
         // ── Radio options ────────────────────────────────────────────────────
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: palette.bgCard,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: palette.textMuted.withValues(alpha: 0.12),
+          child: TreinoFadeSlideIn(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: palette.bgCard,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: palette.textMuted.withValues(alpha: 0.12),
+                ),
               ),
-            ),
-            child: RadioGroup<ThemeMode>(
-              groupValue: current,
-              onChanged: (mode) {
-                if (mode == null) return;
-                ref.read(themeModeProvider.notifier).setMode(mode);
-              },
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Sistema
-                  _AppearanceTile(
-                    value: ThemeMode.system,
-                    groupValue: current,
-                    label: l10n.appearanceSystem,
-                    subtitle: l10n.appearanceSystemDesc,
-                    palette: palette,
-                    isFirst: true,
-                  ),
-                  _Divider(palette: palette),
+              child: RadioGroup<ThemeMode>(
+                groupValue: current,
+                onChanged: (mode) {
+                  if (mode == null) return;
+                  ref.read(themeModeProvider.notifier).setMode(mode);
+                },
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Sistema
+                    _AppearanceTile(
+                      value: ThemeMode.system,
+                      groupValue: current,
+                      label: l10n.appearanceSystem,
+                      subtitle: l10n.appearanceSystemDesc,
+                      palette: palette,
+                      isFirst: true,
+                    ),
+                    _Divider(palette: palette),
 
-                  // Claro
-                  _AppearanceTile(
-                    value: ThemeMode.light,
-                    groupValue: current,
-                    label: l10n.appearanceLight,
-                    palette: palette,
-                  ),
-                  _Divider(palette: palette),
+                    // Claro
+                    _AppearanceTile(
+                      value: ThemeMode.light,
+                      groupValue: current,
+                      label: l10n.appearanceLight,
+                      palette: palette,
+                    ),
+                    _Divider(palette: palette),
 
-                  // Oscuro
-                  _AppearanceTile(
-                    value: ThemeMode.dark,
-                    groupValue: current,
-                    label: l10n.appearanceDark,
-                    palette: palette,
-                    isLast: true,
-                  ),
-                ],
+                    // Oscuro
+                    _AppearanceTile(
+                      value: ThemeMode.dark,
+                      groupValue: current,
+                      label: l10n.appearanceDark,
+                      palette: palette,
+                      isLast: true,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

@@ -7,6 +7,10 @@ import 'package:treino/features/workout/domain/set_log.dart';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+// #372: the aggregator now counts only `countsAsWorkout` sessions (finished
+// AND wasFullyCompleted). These fixtures represent COMPLETED workouts, so they
+// set `wasFullyCompleted: true` explicitly — otherwise the default (false)
+// would make them abandoned and they'd be excluded.
 Session _session(String id, DateTime startedAt) => Session(
       id: id,
       uid: 'athlete1',
@@ -14,6 +18,19 @@ Session _session(String id, DateTime startedAt) => Session(
       routineName: 'Rutina A',
       startedAt: startedAt,
       status: SessionStatus.finished,
+      wasFullyCompleted: true,
+    );
+
+// #372: an ABANDONED session (finished but wasFullyCompleted=false) — its sets
+// must NOT count toward the frequency ranking.
+Session _abandoned(String id, DateTime startedAt) => Session(
+      id: id,
+      uid: 'athlete1',
+      routineId: 'r1',
+      routineName: 'Rutina A',
+      startedAt: startedAt,
+      status: SessionStatus.finished,
+      wasFullyCompleted: false,
     );
 
 SetLog _log({
@@ -107,6 +124,46 @@ void main() {
 
       expect(result, hasLength(1));
       expect(result[0].sessionCount, 1);
+    });
+
+    test('REGRESSION-372: abandoned sessions do NOT count toward frequency',
+        () {
+      // 2 completed squat sessions + 1 ABANDONED session that also logged squat
+      // and a deadlift only ever seen in that abandoned session.
+      final s1 = _session('s1', DateTime(2025, 1, 5));
+      final s2 = _session('s2', DateTime(2025, 1, 10));
+      final sAband = _abandoned('s-aband', DateTime(2025, 1, 12));
+
+      final logsBySession = {
+        's1': [
+          _log(sessionId: 's1', exerciseId: 'squat', exerciseName: 'Sentadilla')
+        ],
+        's2': [
+          _log(sessionId: 's2', exerciseId: 'squat', exerciseName: 'Sentadilla')
+        ],
+        's-aband': [
+          _log(
+              sessionId: 's-aband',
+              exerciseId: 'squat',
+              exerciseName: 'Sentadilla'),
+          _log(
+              sessionId: 's-aband',
+              exerciseId: 'deadlift',
+              exerciseName: 'Peso muerto'),
+        ],
+      };
+
+      final result = aggregateExerciseFrequency(
+        sessions: [sAband, s2, s1], // DESC
+        logsBySession: logsBySession,
+      );
+
+      // squat counted only in the 2 COMPLETED sessions (not 3); deadlift — only
+      // ever in the abandoned session — is absent entirely.
+      expect(result, hasLength(1));
+      expect(result[0].exerciseId, 'squat');
+      expect(result[0].sessionCount, 2);
+      expect(result.where((e) => e.exerciseId == 'deadlift'), isEmpty);
     });
 
     test('SCENARIO-FREQ-02: filters sessions outside the period window', () {

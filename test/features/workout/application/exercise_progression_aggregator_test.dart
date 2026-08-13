@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/core/utils/argentina_time.dart';
 import 'package:treino/features/insights/domain/chart_period.dart';
 import 'package:treino/features/workout/application/exercise_progression_aggregator.dart';
 import 'package:treino/features/workout/domain/exercise_progression.dart';
@@ -8,6 +9,10 @@ import 'package:treino/features/workout/domain/set_log.dart';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+// #372: the aggregator now counts only `countsAsWorkout` sessions (finished
+// AND wasFullyCompleted). These fixtures represent COMPLETED workouts, so they
+// set `wasFullyCompleted: true` explicitly — otherwise the default (false)
+// would make them abandoned and they'd be excluded from every series.
 Session _session(String id, DateTime startedAt) => Session(
       id: id,
       uid: 'athlete1',
@@ -15,6 +20,19 @@ Session _session(String id, DateTime startedAt) => Session(
       routineName: 'Rutina A',
       startedAt: startedAt,
       status: SessionStatus.finished,
+      wasFullyCompleted: true,
+    );
+
+// #372: an ABANDONED session (finished but wasFullyCompleted=false) — its sets
+// must NOT feed any progression series, the PRs, or the frecuencia-8-weeks stat.
+Session _abandoned(String id, DateTime startedAt) => Session(
+      id: id,
+      uid: 'athlete1',
+      routineId: 'r1',
+      routineName: 'Rutina A',
+      startedAt: startedAt,
+      status: SessionStatus.finished,
+      wasFullyCompleted: false,
     );
 
 SetLog _log({
@@ -115,6 +133,11 @@ void main() {
       expect(calculateOneRepMax(weightKg: 100, reps: 0), isNull);
       expect(calculateOneRepMax(weightKg: 100, reps: -1), isNull);
     });
+
+    test('weightKg <= 0 returns null (#368 — bodyweight set, skip)', () {
+      expect(calculateOneRepMax(weightKg: 0, reps: 8), isNull);
+      expect(calculateOneRepMax(weightKg: -5, reps: 8), isNull);
+    });
   });
 
   group('roundToNearestHalfKg [AD2 display rounding]', () {
@@ -184,6 +207,181 @@ void main() {
       // bench sets in s1 should NOT influence squat heaviest weight
       expect(result.heaviestWeightSeries[0].value, 90.0);
       expect(result.heaviestWeightSeries.every((p) => p.value != 60.0), isTrue);
+    });
+
+    test('REGRESSION-372: abandoned sessions feed NO series, PR, or frecuencia',
+        () {
+      // A COMPLETED session at 70kg + an ABANDONED session at 200kg — the 200kg
+      // set would be a bogus all-time PR if the abandoned session counted.
+      final sOk = _session('s-ok', DateTime(2025, 1, 20));
+      final sAband = _abandoned('s-aband', DateTime(2025, 1, 25));
+      final logs = {
+        's-ok': [
+          _log(
+              sessionId: 's-ok',
+              exerciseId: 'squat',
+              exerciseName: 'S',
+              reps: 5,
+              weightKg: 70),
+        ],
+        's-aband': [
+          _log(
+              sessionId: 's-aband',
+              exerciseId: 'squat',
+              exerciseName: 'S',
+              reps: 5,
+              weightKg: 200),
+        ],
+      };
+
+      final result = aggregateExerciseProgression(
+        exerciseId: 'squat',
+        sessionsDesc: [sAband, sOk], // DESC
+        logsBySession: logs,
+        now: DateTime(2025, 2, 1),
+      );
+
+      // Only the completed session feeds the series → the 200kg abandoned set is
+      // absent from every series (and therefore from the derived PRs).
+      expect(result.heaviestWeightSeries.length, 1);
+      expect(result.heaviestWeightSeries.single.value, 70.0);
+      expect(
+          result.heaviestWeightSeries.every((p) => p.value != 200.0), isTrue);
+      // frecuencia-8-weeks counts only the completed session.
+      expect(result.frequencySessionCount, 1);
+    });
+
+    // #368 — bodyweight sets (player logs them with weightKg = 0) must not
+    // become "0 kg" points/records in the 4 weight-based metrics.
+    test(
+        'REGRESSION-368: bodyweight sets (weightKg=0) feed NO weight series '
+        'and derive NO "0 kg" PRs — frecuencia and name still resolve', () {
+      // The issue repro: real 3×8 Dominadas with the player weight field left
+      // empty (weightKg = 0), across two completed sessions.
+      final sA = _session('s-bw-a', DateTime(2025, 1, 10));
+      final sB = _session('s-bw-b', DateTime(2025, 1, 15));
+      List<SetLog> pullUps(String sessionId) => [
+            for (var i = 1; i <= 3; i++)
+              _log(
+                  sessionId: sessionId,
+                  exerciseId: 'pullup',
+                  exerciseName: 'Dominadas',
+                  reps: 8,
+                  weightKg: 0,
+                  setNumber: i),
+          ];
+      final result = aggregateExerciseProgression(
+        exerciseId: 'pullup',
+        sessionsDesc: [sB, sA],
+        logsBySession: {
+          's-bw-a': pullUps('s-bw-a'),
+          's-bw-b': pullUps('s-bw-b'),
+        },
+        now: DateTime(2025, 2, 1),
+      );
+
+      expect(result.heaviestWeightSeries, isEmpty);
+      expect(result.oneRepMaxSeries, isEmpty);
+      expect(result.bestSetVolumeSeries, isEmpty);
+      expect(result.bestSessionVolumeSeries, isEmpty);
+      // No points → no derived PersonalRecord rows → the UI shows its empty
+      // text instead of four green "0" records.
+      expect(result.personalRecords, isEmpty);
+      // The workouts still happened: frecuencia and the resolved name are
+      // weight-agnostic.
+      expect(result.frequencySessionCount, 2);
+      expect(result.exerciseName, 'Dominadas');
+    });
+
+    test(
+        'REGRESSION-368: within a session, 0kg sets are excluded while '
+        'weighted sets still feed every series', () {
+      final sessions = [_session('s-mixed', DateTime(2025, 1, 20))];
+      final logs = {
+        's-mixed': [
+          _log(
+              sessionId: 's-mixed',
+              exerciseId: 'pullup',
+              exerciseName: 'Dominadas',
+              reps: 8,
+              weightKg: 0,
+              setNumber: 1),
+          _log(
+              sessionId: 's-mixed',
+              exerciseId: 'pullup',
+              exerciseName: 'Dominadas',
+              reps: 5,
+              weightKg: 20,
+              setNumber: 2),
+          _log(
+              sessionId: 's-mixed',
+              exerciseId: 'pullup',
+              exerciseName: 'Dominadas',
+              reps: 3,
+              weightKg: 25,
+              setNumber: 3),
+        ],
+      };
+      final result = aggregateExerciseProgression(
+        exerciseId: 'pullup',
+        sessionsDesc: sessions,
+        logsBySession: logs,
+        now: DateTime(2025, 2, 1),
+      );
+
+      expect(result.heaviestWeightSeries.single.value, 25.0);
+      // Best set volume: max(5×20=100, 3×25=75) — the 8×0 set is not a
+      // candidate.
+      expect(result.bestSetVolumeSeries.single.value, closeTo(100.0, 0.01));
+      // Session volume: 100 + 75 — numerically unchanged vs before (the 0kg
+      // set only ever added 0).
+      expect(result.bestSessionVolumeSeries.single.value, closeTo(175.0, 0.01));
+      // 1RM: max(20×(1+5/30)=23.333, 25×(1+3/30)=27.5).
+      expect(result.oneRepMaxSeries.single.value, closeTo(27.5, 0.001));
+      // Every derived PR is > 0 — a 0-valued record can no longer exist.
+      expect(result.personalRecords, hasLength(4));
+      expect(result.personalRecords.every((r) => r.value > 0), isTrue);
+    });
+
+    test(
+        'REGRESSION-368: an all-0kg session is omitted from weight series — '
+        'the weighted session is the only point', () {
+      final sBw = _session('s-bw', DateTime(2025, 1, 10));
+      final sWeighted = _session('s-w', DateTime(2025, 1, 15));
+      final logs = {
+        's-bw': [
+          _log(
+              sessionId: 's-bw',
+              exerciseId: 'pullup',
+              exerciseName: 'Dominadas',
+              reps: 10,
+              weightKg: 0),
+        ],
+        's-w': [
+          _log(
+              sessionId: 's-w',
+              exerciseId: 'pullup',
+              exerciseName: 'Dominadas',
+              reps: 5,
+              weightKg: 10),
+        ],
+      };
+      final result = aggregateExerciseProgression(
+        exerciseId: 'pullup',
+        sessionsDesc: [sWeighted, sBw],
+        logsBySession: logs,
+        now: DateTime(2025, 2, 1),
+      );
+
+      // Only the weighted session produces points — the chart renders its
+      // single-point view instead of a line dropping to 0.
+      expect(result.heaviestWeightSeries.single.value, 10.0);
+      expect(
+        result.heaviestWeightSeries.single.date,
+        sWeighted.startedAt.toLocal(),
+      );
+      // The 0kg session still counts for frecuencia.
+      expect(result.frequencySessionCount, 2);
     });
 
     // T2 — Best Session Volume series (renamed from volumeSeries)
@@ -316,7 +514,7 @@ void main() {
         logsBySession: _logsBySession,
         now: now,
       );
-      expect(result.frequencyLast8Weeks, 2); // s1 and s2 have squat sets
+      expect(result.frequencySessionCount, 2); // s1 and s2 have squat sets
     });
 
     test('SCENARIO-PROG-03A-outside: session older than 56 days excluded', () {
@@ -327,15 +525,23 @@ void main() {
         logsBySession: _logsBySession,
         now: now,
       );
-      expect(result.frequencyLast8Weeks, 1); // only s2
+      expect(result.frequencySessionCount, 1); // only s2
     });
 
     test(
         'SCENARIO-PROG-03B: Frecuencia boundary — session at exactly 56 days is included',
         () {
-      final now = DateTime(2025, 3, 2, 0, 0, 0);
-      final edge = now.subtract(const Duration(days: 56));
-      final sEdge = _session('sEdge', edge);
+      // [#379] `now` is the Argentina-framed reference (as argentinaNow()
+      // provides in production): UTC-flagged wall-clock. Sessions are stored as
+      // real UTC instants. The 56-day cutoff lives in the ART frame, and the
+      // filter compares `toArgentina(startedAt)` against it — so a session whose
+      // ART instant is EXACTLY the cutoff must be INCLUDED (inclusive lower
+      // bound). Since ART = UTC - offset, the real UTC startedAt is
+      // `cutoff + offset`. All UTC-flagged → TZ-independent (local UTC-3 == CI
+      // UTC).
+      final now = DateTime.utc(2025, 3, 2, 12);
+      final cutoffArt = now.subtract(const Duration(days: 56));
+      final sEdge = _session('sEdge', cutoffArt.add(argentinaUtcOffset));
       final logs = {
         'sEdge': [
           _log(
@@ -352,7 +558,7 @@ void main() {
         logsBySession: logs,
         now: now,
       );
-      expect(result.frequencyLast8Weeks, 1); // inclusive lower bound
+      expect(result.frequencySessionCount, 1); // inclusive lower bound
     });
 
     // T5 — Filter + empty key
@@ -368,7 +574,7 @@ void main() {
       expect(result.bestSetVolumeSeries, isEmpty);
       expect(result.bestSessionVolumeSeries, isEmpty);
       expect(result.personalRecords, isEmpty);
-      expect(result.frequencyLast8Weeks, 0);
+      expect(result.frequencySessionCount, 0);
     });
 
     // T5 — exerciseName from SetLog
@@ -392,7 +598,7 @@ void main() {
         logsBySession: _logsBySession,
         now: now,
       );
-      expect(result.frequencyLast8Weeks, 2);
+      expect(result.frequencySessionCount, 2);
     });
 
     test(
@@ -409,7 +615,7 @@ void main() {
       expect(result.bestSetVolumeSeries, isEmpty);
       expect(result.bestSessionVolumeSeries, isEmpty);
       expect(result.personalRecords, isEmpty);
-      expect(result.frequencyLast8Weeks, 0);
+      expect(result.frequencySessionCount, 0);
     });
 
     // AD3 — derivePersonalRecords is wired into the aggregator's output.
@@ -500,8 +706,7 @@ void main() {
     // Sessions on Jan 5 / Jan 10 / Jan 15 (s3/Jan 15 has NO squat logs in the
     // shared fixture). A window covering ONLY Jan 8..20 must exclude Jan 5's
     // session (s1) from every series — only s2 (Jan 10) has squat data left.
-    test('sessions outside the period window are excluded from all series',
-        () {
+    test('sessions outside the period window are excluded from all series', () {
       final window = ChartPeriodWindow(
         currentStart: DateTime(2025, 1, 8),
         currentEnd: DateTime(2025, 1, 20),
@@ -521,43 +726,91 @@ void main() {
       expect(result.heaviestWeightSeries.single.date, _s2.startedAt);
     });
 
+    // [#379] Boundary tests are self-contained with UTC-flagged fixtures: the
+    // shared _sN fixtures use LOCAL midnight, whose Argentina calendar day under
+    // `toArgentina` is TZ-dependent (Jan 5 on UTC-3, Jan 4 on UTC) — fatal for a
+    // day-boundary assertion. Sessions here are real UTC instants at NOON so
+    // their ART day (09:00) is unambiguous, and windows are UTC-flagged exactly
+    // as ChartPeriod.windowFor emits.
     test('a window boundary day (currentStart) is INCLUSIVE', () {
+      final sA = _session('sA', DateTime.utc(2025, 1, 5, 12)); // ART day Jan 5
+      final sB =
+          _session('sB', DateTime.utc(2025, 1, 10, 12)); // ART day Jan 10
+      final logs = <String, List<SetLog>>{
+        'sA': [
+          _log(
+              sessionId: 'sA',
+              exerciseId: 'squat',
+              exerciseName: 'S',
+              reps: 5,
+              weightKg: 80)
+        ],
+        'sB': [
+          _log(
+              sessionId: 'sB',
+              exerciseId: 'squat',
+              exerciseName: 'S',
+              reps: 5,
+              weightKg: 85)
+        ],
+      };
       final window = ChartPeriodWindow(
-        currentStart: DateTime(2025, 1, 5), // exactly s1's day
-        currentEnd: DateTime(2025, 1, 20),
-        previousStart: DateTime(2024, 12, 1),
-        previousEnd: DateTime(2025, 1, 4),
+        currentStart: DateTime.utc(2025, 1, 5), // exactly sA's ART day
+        currentEnd: DateTime.utc(2025, 1, 20),
+        previousStart: DateTime.utc(2024, 12, 1),
+        previousEnd: DateTime.utc(2025, 1, 4),
       );
 
       final result = aggregateExerciseProgression(
         exerciseId: 'squat',
-        sessionsDesc: _sessionsDesc,
-        logsBySession: _logsBySession,
-        now: DateTime(2025, 1, 20),
+        sessionsDesc: [sB, sA],
+        logsBySession: logs,
+        now: DateTime.utc(2025, 1, 20, 12),
         periodWindow: window,
       );
 
-      // s1 (Jan 5, boundary day) + s2 (Jan 10) have squat logs; s3 has none.
+      // sA (boundary day) + sB are INCLUDED.
       expect(result.heaviestWeightSeries.length, 2);
     });
 
     test('a window boundary day (currentEnd) is INCLUSIVE', () {
+      final sA = _session('sA', DateTime.utc(2025, 1, 5, 12)); // ART day Jan 5
+      final sB =
+          _session('sB', DateTime.utc(2025, 1, 10, 12)); // ART day Jan 10
+      final logs = <String, List<SetLog>>{
+        'sA': [
+          _log(
+              sessionId: 'sA',
+              exerciseId: 'squat',
+              exerciseName: 'S',
+              reps: 5,
+              weightKg: 80)
+        ],
+        'sB': [
+          _log(
+              sessionId: 'sB',
+              exerciseId: 'squat',
+              exerciseName: 'S',
+              reps: 5,
+              weightKg: 85)
+        ],
+      };
       final window = ChartPeriodWindow(
-        currentStart: DateTime(2025, 1, 1),
-        currentEnd: DateTime(2025, 1, 10), // exactly s2's day
-        previousStart: DateTime(2024, 12, 1),
-        previousEnd: DateTime(2024, 12, 31),
+        currentStart: DateTime.utc(2025, 1, 1),
+        currentEnd: DateTime.utc(2025, 1, 10), // exactly sB's ART day
+        previousStart: DateTime.utc(2024, 12, 1),
+        previousEnd: DateTime.utc(2024, 12, 31),
       );
 
       final result = aggregateExerciseProgression(
         exerciseId: 'squat',
-        sessionsDesc: _sessionsDesc,
-        logsBySession: _logsBySession,
-        now: DateTime(2025, 1, 20),
+        sessionsDesc: [sB, sA],
+        logsBySession: logs,
+        now: DateTime.utc(2025, 1, 20, 12),
         periodWindow: window,
       );
 
-      // s1 (Jan 5) + s2 (Jan 10, boundary day) have squat logs.
+      // sA + sB (boundary day) are INCLUDED.
       expect(result.heaviestWeightSeries.length, 2);
     });
 
@@ -574,33 +827,300 @@ void main() {
       expect(result.heaviestWeightSeries.length, 2);
     });
 
-    test('frequencyLast8Weeks is unaffected by periodWindow (still uses the '
-        '56-day `now`-relative cutoff, not the period window)', () {
+    // [#555] Frecuencia follows the ACTIVE period window when one is given.
+    // The old behavior (fixed 56-day count regardless of the selector) let
+    // "3 sesiones en las últimas 8 semanas" coexist with a 1-point chart and
+    // "necesitás al menos 2 sesiones" for the same exercise — both true,
+    // reading as a contradiction. UTC-noon fixtures per the #379 convention.
+    test('#555: frequencySessionCount is scoped to periodWindow when provided',
+        () {
+      final sA = _session('sA', DateTime.utc(2025, 1, 5, 12)); // ART day Jan 5
+      final sB =
+          _session('sB', DateTime.utc(2025, 1, 10, 12)); // ART day Jan 10
+      final logs = <String, List<SetLog>>{
+        'sA': [
+          _log(
+              sessionId: 'sA',
+              exerciseId: 'squat',
+              exerciseName: 'S',
+              reps: 5,
+              weightKg: 80)
+        ],
+        'sB': [
+          _log(
+              sessionId: 'sB',
+              exerciseId: 'squat',
+              exerciseName: 'S',
+              reps: 5,
+              weightKg: 85)
+        ],
+      };
+      // Window Jan 8..20 → only sB falls inside.
       final window = ChartPeriodWindow(
-        currentStart: DateTime(2025, 1, 8),
-        currentEnd: DateTime(2025, 1, 20),
-        previousStart: DateTime(2024, 12, 1),
-        previousEnd: DateTime(2025, 1, 7),
+        currentStart: DateTime.utc(2025, 1, 8),
+        currentEnd: DateTime.utc(2025, 1, 20),
+        previousStart: DateTime.utc(2024, 12, 1),
+        previousEnd: DateTime.utc(2025, 1, 7),
       );
 
       final withWindow = aggregateExerciseProgression(
         exerciseId: 'squat',
-        sessionsDesc: _sessionsDesc,
-        logsBySession: _logsBySession,
-        now: DateTime(2025, 1, 20),
+        sessionsDesc: [sB, sA],
+        logsBySession: logs,
+        now: DateTime.utc(2025, 1, 20, 12),
         periodWindow: window,
       );
+
+      // Only sB is inside the active window — sA trained the exercise but
+      // outside the period, so the stat must not count it (#555).
+      expect(withWindow.frequencySessionCount, 1);
+    });
+
+    test(
+        '#555: without a periodWindow the legacy 56-day cutoff still applies '
+        '(backward compat)', () {
+      final sA = _session('sA', DateTime.utc(2025, 1, 5, 12));
+      final sB = _session('sB', DateTime.utc(2025, 1, 10, 12));
+      final logs = <String, List<SetLog>>{
+        'sA': [
+          _log(
+              sessionId: 'sA',
+              exerciseId: 'squat',
+              exerciseName: 'S',
+              reps: 5,
+              weightKg: 80)
+        ],
+        'sB': [
+          _log(
+              sessionId: 'sB',
+              exerciseId: 'squat',
+              exerciseName: 'S',
+              reps: 5,
+              weightKg: 85)
+        ],
+      };
+
       final withoutWindow = aggregateExerciseProgression(
         exerciseId: 'squat',
-        sessionsDesc: _sessionsDesc,
-        logsBySession: _logsBySession,
-        now: DateTime(2025, 1, 20),
+        sessionsDesc: [sB, sA],
+        logsBySession: logs,
+        now: DateTime.utc(2025, 1, 20, 12),
       );
 
-      // Frecuencia counts sessions regardless of the display period window —
-      // it is an independent "last 8 weeks" stat, not filtered by the chart
-      // period selector.
-      expect(withWindow.frequencyLast8Weeks, withoutWindow.frequencyLast8Weeks);
+      // Both sessions are inside the 56-day legacy window.
+      expect(withoutWindow.frequencySessionCount, 2);
+    });
+  });
+
+  group('deriveExerciseSessionHistory [HISTORIAL — pure fn]', () {
+    test(
+        'derives one row per session containing the exercise, most-recent '
+        'first, with best set (max weight, ties → max reps), set count and '
+        'session volume', () {
+      final s1 = _session('s1', DateTime.utc(2026, 7, 20, 12));
+      final s2 = _session('s2', DateTime.utc(2026, 7, 22, 12));
+      final logs = <String, List<SetLog>>{
+        's1': [
+          _log(
+              sessionId: 's1',
+              exerciseId: 'squat',
+              exerciseName: 'Sentadilla',
+              reps: 8,
+              weightKg: 80,
+              setNumber: 1),
+          _log(
+              sessionId: 's1',
+              exerciseId: 'squat',
+              exerciseName: 'Sentadilla',
+              reps: 5,
+              weightKg: 90,
+              setNumber: 2),
+          // Same weight as set 2, more reps → this one is the best set.
+          _log(
+              sessionId: 's1',
+              exerciseId: 'squat',
+              exerciseName: 'Sentadilla',
+              reps: 6,
+              weightKg: 90,
+              setNumber: 3),
+          _log(
+              sessionId: 's1',
+              exerciseId: 'bench',
+              exerciseName: 'Press banca',
+              reps: 5,
+              weightKg: 60),
+        ],
+        's2': [
+          _log(
+              sessionId: 's2',
+              exerciseId: 'squat',
+              exerciseName: 'Sentadilla',
+              reps: 5,
+              weightKg: 95),
+        ],
+      };
+
+      final history = deriveExerciseSessionHistory(
+        exerciseId: 'squat',
+        sessionsDesc: [s2, s1],
+        logsBySession: logs,
+      );
+
+      expect(history, hasLength(2));
+      // Most-recent first (mirrors sessionsDesc).
+      expect(history[0].date, DateTime.utc(2026, 7, 22, 12).toLocal());
+      expect(history[0].setCount, 1);
+      expect(history[0].bestWeightKg, 95);
+      expect(history[0].bestSetReps, 5);
+      expect(history[0].sessionVolume, 5 * 95.0);
+
+      expect(history[1].date, DateTime.utc(2026, 7, 20, 12).toLocal());
+      // The bench log does not leak into squat's row.
+      expect(history[1].setCount, 3);
+      expect(history[1].bestWeightKg, 90);
+      expect(history[1].bestSetReps, 6);
+      expect(history[1].sessionVolume, 8 * 80.0 + 5 * 90.0 + 6 * 90.0);
+    });
+
+    test(
+        '#372: abandoned sessions and sessions without the exercise are '
+        'skipped', () {
+      final done = _session('done', DateTime.utc(2026, 7, 20, 12));
+      final dropped = _abandoned('dropped', DateTime.utc(2026, 7, 21, 12));
+      final other = _session('other', DateTime.utc(2026, 7, 22, 12));
+      final logs = <String, List<SetLog>>{
+        'done': [
+          _log(
+              sessionId: 'done',
+              exerciseId: 'squat',
+              exerciseName: 'S',
+              reps: 5,
+              weightKg: 80),
+        ],
+        'dropped': [
+          _log(
+              sessionId: 'dropped',
+              exerciseId: 'squat',
+              exerciseName: 'S',
+              reps: 5,
+              weightKg: 100),
+        ],
+        'other': [
+          _log(
+              sessionId: 'other',
+              exerciseId: 'bench',
+              exerciseName: 'B',
+              reps: 5,
+              weightKg: 60),
+        ],
+      };
+
+      final history = deriveExerciseSessionHistory(
+        exerciseId: 'squat',
+        sessionsDesc: [other, dropped, done],
+        logsBySession: logs,
+      );
+
+      expect(history, hasLength(1));
+      expect(history.single.bestWeightKg, 80);
+    });
+
+    test(
+        '#368: bodyweight-only session keeps its top-reps set with '
+        'bestWeightKg 0 and zero volume; mixed sessions sum only weighted '
+        'sets but count every set', () {
+      final bodyweight = _session('bw', DateTime.utc(2026, 7, 20, 12));
+      final mixed = _session('mixed', DateTime.utc(2026, 7, 22, 12));
+      final logs = <String, List<SetLog>>{
+        'bw': [
+          _log(
+              sessionId: 'bw',
+              exerciseId: 'pullup',
+              exerciseName: 'Dominadas',
+              reps: 8,
+              weightKg: 0,
+              setNumber: 1),
+          _log(
+              sessionId: 'bw',
+              exerciseId: 'pullup',
+              exerciseName: 'Dominadas',
+              reps: 12,
+              weightKg: 0,
+              setNumber: 2),
+        ],
+        'mixed': [
+          _log(
+              sessionId: 'mixed',
+              exerciseId: 'pullup',
+              exerciseName: 'Dominadas',
+              reps: 10,
+              weightKg: 0,
+              setNumber: 1),
+          _log(
+              sessionId: 'mixed',
+              exerciseId: 'pullup',
+              exerciseName: 'Dominadas',
+              reps: 6,
+              weightKg: 10,
+              setNumber: 2),
+        ],
+      };
+
+      final history = deriveExerciseSessionHistory(
+        exerciseId: 'pullup',
+        sessionsDesc: [mixed, bodyweight],
+        logsBySession: logs,
+      );
+
+      expect(history, hasLength(2));
+      // Mixed: weighted set wins best-set even with fewer reps; volume sums
+      // only the weighted set; both sets count.
+      expect(history[0].bestWeightKg, 10);
+      expect(history[0].bestSetReps, 6);
+      expect(history[0].sessionVolume, 6 * 10.0);
+      expect(history[0].setCount, 2);
+      // Bodyweight-only: top-reps set, zero weight/volume.
+      expect(history[1].bestWeightKg, 0);
+      expect(history[1].bestSetReps, 12);
+      expect(history[1].sessionVolume, 0);
+      expect(history[1].setCount, 2);
+    });
+
+    test('maxEntries caps the rows; empty exerciseId short-circuits', () {
+      final sessions = [
+        for (var i = 0; i < 5; i++)
+          _session('s$i', DateTime.utc(2026, 7, 25 - i, 12)),
+      ];
+      final logs = <String, List<SetLog>>{
+        for (final s in sessions)
+          s.id: [
+            _log(
+                sessionId: s.id,
+                exerciseId: 'squat',
+                exerciseName: 'S',
+                reps: 5,
+                weightKg: 80),
+          ],
+      };
+
+      final capped = deriveExerciseSessionHistory(
+        exerciseId: 'squat',
+        sessionsDesc: sessions,
+        logsBySession: logs,
+        maxEntries: 3,
+      );
+      expect(capped, hasLength(3));
+      // The cap keeps the MOST RECENT rows (walk order is sessionsDesc).
+      expect(capped.first.date, DateTime.utc(2026, 7, 25, 12).toLocal());
+
+      expect(
+        deriveExerciseSessionHistory(
+          exerciseId: '',
+          sessionsDesc: sessions,
+          logsBySession: logs,
+        ),
+        isEmpty,
+      );
     });
   });
 }

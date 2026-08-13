@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/feed/domain/post.dart';
 import 'package:treino/features/feed/domain/post_privacy.dart';
+import 'package:treino/features/feed/domain/reaction_type.dart';
 import 'package:treino/features/feed/domain/routine_tag.dart';
 
 void main() {
@@ -41,7 +42,7 @@ void main() {
         authorGymId: 'gym1',
         text: 'No routine',
         routineTag: null,
-        privacy: PostPrivacy.friends,
+        privacy: PostPrivacy.followers,
         createdAt: createdAt,
       );
 
@@ -87,7 +88,7 @@ void main() {
         authorGymId: 'gym-alpha',
         text: 'Full roundtrip test',
         routineTag: const RoutineTag(routineId: 'r1', routineName: 'Push Day'),
-        privacy: PostPrivacy.friends,
+        privacy: PostPrivacy.followers,
         createdAt: createdAt,
       );
 
@@ -174,6 +175,59 @@ void main() {
         createdAt: createdAt,
       );
       expect(post.authorDisplayName, equals('RequiredField'));
+    });
+
+    test('fromJson reads reactionCounts', () {
+      final result = Post.fromJson({
+        'id': 'reactions-present',
+        'authorUid': 'u1',
+        'authorDisplayName': 'Test',
+        'authorAvatarUrl': null,
+        'authorGymId': null,
+        'text': 'Post',
+        'routineTag': null,
+        'privacy': 'public',
+        'createdAt': Timestamp.fromDate(createdAt),
+        'reactionCounts': {'like': 2, 'fire': 1},
+      });
+
+      expect(result.reactionCounts, {
+        ReactionType.like: 2,
+        ReactionType.fire: 1,
+      });
+    });
+
+    test('fromJson defaults missing reactionCounts to an empty map', () {
+      final result = Post.fromJson({
+        'id': 'reactions-absent',
+        'authorUid': 'u1',
+        'authorDisplayName': 'Test',
+        'authorAvatarUrl': null,
+        'authorGymId': null,
+        'text': 'Legacy post',
+        'routineTag': null,
+        'privacy': 'public',
+        'createdAt': Timestamp.fromDate(createdAt),
+      });
+
+      expect(result.reactionCounts, isEmpty);
+    });
+
+    test('fromJson ignores unknown reaction types mixed with known types', () {
+      final result = Post.fromJson({
+        'id': 'reactions-forward-compatible',
+        'authorUid': 'u1',
+        'authorDisplayName': 'Test',
+        'authorAvatarUrl': null,
+        'authorGymId': null,
+        'text': 'Future reactions',
+        'routineTag': null,
+        'privacy': 'public',
+        'createdAt': Timestamp.fromDate(createdAt),
+        'reactionCounts': {'clap': 5, 'future_type': 8},
+      });
+
+      expect(result.reactionCounts, {ReactionType.clap: 5});
     });
   });
 }

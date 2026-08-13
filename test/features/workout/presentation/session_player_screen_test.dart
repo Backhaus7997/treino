@@ -13,6 +13,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/features/workout/application/exercise_providers.dart';
+import 'package:treino/features/workout/application/routine_providers.dart';
 import 'package:treino/features/workout/application/session_init.dart';
 import 'package:treino/features/workout/application/session_notifier.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
@@ -22,6 +24,7 @@ import 'package:treino/features/workout/domain/set_enums.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/domain/set_spec.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/features/workout/presentation/exercise_detail_screen.dart';
 import 'package:treino/features/workout/presentation/session_player_screen.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
@@ -180,6 +183,42 @@ void main() {
       expect(find.textContaining('DÍA 4'), findsOneWidget);
     });
 
+    // #550: sin split resuelto (rutina no cargada o split null — típico de
+    // rutinas creadas por el atleta) el header NO arranca con " · ": degrada
+    // a "DÍA 4" limpio.
+    testWidgets(
+        '#550: header sin split renderiza "DÍA 4" sin separador colgando',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(_defaultState()),
+        ),
+      );
+      await tester.pump();
+      // Match exacto — el " · DÍA 4" previo al fix falla este find.
+      expect(find.text('DÍA 4'), findsOneWidget);
+    });
+
+    // #550 (regresión): con split presente el header conserva el formato
+    // completo "SPLIT · DÍA N".
+    testWidgets('#550: header con split renderiza "PPL · DÍA 4"',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          [
+            ..._stateOverride(_defaultState()),
+            routineByIdProvider('r1')
+                .overrideWith((ref) async => makeRoutine()),
+          ],
+        ),
+      );
+      await tester.pump(); // frame 1: provider loading
+      await tester.pump(); // frame 2: future resuelto → split visible
+      expect(find.text('PPL · DÍA 4'), findsOneWidget);
+    });
+
     // SCENARIO-275: botón ABANDONAR presente
     testWidgets('SCENARIO-275: renderiza botón ABANDONAR', (tester) async {
       await tester.pumpWidget(
@@ -280,8 +319,8 @@ void main() {
         ),
       );
       await tester.pump();
-      // Nombre con tachado
-      final textWidget = tester.widget<Text>(find.text('Squat'));
+      // Nombre con tachado (el layout ampliado renderiza nombres en UPPERCASE)
+      final textWidget = tester.widget<Text>(find.text('SQUAT'));
       expect(
         textWidget.style?.decoration,
         TextDecoration.lineThrough,
@@ -338,8 +377,11 @@ void main() {
       expect(find.text('+'), findsNothing);
     });
 
-    // SCENARIO-286: fila done NO es tappable
-    testWidgets('SCENARIO-286: fila done no es tappable (onTap null)',
+    // SCENARIO-286 (superseded 2026-07-27): la fila done ahora SÍ es tappable —
+    // el tap en el nombre abre el detalle completo del ejercicio (pedido de
+    // Martín: acceso al detalle desde el player). El assert viejo (no-op)
+    // quedó obsoleto junto con el SetEntrySheet.
+    testWidgets('fila done es tappable y abre el detalle del ejercicio',
         (tester) async {
       final slots = [
         makeSlot(exerciseId: 'e1', exerciseName: 'Squat', targetSets: 1),
@@ -356,15 +398,179 @@ void main() {
       await tester.pumpWidget(
         _wrapProvider(
           const SessionPlayerScreen(init: _kInit),
-          _stateOverride(state),
+          [
+            ..._stateOverride(state),
+            slotExerciseProvider((
+              exerciseId: 'e1',
+              ownerId: null,
+              exerciseName: 'Squat',
+            )).overrideWith((ref) async => null),
+          ],
         ),
       );
       await tester.pump();
-      // Tap en fila done no debe abrir sheet ni lanzar excepción
-      await tester.tap(find.text('Squat'));
+      await tester.tap(find.text('SQUAT'));
       await tester.pumpAndSettle();
-      // El SetEntrySheet NO debe aparecer
-      expect(find.text('SQUAT'), findsNothing);
+      expect(find.byType(ExerciseDetailScreen), findsOneWidget);
+    });
+  });
+
+  // ── Tap en el nombre → detalle del ejercicio (pedido 2026-07-27) ──────────
+
+  group('exercise detail navigation', () {
+    List<Override> detailOverrides(SessionState state) => [
+          ..._stateOverride(state),
+          // Detalle resuelto a null → _NotFoundState; el assert es de
+          // NAVEGACIÓN (push imperativo montó ExerciseDetailScreen), no del
+          // contenido del detalle.
+          slotExerciseProvider((
+            exerciseId: 'e1',
+            ownerId: null,
+            exerciseName: 'Press de banca',
+          )).overrideWith((ref) async => null),
+        ];
+
+    testWidgets(
+        'tap en el nombre del ejercicio ACTIVO pushea ExerciseDetailScreen '
+        'con Scaffold host propio', (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          detailOverrides(_defaultState()),
+        ),
+      );
+      await tester.pump();
+      await tester.tap(find.text('PRESS DE BANCA'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ExerciseDetailScreen), findsOneWidget);
+    });
+
+    testWidgets('back desde el detalle vuelve al player con la sesión intacta',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          detailOverrides(_defaultState()),
+        ),
+      );
+      await tester.pump();
+      await tester.tap(find.text('PRESS DE BANCA'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ExerciseDetailScreen), findsOneWidget);
+
+      // Pop imperativo (mismo Navigator del push) → el player sigue vivo, sin
+      // diálogo de abandono (el PopScope del player no intercepta este pop).
+      final navigator = tester.state<NavigatorState>(find.byType(Navigator));
+      navigator.pop();
+      await tester.pumpAndSettle();
+      expect(find.byType(ExerciseDetailScreen), findsNothing);
+      expect(find.text('TERMINAR SESIÓN'), findsOneWidget);
+      expect(
+        find.textContaining('¿Seguro que querés abandonar?'),
+        findsNothing,
+      );
+    });
+  });
+
+  // ── Indicador de tap → detalle (chevron, pedido 2026-07-28) ───────────────
+  //
+  // Regla: el chevron va SOLO donde el tap abre el detalle del ejercicio —
+  // header de _ExerciseSection (activo / future destrabado / miembro de
+  // superserie) y fila de _CompletedBlockSummary. Los previews `future` NO lo
+  // llevan (su tap significa "adelantar el bloque" y ya tienen hint + play
+  // propio) ni el resumen de superserie completa (no es tocable).
+
+  group('tap indicator (chevron junto al nombre)', () {
+    testWidgets(
+        'ejercicio activo lleva chevron junto al nombre; el preview future '
+        '(tap = adelantar) no lo lleva', (tester) async {
+      await tester.pumpWidget(_wrapProvider(
+        const SessionPlayerScreen(init: _kInit),
+        _stateOverride(_defaultState()),
+      ));
+      await tester.pump();
+      // e1 activo → chevron; e2 future preview → sin chevron.
+      expect(find.byIcon(TreinoIcon.chevronRight), findsOneWidget);
+    });
+
+    testWidgets(
+        'fila completada y ejercicio activo llevan chevron; el future no '
+        '(2 de 3 bloques)', (tester) async {
+      await tester.pumpWidget(_wrapProvider(
+        const SessionPlayerScreen(init: _kInit),
+        _stateOverride(_stateWith1Of3Done()),
+      ));
+      await tester.pump();
+      // e1 completado (resumen tocable) + e2 activo → 2; e3 future → sin.
+      expect(find.byIcon(TreinoIcon.chevronRight), findsNWidgets(2));
+    });
+
+    testWidgets('cada miembro de una superserie interactiva lleva chevron',
+        (tester) async {
+      final state = SessionState(
+        session: makeSession(),
+        day: makeDay(
+          dayNumber: 1,
+          slots: [
+            makeSlot(
+                exerciseId: 'e1',
+                exerciseName: 'A',
+                targetSets: 2,
+                supersetGroup: 1),
+            makeSlot(
+                exerciseId: 'e2',
+                exerciseName: 'B',
+                targetSets: 2,
+                supersetGroup: 1),
+          ],
+        ),
+        setLogs: const [],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      );
+      await tester.pumpWidget(_wrapProvider(
+        const SessionPlayerScreen(init: _kInit),
+        _stateOverride(state),
+      ));
+      await tester.pump();
+      expect(find.byIcon(TreinoIcon.chevronRight), findsNWidgets(2));
+    });
+
+    testWidgets(
+        'superserie COMPLETA colapsa a resumen no tocable — sin chevron',
+        (tester) async {
+      final state = SessionState(
+        session: makeSession(),
+        day: makeDay(
+          dayNumber: 1,
+          slots: [
+            makeSlot(
+                exerciseId: 'e1',
+                exerciseName: 'A',
+                targetSets: 2,
+                supersetGroup: 1),
+            makeSlot(
+                exerciseId: 'e2',
+                exerciseName: 'B',
+                targetSets: 2,
+                supersetGroup: 1),
+          ],
+        ),
+        setLogs: [
+          for (var s = 1; s <= 2; s++) ...[
+            makeSetLog(exerciseId: 'e1', setNumber: s),
+            makeSetLog(exerciseId: 'e2', setNumber: s),
+          ],
+        ],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      );
+      await tester.pumpWidget(_wrapProvider(
+        const SessionPlayerScreen(init: _kInit),
+        _stateOverride(state),
+      ));
+      await tester.pump();
+      expect(find.byIcon(TreinoIcon.chevronRight), findsNothing);
     });
   });
 
@@ -774,10 +980,10 @@ void main() {
       );
       await tester.pump();
       // Press should be shown with strikethrough (completed summary).
-      final pressText = tester.widget<Text>(find.text('Press'));
+      final pressText = tester.widget<Text>(find.text('PRESS'));
       expect(pressText.style?.decoration, TextDecoration.lineThrough);
       // Curl should be shown as the current block (no strikethrough).
-      final curlText = tester.widget<Text>(find.text('Curl'));
+      final curlText = tester.widget<Text>(find.text('CURL'));
       expect(curlText.style?.decoration, isNot(TextDecoration.lineThrough));
     });
 
@@ -1108,6 +1314,27 @@ void main() {
       await tester.pump();
       expect(find.textContaining('1 / 3 ejercicios'), findsOneWidget);
     });
+
+    // Volumen del header vía formatVolumeKg (#436): enteros sin ".0".
+    testWidgets('volumen entero del header muestra "600 kg vol.", no "600.0"',
+        (tester) async {
+      final state = SessionState(
+        session: makeSession(),
+        day: _defaultState().day,
+        setLogs: [makeSetLog(reps: 10, weightKg: 60.0)], // 10×60 = 600.0
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      );
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(state),
+        ),
+      );
+      await tester.pump();
+      expect(find.textContaining('600 kg vol.'), findsOneWidget);
+      expect(find.textContaining('600.0'), findsNothing);
+    });
   });
 
   // ── SCENARIO-WPRES-025: numWeeks==1 player is unchanged (REQ-WPRES-015/030) ─
@@ -1253,7 +1480,7 @@ void main() {
       );
       await tester.pump();
       // The collapsed "3/3" strikethrough summary must NOT appear.
-      final pressText = tester.widget<Text>(find.text('Press'));
+      final pressText = tester.widget<Text>(find.text('PRESS'));
       expect(pressText.style?.decoration, isNot(TextDecoration.lineThrough));
       // Progress badge must read 3/4, not 3/3.
       expect(find.text('3/4'), findsOneWidget);
@@ -1674,7 +1901,7 @@ void main() {
       );
       await tester.pump();
       expect(find.text('1/2'), findsOneWidget);
-      final pressTextA = tester.widget<Text>(find.text('Press'));
+      final pressTextA = tester.widget<Text>(find.text('PRESS'));
       expect(pressTextA.style?.decoration, isNot(TextDecoration.lineThrough),
           reason: 'block must stay current, not collapse as completed');
     });

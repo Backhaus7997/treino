@@ -6,7 +6,7 @@
 //   - profile/presentation/widgets/eliminar_cuenta_sheet.dart (9 keys)
 //   - coach/presentation/trainer_dashboard_tab.dart (9 keys)
 //   - reviews/presentation/widgets/review_bottom_sheet.dart (1 key)
-//   - workout/presentation/widgets/plantillas_section.dart (1 key)
+//   - workout/presentation/widgets/plantillas_tab.dart (1 key)
 //   - profile_setup/presentation/profile_setup_flow.dart (4 keys)
 //
 // These tests will FAIL until ARB keys are added and codegen is re-run.
@@ -58,19 +58,23 @@ void main() {
       expect(l10n.profileEditPersonalNameMaxLength, 'Máximo 50 caracteres');
     });
 
-    testWidgets('profileEditPersonalWeightInvalidNumber verbatim', (tester) async {
+    testWidgets('profileEditPersonalWeightInvalidNumber verbatim',
+        (tester) async {
       final l10n = await _pumpAndGetL10n(tester);
-      expect(l10n.profileEditPersonalWeightInvalidNumber, 'Ingresá un número válido');
+      expect(l10n.profileEditPersonalWeightInvalidNumber,
+          'Ingresá un número válido');
     });
 
     testWidgets('profileEditPersonalWeightOutOfRange verbatim', (tester) async {
       final l10n = await _pumpAndGetL10n(tester);
-      expect(l10n.profileEditPersonalWeightOutOfRange, 'Ingresá un peso entre 30 y 300 kg');
+      expect(l10n.profileEditPersonalWeightOutOfRange,
+          'Ingresá un peso entre 30 y 300 kg');
     });
 
     testWidgets('profileEditPersonalHeightOutOfRange verbatim', (tester) async {
       final l10n = await _pumpAndGetL10n(tester);
-      expect(l10n.profileEditPersonalHeightOutOfRange, 'Ingresá una altura entre 120 y 230 cm');
+      expect(l10n.profileEditPersonalHeightOutOfRange,
+          'Ingresá una altura entre 120 y 230 cm');
     });
 
     // eliminar_cuenta_sheet.dart — 9 keys
@@ -94,8 +98,7 @@ void main() {
       expect(
         l10n.eliminarCuentaSheetBodySuffix,
         '. Vamos a eliminar tu cuenta, tu perfil, tu historial '
-        'de entrenamientos y tu foto. Tus posts van a quedar '
-        'como "Usuario eliminado".',
+        'de entrenamientos, tus posts y tu foto.',
       );
     });
 
@@ -116,7 +119,8 @@ void main() {
 
     testWidgets('eliminarCuentaSheetLoadingSubtitle verbatim', (tester) async {
       final l10n = await _pumpAndGetL10n(tester);
-      expect(l10n.eliminarCuentaSheetLoadingSubtitle, 'Esto puede tardar unos segundos.');
+      expect(l10n.eliminarCuentaSheetLoadingSubtitle,
+          'Esto puede tardar unos segundos.');
     });
 
     testWidgets('eliminarCuentaSheetErrorFallback verbatim', (tester) async {
@@ -153,7 +157,8 @@ void main() {
       expect(l10n.dashboardStatCanceladas, 'CANCELADAS');
     });
 
-    testWidgets('dashboardProximasSesionesSectionLabel verbatim', (tester) async {
+    testWidgets('dashboardProximasSesionesSectionLabel verbatim',
+        (tester) async {
       final l10n = await _pumpAndGetL10n(tester);
       expect(l10n.dashboardProximasSesionesSectionLabel, 'PRÓXIMAS SESIONES');
     });
@@ -173,7 +178,8 @@ void main() {
       expect(l10n.dashboardDejarFeedbackLabel, 'Dejar feedback');
     });
 
-    testWidgets('dashboardActividadRecienteSectionLabel verbatim', (tester) async {
+    testWidgets('dashboardActividadRecienteSectionLabel verbatim',
+        (tester) async {
       final l10n = await _pumpAndGetL10n(tester);
       expect(l10n.dashboardActividadRecienteSectionLabel, 'ACTIVIDAD RECIENTE');
     });
@@ -184,7 +190,7 @@ void main() {
       expect(l10n.reviewSnackBarSuccess, '¡Gracias por tu reseña!');
     });
 
-    // plantillas_section.dart — 1 key
+    // plantillas_tab.dart — 1 key
     testWidgets('plantillasRetryLabel verbatim', (tester) async {
       final l10n = await _pumpAndGetL10n(tester);
       expect(l10n.plantillasRetryLabel, 'Reintentar');

@@ -38,6 +38,9 @@ class AppPalette extends ThemeExtension<AppPalette> {
     required this.espresso,
     required this.danger,
     required this.warning,
+    required this.reactionLike,
+    required this.reactionFire,
+    required this.reactionClap,
     required this.onDanger,
     required this.scrimDark,
   });
@@ -69,6 +72,12 @@ class AppPalette extends ThemeExtension<AppPalette> {
   /// tell at a glance whether action is required or just attention.
   final Color warning;
 
+  /// Active feed reaction colors. These are expressive tokens, intentionally
+  /// separate from semantic status colors such as [danger] and [warning].
+  final Color reactionLike;
+  final Color reactionFire;
+  final Color reactionClap;
+
   /// Foreground (text/icon) rendered on top of [danger] backgrounds.
   /// Achieves ≥ 4.5:1 contrast ratio against [danger] (WCAG AA).
   final Color onDanger;
@@ -92,6 +101,9 @@ class AppPalette extends ThemeExtension<AppPalette> {
     espresso: AppColorPrimitives.espresso500,
     danger: AppColorPrimitives.dangerRed,
     warning: AppColorPrimitives.warningAmber,
+    reactionLike: AppColorPrimitives.reactionLike,
+    reactionFire: AppColorPrimitives.reactionFire,
+    reactionClap: AppColorPrimitives.reactionClap,
     onDanger: AppColorPrimitives.white,
     scrimDark: AppColorPrimitives.black,
   );
@@ -110,6 +122,9 @@ class AppPalette extends ThemeExtension<AppPalette> {
     espresso: AppColorPrimitives.espressoTint50,
     danger: AppColorPrimitives.dangerRedDark,
     warning: AppColorPrimitives.warningAmberDark,
+    reactionLike: AppColorPrimitives.reactionLikeDark,
+    reactionFire: AppColorPrimitives.reactionFireDark,
+    reactionClap: AppColorPrimitives.reactionClapDark,
     onDanger: AppColorPrimitives.white,
     scrimDark: AppColorPrimitives.black,
   );
@@ -131,6 +146,9 @@ class AppPalette extends ThemeExtension<AppPalette> {
     Color? espresso,
     Color? danger,
     Color? warning,
+    Color? reactionLike,
+    Color? reactionFire,
+    Color? reactionClap,
     Color? onDanger,
     Color? scrimDark,
   }) =>
@@ -147,6 +165,9 @@ class AppPalette extends ThemeExtension<AppPalette> {
         espresso: espresso ?? this.espresso,
         danger: danger ?? this.danger,
         warning: warning ?? this.warning,
+        reactionLike: reactionLike ?? this.reactionLike,
+        reactionFire: reactionFire ?? this.reactionFire,
+        reactionClap: reactionClap ?? this.reactionClap,
         onDanger: onDanger ?? this.onDanger,
         scrimDark: scrimDark ?? this.scrimDark,
       );
@@ -167,6 +188,9 @@ class AppPalette extends ThemeExtension<AppPalette> {
       espresso: Color.lerp(espresso, other.espresso, t)!,
       danger: Color.lerp(danger, other.danger, t)!,
       warning: Color.lerp(warning, other.warning, t)!,
+      reactionLike: Color.lerp(reactionLike, other.reactionLike, t)!,
+      reactionFire: Color.lerp(reactionFire, other.reactionFire, t)!,
+      reactionClap: Color.lerp(reactionClap, other.reactionClap, t)!,
       onDanger: Color.lerp(onDanger, other.onDanger, t)!,
       scrimDark: Color.lerp(scrimDark, other.scrimDark, t)!,
     );

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
+import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/cuenta_tab.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/facturacion_tab.dart';
@@ -128,8 +130,7 @@ class _SubNavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
+    return TreinoTappable(
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.only(bottom: 4),
@@ -175,10 +176,13 @@ class _TabBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return switch (tab) {
-      AjustesTab.cuenta => const CuentaTab(),
-      AjustesTab.notificaciones => const NotificacionesTab(),
-      AjustesTab.facturacion => const FacturacionTab(),
-    };
+    return TreinoStateSwitcher(
+      childKey: ValueKey(tab),
+      child: switch (tab) {
+        AjustesTab.cuenta => const CuentaTab(),
+        AjustesTab.notificaciones => const NotificacionesTab(),
+        AjustesTab.facturacion => const FacturacionTab(),
+      },
+    );
   }
 }

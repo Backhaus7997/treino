@@ -22,6 +22,12 @@ _$TrainerLinkImpl _$$TrainerLinkImplFromJson(Map<String, dynamic> json) =>
       pausedAt: _$JsonConverterFromJson<Timestamp, DateTime>(
           json['pausedAt'], const TimestampConverter().fromJson),
       sharedWithTrainer: json['sharedWithTrainer'] as bool? ?? false,
+      entitlement: $enumDecodeNullable(
+              _$TrainerLinkEntitlementEnumMap, json['entitlement']) ??
+          TrainerLinkEntitlement.entitled,
+      blockedAt: _$JsonConverterFromJson<Timestamp, DateTime>(
+          json['blockedAt'], const TimestampConverter().fromJson),
+      blockedReason: json['blockedReason'] as String?,
     );
 
 Map<String, dynamic> _$$TrainerLinkImplToJson(_$TrainerLinkImpl instance) =>
@@ -39,6 +45,10 @@ Map<String, dynamic> _$$TrainerLinkImplToJson(_$TrainerLinkImpl instance) =>
       'pausedAt': _$JsonConverterToJson<Timestamp, DateTime>(
           instance.pausedAt, const TimestampConverter().toJson),
       'sharedWithTrainer': instance.sharedWithTrainer,
+      'entitlement': _$TrainerLinkEntitlementEnumMap[instance.entitlement]!,
+      'blockedAt': _$JsonConverterToJson<Timestamp, DateTime>(
+          instance.blockedAt, const TimestampConverter().toJson),
+      'blockedReason': instance.blockedReason,
     };
 
 const _$TrainerLinkStatusEnumMap = {
@@ -53,6 +63,11 @@ Value? _$JsonConverterFromJson<Json, Value>(
   Value? Function(Json json) fromJson,
 ) =>
     json == null ? null : fromJson(json as Json);
+
+const _$TrainerLinkEntitlementEnumMap = {
+  TrainerLinkEntitlement.entitled: 'entitled',
+  TrainerLinkEntitlement.blocked: 'blocked',
+};
 
 Json? _$JsonConverterToJson<Json, Value>(
   Value? value,

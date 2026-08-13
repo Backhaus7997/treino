@@ -1,3 +1,5 @@
+import '../../workout/domain/muscle_group.dart';
+
 /// Las 10 categorías display que muestra la pantalla de Insights.
 ///
 /// Mismas categorías granulares que el exercise picker
@@ -12,10 +14,12 @@
 /// `triceps`, `shoulders`, `core`/`abs`) se mapean a estos 10 valores vía la
 /// extension de abajo.
 ///
-/// Strings legacy de la taxonomía anterior (`brazos`, `piernas`, etc.) NO se
-/// remapean — devuelven `null` y el provider los skipea silenciosamente
-/// (cutoff 2B 2026-06-19: la app no tiene usuarios reales todavía, así que
-/// se acepta perder ese historial en lugar de inventar repartos arbitrarios).
+/// Los labels legacy en español que el editor viejo persistió (`Pecho`,
+/// `Espalda alta`, `Gemelos`, …) SÍ se canonicalizan vía `MuscleGroup.fromKey`
+/// (#384) — igual que el resto de la app. Solo devuelven `null` (y el provider
+/// los skipea) los strings que ni `fromKey` resuelve (taxonomía ultra-vieja
+/// `brazos`/`piernas`, catch-all `Otro`) más `cardio`/`full_body` (excluidos
+/// de Insights por diseño).
 enum MuscleGroupDisplay {
   pecho,
   espalda,
@@ -123,28 +127,34 @@ enum MuscleGroupDisplay {
       };
 }
 
-/// Mapping del `muscleGroup` granular del catálogo a la categoría display.
+/// Mapping del `muscleGroup` almacenado a la categoría display de Insights.
 extension MuscleGroupMapping on String {
-  /// Devuelve la `MuscleGroupDisplay` correspondiente, o null si el string
-  /// no matchea ningún grupo conocido.
+  /// Devuelve la `MuscleGroupDisplay` correspondiente, o null si el string no
+  /// resuelve a un grupo de fuerza mostrable.
+  ///
+  /// #384: canonicaliza vía [MuscleGroup.fromKey] — la MISMA resolución que usa
+  /// el resto de la app — así que las claves canónicas (`chest`…), los aliases
+  /// (`abs`) y los labels legacy en español que el editor viejo persistió
+  /// (`Pecho`, `Espalda alta`, `Gemelos`, …) mapean todos igual. Antes este
+  /// switch aceptaba solo las claves inglesas y descartaba en silencio el legacy
+  /// español (que sí resuelve en el picker) → sus sets desaparecían del radar.
   ///
   /// Devuelve null para:
-  ///   * Strings desconocidos (defensivo)
-  ///   * `cardio` y `full_body` — se excluyen de Insights por diseño
-  ///   * Strings legacy de la taxonomía vieja (`brazos`, `piernas`, etc.) —
-  ///     cutoff 2B (no se remapean, las sesiones viejas dejan de aparecer
-  ///     en los rollups sin inventar agrupaciones arbitrarias)
-  MuscleGroupDisplay? toDisplayGroup() => switch (toLowerCase()) {
-        'chest' => MuscleGroupDisplay.pecho,
-        'back' => MuscleGroupDisplay.espalda,
-        'shoulders' => MuscleGroupDisplay.hombros,
-        'biceps' => MuscleGroupDisplay.biceps,
-        'triceps' => MuscleGroupDisplay.triceps,
-        'quads' => MuscleGroupDisplay.cuadriceps,
-        'hamstrings' => MuscleGroupDisplay.isquiotibiales,
-        'glutes' => MuscleGroupDisplay.gluteos,
-        'calves' => MuscleGroupDisplay.pantorrilla,
-        'core' || 'abs' => MuscleGroupDisplay.abdominales,
-        _ => null,
+  ///   * `cardio` y `full_body` — excluidos de Insights por diseño (no son
+  ///     atribuibles a un eje puntual del radar).
+  ///   * Strings que ni [MuscleGroup.fromKey] resuelve (desconocidos, el
+  ///     catch-all legacy `Otro`, o la taxonomía ultra-vieja `brazos`/`piernas`).
+  MuscleGroupDisplay? toDisplayGroup() => switch (MuscleGroup.fromKey(this)) {
+        MuscleGroup.pecho => MuscleGroupDisplay.pecho,
+        MuscleGroup.espalda => MuscleGroupDisplay.espalda,
+        MuscleGroup.hombros => MuscleGroupDisplay.hombros,
+        MuscleGroup.biceps => MuscleGroupDisplay.biceps,
+        MuscleGroup.triceps => MuscleGroupDisplay.triceps,
+        MuscleGroup.cuadriceps => MuscleGroupDisplay.cuadriceps,
+        MuscleGroup.isquiotibiales => MuscleGroupDisplay.isquiotibiales,
+        MuscleGroup.gluteos => MuscleGroupDisplay.gluteos,
+        MuscleGroup.pantorrilla => MuscleGroupDisplay.pantorrilla,
+        MuscleGroup.abdominales => MuscleGroupDisplay.abdominales,
+        MuscleGroup.cardio || MuscleGroup.cuerpoCompleto || null => null,
       };
 }

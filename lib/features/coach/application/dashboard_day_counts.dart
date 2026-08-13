@@ -9,7 +9,6 @@
 /// continues to compile without modification.
 library;
 
-import '../../../core/utils/argentina_time.dart';
 import '../domain/appointment.dart';
 
 /// Immutable result of the "Resumen del día" classification.
@@ -30,8 +29,15 @@ class DashboardDayCounts {
 ///
 /// A confirmed session counts as `done` only once it has actually ended
 /// (`startsAt + durationMin`); while it has not yet ended — including while it
-/// is in progress — it counts as `pending`. [now] must be UTC (matching the UTC
-/// [Appointment.startsAt]); "today" is bucketed by the Argentina calendar day.
+/// is in progress — it counts as `pending`.
+///
+/// QA-HOME-001: [now] and [Appointment.startsAt] are BOTH Argentina wall-clock
+/// — UTC-flagged DateTimes whose calendar fields read as ART. `startsAt` is
+/// written that way by the booking UI (`DateTime.utc(date, artHour)`, see
+/// new_session_sheet.dart / ADR-7), so callers MUST pass `argentinaNow()` for
+/// [now], NOT `DateTime.now().toUtc()`. Mixing a real-UTC `now` with a
+/// wall-clock `startsAt` shifted every comparison by 3h (counted not-yet-started
+/// sessions as done and hid the next ~3h). "today" is the ART calendar day.
 DashboardDayCounts dashboardDayCounts(
   List<Appointment> all,
   DateTime now,
@@ -56,12 +62,9 @@ DashboardDayCounts dashboardDayCounts(
   );
 }
 
-// "Same day" in the Argentina calendar (UTC-3, no DST): an appointment at
-// 23:00 ART shares the day with a 10:00 ART one, though their UTC days differ.
-bool _isSameArtDay(DateTime a, DateTime b) {
-  final aArt = toArgentina(a.toUtc());
-  final bArt = toArgentina(b.toUtc());
-  return aArt.year == bArt.year &&
-      aArt.month == bArt.month &&
-      aArt.day == bArt.day;
-}
+// "Same day" in the Argentina calendar. QA-HOME-001: both inputs are ALREADY
+// Argentina wall-clock (fake-UTC, ART calendar fields), so this is a direct
+// field comparison. The previous toArgentina() shift double-shifted them and
+// mis-bucketed 00:00–02:59 ART sessions to the previous day.
+bool _isSameArtDay(DateTime a, DateTime b) =>
+    a.year == b.year && a.month == b.month && a.day == b.day;

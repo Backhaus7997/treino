@@ -45,10 +45,15 @@ class Step2Gym extends ConsumerWidget {
     final uid = ref.read(firebaseAuthProvider).currentUser?.uid;
     if (uid == null) return;
 
-    await ref
+    // `select` devuelve el resultado en vez de dejarlo solo en el estado del
+    // provider: leer `ref` DESPUÉS del await tiraba "Cannot use ref after the
+    // widget was disposed" cuando la pantalla se desmontaba con la operación
+    // en vuelo, y el gimnasio nunca se aplicaba al draft — el onboarding
+    // quedaba trabado en este paso sin decir por qué.
+    final ok = await ref
         .read(selectGymActionProvider.notifier)
         .select(uid: uid, placeId: gymId);
-    if (!ref.read(selectGymActionProvider).hasError) {
+    if (ok) {
       notifier.updateGymId(gymId);
     }
   }

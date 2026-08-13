@@ -7,6 +7,7 @@ import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/reviews/domain/review.dart';
 import 'package:treino/features/reviews/presentation/widgets/review_tile.dart';
 import 'package:treino/features/reviews/presentation/widgets/star_rating_display.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 const _athleteId = 'athlete-1';
 const _trainerId = 'trainer-1';
@@ -45,6 +46,9 @@ Widget _wrap({
       ],
       child: MaterialApp(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
         home: Scaffold(body: ReviewTile(review: review)),
       ),
     );

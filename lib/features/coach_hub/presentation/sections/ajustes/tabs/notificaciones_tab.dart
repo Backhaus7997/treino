@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/notificaciones_prefs.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 
@@ -22,38 +23,45 @@ class NotificacionesTab extends ConsumerWidget {
     final prefsAsync = ref.watch(webNotificationPreferencesProvider);
     final uid = ref.watch(userProfileProvider).valueOrNull?.uid;
 
-    return prefsAsync.when(
-      loading: () => const Padding(
-        padding: EdgeInsets.symmetric(vertical: 48),
-        child: Center(child: CircularProgressIndicator()),
-      ),
-      error: (_, __) => _muted(
-        context,
-        'No se pudieron cargar tus preferencias.', // i18n: Fase W3
-      ),
-      data: (prefs) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _label(context, 'NOTIFICACIONES'), // i18n: Fase W3
-          const SizedBox(height: 4),
-          Text(
-            'Elegí cómo querés recibir cada tipo de aviso.', // i18n: Fase W3
-            style: TextStyle(color: palette.textMuted, fontSize: 13),
-          ),
-          const SizedBox(height: 16),
-          _Matrix(prefs: prefs, uid: uid, colW: _colW),
-          const SizedBox(height: 12),
-          Text(
-            // Honestidad de scope (W3.2): ver notificaciones_prefs.dart.
-            'Las preferencias se guardan. La entrega por email y WhatsApp se '
-            'activa próximamente.', // i18n: Fase W3
-            style: TextStyle(
-              color: palette.textMuted,
-              fontSize: 12,
-              fontStyle: FontStyle.italic,
+    return TreinoStateSwitcher(
+      childKey: ValueKey(prefsAsync.when(
+        loading: () => 'loading',
+        error: (_, __) => 'error',
+        data: (_) => 'data',
+      )),
+      child: prefsAsync.when(
+        loading: () => const Padding(
+          padding: EdgeInsets.symmetric(vertical: 48),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+        error: (_, __) => _muted(
+          context,
+          'No se pudieron cargar tus preferencias.', // i18n: Fase W3
+        ),
+        data: (prefs) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _label(context, 'NOTIFICACIONES'), // i18n: Fase W3
+            const SizedBox(height: 4),
+            Text(
+              'Elegí cómo querés recibir cada tipo de aviso.', // i18n: Fase W3
+              style: TextStyle(color: palette.textMuted, fontSize: 13),
             ),
-          ),
-        ],
+            const SizedBox(height: 16),
+            _Matrix(prefs: prefs, uid: uid, colW: _colW),
+            const SizedBox(height: 12),
+            Text(
+              // Honestidad de scope (W3.2): ver notificaciones_prefs.dart.
+              'Las preferencias se guardan. La entrega por email y WhatsApp se '
+              'activa próximamente.', // i18n: Fase W3
+              style: TextStyle(
+                color: palette.textMuted,
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

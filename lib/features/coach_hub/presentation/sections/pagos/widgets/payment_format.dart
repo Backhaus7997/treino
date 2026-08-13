@@ -29,23 +29,36 @@ const kMesesLargos = [
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 
-/// Monto en pesos con separador de miles es-AR (28000 → "\$28.000").
-String fmtArs(int amount) {
-  final digits = amount.abs().toString();
+/// Agrupa una cadena de dígitos de a 3 con "." es-AR (28000 → "28.000").
+/// Sin signo ni "$" — usado tanto por [fmtArs] como por el
+/// `ThousandsSeparatorInputFormatter` de los TextField de monto.
+String groupThousands(String digits) {
   final buf = StringBuffer();
   for (var i = 0; i < digits.length; i++) {
     if (i > 0 && (digits.length - i) % 3 == 0) buf.write('.');
     buf.write(digits[i]);
   }
-  return '${amount < 0 ? '-' : ''}\$$buf';
+  return buf.toString();
 }
+
+/// Monto en pesos con separador de miles es-AR (28000 → "\$28.000").
+String fmtArs(int amount) =>
+    '${amount < 0 ? '-' : ''}\$${groupThousands(amount.abs().toString())}';
 
 /// "22 mayo" — día + mes en es-AR. // i18n
 String fmtDayMonth(DateTime d) => '${d.day} ${kMesesLargos[d.month]}';
 
 /// dd/MM/yyyy — usado en historial de pagos y en otros tabs.
-String fmtDate(DateTime d) =>
-    '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+///
+/// Todos sus callers le pasan instantes reales (UTC vía TimestampConverter:
+/// `createdAt`, `recordedAt`, `finishedAt`, `startedAt`, `uploadedAt`,
+/// `acceptedAt`) — NUNCA un wall-clock ADR-7 de appointment (esos usan el
+/// `_fmtDate` local de cada pantalla). Por eso localizamos acá: sin `.toLocal()`
+/// la fecha se muestra en UTC (+3h en Argentina, corrida un día de noche) — #392.
+String fmtDate(DateTime d) {
+  final local = d.toLocal();
+  return '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}/${local.year}';
+}
 
 // ── Lógica de vencimiento ─────────────────────────────────────────────────────
 

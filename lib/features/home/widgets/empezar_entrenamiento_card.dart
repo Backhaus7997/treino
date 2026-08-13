@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/utils/join_non_empty.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../workout/domain/muscle_group.dart';
@@ -48,9 +49,8 @@ class EmpezarEntrenamientoCard extends ConsumerWidget {
     final exerciseCount = today != null
         ? '${today.day.slots.length} ${today.day.slots.length == 1 ? "ejercicio" : "ejercicios"}'
         : '— ejercicios';
-    final duration = today != null
-        ? _formatDuration(today.day, today.weekNumber)
-        : '—';
+    final duration =
+        today != null ? _formatDuration(today.day, today.weekNumber) : '—';
     final canStart = today != null;
 
     return Container(
@@ -147,8 +147,10 @@ class EmpezarEntrenamientoCard extends ConsumerWidget {
 }
 
 /// Deduped Spanish muscle-group labels joined with " · ", preserving the
-/// slots' source order. Empty days resolve to "" (the caller hides the
-/// row when empty).
+/// slots' source order. Slots without a muscle group (custom exercises) are
+/// dropped via [joinNonEmpty] so they never leak a dangling separator (#550).
+/// Empty days — or days whose slots ALL lack a group — resolve to "" (the
+/// caller hides the row when empty).
 String _muscleSubtitle(RoutineDay day) {
   final seen = <String>{};
   final labels = <String>[];
@@ -156,7 +158,7 @@ String _muscleSubtitle(RoutineDay day) {
     final label = muscleGroupLabel(slot.muscleGroup);
     if (seen.add(label)) labels.add(label);
   }
-  return labels.join(' · ');
+  return joinNonEmpty(labels, ' · ');
 }
 
 /// Authored estimate when present, otherwise the rule-of-thumb computed by

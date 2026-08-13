@@ -88,8 +88,7 @@ void main() {
       expect(clean.meals.single.groups.single.options, isEmpty);
     });
 
-    test('an all-empty plan is reduced to zero meals (caller must check)',
-        () {
+    test('an all-empty plan is reduced to zero meals (caller must check)', () {
       final plan = _plan([
         const Meal(id: 'm1', name: '', groups: []),
         const Meal(id: 'm2', name: '   ', groups: []),

@@ -3,35 +3,35 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/motion/treino_fade_slide_in.dart';
+import '../../../core/widgets/motion/treino_state_switcher.dart';
+import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
-import '../../auth/application/auth_providers.dart';
-import '../../workout/application/assigned_routine_providers.dart';
-import '../../workout/application/user_routines_providers.dart';
-import '../../workout/domain/routine.dart';
+import '../../workout/application/session_providers.dart'
+    show currentUidProvider;
+import '../../workout/application/unified_routines_providers.dart';
 import '../../workout/presentation/widgets/routine_card.dart';
 import '../application/user_providers.dart' show userProfileProvider;
 
-/// Lists BOTH the trainer-assigned plans and the athlete's self-created
-/// routines for the authenticated athlete, in 2 stacked sections.
+/// Read-only mirror of the unified RUTINAS list (workout-area redesign
+/// slice 1, 2026-07-27): ONE list with the trainer-assigned plans pinned on
+/// top — each with a "DE TU COACH" chip — followed by the athlete's
+/// self-created routines. The card matching `UserProfile.activeRoutineId`
+/// carries the "ACTIVA" chip, always (lazy adoption keeps the marker set).
 ///
-/// PRE-2026-06-30 only rendered trainer-assigned plans (REQ-PSR-020/021); the
-/// self-created list was missing — athletes that built routines via the
-/// Workout tab's "MIS RUTINAS" section had no way to see them from their
-/// profile. This screen now surfaces both with explicit headers + empty
-/// states.
+/// PRE-slice-1 this screen rendered 2 stacked sections (assigned / own) with
+/// its own chip-gating rules; those now live unified in the Workout tab's
+/// `RutinasSection` and this mirror follows the same contract.
 ///
-/// Decisions (2026-06-19 conversation, confirmed 2026-06-30):
-///   - **Always show both sections** (Opción B): the assigned section
-///     stays visible even when the athlete has no trainer — its empty state
-///     promotes finding one ("Buscar PF" CTA → `/coach`).
-///   - **Active routine marker**: when the athlete has 2+ self-created
-///     routines AND one is marked as active via `UserProfile.activeRoutineId`,
-///     that card gets an "ACTIVA" chip (mirrors the visual contract of
-///     `MisRutinasSection` in the Workout tab).
-///   - **Read-only**: this screen does not host edit/archive/toggle-active
-///     actions — those live in the Workout tab. Cards here are tap-to-open.
+/// Decisions preserved from 2026-06-19/30:
+///   - **Find-a-PF promo**: when the athlete has NO trainer-assigned plan,
+///     the "Buscar PF" card renders below the list (was the assigned-section
+///     empty state) — discovery stays promoted.
+///   - **Read-only**: no edit/archive/toggle-active actions here — those
+///     live in the Workout tab. Cards are tap-to-open.
 class ProfileRoutinesScreen extends ConsumerWidget {
   const ProfileRoutinesScreen({super.key});
 
@@ -39,12 +39,12 @@ class ProfileRoutinesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    final myUid = ref.watch(authStateChangesProvider).valueOrNull?.uid ?? '';
+    final myUid = ref.watch(currentUidProvider) ?? '';
 
-    final assignedAsync = ref.watch(assignedRoutinesProvider(myUid));
-    final ownAsync = ref.watch(userCreatedRoutinesProvider(myUid));
-    final activeId =
-        ref.watch(userProfileProvider).valueOrNull?.activeRoutineId;
+    final entriesAsync = ref.watch(unifiedRoutinesProvider(myUid));
+    final activeId = ref.watch(
+      userProfileProvider.select((a) => a.valueOrNull?.activeRoutineId),
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -52,9 +52,8 @@ class ProfileRoutinesScreen extends ConsumerWidget {
         // ── Header ────────────────────────────────────────────────────────
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-          child: GestureDetector(
+          child: TreinoTappable(
             onTap: () => context.pop(),
-            behavior: HitTestBehavior.opaque,
             child: Row(
               children: [
                 Icon(TreinoIcon.back, size: 20, color: palette.textPrimary),
@@ -81,26 +80,62 @@ class ProfileRoutinesScreen extends ConsumerWidget {
               20,
               16 + MediaQuery.paddingOf(context).bottom,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _SectionHeader(label: l10n.profileRoutinesAssignedHeader),
-                const SizedBox(height: 12),
-                _AssignedSection(
-                  async: assignedAsync,
+            child: TreinoStateSwitcher(
+              childKey: ValueKey(entriesAsync.when(
+                skipLoadingOnReload: true,
+                loading: () => 'loading',
+                error: (_, __) => 'error',
+                data: (entries) => entries.isEmpty ? 'empty' : 'data',
+              )),
+              child: entriesAsync.when(
+                skipLoadingOnReload: true,
+                loading: () => _LoadingBlock(palette: palette),
+                error: (_, __) => _ErrorBlock(
+                  message: 'No pudimos cargar tus rutinas. Intentá de nuevo.',
                   palette: palette,
-                  l10n: l10n,
                 ),
-                const SizedBox(height: 28),
-                _SectionHeader(label: l10n.profileRoutinesOwnHeader),
-                const SizedBox(height: 12),
-                _OwnSection(
-                  async: ownAsync,
-                  activeId: activeId,
-                  palette: palette,
-                  l10n: l10n,
-                ),
-              ],
+                data: (entries) {
+                  final hasCoachPlan = entries.any((e) => e.fromCoach);
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (entries.isEmpty)
+                        _OwnEmptyState(palette: palette, l10n: l10n)
+                      else
+                        for (var i = 0; i < entries.length; i++) ...[
+                          if (i > 0) const SizedBox(height: 12),
+                          // key por routine.id: sin ella, Flutter matchea los
+                          // TreinoFadeSlideIn por posición y una recomputación
+                          // en vivo (ej. el coach asigna un plan que se pinea
+                          // arriba) hace que las filas existentes reusen el
+                          // State one-shot de OTRO ítem — parpadea la fila
+                          // equivocada en vez de la realmente nueva.
+                          TreinoFadeSlideIn(
+                            key: ValueKey(entries[i].routine.id),
+                            delay: AppMotion.stagger(i),
+                            child: _RoutineRow(
+                              entry: entries[i],
+                              isActive: entries[i].routine.id == activeId,
+                            ),
+                          ),
+                        ],
+                      if (!hasCoachPlan) ...[
+                        const SizedBox(height: 28),
+                        // Continúa la cascada como último elemento: sin esto
+                        // el promo aparecía instantáneo en el frame 0 pese a
+                        // estar debajo de las rows que sí staggerean,
+                        // invirtiendo la jerarquía top-down que comunica el
+                        // stagger.
+                        TreinoFadeSlideIn(
+                          delay: AppMotion.stagger(entries.length),
+                          child:
+                              _FindTrainerPromo(palette: palette, l10n: l10n),
+                        ),
+                      ],
+                    ],
+                  );
+                },
+              ),
             ),
           ),
         ),
@@ -109,63 +144,10 @@ class ProfileRoutinesScreen extends ConsumerWidget {
   }
 }
 
-// ── Section header (RUTINAS ASIGNADAS / MIS RUTINAS PROPIAS) ────────────────
+// ── Find-a-PF promo (shown while no trainer-assigned plan exists) ───────────
 
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.label});
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    return Text(
-      label,
-      style: GoogleFonts.barlowCondensed(
-        fontWeight: FontWeight.w700,
-        fontSize: 13,
-        letterSpacing: 1.4,
-        color: palette.textMuted,
-      ),
-    );
-  }
-}
-
-// ── Assigned-plans section ──────────────────────────────────────────────────
-
-class _AssignedSection extends StatelessWidget {
-  const _AssignedSection({
-    required this.async,
-    required this.palette,
-    required this.l10n,
-  });
-
-  final AsyncValue<List<Routine>> async;
-  final AppPalette palette;
-  final AppL10n l10n;
-
-  @override
-  Widget build(BuildContext context) {
-    return async.when(
-      loading: () => _LoadingBlock(palette: palette),
-      error: (_, __) => _ErrorBlock(
-        message: 'No pudimos cargar tus rutinas. Intentá de nuevo.',
-        palette: palette,
-      ),
-      data: (routines) {
-        if (routines.isEmpty) {
-          return _AssignedEmptyState(palette: palette, l10n: l10n);
-        }
-        return _RoutineList(
-          routines: routines,
-          activeId: null, // Trainer plans never carry the user's active marker.
-        );
-      },
-    );
-  }
-}
-
-class _AssignedEmptyState extends StatelessWidget {
-  const _AssignedEmptyState({required this.palette, required this.l10n});
+class _FindTrainerPromo extends StatelessWidget {
+  const _FindTrainerPromo({required this.palette, required this.l10n});
   final AppPalette palette;
   final AppL10n l10n;
 
@@ -214,45 +196,7 @@ class _AssignedEmptyState extends StatelessWidget {
   }
 }
 
-// ── Self-created routines section ───────────────────────────────────────────
-
-class _OwnSection extends StatelessWidget {
-  const _OwnSection({
-    required this.async,
-    required this.activeId,
-    required this.palette,
-    required this.l10n,
-  });
-
-  final AsyncValue<List<Routine>> async;
-  final String? activeId;
-  final AppPalette palette;
-  final AppL10n l10n;
-
-  @override
-  Widget build(BuildContext context) {
-    return async.when(
-      loading: () => _LoadingBlock(palette: palette),
-      error: (_, __) => _ErrorBlock(
-        message: 'No pudimos cargar tus rutinas. Intentá de nuevo.',
-        palette: palette,
-      ),
-      data: (routines) {
-        if (routines.isEmpty) {
-          return _OwnEmptyState(palette: palette, l10n: l10n);
-        }
-        // The ACTIVA chip only carries meaning with 2+ routines (with a
-        // single routine the activation is implicit) — matches the same
-        // contract enforced in MisRutinasSection.
-        final showActiveBadge = routines.length > 1;
-        return _RoutineList(
-          routines: routines,
-          activeId: showActiveBadge ? activeId : null,
-        );
-      },
-    );
-  }
-}
+// ── Empty state (no routines at all) ────────────────────────────────────────
 
 class _OwnEmptyState extends StatelessWidget {
   const _OwnEmptyState({required this.palette, required this.l10n});
@@ -282,49 +226,18 @@ class _OwnEmptyState extends StatelessWidget {
   }
 }
 
-// ── Routine list (shared between both sections) ─────────────────────────────
-
-class _RoutineList extends StatelessWidget {
-  const _RoutineList({required this.routines, required this.activeId});
-
-  final List<Routine> routines;
-
-  /// `null` for the assigned section. For the own section, holds the active
-  /// routine id ONLY when `routines.length > 1` (the contract enforced by
-  /// `MisRutinasSection`). The matching card renders an "ACTIVA" chip.
-  final String? activeId;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (var i = 0; i < routines.length; i++) ...[
-          if (i > 0) const SizedBox(height: 12),
-          _RoutineRow(
-            routine: routines[i],
-            isActive: activeId != null && routines[i].id == activeId,
-          ),
-        ],
-      ],
-    );
-  }
-}
+// ── Routine row (RoutineCard + corner chips) ────────────────────────────────
 
 class _RoutineRow extends StatelessWidget {
-  const _RoutineRow({required this.routine, required this.isActive});
-  final Routine routine;
+  const _RoutineRow({required this.entry, required this.isActive});
+  final UnifiedRoutineEntry entry;
   final bool isActive;
 
   @override
   Widget build(BuildContext context) {
-    if (!isActive) return RoutineCard(routine: routine);
-    // When active, stack the chip in the corner without rewriting the card.
-    // SizedBox(width: infinity) forces the Stack to occupy the full width of
-    // its parent (the outer Column has crossAxisAlignment: stretch but Stack
-    // does NOT propagate stretch to its child — without this, RoutineCard
-    // would collapse to its intrinsic width and the card would render
-    // narrower than its non-active siblings.
+    final showChips = isActive || entry.fromCoach;
+    if (!showChips) return RoutineCard(routine: entry.routine);
+    // When chipped, stack the chips in the corner without rewriting the card.
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     // RoutineCard wraps a Container with no explicit width — sin el
@@ -336,31 +249,58 @@ class _RoutineRow extends StatelessWidget {
       children: [
         SizedBox(
           width: double.infinity,
-          child: RoutineCard(routine: routine),
+          child: RoutineCard(routine: entry.routine),
         ),
         Positioned(
           top: 12,
           right: 12,
-          child: Container(
-            key: const Key('profile_routines_active_chip'),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-            decoration: BoxDecoration(
-              color: palette.accent.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(9999),
-              border: Border.all(color: palette.accent.withValues(alpha: 0.5)),
-            ),
-            child: Text(
-              l10n.profileRoutinesActiveChip,
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 11,
-                letterSpacing: 1.2,
-                color: palette.accent,
-              ),
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (entry.fromCoach)
+                _Chip(
+                  key: Key('profile_routines_coach_chip_${entry.routine.id}'),
+                  label: l10n.workoutRutinasCoachChip,
+                  color: palette.highlight,
+                ),
+              if (entry.fromCoach && isActive) const SizedBox(width: 6),
+              if (isActive)
+                _Chip(
+                  key: const Key('profile_routines_active_chip'),
+                  label: l10n.profileRoutinesActiveChip,
+                  color: palette.accent,
+                ),
+            ],
           ),
         ),
       ],
+    );
+  }
+}
+
+class _Chip extends StatelessWidget {
+  const _Chip({super.key, required this.label, required this.color});
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(9999),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.barlowCondensed(
+          fontWeight: FontWeight.w700,
+          fontSize: 11,
+          letterSpacing: 1.2,
+          color: color,
+        ),
+      ),
     );
   }
 }

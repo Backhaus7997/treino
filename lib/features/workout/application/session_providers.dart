@@ -25,14 +25,25 @@ final sessionRepositoryProvider = Provider<SessionRepository>(
   ),
 );
 
-/// Fetches all sessions for [uid], ordered by startedAt descending.
-/// Returns an empty list when [uid] is empty/invalid.
+/// Upper bound on the sessions fetched for the Workout tab, the history screen
+/// and the derived aggregate providers. QA-WKT-008: without a bound this
+/// autoDispose provider re-ran a full-history collection scan on every
+/// re-mount. A year+ of recent sessions covers every current consumer (the
+/// history list, the last-weight scan, plan progress); loading older history
+/// behind a cursor is a follow-up.
+const int kSessionHistoryFetchLimit = 365;
+
+/// Fetches [uid]'s most recent sessions (up to [kSessionHistoryFetchLimit]),
+/// ordered by startedAt descending. Returns an empty list when [uid] is
+/// empty/invalid.
 /// autoDispose: refresca al re-mountear (volver al tab Workout tras un
 /// nuevo entreno) sin necesidad de invalidate manual desde el player.
 final sessionsByUidProvider =
     FutureProvider.autoDispose.family<List<Session>, String>((ref, uid) async {
   if (uid.isEmpty) return const [];
-  return ref.watch(sessionRepositoryProvider).listByUid(uid);
+  return ref
+      .watch(sessionRepositoryProvider)
+      .listByUid(uid, limit: kSessionHistoryFetchLimit);
 });
 
 /// Fetches only [uid]'s FINISHED sessions completed today (UTC), ordered by

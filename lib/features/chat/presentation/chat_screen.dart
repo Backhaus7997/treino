@@ -1,3 +1,4 @@
+import 'dart:async' show unawaited;
 import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
@@ -8,12 +9,17 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/analytics/analytics_service.dart';
+import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
+import '../../feed/application/follow_providers.dart';
+import '../../feed/domain/follow.dart';
+import '../../feed/domain/follow_status.dart';
 import '../../feed/presentation/widgets/post_avatar.dart';
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
+import '../application/chat_media_send_controller.dart';
 import '../application/chat_providers.dart';
 import '../domain/media_type.dart';
 import '../domain/message.dart';
@@ -40,9 +46,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _textController = TextEditingController();
   bool _sending = false;
 
-  // Upload state — drives LinearProgressIndicator and disables controls.
-  bool _uploading = false;
-  double _uploadProgress = 0;
+  // Upload state (progress bar + disabled composer) ya no vive acá: lo
+  // expone chatMediaSendControllerProvider(chatId), que sobrevive al dispose
+  // de esta pantalla (issue #435).
 
   @override
   void initState() {
@@ -72,24 +78,35 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     super.dispose();
   }
 
+  bool get _mediaSendInFlight =>
+      ref.read(chatMediaSendControllerProvider(widget.chatId)).uploading;
+
   Future<void> _onSend() async {
-    if (_sending || _uploading) return;
+    if (_sending || _mediaSendInFlight) return;
     final text = _textController.text.trim();
     if (text.isEmpty) return;
     final currentUid = ref.read(currentUidProvider);
     if (currentUid == null) return;
 
     setState(() => _sending = true);
+    // Capturados antes del await (mismo criterio que _onAttach / issue #435):
+    // el envío pertenece a ESTE chat y `ref` no se puede usar una vez que la
+    // pantalla murió, pero el mensaje igual salió y el evento corresponde.
+    final chatId = widget.chatId;
+    final repository = ref.read(chatRepositoryProvider);
+    final analytics = ref.read(analyticsServiceProvider);
     try {
-      await ref.read(chatRepositoryProvider).sendMessage(
-            chatId: widget.chatId,
-            senderId: currentUid,
-            text: text,
-          );
-      ref.read(analyticsServiceProvider).logChatMessageSent(
-            chatId: widget.chatId,
-            senderId: currentUid,
-          );
+      await repository.sendMessage(
+        chatId: chatId,
+        senderId: currentUid,
+        text: text,
+      );
+      analytics.logChatMessageSent(chatId: chatId, senderId: currentUid);
+      // #501: el await pudo sobrevivir a la pantalla (back, deep-link,
+      // logout). Tocar el controller ya disposed tira "used after being
+      // disposed" y el catch de abajo lo reporta como envío fallido cuando en
+      // realidad salió.
+      if (!mounted) return;
       _textController.clear();
     } catch (e, st) {
       developer.log(
@@ -111,8 +128,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Future<void> _onAttach() async {
-    if (_uploading || _sending) return;
+    if (_sending || _mediaSendInFlight) return;
     final l10n = AppL10n.of(context);
+    // Capturado antes de los awaits: el envío pertenece a ESTE chat pase lo
+    // que pase con la pantalla mientras el sheet/picker están abiertos.
+    final chatId = widget.chatId;
     final picked = await showModalBottomSheet<_PickChoice>(
       context: context,
       builder: (_) => _AttachSheet(l10n: l10n),
@@ -139,52 +159,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     if (file == null || !mounted) return;
 
-    setState(() {
-      _uploading = true;
-      _uploadProgress = 0;
-    });
-
-    try {
-      final uploadService = ref.read(chatMediaUploadServiceProvider);
-      final mediaUrl = await uploadService.upload(
-        file.path,
-        chatId: widget.chatId,
-        mediaType: mediaType,
-        onProgress: (fraction) {
-          if (mounted) setState(() => _uploadProgress = fraction);
-        },
-      );
-
-      if (!mounted) return;
-
-      await ref.read(chatRepositoryProvider).sendMessage(
-            chatId: widget.chatId,
+    // Fire-and-forget A PROPÓSITO (issue #435): el controller vive en el
+    // ProviderContainer y completa upload+send aunque esta pantalla muera.
+    // Errores, cleanup de huérfanos y aviso al usuario son responsabilidad
+    // del controller (snackbar por el ScaffoldMessenger root).
+    unawaited(
+      ref.read(chatMediaSendControllerProvider(chatId).notifier).sendMedia(
+            localPath: file.path,
             senderId: currentUid,
-            mediaUrl: mediaUrl,
             mediaType: mediaType,
-          );
-    } catch (e, st) {
-      developer.log(
-        'media upload/send failed',
-        name: 'chat',
-        error: e,
-        stackTrace: st,
-      );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(AppL10n.of(context).chatMediaUploadFailed),
           ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _uploading = false;
-          _uploadProgress = 0;
-        });
-      }
-    }
+    );
   }
 
   @override
@@ -193,7 +178,38 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final l10n = AppL10n.of(context);
     final messagesAsync = ref.watch(messagesProvider(widget.chatId));
     final currentUid = ref.watch(currentUidProvider);
+
+    // REQ-FOLLOW-012 — ESPEJO EXACTO de `senderMayPost` en las rules.
+    //
+    // Escribir lo habilita la arista ENTRANTE: el otro tiene que seguirme a
+    // mí. Es al revés de lo que sugiere la intuición, y es la decisión de
+    // producto: dejar de seguir a alguien le saca a ESA persona la escritura
+    // hacia vos, con una sola acción.
+    //
+    // La rama del Coach va PRIMERO, igual que en las rules. Y no es
+    // decorativa: `athlete_coach_view.dart` y `athlete_detail_screen.dart`
+    // empujan `/coach/chat/...`, que renderiza ESTA pantalla, así que sin este
+    // escape el entrenador perdería el composer aunque el servidor se lo
+    // permita.
+    //
+    // `valueOrNull` en vez de bloquear con el AsyncValue: mientras carga se
+    // asume que SÍ puede escribir. Un falso positivo momentáneo termina en un
+    // `permission-denied` recuperable; un falso negativo le tapa el composer a
+    // alguien que sí puede, en cada apertura de chat.
+    final chat = ref.watch(chatByIdProvider(widget.chatId)).valueOrNull;
+    final isCoachChat = chat?.linkId != null;
+    final incomingEdge = currentUid == null
+        ? null
+        : ref
+            .watch(followEdgeProvider(
+              Follow.edgeId(widget.otherUid, currentUid),
+            ))
+            .valueOrNull;
+    final canWrite = isCoachChat ||
+        incomingEdge?.status == FollowStatus.accepted ||
+        currentUid == null;
     final pubAsync = ref.watch(userPublicProfileProvider(widget.otherUid));
+    final mediaSend = ref.watch(chatMediaSendControllerProvider(widget.chatId));
 
     // REQ-CHATUNREAD-007: re-mark as read when a new message arrives while
     // the screen is open, so the badge doesn't re-appear.
@@ -213,94 +229,117 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           onPressed: () =>
               context.canPop() ? context.pop() : context.go('/feed/messages'),
         ),
-        title: pubAsync.when(
-          loading: () => const SizedBox.shrink(),
-          error: (_, __) => Text(
-            l10n.chatScreenTitleFallback,
-            style: TextStyle(color: palette.textPrimary, fontSize: 16),
-          ),
-          data: (pub) {
-            // When userPublicProfiles/{uid} is deleted, pub is null →
-            // show "Usuario eliminado" per ADR-ACCDEL-005.
-            final name = pub?.displayName ?? l10n.chatListDeletedUser;
-            final avatar = pub?.avatarUrl;
-            return Row(
-              children: [
-                Semantics(
-                  image: true,
-                  label: l10n.a11yAvatarLabel(name),
-                  child: PostAvatar(
-                    authorDisplayName: name,
-                    authorAvatarUrl: avatar,
-                    size: 36,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    name,
-                    style: TextStyle(
-                      color: palette.textPrimary,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
+        title: TreinoStateSwitcher(
+          childKey: ValueKey(pubAsync.when(
+            loading: () => 'loading',
+            error: (_, __) => 'error',
+            data: (_) => 'data',
+          )),
+          child: pubAsync.when(
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => Text(
+              l10n.chatScreenTitleFallback,
+              style: TextStyle(color: palette.textPrimary, fontSize: 16),
+            ),
+            data: (pub) {
+              // When userPublicProfiles/{uid} is deleted, pub is null →
+              // show "Usuario eliminado" per ADR-ACCDEL-005.
+              final name = pub?.displayName ?? l10n.chatListDeletedUser;
+              final avatar = pub?.avatarUrl;
+              return Row(
+                children: [
+                  Semantics(
+                    image: true,
+                    label: l10n.a11yAvatarLabel(name),
+                    child: PostAvatar(
+                      authorDisplayName: name,
+                      authorAvatarUrl: avatar,
+                      size: 36,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ],
-            );
-          },
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      name,
+                      style: TextStyle(
+                        color: palette.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
         ),
       ),
       body: SafeArea(
         child: Column(
           children: [
             Expanded(
-              child: messagesAsync.when(
-                loading: () => Center(
-                  child: CircularProgressIndicator(color: palette.accent),
-                ),
-                error: (_, __) => Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Text(
-                      l10n.chatScreenLoadError,
-                      style: TextStyle(color: palette.textMuted),
+              // Solo el estado (loading/error/empty/data) cross-fadea acá —
+              // NO stagger de mensajes: la lista es reverse:true + lazy
+              // (ListView.builder), reciclar ítems con TreinoFadeSlideIn los
+              // reanimaría en cada scroll (docs/design-system.md).
+              child: TreinoStateSwitcher(
+                childKey: ValueKey(messagesAsync.when(
+                  loading: () => 'loading',
+                  error: (_, __) => 'error',
+                  data: (messages) => messages.isEmpty ? 'empty' : 'data',
+                )),
+                child: messagesAsync.when(
+                  loading: () => Center(
+                    child: CircularProgressIndicator(color: palette.accent),
+                  ),
+                  error: (_, __) => Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Text(
+                        l10n.chatScreenLoadError,
+                        style: TextStyle(color: palette.textMuted),
+                      ),
                     ),
                   ),
+                  data: (messages) {
+                    if (messages.isEmpty) {
+                      return _ConversationEmpty(palette: palette);
+                    }
+                    return ListView.builder(
+                      reverse: true,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 12),
+                      itemCount: messages.length,
+                      itemBuilder: (_, i) {
+                        final msg = messages[i];
+                        final isMine = msg.senderId == currentUid;
+                        return _Bubble(
+                          message: msg,
+                          isMine: isMine,
+                          palette: palette,
+                        );
+                      },
+                    );
+                  },
                 ),
-                data: (messages) {
-                  if (messages.isEmpty) {
-                    return _ConversationEmpty(palette: palette);
-                  }
-                  return ListView.builder(
-                    reverse: true,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 12),
-                    itemCount: messages.length,
-                    itemBuilder: (_, i) {
-                      final msg = messages[i];
-                      final isMine = msg.senderId == currentUid;
-                      return _Bubble(
-                        message: msg,
-                        isMine: isMine,
-                        palette: palette,
-                      );
-                    },
-                  );
-                },
               ),
             ),
-            if (_uploading)
+            if (mediaSend.uploading)
               LinearProgressIndicator(
-                value: _uploadProgress > 0 ? _uploadProgress : null,
+                value: mediaSend.progress > 0 ? mediaSend.progress : null,
                 color: palette.accent,
                 backgroundColor: palette.bgCard,
               ),
+            // El aviso va ARRIBA del composer, no en su lugar: dejar el campo
+            // visible pero apagado explica POR QUÉ no se puede escribir. Si el
+            // composer desapareciera, la pantalla se vería rota sin motivo.
+            if (!canWrite) _BlockedComposerNotice(palette: palette),
             _Composer(
               controller: _textController,
-              sending: _sending || _uploading,
+              sending: _sending || mediaSend.uploading,
+              canWrite: canWrite,
               onSend: _onSend,
               onAttach: _onAttach,
               palette: palette,
@@ -393,6 +432,7 @@ class _Composer extends StatelessWidget {
   const _Composer({
     required this.controller,
     required this.sending,
+    required this.canWrite,
     required this.onSend,
     required this.onAttach,
     required this.palette,
@@ -400,6 +440,10 @@ class _Composer extends StatelessWidget {
 
   final TextEditingController controller;
   final bool sending;
+
+  /// Espejo de `senderMayPost` en las rules. Se compone con [sending]: el
+  /// composer se apaga si hay un envío en vuelo O si no hay permiso.
+  final bool canWrite;
   final VoidCallback onSend;
   final VoidCallback onAttach;
   final AppPalette palette;
@@ -407,6 +451,7 @@ class _Composer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
+    final disabled = sending || !canWrite;
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
       child: Row(
@@ -414,12 +459,9 @@ class _Composer extends StatelessWidget {
         children: [
           // Attach button.
           IconButton(
-            onPressed: sending ? null : onAttach,
+            onPressed: disabled ? null : onAttach,
             tooltip: l10n.chatAttachMediaLabel,
-            icon: Icon(
-              TreinoIcon.attach,
-              color: sending ? palette.textMuted : palette.textMuted,
-            ),
+            icon: Icon(TreinoIcon.attach, color: palette.textMuted),
           ),
           Expanded(
             child: Container(
@@ -441,13 +483,19 @@ class _Composer extends StatelessWidget {
                   border: InputBorder.none,
                   isCollapsed: true,
                 ),
-                enabled: !sending,
+                enabled: !disabled,
               ),
             ),
           ),
           const SizedBox(width: 8),
           IconButton(
-            onPressed: sending ? null : onSend,
+            onPressed: disabled ? null : onSend,
+            // Swap instantáneo (sin TreinoStateSwitcher): enviar es la acción
+            // más frecuente del chat — 240ms de cross-fade para una
+            // micro-acción rutinaria es más lento que el escalón que le
+            // corresponde. Mismo patrón que AuthPillButton.isLoading
+            // (auth_pill_button.dart), el hermano del sistema para este
+            // mismo gesto de "swap icono ↔ spinner".
             icon: sending
                 ? Semantics(
                     label: l10n.chatSendingA11y,
@@ -461,6 +509,50 @@ class _Composer extends StatelessWidget {
                   )
                 : Icon(TreinoIcon.send, color: palette.accent),
             tooltip: sending ? l10n.chatSendingA11y : l10n.chatScreenSendLabel,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Aviso PERSISTENTE que reemplaza al composer cuando no se puede escribir.
+///
+/// Persistente y no un snackbar a propósito: el estado dura hasta que la otra
+/// persona vuelva a seguirte, así que un aviso que se desvanece dejaría la
+/// pantalla mostrando un composer inexistente sin explicación.
+///
+/// Copy confirmado por el dueño en 4.7. Se eligió el que EXPLICA de qué depende
+/// —"esta persona tiene que seguirte"— por sobre las alternativas neutras: es
+/// el único que le dice al usuario qué destrabaría la situación. No expone nada
+/// que no se vea ya en el perfil de la otra persona.
+class _BlockedComposerNotice extends StatelessWidget {
+  const _BlockedComposerNotice({required this.palette});
+
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        border: Border(top: BorderSide(color: palette.border)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(TreinoIcon.infoCircle, size: 18, color: palette.textMuted),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              AppL10n.of(context).chatBlockedComposerNotice,
+              style: GoogleFonts.barlow(
+                fontSize: 14,
+                color: palette.textMuted,
+              ),
+            ),
           ),
         ],
       ),

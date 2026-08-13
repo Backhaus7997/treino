@@ -103,6 +103,7 @@ describe("SCENARIO-629 + SCENARIO-680: new message → sendFcm called with recip
     expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
     expect(callArg.tokens).toEqual(["trainer-token"]);
+    expect(callArg.data?.kind).toBe("chat-message");
   });
 
   it("does NOT include the sender's uid in recipients (SCENARIO-680)", async () => {

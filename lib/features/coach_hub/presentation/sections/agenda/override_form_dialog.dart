@@ -7,7 +7,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../../app/theme/app_motion.dart';
 import '../../../../../app/theme/app_palette.dart';
+import '../../../../../core/widgets/motion/treino_fade_slide_in.dart';
+import '../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../coach/application/agenda_providers.dart';
 import '../../../../coach/domain/availability_override.dart';
 import '../../../../coach/presentation/agenda_formatters.dart';
@@ -52,18 +55,21 @@ class _BlockOverrideFormDialogState
       ),
       content: ConstrainedBox(
         constraints: const BoxConstraints(minWidth: 340, maxWidth: 400),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _FormLabel('Fecha a bloquear', palette), // i18n
-            const SizedBox(height: 6),
-            _DateField(
-              date: _date,
-              onChanged: (d) => setState(() => _date = d),
-              palette: palette,
-            ),
-          ],
+        child: TreinoFadeSlideIn(
+          distance: AppMotion.slideSm,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _FormLabel('Fecha a bloquear', palette), // i18n
+              const SizedBox(height: 6),
+              _DateField(
+                date: _date,
+                onChanged: (d) => setState(() => _date = d),
+                palette: palette,
+              ),
+            ],
+          ),
         ),
       ),
       actions: [
@@ -164,85 +170,88 @@ class _ExtraOverrideFormDialogState
       ),
       content: ConstrainedBox(
         constraints: const BoxConstraints(minWidth: 340, maxWidth: 420),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _FormLabel('Fecha', palette), // i18n
-              const SizedBox(height: 6),
-              _DateField(
-                date: _date,
-                onChanged: (d) => setState(() => _date = d),
-                palette: palette,
-              ),
-              const SizedBox(height: 16),
+        child: TreinoFadeSlideIn(
+          distance: AppMotion.slideSm,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _FormLabel('Fecha', palette), // i18n
+                const SizedBox(height: 6),
+                _DateField(
+                  date: _date,
+                  onChanged: (d) => setState(() => _date = d),
+                  palette: palette,
+                ),
+                const SizedBox(height: 16),
 
-              _FormLabel('Hora inicio', palette), // i18n
-              const SizedBox(height: 6),
-              _TimeField(
-                hour: _startHour,
-                minute: _startMinute,
-                onChanged: (h, m) => setState(() {
-                  _startHour = h;
-                  _startMinute = m;
-                  _windowError = null;
-                }),
-                palette: palette,
-              ),
-              const SizedBox(height: 16),
+                _FormLabel('Hora inicio', palette), // i18n
+                const SizedBox(height: 6),
+                _TimeField(
+                  hour: _startHour,
+                  minute: _startMinute,
+                  onChanged: (h, m) => setState(() {
+                    _startHour = h;
+                    _startMinute = m;
+                    _windowError = null;
+                  }),
+                  palette: palette,
+                ),
+                const SizedBox(height: 16),
 
-              _FormLabel('Hora fin', palette), // i18n
-              const SizedBox(height: 6),
-              _TimeField(
-                hour: _endHour,
-                minute: _endMinute,
-                onChanged: (h, m) => setState(() {
-                  _endHour = h;
-                  _endMinute = m;
-                  _windowError = null;
-                }),
-                palette: palette,
-              ),
+                _FormLabel('Hora fin', palette), // i18n
+                const SizedBox(height: 6),
+                _TimeField(
+                  hour: _endHour,
+                  minute: _endMinute,
+                  onChanged: (h, m) => setState(() {
+                    _endHour = h;
+                    _endMinute = m;
+                    _windowError = null;
+                  }),
+                  palette: palette,
+                ),
 
-              if (_windowError != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  _windowError!,
-                  style: GoogleFonts.barlow(
-                    fontSize: 12,
-                    color: palette.highlight,
+                if (_windowError != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    _windowError!,
+                    style: GoogleFonts.barlow(
+                      fontSize: 12,
+                      color: palette.highlight,
+                    ),
                   ),
+                ],
+
+                const SizedBox(height: 16),
+                _FormLabel('Duración del turno', palette), // i18n
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 8,
+                  children: _kDurations.map((d) {
+                    final selected = d == _slotDurationMin;
+                    return ChoiceChip(
+                      label: Text(
+                        '$d min', // i18n
+                        style: GoogleFonts.barlowCondensed(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          color: selected ? palette.bg : palette.textPrimary,
+                        ),
+                      ),
+                      selected: selected,
+                      selectedColor: palette.accent,
+                      backgroundColor: palette.bgCard,
+                      side: BorderSide(
+                        color: selected ? palette.accent : palette.border,
+                      ),
+                      onSelected: (_) => setState(() => _slotDurationMin = d),
+                    );
+                  }).toList(),
                 ),
               ],
-
-              const SizedBox(height: 16),
-              _FormLabel('Duración del turno', palette), // i18n
-              const SizedBox(height: 6),
-              Wrap(
-                spacing: 8,
-                children: _kDurations.map((d) {
-                  final selected = d == _slotDurationMin;
-                  return ChoiceChip(
-                    label: Text(
-                      '$d min', // i18n
-                      style: GoogleFonts.barlowCondensed(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                        color: selected ? palette.bg : palette.textPrimary,
-                      ),
-                    ),
-                    selected: selected,
-                    selectedColor: palette.accent,
-                    backgroundColor: palette.bgCard,
-                    side: BorderSide(
-                      color: selected ? palette.accent : palette.border,
-                    ),
-                    onSelected: (_) => setState(() => _slotDurationMin = d),
-                  );
-                }).toList(),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -340,28 +349,34 @@ class _DateField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => _pick(context),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          border: Border.all(color: palette.border),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.calendar_today_outlined,
-                size: 18, color: palette.textMuted),
-            const SizedBox(width: 8),
-            Text(
-              AgendaFormatters.formatDate(date),
-              style: GoogleFonts.barlow(
-                fontSize: 14,
-                color: palette.textPrimary,
+    // MouseRegion(cursor): call-site web — InkWell daba cursor de mano al
+    // hover, TreinoTappable no trae MouseRegion. Fix local seguro (el fix
+    // de fondo pertenece al widget core).
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: TreinoTappable(
+        onTap: () => _pick(context),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            border: Border.all(color: palette.border),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.calendar_today_outlined,
+                  size: 18, color: palette.textMuted),
+              const SizedBox(width: 8),
+              Text(
+                AgendaFormatters.formatDate(date),
+                style: GoogleFonts.barlow(
+                  fontSize: 14,
+                  color: palette.textPrimary,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -396,28 +411,34 @@ class _TimeField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => _pick(context),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          border: Border.all(color: palette.border),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.access_time_outlined,
-                size: 18, color: palette.textMuted),
-            const SizedBox(width: 8),
-            Text(
-              '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}',
-              style: GoogleFonts.barlow(
-                fontSize: 14,
-                color: palette.textPrimary,
+    // MouseRegion(cursor): call-site web — InkWell daba cursor de mano al
+    // hover, TreinoTappable no trae MouseRegion. Fix local seguro (el fix
+    // de fondo pertenece al widget core).
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: TreinoTappable(
+        onTap: () => _pick(context),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            border: Border.all(color: palette.border),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.access_time_outlined,
+                  size: 18, color: palette.textMuted),
+              const SizedBox(width: 8),
+              Text(
+                '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}',
+                style: GoogleFonts.barlow(
+                  fontSize: 14,
+                  color: palette.textPrimary,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -521,9 +521,7 @@ void main() {
       return container;
     }
 
-    test(
-        'coach + 1 friend unread, 1 read → coach: 1, friends: 1',
-        () async {
+    test('coach + 1 friend unread, 1 read → coach: 1, friends: 1', () async {
       const me = 'me';
       const coach = 'coach';
       const friend = 'friend';
@@ -547,9 +545,7 @@ void main() {
       subB.close();
     });
 
-    test(
-        'no coach link → coach: 0, friends: full unread count',
-        () async {
+    test('no coach link → coach: 0, friends: full unread count', () async {
       const me = 'me';
       const friend = 'friend';
       final chats = [
@@ -569,8 +565,7 @@ void main() {
       subB.close();
     });
 
-    test(
-        'only coach chat unread → coach: 1, friends: 0 (no leak to feed)',
+    test('only coach chat unread → coach: 1, friends: 0 (no leak to feed)',
         () async {
       const me = 'me';
       const coach = 'coach';
@@ -589,8 +584,7 @@ void main() {
       subB.close();
     });
 
-    test(
-        'only friend chat unread → coach: 0, friends: 1 (repro of the bug)',
+    test('only friend chat unread → coach: 0, friends: 1 (repro of the bug)',
         () async {
       // This is the exact reproduction of the smoke bug: an alumno with a
       // linked coach gets a message from another alumno. Before the split,

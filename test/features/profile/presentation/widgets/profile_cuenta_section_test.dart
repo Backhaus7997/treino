@@ -1,10 +1,14 @@
+import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart' show User;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
-import 'package:treino/features/feed/application/friendship_providers.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:treino/features/feed/application/follow_providers.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
 import 'package:treino/features/gyms/domain/gym.dart';
 import 'package:treino/features/gyms/domain/gym_source.dart';
@@ -29,6 +33,14 @@ UserProfile _profile({String? gymId}) => UserProfile(
       updatedAt: DateTime(2025),
       gymId: gymId,
     );
+
+class _MockUser extends Mock implements User {}
+
+User _userWithUid(String uid) {
+  final u = _MockUser();
+  when(() => u.uid).thenReturn(uid);
+  return u;
+}
 
 Widget _buildSection({
   required List<Override> overrides,
@@ -96,19 +108,19 @@ void main() {
           overrides: [
             authStateChangesProvider.overrideWith((_) => Stream.value(null)),
             userProfileProvider.overrideWith((_) => Stream.value(_profile())),
-            pendingRequestCountProvider('').overrideWith((_) => 0),
+            pendingFollowRequestCountProvider('').overrideWith((_) => 0),
           ],
         ),
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Solicitudes de amistad'), findsOneWidget);
+      expect(find.text('Solicitudes de seguidores'), findsOneWidget);
       expect(find.text('Datos personales'), findsOneWidget);
       expect(find.text('Gimnasio'), findsOneWidget);
       expect(find.text('Mis rutinas'), findsOneWidget);
     });
 
-    // SCENARIO-502: Solicitudes tile shows count from pendingRequestCountProvider
+    // SCENARIO-502: Solicitudes tile shows count from pendingFollowRequestCountProvider
     testWidgets(
         'SCENARIO-502: Solicitudes tile shows "4 nuevas" when count is 4',
         (tester) async {
@@ -117,7 +129,7 @@ void main() {
           overrides: [
             authStateChangesProvider.overrideWith((_) => Stream.value(null)),
             userProfileProvider.overrideWith((_) => Stream.value(_profile())),
-            pendingRequestCountProvider('').overrideWith((_) => 4),
+            pendingFollowRequestCountProvider('').overrideWith((_) => 4),
           ],
         ),
       );
@@ -135,7 +147,7 @@ void main() {
           overrides: [
             authStateChangesProvider.overrideWith((_) => Stream.value(null)),
             userProfileProvider.overrideWith((_) => Stream.value(_profile())),
-            pendingRequestCountProvider('').overrideWith((_) => 0),
+            pendingFollowRequestCountProvider('').overrideWith((_) => 0),
           ],
         ),
       );
@@ -155,7 +167,7 @@ void main() {
           overrides: [
             authStateChangesProvider.overrideWith((_) => Stream.value(null)),
             userProfileProvider.overrideWith((_) => Stream.value(_profile())),
-            pendingRequestCountProvider('').overrideWith((_) => 0),
+            pendingFollowRequestCountProvider('').overrideWith((_) => 0),
           ],
         ),
       );
@@ -176,7 +188,7 @@ void main() {
           overrides: [
             authStateChangesProvider.overrideWith((_) => Stream.value(null)),
             userProfileProvider.overrideWith((_) => Stream.value(_profile())),
-            pendingRequestCountProvider('').overrideWith((_) => 0),
+            pendingFollowRequestCountProvider('').overrideWith((_) => 0),
           ],
         ),
       );
@@ -191,14 +203,14 @@ void main() {
     // ── Migrated from profile_friend_requests_tile_test.dart ────────────────
     // SCENARIO-465a (migrated): Solicitudes count=3 reflected in tile
     testWidgets(
-        'SCENARIO-465a (migrated): Solicitudes tile reflects count 3 from pendingRequestCountProvider',
+        'SCENARIO-465a (migrated): Solicitudes tile reflects count 3 from pendingFollowRequestCountProvider',
         (tester) async {
       await tester.pumpWidget(
         _buildSection(
           overrides: [
             authStateChangesProvider.overrideWith((_) => Stream.value(null)),
             userProfileProvider.overrideWith((_) => Stream.value(_profile())),
-            pendingRequestCountProvider('').overrideWith((_) => 3),
+            pendingFollowRequestCountProvider('').overrideWith((_) => 3),
           ],
         ),
       );
@@ -216,13 +228,13 @@ void main() {
           overrides: [
             authStateChangesProvider.overrideWith((_) => Stream.value(null)),
             userProfileProvider.overrideWith((_) => Stream.value(_profile())),
-            pendingRequestCountProvider('').overrideWith((_) => 0),
+            pendingFollowRequestCountProvider('').overrideWith((_) => 0),
           ],
         ),
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Solicitudes de amistad'), findsOneWidget);
+      expect(find.text('Solicitudes de seguidores'), findsOneWidget);
       // When count == 0, subtitle should NOT show "0 nuevas"
       expect(find.text('0 nuevas'), findsNothing);
     });
@@ -236,13 +248,13 @@ void main() {
           overrides: [
             authStateChangesProvider.overrideWith((_) => Stream.value(null)),
             userProfileProvider.overrideWith((_) => Stream.value(_profile())),
-            pendingRequestCountProvider('').overrideWith((_) => 2),
+            pendingFollowRequestCountProvider('').overrideWith((_) => 2),
           ],
         ),
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Solicitudes de amistad'));
+      await tester.tap(find.text('Solicitudes de seguidores'));
       await tester.pumpAndSettle();
 
       expect(find.text('FRIEND_REQUESTS'), findsOneWidget);
@@ -261,7 +273,7 @@ void main() {
             userProfileProvider.overrideWith(
               (_) => Stream.value(_profile(gymId: 'sportclub-belgrano')),
             ),
-            pendingRequestCountProvider('').overrideWith((_) => 0),
+            pendingFollowRequestCountProvider('').overrideWith((_) => 0),
             gymByIdProvider('sportclub-belgrano').overrideWith(
               (ref) async => Gym(
                 id: 'sportclub-belgrano',
@@ -279,6 +291,92 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('SportClub - Belgrano'), findsOneWidget);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // REQ-FOLLOW-017 — el badge tiene que contar la MISMA colección que el inbox.
+  //
+  // Estos dos casos siembran Firestore de verdad en vez de overridear el
+  // provider, porque lo que se está probando es justamente DE DÓNDE sale el
+  // número. Con el provider mockeado, contar `friendships` o contar `follows`
+  // da idéntico y el test no prueba nada.
+  //
+  // El bug que atrapan: tras el flip, `friendships` queda congelada y las
+  // solicitudes nuevas viven en `follows`. Un badge que siga leyendo la
+  // colección vieja marca 0 PARA SIEMPRE mientras el inbox muestra pedidos
+  // reales — la peor combinación, porque el usuario nunca se entera.
+  // ─────────────────────────────────────────────────────────────────────────
+  group('ProfileCuentaSection — badge de solicitudes', () {
+    Widget buildWithFirestore(FakeFirebaseFirestore firestore) => _buildSection(
+          overrides: [
+            firestoreProvider.overrideWithValue(firestore),
+            authStateChangesProvider
+                .overrideWith((_) => Stream.value(_userWithUid('me'))),
+            userProfileProvider.overrideWith((_) => Stream.value(_profile())),
+          ],
+        );
+
+    testWidgets('cuenta las solicitudes pendientes de `follows`',
+        (tester) async {
+      final firestore = FakeFirebaseFirestore();
+      // Dos aristas pendientes HACIA mí (followeeUid == 'me').
+      for (final other in ['bob', 'carla']) {
+        await firestore.collection('follows').doc('${other}_me').set({
+          'id': '${other}_me',
+          'followerUid': other,
+          'followeeUid': 'me',
+          'status': 'pending',
+          'members': [other, 'me'],
+          'createdAt': Timestamp.now(),
+        });
+      }
+
+      await tester.pumpWidget(buildWithFirestore(firestore));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('2'), findsWidgets);
+    });
+
+    testWidgets('NO cuenta una solicitud pendiente en la `friendships` legacy',
+        (tester) async {
+      final firestore = FakeFirebaseFirestore();
+      // Residuo del modelo viejo. Después del flip esto no es una solicitud
+      // viva: la colección está congelada y el inbox ni la mira.
+      await firestore.collection('friendships').doc('bob_me').set({
+        'id': 'bob_me',
+        'uidA': 'bob',
+        'uidB': 'me',
+        'status': 'pending',
+        'requesterId': 'bob',
+        'members': ['bob', 'me'],
+        'createdAt': Timestamp.now(),
+      });
+
+      await tester.pumpWidget(buildWithFirestore(firestore));
+      await tester.pumpAndSettle();
+
+      // Sin solicitudes en `follows` el subtítulo no se renderiza.
+      expect(find.textContaining('nueva'), findsNothing);
+    });
+
+    testWidgets('sólo cuenta las RECIBIDAS, no las que yo mandé',
+        (tester) async {
+      final firestore = FakeFirebaseFirestore();
+      // Yo le mandé solicitud a bob: es saliente, no va en mi inbox.
+      await firestore.collection('follows').doc('me_bob').set({
+        'id': 'me_bob',
+        'followerUid': 'me',
+        'followeeUid': 'bob',
+        'status': 'pending',
+        'members': ['me', 'bob'],
+        'createdAt': Timestamp.now(),
+      });
+
+      await tester.pumpWidget(buildWithFirestore(firestore));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('nueva'), findsNothing);
     });
   });
 }

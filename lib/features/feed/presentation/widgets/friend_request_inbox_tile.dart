@@ -8,10 +8,9 @@ import '../../../../l10n/app_l10n.dart';
 import '../../../profile/application/user_public_profile_providers.dart';
 import '../../../gyms/domain/gym_display_name.dart';
 import '../../application/feed_screen_providers.dart'
-    show myFriendsFeedProvider;
-import '../../application/friendship_providers.dart'
-    show friendshipRepositoryProvider;
-import '../../domain/friendship.dart';
+    show myFollowingFeedProvider;
+import '../../application/follow_providers.dart' show followRepositoryProvider;
+import '../../domain/follow.dart';
 import 'post_avatar.dart';
 
 /// A single row in the friend requests inbox.
@@ -20,20 +19,22 @@ import 'post_avatar.dart';
 /// gym name subtitle + RECHAZAR / ACEPTAR action pills.
 ///
 /// Actions are fire-and-forget — the inbox stream re-emission removes the
-/// row. `acceptedFriendsProvider` and `friendshipByPairProvider` are now
-/// `StreamProvider.family.autoDispose` and self-update on Firestore mutations
+/// row. `followingProvider` y `followEdgeProvider` son
+/// `StreamProvider.family.autoDispose` y se auto-actualizan ante mutaciones
 /// — no manual `invalidate` needed for them (REQ-FPS-008, ADR-FPS-006).
-/// `myFriendsFeedProvider` (still a FutureProvider) MUST be explicitly
+/// `myFollowingFeedProvider` (still a FutureProvider) MUST be explicitly
 /// invalidated after ACEPTAR because Riverpod does not auto-cascade
 /// invalidation to providers with no active listener at the moment.
 class FriendRequestInboxTile extends ConsumerStatefulWidget {
   const FriendRequestInboxTile({
     super.key,
-    required this.friendship,
+    required this.follow,
     required this.viewerUid,
   });
 
-  final Friendship friendship;
+  /// La arista ENTRANTE pendiente: `follows/{quien pide}_{yo}`.
+  /// El que pide es `follow.followerUid` (antes `requesterId`).
+  final Follow follow;
   final String viewerUid;
 
   @override
@@ -50,7 +51,7 @@ class _FriendRequestInboxTileState
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     final profileAsync =
-        ref.watch(userPublicProfileProvider(widget.friendship.requesterId));
+        ref.watch(userPublicProfileProvider(widget.follow.followerUid));
 
     final profile = profileAsync.valueOrNull;
     final displayName = profile?.displayName ?? 'Usuario anónimo';
@@ -72,8 +73,8 @@ class _FriendRequestInboxTileState
           // remain as independent tap regions to its right.
           Expanded(
             child: InkWell(
-              onTap: () => context
-                  .push('/feed/profile/${widget.friendship.requesterId}'),
+              onTap: () =>
+                  context.push('/feed/profile/${widget.follow.followerUid}'),
               borderRadius: BorderRadius.circular(8),
               child: Row(
                 children: [
@@ -153,9 +154,9 @@ class _FriendRequestInboxTileState
     // sibling consumers (Feed AMIGOS) stale. The container lives at the
     // root and survives the tile's disposal, so its invalidate always runs.
     // ADR-FPS-006: This dispose-safe capture pattern MUST be kept for the
-    // surviving `myFriendsFeedProvider` invalidation.
+    // surviving `myFollowingFeedProvider` invalidation.
     final container = ProviderScope.containerOf(context, listen: false);
-    final repo = container.read(friendshipRepositoryProvider);
+    final repo = container.read(followRepositoryProvider);
     final viewerUid = widget.viewerUid;
     // Capture the messenger BEFORE the await for the same reason as the
     // container: a successful accept removes this row and disposes the tile,
@@ -165,13 +166,13 @@ class _FriendRequestInboxTileState
     final messenger = ScaffoldMessenger.of(context);
     final errorMessage = AppL10n.of(context).feedFriendActionError;
     try {
-      await repo.accept(widget.friendship.id, viewerUid);
-      // Stream providers (`acceptedFriendsProvider`, `friendshipByPairProvider`)
+      await repo.acceptRequest(widget.follow.id, viewerUid);
+      // Stream providers (`followingProvider`, `followEdgeProvider`)
       // self-update via .snapshots() — no manual invalidation needed.
-      // `myFriendsFeedProvider` (still a FutureProvider) MUST be invalidated
+      // `myFollowingFeedProvider` (still a FutureProvider) MUST be invalidated
       // explicitly — Riverpod does NOT auto-cascade invalidation to downstream
       // providers with no active listener at the moment (ADR-FPS-006).
-      container.invalidate(myFriendsFeedProvider);
+      container.invalidate(myFollowingFeedProvider);
     } catch (_) {
       // The stream will not emit a removal, so the row stays — tell the user
       // the action failed so they can retry instead of silently swallowing it.
@@ -190,17 +191,17 @@ class _FriendRequestInboxTileState
     // invalidation here (rejection never affects AMIGOS feed), but kept
     // for consistency and in case future calls need it.
     final container = ProviderScope.containerOf(context, listen: false);
-    final repo = container.read(friendshipRepositoryProvider);
+    final repo = container.read(followRepositoryProvider);
     // Dispose-safe capture (see `_onAceptar`): a successful reject removes the
     // row and disposes the tile, so the messenger must be resolved before the
     // await to guarantee the failure SnackBar survives the tile's disposal.
     final messenger = ScaffoldMessenger.of(context);
     final errorMessage = AppL10n.of(context).feedFriendActionError;
     try {
-      await repo.delete(widget.friendship.id, widget.viewerUid);
+      await repo.deleteEdge(widget.follow.id);
       // Stream providers self-update on Firestore mutation — no manual
-      // invalidation required. Rejection never created a friendship, so
-      // myFriendsFeedProvider is unaffected.
+      // invalidation required. Rechazar borra una arista que nunca llegó a
+      // `accepted`, así que myFollowingFeedProvider no se ve afectado.
     } catch (_) {
       // The stream will not emit a removal, so the row stays — surface the
       // failure instead of swallowing it so the user can retry.

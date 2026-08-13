@@ -143,4 +143,48 @@ void main() {
       expect(decoded.cancelledAt, DateTime.utc(2026, 5, 30, 10));
     });
   });
+
+  // ── Slice 2a — Agenda→cobro bridge: paymentId field ─────────────────────
+  group('Appointment.paymentId (Slice 2a)', () {
+    test('Appointment.create defaults paymentId to null (not billed)', () {
+      final appt = Appointment.create(
+        trainerId: 'tA',
+        athleteId: 'aB',
+        athleteDisplayName: 'Juan',
+        startsAt: DateTime.utc(2026, 6, 1, 9),
+        durationMin: 60,
+      );
+      expect(appt.paymentId, isNull);
+    });
+
+    test('round-trip preserves a non-null paymentId', () {
+      final appt = Appointment(
+        id: 'tA_1',
+        trainerId: 'tA',
+        athleteId: 'aB',
+        athleteDisplayName: 'Juan',
+        startsAt: DateTime.utc(2026, 6, 1, 9),
+        durationMin: 60,
+        status: AppointmentStatus.confirmed,
+        paymentId: 'payment-123',
+      );
+      final decoded = Appointment.fromJson(appt.toJson());
+      expect(decoded.paymentId, 'payment-123');
+    });
+
+    test('fromJson defaults paymentId to null when absent from legacy docs',
+        () {
+      final raw = <String, dynamic>{
+        'id': 'tA_1',
+        'trainerId': 'tA',
+        'athleteId': 'aB',
+        'athleteDisplayName': 'Juan',
+        'startsAt': Timestamp.fromDate(DateTime.utc(2026, 6, 1, 9)),
+        'durationMin': 60,
+        'status': 'confirmed',
+      };
+      final decoded = Appointment.fromJson(raw);
+      expect(decoded.paymentId, isNull);
+    });
+  });
 }

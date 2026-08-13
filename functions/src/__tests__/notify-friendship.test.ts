@@ -1,163 +1,191 @@
 /**
- * Unit + integration tests for notifyOnFriendship Cloud Function.
+ * Unit + integration tests de la Cloud Function notifyOnFollow.
  *
- * Unit tests exercise the pure `resolveFriendshipNotif` + `buildFriendshipCopy`
- * helpers — no emulator required. They cover every branch of the truth table:
+ * Los unit tests ejercitan los helpers puros `resolveFollowNotif` +
+ * `buildFollowCopy` — sin emulador. Cubren toda la tabla de verdad:
  *
- *   before             after                     → resolution
- *   ────────────────── ─────────────────────────  ──────────────────
- *   undefined          undefined                 skip (delete)
- *   undefined          {status:'pending', …}     request-received
- *   undefined          {status:'accepted', …}    auto-followed
- *   pending            accepted                  request-accepted
- *   accepted           accepted (no-op)          skip
- *   pending            pending (no-op)           skip
- *   accepted           pending (illegal downgrade) skip
- *   undefined          {missing requesterId}     skip (invalid)
- *   undefined          {members: []}             skip (invalid)
+ *   before             after                       → resolución
+ *   ────────────────── ───────────────────────────  ──────────────────
+ *   undefined          undefined                   skip (delete)
+ *   undefined          {status:'pending', …}       request-received
+ *   undefined          {status:'accepted', …}      auto-followed
+ *   pending            accepted                    request-accepted
+ *   accepted           accepted (no-op)            skip
+ *   pending            pending (no-op)             skip
+ *   accepted           pending (downgrade ilegal)  skip
+ *   undefined          {sin followerUid}           skip (inválido)
+ *   undefined          {sin followeeUid}           skip (inválido)
  *
- * Integration tests exercise `notifyOnFriendshipHandler` against the
- * Firestore emulator to verify the display-name lookup + sendFcm call.
+ * `follow-model` PR3a: las 3 ramas y TODO el copy quedan intactos. Lo único
+ * que cambia es de dónde sale la dirección: antes `requesterId` + búsqueda
+ * dentro de `members`; ahora `followerUid`/`followeeUid`, explícitos en la
+ * arista. El copy del backend ya estaba escrito en clave "seguidor", así que es
+ * la única pieza del sistema que no necesitó adaptarse.
  *
- * Set FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 before running the integration
- * tests. Unit tests run without emulator.
+ * Los de integración ejercitan `notifyOnFollowHandler` contra el emulador de
+ * Firestore para verificar el lookup del displayName + la llamada a sendFcm.
+ *
+ * REQ: REQ-FOLLOW-014
  */
 
 import * as admin from "firebase-admin";
 import {
-  buildFriendshipCopy,
-  notifyOnFriendshipHandler,
-  resolveFriendshipNotif,
+  buildFollowCopy,
+  notifyOnFollowHandler,
+  resolveFollowNotif,
 } from "../notifications/notify-friendship";
 
-// ─── Unit tests (no emulator) ──────────────────────────────────────────────
+// ─── Unit tests (sin emulador) ─────────────────────────────────────────────
 
-describe("resolveFriendshipNotif — pure branching", () => {
-  const members = ["alice", "bob"];
+describe("resolveFollowNotif — ramas puras", () => {
+  /** Arista dirigida: alice sigue a bob. */
+  const edge = (status: string) => ({
+    followerUid: "alice",
+    followeeUid: "bob",
+    status,
+  });
 
-  it("skips when after is undefined (delete/unfollow)", () => {
-    expect(resolveFriendshipNotif(undefined, undefined)).toEqual({
+  it("skip cuando after es undefined (delete / unfollow)", () => {
+    expect(resolveFollowNotif(undefined, undefined)).toEqual({
       kind: "skip",
       reason: "after missing (delete or unfollow)",
     });
   });
 
-  it("skips when required fields are missing (no requesterId)", () => {
-    const after = { status: "pending", members };
-    expect(resolveFriendshipNotif(undefined, after)).toEqual({
-      kind: "skip",
-      reason: "missing required fields",
-    });
+  it("skip cuando falta followerUid", () => {
+    expect(
+      resolveFollowNotif(undefined, { status: "pending", followeeUid: "bob" }),
+    ).toEqual({ kind: "skip", reason: "missing required fields" });
   });
 
-  it("skips when members[] does not have exactly 2 entries", () => {
-    const after = { status: "pending", requesterId: "alice", members: ["alice"] };
-    expect(resolveFriendshipNotif(undefined, after)).toEqual({
-      kind: "skip",
-      reason: "missing required fields",
-    });
+  it("skip cuando falta followeeUid", () => {
+    expect(
+      resolveFollowNotif(undefined, { status: "pending", followerUid: "alice" }),
+    ).toEqual({ kind: "skip", reason: "missing required fields" });
   });
 
-  it("skips when the other party cannot be inferred (requester is both)", () => {
-    // Corrupt shape: members has 2 entries but they're both the requester.
-    const after = {
-      status: "pending",
-      requesterId: "alice",
-      members: ["alice", "alice"],
-    };
-    expect(resolveFriendshipNotif(undefined, after)).toEqual({
-      kind: "skip",
-      reason: "cannot infer other party from members",
-    });
+  it("skip ante una arista reflexiva (follower == followee)", () => {
+    expect(
+      resolveFollowNotif(undefined, {
+        status: "pending",
+        followerUid: "alice",
+        followeeUid: "alice",
+      }),
+    ).toEqual({ kind: "skip", reason: "reflexive edge" });
   });
 
-  it("resolves create + pending as request-received to the target", () => {
-    const after = { status: "pending", requesterId: "alice", members };
-    expect(resolveFriendshipNotif(undefined, after)).toEqual({
+  it("skip ante la forma LEGACY de friendships (requesterId + members)", () => {
+    // Un residuo sin migrar no tiene que resolver "por casualidad": si
+    // resolviera, dispararía pushes por relaciones viejas.
+    expect(
+      resolveFollowNotif(undefined, {
+        status: "pending",
+        requesterId: "alice",
+        members: ["alice", "bob"],
+      }),
+    ).toEqual({ kind: "skip", reason: "missing required fields" });
+  });
+
+  it("create + pending → request-received al DESTINATARIO", () => {
+    expect(resolveFollowNotif(undefined, edge("pending"))).toEqual({
       kind: "request-received",
       recipientUid: "bob",
       actorUid: "alice",
     });
   });
 
-  it("resolves create + accepted as auto-followed (public target path)", () => {
-    const after = { status: "accepted", requesterId: "alice", members };
-    expect(resolveFriendshipNotif(undefined, after)).toEqual({
+  it("create + accepted → auto-followed (camino de perfil público)", () => {
+    expect(resolveFollowNotif(undefined, edge("accepted"))).toEqual({
       kind: "auto-followed",
       recipientUid: "bob",
       actorUid: "alice",
     });
   });
 
-  it("resolves pending → accepted as request-accepted to the requester", () => {
-    const before = { status: "pending", requesterId: "alice", members };
-    const after = { status: "accepted", requesterId: "alice", members };
-    expect(resolveFriendshipNotif(before, after)).toEqual({
+  it("pending → accepted → request-accepted al FOLLOWER", () => {
+    expect(resolveFollowNotif(edge("pending"), edge("accepted"))).toEqual({
       kind: "request-accepted",
       recipientUid: "alice",
       actorUid: "bob",
     });
   });
 
-  it("skips no-op update where status is unchanged (pending→pending)", () => {
-    const before = { status: "pending", requesterId: "alice", members };
-    const after = { status: "pending", requesterId: "alice", members };
-    expect(resolveFriendshipNotif(before, after)).toEqual({
+  it("la dirección sale de la arista, no del orden alfabético", () => {
+    // `zoe` sigue a `alice`: el destinatario es alice y el actor es zoe, aunque
+    // alice ordene primero. Mata la mutación de ordenar el par.
+    expect(
+      resolveFollowNotif(undefined, {
+        followerUid: "zoe",
+        followeeUid: "alice",
+        status: "pending",
+      }),
+    ).toEqual({
+      kind: "request-received",
+      recipientUid: "alice",
+      actorUid: "zoe",
+    });
+  });
+
+  it("resuelve sin `members` en el documento", () => {
+    // `members` existe para el barrido del borrado de cuenta (LD-01), no para
+    // deducir el sentido de la arista.
+    expect(resolveFollowNotif(undefined, edge("pending")).kind).toBe(
+      "request-received",
+    );
+  });
+
+  it("skip en un update no-op (pending→pending)", () => {
+    expect(resolveFollowNotif(edge("pending"), edge("pending"))).toEqual({
       kind: "skip",
       reason: "update without pending→accepted transition",
     });
   });
 
-  it("skips no-op update where status is unchanged (accepted→accepted)", () => {
-    const before = { status: "accepted", requesterId: "alice", members };
-    const after = { status: "accepted", requesterId: "alice", members };
-    expect(resolveFriendshipNotif(before, after)).toEqual({
+  it("skip en un update no-op (accepted→accepted)", () => {
+    expect(resolveFollowNotif(edge("accepted"), edge("accepted"))).toEqual({
       kind: "skip",
       reason: "update without pending→accepted transition",
     });
   });
 
-  it("skips illegal downgrade accepted → pending", () => {
-    // Rules don't allow this write, but a bad admin-SDK call could try it —
-    // resolver defensively refuses to notify.
-    const before = { status: "accepted", requesterId: "alice", members };
-    const after = { status: "pending", requesterId: "alice", members };
-    expect(resolveFriendshipNotif(before, after)).toEqual({
+  it("skip ante un downgrade ilegal accepted → pending", () => {
+    // Las rules no permiten este write, pero una llamada mala del Admin SDK
+    // podría intentarlo — el resolver se niega a notificar por las dudas.
+    expect(resolveFollowNotif(edge("accepted"), edge("pending"))).toEqual({
       kind: "skip",
       reason: "update without pending→accepted transition",
     });
   });
 
-  it("skips create with unexpected status", () => {
-    const after = { status: "blocked", requesterId: "alice", members };
-    expect(resolveFriendshipNotif(undefined, after)).toEqual({
+  it("skip en un create con status inesperado", () => {
+    expect(resolveFollowNotif(undefined, edge("blocked"))).toEqual({
       kind: "skip",
       reason: 'unknown status "blocked"',
     });
   });
 });
 
-describe("buildFriendshipCopy — es-AR copy", () => {
-  it("es-AR copy for request-received", () => {
-    expect(buildFriendshipCopy("request-received", "Sofía")).toBe(
+describe("buildFollowCopy — copy es-AR (INTACTO)", () => {
+  it("request-received", () => {
+    expect(buildFollowCopy("request-received", "Sofía")).toBe(
       "Sofía te envió una solicitud de seguidor",
     );
   });
 
-  it("es-AR copy for auto-followed", () => {
-    expect(buildFriendshipCopy("auto-followed", "Sofía")).toBe(
+  it("auto-followed", () => {
+    expect(buildFollowCopy("auto-followed", "Sofía")).toBe(
       "Sofía empezó a seguirte",
     );
   });
 
-  it("es-AR copy for request-accepted", () => {
-    expect(buildFriendshipCopy("request-accepted", "Sofía")).toBe(
+  it("request-accepted", () => {
+    expect(buildFollowCopy("request-accepted", "Sofía")).toBe(
       "Sofía aceptó tu solicitud",
     );
   });
 });
 
-// ─── Integration tests (require emulator) ──────────────────────────────────
+// ─── Integration tests (requieren emulador) ────────────────────────────────
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
@@ -168,7 +196,7 @@ let testApp: admin.app.App;
 beforeAll(() => {
   testApp = admin.initializeApp(
     { projectId: "treino-dev" },
-    "notify-friendship-test",
+    "notify-follow-test",
   );
 });
 
@@ -209,10 +237,15 @@ async function cleanup(...uids: string[]): Promise<void> {
   }
 }
 
-describe("notifyOnFriendshipHandler — integration", () => {
-  const alice = "friend-int-alice";
-  const bob = "friend-int-bob";
-  const members = [alice, bob];
+describe("notifyOnFollowHandler — integración", () => {
+  const alice = "follow-int-alice";
+  const bob = "follow-int-bob";
+  /** alice sigue a bob. */
+  const edge = (status: string) => ({
+    followerUid: alice,
+    followeeUid: bob,
+    status,
+  });
 
   beforeEach(async () => {
     await seedUser(alice, ["alice-token"]);
@@ -223,76 +256,74 @@ describe("notifyOnFriendshipHandler — integration", () => {
 
   afterEach(() => cleanup(alice, bob));
 
-  it("create pending → sends to target (bob) with actor name (Alicia)", async () => {
+  it("create pending → le llega al destinatario (bob) con el nombre del actor", async () => {
     const mock = makeMockMessaging();
-    const after = { status: "pending", requesterId: alice, members };
 
-    await notifyOnFriendshipHandler(testApp, undefined, after, mock);
+    await notifyOnFollowHandler(testApp, undefined, edge("pending"), mock);
 
     expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
-    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock
+      .calls[0][0] as admin.messaging.MulticastMessage;
     expect(callArg.tokens).toContain("bob-token");
     expect(callArg.tokens).not.toContain("alice-token");
     expect(callArg.notification?.body).toBe(
       "Alicia te envió una solicitud de seguidor",
     );
     expect(callArg.data?.deepLink).toBe(`/feed/profile/${alice}`);
-    expect(callArg.data?.kind).toBe("request-received");
+    expect(callArg.data?.kind).toBe("friend-request");
   });
 
-  it("create accepted (auto) → sends to target with 'empezó a seguirte'", async () => {
+  it("create accepted (auto) → le llega al destinatario con 'empezó a seguirte'", async () => {
     const mock = makeMockMessaging();
-    const after = { status: "accepted", requesterId: alice, members };
 
-    await notifyOnFriendshipHandler(testApp, undefined, after, mock);
+    await notifyOnFollowHandler(testApp, undefined, edge("accepted"), mock);
 
-    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock
+      .calls[0][0] as admin.messaging.MulticastMessage;
     expect(callArg.tokens).toContain("bob-token");
     expect(callArg.notification?.body).toBe("Alicia empezó a seguirte");
-    expect(callArg.data?.kind).toBe("auto-followed");
+    expect(callArg.data?.kind).toBe("friend-follow");
   });
 
-  it("pending → accepted → sends to requester (alice) with 'aceptó tu solicitud'", async () => {
+  it("pending → accepted → le llega al follower (alice) con 'aceptó tu solicitud'", async () => {
     const mock = makeMockMessaging();
-    const before = { status: "pending", requesterId: alice, members };
-    const after = { status: "accepted", requesterId: alice, members };
 
-    await notifyOnFriendshipHandler(testApp, before, after, mock);
+    await notifyOnFollowHandler(testApp, edge("pending"), edge("accepted"), mock);
 
-    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock
+      .calls[0][0] as admin.messaging.MulticastMessage;
     expect(callArg.tokens).toContain("alice-token");
     expect(callArg.tokens).not.toContain("bob-token");
     expect(callArg.notification?.body).toBe("Bruno aceptó tu solicitud");
     expect(callArg.data?.deepLink).toBe(`/feed/profile/${bob}`);
-    expect(callArg.data?.kind).toBe("request-accepted");
+    expect(callArg.data?.kind).toBe("friend-accepted");
   });
 
-  it("delete (after undefined) → sendFcm NOT called", async () => {
+  it("delete (after undefined) → NO se llama a sendFcm", async () => {
     const mock = makeMockMessaging();
 
-    await notifyOnFriendshipHandler(testApp, undefined, undefined, mock);
+    await notifyOnFollowHandler(testApp, undefined, undefined, mock);
 
     expect(mock.sendEachForMulticast as jest.Mock).not.toHaveBeenCalled();
   });
 
-  it("no-op update (same status) → sendFcm NOT called", async () => {
+  it("update no-op (mismo status) → NO se llama a sendFcm", async () => {
     const mock = makeMockMessaging();
-    const doc = { status: "pending", requesterId: alice, members };
 
-    await notifyOnFriendshipHandler(testApp, doc, doc, mock);
+    await notifyOnFollowHandler(testApp, edge("pending"), edge("pending"), mock);
 
     expect(mock.sendEachForMulticast as jest.Mock).not.toHaveBeenCalled();
   });
 
-  it("actor missing public profile → falls back to 'Alguien'", async () => {
-    await cleanup(alice); // wipe alice's profile
-    await seedUser(alice, ["alice-token"]); // but keep her token doc
+  it("actor sin perfil público → cae a 'Alguien'", async () => {
+    await cleanup(alice); // se borra el perfil de alice
+    await seedUser(alice, ["alice-token"]); // pero se conserva su doc de tokens
     const mock = makeMockMessaging();
-    const after = { status: "pending", requesterId: alice, members };
 
-    await notifyOnFriendshipHandler(testApp, undefined, after, mock);
+    await notifyOnFollowHandler(testApp, undefined, edge("pending"), mock);
 
-    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock
+      .calls[0][0] as admin.messaging.MulticastMessage;
     expect(callArg.notification?.body).toBe(
       "Alguien te envió una solicitud de seguidor",
     );

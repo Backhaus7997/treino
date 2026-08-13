@@ -68,7 +68,10 @@ void main() {
 
       expect(find.text('12'), findsOneWidget);
       expect(find.text('8'), findsOneWidget);
-      expect(find.text('12000'), findsOneWidget);
+      // Volume uses the shared formatVolumeKg: from 10 000 up it compacts
+      // ("12k"), matching the radar card on the same screen (#378).
+      expect(find.text('12k'), findsOneWidget);
+      expect(find.text('12000'), findsNothing);
       expect(find.text('96'), findsOneWidget);
     });
 

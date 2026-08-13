@@ -180,7 +180,15 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('BUENAS, JOACO'), findsOneWidget);
+      // El saludo es un RichText: "BUENAS, " (blanco) + "JOACO" (mint).
+      final greeting = tester.widgetList<RichText>(find.byType(RichText)).where(
+        (rt) {
+          final s = rt.text.toPlainText();
+          return s.contains('BUENAS,') && s.contains('JOACO');
+        },
+      );
+      expect(greeting, isNotEmpty,
+          reason: 'saludo con "BUENAS, " + nombre en mint');
     });
   });
 
@@ -231,7 +239,7 @@ void main() {
 
       // 3 active, 1 paused → tile shows '3'
       // The label is present:
-      expect(find.textContaining('Alumnos activos'), findsOneWidget);
+      expect(find.textContaining('ALUMNOS ACTIVOS'), findsOneWidget);
     });
   });
 
@@ -245,7 +253,7 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Adherencia promedio'), findsOneWidget);
+      expect(find.textContaining('ADHERENCIA PROMEDIO'), findsOneWidget);
     });
   });
 

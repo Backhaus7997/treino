@@ -62,11 +62,14 @@ void main() {
     when(() => user.email).thenReturn('a@b.c');
     when(() => user.displayName).thenReturn('Ana');
 
-    // Default stubs so existing tests that don't care about repo still work
+    // Default stubs so existing tests that don't care about repo still work.
+    // termsAcceptedAt must be matched too — signUpWithEmail always passes it
+    // now (QA-AUTH-001, issue #434), so a stub without it would not match.
     when(
       () => mockRepo.getOrCreate(
         uid: any(named: 'uid'),
         email: any(named: 'email'),
+        termsAcceptedAt: any(named: 'termsAcceptedAt'),
       ),
     ).thenAnswer((_) async => _fakeProfile);
     when(
@@ -157,8 +160,36 @@ void main() {
         () => mockRepo.getOrCreate(
           uid: any(named: 'uid'),
           email: any(named: 'email'),
+          termsAcceptedAt: any(named: 'termsAcceptedAt'),
         ),
       ).called(1);
+    });
+
+    // QA-AUTH-001 (issue #434): the Register checkbox gate happens before
+    // signUpWithEmail is ever called — by the time we get here the user has
+    // already accepted, so the signup call itself must record a non-null
+    // consent timestamp.
+    test(
+        'QA-AUTH-001: signUpWithEmail passes a non-null termsAcceptedAt to getOrCreate',
+        () async {
+      when(
+        () => fbAuth.createUserWithEmailAndPassword(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+        ),
+      ).thenAnswer((_) async => cred);
+      when(() => user.sendEmailVerification()).thenAnswer((_) async {});
+
+      await sut.signUpWithEmail(email: 'a@b.c', password: 'Pass1234');
+
+      final captured = verify(
+        () => mockRepo.getOrCreate(
+          uid: any(named: 'uid'),
+          email: any(named: 'email'),
+          termsAcceptedAt: captureAny(named: 'termsAcceptedAt'),
+        ),
+      ).captured;
+      expect(captured.single, isA<DateTime>());
     });
 
     // T30: SCENARIO-021 — rollback: getOrCreate throws → user.delete() called
@@ -177,6 +208,7 @@ void main() {
         () => mockRepo.getOrCreate(
           uid: any(named: 'uid'),
           email: any(named: 'email'),
+          termsAcceptedAt: any(named: 'termsAcceptedAt'),
         ),
       ).thenThrow(Exception('firestore down'));
 
@@ -226,6 +258,7 @@ void main() {
         () => mockRepo.getOrCreate(
           uid: any(named: 'uid'),
           email: any(named: 'email'),
+          termsAcceptedAt: any(named: 'termsAcceptedAt'),
         ),
       ).thenThrow(Exception('firestore down'));
 

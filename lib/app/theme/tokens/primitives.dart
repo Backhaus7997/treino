@@ -80,6 +80,37 @@ abstract final class AppColorPrimitives {
   static const Color warningAmberDark = Color(0xFFFB8C00);
 
   // ---------------------------------------------------------------------------
+  // Familia Reactions (reacciones del feed)
+  // ---------------------------------------------------------------------------
+
+  /// `#FF4D6D` — Rosa de "me gusta", estado dark.
+  static const Color reactionLike = Color(0xFFFF4D6D);
+
+  /// `#E63950` — Rosa de "me gusta", estado light (mayor contraste).
+  static const Color reactionLikeDark = Color(0xFFE63950);
+
+  /// `#FF7A2F` — Naranja de "fuego", estado dark.
+  static const Color reactionFire = Color(0xFFFF7A2F);
+
+  /// `#F4630C` — Naranja de "fuego", estado light (mayor contraste).
+  static const Color reactionFireDark = Color(0xFFF4630C);
+
+  /// `#FFC93C` — Ámbar de "aplauso", estado dark.
+  static const Color reactionClap = Color(0xFFFFC93C);
+
+  /// `#D99000` — Ámbar dorado de "aplauso", estado light.
+  ///
+  /// Es ámbar dorado y no el mostaza `#B87500` que salía de maximizar
+  /// contraste: a ese tono los aplausos se leían apagados y no como el emoji
+  /// 👏.
+  ///
+  /// Da ~3:1 sobre `bgCard`, algo menos que los otros dos, y es aceptable acá
+  /// porque el color NO es el único indicador de estado: la reacción propia
+  /// además cambia de contorno a relleno. Un daltónico distingue el estado por
+  /// la forma sin depender del tono. Ver `_iconFor` en `post_reactions_row.dart`.
+  static const Color reactionClapDark = Color(0xFFD99000);
+
+  // ---------------------------------------------------------------------------
   // Colores neutros absolutos
   // ---------------------------------------------------------------------------
 
@@ -136,6 +167,53 @@ abstract final class AppColorPrimitives {
 
   /// `#0F1513` — Texto primario sobre fondos light.
   static const Color inkText900 = Color(0xFF0F1513);
+}
+
+/// Capa 1 — Paletas DECORATIVAS multi-tono.
+///
+/// A diferencia de [AppColorPrimitives], que es insumo exclusivo de la capa
+/// semántica, estas paletas SÍ pueden referenciarse desde un widget: no
+/// representan un rol semántico (acento, peligro, borde) sino un conjunto
+/// arbitrario de tonos usado por su variedad, no por su significado.
+///
+/// Viven acá por una razón mecánica: `no_hex_scan_test` permite hex literal
+/// únicamente en este archivo, y su ratchet prohíbe agrandar la allowlist. Que
+/// el hex viva acá mantiene una sola fuente de verdad de valores crudos sin
+/// contaminar el contrato de [AppColorPrimitives].
+abstract final class AppDecorativePalettes {
+  /// Paleta del confeti de festejo (`TreinoConfetti`).
+  ///
+  /// Set fijo y variado, **deliberadamente NO ligado a Mint Magenta**: si el
+  /// festejo usara los acentos de marca se sentiría como "dos tonos de la
+  /// marca otra vez" en vez de una celebración. Esa era la excepción que el
+  /// autor de `treino_confetti.dart` documentó a mano; se preserva el criterio
+  /// y sólo se muda el valor.
+  static const List<Color> confetti = [
+    Color(0xFFFF6B6B), // rojo coral
+    Color(0xFFFFD93D), // amarillo
+    Color(0xFF6BCB77), // verde
+    Color(0xFF4D96FF), // azul
+    Color(0xFFB983FF), // violeta
+    Color(0xFFFF9F45), // naranja
+    Color(0xFFFF6FB5), // rosa
+  ];
+
+  /// Paleta de avatares del chat del Coach Hub.
+  ///
+  /// Se elige de forma determinística a partir del uid, así el mismo alumno
+  /// siempre tiene el mismo color. Tonos saturados que contrastan sobre fondos
+  /// oscuros y con la inicial en blanco. El ORDEN es significativo: cambiarlo
+  /// le cambia el color a todos los usuarios existentes.
+  static const List<Color> avatar = [
+    Color(0xFF8B5CF6), // violeta
+    Color(0xFFF59E0B), // ámbar
+    Color(0xFFEF4444), // rojo
+    Color(0xFF10B981), // verde
+    Color(0xFF3B82F6), // azul
+    Color(0xFFEC4899), // rosa
+    Color(0xFF14B8A6), // teal
+    Color(0xFFF97316), // naranja
+  ];
 }
 
 /// Capa 1 — Tokens de spacing del sistema de diseño TREINO.

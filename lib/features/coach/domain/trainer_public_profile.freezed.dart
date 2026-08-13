@@ -44,7 +44,17 @@ mixin _$TrainerPublicProfile {
 // ADR-RV-004: lives on TrainerPublicProfile for O(1) discovery reads.
 // ADR-RV-005: MUST NOT appear in UserRepository._trainerPublicFields.
   double? get averageRating => throw _privateConstructorUsedError;
-  int get reviewCount => throw _privateConstructorUsedError;
+  int get reviewCount =>
+      throw _privateConstructorUsedError; // ── Stats reales del perfil público (#388) ─────────────────────────────
+// `trainerExperienceYears` es self-attested: lo edita el PF en su form y
+// llega acá vía el dual-write de UserRepository (como trainerBio).
+// `athleteCount` es un agregado derivado (count de trainer_links activos),
+// escrito exclusivamente por el linkAggregate Cloud Function — mismo
+// contrato que averageRating/reviewCount: MUST NOT aparecer en
+// UserRepository._trainerPublicFields ni ser escribible por el cliente
+// (pin en firestore.rules). Null ⇒ nunca computado → la UI muestra "—".
+  int? get trainerExperienceYears => throw _privateConstructorUsedError;
+  int? get athleteCount => throw _privateConstructorUsedError;
 
   /// Serializes this TrainerPublicProfile to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -79,7 +89,9 @@ abstract class $TrainerPublicProfileCopyWith<$Res> {
       List<String> trainerGeohashes,
       bool trainerOffersOnline,
       double? averageRating,
-      int reviewCount});
+      int reviewCount,
+      int? trainerExperienceYears,
+      int? athleteCount});
 }
 
 /// @nodoc
@@ -114,6 +126,8 @@ class _$TrainerPublicProfileCopyWithImpl<$Res,
     Object? trainerOffersOnline = null,
     Object? averageRating = freezed,
     Object? reviewCount = null,
+    Object? trainerExperienceYears = freezed,
+    Object? athleteCount = freezed,
   }) {
     return _then(_value.copyWith(
       uid: null == uid
@@ -180,6 +194,14 @@ class _$TrainerPublicProfileCopyWithImpl<$Res,
           ? _value.reviewCount
           : reviewCount // ignore: cast_nullable_to_non_nullable
               as int,
+      trainerExperienceYears: freezed == trainerExperienceYears
+          ? _value.trainerExperienceYears
+          : trainerExperienceYears // ignore: cast_nullable_to_non_nullable
+              as int?,
+      athleteCount: freezed == athleteCount
+          ? _value.athleteCount
+          : athleteCount // ignore: cast_nullable_to_non_nullable
+              as int?,
     ) as $Val);
   }
 }
@@ -209,7 +231,9 @@ abstract class _$$TrainerPublicProfileImplCopyWith<$Res>
       List<String> trainerGeohashes,
       bool trainerOffersOnline,
       double? averageRating,
-      int reviewCount});
+      int reviewCount,
+      int? trainerExperienceYears,
+      int? athleteCount});
 }
 
 /// @nodoc
@@ -241,6 +265,8 @@ class __$$TrainerPublicProfileImplCopyWithImpl<$Res>
     Object? trainerOffersOnline = null,
     Object? averageRating = freezed,
     Object? reviewCount = null,
+    Object? trainerExperienceYears = freezed,
+    Object? athleteCount = freezed,
   }) {
     return _then(_$TrainerPublicProfileImpl(
       uid: null == uid
@@ -307,6 +333,14 @@ class __$$TrainerPublicProfileImplCopyWithImpl<$Res>
           ? _value.reviewCount
           : reviewCount // ignore: cast_nullable_to_non_nullable
               as int,
+      trainerExperienceYears: freezed == trainerExperienceYears
+          ? _value.trainerExperienceYears
+          : trainerExperienceYears // ignore: cast_nullable_to_non_nullable
+              as int?,
+      athleteCount: freezed == athleteCount
+          ? _value.athleteCount
+          : athleteCount // ignore: cast_nullable_to_non_nullable
+              as int?,
     ));
   }
 }
@@ -331,7 +365,9 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
       final List<String> trainerGeohashes = const <String>[],
       this.trainerOffersOnline = false,
       this.averageRating,
-      this.reviewCount = 0})
+      this.reviewCount = 0,
+      this.trainerExperienceYears,
+      this.athleteCount})
       : _trainerLocations = trainerLocations,
         _trainerGeohashes = trainerGeohashes;
 
@@ -397,10 +433,22 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
   @override
   @JsonKey()
   final int reviewCount;
+// ── Stats reales del perfil público (#388) ─────────────────────────────
+// `trainerExperienceYears` es self-attested: lo edita el PF en su form y
+// llega acá vía el dual-write de UserRepository (como trainerBio).
+// `athleteCount` es un agregado derivado (count de trainer_links activos),
+// escrito exclusivamente por el linkAggregate Cloud Function — mismo
+// contrato que averageRating/reviewCount: MUST NOT aparecer en
+// UserRepository._trainerPublicFields ni ser escribible por el cliente
+// (pin en firestore.rules). Null ⇒ nunca computado → la UI muestra "—".
+  @override
+  final int? trainerExperienceYears;
+  @override
+  final int? athleteCount;
 
   @override
   String toString() {
-    return 'TrainerPublicProfile(uid: $uid, displayName: $displayName, displayNameLowercase: $displayNameLowercase, avatarUrl: $avatarUrl, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerGeohash: $trainerGeohash, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerMonthlyRate: $trainerMonthlyRate, paymentAlias: $paymentAlias, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline, averageRating: $averageRating, reviewCount: $reviewCount)';
+    return 'TrainerPublicProfile(uid: $uid, displayName: $displayName, displayNameLowercase: $displayNameLowercase, avatarUrl: $avatarUrl, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerGeohash: $trainerGeohash, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerMonthlyRate: $trainerMonthlyRate, paymentAlias: $paymentAlias, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline, averageRating: $averageRating, reviewCount: $reviewCount, trainerExperienceYears: $trainerExperienceYears, athleteCount: $athleteCount)';
   }
 
   @override
@@ -438,7 +486,11 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
             (identical(other.averageRating, averageRating) ||
                 other.averageRating == averageRating) &&
             (identical(other.reviewCount, reviewCount) ||
-                other.reviewCount == reviewCount));
+                other.reviewCount == reviewCount) &&
+            (identical(other.trainerExperienceYears, trainerExperienceYears) ||
+                other.trainerExperienceYears == trainerExperienceYears) &&
+            (identical(other.athleteCount, athleteCount) ||
+                other.athleteCount == athleteCount));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -460,7 +512,9 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
       const DeepCollectionEquality().hash(_trainerGeohashes),
       trainerOffersOnline,
       averageRating,
-      reviewCount);
+      reviewCount,
+      trainerExperienceYears,
+      athleteCount);
 
   /// Create a copy of TrainerPublicProfile
   /// with the given fields replaced by the non-null parameter values.
@@ -498,7 +552,9 @@ abstract class _TrainerPublicProfile implements TrainerPublicProfile {
       final List<String> trainerGeohashes,
       final bool trainerOffersOnline,
       final double? averageRating,
-      final int reviewCount}) = _$TrainerPublicProfileImpl;
+      final int reviewCount,
+      final int? trainerExperienceYears,
+      final int? athleteCount}) = _$TrainerPublicProfileImpl;
 
   factory _TrainerPublicProfile.fromJson(Map<String, dynamic> json) =
       _$TrainerPublicProfileImpl.fromJson;
@@ -542,7 +598,18 @@ abstract class _TrainerPublicProfile implements TrainerPublicProfile {
   @override
   double? get averageRating;
   @override
-  int get reviewCount;
+  int get reviewCount; // ── Stats reales del perfil público (#388) ─────────────────────────────
+// `trainerExperienceYears` es self-attested: lo edita el PF en su form y
+// llega acá vía el dual-write de UserRepository (como trainerBio).
+// `athleteCount` es un agregado derivado (count de trainer_links activos),
+// escrito exclusivamente por el linkAggregate Cloud Function — mismo
+// contrato que averageRating/reviewCount: MUST NOT aparecer en
+// UserRepository._trainerPublicFields ni ser escribible por el cliente
+// (pin en firestore.rules). Null ⇒ nunca computado → la UI muestra "—".
+  @override
+  int? get trainerExperienceYears;
+  @override
+  int? get athleteCount;
 
   /// Create a copy of TrainerPublicProfile
   /// with the given fields replaced by the non-null parameter values.

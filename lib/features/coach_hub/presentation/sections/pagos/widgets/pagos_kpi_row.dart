@@ -8,6 +8,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/core/widgets/motion/treino_count_up.dart';
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart'
     show pagosPorCobrarProvider;
 
@@ -16,7 +17,9 @@ import 'payment_format.dart';
 
 // ── KpiTile ───────────────────────────────────────────────────────────────────
 
-/// Tile individual de KPI (etiqueta + valor formateado).
+/// Tile individual de KPI (etiqueta + monto animado). El monto cuenta desde
+/// el valor previamente mostrado hacia [value] (TreinoCountUp no reinicia en
+/// 0 entre rebuilds), consistente con el resto de las cifras "hero" de la app.
 class KpiTile extends StatelessWidget {
   const KpiTile({
     super.key,
@@ -25,7 +28,10 @@ class KpiTile extends StatelessWidget {
   });
 
   final String label;
-  final String value;
+
+  /// Monto en ARS (entero, sin formatear — [TreinoCountUp] formatea vía
+  /// [fmtArs] en cada frame de la animación).
+  final int value;
 
   @override
   Widget build(BuildContext context) {
@@ -46,8 +52,9 @@ class KpiTile extends StatelessWidget {
             style: TextStyle(color: palette.textMuted, fontSize: 12),
           ),
           const SizedBox(height: 6),
-          Text(
-            value,
+          TreinoCountUp(
+            value: value,
+            formatter: (v) => fmtArs(v.round()),
             style: TextStyle(
               color: palette.textPrimary,
               fontSize: 22,
@@ -104,17 +111,17 @@ class PagosKpiRow extends ConsumerWidget {
       children: [
         KpiTile(
           label: 'Ingreso del mes', // i18n
-          value: fmtArs(ingresoMes),
+          value: ingresoMes,
         ),
         const SizedBox(width: 12),
         KpiTile(
           label: 'Pendiente cobrar', // i18n
-          value: fmtArs(pendienteCobrar),
+          value: pendienteCobrar,
         ),
         const SizedBox(width: 12),
         KpiTile(
           label: 'Vencido', // i18n
-          value: fmtArs(vencidoTotal),
+          value: vencidoTotal,
         ),
       ],
     );

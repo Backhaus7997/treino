@@ -16,6 +16,19 @@ Admin SDK utilities operated by the team against `treino-dev` and (rarely) `trei
   cd scripts && npm install
   ```
 
+### Running against the emulator (no service-account key)
+
+Every Admin SDK script here checks `FIRESTORE_EMULATOR_HOST` **before** loading
+`sa-key.json`. Set it and the script initializes against the local emulator
+(`projectId: 'treino-dev'`) with no credentials at all:
+
+```sh
+FIRESTORE_EMULATOR_HOST=localhost:8080 node scripts/<script>.js
+```
+
+Without that env var the key is required, and a missing `sa-key.json` fails
+with an actionable message instead of a raw `MODULE_NOT_FOUND`.
+
 ---
 
 ## promote_user_to_trainer.js
@@ -53,6 +66,36 @@ The user reopens the app → `authRedirect` detects
 `role == trainer && !trainerProfileComplete` and routes them to
 `/profile/edit-trainer?mode=onboarding`. Back navigation is blocked until the
 form is submitted. On save the user lands on `/home` as a discoverable trainer.
+
+---
+
+## seed_emulator_full.js (Emulator seed)
+
+EMULATOR-ONLY full-stack seed for manual testing. Refuses to run without
+`FIREBASE_AUTH_EMULATOR_HOST` + `FIRESTORE_EMULATOR_HOST` set.
+
+```sh
+FIREBASE_AUTH_EMULATOR_HOST=localhost:9099 \
+FIRESTORE_EMULATOR_HOST=localhost:8080 \
+node scripts/seed_emulator_full.js          # seed (idempotent, re-run safe)
+node scripts/seed_emulator_full.js --clear  # remove everything it created
+```
+
+Populates: Auth users (3 coaches + 5 athletes, throwaway passwords printed at
+the end), `gyms`, `users` + `userPublicProfiles` + `trainerPublicProfiles`,
+`trainer_links`, `friendships`, the **`exercises` stock catalogue** (reused
+from `seed_workout_catalog.js` — same data prod uses), `routines`
+(trainer-assigned plans + a public template), historical sessions under
+`users/{uid}/sessions` **with realistic `setLogs` subcollections**
+(deterministic progressive weights ramping onto each slot's `targetWeightKg`;
+`totalVolumeKg` = Σ reps×kg of the generated sets; partial sessions stop
+mid-workout), `posts` (all privacy levels), `appointments`, and
+`coach_availability_rules`.
+
+Dates are relative to the run instant; pin `SEED_NOW=<ISO date>` for
+reproducible data. Session `muscleGroup` values use the canonical English keys
+(`chest`, `back`, …) exactly like app-written data — Insights' muscle pipeline
+(radar, Músculos del día, Volumen por grupo) depends on them.
 
 ---
 
@@ -98,7 +141,8 @@ node scripts/backfill_gym_names.js
 ```
 
 Both scripts:
-- Print the target `project_id` (from `sa-key.json`) before doing anything,
+- Print the target `project_id` (from `sa-key.json`, or `treino-dev` when
+  `FIRESTORE_EMULATOR_HOST` is set) before doing anything,
   and **refuse to run** unless the project id looks like a dev project
   (contains "dev"). Pass `--allow-prod` to override, only after dev
   verification + maintainer sign-off.

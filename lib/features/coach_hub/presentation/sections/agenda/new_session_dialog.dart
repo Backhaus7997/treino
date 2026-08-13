@@ -14,9 +14,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../../app/theme/app_motion.dart';
 import '../../../../../app/theme/app_palette.dart';
+import '../../../../../core/widgets/motion/treino_fade_slide_in.dart';
+import '../../../../../core/widgets/motion/treino_success_check.dart';
+import '../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../coach/application/agenda_providers.dart';
 import '../../../../coach/application/trainer_link_providers.dart';
+import '../../../../coach/domain/compute_free_slots.dart' show isDayBlocked;
 import '../../../../coach/domain/trainer_link.dart';
 import '../../../../coach/domain/trainer_link_status.dart';
 import '../../../../profile/application/user_public_profile_providers.dart';
@@ -165,6 +170,17 @@ class _NewSessionDialogState extends ConsumerState<NewSessionDialog> {
       return;
     }
 
+    // Blocked-day soft warning: comes AFTER cheap sync validations (athlete,
+    // date, duration, auth) so we don't do an async overrides read when the
+    // form is already invalid. This is a warn-but-allow guard, not a hard
+    // stop — confirming still proceeds to createByTrainer below.
+    final blocked = await _isTargetDayBlocked(trainerId: trainerId);
+    if (!mounted) return;
+    if (blocked) {
+      final proceed = await _confirmBlockedDay();
+      if (!mounted || !proceed) return;
+    }
+
     setState(() {
       _saving = true;
       _errorMessage = null;
@@ -190,7 +206,17 @@ class _NewSessionDialogState extends ConsumerState<NewSessionDialog> {
       if (!mounted) return;
       Navigator.of(context).pop(true);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sesión registrada.')), // i18n
+        const SnackBar(
+          // El pop ya pasó — el check no compite con la navegación.
+          content: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TreinoSuccessCheck(size: 18, strokeWidth: 2),
+              SizedBox(width: 10),
+              Flexible(child: Text('Sesión registrada.')), // i18n
+            ],
+          ),
+        ),
       );
     } catch (_) {
       if (!mounted) return;
@@ -200,6 +226,87 @@ class _NewSessionDialogState extends ConsumerState<NewSessionDialog> {
             'No pudimos registrar la sesión. Probá de nuevo.'; // i18n
       });
     }
+  }
+
+  /// Reads overrides for [_date] ± 1 day and checks [isDayBlocked].
+  ///
+  /// Reads the repository directly (`watchOverrides(...).first`) rather than
+  /// `overridesStreamProvider(...).future` — the provider is `autoDispose`
+  /// and nothing else keeps it alive from this one-shot read, so going
+  /// through the repo avoids relying on provider lifecycle for a value we
+  /// only need once, right before submit.
+  ///
+  /// Fail-open: this is a soft warning, not a hard stop. If the read throws
+  /// (permission/offline/etc.) we must not let the exception escape the
+  /// async onPressed handler — that would silently no-op the whole submit.
+  /// On any error we treat the day as NOT blocked so submit proceeds
+  /// normally, just without the warning.
+  Future<bool> _isTargetDayBlocked({required String trainerId}) async {
+    try {
+      final from = _date.subtract(const Duration(days: 1));
+      final to = _date.add(const Duration(days: 1));
+      final overrides = await ref
+          .read(availabilityRepositoryProvider)
+          .watchOverrides(trainerId, from, to)
+          .first;
+      return isDayBlocked(overrides, _date);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Shows the "Día bloqueado" confirm dialog. Returns true if the trainer
+  /// chose to proceed anyway (soft warning — always offers a confirm path).
+  Future<bool> _confirmBlockedDay() async {
+    final palette = AppPalette.of(context);
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: palette.bgCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Día bloqueado', // i18n
+          style: GoogleFonts.barlowCondensed(
+            fontWeight: FontWeight.w700,
+            fontSize: 18,
+            color: palette.textPrimary,
+          ),
+        ),
+        content: Text(
+          'El ${_formatDate(_date)} está marcado como bloqueado en tus '
+          'horarios. ¿Querés cargar la sesión igual?', // i18n
+          style: GoogleFonts.barlow(fontSize: 14, color: palette.textPrimary),
+        ),
+        actions: [
+          OutlinedButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(
+              'Cancelar', // i18n
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                color: palette.textPrimary,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: palette.accent,
+              foregroundColor: palette.bg,
+            ),
+            child: Text(
+              'Cargar igual', // i18n
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────
@@ -232,113 +339,116 @@ class _NewSessionDialogState extends ConsumerState<NewSessionDialog> {
       ),
       content: SizedBox(
         width: 420,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // ── Athlete picker ────────────────────────────────────────
-              _FieldLabel(label: 'ALUMNO', palette: palette), // i18n
-              const SizedBox(height: 8),
-              if (!hasActiveLinks)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Text(
-                    'No tenés alumnos activos todavía.', // i18n
-                    style: GoogleFonts.barlow(
-                      fontSize: 13,
-                      color: palette.textMuted,
+        child: TreinoFadeSlideIn(
+          distance: AppMotion.slideSm,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // ── Athlete picker ────────────────────────────────────────
+                _FieldLabel(label: 'ALUMNO', palette: palette), // i18n
+                const SizedBox(height: 8),
+                if (!hasActiveLinks)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      'No tenés alumnos activos todavía.', // i18n
+                      style: GoogleFonts.barlow(
+                        fontSize: 13,
+                        color: palette.textMuted,
+                      ),
                     ),
+                  )
+                else
+                  _AthleteDropdown(
+                    links: activeLinks,
+                    selectedId: _selectedAthleteId,
+                    palette: palette,
+                    onChanged: (id) => setState(() {
+                      _selectedAthleteId = id;
+                      _errorMessage = null;
+                    }),
                   ),
-                )
-              else
-                _AthleteDropdown(
-                  links: activeLinks,
-                  selectedId: _selectedAthleteId,
+                const SizedBox(height: 14),
+
+                // ── Fecha ─────────────────────────────────────────────────
+                _FieldLabel(label: 'FECHA', palette: palette), // i18n
+                const SizedBox(height: 8),
+                _TappableField(
                   palette: palette,
-                  onChanged: (id) => setState(() {
-                    _selectedAthleteId = id;
+                  text: _formatDate(_date),
+                  onTap: _pickDate,
+                ),
+                const SizedBox(height: 14),
+
+                // ── Hora ──────────────────────────────────────────────────
+                _FieldLabel(label: 'HORA', palette: palette), // i18n
+                const SizedBox(height: 8),
+                _TappableField(
+                  palette: palette,
+                  text: _time.format(context),
+                  onTap: _pickTime,
+                ),
+                const SizedBox(height: 14),
+
+                // ── Duración ──────────────────────────────────────────────
+                _FieldLabel(label: 'DURACIÓN (min)', palette: palette), // i18n
+                const SizedBox(height: 8),
+                _DurationSection(
+                  controller: _durationController,
+                  palette: palette,
+                  onChipTap: (val) => setState(() {
+                    _durationController.text = val.toString();
                     _errorMessage = null;
                   }),
                 ),
-              const SizedBox(height: 14),
+                const SizedBox(height: 14),
 
-              // ── Fecha ─────────────────────────────────────────────────
-              _FieldLabel(label: 'FECHA', palette: palette), // i18n
-              const SizedBox(height: 8),
-              _TappableField(
-                palette: palette,
-                text: _formatDate(_date),
-                onTap: _pickDate,
-              ),
-              const SizedBox(height: 14),
-
-              // ── Hora ──────────────────────────────────────────────────
-              _FieldLabel(label: 'HORA', palette: palette), // i18n
-              const SizedBox(height: 8),
-              _TappableField(
-                palette: palette,
-                text: _time.format(context),
-                onTap: _pickTime,
-              ),
-              const SizedBox(height: 14),
-
-              // ── Duración ──────────────────────────────────────────────
-              _FieldLabel(label: 'DURACIÓN (min)', palette: palette), // i18n
-              const SizedBox(height: 8),
-              _DurationSection(
-                controller: _durationController,
-                palette: palette,
-                onChipTap: (val) => setState(() {
-                  _durationController.text = val.toString();
-                  _errorMessage = null;
-                }),
-              ),
-              const SizedBox(height: 14),
-
-              // ── Nota ──────────────────────────────────────────────────
-              _FieldLabel(label: 'NOTA (opcional)', palette: palette), // i18n
-              const SizedBox(height: 8),
-              TextField(
-                controller: _noteController,
-                maxLines: 2,
-                style: GoogleFonts.barlow(
-                  fontSize: 14,
-                  color: palette.textPrimary,
-                ),
-                decoration: InputDecoration(
-                  hintText: 'Ej: traer banda, primera sesión…', // i18n
-                  hintStyle: GoogleFonts.barlow(
-                    fontSize: 14,
-                    color: palette.textMuted,
-                  ),
-                  filled: true,
-                  fillColor: palette.bg,
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: palette.border),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: palette.accent, width: 1.5),
-                  ),
-                ),
-              ),
-
-              // ── Error message ─────────────────────────────────────────
-              if (_errorMessage != null) ...[
-                const SizedBox(height: 12),
-                Text(
-                  _errorMessage!,
+                // ── Nota ──────────────────────────────────────────────────
+                _FieldLabel(label: 'NOTA (opcional)', palette: palette), // i18n
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _noteController,
+                  maxLines: 2,
                   style: GoogleFonts.barlow(
-                    fontSize: 13,
-                    color: palette.danger,
+                    fontSize: 14,
+                    color: palette.textPrimary,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Ej: traer banda, primera sesión…', // i18n
+                    hintStyle: GoogleFonts.barlow(
+                      fontSize: 14,
+                      color: palette.textMuted,
+                    ),
+                    filled: true,
+                    fillColor: palette.bg,
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: palette.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: palette.accent, width: 1.5),
+                    ),
                   ),
                 ),
-              ],
 
-              const SizedBox(height: 8),
-            ],
+                // ── Error message ─────────────────────────────────────────
+                if (_errorMessage != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    _errorMessage!,
+                    style: GoogleFonts.barlow(
+                      fontSize: 13,
+                      color: palette.danger,
+                    ),
+                  ),
+                ],
+
+                const SizedBox(height: 8),
+              ],
+            ),
           ),
         ),
       ),
@@ -566,30 +676,36 @@ class _TappableField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        decoration: BoxDecoration(
-          color: palette.bg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: palette.border),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                text,
-                style: GoogleFonts.barlow(
-                  fontSize: 14,
-                  color: palette.textPrimary,
+    // MouseRegion(cursor): en web este call-site era InkWell (cursor de
+    // mano al hover); TreinoTappable es un GestureDetector pelado sin
+    // MouseRegion. Fix local seguro — el fix de fondo (cursor/foco dentro de
+    // TreinoTappable) pertenece al widget core, fuera de este slice.
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: TreinoTappable(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          decoration: BoxDecoration(
+            color: palette.bg,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: palette.border),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  text,
+                  style: GoogleFonts.barlow(
+                    fontSize: 14,
+                    color: palette.textPrimary,
+                  ),
                 ),
               ),
-            ),
-            Icon(Icons.edit_calendar_outlined,
-                size: 16, color: palette.textMuted),
-          ],
+              Icon(Icons.edit_calendar_outlined,
+                  size: 16, color: palette.textMuted),
+            ],
+          ),
         ),
       ),
     );

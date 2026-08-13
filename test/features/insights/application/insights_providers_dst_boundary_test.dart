@@ -48,8 +48,10 @@ void main() {
     expect(weekStart.millisecond, 0);
 
     // weekEnd es el último instante de la semana: 1ms antes del siguiente
-    // lunes a medianoche local, calculado por calendario (no por Duration).
-    final nextMonday = DateTime(
+    // lunes a medianoche, calculado por calendario (no por Duration). [#379]
+    // Los bordes viven en el frame ART (UTC-flagged), así que el ancla de
+    // comparación también debe ser DateTime.utc para que coincida el flag.
+    final nextMonday = DateTime.utc(
       weekStart.year,
       weekStart.month,
       weekStart.day + 7,

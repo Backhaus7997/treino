@@ -8,6 +8,7 @@ import 'package:treino/features/reviews/data/review_repository.dart';
 import 'package:treino/features/reviews/domain/review.dart';
 import 'package:treino/features/reviews/presentation/widgets/review_bottom_sheet.dart';
 import 'package:treino/features/reviews/presentation/widgets/star_rating_input.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 class _MockReviewRepository extends Mock implements ReviewRepository {}
 
@@ -39,6 +40,9 @@ Widget _wrapSheet({
     ],
     child: MaterialApp(
       theme: AppTheme.dark(),
+      localizationsDelegates: AppL10n.localizationsDelegates,
+      supportedLocales: AppL10n.supportedLocales,
+      locale: const Locale('es', 'AR'),
       home: Scaffold(
         body: ReviewBottomSheet(
           linkId: _linkId,
@@ -110,7 +114,6 @@ void main() {
       );
       await tester.tap(gestures.first);
       await tester.pump();
-      // i18n: Fase 6 Etapa 7
       final button = tester.widget<ElevatedButton>(
         find.widgetWithText(ElevatedButton, 'ENVIAR'),
       );
@@ -123,6 +126,9 @@ void main() {
         ProviderScope(
           child: MaterialApp(
             theme: AppTheme.dark(),
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('es', 'AR'),
             home: Scaffold(
               body: Builder(builder: (ctx) {
                 return ElevatedButton(

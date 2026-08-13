@@ -97,25 +97,39 @@ void main() {
     });
   });
 
-  group('MuscleGroupMapping.toDisplayGroup — legacy taxonomy strings cutoff 2B',
-      () {
-    test('legacy "brazos" → null (old rollup, NOT remapped to biceps/triceps)',
-        () {
-      expect('brazos'.toDisplayGroup(), isNull,
-          reason: 'cutoff 2B: old rollup strings are dropped silently, not '
-              'arbitrarily redistributed across new granular groups');
+  // #384: legacy Spanish labels the old custom-exercise editor persisted are now
+  // canonicalised via MuscleGroup.fromKey — the SAME resolution the rest of the
+  // app uses — so their sets no longer vanish from the muscle radar. Before the
+  // fix these returned null (silently dropped).
+  group('MuscleGroupMapping.toDisplayGroup — legacy Spanish labels (#384)', () {
+    test('Spanish display labels stored as muscleGroup now map (not null)', () {
+      expect('pecho'.toDisplayGroup(), MuscleGroupDisplay.pecho);
+      expect('espalda'.toDisplayGroup(), MuscleGroupDisplay.espalda);
+      expect('hombros'.toDisplayGroup(), MuscleGroupDisplay.hombros);
     });
 
-    test(
-        'legacy "piernas" → null (old rollup, NOT remapped to quads/hamstrings/glutes/calves)',
-        () {
+    test('legacy Spanish aliases fromKey resolves also map', () {
+      expect('Espalda alta'.toDisplayGroup(), MuscleGroupDisplay.espalda);
+      expect('Dorsales'.toDisplayGroup(), MuscleGroupDisplay.espalda);
+      expect('Gemelos'.toDisplayGroup(), MuscleGroupDisplay.pantorrilla);
+      expect('Antebrazos'.toDisplayGroup(), MuscleGroupDisplay.biceps);
+      expect('Cuádriceps'.toDisplayGroup(), MuscleGroupDisplay.cuadriceps);
+      expect('Glúteos'.toDisplayGroup(), MuscleGroupDisplay.gluteos);
+    });
+
+    test('mixed-case legacy Spanish is normalized', () {
+      expect('PECHO'.toDisplayGroup(), MuscleGroupDisplay.pecho);
+      expect('gEmElOs'.toDisplayGroup(), MuscleGroupDisplay.pantorrilla);
+    });
+  });
+
+  group('MuscleGroupMapping.toDisplayGroup — still unmapped', () {
+    test('ultra-legacy rollup strings "brazos"/"piernas" → null', () {
+      // Pre-date even the Spanish-label taxonomy and are NOT in
+      // MuscleGroup.fromKey, so they stay dropped (no arbitrary redistribution
+      // across the new granular groups).
+      expect('brazos'.toDisplayGroup(), isNull);
       expect('piernas'.toDisplayGroup(), isNull);
-    });
-
-    test('Spanish display labels stored as muscleGroup → null', () {
-      expect('pecho'.toDisplayGroup(), isNull);
-      expect('espalda'.toDisplayGroup(), isNull);
-      expect('hombros'.toDisplayGroup(), isNull);
     });
   });
 

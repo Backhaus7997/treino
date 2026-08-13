@@ -1,11 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/utils/argentina_time.dart';
 import '../../workout/application/exercise_providers.dart';
-import '../../workout/application/routine_providers.dart';
 import '../../workout/application/session_providers.dart';
 import '../../workout/domain/session.dart';
 import '../domain/day_insights.dart';
 import 'day_insights_aggregator.dart';
+import 'routine_slot_groups.dart';
 
 /// [AD5] Family key for [athleteDayInsightsProvider]. Explicit [uid] (NOT
 /// `currentUidProvider`) so the SAME provider serves the athlete's own
@@ -35,7 +36,7 @@ final athleteDayInsightsProvider = FutureProvider.autoDispose
 
   final daySessions = allSessions.where((s) {
     if (!s.countsAsWorkout) return false;
-    final started = s.startedAt.toLocal();
+    final started = toArgentina(s.startedAt);
     return started.year == key.day.year &&
         started.month == key.day.month &&
         started.day == key.day.day;
@@ -55,21 +56,12 @@ final athleteDayInsightsProvider = FutureProvider.autoDispose
   final byId = {for (final e in exercises) e.id: e};
 
   // Fallback exerciseId → muscleGroup vía los slots de la rutina de CADA
-  // sesión del día (un día puede tener sesiones de rutinas distintas, a
-  // diferencia del weekly provider que solo mira la sesión más reciente).
-  final routineIds = daySessions.map((s) => s.routineId).toSet();
-  final routines = await Future.wait(
-    routineIds.map((id) => ref.watch(routineByIdProvider(id).future)),
-  );
-  final slotGroupById = <String, String>{};
-  for (final routine in routines) {
-    if (routine == null) continue;
-    for (final day in routine.days) {
-      for (final slot in day.slots) {
-        slotGroupById.putIfAbsent(slot.exerciseId, () => slot.muscleGroup);
-      }
-    }
-  }
+  // sesión del día (un día puede tener sesiones de rutinas distintas) —
+  // mismo criterio per-sesión que el weekly y los radares desde #442.
+  // [slotMuscleGroupsForSessions] (#479): una rutina borrada o con acceso
+  // revocado degrada a "sin fallback para SUS ejercicios" en vez de tirar el
+  // tile del día entero; las fallas transientes siguen propagando.
+  final slotGroupById = await slotMuscleGroupsForSessions(ref, daySessions);
 
   final setLogsBySessionId = {
     for (final entry in await Future.wait(
@@ -110,7 +102,7 @@ final athleteDayInsightsProvider = FutureProvider.autoDispose
 /// coach's alumno-detail view can reuse it.
 final athleteLast7DaysInsightsProvider = FutureProvider.autoDispose
     .family<List<DayInsights>, String>((ref, uid) async {
-  final today = DateTime.now().toLocal();
+  final today = argentinaNow();
   final days = lastNDays(today, 7);
 
   return Future.wait(

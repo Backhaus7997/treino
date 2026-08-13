@@ -65,6 +65,7 @@ void main() {
           sessionRepositoryProvider.overrideWithValue(repo),
           exercisesProvider.overrideWith((ref) async => []),
           routineByIdProvider('r1').overrideWith((ref) async => null),
+          visibleRoutineByIdProvider('r1').overrideWith((ref) async => null),
         ],
         child: MaterialApp.router(
           theme: AppTheme.dark(),
@@ -77,22 +78,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // The screen's ListView builds lazily — the tile sits below the fold in
-    // the test viewport, so scroll it into existence BEFORE asserting.
+    // El body es SingleChildScrollView + Column (no ListView): construye
+    // todo el árbol de una, así que el tile existe aunque quede fuera del
+    // viewport de test — no hace falta scrollear para que aparezca.
     final tileFinder = find.text('Reporte mensual', skipOffstage: false);
-    // Scroll programmatically: gesture-based scrollUntilVisible gets its
-    // drags swallowed by the RadarChart's pan handling, so jump the outer
-    // ListView's position until the lazily-built tile exists.
-    final scrollState = tester.state<ScrollableState>(
-      find
-          .descendant(
-              of: find.byType(ListView), matching: find.byType(Scrollable))
-          .first,
-    );
-    for (var i = 0; i < 20 && tileFinder.evaluate().isEmpty; i++) {
-      scrollState.position.jumpTo(scrollState.position.maxScrollExtent);
-      await tester.pumpAndSettle();
-    }
     expect(tileFinder, findsOneWidget);
 
     await tester.ensureVisible(tileFinder);

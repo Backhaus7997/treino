@@ -122,8 +122,7 @@ void main() {
           const CoachHubPlanPreviewScreen(),
           overrides: [
             routineRepositoryProvider.overrideWithValue(repo),
-            analyticsServiceProvider
-                .overrideWithValue(FakeAnalyticsService()),
+            analyticsServiceProvider.overrideWithValue(FakeAnalyticsService()),
             parsedPlanProvider.overrideWith((ref) => plan),
             userProfileProvider.overrideWith(
               (ref) => Stream.value(_trainerProfile()),

@@ -113,17 +113,18 @@ void main() {
     verifyNever(() => mockDeletionService.call(uid: any(named: 'uid')));
   });
 
-  // SCENARIO-554 + SCENARIO-563 happy path
+  // SCENARIO-554 + SCENARIO-563 happy path.
+  // QA-PRO-010: the re-auth sheet already re-authenticated before returning the
+  // credential, so the notifier must NOT call reauthenticate again (a second
+  // call consumes single-use OAuth tokens and can abort a confirmed deletion).
+  // The notifier's job is CF-then-signOut.
   test(
-      'SCENARIO-554 + SCENARIO-563: on valid credential, reauthenticate is called '
-      'BEFORE CF, signOut called on success, state becomes AsyncData(null)',
+      'SCENARIO-554 + SCENARIO-563: on valid credential the notifier calls CF '
+      'then signOut WITHOUT a second reauthenticate; state becomes AsyncData',
       () async {
     final credential = FakeAuthCredential();
     final callOrder = <String>[];
 
-    when(() => mockAuthService.reauthenticate(any())).thenAnswer((_) async {
-      callOrder.add('reauth');
-    });
     when(
       () => mockDeletionService.call(uid: any(named: 'uid')),
     ).thenAnswer((_) async {
@@ -141,7 +142,8 @@ void main() {
         .read(accountDeletionNotifierProvider.notifier)
         .deleteAccount();
 
-    expect(callOrder, ['reauth', 'cf', 'signOut']);
+    expect(callOrder, ['cf', 'signOut']);
+    verifyNever(() => mockAuthService.reauthenticate(any()));
     final state = container.read(accountDeletionNotifierProvider);
     expect(state, isA<AsyncData<void>>());
   });
@@ -166,24 +168,11 @@ void main() {
     expect(state.error, isA<AuthFailure>());
   });
 
-  // SCENARIO-558 re-auth failed → AsyncError
-  test('SCENARIO-558: re-auth fails → state is AsyncError(reAuthFailed)',
-      () async {
-    final credential = FakeAuthCredential();
-
-    when(() => mockAuthService.reauthenticate(any()))
-        .thenThrow(const AuthFailure.reAuthFailed());
-    verifyNever(() => mockDeletionService.call(uid: any(named: 'uid')));
-
-    final container = buildContainer(sheetResult: () async => credential);
-
-    await container
-        .read(accountDeletionNotifierProvider.notifier)
-        .deleteAccount();
-
-    final state = container.read(accountDeletionNotifierProvider);
-    expect(state, isA<AsyncError<void>>());
-  });
+  // SCENARIO-558: re-auth failure is now handled INSIDE the sheet — it is the
+  // single re-auth point (QA-PRO-010). A failed re-auth makes the sheet show its
+  // inline error and return null, which is covered by the null-credential test
+  // above ("reauthenticate and CF are NOT called"). The notifier no longer
+  // re-authenticates, so there is no notifier-level re-auth-failure path.
 
   // retry within 5 minutes skips re-auth
   test('retry within 5 min skips re-auth sheet and calls CF directly',

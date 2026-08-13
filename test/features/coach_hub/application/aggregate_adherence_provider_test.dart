@@ -22,7 +22,7 @@ import 'package:treino/features/coach_hub/application/aggregate_adherence_provid
 import 'package:treino/features/workout/application/assigned_routine_providers.dart'
     show assignedRoutinesProvider;
 import 'package:treino/features/workout/application/session_providers.dart'
-    show finishedInWindowByUidProvider, FinishedInWindowKey;
+    show finishedInWindowByUidProvider;
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_day.dart';
 import 'package:treino/features/workout/domain/routine_status.dart';

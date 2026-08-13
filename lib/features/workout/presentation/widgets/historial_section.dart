@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/utils/kg_format.dart';
 import '../../application/session_providers.dart';
 import '../../domain/session.dart';
 import '../../domain/session_status.dart';
@@ -30,13 +31,14 @@ class _HistorialSectionState extends ConsumerState<HistorialSection> {
     final l10n = AppL10n.of(context);
     final theme = Theme.of(context);
     final uid = ref.watch(currentUidProvider) ?? '';
+    final useStackedLayout = MediaQuery.textScalerOf(context).scale(1) > 1.3;
 
     final sessionsAsync = ref.watch(sessionsByUidProvider(uid));
 
     final completedCount = sessionsAsync.maybeWhen(
       data: (all) => all
-          .where((s) =>
-              s.status == SessionStatus.finished && s.wasFullyCompleted)
+          .where(
+              (s) => s.status == SessionStatus.finished && s.wasFullyCompleted)
           .length,
       orElse: () => 0,
     );
@@ -44,31 +46,45 @@ class _HistorialSectionState extends ConsumerState<HistorialSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
+        if (useStackedLayout)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
                 l10n.workoutHistorialHeading,
                 style: theme.textTheme.titleMedium,
               ),
-            ),
-            // First-class entry point to the full, uncapped history. Surfaced
-            // only when there is history so the empty state stays clean.
-            if (completedCount > 0)
-              TextButton(
-                onPressed: () => context.push('/workout/historial'),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  minimumSize: const Size(0, 0),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              if (completedCount > 0) ...[
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () => context.push('/workout/historial'),
+                  child: Text(
+                    l10n.workoutHistorialSeeAll,
+                    style: TextStyle(color: AppPalette.of(context).accent),
+                  ),
                 ),
+              ],
+            ],
+          )
+        else
+          Row(
+            children: [
+              Expanded(
                 child: Text(
-                  l10n.workoutHistorialSeeAll,
-                  style: TextStyle(color: AppPalette.of(context).accent),
+                  l10n.workoutHistorialHeading,
+                  style: theme.textTheme.titleMedium,
                 ),
               ),
-          ],
-        ),
+              if (completedCount > 0)
+                TextButton(
+                  onPressed: () => context.push('/workout/historial'),
+                  child: Text(
+                    l10n.workoutHistorialSeeAll,
+                    style: TextStyle(color: AppPalette.of(context).accent),
+                  ),
+                ),
+            ],
+          ),
         const SizedBox(height: 12),
         sessionsAsync.when(
           loading: () => const _ListLoadingState(),
@@ -206,52 +222,73 @@ class _HistorialCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final theme = Theme.of(context);
-    final formattedDate = formatSessionDate(session.startedAt);
+    // startedAt is a real UTC instant — localize before formatting (#380).
+    final formattedDate = formatSessionDate(session.startedAt.toLocal());
+    final useStackedLayout = MediaQuery.textScalerOf(context).scale(1) > 1.3;
+    final volume = Text(
+      '${formatVolumeKg(session.totalVolumeKg)}'
+      '${AppL10n.of(context).workoutHistorialCardKgSuffix}',
+      style: theme.textTheme.bodySmall?.copyWith(color: palette.textMuted),
+    );
+    final duration = Text(
+      '${session.durationMin}'
+      '${AppL10n.of(context).workoutHistorialCardMinSuffix}',
+      style: theme.textTheme.bodySmall?.copyWith(color: palette.textMuted),
+    );
 
-    return GestureDetector(
-      onTap: () => context.push('/workout/historial/${session.id}'),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Row(
-          children: [
-            const _CompletedIcon(),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    session.routineName,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: palette.textPrimary,
-                      fontWeight: FontWeight.w600,
-                    ),
+    return Semantics(
+      button: true,
+      label: '${session.routineName}, $formattedDate',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => context.push('/workout/historial/${session.id}'),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const _CompletedIcon(),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        session.routineName,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: palette.textPrimary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        formattedDate,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: palette.textMuted,
+                        ),
+                      ),
+                      if (useStackedLayout) ...[
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 8,
+                          children: [volume, duration],
+                        ),
+                      ],
+                    ],
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    formattedDate,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: palette.textMuted,
-                    ),
-                  ),
+                ),
+                if (!useStackedLayout) ...[
+                  const SizedBox(width: 8),
+                  volume,
+                  const SizedBox(width: 8),
+                  duration,
                 ],
-              ),
+              ],
             ),
-            const SizedBox(width: 8),
-            Text(
-              '${session.totalVolumeKg}${AppL10n.of(context).workoutHistorialCardKgSuffix}',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: palette.textMuted,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              '${session.durationMin}${AppL10n.of(context).workoutHistorialCardMinSuffix}',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: palette.textMuted,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

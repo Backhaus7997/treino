@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../l10n/app_l10n.dart';
 import '../../../profile/application/user_public_profile_providers.dart';
 import '../../application/agenda_providers.dart';
 import '../../domain/appointment.dart';
@@ -91,15 +92,22 @@ class _DayTimelineState extends ConsumerState<DayTimeline> {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
 
-    final apptAsync = ref.watch(
-      trainerAppointmentsStreamProvider(
-        TrainerAppointmentsKey(
-          trainerId: widget.trainerId,
-          fromDate: widget.rangeFrom,
-          toDate: widget.rangeTo,
-        ),
-      ),
+    final key = TrainerAppointmentsKey(
+      trainerId: widget.trainerId,
+      fromDate: widget.rangeFrom,
+      toDate: widget.rangeTo,
     );
+    final apptAsync = ref.watch(trainerAppointmentsStreamProvider(key));
+
+    // A real stream failure must not read as an empty day: the grid is
+    // tap-to-create, so rendering it on error invites booking over an agenda we
+    // failed to load. Surface a retry instead. (Loading still shows the grid.)
+    if (apptAsync.hasError && !apptAsync.hasValue) {
+      return _TimelineErrorState(
+        palette: palette,
+        onRetry: () => ref.invalidate(trainerAppointmentsStreamProvider(key)),
+      );
+    }
 
     // Gracefully degrade while loading — still show the empty grid.
     final allAppointments = apptAsync.valueOrNull ?? const <Appointment>[];
@@ -309,6 +317,7 @@ class _DayTimelineState extends ConsumerState<DayTimeline> {
       final startMin = appt.startsAt.hour * 60 + appt.startsAt.minute;
       final top = (startMin - startHour * 60) * _kPxPerMin;
       final blockHeight = math.max(appt.durationMin * _kPxPerMin, _kMinBlockH);
+      final endsAt = appt.startsAt.add(Duration(minutes: appt.durationMin));
 
       final colW = availW / layout.columnCount;
       final left = _kGutter + layout.columnIndex * colW;
@@ -326,8 +335,11 @@ class _DayTimelineState extends ConsumerState<DayTimeline> {
       final athleteName =
           (isRawUid || rawName.trim().isEmpty) ? 'Alumno' : rawName;
 
-      // How many text lines fit in the block?
+      // Progressive disclosure by block height: the start time always shows,
+      // then the name, then the end time last — each only when there's
+      // vertical room, which keeps short blocks from overflowing.
       final fitsName = blockHeight >= 44;
+      final fitsEnd = blockHeight >= 60;
 
       return Positioned(
         top: top,
@@ -371,7 +383,8 @@ class _DayTimelineState extends ConsumerState<DayTimeline> {
                 // Content
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.all(6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
@@ -393,6 +406,19 @@ class _DayTimelineState extends ConsumerState<DayTimeline> {
                             style: GoogleFonts.barlow(
                               fontSize: 11,
                               color: palette.textPrimary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                        if (fitsEnd) ...[
+                          const SizedBox(height: 1),
+                          Text(
+                            AgendaFormatters.formatTime(endsAt),
+                            style: GoogleFonts.barlowCondensed(
+                              fontWeight: FontWeight.w500,
+                              fontSize: 11,
+                              color: palette.highlight.withAlpha(180),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -545,4 +571,57 @@ List<_SessionLayout> _computeLayout(List<Appointment> sessions) {
   }
 
   return sorted;
+}
+
+// ── Error state ─────────────────────────────────────────────────────────────
+
+/// Shown in place of the hour grid when the appointments stream fails outright
+/// (error with no cached value). Mirrors the availability editor's error state:
+/// a message plus a Reintentar button that re-subscribes the stream. Without
+/// this the failed day rendered as an empty, tap-to-book grid — indistinguishable
+/// from a genuinely free day.
+class _TimelineErrorState extends StatelessWidget {
+  const _TimelineErrorState({required this.palette, required this.onRetry});
+
+  final AppPalette palette;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              l10n.agendaGenericError,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton(
+              onPressed: onRetry,
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: palette.accent),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(9999),
+                ),
+              ),
+              child: Text(
+                l10n.coachRetryLabel,
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  letterSpacing: 0.8,
+                  color: palette.accent,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

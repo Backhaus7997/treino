@@ -4,9 +4,11 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/utils/argentina_time.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
+import '../../workout/application/exercise_providers.dart';
 import '../application/insights_providers.dart';
 import '../domain/muscle_group.dart';
 import '../domain/weekly_insights.dart';
@@ -29,7 +31,7 @@ class VolumeByGroupScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    final weekStart = mondayOfWeek(DateTime.now().toLocal());
+    final weekStart = mondayOfWeek(argentinaNow());
     final async = ref.watch(
       athleteWeekInsightsProvider((uid: uid, weekStart: weekStart)),
     );
@@ -54,9 +56,7 @@ class VolumeByGroupScreen extends ConsumerWidget {
                 child: CircularProgressIndicator(color: palette.accent),
               ),
               error: (_, __) => _ErrorState(
-                onRetry: () => ref.invalidate(
-                  athleteWeekInsightsProvider((uid: uid, weekStart: weekStart)),
-                ),
+                onRetry: () => _retryWeek(ref, uid, weekStart),
               ),
               data: (insights) => insights == null
                   ? Center(
@@ -129,6 +129,16 @@ void _safePopOrInsights(BuildContext context) {
 
 // ── Error state ───────────────────────────────────────────────────────────────
 
+/// QA-498: `ref.invalidate` NO cascada a las dependencias, y [exercisesProvider]
+/// NO es autoDispose — cachea su `AsyncError` para toda la vida del container.
+/// Invalidar solo [athleteWeekInsightsProvider] re-leía el MISMO error cacheado
+/// del catálogo: un reintentar que nunca podía recuperar. Mismo criterio que el
+/// `_retry` de MuscleDistributionScreen (#376).
+void _retryWeek(WidgetRef ref, String uid, DateTime weekStart) {
+  ref.invalidate(exercisesProvider);
+  ref.invalidate(athleteWeekInsightsProvider((uid: uid, weekStart: weekStart)));
+}
+
 class _ErrorState extends StatelessWidget {
   const _ErrorState({required this.onRetry});
 
@@ -169,6 +179,7 @@ class _VolumeBarCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final hasTarget = insights.targetByGroup.isNotEmpty;
 
     return Container(
@@ -181,7 +192,9 @@ class _VolumeBarCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'VOLUMEN POR GRUPO',
+            // QA #371: misma clave que el header de la pantalla — el copy es
+            // idéntico y así la card queda dentro del sistema l10n.
+            l10n.volumeByGroupScreenTitle,
             style: GoogleFonts.barlowCondensed(
               fontWeight: FontWeight.w700,
               fontSize: 12,
@@ -192,7 +205,7 @@ class _VolumeBarCard extends StatelessWidget {
           const SizedBox(height: 14),
           if (!hasTarget)
             Text(
-              'Necesitás una rutina asignada para ver tu volumen objetivo.',
+              l10n.volumeByGroupEmptyTarget,
               style: GoogleFonts.barlow(
                 fontWeight: FontWeight.w400,
                 fontSize: 13,

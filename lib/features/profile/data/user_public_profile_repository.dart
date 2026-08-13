@@ -1,7 +1,17 @@
 import 'package:cloud_firestore/cloud_firestore.dart'
-    show CollectionReference, FieldPath, FirebaseFirestore, SetOptions;
+    show
+        CollectionReference,
+        DocumentSnapshot,
+        FieldPath,
+        FieldValue,
+        FirebaseException,
+        FirebaseFirestore,
+        Query,
+        SetOptions,
+        Timestamp;
 
 import '../../gyms/domain/gym.dart' show kNoGymId;
+import '../domain/racha_freshness.dart';
 import '../domain/user_public_profile.dart';
 
 /// Repository for the `userPublicProfiles` collection.
@@ -15,10 +25,18 @@ import '../domain/user_public_profile.dart';
 /// Permission coverage is provided by the T35-style manual emulator test
 /// (SCENARIO-268..270). See design Section A.6.
 class UserPublicProfileRepository {
-  UserPublicProfileRepository({required FirebaseFirestore firestore})
-      : _firestore = firestore;
+  UserPublicProfileRepository({
+    required FirebaseFirestore firestore,
+    DateTime Function()? now,
+  })  : _firestore = firestore,
+        _now = now ?? DateTime.now;
 
   final FirebaseFirestore _firestore;
+
+  /// Injectable clock for [leaderboard]'s racha decay (#552). Constructor
+  /// injection (not a method param) so mocktail `when()`/`verify()` stubs on
+  /// this repository's methods keep compiling unchanged.
+  final DateTime Function() _now;
 
   CollectionReference<Map<String, Object?>> get _col =>
       _firestore.collection('userPublicProfiles');
@@ -81,7 +99,35 @@ class UserPublicProfileRepository {
   /// FriendshipRepository.accept/delete) to update counters without
   /// clobbering identity fields (displayName, avatarUrl, gymId) set by
   /// UserRepository. See ADR-WRS-12.
+  ///
+  /// #552 — Callers MUST NOT pass `rachaUpdatedAt`: whenever the write
+  /// includes `racha`, this method derives the freshness stamp itself
+  /// (server timestamp), mirroring how `UserRepository` always derives
+  /// `displayNameLowercase`/`n`. Keeping value and stamp in the SAME write
+  /// is what makes [effectiveRacha]'s read-time decay trustworthy — a racha
+  /// written without a stamp (or vice versa) would decay wrongly.
   Future<void> updateCounters(String uid, Map<String, Object?> fields) async {
+    if (fields.containsKey('racha')) {
+      final stamped = <String, Object?>{
+        ...fields,
+        'rachaUpdatedAt': FieldValue.serverTimestamp(),
+      };
+      try {
+        await _col.doc(uid).set(stamped, SetOptions(merge: true));
+        return;
+      } on FirebaseException catch (e) {
+        // Transitional (#552): until the updated firestore.rules (which add
+        // `rachaUpdatedAt` to the userPublicProfiles field allowlist) are
+        // deployed, the stamped write is denied. Fall back to the legacy
+        // shape so `racha`/`workoutsCount` keep flowing — the board then
+        // shows the pre-#552 passthrough behavior instead of silently
+        // freezing every counter. Remove once the rules deploy is live.
+        // Not covered by fake_cloud_firestore (it does not enforce rules);
+        // covered by the T35-style manual emulator pass, like the rest of
+        // this file's permission behavior.
+        if (e.code != 'permission-denied') rethrow;
+      }
+    }
     await _col.doc(uid).set(fields, SetOptions(merge: true));
   }
 
@@ -135,7 +181,8 @@ class UserPublicProfileRepository {
   /// them from every OTHER gym's leaderboard too.
   ///
   /// A gym with zero opted-in athletes simply yields an empty snapshot — not
-  /// an error (spec: Empty States).
+  /// an error (spec: Empty States). So does a gym where every opted-in athlete
+  /// is missing the metric — see [_presenceRequiredMetrics].
   Future<List<UserPublicProfile>> leaderboard({
     required String gymId,
     required String metricField,
@@ -143,15 +190,84 @@ class UserPublicProfileRepository {
   }) async {
     if (gymId.isEmpty || gymId == kNoGymId) return const [];
 
-    final snap = await _col
+    Query<Map<String, Object?>> query = _col
         .where('gymId', isEqualTo: gymId)
-        .where('rankingOptIn', isEqualTo: true)
-        .orderBy(metricField, descending: true)
-        .limit(limit)
-        .get();
+        .where('rankingOptIn', isEqualTo: true);
+
+    if (_presenceRequiredMetrics.contains(metricField)) {
+      // Compiles to a `!= null` filter, which reuses the SAME composite index
+      // the `orderBy` below already requires (gymId ASC, rankingOptIn ASC,
+      // metricField DESC) — no `firestore.indexes.json` change needed.
+      query = query.where(metricField, isNull: false);
+    }
+
+    final snap =
+        await query.orderBy(metricField, descending: true).limit(limit).get();
+
+    if (metricField == 'racha') return _decayedStreakBoard(snap.docs);
 
     return snap.docs.map((d) => UserPublicProfile.fromJson(d.data())).toList();
   }
+
+  /// #552 — read-time decay for the streak board. The stored `racha` is a
+  /// snapshot from the athlete's last finish and never decays on its own, so
+  /// an inactive athlete would sit on the board with a dead streak forever
+  /// while their own PERFIL (live `computeStreak`) says 0. Each row's racha
+  /// is replaced with [effectiveRacha] (0 unless its `rachaUpdatedAt` stamp
+  /// is from today/yesterday in ART), then rows are re-sorted because decay
+  /// can reorder them.
+  ///
+  /// Metric-specific handling inside the generic query method follows the
+  /// [_presenceRequiredMetrics] precedent above. Known bounded limitation:
+  /// the top-[limit] cut happens server-side on the RAW values, so with more
+  /// than `limit` opted-in athletes a stale-but-high racha can crowd a
+  /// fresh-but-low one out of the page; within the page, order and values
+  /// are correct. Docs never stamped (pre-#552) pass through undecayed until
+  /// `scripts/backfill_racha_freshness.js` stamps them.
+  List<UserPublicProfile> _decayedStreakBoard(
+    List<DocumentSnapshot<Map<String, Object?>>> docs,
+  ) {
+    final now = _now();
+    final decayed = docs.map((d) {
+      final data = d.data() ?? const <String, Object?>{};
+      final profile = UserPublicProfile.fromJson(data);
+      final stamp = data['rachaUpdatedAt'];
+      return profile.copyWith(
+        racha: effectiveRacha(
+          racha: profile.racha,
+          rachaUpdatedAt: stamp is Timestamp ? stamp.toDate() : null,
+          now: now,
+        ),
+      );
+    }).toList();
+    // Re-sort with the same tie-break Firestore itself applies (documentId
+    // ASC — here uid == doc id), so the order is deterministic regardless of
+    // List.sort's stability.
+    decayed.sort((a, b) {
+      final byRacha = (b.racha ?? 0).compareTo(a.racha ?? 0);
+      return byRacha != 0 ? byRacha : a.uid.compareTo(b.uid);
+    });
+    return decayed;
+  }
+
+  /// QA-GYM-506 — the metric fields whose `null` means "el atleta no tiene ese
+  /// dato", NOT "cero". Exactly the three [clearRankingMetrics] resets to an
+  /// explicit `null`, which is also what the opt-in backfill leaves behind for
+  /// a lift the athlete never performed.
+  ///
+  /// `orderBy` alone does NOT exclude them: Firestore only skips documents
+  /// where the field is ABSENT, so an explicit `null` still matched the query
+  /// and (under `descending: true`) landed at the tail of the board, where the
+  /// client rendered it as a fabricated "0 kg" PR.
+  ///
+  /// `racha` and `lifetimeVolumeKg` are deliberately NOT in this set: no
+  /// streak IS a 0-day streak and no volume IS 0 kg lifted, so their 0 floor
+  /// is honest and those athletes stay on their boards.
+  static const _presenceRequiredMetrics = {
+    'bestSquatKg',
+    'bestBenchKg',
+    'bestDeadliftKg',
+  };
 
   /// Flips the trainer's `sharedTemplatesWithAthletes` flag. When `true`,
   /// the Firestore rule on `routines` lets any authenticated user read this

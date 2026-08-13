@@ -181,7 +181,7 @@ void main() {
 
       expect(find.text('Camila Ruiz'), findsOneWidget);
       expect(find.text('crossfit'), findsOneWidget); // wire encoding lowercase
-      expect(find.textContaining('7500'), findsOneWidget);
+      expect(find.textContaining('7.500'), findsOneWidget);
     });
 
     // NOTA: loading state no se testea aquí por problemas de leaked timers —

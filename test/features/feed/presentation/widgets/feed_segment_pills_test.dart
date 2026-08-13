@@ -5,10 +5,14 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/feed/application/feed_screen_providers.dart';
 import 'package:treino/features/feed/domain/feed_segment.dart';
 import 'package:treino/features/feed/presentation/widgets/feed_segment_pills.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 Widget _wrapProvider(Widget w, List<Override> overrides) => ProviderScope(
       overrides: overrides,
       child: MaterialApp(
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
         theme: AppTheme.dark(),
         home: Scaffold(body: w),
       ),
@@ -29,12 +33,12 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.text('AMIGOS'), findsOneWidget);
+      expect(find.text('SEGUIDORES'), findsOneWidget);
       expect(find.text('MI GYM'), findsOneWidget);
       expect(find.text('PÚBLICO'), findsOneWidget);
 
       // Verify left-to-right order via widget position
-      final amigosOffset = tester.getCenter(find.text('AMIGOS'));
+      final amigosOffset = tester.getCenter(find.text('SEGUIDORES'));
       final gymOffset = tester.getCenter(find.text('MI GYM'));
       final publicoOffset = tester.getCenter(find.text('PÚBLICO'));
       expect(amigosOffset.dx, lessThan(gymOffset.dx));
@@ -59,7 +63,7 @@ void main() {
       // distinction lives in BoxDecoration.color (accent vs bgCard).
       final amigosContainers = tester.widgetList<Container>(
         find.ancestor(
-          of: find.text('AMIGOS'),
+          of: find.text('SEGUIDORES'),
           matching: find.byType(Container),
         ),
       );
@@ -129,6 +133,9 @@ void main() {
         UncontrolledProviderScope(
           container: container,
           child: MaterialApp(
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('es', 'AR'),
             theme: AppTheme.dark(),
             home: const Scaffold(body: FeedSegmentPills()),
           ),
@@ -136,7 +143,7 @@ void main() {
       );
       await tester.pump();
 
-      await tester.tap(find.text('AMIGOS'));
+      await tester.tap(find.text('SEGUIDORES'));
       await tester.pumpAndSettle();
 
       expect(container.read(feedSegmentProvider), equals(FeedSegment.amigos));
@@ -157,6 +164,9 @@ void main() {
         UncontrolledProviderScope(
           container: container,
           child: MaterialApp(
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('es', 'AR'),
             theme: AppTheme.dark(),
             home: const Scaffold(body: FeedSegmentPills()),
           ),
@@ -185,6 +195,9 @@ void main() {
         UncontrolledProviderScope(
           container: container,
           child: MaterialApp(
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('es', 'AR'),
             theme: AppTheme.dark(),
             home: const Scaffold(body: FeedSegmentPills()),
           ),
@@ -221,7 +234,7 @@ void main() {
       // AMIGOS should be inactive (not accent)
       final amigosContainers = tester.widgetList<Container>(
         find.ancestor(
-          of: find.text('AMIGOS'),
+          of: find.text('SEGUIDORES'),
           matching: find.byType(Container),
         ),
       );
@@ -253,6 +266,79 @@ void main() {
       );
       expect(gymOpacity, findsNothing);
       expect(publicoOpacity, findsNothing);
+    });
+
+    // Regresión doble. Primero el `Row` medía solo su contenido y quedaba
+    // apoyado contra el margen izquierdo: en un iPhone de 393pt los pills
+    // terminaban a los 321 y sobraban 72pt de aire muerto a la derecha. El
+    // arreglo siguiente estiró el Row con `spaceBetween` y quedó peor: la
+    // separación entre pills saltaba de 12 a ~37. Partes iguales cubre las
+    // dos cosas, y esto lo fija.
+    testWidgets('los tres pills miden lo mismo y la fila llena el ancho',
+        (tester) async {
+      const screenWidth = 393.0;
+      tester.view.physicalSize = const Size(screenWidth, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        _wrapProvider(
+          const FeedSegmentPills(),
+          [feedSegmentProvider.overrideWith((ref) => FeedSegment.amigos)],
+        ),
+      );
+      await tester.pump();
+
+      Rect pillOf(String label) => tester.getRect(
+            find
+                .ancestor(
+                  of: find.text(label),
+                  matching: find.byType(Container),
+                )
+                .first,
+          );
+
+      final first = pillOf('SEGUIDORES');
+      final middle = pillOf('MI GYM');
+      final last = pillOf('PÚBLICO');
+
+      // Partes iguales: (393 - 40 de márgenes - 24 de gaps) / 3.
+      const expected = (screenWidth - 2 * 20 - 2 * 12) / 3;
+      expect(first.width, closeTo(expected, 0.5));
+      expect(middle.width, closeTo(expected, 0.5));
+      expect(last.width, closeTo(expected, 0.5));
+
+      // La fila muere contra los dos márgenes, alineada con el header.
+      expect(first.left, closeTo(20, 0.5));
+      expect(last.right, closeTo(screenWidth - 20, 0.5));
+
+      // Y la separación se queda en los 12 del diseño, no repartida.
+      expect(middle.left - first.right, closeTo(12, 0.5));
+      expect(last.left - middle.right, closeTo(12, 0.5));
+    });
+
+    testWidgets('en pantalla angosta el label se achica en vez de desbordar',
+        (tester) async {
+      tester.view.physicalSize = const Size(240, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        _wrapProvider(
+          const FeedSegmentPills(),
+          [feedSegmentProvider.overrideWith((ref) => FeedSegment.amigos)],
+        ),
+      );
+      await tester.pump();
+
+      // Sin overflow y con los tres destinos todavía a la vista: el pill ya no
+      // crece con el texto, así que el que se adapta es el label.
+      expect(tester.takeException(), isNull);
+      expect(find.text('SEGUIDORES'), findsOneWidget);
+      expect(find.text('MI GYM'), findsOneWidget);
+      expect(find.text('PÚBLICO'), findsOneWidget);
     });
   });
 }

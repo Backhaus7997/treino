@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart' as intl;
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/motion/treino_success_check.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
@@ -15,16 +16,15 @@ import '../domain/performance_test.dart';
 
 /// Formats [dt] for the screen header using the active [localeName].
 ///
-/// Uses the same UTC convention as every reader of
-/// [PerformanceTest.recordedAt] (chart `_shortDate`, athlete detail
-/// `_formatMeasurementDate`): the stored UTC instant is shown as-is, with no
-/// `.toLocal()`. [intl.DateFormat.format] reads the [DateTime]'s own calendar
-/// fields (day/month/year/hour/minute) directly, so passing a UTC value (e.g.
-/// `DateTime.now().toUtc()`) keeps the header aligned with the date that gets
-/// persisted and rendered after saving, while localizing the month name.
+/// [PerformanceTest.recordedAt] is a real instant (persisted as
+/// `DateTime.now().toUtc()`), so it must be shown in the viewer's local time —
+/// same convention as `log_measurement_screen`. [intl.DateFormat.format] reads
+/// the [DateTime]'s own calendar fields directly, so callers pass an already
+/// `.toLocal()`-ed value; a raw UTC instant would read +3h in Argentina (#392).
 String _formatDateTime(DateTime dt, String localeName) {
-  final date = intl.DateFormat('d MMM y', localeName).format(dt);
-  final time = intl.DateFormat('HH:mm', localeName).format(dt);
+  final local = dt.toLocal();
+  final date = intl.DateFormat('d MMM y', localeName).format(local);
+  final time = intl.DateFormat('HH:mm', localeName).format(local);
   return '$date · $time';
 }
 
@@ -252,7 +252,18 @@ class _LogPerformanceTestScreenState
       if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.performanceLogSaveSuccess)),
+        SnackBar(
+          content: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // El pop ya pasó (línea de arriba) — no compite con ninguna
+              // navegación.
+              const TreinoSuccessCheck(size: 18, strokeWidth: 2),
+              const SizedBox(width: 10),
+              Flexible(child: Text(l10n.performanceLogSaveSuccess)),
+            ],
+          ),
+        ),
       );
     } catch (_) {
       if (!mounted) return;
@@ -273,10 +284,9 @@ class _LogPerformanceTestScreenState
     final l10n = AppL10n.of(context);
     final trainerUid = ref.watch(currentUidProvider);
     final canSave = trainerUid != null && !_saving && _hasAnyMetric;
-    // Use UTC to match the persisted recordedAt (see _save) and the UTC display
-    // convention of every reader, so the header date never disagrees with the
-    // saved record near midnight.
-    final now = DateTime.now().toUtc();
+    // Real instant; _formatDateTime localizes it for display (#392). The record
+    // is still persisted as UTC in _save — same instant, shown in local time.
+    final now = DateTime.now();
 
     return Scaffold(
       backgroundColor: palette.bg,
@@ -333,180 +343,182 @@ class _LogPerformanceTestScreenState
                   key: _formKey,
                   autovalidateMode: AutovalidateMode.onUserInteraction,
                   child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // ── SALTOS ───────────────────────────────────────────────
-                    _sectionLabel(l10n.performanceLogSectionJumps, palette),
-                    const SizedBox(height: 12),
-                    _numericField(
-                      label: l10n.performanceLogFieldCmj,
-                      controller: _cmjCtrl,
-                      validator: _validateMetric,
-                      palette: palette,
-                      suffix: 'cm',
-                    ),
-                    const SizedBox(height: 12),
-                    _numericField(
-                      label: l10n.performanceLogFieldSquatJump,
-                      controller: _squatJumpCtrl,
-                      validator: _validateMetric,
-                      palette: palette,
-                      suffix: 'cm',
-                    ),
-                    const SizedBox(height: 12),
-                    _numericField(
-                      label: l10n.performanceLogFieldAbalakov,
-                      controller: _abalakovCtrl,
-                      validator: _validateMetric,
-                      palette: palette,
-                      suffix: 'cm',
-                    ),
-                    const SizedBox(height: 12),
-                    _numericField(
-                      label: l10n.performanceLogFieldBroadJump,
-                      controller: _broadJumpCtrl,
-                      validator: _validateMetric,
-                      palette: palette,
-                      suffix: 'cm',
-                    ),
-                    const SizedBox(height: 20),
-
-                    // ── VELOCIDAD ────────────────────────────────────────────
-                    _sectionLabel(l10n.performanceLogSectionSpeed, palette),
-                    const SizedBox(height: 12),
-                    _numericField(
-                      label: l10n.performanceLogFieldSprint10,
-                      controller: _sprint10Ctrl,
-                      validator: _validateMetric,
-                      palette: palette,
-                      suffix: 's',
-                    ),
-                    const SizedBox(height: 12),
-                    _numericField(
-                      label: l10n.performanceLogFieldSprint20,
-                      controller: _sprint20Ctrl,
-                      validator: _validateMetric,
-                      palette: palette,
-                      suffix: 's',
-                    ),
-                    const SizedBox(height: 12),
-                    _numericField(
-                      label: l10n.performanceLogFieldSprint30,
-                      controller: _sprint30Ctrl,
-                      validator: _validateMetric,
-                      palette: palette,
-                      suffix: 's',
-                    ),
-                    const SizedBox(height: 12),
-                    _numericField(
-                      label: l10n.performanceLogFieldSprint40,
-                      controller: _sprint40Ctrl,
-                      validator: _validateMetric,
-                      palette: palette,
-                      suffix: 's',
-                    ),
-                    const SizedBox(height: 20),
-
-                    // ── FUERZA 1RM ───────────────────────────────────────────
-                    _sectionLabel(l10n.performanceLogSectionStrength, palette),
-                    const SizedBox(height: 12),
-                    _numericField(
-                      label: l10n.performanceLogFieldSquat1rm,
-                      controller: _squat1rmCtrl,
-                      validator: _validateMetric,
-                      palette: palette,
-                      suffix: 'kg',
-                    ),
-                    const SizedBox(height: 12),
-                    _numericField(
-                      label: l10n.performanceLogFieldBenchPress,
-                      controller: _benchPress1rmCtrl,
-                      validator: _validateMetric,
-                      palette: palette,
-                      suffix: 'kg',
-                    ),
-                    const SizedBox(height: 12),
-                    _numericField(
-                      label: l10n.performanceLogFieldDeadlift,
-                      controller: _deadlift1rmCtrl,
-                      validator: _validateMetric,
-                      palette: palette,
-                      suffix: 'kg',
-                    ),
-                    const SizedBox(height: 12),
-                    _numericField(
-                      label: l10n.performanceLogFieldOverheadPress,
-                      controller: _overheadPress1rmCtrl,
-                      validator: _validateMetric,
-                      palette: palette,
-                      suffix: 'kg',
-                    ),
-                    const SizedBox(height: 12),
-                    _numericField(
-                      label: l10n.performanceLogFieldPullUp,
-                      controller: _pullUp1rmCtrl,
-                      validator: _validateMetric,
-                      palette: palette,
-                      suffix: 'kg',
-                    ),
-                    const SizedBox(height: 20),
-
-                    // ── RESISTENCIA / OTROS ──────────────────────────────────
-                    _sectionLabel(l10n.performanceLogSectionEndurance, palette),
-                    const SizedBox(height: 12),
-                    _numericField(
-                      label: l10n.performanceLogFieldVo2max,
-                      controller: _vo2maxCtrl,
-                      validator: _validateMetric,
-                      palette: palette,
-                      suffix: 'ml/kg/min',
-                    ),
-                    const SizedBox(height: 12),
-                    _numericField(
-                      label: l10n.performanceLogFieldCourseNavette,
-                      controller: _courseNavetteCtrl,
-                      validator: _validateMetric,
-                      palette: palette,
-                    ),
-                    const SizedBox(height: 12),
-                    _numericField(
-                      label: l10n.performanceLogFieldCooper,
-                      controller: _cooperCtrl,
-                      validator: _validateMetric,
-                      palette: palette,
-                      suffix: 'm',
-                    ),
-                    const SizedBox(height: 12),
-                    _numericField(
-                      label: l10n.performanceLogFieldSitAndReach,
-                      controller: _sitAndReachCtrl,
-                      validator: _validateMetric,
-                      palette: palette,
-                      suffix: 'cm',
-                    ),
-                    const SizedBox(height: 20),
-
-                    // ── NOTAS ────────────────────────────────────────────────
-                    _sectionLabel(l10n.performanceLogSectionNotes, palette),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _notesCtrl,
-                      minLines: 3,
-                      maxLines: 6,
-                      keyboardType: TextInputType.multiline,
-                      style: GoogleFonts.barlow(
-                        color: palette.textPrimary,
-                        fontSize: 14,
-                      ),
-                      decoration: _inputDecoration(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // ── SALTOS ───────────────────────────────────────────────
+                      _sectionLabel(l10n.performanceLogSectionJumps, palette),
+                      const SizedBox(height: 12),
+                      _numericField(
+                        label: l10n.performanceLogFieldCmj,
+                        controller: _cmjCtrl,
+                        validator: _validateMetric,
                         palette: palette,
-                        hint: l10n.performanceLogNotesHint,
+                        suffix: 'cm',
                       ),
-                    ),
+                      const SizedBox(height: 12),
+                      _numericField(
+                        label: l10n.performanceLogFieldSquatJump,
+                        controller: _squatJumpCtrl,
+                        validator: _validateMetric,
+                        palette: palette,
+                        suffix: 'cm',
+                      ),
+                      const SizedBox(height: 12),
+                      _numericField(
+                        label: l10n.performanceLogFieldAbalakov,
+                        controller: _abalakovCtrl,
+                        validator: _validateMetric,
+                        palette: palette,
+                        suffix: 'cm',
+                      ),
+                      const SizedBox(height: 12),
+                      _numericField(
+                        label: l10n.performanceLogFieldBroadJump,
+                        controller: _broadJumpCtrl,
+                        validator: _validateMetric,
+                        palette: palette,
+                        suffix: 'cm',
+                      ),
+                      const SizedBox(height: 20),
 
-                    // Space so pinned button doesn't cover last field
-                    const SizedBox(height: 80),
-                  ],
+                      // ── VELOCIDAD ────────────────────────────────────────────
+                      _sectionLabel(l10n.performanceLogSectionSpeed, palette),
+                      const SizedBox(height: 12),
+                      _numericField(
+                        label: l10n.performanceLogFieldSprint10,
+                        controller: _sprint10Ctrl,
+                        validator: _validateMetric,
+                        palette: palette,
+                        suffix: 's',
+                      ),
+                      const SizedBox(height: 12),
+                      _numericField(
+                        label: l10n.performanceLogFieldSprint20,
+                        controller: _sprint20Ctrl,
+                        validator: _validateMetric,
+                        palette: palette,
+                        suffix: 's',
+                      ),
+                      const SizedBox(height: 12),
+                      _numericField(
+                        label: l10n.performanceLogFieldSprint30,
+                        controller: _sprint30Ctrl,
+                        validator: _validateMetric,
+                        palette: palette,
+                        suffix: 's',
+                      ),
+                      const SizedBox(height: 12),
+                      _numericField(
+                        label: l10n.performanceLogFieldSprint40,
+                        controller: _sprint40Ctrl,
+                        validator: _validateMetric,
+                        palette: palette,
+                        suffix: 's',
+                      ),
+                      const SizedBox(height: 20),
+
+                      // ── FUERZA 1RM ───────────────────────────────────────────
+                      _sectionLabel(
+                          l10n.performanceLogSectionStrength, palette),
+                      const SizedBox(height: 12),
+                      _numericField(
+                        label: l10n.performanceLogFieldSquat1rm,
+                        controller: _squat1rmCtrl,
+                        validator: _validateMetric,
+                        palette: palette,
+                        suffix: 'kg',
+                      ),
+                      const SizedBox(height: 12),
+                      _numericField(
+                        label: l10n.performanceLogFieldBenchPress,
+                        controller: _benchPress1rmCtrl,
+                        validator: _validateMetric,
+                        palette: palette,
+                        suffix: 'kg',
+                      ),
+                      const SizedBox(height: 12),
+                      _numericField(
+                        label: l10n.performanceLogFieldDeadlift,
+                        controller: _deadlift1rmCtrl,
+                        validator: _validateMetric,
+                        palette: palette,
+                        suffix: 'kg',
+                      ),
+                      const SizedBox(height: 12),
+                      _numericField(
+                        label: l10n.performanceLogFieldOverheadPress,
+                        controller: _overheadPress1rmCtrl,
+                        validator: _validateMetric,
+                        palette: palette,
+                        suffix: 'kg',
+                      ),
+                      const SizedBox(height: 12),
+                      _numericField(
+                        label: l10n.performanceLogFieldPullUp,
+                        controller: _pullUp1rmCtrl,
+                        validator: _validateMetric,
+                        palette: palette,
+                        suffix: 'kg',
+                      ),
+                      const SizedBox(height: 20),
+
+                      // ── RESISTENCIA / OTROS ──────────────────────────────────
+                      _sectionLabel(
+                          l10n.performanceLogSectionEndurance, palette),
+                      const SizedBox(height: 12),
+                      _numericField(
+                        label: l10n.performanceLogFieldVo2max,
+                        controller: _vo2maxCtrl,
+                        validator: _validateMetric,
+                        palette: palette,
+                        suffix: 'ml/kg/min',
+                      ),
+                      const SizedBox(height: 12),
+                      _numericField(
+                        label: l10n.performanceLogFieldCourseNavette,
+                        controller: _courseNavetteCtrl,
+                        validator: _validateMetric,
+                        palette: palette,
+                      ),
+                      const SizedBox(height: 12),
+                      _numericField(
+                        label: l10n.performanceLogFieldCooper,
+                        controller: _cooperCtrl,
+                        validator: _validateMetric,
+                        palette: palette,
+                        suffix: 'm',
+                      ),
+                      const SizedBox(height: 12),
+                      _numericField(
+                        label: l10n.performanceLogFieldSitAndReach,
+                        controller: _sitAndReachCtrl,
+                        validator: _validateMetric,
+                        palette: palette,
+                        suffix: 'cm',
+                      ),
+                      const SizedBox(height: 20),
+
+                      // ── NOTAS ────────────────────────────────────────────────
+                      _sectionLabel(l10n.performanceLogSectionNotes, palette),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _notesCtrl,
+                        minLines: 3,
+                        maxLines: 6,
+                        keyboardType: TextInputType.multiline,
+                        style: GoogleFonts.barlow(
+                          color: palette.textPrimary,
+                          fontSize: 14,
+                        ),
+                        decoration: _inputDecoration(
+                          palette: palette,
+                          hint: l10n.performanceLogNotesHint,
+                        ),
+                      ),
+
+                      // Space so pinned button doesn't cover last field
+                      const SizedBox(height: 80),
+                    ],
                   ),
                 ),
               ),

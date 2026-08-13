@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../../../app/theme/app_palette.dart';
+import '../../../../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../../../../core/widgets/treino_icon.dart';
 import '../providers/biblioteca_providers.dart';
 import 'biblioteca_filter_chips.dart';
@@ -71,56 +72,63 @@ class EjerciciosTab extends ConsumerWidget {
         const BibliotecaFilterChips(),
         // ── Exercise grid ──────────────────────────────────────────────────
         Expanded(
-          child: exercisesAsync.when(
-            loading: () => Center(
-              child: CircularProgressIndicator(color: palette.accent),
-            ),
-            error: (e, _) => Center(
-              child: Text(
-                'Error al cargar ejercicios.', // i18n
-                style: GoogleFonts.barlow(
-                  color: palette.textMuted,
-                  fontSize: 14,
+          child: TreinoStateSwitcher(
+            childKey: ValueKey(exercisesAsync.when(
+              loading: () => 'loading',
+              error: (_, __) => 'error',
+              data: (exercises) => exercises.isEmpty ? 'empty' : 'data',
+            )),
+            child: exercisesAsync.when(
+              loading: () => Center(
+                child: CircularProgressIndicator(color: palette.accent),
+              ),
+              error: (e, _) => Center(
+                child: Text(
+                  'Error al cargar ejercicios.', // i18n
+                  style: GoogleFonts.barlow(
+                    color: palette.textMuted,
+                    fontSize: 14,
+                  ),
                 ),
               ),
-            ),
-            data: (exercises) {
-              if (exercises.isEmpty) {
-                return Center(
-                  child: Text(
-                    'No se encontraron ejercicios.', // i18n
-                    style: GoogleFonts.barlow(
-                      color: palette.textMuted,
-                      fontSize: 14,
+              data: (exercises) {
+                if (exercises.isEmpty) {
+                  return Center(
+                    child: Text(
+                      'No se encontraron ejercicios.', // i18n
+                      style: GoogleFonts.barlow(
+                        color: palette.textMuted,
+                        fontSize: 14,
+                      ),
                     ),
-                  ),
-                );
-              }
-              return GridView.builder(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: 260,
-                  childAspectRatio: 0.82,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                ),
-                itemCount: exercises.length,
-                itemBuilder: (context, index) {
-                  final exercise = exercises[index];
-                  return ExerciseGridCard(
-                    exercise: exercise,
-                    onTap: () {
-                      showExerciseDetailDialog(
-                        context,
-                        exerciseId: exercise.id,
-                        ownerId: resolveOwnerId(ref, exercise.category),
-                        exerciseName: exercise.name,
-                      );
-                    },
                   );
-                },
-              );
-            },
+                }
+                return GridView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: 260,
+                    childAspectRatio: 0.82,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                  ),
+                  itemCount: exercises.length,
+                  itemBuilder: (context, index) {
+                    final exercise = exercises[index];
+                    return ExerciseGridCard(
+                      exercise: exercise,
+                      onTap: () {
+                        showExerciseDetailDialog(
+                          context,
+                          exerciseId: exercise.id,
+                          ownerId: resolveOwnerId(ref, exercise.category),
+                          exerciseName: exercise.name,
+                        );
+                      },
+                    );
+                  },
+                );
+              },
+            ),
           ),
         ),
       ],

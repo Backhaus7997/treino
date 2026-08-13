@@ -4,6 +4,7 @@ import 'package:video_player/video_player.dart';
 import '../../app/theme/app_motion.dart';
 import '../../app/theme/app_palette.dart';
 import '../../app/theme/app_theme.dart';
+import 'motion/treino_shimmer.dart';
 import 'treino_icon.dart';
 
 /// Public, reusable native video player for Firebase Storage download URLs.
@@ -113,20 +114,27 @@ class _FirebaseStorageVideoPlayerState
       // not exceed the same envelope as a wide video. Layout may shift
       // once init completes and the real aspect ratio is known; this is
       // limited to first-render (browser caches the manifest afterwards).
+      //
+      // Cold Storage URLs take multi-second inits, and `bgCard` reads as
+      // plain black in a video slot — a muted 22px spinner got missed and the
+      // state was reported as "broken video" (#545). Shimmer sweep + accent
+      // spinner make "loading" unmistakable at a glance.
       return _CappedAspectRatio(
         aspectRatio: 16 / 9,
         maxHeight: widget.maxHeight,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: Container(
-            color: palette.bgCard,
-            alignment: Alignment.center,
-            child: SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.2,
-                color: palette.textMuted,
+          child: TreinoShimmer(
+            child: Container(
+              color: palette.bgCard,
+              alignment: Alignment.center,
+              child: SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.6,
+                  color: palette.accent,
+                ),
               ),
             ),
           ),
@@ -169,7 +177,7 @@ class _FirebaseStorageVideoPlayerState
               AnimatedOpacity(
                 opacity: isPlaying ? 0 : 1,
                 duration: AppMotion.fast,
-                child: const _PlayOverlay(),
+                child: const VideoPlayOverlay(),
               ),
               Positioned(
                 left: 0,
@@ -195,10 +203,13 @@ class _FirebaseStorageVideoPlayerState
   }
 }
 
-// ─── Private helpers ──────────────────────────────────────────────────────────
-
-class _PlayOverlay extends StatelessWidget {
-  const _PlayOverlay();
+/// Subtle, brand-neutral play affordance shared by every video surface —
+/// 44px white circle with a soft drop shadow, no big black puck. Public so
+/// the feature-side video cards (exercise_video_player.dart) and the
+/// exercise-detail video hero reuse the exact same overlay instead of
+/// keeping per-file copies.
+class VideoPlayOverlay extends StatelessWidget {
+  const VideoPlayOverlay({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -232,6 +243,8 @@ class _PlayOverlay extends StatelessWidget {
     );
   }
 }
+
+// ─── Private helpers ──────────────────────────────────────────────────────────
 
 class _VideoErrorPlaceholder extends StatelessWidget {
   const _VideoErrorPlaceholder({required this.palette});
