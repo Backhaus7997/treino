@@ -2873,5 +2873,7 @@
   "@onboardingTourProgress": {
     "description": "Etiqueta de lector de pantalla del indicador de progreso. Las barras son decorativas.",
     "placeholders": {"current": {"type": "int"}, "total": {"type": "int"}}
-  }
+  },
+  "onboardingCustomExerciseCta": "CREAR MI EJERCICIO",
+  "@onboardingCustomExerciseCta": {"description": "CTA de la última slide del onboarding de ejercicios propios. Cierra el modal y devuelve al editor de rutina, donde 'Agregar ejercicio' lleva al alta."}
 }

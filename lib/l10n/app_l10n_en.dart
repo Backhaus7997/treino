@@ -3359,4 +3359,7 @@ class AppL10nEn extends AppL10n {
   String onboardingTourProgress(int current, int total) {
     return 'Step $current of $total';
   }
+
+  @override
+  String get onboardingCustomExerciseCta => 'CREATE MY EXERCISE';
 }

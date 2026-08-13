@@ -11,6 +11,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../../app/theme/app_palette.dart';
 import '../../../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../../../core/widgets/treino_icon.dart';
+import '../../../../onboarding/domain/onboarding_surface.dart';
+import '../../../../onboarding/presentation/custom_exercise_onboarding_gate.dart';
 import '../../../../profile/application/user_public_profile_providers.dart';
 import '../../../../profile/domain/experience_level.dart';
 import '../../../../workout/application/assigned_routine_providers.dart';
@@ -218,6 +220,23 @@ class _RoutineEditorWebScreenState
     if (_isEditing) {
       _loading = true;
       _load();
+    } else {
+      // Create mode only, covering both the assigned-routine and the template
+      // route — a trainer opening an existing plan never gets the onboarding on
+      // top of it.
+      //
+      // Post-frame, not here: `initState` has no `Localizations` ancestor
+      // resolved yet and the navigator cannot present mid-frame. Trainer deck
+      // unconditionally — `coachHubRedirect` sends everyone else to
+      // `/not-allowed`, so there is no athlete on this screen.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        maybeShowCustomExerciseOnboarding(
+          context: context,
+          ref: ref,
+          surface: OnboardingSurface.customExerciseTrainerWeb,
+        );
+      });
     }
   }
 

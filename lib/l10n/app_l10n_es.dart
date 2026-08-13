@@ -3419,6 +3419,9 @@ class AppL10nEs extends AppL10n {
   String onboardingTourProgress(int current, int total) {
     return 'Paso $current de $total';
   }
+
+  @override
+  String get onboardingCustomExerciseCta => 'CREAR MI EJERCICIO';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -6833,4 +6836,7 @@ class AppL10nEsAr extends AppL10nEs {
   String onboardingTourProgress(int current, int total) {
     return 'Paso $current de $total';
   }
+
+  @override
+  String get onboardingCustomExerciseCta => 'CREAR MI EJERCICIO';
 }
