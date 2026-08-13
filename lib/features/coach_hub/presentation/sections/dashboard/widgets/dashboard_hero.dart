@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/core/utils/argentina_time.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/application/dashboard_day_counts.dart';
@@ -362,7 +363,11 @@ class _Greeting extends StatelessWidget {
 /// Única instancia en el árbol (welcome card) — la key del contenedor
 /// interno se hardcodea en vez de exponerse por constructor.
 class _PrimaryQuickAction extends StatelessWidget {
-  const _PrimaryQuickAction({required this.label, required this.onTap});
+  const _PrimaryQuickAction({
+    required this.label,
+    required this.onTap,
+    required this.icon,
+  });
 
   final String label;
   final VoidCallback onTap;

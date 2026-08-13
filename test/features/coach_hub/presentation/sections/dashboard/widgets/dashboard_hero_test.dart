@@ -88,8 +88,11 @@ Future<GoRouter> _pumpWithRouter(
       GoRoute(
           path: '/biblioteca',
           builder: (_, __) => const Text('page:/biblioteca')),
+      // #569: los destinos reales de "crear rutina" y "mensajes".
       GoRoute(
-          path: '/mensajes', builder: (_, __) => const Text('page:/mensajes')),
+          path: '/template-editor',
+          builder: (_, __) => const Text('page:/template-editor')),
+      GoRoute(path: '/chat', builder: (_, __) => const Text('page:/chat')),
     ],
   );
   addTearDown(router.dispose);
@@ -208,8 +211,8 @@ void main() {
     });
 
     testWidgets(
-        'the 3 primary quick actions navigate to /alumnos, /biblioteca, '
-        '/mensajes', (tester) async {
+        'the 3 primary quick actions navigate to /alumnos, /template-editor, '
+        '/chat', (tester) async {
       await _pumpWithRouter(
         tester,
         const DashboardWelcomeCard(),
@@ -221,7 +224,8 @@ void main() {
       expect(find.text('page:/alumnos'), findsOneWidget);
     });
 
-    testWidgets('crear rutina navigates to /biblioteca', (tester) async {
+    // #569: antes iba a /biblioteca (el listado) en vez del editor.
+    testWidgets('crear rutina navigates to /template-editor', (tester) async {
       await _pumpWithRouter(
         tester,
         const DashboardWelcomeCard(),
@@ -230,10 +234,11 @@ void main() {
 
       await tester.tap(find.byKey(const Key('quick_action_crear_rutina')));
       await tester.pumpAndSettle();
-      expect(find.text('page:/biblioteca'), findsOneWidget);
+      expect(find.text('page:/template-editor'), findsOneWidget);
     });
 
-    testWidgets('mensajes navigates to /mensajes', (tester) async {
+    // #569: '/mensajes' no existe en el router y tiraba 404.
+    testWidgets('mensajes navigates to /chat', (tester) async {
       await _pumpWithRouter(
         tester,
         const DashboardWelcomeCard(),
@@ -242,7 +247,7 @@ void main() {
 
       await tester.tap(find.byKey(const Key('quick_action_mensajes')));
       await tester.pumpAndSettle();
-      expect(find.text('page:/mensajes'), findsOneWidget);
+      expect(find.text('page:/chat'), findsOneWidget);
     });
   });
 
@@ -322,8 +327,7 @@ void main() {
         find.byKey(const Key('quick_action_nuevo_alumno')),
       );
       expect(semantics.flagsCollection.isButton, isTrue,
-          reason:
-              '"+ Nuevo alumno" debe exponer Semantics(button: true)');
+          reason: '"+ Nuevo alumno" debe exponer Semantics(button: true)');
 
       final focusNode = Focus.of(
         tester.element(find.byKey(const Key('quick_action_nuevo_alumno'))),

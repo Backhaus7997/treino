@@ -240,7 +240,11 @@ void main() {
 
       // 3 active, 1 paused → tile shows '3'
       // The label is present:
-      expect(find.textContaining('ALUMNOS ACTIVOS'), findsOneWidget);
+      expect(
+          find.byWidgetPredicate((w) =>
+              w is Text &&
+              (w.data ?? '').toUpperCase().contains('ALUMNOS ACTIVOS')),
+          findsOneWidget);
     });
   });
 
@@ -254,7 +258,11 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('ADHERENCIA PROMEDIO'), findsOneWidget);
+      expect(
+          find.byWidgetPredicate((w) =>
+              w is Text &&
+              (w.data ?? '').toUpperCase().contains('ADHERENCIA PROMEDIO')),
+          findsOneWidget);
     });
   });
 
