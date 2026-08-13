@@ -74,12 +74,30 @@ class WearWorkoutPlugin(
                     putExtra(WorkoutForegroundService.EXTRA_STARTED_AT_ELAPSED, now)
                 }
                 try {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    // `startForegroundService` devuelve null —y NO tira— cuando
+                    // el componente no está declarado en el manifest mergeado.
+                    // Sin este chequeo el keep-alive degrada en silencio al
+                    // comportamiento SIN servicio, y la medición diría "ok"
+                    // mientras la app se muere. Es exactamente el modo de falla
+                    // que hay hoy: el <service> vive en src/debug/, así que en
+                    // release ni se declara.
+                    val started = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                         context.startForegroundService(intent)
                     } else {
                         context.startService(intent)
                     }
-                    result.success(mapOf("ok" to true, "nowElapsedMs" to now))
+                    if (started == null) {
+                        result.success(
+                            mapOf(
+                                "ok" to false,
+                                "error" to "servicio NO declarado en el manifest de este build " +
+                                    "(el <service> solo esta en src/debug/)",
+                                "nowElapsedMs" to now,
+                            ),
+                        )
+                    } else {
+                        result.success(mapOf("ok" to true, "nowElapsedMs" to now))
+                    }
                 } catch (e: Exception) {
                     // Se devuelve en vez de tirar: el spike necesita MEDIR el
                     // fallo, no morirse. El caso típico es la precondición de
