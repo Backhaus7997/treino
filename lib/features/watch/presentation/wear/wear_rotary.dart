@@ -1,8 +1,7 @@
 import 'dart:async';
-import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 
 /// La corona / bisel giratorio del reloj.
@@ -30,8 +29,7 @@ class WearRotary {
   /// `onListen`/`onCancel` del lado Kotlin. Con varias pantallas vivas
   /// suscribiéndose y desuscribiéndose, un `cancel` —que además es
   /// asincrónico— llega DESPUÉS del `listen` nuevo y deja `rotarySink = null`.
-  /// La corona dejaba de andar por completo, que es exactamente lo que reportó
-  /// el dueño: *"nada de la corona"*.
+  /// La corona dejaba de andar por completo.
   ///
   /// Con un stream único el canal se abre una sola vez y no se cierra nunca.
   static Stream<double>? _shared;
@@ -43,9 +41,26 @@ class WearRotary {
 
 /// Conecta la corona a un [ScrollController].
 ///
+/// ## Cómo se logra que se sienta igual que el dedo
+///
+/// **Alimentando el mismo camino que usa el dedo.** `ScrollPosition.drag()`
+/// devuelve el objeto [Drag] que un gesto real usa para empujar la lista: pasa
+/// por la física del scrollable, respeta los límites, y al soltar dispara la
+/// simulación balística — el fling con su desaceleración.
+///
+/// Las versiones anteriores usaban `jumpTo`, que **saltea la física entera**:
+/// setea la posición a mano, sin fricción, sin inercia y sin rebote. Se intentó
+/// tapar eso interpolando entre destinos, ajustando la sensibilidad y agregando
+/// refuerzo por velocidad, y el dueño lo siguió viendo: *"sigue bajando o
+/// subiendo como por bloques y se ven los cortes"*. Tenía razón, y el problema
+/// no era de ajuste: **ningún suavizado sobre `jumpTo` produce inercia, porque
+/// la inercia no está**.
+///
+/// Con `drag()` no se PARECE al scroll con el dedo: **es** el scroll con el
+/// dedo, alimentado por otro dispositivo de entrada.
+///
 /// **Uno solo por pantalla.** Si hay dos scrollables vivos, la corona no sabe a
-/// cuál hablarle. Es la razón de fondo por la que el companion usa UNA lista
-/// vertical por pantalla en vez del pager horizontal que tenía antes.
+/// cuál hablarle.
 class WearRotaryScroll extends StatefulWidget {
   const WearRotaryScroll({
     super.key,
@@ -67,72 +82,45 @@ class WearRotaryScroll extends StatefulWidget {
   State<WearRotaryScroll> createState() => _WearRotaryScrollState();
 }
 
-class _WearRotaryScrollState extends State<WearRotaryScroll>
-    with SingleTickerProviderStateMixin {
-  /// Cuánto scroll produce una muesca girando DESPACIO.
+class _WearRotaryScrollState extends State<WearRotaryScroll> {
+  /// Cuánto scroll produce una muesca.
   ///
   /// Medido en el SM-L500: cada muesca da `axis = ±1.0`, que por el
   /// `scaledVerticalScrollFactor` son 136 píxeles FÍSICOS = 64 lógicos. En una
-  /// pantalla de 206 dp eso ya es casi un tercio de pantalla, así que el
-  /// multiplicador base tiene que ser CHICO — girar despacio es el gesto de
-  /// precisión, cuando el atleta busca una fila concreta.
-  static const double _sensitivity = 0.9;
+  /// pantalla de 206 dp eso ya es un tercio de pantalla, así que el
+  /// multiplicador es CHICO: el recorrido largo lo aporta el fling, no el paso.
+  static const double _sensitivity = 0.85;
 
-  /// Cuánto se agranda el paso girando rápido.
+  /// Cuánto silencio cuenta como "soltó la corona".
   ///
-  /// **Ésta es la parte que hacía falta.** Con un paso fijo, girar despacio se
-  /// siente escalonado (pasos grandes para un gesto fino) y girar rápido se
-  /// siente corto (hay que dar muchas vueltas para recorrer una lista). Los
-  /// dispositivos nativos escalan el paso con la velocidad, y por eso se sienten
-  /// continuos.
-  static const double _maxBoost = 3.5;
-
-  /// Intervalo entre muescas que se considera "despacio", en segundos.
-  ///
-  /// Por encima de esto no hay refuerzo; por debajo crece hasta [_maxBoost].
-  static const double _slowInterval = 0.14;
-
-  /// Qué tan rápido persigue el destino, en unidades de 1/segundo.
-  ///
-  /// Más alto = más pegado a la muesca pero más brusco; más bajo = más suave
-  /// pero se siente flotando. 14 llega al ~95% del destino en unos 215 ms: con
-  /// el refuerzo por velocidad ya no hace falta ir tan pegado, y aflojarlo un
-  /// poco es lo que redondea la sensación de continuidad.
-  static const double _responsiveness = 14;
-
-  /// Con menos de esto ya llegamos: perseguir décimas de píxel sólo gasta
-  /// frames sin que se vea nada.
-  static const double _epsilon = 0.5;
-
-  late final Ticker _ticker = createTicker(_onTick);
+  /// Al vencer se cierra el arrastre con la velocidad acumulada, que es lo que
+  /// dispara el fling. Corto para que el fling salga apenas se deja de girar,
+  /// pero más largo que el intervalo entre muescas de un giro rápido — si no,
+  /// un giro sostenido se partiría en varios arrastres y cada corte se sentiría
+  /// como un frenazo.
+  static const Duration _idleBeforeFling = Duration(milliseconds: 80);
 
   StreamSubscription<double>? _sub;
   double _dpr = 1;
 
-  /// Adónde queremos llegar. Null = no hay nada pendiente.
-  ///
-  /// **Acá está la clave de la fluidez.** La versión anterior hacía `jumpTo` con
-  /// el delta de cada muesca: aunque se agrupara por frame, cada muesca seguía
-  /// siendo un ESCALÓN instantáneo de ~96 px. El dueño lo describió como *"a
-  /// tirones"*, y tenía razón — no era un problema de frecuencia, era que no
-  /// había interpolación.
-  ///
-  /// Ahora las muescas se suman a un DESTINO y un ticker desliza hacia él con
-  /// suavizado exponencial. Girar rápido no encola saltos: corre el destino más
-  /// lejos y el deslizamiento se acelera solo.
-  double? _target;
+  /// Arrastre en curso. El MISMO tipo que produce un dedo.
+  Drag? _drag;
+  Timer? _idle;
 
-  Duration _lastTick = Duration.zero;
+  /// Velocidad suavizada, en píxeles lógicos por segundo.
+  ///
+  /// Es lo que se le pasa a [Drag.end]: sin velocidad no hay fling, y sin fling
+  /// el scroll frena en seco apenas se deja de girar. Ese frenazo es justo lo
+  /// que se leía como "bloques".
+  double _velocity = 0;
 
-  /// Cuándo llegó la muesca anterior, para medir la velocidad del giro.
   final _sinceLastNotch = Stopwatch();
 
   @override
   void initState() {
     super.initState();
     // Se suscribe SIEMPRE, y el filtro de `enabled` se hace al recibir. Alternar
-    // la suscripción según la página era lo que rompía el canal — ver el doc de
-    // [WearRotary._shared].
+    // la suscripción según la página rompía el canal — ver [WearRotary._shared].
     _sub = WearRotary.physicalPixels.listen(_apply);
   }
 
@@ -145,7 +133,8 @@ class _WearRotaryScrollState extends State<WearRotaryScroll>
   @override
   void dispose() {
     _sub?.cancel();
-    _ticker.dispose();
+    _idle?.cancel();
+    _drag?.cancel();
     super.dispose();
   }
 
@@ -156,63 +145,59 @@ class _WearRotaryScrollState extends State<WearRotaryScroll>
 
     final c = widget.controller;
     if (!c.hasClients) return;
-    final p = c.position;
-
-    // Refuerzo por velocidad. Se mide el intervalo REAL entre muescas en vez
-    // de asumir una cadencia: la corona no emite a frecuencia fija.
-    final gap = _sinceLastNotch.isRunning
-        ? _sinceLastNotch.elapsedMicroseconds / 1e6
-        : _slowInterval;
-    _sinceLastNotch
-      ..reset()
-      ..start();
-    final boost = (_slowInterval / gap).clamp(1.0, _maxBoost);
 
     // `scaledVerticalScrollFactor` viene en píxeles FÍSICOS; el offset de
     // Flutter es en píxeles LÓGICOS. Sin esta división, en el SM-L500
     // (devicePixelRatio 2.125) cada muesca scrollea el doble de lo que debería.
-    final delta = physical / _dpr * _sensitivity * boost;
+    final delta = physical / _dpr * _sensitivity;
 
-    // Se acumula sobre el destino ANTERIOR, no sobre la posición actual: si no,
-    // girar rápido perdería las muescas que llegan mientras todavía desliza.
-    final base = _target ?? p.pixels;
-    _target = (base + delta).clamp(p.minScrollExtent, p.maxScrollExtent);
+    // Velocidad a partir del intervalo REAL entre muescas: la corona no emite a
+    // frecuencia fija. Se acota y se suaviza para que una muesca fuera de
+    // tiempo no dispare un fling desproporcionado.
+    final gap = _sinceLastNotch.isRunning
+        ? (_sinceLastNotch.elapsedMicroseconds / 1e6).clamp(0.008, 0.5)
+        : 0.5;
+    _sinceLastNotch
+      ..reset()
+      ..start();
 
-    if (!_ticker.isActive) {
-      _lastTick = Duration.zero;
-      _ticker.start();
-    }
+    // El signo se invierte: en el protocolo de arrastre, mover el dedo hacia
+    // ARRIBA (delta negativo) baja por la lista.
+    final instant = -delta / gap;
+    _velocity = _drag == null ? instant : _velocity * 0.7 + instant * 0.3;
+
+    _drag ??= c.position.drag(
+      DragStartDetails(globalPosition: Offset.zero),
+      () => _drag = null,
+    );
+    _drag!.update(
+      DragUpdateDetails(
+        globalPosition: Offset.zero,
+        delta: Offset(0, -delta),
+        primaryDelta: -delta,
+      ),
+    );
+
+    // Cada muesca corre el vencimiento: un giro sostenido es UN arrastre largo,
+    // no muchos cortos. Partirlo en pedazos es exactamente lo que producía los
+    // frenazos entre bloques.
+    _idle?.cancel();
+    _idle = Timer(_idleBeforeFling, _endDrag);
   }
 
-  void _onTick(Duration elapsed) {
-    final c = widget.controller;
-    final target = _target;
-    if (target == null || !c.hasClients) {
-      _stop();
-      return;
-    }
-
-    final dt = (elapsed - _lastTick).inMicroseconds / 1e6;
-    _lastTick = elapsed;
-
-    final current = c.position.pixels;
-    final remaining = target - current;
-    if (remaining.abs() < _epsilon || dt <= 0) {
-      c.jumpTo(target);
-      _stop();
-      return;
-    }
-
-    // Suavizado exponencial con dt: si un frame se atrasa, el deslizamiento
-    // avanza proporcionalmente más y no se siente distinto. Con un factor fijo
-    // por frame, un hipo de render se notaría como un tirón.
-    final t = 1 - math.exp(-_responsiveness * dt);
-    c.jumpTo(current + remaining * t);
-  }
-
-  void _stop() {
-    _target = null;
-    if (_ticker.isActive) _ticker.stop();
+  /// Cierra el arrastre con velocidad, para que la física haga el fling.
+  void _endDrag() {
+    final drag = _drag;
+    _drag = null;
+    _sinceLastNotch.stop();
+    if (drag == null) return;
+    drag.end(
+      DragEndDetails(
+        primaryVelocity: _velocity,
+        velocity: Velocity(pixelsPerSecond: Offset(0, _velocity)),
+      ),
+    );
+    _velocity = 0;
   }
 
   @override
