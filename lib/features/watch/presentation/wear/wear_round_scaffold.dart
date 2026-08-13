@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import 'wear_pager.dart';
 import 'wear_rotary.dart';
 
 /// Márgenes verticales de Wear OS, en porcentaje del ALTO de pantalla.
@@ -137,7 +138,11 @@ class _WearRoundScaffoldState extends State<WearRoundScaffold> {
         padding: EdgeInsets.symmetric(horizontal: hPad),
         // La corona va acá y no en cada pantalla: así hay UN solo scrollable
         // por pantalla y no queda ambiguo a cuál le habla el hardware.
+        //
+        // `enabled` importa: el `PageView` mantiene las tres páginas vivas, así
+        // que sin esto el giro movería listas que nadie está mirando.
         child: WearRotaryScroll(
+          enabled: WearPageScope.isActiveOf(context),
           controller: _controller,
           // Sin esto, el primer y el último ítem parecen CORTADOS contra el
           // bisel y el atleta cree que la pantalla se rompió. Con el fundido se

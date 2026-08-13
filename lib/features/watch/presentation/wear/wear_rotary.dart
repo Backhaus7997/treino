@@ -36,23 +36,60 @@ class WearRotaryScroll extends StatefulWidget {
     super.key,
     required this.controller,
     required this.child,
+    this.enabled = true,
   });
 
   final ScrollController controller;
   final Widget child;
+
+  /// Si esta instancia escucha el hardware.
+  ///
+  /// En un pager las páginas quedan VIVAS aunque no se vean, así que sin este
+  /// interruptor el giro movería listas que nadie está mirando.
+  final bool enabled;
 
   @override
   State<WearRotaryScroll> createState() => _WearRotaryScrollState();
 }
 
 class _WearRotaryScrollState extends State<WearRotaryScroll> {
+  /// Multiplicador de sensibilidad.
+  ///
+  /// `scaledVerticalScrollFactor` está calibrado para la rueda de un mouse en
+  /// un teléfono, no para la corona de un reloj. Aplicado tal cual, el dueño lo
+  /// describió como *"anda pero lento"*: hay que girar media vuelta para mover
+  /// la lista un renglón.
+  ///
+  /// 2.5 fue el punto donde una muesca mueve aproximadamente una fila.
+  static const double _sensitivity = 2.5;
+
   StreamSubscription<double>? _sub;
   double _dpr = 1;
+
+  /// Delta acumulado que todavía no se aplicó.
+  ///
+  /// La corona emite decenas de eventos por segundo. Llamar `jumpTo` en cada
+  /// uno hace que el scroll se sienta TRABADO: cada salto reinicia la posición
+  /// y el render no llega. Se acumulan los eventos y se aplican UNA vez por
+  /// frame, que es lo máximo que la pantalla puede mostrar igual.
+  double _pending = 0;
+  bool _scheduled = false;
 
   @override
   void initState() {
     super.initState();
-    _sub = WearRotary.physicalPixels.listen(_apply);
+    _resubscribe();
+  }
+
+  @override
+  void didUpdateWidget(WearRotaryScroll old) {
+    super.didUpdateWidget(old);
+    if (old.enabled != widget.enabled) _resubscribe();
+  }
+
+  void _resubscribe() {
+    _sub?.cancel();
+    _sub = widget.enabled ? WearRotary.physicalPixels.listen(_apply) : null;
   }
 
   @override
@@ -68,19 +105,26 @@ class _WearRotaryScrollState extends State<WearRotaryScroll> {
   }
 
   void _apply(double physical) {
-    final c = widget.controller;
-    if (!c.hasClients) return;
-    final p = c.position;
     // `scaledVerticalScrollFactor` viene en píxeles FÍSICOS; el offset de
     // Flutter es en píxeles LÓGICOS. Sin esta división, en el SM-L500
-    // (devicePixelRatio 2.125) cada muesca scrollea el doble de lo que debería
-    // y la lista se siente incontrolable.
-    final target = (p.pixels + physical / _dpr)
-        .clamp(p.minScrollExtent, p.maxScrollExtent);
-    // `jumpTo` y no `animateTo`: la corona ya emite muchos eventos chicos, y
-    // animar cada uno es cancelar la animación anterior decenas de veces por
-    // segundo. `jumpTo` da el 1:1 que se siente nativo.
-    c.jumpTo(target);
+    // (devicePixelRatio 2.125) cada muesca scrollea el doble de lo que debería.
+    _pending += physical / _dpr * _sensitivity;
+    if (_scheduled) return;
+    _scheduled = true;
+    // Una aplicación por frame. Ver el doc de [_pending].
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scheduled = false;
+      final delta = _pending;
+      _pending = 0;
+      final c = widget.controller;
+      if (!c.hasClients || delta == 0) return;
+      final p = c.position;
+      final target =
+          (p.pixels + delta).clamp(p.minScrollExtent, p.maxScrollExtent);
+      // `jumpTo` y no `animateTo`: animar cada lote es cancelar la animación
+      // anterior en el frame siguiente. `jumpTo` da el 1:1 que se siente nativo.
+      c.jumpTo(target);
+    });
   }
 
   @override
