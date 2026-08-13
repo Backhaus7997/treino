@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../../app/theme/app_motion.dart';
+import '../../../app/theme/tokens/primitives.dart';
 
 /// Ráfaga de confetti one-shot para el momento más celebratorio del flujo:
 /// terminar un entreno completo — TREINO Motion (cobertura total, extensión
@@ -139,19 +140,16 @@ class _TreinoConfettiState extends State<TreinoConfetti>
   }
 }
 
-// intentional: excepción documentada a "nunca HEX literal" — ver el
-// dartdoc de TreinoConfetti. Set fijo y variado, no ligado a AppPalette;
-// deliberadamente NO usa Mint Magenta para que el festejo no se sienta como
-// "dos tonos de la marca otra vez".
-const _confettiColors = <Color>[
-  Color(0xFFFF6B6B), // rojo coral
-  Color(0xFFFFD93D), // amarillo
-  Color(0xFF6BCB77), // verde
-  Color(0xFF4D96FF), // azul
-  Color(0xFFB983FF), // violeta
-  Color(0xFFFF9F45), // naranja
-  Color(0xFFFF6FB5), // rosa
-];
+// Set fijo y variado, no ligado a AppPalette: deliberadamente NO usa Mint
+// Magenta para que el festejo no se sienta como "dos tonos de la marca otra
+// vez" — ver el dartdoc de TreinoConfetti.
+//
+// El criterio no cambió; los valores se mudaron a
+// [AppDecorativePalettes.confetti] porque `no_hex_scan_test` admite hex
+// literal sólo en `primitives.dart`. Sigue siendo una paleta decorativa, NO
+// un token semántico: por eso vive en AppDecorativePalettes y no en
+// AppColorPrimitives, que es insumo exclusivo de AppPalette.
+const _confettiColors = AppDecorativePalettes.confetti;
 
 /// Parámetros congelados de una partícula al momento de generarse — la
 /// física en sí (posición/rotación/opacidad por frame) se resuelve en

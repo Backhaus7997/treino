@@ -1202,6 +1202,126 @@ abstract class AppL10n {
   /// **'¡Terminé mi entreno! 💪'**
   String get workoutPostAutoCompleteText;
 
+  /// Title of the skippable post-session check-in step, and of the sheet it opens. Asks how the athlete felt — subjective, never a performance metric.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿CÓMO TE SENTISTE?'**
+  String get wellbeingCheckInTitle;
+
+  /// Reassures that the check-in is skippable at no cost. The post-session moment is when the user wants to leave.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Opcional. Podés saltearlo.'**
+  String get wellbeingCheckInOptional;
+
+  /// No description provided for @wellbeingFeelingVeryBad.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Muy mal'**
+  String get wellbeingFeelingVeryBad;
+
+  /// No description provided for @wellbeingFeelingBad.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Mal'**
+  String get wellbeingFeelingBad;
+
+  /// No description provided for @wellbeingFeelingNeutral.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Normal'**
+  String get wellbeingFeelingNeutral;
+
+  /// No description provided for @wellbeingFeelingGood.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Bien'**
+  String get wellbeingFeelingGood;
+
+  /// No description provided for @wellbeingFeelingGreat.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Muy bien'**
+  String get wellbeingFeelingGreat;
+
+  /// No description provided for @wellbeingPainQuestion.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Tuviste dolor o molestia?'**
+  String get wellbeingPainQuestion;
+
+  /// No description provided for @wellbeingPainYes.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SÍ'**
+  String get wellbeingPainYes;
+
+  /// No description provided for @wellbeingPainNo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'NO'**
+  String get wellbeingPainNo;
+
+  /// No description provided for @wellbeingPainAreasQuestion.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿En qué zona?'**
+  String get wellbeingPainAreasQuestion;
+
+  /// No description provided for @wellbeingPainAreasHint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Podés marcar más de una.'**
+  String get wellbeingPainAreasHint;
+
+  /// No description provided for @wellbeingNoteLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Nota (opcional)'**
+  String get wellbeingNoteLabel;
+
+  /// No description provided for @wellbeingNoteHint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Algo que quieras recordar de hoy'**
+  String get wellbeingNoteHint;
+
+  /// Neutral note shown only when the athlete reports pain. The app records, it never interprets: this copy must not diagnose, recommend or condition any app behaviour on the answer.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Si el dolor persiste, consultá a un profesional de la salud.'**
+  String get wellbeingMedicalDisclaimer;
+
+  /// No description provided for @wellbeingSaveButton.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'GUARDAR'**
+  String get wellbeingSaveButton;
+
+  /// No description provided for @wellbeingSkipButton.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'AHORA NO'**
+  String get wellbeingSkipButton;
+
+  /// No description provided for @wellbeingSavedLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'REGISTRADO'**
+  String get wellbeingSavedLabel;
+
+  /// No description provided for @wellbeingEditButton.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Editar'**
+  String get wellbeingEditButton;
+
+  /// No description provided for @wellbeingSaveError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos guardar tu registro. Probá de nuevo.'**
+  String get wellbeingSaveError;
+
   /// Header title of the share-a-workout composer screen, opened from the COMPARTIR button of the post-workout summary.
   ///
   /// In es_AR, this message translates to:
@@ -3128,6 +3248,24 @@ abstract class AppL10n {
   /// **'Confirmar'**
   String get routineEditorDialogConfirm;
 
+  /// No description provided for @routineEditorCopyPrescriptionTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Copiar sets?'**
+  String get routineEditorCopyPrescriptionTitle;
+
+  /// Confirmation body for the slot-menu shortcut that copies the previous exercise's prescription into this one.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Se van a reemplazar los sets de este ejercicio por los de «{sourceExercise}».'**
+  String routineEditorCopyPrescriptionBody(String sourceExercise);
+
+  /// No description provided for @routineEditorSlotMenuCopyPrevious.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Copiar sets del anterior'**
+  String get routineEditorSlotMenuCopyPrevious;
+
   /// No description provided for @routineEditorSlotMenuReplace.
   ///
   /// In es_AR, this message translates to:
@@ -3163,6 +3301,42 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'+ Agregar set'**
   String get routineEditorAddSet;
+
+  /// Screen-reader label for the KG column header, which doubles as the bulk-fill affordance.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Replicar el peso del primer set en todos'**
+  String get routineEditorFillKgA11y;
+
+  /// No description provided for @routineEditorFillKgApplied.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Peso replicado en todos los sets.'**
+  String get routineEditorFillKgApplied;
+
+  /// No description provided for @routineEditorFillKgEmpty.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cargá el peso del primer set para poder replicarlo.'**
+  String get routineEditorFillKgEmpty;
+
+  /// No description provided for @routineEditorFillKgUndo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Deshacer'**
+  String get routineEditorFillKgUndo;
+
+  /// Screen-reader label for a KG stepper button that adds weight to the set being edited.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sumar {amount} kilos al peso'**
+  String routineEditorKgStepIncreaseA11y(String amount);
+
+  /// Screen-reader label for a KG stepper button that takes weight off the set being edited.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Restar {amount} kilos al peso'**
+  String routineEditorKgStepDecreaseA11y(String amount);
 
   /// No description provided for @routineEditorMeasureReps.
   ///
