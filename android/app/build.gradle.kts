@@ -40,6 +40,30 @@ android {
         versionName = flutter.versionName
     }
 
+    // El companion de Wear OS es OTRO APK, que se instala en el reloj. La doc de
+    // Google es explícita: "Wear OS APKs are separate from mobile APKs, and are
+    // uploaded and updated independently from within the Play Console."
+    //
+    // Se separa por flavor y no por proyecto aparte para no duplicar pubspec, CI
+    // ni el arbol Dart: el companion reusa la capa de dominio TAL CUAL (medido:
+    // 22/22 casos del contrato de `conformance/` corriendo en el reloj, con cero
+    // cambios en lib/features/workout/domain/).
+    flavorDimensions += "device"
+    productFlavors {
+        create("phone") {
+            dimension = "device"
+        }
+        create("wear") {
+            dimension = "device"
+            // Wear OS 3 = API 30. Por debajo no existe el Wear OS moderno.
+            minSdk = 30
+            // NADA de applicationIdSuffix: la Data Layer API exige que reloj y
+            // teléfono compartan applicationId Y clave de firma. Con un sufijo,
+            // el handoff de credencial deja de funcionar y el sintoma aparece
+            // lejos de la causa.
+        }
+    }
+
     signingConfigs {
         // Credenciales de la upload key, leídas de android/key.properties
         // (gitignored — nunca se commitea). Sólo se declara el config si el

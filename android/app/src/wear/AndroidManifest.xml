@@ -1,0 +1,46 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+      Manifest del companion de Wear OS. Se mergea SOLO en el flavor `wear`, en
+      cualquier build type — o sea que a diferencia del bloque que vivía en
+      src/debug/, esto SÍ entra en profile y release.
+
+      Ese era un agujero real: `startForegroundService()` devuelve null (y NO
+      tira) cuando el componente no está en el manifest mergeado, así que el
+      keep-alive degradaba en silencio al comportamiento SIN servicio. Un
+      re-test en release habría medido la celda A creyendo medir la B.
+    -->
+
+    <!-- Marca el APK como app de reloj. Es lo que hace que el launcher del
+         reloj la trate como tal y que Play la ofrezca al dispositivo correcto.
+         Va SOLO acá: en el APK del teléfono haría que la app no se pueda
+         instalar en un teléfono. -->
+    <uses-feature android:name="android.hardware.type.watch" />
+
+    <!-- Precondición de runtime del foreground service tipo `health`: es un OR
+         entre varios permisos, y HIGH_SAMPLING_RATE_SENSORS es la rama barata
+         — install-time, sin diálogo — así que arrancar el servicio no queda
+         atado al flujo de permisos de sensores. Sin cumplir la precondición,
+         startForeground() tira SecurityException con el manifest perfecto. -->
+    <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- El aviso del descanso vibra. NO se declaran SCHEDULE_EXACT_ALARM ni
+         USE_EXACT_ALARM a propósito: la variante de setExact con
+         OnAlarmListener no los exige. El primero viene denegado por default
+         desde Android 14 para targets 33+, y el segundo Play lo restringe a
+         apps cuyo core ES un temporizador. Ver RestAlarm.kt. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <application>
+        <!-- Sin foregroundServiceType, con targetSdk >= 34, startForeground()
+             tira IllegalArgumentException ("not a subset of ... 0x00000000"),
+             NO la MissingForegroundServiceTypeException que uno buscaría en
+             logcat. Es una hora perdida buscando el nombre equivocado. -->
+        <service
+            android:name="com.treino.app.workout.WorkoutForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="health" />
+    </application>
+</manifest>
