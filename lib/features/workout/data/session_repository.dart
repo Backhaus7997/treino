@@ -9,6 +9,7 @@ import '../../profile/data/user_public_profile_repository.dart';
 import '../domain/session.dart';
 import '../domain/session_status.dart';
 import '../domain/set_log.dart';
+import '../application/session_duration.dart';
 import '../domain/set_log_identity.dart';
 
 class SessionRepository {
@@ -323,7 +324,22 @@ class SessionRepository {
   /// `totalVolumeKg` y `durationMin` se dejan como están —una sesión activa nace
   /// en 0 y nadie los toca hasta terminarla— porque inventarles un valor sería
   /// peor que dejar el 0 honesto.
-  Future<Session?> getActive(String uid) async {
+  /// Además cierra la ÚLTIMA si ya venció.
+  ///
+  /// Barrer las repetidas dejaba viva una sesión de ayer, y el aviso de retomar
+  /// seguía saliendo hoy — con un agravante: el modal muestra solo la hora, sin
+  /// fecha, así que un entreno de hace cinco días se lee como "desde 19:42" y el
+  /// atleta no tiene forma de saber que está viejo.
+  ///
+  /// El corte es [maxWorkoutDuration], la MISMA constante que ya usa
+  /// `sanitizedActiveSessionElapsedSeconds` para acotar el cronómetro. No es un
+  /// número nuevo: si el propio contador de tiempo considera que un entreno no
+  /// puede durar más de eso, una sesión activa más vieja está muerta por
+  /// definición.
+  ///
+  /// [now] se inyecta para que el test sea determinístico, igual que en
+  /// [listFinishedToday].
+  Future<Session?> getActive(String uid, {DateTime? now}) async {
     final snap = await _sessions(uid)
         .where('status', isEqualTo: 'active')
         .orderBy('startedAt', descending: true)
@@ -334,15 +350,26 @@ class SessionRepository {
         .get();
     if (snap.docs.isEmpty) return null;
 
+    final ahora = (now ?? DateTime.now()).toUtc();
+    final masNueva = _sessionFromDoc(snap.docs.first);
+    // Una sesión que no se puede ni leer no se puede ofrecer para retomar, pero
+    // tampoco hay que dejarla colgada: entra en el barrido con las demás.
+    final vencio = masNueva == null ||
+        ahora.difference(masNueva.startedAt.toUtc()) > maxWorkoutDuration;
+
+    // Si venció, se cierran TODAS; si no, todas menos la que el atleta está
+    // haciendo.
+    final aCerrar = vencio ? snap.docs : snap.docs.skip(1).toList();
+
     // Best-effort: si el barrido falla, se devuelve igual la sesión activa. El
     // atleta tiene que poder seguir entrenando aunque la limpieza no entre.
-    if (snap.docs.length > 1) {
+    if (aCerrar.isNotEmpty) {
       try {
-        final now = Timestamp.fromDate(DateTime.now().toUtc());
-        for (final vieja in snap.docs.skip(1)) {
+        final cerradaEn = Timestamp.fromDate(ahora);
+        for (final vieja in aCerrar) {
           await vieja.reference.update({
             'status': SessionStatusX(SessionStatus.finished).toJson(),
-            'finishedAt': now,
+            'finishedAt': cerradaEn,
             'wasFullyCompleted': false,
           });
         }
@@ -356,7 +383,7 @@ class SessionRepository {
       }
     }
 
-    return _sessionFromDoc(snap.docs.first);
+    return vencio ? null : masNueva;
   }
 
   // ─── addSetLog ──────────────────────────────────────────────────────────

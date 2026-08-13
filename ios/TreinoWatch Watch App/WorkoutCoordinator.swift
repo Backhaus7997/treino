@@ -286,6 +286,25 @@ final class WorkoutCoordinator: ObservableObject {
         Task { await sync() }
     }
 
+    /// Abandona un entreno que el atleta NO puede completar (HANDOFF §8.3).
+    ///
+    /// Es el MISMO mecanismo que `finish()`, y a proposito: no hay logica
+    /// duplicada que pueda divergir. `finish()` ya escribe
+    /// `wasFullyCompleted: isFullyCompleted(current)`, que en un entreno a
+    /// medias da `false` — o sea que la sesion queda cerrada pero NO cuenta como
+    /// entreno hecho: no mueve el plan, ni la racha, ni los rankings. Es
+    /// exactamente lo que hace ABANDONAR en el telefono.
+    ///
+    /// Lo unico que faltaba era la salida en la pantalla: hasta ahora el reloj
+    /// no tenia ningun gesto, y si te lesionabas sin el telefono a mano la
+    /// sesion quedaba abierta para siempre.
+    ///
+    /// Existe con nombre propio y no se llama `finish()` desde la vista para que
+    /// el codigo diga lo que el atleta quiso hacer.
+    func abandon() async {
+        await finish()
+    }
+
     /// Cierra el entreno. Intenta subir lo que falte ANTES de descartar el
     /// estado local: si se borrara primero, una serie que nunca llego al
     /// historial se perderia sin dejar rastro.

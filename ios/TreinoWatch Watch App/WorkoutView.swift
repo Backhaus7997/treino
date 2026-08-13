@@ -21,6 +21,12 @@ struct WorkoutView: View {
     /// permiso— la pantalla se dibuja igual, sin pulsaciones y sin hueco.
     @EnvironmentObject private var workoutSession: WorkoutSessionController
 
+    /// Si esta abierto el pedido de confirmacion para abandonar.
+    ///
+    /// El boton no abandona: abre esto. Un solo toque no puede tirar un entreno
+    /// a la basura — y menos en una pantalla del tamaño de una moneda.
+    @State private var confirmandoAbandono = false
+
     var body: some View {
         if let exercise = workout.currentExercise, let session = workout.session {
             ScrollView {
@@ -60,9 +66,40 @@ struct WorkoutView: View {
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
                             .padding(.top, 4)
+
+                        // Salida para un entreno que NO se puede completar
+                        // (HANDOFF §8.3). Si te lesionás a mitad y no tenés el
+                        // teléfono a mano, antes no había ningún gesto: la
+                        // sesión quedaba abierta para siempre.
+                        //
+                        // Deliberadamente POCO accesible, que es lo que pidió el
+                        // dueño: chico, gris, sin tinte destructivo y debajo del
+                        // texto. El botón de arriba se gana marcando series; a
+                        // este hay que buscarlo. Y no ejecuta nada por sí solo —
+                        // pide confirmación, igual que el teléfono.
+                        Button("Abandonar entreno") {
+                            confirmandoAbandono = true
+                        }
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .buttonStyle(.plain)
+                        .padding(.top, 6)
                     }
                 }
                 .padding(.horizontal, 2)
+            }
+            .confirmationDialog(
+                "¿Abandonar el entreno?",
+                isPresented: $confirmandoAbandono,
+                titleVisibility: .visible
+            ) {
+                Button("Abandonar", role: .destructive) {
+                    Task { await workout.abandon() }
+                }
+                Button("Seguir entrenando", role: .cancel) {}
+            } message: {
+                // Mismo contrato que el telefono: lo hecho NO se pierde.
+                Text("Se guarda lo que hiciste hasta acá.")
             }
         } else {
             ProgressView()

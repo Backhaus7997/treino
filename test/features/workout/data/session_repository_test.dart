@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/profile/data/user_public_profile_repository.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/data/session_repository.dart';
+import 'package:treino/features/workout/application/session_duration.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
 
@@ -199,7 +200,9 @@ void main() {
       () async {
     await createActiveSession();
 
-    final result = await repo.getActive(uid);
+    // `now` explicito: la sesion nace en testNow(), y sin pasarlo getActive
+    // usaria la fecha real — meses despues — y la daria por vencida.
+    final result = await repo.getActive(uid, now: testNow());
 
     expect(result, isNotNull);
     expect(result!.status, equals(SessionStatus.active));
@@ -222,7 +225,10 @@ void main() {
       );
     }
 
-    final activa = await repo.getActive(uid);
+    final activa = await repo.getActive(
+      uid,
+      now: DateTime.utc(2026, 5, 13, 10),
+    );
 
     expect(
       activa!.startedAt,
@@ -252,11 +258,54 @@ void main() {
     }
   });
 
+  test('getActive cierra tambien la ultima si ya vencio', () async {
+    // Barrer solo las repetidas dejaba viva una sesión de ayer, y el aviso de
+    // retomar seguía saliendo hoy. Peor: el modal muestra solo la hora, sin
+    // fecha, así que un entreno de hace días se lee como "desde 19:42".
+    //
+    // El corte es maxWorkoutDuration (8h), la MISMA constante que ya acota el
+    // cronómetro: si el contador considera que un entreno no puede durar más,
+    // una activa más vieja está muerta por definición.
+    final arranque = DateTime.utc(2026, 5, 18, 10);
+    await repo.create(
+      uid: uid,
+      routineId: routineId,
+      routineName: routineName,
+      startedAt: arranque,
+    );
+
+    // Justo adentro de la ventana: se sigue pudiendo retomar.
+    final aunViva = await repo.getActive(
+      uid,
+      now: arranque.add(maxWorkoutDuration - const Duration(minutes: 1)),
+    );
+    expect(aunViva, isNotNull, reason: 'dentro de las 8h todavía se retoma');
+
+    // Pasada la ventana: no se ofrece, y ademas queda cerrada.
+    final vencida = await repo.getActive(
+      uid,
+      now: arranque.add(maxWorkoutDuration + const Duration(minutes: 1)),
+    );
+    expect(
+      vencida,
+      isNull,
+      reason: 'una sesión de ayer no se ofrece para retomar',
+    );
+
+    final todas = await repo.listByUid(uid);
+    expect(
+      todas.single.status,
+      equals(SessionStatus.finished),
+      reason: 'y no queda colgada: si no, el reloj se le engancha igual',
+    );
+    expect(todas.single.wasFullyCompleted, isFalse);
+  });
+
   test('getActive no escribe nada cuando hay una sola activa', () async {
     await createActiveSession();
 
     final antes = (await repo.listByUid(uid)).single;
-    await repo.getActive(uid);
+    await repo.getActive(uid, now: testNow());
     final despues = (await repo.listByUid(uid)).single;
 
     expect(despues.status, equals(SessionStatus.active));

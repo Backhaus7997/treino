@@ -127,7 +127,14 @@ void main() {
   test(
     'la sesion activa se limpia sola cuando el reloj la termina',
     () async {
-      await writeSession(id: 'en-curso', startedAt: DateTime.utc(2026, 8, 3));
+      // Relativa a AHORA y no una fecha fija: desde que `getActive` cierra las
+      // sesiones vencidas (HANDOFF §8.1), una activa de hace diez días nace
+      // muerta y este test no llegaría ni a verla. Lo que se prueba acá es otra
+      // cosa —que el teléfono se entera cuando el reloj cierra—, así que la
+      // fecha es incidental y conviene que sea siempre reciente.
+      final arranque =
+          DateTime.now().toUtc().subtract(const Duration(minutes: 5));
+      await writeSession(id: 'en-curso', startedAt: arranque);
 
       final received = <AsyncValue<Session?>>[];
       final sub = container.listen(
@@ -146,8 +153,8 @@ void main() {
       // El reloj la cierra. En el teléfono no corre ningún notifier.
       await writeSession(
         id: 'en-curso',
-        startedAt: DateTime.utc(2026, 8, 3),
-        finishedAt: DateTime.utc(2026, 8, 3, 1),
+        startedAt: arranque,
+        finishedAt: arranque.add(const Duration(minutes: 1)),
       );
 
       await waitFor(
