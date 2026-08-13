@@ -64,12 +64,15 @@ Si el usuario pide alguno → **frená y confirmá**.
 
 **Rankings SÍ está en scope** y ya está implementado: ranking por gym, opt-in
 explícito del atleta (rachas / volumen / main lifts). Vive en la 2da página
-swipeable del tab Entrenar (`/workout?tab=rankings`). No lo confundas con
-"Gamificación" de la lista de arriba. → Detalle en [docs/product.md](./docs/product.md).
+swipeable del tab **Feed** (`/feed?tab=rankings`), detrás del pill
+`[FEED | RANKINGS]` — `feed_screen.dart`, `_AthleteFeed`. Estuvo en Entrenar
+hasta rankings-v2; `/workout?tab=rankings` y `/profile/rankings` hoy son
+redirects legacy (`router.dart`). No lo confundas con "Gamificación" de la lista
+de arriba. → Detalle en [docs/product.md](./docs/product.md).
 
 ### 5. Tab bar (5 tabs, Inicio al medio)
 
-`Entrenar · Feed · Inicio · Coach · Perfil`. Discovery de PFs vive **sólo** en la tab Coach. Feed es 100% social.
+`Entrenar · Feed · Inicio · Coach · Perfil`. Discovery de PFs vive **sólo** en la tab Coach — la tab Feed no vende nada ni lista entrenadores. "Social" describe qué NO va en Feed (marketplace), no que sea una sola página: Feed tiene dos, `[FEED | RANKINGS]` (ver §4).
 
 ### 6. Performance (cero rebuilds innecesarios)
 
