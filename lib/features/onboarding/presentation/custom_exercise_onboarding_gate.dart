@@ -91,8 +91,13 @@ Future<void> maybeShowCustomExerciseOnboarding({
         // bottom bar sits on top of it.
         useRootNavigator: true,
         isScrollControlled: true,
+        // Se arrastra para abajo con el grabber, como cualquier sheet de iOS.
+        // Cerrar así cuenta como visto igual que SALTAR: el `markSeen` del
+        // `finally` no distingue cómo se cerró, justamente para esto.
+        enableDrag: true,
+        // El tap en el scrim sí queda bloqueado: es el gesto que se dispara sin
+        // querer, y a diferencia del arrastre no comunica intención.
         isDismissible: false,
-        enableDrag: false,
         backgroundColor: Colors.transparent,
         barrierColor: palette.scrimDark.withValues(alpha: 0.66),
         builder: (sheetContext) => _OnboardingSheet(
