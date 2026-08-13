@@ -16,8 +16,14 @@ enum PagosFiltro { vencidos, porVencer, pagados, todos }
 
 /// Filtro seleccionado en la sección Pagos. Default: Vencidos — la sección
 /// abre en triage, igual que `solicitudTabProvider` (Pendientes).
+/// Filtro activo de la sección Pagos.
+///
+/// Arranca en `porVencer` por #605 ("Registrar pago vincula alumno + abre en
+/// 'Por vencer'"): el PF entra a Pagos para ver qué está por cobrar, no para
+/// mirar lo que ya se venció. Los chips reemplazaron a los tabs en la Fase 9,
+/// pero el destino inicial sigue siendo el mismo.
 final pagosFiltroProvider =
-    StateProvider.autoDispose<PagosFiltro>((_) => PagosFiltro.vencidos);
+    StateProvider.autoDispose<PagosFiltro>((_) => PagosFiltro.porVencer);
 
 // ── Badge ─────────────────────────────────────────────────────────────────────
 

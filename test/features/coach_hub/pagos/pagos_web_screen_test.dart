@@ -9,7 +9,7 @@ import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/pagos_web_screen.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart'
-    show TreinoFilterChips;
+    show TreinoFilterChips, TreinoInteractiveState;
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart'
     show pagosPorCobrarProvider;
 import 'package:treino/features/payments/application/payment_providers.dart'
@@ -243,16 +243,16 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Default filter is Vencidos.
-      expect(find.text('Cuota vencida'), findsOneWidget);
-      expect(find.text('Cuota por vencer'), findsNothing);
+      // El filtro por defecto es Por vencer (#605), no Vencidos.
+      expect(find.text('Cuota por vencer'), findsOneWidget);
+      expect(find.text('Cuota vencida'), findsNothing);
       expect(find.text('Cuota pagada'), findsNothing);
 
-      await tester.tap(find.text('Por vencer'));
+      await tester.tap(find.text('Vencidos'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Cuota vencida'), findsNothing);
-      expect(find.text('Cuota por vencer'), findsOneWidget);
+      expect(find.text('Cuota vencida'), findsOneWidget);
+      expect(find.text('Cuota por vencer'), findsNothing);
       expect(find.text('Cuota pagada'), findsNothing);
 
       await tester.tap(find.text('Pagados'));
@@ -346,7 +346,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('+ Registrar pago'));
+      await tester.tap(
+          find.widgetWithText(TreinoInteractiveState, 'Registrar pago').first);
       await tester.pumpAndSettle();
 
       await tester.tap(find.byType(DropdownButtonFormField<String>));
@@ -393,7 +394,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('+ Registrar pago'));
+      await tester.tap(
+          find.widgetWithText(TreinoInteractiveState, 'Registrar pago').first);
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Cancelar')); // i18n

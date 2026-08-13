@@ -12,7 +12,6 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/core/widgets/motion/treino_count_up.dart';
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart'
     show pagosPorCobrarProvider;

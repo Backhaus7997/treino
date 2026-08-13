@@ -121,11 +121,17 @@ void main() {
   });
 
   group('pagosFiltroProvider', () {
-    test('default es PagosFiltro.vencidos (la sección abre en triage)', () {
+    // #605 ("Registrar pago vincula alumno + abre en 'Por vencer'") define el
+    // destino inicial de la sección. La Fase 9 cambió los tabs por chips, pero
+    // no el destino: el PF entra a Pagos a ver qué está por cobrar.
+    //
+    // Este test decía `vencidos` ("la sección abre en triage") — era la
+    // propuesta de la fase, anterior a #605.
+    test("default es PagosFiltro.porVencer (#605)", () {
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
-      expect(container.read(pagosFiltroProvider), PagosFiltro.vencidos);
+      expect(container.read(pagosFiltroProvider), PagosFiltro.porVencer);
     });
   });
 }

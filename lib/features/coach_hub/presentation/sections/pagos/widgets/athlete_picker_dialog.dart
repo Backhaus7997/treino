@@ -154,13 +154,13 @@ class _AthleteList extends ConsumerWidget {
       child: ListView.separated(
         shrinkWrap: true,
         itemCount: roster.length,
-        separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.hairline),
+        separatorBuilder: (_, __) =>
+            const SizedBox(height: AppSpacing.hairline),
         itemBuilder: (_, i) {
           final link = roster[i];
-          final name =
-              profiles[link.athleteId]?.displayName?.isNotEmpty == true
-                  ? profiles[link.athleteId]!.displayName!
-                  : 'Alumno'; // i18n fallback
+          final name = profiles[link.athleteId]?.displayName?.isNotEmpty == true
+              ? profiles[link.athleteId]!.displayName!
+              : 'Alumno'; // i18n fallback
 
           return ListTile(
             key: Key('pagos_athlete_picker_${link.athleteId}'),

@@ -32,7 +32,7 @@ import 'package:treino/features/workout/application/session_providers.dart'
 
 import '../../widgets/coach_hub_widgets.dart'
     show TreinoFilterChips, TreinoInteractiveState, TreinoSectionHeader;
-import 'widgets/athlete_picker_dialog.dart';
+import 'widgets/registrar_pago_dialog.dart';
 import 'widgets/marcar_pagado_actions.dart';
 import 'widgets/pagos_buckets_provider.dart';
 import 'widgets/pagos_filtro_provider.dart';
