@@ -67,19 +67,30 @@ enum HistorySync {
         let startedAt: Date
     }
 
-    /// Busca CUALQUIER sesión sin terminar del atleta, sin importar la rutina.
+    /// Busca CUALQUIER sesión sin terminar del atleta, sin importar la rutina,
+    /// y **barre las colgadas** por el camino.
     ///
     /// Es lo que permite que el reloj adopte solo un entreno que empezó el
     /// teléfono. `findActiveSession` no sirve para esto: filtra por la rutina
     /// del entreno de hoy, así que un entreno arrancado desde una plantilla —o
     /// desde cualquier rutina que no sea la activa— quedaba invisible.
     ///
-    /// Devuelve la más reciente por `startedAt`. Si hubiera varias abiertas
-    /// (sesiones abandonadas que nadie cerró), la más nueva es la que el atleta
-    /// está haciendo ahora.
+    /// ⚠️ EL BARRIDO NO ERA SIMÉTRICO (HANDOFF §8.1). El teléfono cierra con un
+    /// write real todo lo que pase de 8h (`SessionRepository.getActive`); acá no
+    /// había NINGÚN corte por antigüedad, así que un atleta que usara solo la
+    /// muñeca no barría nada y **adoptaba una sesión de hace días** como si
+    /// fuera el entreno de hoy. La política ahora es la misma de los dos lados y
+    /// vive en un solo lugar: `StaleSessionRules.decidir`.
+    ///
+    /// El cierre es **best-effort**, igual que en el teléfono: si el write falla
+    /// se devuelve igual la sesión viva. El atleta tiene que poder seguir
+    /// entrenando aunque la limpieza no entre.
+    ///
+    /// - Parameter now: se inyecta para poder medir el corte sin esperar 8h.
     static func findAnyActiveSession(
         client: FirestoreREST,
-        uid: String
+        uid: String,
+        now: Date = Date()
     ) async throws -> ActiveSession? {
         let rows = try await client.runQuery([
             "from": [["collectionId": "sessions"]],
@@ -90,27 +101,80 @@ enum HistorySync {
             "limit": 10,
         ], parent: "users/\(uid)")
 
-        for doc in rows {
-            let f = doc.fields
-            // El filtro va en el cliente: sumar `status` a la query exigiria un
-            // indice compuesto, y son diez filas.
-            //
-            // `FS.isEmpty` y NO `== nil`: el telefono escribe finishedAt con
-            // nullValue explicito, asi que el campo EXISTE aunque no haya
-            // valor. Ver la nota en FS.isEmpty.
-            guard FS.isEmpty(f["finishedAt"]),
-                  let routineId = FS.string(f["routineId"])
-            else { continue }
-            return ActiveSession(
-                id: doc.id,
-                routineId: routineId,
-                routineName: FS.string(f["routineName"]) ?? "Rutina",
-                dayNumber: FS.int(f["dayNumber"]) ?? 1,
-                weekNumber: FS.int(f["weekNumber"]) ?? 0,
-                startedAt: parseTimestamp(f["startedAt"]) ?? Date()
+        // El filtro va en el cliente: sumar `status` a la query exigiria un
+        // indice compuesto, y son diez filas.
+        //
+        // `FS.isEmpty` y NO `== nil`: el telefono escribe finishedAt con
+        // nullValue explicito, asi que el campo EXISTE aunque no haya
+        // valor. Ver la nota en FS.isEmpty.
+        let abiertas = rows.filter { FS.isEmpty($0.fields["finishedAt"]) }
+
+        let decision = StaleSessionRules.decidir(
+            candidatas: abiertas.map {
+                StaleSessionRules.Candidata(
+                    id: $0.id,
+                    startedAt: parseTimestamp($0.fields["startedAt"]) ?? now
+                )
+            },
+            ahora: now
+        )
+
+        // Best-effort a proposito: una limpieza que falla no puede dejar al
+        // atleta sin poder entrenar. `try?` y no un catch con log porque este
+        // archivo no tiene logger y agregarlo por esto seria mas ruido que
+        // señal — el sintoma de que el barrido no entra es visible: la sesion
+        // sigue apareciendo.
+        for colgada in decision.aCerrar {
+            try? await closeStaleSession(
+                client: client, uid: uid, sessionId: colgada, closedAt: now
             )
         }
-        return nil
+
+        guard let adoptar = decision.adoptar,
+              let doc = abiertas.first(where: { $0.id == adoptar })
+        else { return nil }
+
+        let f = doc.fields
+        // Sin `routineId` no se puede resolver que ejercicios mostrar. Se
+        // devuelve nil en vez de seguir buscando hacia atras: caer a una sesion
+        // MAS VIEJA teniendo una abierta mas nueva es exactamente el bug que
+        // esta funcion acaba de dejar de tener.
+        guard let routineId = FS.string(f["routineId"]) else { return nil }
+
+        return ActiveSession(
+            id: doc.id,
+            routineId: routineId,
+            routineName: FS.string(f["routineName"]) ?? "Rutina",
+            dayNumber: FS.int(f["dayNumber"]) ?? 1,
+            weekNumber: FS.int(f["weekNumber"]) ?? 0,
+            startedAt: parseTimestamp(f["startedAt"]) ?? now
+        )
+    }
+
+    /// Cierra una sesión que quedó colgada.
+    ///
+    /// Escribe los MISMOS campos que el barrido del teléfono
+    /// (`SessionRepository.getActive`) y ninguno más: `totalVolumeKg` y
+    /// `durationMin` se dejan como están —una sesión activa nace en 0 y nadie
+    /// los toca hasta terminarla— porque inventarles un valor sería peor que
+    /// dejar el 0 honesto.
+    ///
+    /// `wasFullyCompleted: false` es lo que hace que NO cuente como entreno
+    /// hecho: no mueve el plan, ni la racha, ni los rankings.
+    static func closeStaleSession(
+        client: FirestoreREST,
+        uid: String,
+        sessionId: String,
+        closedAt: Date
+    ) async throws {
+        try await client.patchFields(
+            path: "users/\(uid)/sessions/\(sessionId)",
+            fields: [
+                "status": ["stringValue": "finished"],
+                "finishedAt": ["timestampValue": iso(closedAt)],
+                "wasFullyCompleted": ["booleanValue": false],
+            ]
+        )
     }
 
     /// Si la sesión ya está TERMINADA en el historial.

@@ -513,6 +513,8 @@ runEffortBroadcast()
 runSetLogWriteTarget()
 runSetLogDeletion()
 runExerciseCursor()
+runStaleSessions()
+runCloseFeedback()
 
 if failures.isEmpty {
     print("OK: \(totalChecks) chequeos de la logica de permisos de Salud")
@@ -912,5 +914,177 @@ private func runExerciseCursor() {
         firstUnfinishedExerciseIndex(seriesPlanificadas: [4, 3, 3], seriesCargadas: [4]),
         1,
         "Una lista de cargadas mas corta no rompe"
+    )
+}
+
+// MARK: - Sesiones colgadas: que adoptar y que cerrar (HANDOFF §8.1)
+//
+// El barrido lo disparaba SOLO el telefono. El reloj adoptaba cualquier sesion
+// sin `finishedAt`, sin mirar la fecha: un atleta que usara solo la muñeca
+// podia caer en un entreno de hace dias creyendo que era el de hoy.
+//
+// Esto es caro de reproducir corriendo —hay que fabricar historial viejo— y
+// barato de medir acá.
+
+private func runStaleSessions() {
+    let ahora = Date(timeIntervalSince1970: 1_760_000_000)
+    func haceHoras(_ h: Double) -> Date { ahora.addingTimeInterval(-h * 3600) }
+    func candidata(_ id: String, _ cuandoEmpezo: Date) -> StaleSessionRules.Candidata {
+        StaleSessionRules.Candidata(id: id, startedAt: cuandoEmpezo)
+    }
+
+    // El techo es DERIVADO del del telefono, no una copia. Si alguien mueve uno,
+    // este chequeo cae con el otro en vez de dejarlos discrepar en silencio.
+    checkEqual(
+        StaleSessionRules.maxAntiguedad,
+        TimeInterval(WorkoutDurationRules.maxMinutos * 60),
+        "El corte de antiguedad sale del mismo techo que la duracion"
+    )
+    checkEqual(StaleSessionRules.maxAntiguedad, 8 * 3600, "El corte son 8 horas")
+
+    // Sin nada abierto no hay nada que hacer.
+    checkEqual(
+        StaleSessionRules.decidir(candidatas: [], ahora: ahora),
+        StaleSessionRules.Decision(adoptar: nil, aCerrar: []),
+        "Sin sesiones abiertas no se adopta ni se cierra nada"
+    )
+
+    // El caso normal: el atleta esta entrenando ahora.
+    checkEqual(
+        StaleSessionRules.decidir(
+            candidatas: [candidata("viva", haceHoras(0.5))], ahora: ahora
+        ),
+        StaleSessionRules.Decision(adoptar: "viva", aCerrar: []),
+        "Una sesion de hace media hora se adopta y no se cierra"
+    )
+
+    // ⚠️ EL BUG. Una sola sesion, de hace tres dias. Antes se adoptaba: el reloj
+    // abria la pantalla de entreno sobre un entreno de otro dia. Sin el corte
+    // por antiguedad este chequeo se pone rojo.
+    checkEqual(
+        StaleSessionRules.decidir(
+            candidatas: [candidata("de-hace-tres-dias", haceHoras(72))],
+            ahora: ahora
+        ),
+        StaleSessionRules.Decision(adoptar: nil, aCerrar: ["de-hace-tres-dias"]),
+        "Una sesion de hace tres dias NO se adopta: se cierra"
+    )
+
+    // El borde, exacto. `>` estricto, igual que el telefono: a las 8h clavadas
+    // todavia esta viva.
+    checkEqual(
+        StaleSessionRules.decidir(
+            candidatas: [candidata("justo", haceHoras(8))], ahora: ahora
+        ),
+        StaleSessionRules.Decision(adoptar: "justo", aCerrar: []),
+        "A las 8h clavadas la sesion sigue viva"
+    )
+    checkEqual(
+        StaleSessionRules.decidir(
+            candidatas: [candidata("pasada", ahora.addingTimeInterval(-8 * 3600 - 60))],
+            ahora: ahora
+        ),
+        StaleSessionRules.Decision(adoptar: nil, aCerrar: ["pasada"]),
+        "Un minuto despues de las 8h ya vencio"
+    )
+
+    // Varias abiertas y la mas nueva viva: esa es la que el atleta esta
+    // haciendo, las otras se barren. Barrer solo las repetidas y dejar viva una
+    // de ayer era el agujero del telefono; acá no se repite.
+    checkEqual(
+        StaleSessionRules.decidir(
+            candidatas: [
+                candidata("anteayer", haceHoras(50)),
+                candidata("ahora", haceHoras(0.2)),
+                candidata("ayer", haceHoras(26)),
+            ],
+            ahora: ahora
+        ),
+        StaleSessionRules.Decision(
+            adoptar: "ahora", aCerrar: ["ayer", "anteayer"]
+        ),
+        "Con la mas nueva viva se adopta esa y se cierran las demas"
+    )
+
+    // Todas vencidas: no se adopta ninguna y se barren TODAS, incluida la mas
+    // nueva. Es lo que hace `getActive` cuando la primera ya vencio.
+    checkEqual(
+        StaleSessionRules.decidir(
+            candidatas: [
+                candidata("vieja", haceHoras(30)),
+                candidata("menos-vieja", haceHoras(9)),
+            ],
+            ahora: ahora
+        ),
+        StaleSessionRules.Decision(
+            adoptar: nil, aCerrar: ["menos-vieja", "vieja"]
+        ),
+        "Si vencio la mas nueva, vencieron todas"
+    )
+
+    // La decision NO depende del orden de entrada. La query ordena, pero una
+    // regla que se apoya en eso se rompe muda el dia que alguien la toca.
+    checkEqual(
+        StaleSessionRules.decidir(
+            candidatas: [
+                candidata("b", haceHoras(1)),
+                candidata("a", haceHoras(0.1)),
+                candidata("c", haceHoras(2)),
+            ],
+            ahora: ahora
+        ),
+        StaleSessionRules.Decision(adoptar: "a", aCerrar: ["b", "c"]),
+        "El orden de entrada no cambia la decision"
+    )
+
+    // Reloj desfasado: una fecha en el FUTURO no vence. Cerrarla le sacaria al
+    // atleta el entreno que esta haciendo.
+    checkEqual(
+        StaleSessionRules.decidir(
+            candidatas: [candidata("futuro", ahora.addingTimeInterval(600))],
+            ahora: ahora
+        ),
+        StaleSessionRules.Decision(adoptar: "futuro", aCerrar: []),
+        "Una sesion con fecha futura no se da por vencida"
+    )
+}
+
+// MARK: - Cerrar el entreno puede fallar, y hay que DECIRLO (HANDOFF §8.3)
+//
+// Abandonar sin conectividad era un no-op silencioso: el dialogo se cerraba y
+// la sesion seguia abierta. El motivo es lo unico que el atleta necesita para
+// entender que paso y volver a intentar.
+
+private func runCloseFeedback() {
+    // Singular y plural. Un "1 series" en la muñeca se lee como un bug.
+    checkEqual(
+        WorkoutCloseFailure.seriesSinSubir(1).mensaje,
+        "Falta subir 1 serie. El entreno sigue abierto.",
+        "Con una sola serie pendiente el mensaje va en singular"
+    )
+    checkEqual(
+        WorkoutCloseFailure.seriesSinSubir(3).mensaje,
+        "Falta subir 3 series. El entreno sigue abierto.",
+        "Con varias series pendientes el mensaje va en plural"
+    )
+
+    // Las dos causas piden lo mismo del atleta —reintentar— pero NO dicen lo
+    // mismo. Colapsarlas esconde justo la que hay que diagnosticar.
+    check(
+        WorkoutCloseFailure.seriesSinSubir(2).mensaje
+            != WorkoutCloseFailure.historialNoRespondio.mensaje,
+        "Las dos causas de fallo no pueden decir lo mismo"
+    )
+
+    // El contrato con el atleta, el mismo que el dialogo de confirmacion: lo
+    // hecho NO se pierde. Si el mensaje no lo dice, el cartel naranja se lee
+    // como "perdiste el entreno".
+    check(
+        WorkoutCloseFailure.historialNoRespondio.mensaje.contains("guardado"),
+        "El fallo del historial tiene que decir que lo hecho esta guardado"
+    )
+    check(
+        WorkoutCloseFailure.seriesSinSubir(2).mensaje.contains("sigue abierto"),
+        "El fallo por pendientes tiene que decir que el entreno sigue abierto"
     )
 }

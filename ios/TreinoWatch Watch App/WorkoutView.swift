@@ -85,6 +85,17 @@ struct WorkoutView: View {
                         .buttonStyle(.plain)
                         .padding(.top, 6)
                     }
+
+                    // Por que NO se cerro el entreno.
+                    //
+                    // Va afuera del if/else porque las dos salidas —TERMINAR y
+                    // ABANDONAR— llaman a `finish()` y las dos pueden fallar
+                    // igual. Antes no habia nada: el fallo por pendientes
+                    // cortaba en silencio y el del historial se guardaba en
+                    // `syncError`, que no lo renderizaba ninguna vista.
+                    if let motivo = workout.closeFailure {
+                        closeFailureBanner(motivo)
+                    }
                 }
                 .padding(.horizontal, 2)
             }
@@ -195,6 +206,36 @@ struct WorkoutView: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
         .background(Color.green.opacity(0.15), in: Capsule())
+    }
+
+    /// El aviso de que el entreno NO se cerró, con la salida.
+    ///
+    /// Naranja y no rojo a propósito: no se perdió nada, la sesión sigue viva y
+    /// lo hecho está guardado. Rojo diría "pasó algo grave", y lo que pasó es
+    /// que no hay señal.
+    ///
+    /// REINTENTAR llama a `finish()`, el mismo camino que falló. Es lo que hace
+    /// el teléfono en `_showFinishError` — un SnackBar con acción Reintentar—, y
+    /// es lo único accionable: cuando vuelva la conectividad, el mismo botón
+    /// cierra. Sin él, el atleta tiene el diagnóstico y ninguna salida.
+    private func closeFailureBanner(_ motivo: WorkoutCloseFailure) -> some View {
+        VStack(spacing: 4) {
+            Text(motivo.mensaje)
+                .font(.system(size: 11))
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.orange)
+
+            Button("Reintentar") {
+                Task { await workout.finish() }
+            }
+            .font(.caption2)
+            .buttonStyle(.plain)
+            .foregroundStyle(.orange)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 6)
+        .background(Color.orange.opacity(0.15), in: RoundedRectangle(cornerRadius: 8))
+        .padding(.top, 6)
     }
 
     private func setsList(exercise: WatchExercise, session: WorkoutSession) -> some View {

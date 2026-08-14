@@ -38,6 +38,16 @@ final class WorkoutCoordinator: ObservableObject {
     /// hay pendientes, no el detalle.
     @Published private(set) var syncError: String?
 
+    /// Por que no se pudo CERRAR el entreno, si es que no se pudo.
+    ///
+    /// Existe aparte de `syncError` porque son dos cosas distintas: `syncError`
+    /// es el detalle tecnico del ultimo error —un `String(describing:)`, que no
+    /// se le muestra a nadie— y esto es lo unico que el atleta necesita saber.
+    ///
+    /// Sin esto, ABANDONAR era un no-op SILENCIOSO sin conectividad: el dialogo
+    /// se cerraba y la sesion seguia abierta. Ver `WorkoutCloseFailure`.
+    @Published private(set) var closeFailure: WorkoutCloseFailure?
+
     private var restTimer: Timer?
 
     private let log = Logger(
@@ -309,13 +319,26 @@ final class WorkoutCoordinator: ObservableObject {
     /// estado local: si se borrara primero, una serie que nunca llego al
     /// historial se perderia sin dejar rastro.
     func finish() async {
+        // Se limpia al ENTRAR y no al salir: el intento anterior ya no describe
+        // nada, y dejar el cartel viejo mientras corre el nuevo sync le mentiria
+        // al atleta sobre que esta pasando ahora.
+        closeFailure = nil
+
         stopRest()
         await sync()
 
         // Si quedan pendientes, el entreno NO se descarta: se conserva para
         // reintentar. Perder series que el atleta hizo es peor que dejarle la
         // pantalla abierta.
-        if let current = session, !current.pendingSets.isEmpty { return }
+        //
+        // ⚠️ Pero se AVISA. Esta rama cortaba en silencio: el atleta se
+        // lesionaba sin señal, tocaba ABANDONAR, confirmaba, el dialogo se
+        // cerraba y la sesion seguia abierta sin ninguna pista de por que. La
+        // decision de no descartar es correcta; lo que faltaba era decirlo.
+        if let current = session, !current.pendingSets.isEmpty {
+            closeFailure = .seriesSinSubir(current.pendingSets.count)
+            return
+        }
 
         // Marca la sesion FINALIZADA en el historial. Sin esto el reloj borraba
         // su estado local pero la sesion quedaba `active` en Firestore, y la app
@@ -336,6 +359,11 @@ final class WorkoutCoordinator: ObservableObject {
                 )
             } catch {
                 syncError = String(describing: error)
+                // El detalle queda en `syncError` para diagnostico; al atleta le
+                // llega el motivo y el boton de reintentar. Antes esta rama solo
+                // escribia `syncError`, que no lo renderizaba NINGUNA vista:
+                // el dialogo se cerraba sin aviso.
+                closeFailure = .historialNoRespondio
                 return
             }
         }
@@ -436,6 +464,9 @@ final class WorkoutCoordinator: ObservableObject {
                 WorkoutSessionStore.clear()
                 endWorkoutSession()
                 syncError = nil
+                // El entreno ya no existe: cualquier motivo de "no se pudo
+                // cerrar" que hubiera quedado en pantalla dejo de ser cierto.
+                closeFailure = nil
                 return
             }
 
@@ -632,6 +663,17 @@ final class WorkoutCoordinator: ObservableObject {
             }
 
             syncError = nil
+
+            // Si la cola se drenó, el cartel de "falta subir N series" dejó de
+            // ser cierto — y se cae solo, sin que el atleta tenga que tocar
+            // nada. Es el caso normal: volvió la señal, entró el sync de fondo.
+            //
+            // El de `.historialNoRespondio` NO se toca acá: ese lo levanta el
+            // cierre, no el sync, y solo se limpia volviendo a intentar cerrar.
+            if case .seriesSinSubir = closeFailure,
+               current.pendingSets.isEmpty {
+                closeFailure = nil
+            }
         } catch {
             syncError = String(describing: error)
         }
