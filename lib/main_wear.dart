@@ -44,6 +44,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app/theme/app_theme.dart';
+import 'features/watch/application/wear_pairing_providers.dart';
 import 'features/watch/application/wear_rest_providers.dart';
 import 'features/watch/presentation/wear/wear_root.dart';
 import 'features/watch/presentation/wear/wear_view_models.dart';
@@ -155,7 +156,7 @@ class TreinoWearApp extends StatelessWidget {
   }
 }
 
-/// Arranca el foreground service al montar.
+/// Arranca el foreground service en cuanto hay emparejamiento resuelto.
 ///
 /// Va acá y no en `main()` a propósito: la precondición de runtime del
 /// foreground service tipo `health` es *while-in-use*, así que tiene que
@@ -175,11 +176,22 @@ class _WearHomeState extends ConsumerState<_WearHome> {
   /// Entreno EN CURSO, o null. Arranca en null: el atleta ve HOY primero.
   WearWorkoutSnapshot? _session;
 
-  @override
-  void initState() {
-    super.initState();
-    // Sin esto la app se congela con la muñeca baja: medido, 22.6% de
-    // cobertura del tiempo despierto contra 100.0% con el servicio puesto.
+  /// Que el servicio ya se haya pedido. Sólo se arranca UNA vez.
+  bool _servicioArrancado = false;
+
+  /// Levanta el foreground service, pero recién con el emparejamiento resuelto.
+  ///
+  /// Antes se arrancaba incondicionalmente en el `initState`, y estaba bien
+  /// mientras `pairing` estaba clavado en `ready`. Ahora que la máquina es de
+  /// verdad, arrancarlo ahí levantaría el servicio —y su notificación
+  /// permanente— para mostrar la pantalla de "abrí la app en el teléfono". Es
+  /// una regresión de batería que este cambio habilitaba sin querer.
+  ///
+  /// Sin el servicio la app se congela con la muñeca baja: medido, 22.6% de
+  /// cobertura del tiempo despierto contra 100.0% con el servicio puesto.
+  void _arrancarServicioSiCorresponde(WearPairingState pairing) {
+    if (_servicioArrancado || pairing != WearPairingState.ready) return;
+    _servicioArrancado = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(wearWorkoutServiceProvider).startWorkout();
     });
@@ -240,24 +252,29 @@ class _WearHomeState extends ConsumerState<_WearHome> {
   );
 
   @override
-  Widget build(BuildContext context) => WearRoot(
-        pairing: WearPairingState.ready,
-        session: _session,
-        workout: _muestraHoy,
-        plans: _muestraPlanes,
-        templates: _muestraPlantillas,
-        selectedRoutine: _selected,
-        onStartToday: () => setState(() => _session = _sesionInicial),
-        onSelectRoutine: (r, k) => setState(() => _selected = (r, k)),
-        onCloseDetail: () => setState(() => _selected = null),
-        onStartRoutine: () => setState(() {
-          _selected = null;
-          _session = _sesionInicial;
-        }),
-        onActivateRoutine: () => setState(() => _selected = null),
-        // Ésta es la línea que faltaba y hacía que "no funcionaran los
-        // botones": el tap arrancaba el descanso y nadie marcaba nunca la
-        // serie, así que el círculo era imposible de llenar.
-        onLogSet: (n) => setState(() => _session = _session?.withLogged(n)),
-      );
+  Widget build(BuildContext context) {
+    final pairing = ref.watch(wearPairingProvider);
+    _arrancarServicioSiCorresponde(pairing);
+
+    return WearRoot(
+      pairing: pairing,
+      session: _session,
+      workout: _muestraHoy,
+      plans: _muestraPlanes,
+      templates: _muestraPlantillas,
+      selectedRoutine: _selected,
+      onStartToday: () => setState(() => _session = _sesionInicial),
+      onSelectRoutine: (r, k) => setState(() => _selected = (r, k)),
+      onCloseDetail: () => setState(() => _selected = null),
+      onStartRoutine: () => setState(() {
+        _selected = null;
+        _session = _sesionInicial;
+      }),
+      onActivateRoutine: () => setState(() => _selected = null),
+      // Ésta es la línea que faltaba y hacía que "no funcionaran los
+      // botones": el tap arrancaba el descanso y nadie marcaba nunca la
+      // serie, así que el círculo era imposible de llenar.
+      onLogSet: (n) => setState(() => _session = _session?.withLogged(n)),
+    );
+  }
 }
