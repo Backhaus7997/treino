@@ -49,6 +49,24 @@ class Routine with _$Routine {
     @JsonKey(includeToJson: false) double? ratingAvg,
     // ignore: invalid_annotation_target
     @JsonKey(includeToJson: false) int? ratingsCount,
+    // ── Plain-language summary (#648) ────────────────────────────────────────
+    // One sentence explaining what the routine IS, in words someone who has
+    // never set foot in a gym can parse. The catalogue leads with jargon —
+    // "Bro Split", "PPL", "Upper/Lower" — and 2 of 5 usability participants
+    // could not tell what those meant; the term is not hidden, it is explained.
+    //
+    // Seeded via scripts/seed_templates.js (Admin SDK, bypasses rules).
+    // `includeToJson: false` for the same reason as the rating aggregates
+    // above, and it is what keeps this field OUT of firestore.rules: the
+    // client never puts it in a write payload, so no `hasOnly` list has to
+    // learn about it and no athlete/trainer routine update can break on it
+    // (the #563 failure mode). Routine writes use `update()`, never `set()`,
+    // so an excluded field survives untouched.
+    //
+    // Trainer-authored summaries would need the editor AND the rules
+    // allowlists — deliberately a separate slice.
+    // ignore: invalid_annotation_target
+    @JsonKey(includeToJson: false) String? summary,
   }) = _Routine;
 
   factory Routine.fromJson(Map<String, Object?> json) =>
