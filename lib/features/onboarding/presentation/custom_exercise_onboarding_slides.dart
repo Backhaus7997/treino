@@ -85,6 +85,7 @@ List<OnboardingCardContent>? customExerciseSlidesFor(
         trainerCustomExerciseSlides,
       OnboardingSurface.athleteMobile ||
       OnboardingSurface.trainerMobile ||
-      OnboardingSurface.trainerWeb =>
+      OnboardingSurface.trainerWeb ||
+      OnboardingSurface.templatesAthleteMobile =>
         null,
     };

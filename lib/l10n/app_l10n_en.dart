@@ -3362,4 +3362,116 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get onboardingCustomExerciseCta => 'CREATE MY EXERCISE';
+
+  @override
+  String get templatesOnboardingStep1Title => 'How many days can you train?';
+
+  @override
+  String get templatesOnboardingStep1Body =>
+      'Pick what you can keep up. We save your answer to personalise what we recommend.';
+
+  @override
+  String get templatesOnboardingStep1Label => 'Days per week';
+
+  @override
+  String get templatesOnboardingStep1Hint =>
+      'No answer filters the catalog: you will keep seeing every template.';
+
+  @override
+  String get templatesOnboardingStep2Title => 'How long is your session?';
+
+  @override
+  String get templatesOnboardingStep2Body =>
+      '45 real minutes beat an ideal hour. Pick the time you actually have.';
+
+  @override
+  String get templatesOnboardingStep2Label => 'Minutes per session';
+
+  @override
+  String get templatesOnboardingStep3Title => 'What are you training for?';
+
+  @override
+  String get templatesOnboardingStep3Body =>
+      'Nobody picks by split, they pick by what for. It is the answer that tells us most about what you are after.';
+
+  @override
+  String get templatesOnboardingStep3Label => 'Goal';
+
+  @override
+  String get templatesOnboardingStep4Title => 'This is not an exam';
+
+  @override
+  String get templatesOnboardingStep4Body =>
+      'We save your answers to your profile. This one is optional: leave it empty if you have no preference.';
+
+  @override
+  String get templatesOnboardingStep4Label => 'Zones to prioritise · optional';
+
+  @override
+  String get templatesOnboardingCta => 'SEE MY TEMPLATES';
+
+  @override
+  String get templatesOnboardingMinutes30 => '30 MIN';
+
+  @override
+  String get templatesOnboardingMinutes30Hint => 'In and out';
+
+  @override
+  String get templatesOnboardingMinutes45 => '45 MIN';
+
+  @override
+  String get templatesOnboardingMinutes45Hint => 'The usual';
+
+  @override
+  String get templatesOnboardingMinutes60 => '60 MIN';
+
+  @override
+  String get templatesOnboardingMinutes60Hint => 'A full hour';
+
+  @override
+  String get templatesOnboardingMinutes75 => '75 MIN OR MORE';
+
+  @override
+  String get templatesOnboardingMinutes75Hint => 'Strength';
+
+  @override
+  String get templatesGoalHealth => 'HEALTH';
+
+  @override
+  String get templatesGoalInjuryPrevention => 'PREVENTION';
+
+  @override
+  String get templatesGoalAesthetics => 'AESTHETICS';
+
+  @override
+  String get templatesGoalSport => 'SPORT';
+
+  @override
+  String get templatesGoalWellbeing => 'WELLBEING';
+
+  @override
+  String get templatesZoneBack => 'BACK';
+
+  @override
+  String get templatesZoneChest => 'CHEST';
+
+  @override
+  String get templatesZoneShoulders => 'SHOULDERS';
+
+  @override
+  String get templatesZoneGlutes => 'GLUTES';
+
+  @override
+  String get templatesZoneQuads => 'QUADS';
+
+  @override
+  String get templatesZoneCore => 'CORE';
+
+  @override
+  String templatesOnboardingDaysOption(int days) {
+    return '$days DAYS';
+  }
+
+  @override
+  String get templatesOnboardingBack => 'BACK';
 }

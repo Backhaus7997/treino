@@ -37,6 +37,21 @@ enum OnboardingSurface {
   /// Same feature onboarding on the Coach Hub routine editor. Trainer-only by
   /// construction — `coachHubRedirect` sends everyone else to `/not-allowed`.
   customExerciseTrainerWeb,
+
+  /// The PLANTILLAS mini-onboarding (#635): four questions asked the first time
+  /// an athlete opens Entrenar → PLANTILLAS.
+  ///
+  /// Unlike every surface above it, this one does not just TELL — it collects
+  /// answers and writes them to `users/{uid}.templatePreferences`. It still
+  /// belongs in this enum because the "has this user seen it" mechanism is
+  /// identical, which is the whole reason `OnboardingSurface` is shared rather
+  /// than re-declared per feature.
+  ///
+  /// Athlete-only, and there is no trainer twin yet on purpose: the trainer
+  /// half of the handoff declares `goals` / `primaryMuscleGroups` on the
+  /// ROUTINE at publish time, and those fields do not exist until #635 PR#1.
+  /// Shipping a trainer surface with nowhere to write would be a dead flow.
+  templatesAthleteMobile,
 }
 
 /// The WELCOME tours — the surfaces that own a full-screen module tour.
@@ -76,6 +91,7 @@ extension OnboardingSurfaceX on OnboardingSurface {
         OnboardingSurface.customExerciseAthleteMobile => 1,
         OnboardingSurface.customExerciseTrainerMobile => 1,
         OnboardingSurface.customExerciseTrainerWeb => 1,
+        OnboardingSurface.templatesAthleteMobile => 1,
       };
 
   /// The MODULE slides, in order — welcome tours only.
@@ -112,7 +128,8 @@ extension OnboardingSurfaceX on OnboardingSurface {
           ],
         OnboardingSurface.customExerciseAthleteMobile ||
         OnboardingSurface.customExerciseTrainerMobile ||
-        OnboardingSurface.customExerciseTrainerWeb =>
+        OnboardingSurface.customExerciseTrainerWeb ||
+        OnboardingSurface.templatesAthleteMobile =>
           const <OnboardingModule>[],
       };
 

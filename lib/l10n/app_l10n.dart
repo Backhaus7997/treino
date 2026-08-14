@@ -6074,6 +6074,216 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'CREAR MI EJERCICIO'**
   String get onboardingCustomExerciseCta;
+
+  /// Paso 1 del mini-onboarding de PLANTILLAS (#635). Pregunta por días disponibles.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Cuántos días podés entrenar?'**
+  String get templatesOnboardingStep1Title;
+
+  /// Paso 1, bajada. NO promete que la grilla se ordene: en este PR las respuestas sólo se persisten, el ranking por afinidad llega con #635 PR#3. Cuando ese ranking exista, esta copy se actualiza junto con él.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Elegí lo que vas a sostener. Guardamos tu respuesta para personalizar lo que te recomendamos.'**
+  String get templatesOnboardingStep1Body;
+
+  /// No description provided for @templatesOnboardingStep1Label.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Días por semana'**
+  String get templatesOnboardingStep1Label;
+
+  /// Aclara que responder no vacía la grilla. Cierto hoy (nada consume las respuestas) y después del ranking (#635 PR#3), que ordena pero nunca esconde.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ninguna respuesta filtra el catálogo: vas a seguir viendo todas las plantillas.'**
+  String get templatesOnboardingStep1Hint;
+
+  /// Paso 2. Pregunta por duración de sesión.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Cuánto dura tu sesión?'**
+  String get templatesOnboardingStep2Title;
+
+  /// No description provided for @templatesOnboardingStep2Body.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'45 minutos reales valen más que una hora ideal. Elegí el tiempo que tenés de verdad.'**
+  String get templatesOnboardingStep2Body;
+
+  /// No description provided for @templatesOnboardingStep2Label.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Minutos por sesión'**
+  String get templatesOnboardingStep2Label;
+
+  /// Paso 3. Pregunta por objetivo de entrenamiento.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Para qué querés entrenar?'**
+  String get templatesOnboardingStep3Title;
+
+  /// No description provided for @templatesOnboardingStep3Body.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Nadie elige por split, elige por para qué. Es la respuesta que más nos dice sobre lo que buscás.'**
+  String get templatesOnboardingStep3Body;
+
+  /// No description provided for @templatesOnboardingStep3Label.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Objetivo'**
+  String get templatesOnboardingStep3Label;
+
+  /// Paso 4. Zonas a priorizar; opcional. El título baja la presión de la última pregunta. NO dice 'queda como filtro': nada de esto filtra la grilla.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esto no es un examen'**
+  String get templatesOnboardingStep4Title;
+
+  /// Paso 4, bajada. NO promete controles para editar las respuestas desde PLANTILLAS: todavía no existen. Actualizar cuando #635 PR#3 los agregue.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Guardamos tus respuestas en tu perfil. Esta es opcional: dejala vacía si no tenés preferencia.'**
+  String get templatesOnboardingStep4Body;
+
+  /// No description provided for @templatesOnboardingStep4Label.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Zonas a priorizar · opcional'**
+  String get templatesOnboardingStep4Label;
+
+  /// CTA del último paso. Cierra el flow, persiste las respuestas y devuelve a la grilla.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VER MIS PLANTILLAS'**
+  String get templatesOnboardingCta;
+
+  /// No description provided for @templatesOnboardingMinutes30.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'30 MIN'**
+  String get templatesOnboardingMinutes30;
+
+  /// No description provided for @templatesOnboardingMinutes30Hint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Entro y salgo'**
+  String get templatesOnboardingMinutes30Hint;
+
+  /// No description provided for @templatesOnboardingMinutes45.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'45 MIN'**
+  String get templatesOnboardingMinutes45;
+
+  /// No description provided for @templatesOnboardingMinutes45Hint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Lo de siempre'**
+  String get templatesOnboardingMinutes45Hint;
+
+  /// No description provided for @templatesOnboardingMinutes60.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'60 MIN'**
+  String get templatesOnboardingMinutes60;
+
+  /// No description provided for @templatesOnboardingMinutes60Hint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Hora completa'**
+  String get templatesOnboardingMinutes60Hint;
+
+  /// No description provided for @templatesOnboardingMinutes75.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'75 MIN O MÁS'**
+  String get templatesOnboardingMinutes75;
+
+  /// No description provided for @templatesOnboardingMinutes75Hint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Fuerza'**
+  String get templatesOnboardingMinutes75Hint;
+
+  /// No description provided for @templatesGoalHealth.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SALUD'**
+  String get templatesGoalHealth;
+
+  /// No description provided for @templatesGoalInjuryPrevention.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PREVENCIÓN'**
+  String get templatesGoalInjuryPrevention;
+
+  /// No description provided for @templatesGoalAesthetics.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ESTÉTICA'**
+  String get templatesGoalAesthetics;
+
+  /// No description provided for @templatesGoalSport.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DEPORTE'**
+  String get templatesGoalSport;
+
+  /// No description provided for @templatesGoalWellbeing.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'BIENESTAR'**
+  String get templatesGoalWellbeing;
+
+  /// No description provided for @templatesZoneBack.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ESPALDA'**
+  String get templatesZoneBack;
+
+  /// No description provided for @templatesZoneChest.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PECHO'**
+  String get templatesZoneChest;
+
+  /// No description provided for @templatesZoneShoulders.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'HOMBROS'**
+  String get templatesZoneShoulders;
+
+  /// No description provided for @templatesZoneGlutes.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'GLÚTEOS'**
+  String get templatesZoneGlutes;
+
+  /// No description provided for @templatesZoneQuads.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CUÁDRICEPS'**
+  String get templatesZoneQuads;
+
+  /// No description provided for @templatesZoneCore.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CORE'**
+  String get templatesZoneCore;
+
+  /// Opción de días por semana del paso 1 (#635). 2 a 6.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{days} DÍAS'**
+  String templatesOnboardingDaysOption(int days);
+
+  /// Vuelve al paso anterior del mini-onboarding de PLANTILLAS (#635). Ausente en el paso 1.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VOLVER'**
+  String get templatesOnboardingBack;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

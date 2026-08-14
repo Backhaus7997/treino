@@ -57,6 +57,10 @@ _$UserProfileImpl _$$UserProfileImplFromJson(Map<String, dynamic> json) =>
             (k, e) => MapEntry(k, (e as num).toInt()),
           ) ??
           const <String, int>{},
+      templatePreferences: json['templatePreferences'] == null
+          ? null
+          : TemplatePreferences.fromJson(
+              json['templatePreferences'] as Map<String, dynamic>),
     );
 
 Map<String, dynamic> _$$UserProfileImplToJson(_$UserProfileImpl instance) =>
@@ -96,6 +100,7 @@ Map<String, dynamic> _$$UserProfileImplToJson(_$UserProfileImpl instance) =>
       'subscription': instance.subscription?.toJson(),
       'weightedLoad': instance.weightedLoad,
       'onboardingSeen': instance.onboardingSeen,
+      'templatePreferences': instance.templatePreferences?.toJson(),
     };
 
 const _$UserRoleEnumMap = {
