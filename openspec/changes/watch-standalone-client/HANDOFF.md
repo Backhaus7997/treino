@@ -245,14 +245,30 @@ mutación que lo salteaba, y por eso las dos series duplicadas sobrevivían.
   commitear con el token registrado en Console — esto último deja
   `enforceAppCheck` PRENDIDO en el servidor, que es lo que uno quiere.
 - **Firebase hace públicas las callables Gen2 con `invokerIamDisabled`, NO con un
-  binding `allUsers → run.invoker`.** Ese campo sólo se ve en la API v2 de Cloud
-  Run: `gcloud run services describe` devuelve la representación knative v1 y no
-  lo muestra, así que dos servicios que se comportan distinto se ven idénticos.
-  Una callable puede figurar en `functions:list` y **no ser invocable**.
+  binding `allUsers → run.invoker`.** En `treino-dev` ese binding es además
+  **imposible**: `constraints/iam.allowedPolicyMemberDomains` está enforced con
+  `allowedValues: [C03bxdsb7]`. Una callable puede figurar en `functions:list` y
+  **no ser invocable**. Se lee como anotación en el describe normal:
+  ```
+  gcloud run services describe <servicio> --region=<region> --format=json \
+    | rg invoker-iam-disabled
+  # /metadata/annotations/run.googleapis.com/invoker-iam-disabled = true
+  ```
   Distinguir por la FORMA de la respuesta: **403 HTML** = el frontend de Google
   bloquea antes del contenedor; **401 JSON `UNAUTHENTICATED`** = contestó la
   función (ese 401 es el resultado CORRECTO sin token de Auth). Se arregla con
-  `gcloud run services update <servicio-en-minúsculas> --no-invoker-iam-check`.
+  `gcloud run services update <servicio> --no-invoker-iam-check`.
+- **Los servicios de Cloud Run van en MINÚSCULAS** (`addalias`, no `addAlias`), y
+  `gcloud run services get-iam-policy <nombreMalEscrito>` **no da 404**: devuelve
+  `{"etag":"ACAB"}`, indistinguible de un servicio real sin bindings. Un typo de
+  mayúsculas se lee como un hallazgo.
+- **Un filtro de ruido puede comerse la respuesta.** Diffeando el `describe` de
+  dos servicios de Cloud Run para encontrar por qué uno era alcanzable y el otro
+  no, el filtro que sacaba claves ruidosas incluía `annotations/run` — justo
+  donde vive `invoker-iam-disabled`. El diff salió "sin diferencias de
+  autorización" y llevó a concluir que el dato no estaba en esa API. **Estaba.**
+  Corolario del ítem de arriba sobre validar el instrumento: cuando un diff no
+  encuentra nada, sospechá del filtro antes que de los datos.
 - **`CFBundleIconName` en watchOS vive ANIDADO** bajo `CFBundleIcons →
   CFBundlePrimaryIcon`, no en la raíz del plist. `plutil -extract CFBundleIconName`
   contra la raíz da un falso negativo.
