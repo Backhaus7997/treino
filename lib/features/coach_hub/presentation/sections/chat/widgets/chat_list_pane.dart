@@ -100,9 +100,7 @@ class _ChatListPaneState extends ConsumerState<ChatListPane> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
             child: TextField(
-              // Key del buscador: main y la Fase 8 implementaron la búsqueda
-              // por separado. Queda la de main; se conserva la key de la fase
-              // para que sus tests sigan encontrando el campo.
+              // key conservada de la Fase 8 para sus tests de busqueda.
               key: const Key('chat_search_field'),
               controller: _searchCtrl,
               onChanged: (v) => setState(() => _query = v.trim().toLowerCase()),

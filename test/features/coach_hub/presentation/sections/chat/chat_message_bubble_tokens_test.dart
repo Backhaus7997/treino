@@ -24,7 +24,12 @@ import 'package:treino/l10n/app_l10n.dart';
 /// Escala cerrada de radios del design system TREINO (regla dura, ver
 /// CLAUDE.md/AppRadius). Cualquier corner radius de un componente de
 /// producción debe pertenecer a este set.
-final _allowedRadii = {AppRadius.sm, AppRadius.md, AppRadius.lg, AppRadius.full};
+final _allowedRadii = {
+  AppRadius.sm,
+  AppRadius.md,
+  AppRadius.lg,
+  AppRadius.full
+};
 
 Widget _wrapBubble(Widget child, {required ThemeData theme}) {
   return MediaQuery(
@@ -127,8 +132,7 @@ void main() {
             expect(
               _allowedRadii,
               contains(corner.x),
-              reason:
-                  'corner radius $corner (x=${corner.x}) debe pertenecer a '
+              reason: 'corner radius $corner (x=${corner.x}) debe pertenecer a '
                   'la escala 12/16/20/9999 — AppSpacing.hairline (4.0) no es '
                   'un radio válido.',
             );
