@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -58,7 +60,17 @@ Future<void> maybeShowTemplatesOnboarding({
 
   // The welcome tour owns the screen, or is about to. Two modals stacked on one
   // frame is the failure this provider exists to prevent.
-  if (ref.read(onboardingBlocksProvider)) return;
+  //
+  // WAIT for it instead of returning. What must not happen is STACKING, not
+  // this flow — and this function gets exactly ONE attempt per mount, fired
+  // from `initState` on a tab that keeps itself alive. So an athlete who
+  // reaches PLANTILLAS before the welcome tour has run (a restored route, a
+  // deep link) would spend that single attempt on a `return` and never see the
+  // mini-onboarding on the visit that IS their first one.
+  if (ref.read(onboardingBlocksProvider)) {
+    if (!await _awaitUnblocked(ref)) return;
+    if (!context.mounted) return;
+  }
 
   if (!ref.read(shouldShowTourProvider(surface))) return;
 
@@ -107,6 +119,26 @@ Future<void> maybeShowTemplatesOnboarding({
     // comes back forever for anyone who dismissed it once.
     await ref.read(onboardingControllerProvider).markSeen(surface);
   }
+}
+
+/// Completes with `true` once no other onboarding owns the screen.
+///
+/// Deliberately WITHOUT a timeout. A `Timer` left running past the end of a
+/// widget test fails it, and there is nothing sensible to do when it fires
+/// anyway. The wait is bounded by the widget instead: `listenManual` closes its
+/// subscription when the host element unmounts, so a torn-down tab simply
+/// leaves this future hanging and the caller never resumes — which is the right
+/// answer, because the screen this flow belongs to is gone. Whatever attempt
+/// was owed comes back on the next mount, from `initState` as usual.
+Future<bool> _awaitUnblocked(WidgetRef ref) {
+  final completer = Completer<bool>();
+  final subscription = ref.listenManual<bool>(
+    onboardingBlocksProvider,
+    (_, blocks) {
+      if (!blocks && !completer.isCompleted) completer.complete(true);
+    },
+  );
+  return completer.future.whenComplete(subscription.close);
 }
 
 /// Mobile presentation: bottom sheet, content owns its chrome.

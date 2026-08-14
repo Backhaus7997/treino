@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -96,6 +98,7 @@ Future<void> _pump(
   WidgetTester tester, {
   required _CapturingUserRepository repo,
   UserProfile? profile,
+  Stream<UserProfile?>? profiles,
 }) async {
   await tester.binding.setSurfaceSize(const Size(390, 844));
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -104,7 +107,8 @@ Future<void> _pump(
     ProviderScope(
       overrides: [
         userRepositoryProvider.overrideWithValue(repo),
-        userProfileProvider.overrideWith((ref) => Stream.value(profile)),
+        userProfileProvider
+            .overrideWith((ref) => profiles ?? Stream.value(profile)),
       ],
       child: MaterialApp(
         theme: AppTheme.dark(),
@@ -177,6 +181,35 @@ void main() {
       );
 
       expect(find.byType(TemplatesOnboardingView), findsNothing);
+    });
+
+    testWidgets('presents once the pending welcome tour clears',
+        (tester) async {
+      // Same starting point as the test above — and the other half of it.
+      // Waiting is not the same as giving up: this function gets ONE attempt
+      // per mount (initState, on a tab that keeps itself alive), so an athlete
+      // who reaches PLANTILLAS before the welcome tour has run would otherwise
+      // spend that attempt on a `return` and miss the visit that IS their
+      // first one.
+      final profiles = StreamController<UserProfile?>();
+      addTearDown(profiles.close);
+
+      await _pump(
+        tester,
+        repo: _CapturingUserRepository(),
+        profiles: profiles.stream,
+      );
+
+      profiles.add(_profile(onboardingSeen: const {}));
+      await _settle(tester);
+      expect(find.byType(TemplatesOnboardingView), findsNothing);
+
+      // The welcome tour ran on HomeScreen and marked itself seen.
+      profiles.add(_profile());
+      await _settle(tester);
+
+      expect(find.byType(TemplatesOnboardingView), findsOneWidget);
+      expect(find.text('¿CUÁNTOS DÍAS PODÉS ENTRENAR?'), findsOneWidget);
     });
 
     testWidgets('does NOT present for a trainer', (tester) async {
