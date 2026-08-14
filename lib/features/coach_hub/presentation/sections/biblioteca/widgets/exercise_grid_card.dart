@@ -4,12 +4,12 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../../../app/theme/app_motion.dart';
 import '../../../../../../app/theme/app_palette.dart';
 import '../../../../../../app/theme/tokens/primitives.dart';
 import '../../../../../../core/widgets/exercise_asset_image.dart';
-import '../../../../../../core/widgets/treino_icon.dart';
 import '../../../../../workout/domain/exercise.dart';
 import '../../../../../workout/domain/muscle_group.dart';
 import '../../../widgets/coach_hub_widgets.dart';
@@ -17,8 +17,12 @@ import '../../../widgets/coach_hub_widgets.dart';
 /// Grid card for a single exercise in the Biblioteca web section.
 ///
 /// Displays:
-/// - Thumbnail (assets/exercises/{id}.png with icon fallback; custom exercises
-///   skip the asset and show the dumbbell icon directly).
+/// - Thumbnail ([_BrandPlaceholder] — wordmark TREINO tintado en accent a
+///   alpha bajo, discreto; NO se usan imágenes de red — ronda de revisión
+///   "imágenes de ejercicios en Biblioteca" decidió volver al placeholder de
+///   marca en vez de fotos de un catálogo externo curado a mano. Ver
+///   `scripts/generate_exercise_media_catalog.py` para el contexto de esa
+///   exploración archivada).
 /// - Exercise name (bold, maxLines 2).
 /// - "Músculo · Categoría" subtitle.
 /// - Equipment chip (omitted when null).
@@ -79,33 +83,26 @@ class ExerciseGridCard extends StatelessWidget {
                       borderRadius: const BorderRadius.vertical(
                         top: Radius.circular(AppRadius.md),
                       ),
+                      // #588: foto real del ejercicio via thumbnailUrl, el
+                      // mismo widget compartido que usa mobile.
+                      //
+                      // La ronda de revisión había sacado las imágenes de red
+                      // (8d4962a7) porque su resolver las buscaba por NOMBRE y
+                      // podía mostrar la equivocada. Ese riesgo no aplica acá:
+                      // el thumbnailUrl viene en el propio ejercicio. Se
+                      // conserva su _BrandPlaceholder como fallback, que es
+                      // mejor que el ícono suelto que había antes.
                       child: _isCustom
-                          ? Container(
-                              color: palette.accent.withValues(alpha: 0.12),
-                              alignment: Alignment.center,
-                              child: Icon(
-                                TreinoIcon.dumbbell,
-                                size: 40,
-                                color: palette.accent,
-                              ),
-                            )
-                          // #588: foto real del ejercicio via thumbnailUrl,
-                          // el mismo widget compartido que usa mobile. Cae por
-                          // assets locales y termina en el ícono de mancuerna
-                          // si la URL es null o falla.
+                          ? _BrandPlaceholder(
+                              palette: palette, emphasized: true)
                           : ExerciseAssetImage(
                               exerciseId: exercise.id,
                               muscleGroup: exercise.muscleGroup,
                               thumbnailUrl: exercise.thumbnailUrl,
                               fit: BoxFit.cover,
-                              fallback: Container(
-                                color: palette.bgCard,
-                                alignment: Alignment.center,
-                                child: Icon(
-                                  TreinoIcon.dumbbell,
-                                  size: 40,
-                                  color: palette.textMuted,
-                                ),
+                              fallback: _BrandPlaceholder(
+                                palette: palette,
+                                emphasized: false,
                               ),
                             ),
                     ),
@@ -198,6 +195,54 @@ String _categoryLabel(String raw) {
     'custom' => 'Personalizado', // i18n
     _ => raw,
   };
+}
+
+/// Placeholder de marca del thumbnail — wordmark TREINO (`assets/logo/`,
+/// vía [flutter_svg]) centrado, tintado en accent a alpha bajo sobre el
+/// fondo de la card. Reemplazó las imágenes de red de un catálogo curado a
+/// mano (ronda de revisión "imágenes de ejercicios en Biblioteca" — ver
+/// `scripts/generate_exercise_media_catalog.py`, conservado como registro
+/// histórico de esa exploración pero ya no usado en producción).
+///
+/// [emphasized] (ejercicios CUSTOM) sube el alpha del logo y tiñe el fondo
+/// en accent — la card CUSTOM ya tenía más presencia de accent antes de
+/// este cambio (ícono a accent completo sobre fondo accent-tintado); acá se
+/// preserva ese criterio con el nuevo placeholder.
+class _BrandPlaceholder extends StatelessWidget {
+  const _BrandPlaceholder({required this.palette, required this.emphasized});
+
+  final AppPalette palette;
+  final bool emphasized;
+
+  static const double _logoAlpha = 0.3;
+  static const double _logoAlphaEmphasized = 0.55;
+  static const double _bgAlphaEmphasized = 0.12;
+  static const double _logoWidthFactor = 0.4;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('exercise_grid_card_brand_placeholder'),
+      color: emphasized
+          ? palette.accent.withValues(alpha: _bgAlphaEmphasized)
+          : palette.bgCard,
+      alignment: Alignment.center,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SvgPicture.asset(
+            'assets/logo/treino_logo.svg',
+            width: constraints.maxWidth * _logoWidthFactor,
+            colorFilter: ColorFilter.mode(
+              palette.accent.withValues(
+                alpha: emphasized ? _logoAlphaEmphasized : _logoAlpha,
+              ),
+              BlendMode.srcIn,
+            ),
+          );
+        },
+      ),
+    );
+  }
 }
 
 class _CustomBadge extends StatelessWidget {

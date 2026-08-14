@@ -3,7 +3,10 @@
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/core/widgets/exercise_asset_image.dart';
+import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach_hub/presentation/sections/biblioteca/widgets/exercise_grid_card.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/treino_interactive_state.dart';
@@ -69,6 +72,59 @@ void main() {
       await tester.pump();
 
       expect(find.text('CUSTOM'), findsNothing);
+    });
+
+    testWidgets(
+        'thumbnail: card de catálogo muestra la FOTO del ejercicio (#588), '
+        'con el placeholder de marca sólo como fallback', (tester) async {
+      await tester.pumpWidget(_wrap(
+        ExerciseGridCard(exercise: _bench, onTap: () {}),
+      ));
+      await tester.pump();
+
+      // Esta ronda había reemplazado la foto por el wordmark en TODAS las
+      // cards. Las fotos de la biblioteca son producto que ya estaba en main
+      // (#588), así que ganan: la card de catálogo resuelve por
+      // ExerciseAssetImage y el wordmark queda como último eslabón de su
+      // cadena de fallbacks, no como thumbnail por defecto.
+      expect(find.byType(ExerciseAssetImage), findsOneWidget);
+      expect(find.byType(Image), findsOneWidget);
+      expect(
+        find.byKey(const Key('exercise_grid_card_brand_placeholder')),
+        findsNothing,
+      );
+
+      final asset = tester.widget<ExerciseAssetImage>(
+        find.byType(ExerciseAssetImage),
+      );
+      expect(asset.exerciseId, _bench.id);
+      expect(asset.fit, BoxFit.cover);
+    });
+
+    testWidgets(
+        'thumbnail: card CUSTOM también muestra el placeholder de marca, '
+        'con accent más presente que la card normal', (tester) async {
+      await tester.pumpWidget(_wrap(
+        ExerciseGridCard(exercise: _customEx, onTap: () {}),
+      ));
+      await tester.pump();
+
+      expect(
+        find.byKey(const Key('exercise_grid_card_brand_placeholder')),
+        findsOneWidget,
+      );
+      expect(find.byType(SvgPicture), findsOneWidget);
+      expect(find.byType(Image), findsNothing);
+
+      const palette = AppPalette.mintMagenta;
+      final svg = tester.widget<SvgPicture>(find.byType(SvgPicture));
+      expect(
+        svg.colorFilter,
+        ColorFilter.mode(
+          palette.accent.withValues(alpha: 0.55),
+          BlendMode.srcIn,
+        ),
+      );
     });
 
     testWidgets('tap invoca onTap', (tester) async {
