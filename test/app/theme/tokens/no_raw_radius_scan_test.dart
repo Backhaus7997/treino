@@ -52,11 +52,11 @@ void main() {
     /// Techo de archivos permitidos. Congelado en el estado de `main` al abrir
     /// la issue #665. NUNCA subir este número: cada fase que migra un archivo
     /// lo baja.
-    const allowlistCeiling = 149;
+    const allowlistCeiling = 141;
 
     /// Techo de ocurrencias totales de radio crudo en `lib/`. Mismo contrato
     /// que [allowlistCeiling]: sólo baja.
-    const rawRadiusDebtCeiling = 668;
+    const rawRadiusDebtCeiling = 524;
 
     /// Allowlist de rutas relativas a `lib/` que todavía contienen radios
     /// crudos. Es un REGISTRO DE DEUDA, no una licencia: estar acá significa
@@ -65,20 +65,14 @@ void main() {
       'app/theme/app_theme.dart',
       'core/widgets/firebase_storage_video_player.dart',
       'core/widgets/treino_bottom_bar.dart',
-      'features/auth/presentation/widgets/auth_failure_banner.dart',
-      'features/auth/presentation/widgets/auth_pill_button.dart',
       'features/auth/presentation/widgets/password_strength_bar.dart',
-      'features/auth/presentation/widgets/trainer_inquiry_card.dart',
-      'features/chat/presentation/chat_image_bubble.dart',
       'features/chat/presentation/chat_screen.dart',
       'features/checkins/presentation/post_session_check_in_sheet.dart',
       'features/coach/athlete_coach_view.dart',
       'features/coach/presentation/athlete_agenda_screen.dart',
       'features/coach/presentation/athlete_detail_screen.dart',
       'features/coach/presentation/availability_editor_screen.dart',
-      'features/coach/presentation/trainer_agenda_tab.dart',
       'features/coach/presentation/trainer_dashboard_tab.dart',
-      'features/coach/presentation/trainers_list_screen.dart',
       'features/coach/presentation/widgets/appointment_detail_sheet.dart',
       'features/coach/presentation/widgets/athlete_picker_sheet.dart',
       'features/coach/presentation/widgets/day_slots_sheet.dart',
@@ -91,7 +85,6 @@ void main() {
       'features/coach/presentation/widgets/session_detail_sheet.dart',
       'features/coach/presentation/widgets/trainer_advanced_filter_chips.dart',
       'features/coach/presentation/widgets/trainer_day_detail_sheet.dart',
-      'features/coach/presentation/widgets/trainer_list_tile.dart',
       'features/coach/presentation/widgets/trainers_map_bottom_sheet.dart',
       'features/coach/presentation/widgets/trainers_map_view.dart',
       'features/coach/trainer_coach_view.dart',
@@ -164,7 +157,6 @@ void main() {
       'features/measurements/presentation/log_measurement_screen.dart',
       'features/measurements/presentation/widgets/measurement_history_list.dart',
       'features/measurements/presentation/widgets/measurement_progress_chart.dart',
-      'features/notifications/presentation/notification_history_screen.dart',
       'features/performance/presentation/log_performance_test_screen.dart',
       'features/performance/presentation/widgets/performance_progress_chart.dart',
       'features/profile/presentation/appearance_screen.dart',
