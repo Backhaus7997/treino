@@ -369,10 +369,14 @@ void main() {
       mockRepo = _MockRoutineRepository();
     });
 
-    testWidgets('el botón de archivar sólo aparece en activas web-editables',
+    // a725b026 borró el guard de editabilidad web: el editor abre cualquier
+    // rutina sin perder datos, incluidas las periodizadas. Este test fijaba lo
+    // contrario ("sólo en activas web-editables"), que era el comportamiento
+    // anterior a ese fix. Ahora TODA activa ofrece archivar.
+    testWidgets('el botón de archivar aparece en toda rutina activa',
         (tester) async {
       final routines = [
-        _routine(id: 'r1', name: 'Activa editable'),
+        _routine(id: 'r1', name: 'Activa simple'),
         _routine(id: 'r2', name: 'Periodizada', numWeeks: 4),
       ];
       await _pumpWithRepo(
@@ -387,7 +391,7 @@ void main() {
       );
       expect(
         find.byKey(const ValueKey('routine_row_archive_button_r2')),
-        findsNothing,
+        findsOneWidget,
       );
     });
 

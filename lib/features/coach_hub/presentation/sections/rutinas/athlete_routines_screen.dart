@@ -5,13 +5,11 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
-import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 // NO se importa routine_web_editability: a725b026 lo eliminó de main junto con
 // el guard — el editor web abre cualquier rutina sin perder datos.
@@ -206,7 +204,7 @@ class _AthleteRoutinesBody extends ConsumerWidget {
           // un ítem más — crear una rutina y volver — hace parpadear la última
           // fila visible, porque el matching es posicional.
           TreinoFadeSlideIn(
-            key: ValueKey(active[i].id),
+            key: ValueKey(visible[i].id),
             delay: AppMotion.stagger(i),
             child: _RoutineRow(
               routine: visible[i],

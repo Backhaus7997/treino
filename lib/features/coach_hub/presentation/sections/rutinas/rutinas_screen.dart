@@ -112,7 +112,10 @@ class RutinasScreen extends ConsumerWidget {
 Widget _muted(AppPalette palette, String text) => Padding(
       padding: const EdgeInsets.symmetric(vertical: 24),
       child: Text(text,
-          style: TextStyle(fontFamily: AppFonts.barlow, color: palette.textMuted, fontSize: 14)),
+          style: TextStyle(
+              fontFamily: AppFonts.barlow,
+              color: palette.textMuted,
+              fontSize: 14)),
     );
 
 /// Estado simplificado del vínculo para esta lista — a diferencia de
@@ -545,7 +548,8 @@ class _AthleteRowState extends State<_AthleteRow> {
                     Text(
                       widget.name,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontFamily: AppFonts.barlow, 
+                      style: TextStyle(
+                          fontFamily: AppFonts.barlow,
                           color: palette.textPrimary,
                           fontSize: 15,
                           fontWeight: FontWeight.w600),
@@ -554,8 +558,10 @@ class _AthleteRowState extends State<_AthleteRow> {
                       Text(
                         gymName,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontFamily: AppFonts.barlow, 
-                            color: palette.textMuted, fontSize: 12),
+                        style: TextStyle(
+                            fontFamily: AppFonts.barlow,
+                            color: palette.textMuted,
+                            fontSize: 12),
                       ),
                   ],
                 ),
@@ -675,7 +681,8 @@ class _RutinasCard extends StatelessWidget {
               child: Text(
                 name,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontFamily: AppFonts.barlow, 
+                style: TextStyle(
+                  fontFamily: AppFonts.barlow,
                   color: palette.textPrimary,
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
