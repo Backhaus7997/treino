@@ -52,11 +52,11 @@ void main() {
     /// Techo de archivos permitidos. Congelado en el estado de `main` al abrir
     /// la issue #665. NUNCA subir este número: cada fase que migra un archivo
     /// lo baja.
-    const allowlistCeiling = 141;
+    const allowlistCeiling = 121;
 
     /// Techo de ocurrencias totales de radio crudo en `lib/`. Mismo contrato
     /// que [allowlistCeiling]: sólo baja.
-    const rawRadiusDebtCeiling = 524;
+    const rawRadiusDebtCeiling = 390;
 
     /// Allowlist de rutas relativas a `lib/` que todavía contienen radios
     /// crudos. Es un REGISTRO DE DEUDA, no una licencia: estar acá significa
@@ -91,13 +91,8 @@ void main() {
       'features/coach_hub/presentation/coach_hub_login_screen.dart',
       'features/coach_hub/presentation/coach_hub_plan_preview_screen.dart',
       'features/coach_hub/presentation/coach_hub_upload_plan_screen.dart',
-      'features/coach_hub/presentation/sections/agenda/agenda_web_calendar.dart',
       'features/coach_hub/presentation/sections/agenda/agenda_web_day_list.dart',
-      'features/coach_hub/presentation/sections/agenda/agenda_web_screen.dart',
       'features/coach_hub/presentation/sections/agenda/appointment_detail_dialog.dart',
-      'features/coach_hub/presentation/sections/agenda/availability_editor_panel.dart',
-      'features/coach_hub/presentation/sections/agenda/batch_cobrar_dialog.dart',
-      'features/coach_hub/presentation/sections/agenda/new_session_dialog.dart',
       'features/coach_hub/presentation/sections/agenda/override_form_dialog.dart',
       'features/coach_hub/presentation/sections/agenda/rule_form_dialog.dart',
       'features/coach_hub/presentation/sections/ajustes/tabs/cuenta_tab.dart',
@@ -107,15 +102,11 @@ void main() {
       'features/coach_hub/presentation/sections/alumnos/alumnos_screen.dart',
       'features/coach_hub/presentation/sections/biblioteca/widgets/template_detail_dialog.dart',
       'features/coach_hub/presentation/sections/biblioteca/widgets/templates_tab.dart',
-      'features/coach_hub/presentation/sections/chat/widgets/chat_detail_pane.dart',
       'features/coach_hub/presentation/sections/chat/widgets/chat_list_pane.dart',
       'features/coach_hub/presentation/sections/chat/widgets/chat_message_bubble.dart',
-      'features/coach_hub/presentation/sections/facturacion_planes/keep_students_screen.dart',
       'features/coach_hub/presentation/sections/facturacion_planes/paywall_preview_screen.dart',
       'features/coach_hub/presentation/sections/facturacion_planes/plan_limit_paywall.dart',
       'features/coach_hub/presentation/sections/facturacion_planes/pricing_screen.dart',
-      'features/coach_hub/presentation/sections/pagos/widgets/estado_cuenta_card.dart',
-      'features/coach_hub/presentation/sections/pagos/widgets/pagos_table.dart',
       'features/coach_hub/presentation/sections/pagos/widgets/registrar_pago_dialog.dart',
       'features/coach_hub/presentation/sections/routine_editor/routine_editor_web_screen.dart',
       'features/coach_hub/presentation/sections/rutinas/rutinas_screen.dart',
@@ -126,15 +117,7 @@ void main() {
       'features/coach_hub/presentation/widgets/exercise_picker_dialog.dart',
       'features/feed/feed_screen.dart',
       'features/feed/presentation/create_post_screen.dart',
-      'features/feed/presentation/follow_list_screen.dart',
-      'features/feed/presentation/public_profile_screen.dart',
-      'features/feed/presentation/routine_tag_picker_sheet.dart',
-      'features/feed/presentation/search_users_screen.dart',
-      'features/feed/presentation/widgets/feed_segment_pills.dart',
       'features/feed/presentation/widgets/friend_request_inbox_tile.dart',
-      'features/feed/presentation/widgets/post_card.dart',
-      'features/feed/presentation/widgets/post_privacy_selector.dart',
-      'features/feed/presentation/widgets/public_profile_follow_button.dart',
       'features/feed/presentation/widgets/suggested_users_section.dart',
       'features/feed/presentation/widgets/unfriend_confirmation_sheet.dart',
       'features/feed/presentation/widgets/user_search_result_tile.dart',
@@ -160,12 +143,9 @@ void main() {
       'features/performance/presentation/log_performance_test_screen.dart',
       'features/performance/presentation/widgets/performance_progress_chart.dart',
       'features/profile/presentation/appearance_screen.dart',
-      'features/profile/presentation/profile_edit_personal_screen.dart',
       'features/profile/presentation/profile_edit_trainer_screen.dart',
       'features/profile/presentation/profile_gym_screen.dart',
-      'features/profile/presentation/profile_routines_screen.dart',
       'features/profile/presentation/widgets/eliminar_cuenta_sheet.dart',
-      'features/profile/presentation/widgets/pinned_current_gym.dart',
       'features/profile/presentation/widgets/profile_avatar_card.dart',
       'features/profile/presentation/widgets/profile_section_group.dart',
       'features/profile/presentation/widgets/profile_section_tile.dart',
