@@ -32,6 +32,15 @@ mixin _$TemplatePreferences {
   /// (`Routine.goals`, #635 PR#1) because one template genuinely serves
   /// several goals; a person picking "what am I training for" right now does
   /// not need that. Null ⇒ not answered.
+  ///
+  /// `nullForUndefinedEnumValue` is not decoration. Without it the generated
+  /// `$enumDecodeNullable` THROWS on any key it does not know, and this model
+  /// is decoded as part of `UserProfile` — so one goal value added by a newer
+  /// build would break the whole profile stream on every older client and
+  /// route them to `/profile-unavailable` (#544). An unknown goal has to
+  /// degrade to "no preference", exactly like [RoutineGoal.fromWireKey] and
+  /// [priorityGroups] already do for their own unknown keys.
+  @JsonKey(unknownEnumValue: JsonKey.nullForUndefinedEnumValue)
   RoutineGoal? get goal => throw _privateConstructorUsedError;
 
   /// Canonical [MuscleGroup] keys (`chest`, `back`, `quads`…) — the app's one
@@ -59,6 +68,7 @@ abstract class $TemplatePreferencesCopyWith<$Res> {
   $Res call(
       {int? daysPerWeek,
       int? minutesPerSession,
+      @JsonKey(unknownEnumValue: JsonKey.nullForUndefinedEnumValue)
       RoutineGoal? goal,
       List<String> priorityMuscleGroups});
 }
@@ -115,6 +125,7 @@ abstract class _$$TemplatePreferencesImplCopyWith<$Res>
   $Res call(
       {int? daysPerWeek,
       int? minutesPerSession,
+      @JsonKey(unknownEnumValue: JsonKey.nullForUndefinedEnumValue)
       RoutineGoal? goal,
       List<String> priorityMuscleGroups});
 }
@@ -164,7 +175,7 @@ class _$TemplatePreferencesImpl extends _TemplatePreferences {
   const _$TemplatePreferencesImpl(
       {this.daysPerWeek,
       this.minutesPerSession,
-      this.goal,
+      @JsonKey(unknownEnumValue: JsonKey.nullForUndefinedEnumValue) this.goal,
       final List<String> priorityMuscleGroups = const <String>[]})
       : _priorityMuscleGroups = priorityMuscleGroups,
         super._();
@@ -186,7 +197,16 @@ class _$TemplatePreferencesImpl extends _TemplatePreferences {
   /// (`Routine.goals`, #635 PR#1) because one template genuinely serves
   /// several goals; a person picking "what am I training for" right now does
   /// not need that. Null ⇒ not answered.
+  ///
+  /// `nullForUndefinedEnumValue` is not decoration. Without it the generated
+  /// `$enumDecodeNullable` THROWS on any key it does not know, and this model
+  /// is decoded as part of `UserProfile` — so one goal value added by a newer
+  /// build would break the whole profile stream on every older client and
+  /// route them to `/profile-unavailable` (#544). An unknown goal has to
+  /// degrade to "no preference", exactly like [RoutineGoal.fromWireKey] and
+  /// [priorityGroups] already do for their own unknown keys.
   @override
+  @JsonKey(unknownEnumValue: JsonKey.nullForUndefinedEnumValue)
   final RoutineGoal? goal;
 
   /// Canonical [MuscleGroup] keys (`chest`, `back`, `quads`…) — the app's one
@@ -253,6 +273,7 @@ abstract class _TemplatePreferences extends TemplatePreferences {
   const factory _TemplatePreferences(
       {final int? daysPerWeek,
       final int? minutesPerSession,
+      @JsonKey(unknownEnumValue: JsonKey.nullForUndefinedEnumValue)
       final RoutineGoal? goal,
       final List<String> priorityMuscleGroups}) = _$TemplatePreferencesImpl;
   const _TemplatePreferences._() : super._();
@@ -274,7 +295,16 @@ abstract class _TemplatePreferences extends TemplatePreferences {
   /// (`Routine.goals`, #635 PR#1) because one template genuinely serves
   /// several goals; a person picking "what am I training for" right now does
   /// not need that. Null ⇒ not answered.
+  ///
+  /// `nullForUndefinedEnumValue` is not decoration. Without it the generated
+  /// `$enumDecodeNullable` THROWS on any key it does not know, and this model
+  /// is decoded as part of `UserProfile` — so one goal value added by a newer
+  /// build would break the whole profile stream on every older client and
+  /// route them to `/profile-unavailable` (#544). An unknown goal has to
+  /// degrade to "no preference", exactly like [RoutineGoal.fromWireKey] and
+  /// [priorityGroups] already do for their own unknown keys.
   @override
+  @JsonKey(unknownEnumValue: JsonKey.nullForUndefinedEnumValue)
   RoutineGoal? get goal;
 
   /// Canonical [MuscleGroup] keys (`chest`, `back`, `quads`…) — the app's one
