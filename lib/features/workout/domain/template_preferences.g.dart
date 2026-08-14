@@ -11,7 +11,8 @@ _$TemplatePreferencesImpl _$$TemplatePreferencesImplFromJson(
     _$TemplatePreferencesImpl(
       daysPerWeek: (json['daysPerWeek'] as num?)?.toInt(),
       minutesPerSession: (json['minutesPerSession'] as num?)?.toInt(),
-      goal: $enumDecodeNullable(_$RoutineGoalEnumMap, json['goal']),
+      goal: $enumDecodeNullable(_$RoutineGoalEnumMap, json['goal'],
+          unknownValue: JsonKey.nullForUndefinedEnumValue),
       priorityMuscleGroups: (json['priorityMuscleGroups'] as List<dynamic>?)
               ?.map((e) => e as String)
               .toList() ??

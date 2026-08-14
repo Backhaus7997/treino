@@ -35,6 +35,16 @@ class TemplatePreferences with _$TemplatePreferences {
     /// (`Routine.goals`, #635 PR#1) because one template genuinely serves
     /// several goals; a person picking "what am I training for" right now does
     /// not need that. Null ⇒ not answered.
+    ///
+    /// `nullForUndefinedEnumValue` is not decoration. Without it the generated
+    /// `$enumDecodeNullable` THROWS on any key it does not know, and this model
+    /// is decoded as part of `UserProfile` — so one goal value added by a newer
+    /// build would break the whole profile stream on every older client and
+    /// route them to `/profile-unavailable` (#544). An unknown goal has to
+    /// degrade to "no preference", exactly like [RoutineGoal.fromWireKey] and
+    /// [priorityGroups] already do for their own unknown keys.
+    // ignore: invalid_annotation_target
+    @JsonKey(unknownEnumValue: JsonKey.nullForUndefinedEnumValue)
     RoutineGoal? goal,
 
     /// Canonical [MuscleGroup] keys (`chest`, `back`, `quads`…) — the app's one
