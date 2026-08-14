@@ -52,18 +52,16 @@ void main() {
     /// Techo de archivos permitidos. Congelado en el estado de `main` al abrir
     /// la issue #665. NUNCA subir este número: cada fase que migra un archivo
     /// lo baja.
-    const allowlistCeiling = 121;
+    const allowlistCeiling = 87;
 
     /// Techo de ocurrencias totales de radio crudo en `lib/`. Mismo contrato
     /// que [allowlistCeiling]: sólo baja.
-    const rawRadiusDebtCeiling = 390;
+    const rawRadiusDebtCeiling = 244;
 
     /// Allowlist de rutas relativas a `lib/` que todavía contienen radios
     /// crudos. Es un REGISTRO DE DEUDA, no una licencia: estar acá significa
     /// "pendiente de migrar", no "exento".
     const allowlist = {
-      'app/theme/app_theme.dart',
-      'core/widgets/firebase_storage_video_player.dart',
       'core/widgets/treino_bottom_bar.dart',
       'features/auth/presentation/widgets/password_strength_bar.dart',
       'features/chat/presentation/chat_screen.dart',
@@ -123,24 +121,9 @@ void main() {
       'features/feed/presentation/widgets/user_search_result_tile.dart',
       'features/feed/presentation/widgets/workout_snapshot_detail.dart',
       'features/gym_rankings/presentation/rankings_screen.dart',
-      'features/home/home_screen.dart',
-      'features/home/widgets/empezar_entrenamiento_card.dart',
       'features/home/widgets/esta_semana_card.dart',
-      'features/insights/presentation/insights_screen.dart',
-      'features/insights/presentation/measurements_screen.dart',
-      'features/insights/presentation/monthly_report_screen.dart',
-      'features/insights/presentation/muscle_distribution_screen.dart',
-      'features/insights/presentation/volume_by_group_screen.dart',
-      'features/insights/presentation/widgets/body_silhouette_placeholder.dart',
-      'features/insights/presentation/widgets/daily_heatmap_section.dart',
       'features/insights/presentation/widgets/monthly_report_chart.dart',
-      'features/insights/presentation/widgets/monthly_report_summary_cards.dart',
-      'features/insights/presentation/widgets/muscle_distribution_radar.dart',
-      'features/insights/presentation/widgets/workout_days_calendar.dart',
-      'features/measurements/presentation/log_measurement_screen.dart',
-      'features/measurements/presentation/widgets/measurement_history_list.dart',
       'features/measurements/presentation/widgets/measurement_progress_chart.dart',
-      'features/performance/presentation/log_performance_test_screen.dart',
       'features/performance/presentation/widgets/performance_progress_chart.dart',
       'features/profile/presentation/appearance_screen.dart',
       'features/profile/presentation/profile_edit_trainer_screen.dart',
@@ -152,33 +135,16 @@ void main() {
       'features/profile/presentation/widgets/re_auth_bottom_sheet.dart',
       'features/profile/profile_screen.dart',
       'features/profile/trainer_profile_view.dart',
-      'features/profile_setup/presentation/widgets/experience_card.dart',
-      'features/profile_setup/presentation/widgets/gender_chip.dart',
-      'features/profile_setup/presentation/widgets/gym_card.dart',
-      'features/profile_setup/presentation/widgets/profile_setup_header.dart',
       'features/reviews/presentation/widgets/review_bottom_sheet.dart',
       'features/reviews/presentation/widgets/review_cta.dart',
       'features/workout/presentation/custom_exercise_editor_screen.dart',
-      'features/workout/presentation/exercise_detail_screen.dart',
       'features/workout/presentation/my_exercises_screen.dart',
-      'features/workout/presentation/routine_detail_screen.dart',
       'features/workout/presentation/routine_editor_screen.dart',
       'features/workout/presentation/session_player_screen.dart',
-      'features/workout/presentation/share_workout_composer_screen.dart',
-      'features/workout/presentation/widgets/coach_chip.dart',
       'features/workout/presentation/widgets/coach_note.dart',
       'features/workout/presentation/widgets/exercise_progression_chart.dart',
-      'features/workout/presentation/widgets/exercise_progression_section.dart',
       'features/workout/presentation/widgets/exercise_slot_row.dart',
-      'features/workout/presentation/widgets/exercise_video_player.dart',
-      'features/workout/presentation/widgets/level_filter_pills.dart',
-      'features/workout/presentation/widgets/most_frequent_exercises_list.dart',
-      'features/workout/presentation/widgets/personal_records_list.dart',
-      'features/workout/presentation/widgets/resume_session_modal.dart',
-      'features/workout/presentation/widgets/routine_card.dart',
-      'features/workout/presentation/widgets/rutinas_section.dart',
       'features/workout/presentation/widgets/session_highlights_section.dart',
-      'features/workout/presentation/widgets/session_stats_card.dart',
       'features/workout/presentation/widgets/set_entry_sheet.dart',
       'features/workout/presentation/widgets/template_rating_sheet.dart',
       'features/workout/trainer_workout_view.dart',

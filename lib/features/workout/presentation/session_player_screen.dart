@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
@@ -714,7 +715,7 @@ class _SessionHeader extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               minimumSize: const Size(0, 44),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(9999),
+                borderRadius: BorderRadius.circular(AppRadius.full),
               ),
             ),
             child: Text(
@@ -756,7 +757,7 @@ class _AttendanceCard extends ConsumerWidget {
     return Container(
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Row(
@@ -819,7 +820,7 @@ class _SessionStatsCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Column(
@@ -1769,7 +1770,7 @@ class _ExerciseSectionState extends State<_ExerciseSection> {
                 color: isDone
                     ? palette.accent.withValues(alpha: 0.15)
                     : palette.bg,
-                borderRadius: BorderRadius.circular(9999),
+                borderRadius: BorderRadius.circular(AppRadius.full),
                 border: Border.all(
                   color: isDone ? palette.accent : palette.border,
                   width: 1,
@@ -1832,7 +1833,7 @@ class _AddSetButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
           color: palette.bg,
-          borderRadius: BorderRadius.circular(9999),
+          borderRadius: BorderRadius.circular(AppRadius.full),
           border: Border.all(color: palette.border),
         ),
         child: Row(
@@ -1905,7 +1906,7 @@ class _RemoveSetConfirmDialog extends StatelessWidget {
     return AlertDialog(
       backgroundColor: palette.bgCard,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
       ),
       title: Text(
         'Eliminar serie',
@@ -2470,7 +2471,7 @@ class _DurationSetRowState extends State<_DurationSetRow> {
                     color: isInteractive
                         ? palette.accent.withValues(alpha: 0.15)
                         : palette.bg,
-                    borderRadius: BorderRadius.circular(9999),
+                    borderRadius: BorderRadius.circular(AppRadius.full),
                     border: Border.all(
                       color: isInteractive ? palette.accent : palette.border,
                     ),
@@ -2519,7 +2520,7 @@ class _TerminarSessionButton extends StatelessWidget {
           disabledBackgroundColor: palette.bgCard,
           minimumSize: const Size.fromHeight(56),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(9999),
+            borderRadius: BorderRadius.circular(AppRadius.full),
           ),
         ),
         child: Text(
@@ -2554,7 +2555,7 @@ class _AbandonConfirmDialog extends StatelessWidget {
     return AlertDialog(
       backgroundColor: palette.bgCard,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
       ),
       content: Text(
         '¿Seguro que querés abandonar? Se va a guardar tu progreso hasta acá.',
