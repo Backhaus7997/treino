@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
@@ -25,7 +26,7 @@ Future<RoutineTag?> showRoutineTagPickerSheet({
     isScrollControlled: true,
     backgroundColor: palette.bgCard,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
     ),
     builder: (_) => RoutineTagPickerSheet(uid: uid),
   );
@@ -58,7 +59,7 @@ class RoutineTagPickerSheet extends ConsumerWidget {
                 height: 4,
                 decoration: BoxDecoration(
                   color: palette.border,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
                 ),
               ),
             ),
