@@ -2,7 +2,11 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../../app/theme/tokens/components/treino_segmented_pill_tokens.dart';
+// El barrel, no el archivo suelto: es la API pública del design system
+// (docs/design-system.md:29). Este widget usa SÓLO los tokens de capa 3 que
+// expone `TreinoSegmentedPillTokens` — nunca `AppColorPrimitives`, que el
+// barrel también reexporta pero es insumo exclusivo de `AppPalette`.
+import '../../app/theme/tokens/tokens.dart';
 
 /// Control segmentado de sub-navegación — la pista con dos o más celdas que
 /// vive arriba de Entrenar, Feed, Coach y el discovery de PFs.
@@ -19,6 +23,10 @@ import '../../app/theme/tokens/components/treino_segmented_pill_tokens.dart';
 /// radio (24 vs 9999), alto (38 vs 40 vs calculado), tipografía (tres fuentes
 /// distintas) y estrategia de overflow (tres). **Por eso casi nada es
 /// parametrizable**: exponer esos ejes es exactamente cómo se separaron.
+///
+/// La migración va en dos PRs: Entrenar y Coach primero, Feed y el discovery de
+/// PFs después. Hasta que aterricen los dos, esas dos pantallas siguen con su
+/// `TabBar` inline. La quinta copia —Coach Hub web— es aparte: ver #667.
 ///
 /// Notas de integración, todas aprendidas de las copias que reemplaza:
 ///
@@ -37,12 +45,8 @@ import '../../app/theme/tokens/components/treino_segmented_pill_tokens.dart';
 ///    pantalla. No lo "arregles" acá: haría falta poseer el controller.
 ///  - **No modela `disabled`.** `TabBar` no tiene estado deshabilitado por
 ///    pestaña y ningún call site lo necesita.
-class TreinoSegmentedPill extends StatelessWidget {
-  const TreinoSegmentedPill({
-    super.key,
-    required this.labels,
-    this.onTap,
-  });
+class TreinoSegmentedPill extends StatefulWidget {
+  const TreinoSegmentedPill({super.key, required this.labels, this.onTap});
 
   /// Las etiquetas, en orden. La cantidad tiene que coincidir con el `length`
   /// del [DefaultTabController] ancestro.
@@ -60,11 +64,36 @@ class TreinoSegmentedPill extends StatelessWidget {
   /// Coach lo usa para cerrar el sheet del día abierto.
   final ValueChanged<int>? onTap;
 
+  @override
+  State<TreinoSegmentedPill> createState() => _TreinoSegmentedPillState();
+}
+
+class _TreinoSegmentedPillState extends State<TreinoSegmentedPill> {
   /// `const` a mano: `BorderRadius.circular` no es const-construible, y esto
-  /// se reconstruye en cada build de cuatro pantallas.
-  static const _radius = BorderRadius.all(
+  /// se reconstruye en cada build de las pantallas migradas.
+  static const _trackRadius = BorderRadius.all(
+    Radius.circular(TreinoSegmentedPillTokens.trackRadius),
+  );
+
+  /// Mismo valor que [_trackRadius] hoy —los dos son `AppRadius.full`— pero se
+  /// leen de tokens distintos a propósito: si algún día la pista y el thumb
+  /// dejan de ser concéntricos, el cambio es de un token y no de este archivo.
+  static const _segmentRadius = BorderRadius.all(
     Radius.circular(TreinoSegmentedPillTokens.segmentRadius),
   );
+
+  /// Si alguna celda tiene el foco de teclado.
+  ///
+  /// El único estado del widget, y existe por una razón concreta: el overlay
+  /// de foco de `TabBar` NO se ve sobre la celda activa, porque la tinta de
+  /// Material se pinta debajo del subárbol y el thumb opaco la tapa. Sin esto,
+  /// un usuario de teclado que activa una pestaña pierde el indicador de foco
+  /// justo donde queda parado — WCAG 2.4.7.
+  ///
+  /// El anillo va en la PISTA, no en la celda: ahí el z-order deja de
+  /// importar, y no hace falta abandonar el `indicator` de `TabBar` ni saber
+  /// cuál de las celdas tiene el foco.
+  bool _hasFocus = false;
 
   @override
   Widget build(BuildContext context) {
@@ -82,7 +111,7 @@ class TreinoSegmentedPill extends StatelessWidget {
         (labelStyle?.height ?? 1.2);
     final segmentHeight = math.max(
       TreinoSegmentedPillTokens.minSegmentHeight,
-      scaledLabelHeight + TreinoSegmentedPillTokens.segmentVerticalPadding,
+      scaledLabelHeight + TreinoSegmentedPillTokens.labelVerticalRoom,
     );
 
     // Por encima del umbral, repartir el ancho deja las etiquetas ilegibles;
@@ -90,72 +119,110 @@ class TreinoSegmentedPill extends StatelessWidget {
     final isScrollable = textScaler.scale(1) >
         TreinoSegmentedPillTokens.scrollTextScaleThreshold;
 
-    return Container(
-      padding: const EdgeInsets.all(TreinoSegmentedPillTokens.trackPadding),
-      decoration: BoxDecoration(
-        color: t.trackFill,
-        // Pista y thumb comparten radio: concéntricos por construcción.
-        borderRadius: _radius,
-        border: Border.all(
-          color: t.trackBorder,
-          width: TreinoSegmentedPillTokens.borderWidth,
-        ),
-      ),
-      child: TabBar(
-        isScrollable: isScrollable,
-        tabAlignment: isScrollable ? TabAlignment.start : TabAlignment.fill,
-        dividerColor: TreinoSegmentedPillTokens.dividerColor,
-        indicatorSize: TabBarIndicatorSize.tab,
-        indicator: BoxDecoration(
-          color: t.activeFill,
-          borderRadius: _radius,
-          // El keyline es lo único que identifica el estado seleccionado en
-          // tema claro: el mint sobre una pista clara da 1.64:1. En dark es
-          // invisible e inocuo — ahí el 3:1 lo carga el relleno.
+    return Focus(
+      // No participa de la navegación: sólo observa. `hasFocus` de un nodo
+      // `Focus` es true si él o CUALQUIER descendiente tiene el foco primario,
+      // que es exactamente lo que hace falta para saber si el teclado está
+      // parado en alguna celda sin tocar los `FocusNode` que crea `TabBar`.
+      canRequestFocus: false,
+      skipTraversal: true,
+      onFocusChange: (value) {
+        if (value != _hasFocus) setState(() => _hasFocus = value);
+      },
+      child: Container(
+        padding: const EdgeInsets.all(TreinoSegmentedPillTokens.trackPadding),
+        decoration: BoxDecoration(
+          color: t.trackFill,
+          borderRadius: _trackRadius,
+          // Anillo por fuera con `spreadRadius`, no un borde más grueso: un
+          // borde desplazaría el contenido 2pt al enfocar y la fila entera
+          // saltaría.
+          boxShadow: _hasFocus
+              ? [
+                  BoxShadow(
+                    color: TreinoFocusTokens.of(context).ring,
+                    spreadRadius: TreinoFocusTokens.ringWidth,
+                  ),
+                ]
+              : null,
           border: Border.all(
-            color: TreinoSegmentedPillTokens.activeInk,
+            color: t.trackBorder,
             width: TreinoSegmentedPillTokens.borderWidth,
           ),
         ),
-        splashBorderRadius: _radius,
-        overlayColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.pressed)) return t.pressedOverlay;
-          if (states.contains(WidgetState.hovered)) return t.hoverOverlay;
-          if (states.contains(WidgetState.focused)) return t.focusOverlay;
-          return null;
-        }),
-        labelColor: TreinoSegmentedPillTokens.activeInk,
-        unselectedLabelColor: t.inactiveLabel,
-        labelStyle: labelStyle,
-        // El MISMO estilo para los dos estados, a propósito: `TabBar`
-        // interpola entre ambos en cada cambio de selección. Con estilos que
-        // difieren en familia el salto se ve a mitad de la animación, y si
-        // difieren en peso la tira entera se re-layoutea al cambiar de celda.
-        // Las dos cosas pasaban en las copias que esto reemplaza.
-        unselectedLabelStyle: labelStyle,
-        labelPadding: const EdgeInsets.symmetric(
-          horizontal: TreinoSegmentedPillTokens.labelPadding,
-        ),
-        onTap: onTap,
-        tabs: [
-          for (final label in labels)
-            Tab(
-              height: segmentHeight,
-              // FittedBox + maxLines/softWrap subsume las tres estrategias de
-              // overflow que convivían: encoge antes que desbordar, y nunca
-              // parte la etiqueta en dos renglones.
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  softWrap: false,
-                  overflow: TextOverflow.fade,
-                  textAlign: TextAlign.center,
+        child: TabBar(
+          isScrollable: isScrollable,
+          tabAlignment: isScrollable ? TabAlignment.start : TabAlignment.fill,
+          dividerColor: TreinoSegmentedPillTokens.dividerColor,
+          indicatorSize: TabBarIndicatorSize.tab,
+          // 0 y no el default de 2: `TabBar` mete un `Padding` de
+          // `indicatorWeight` abajo de CADA tab siempre, incluso cuando el
+          // `indicator` es propio y no la barrita de Material. Con el default la
+          // celda medía 46pt contra los 44 de `Tab.height` y el label quedaba
+          // 1px arriba del centro del thumb.
+          indicatorWeight: 0,
+          indicator: BoxDecoration(
+            color: t.activeFill,
+            borderRadius: _segmentRadius,
+            // El keyline es lo único que identifica el estado seleccionado en
+            // tema claro: el mint sobre una pista clara da 1.64:1. En dark es
+            // invisible e inocuo — ahí el 3:1 lo carga el relleno.
+            border: Border.all(
+              color: TreinoSegmentedPillTokens.activeInk,
+              width: TreinoSegmentedPillTokens.borderWidth,
+            ),
+          ),
+          splashBorderRadius: _segmentRadius,
+          overlayColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.pressed)) return t.pressedOverlay;
+            if (states.contains(WidgetState.hovered)) return t.hoverOverlay;
+            if (states.contains(WidgetState.focused)) return t.focusOverlay;
+            return null;
+          }),
+          labelColor: TreinoSegmentedPillTokens.activeInk,
+          unselectedLabelColor: t.inactiveLabel,
+          labelStyle: labelStyle,
+          // El MISMO estilo para los dos estados, a propósito: `TabBar`
+          // interpola entre ambos en cada cambio de selección. Con estilos que
+          // difieren en familia el salto se ve a mitad de la animación, y si
+          // difieren en peso la tira entera se re-layoutea al cambiar de celda.
+          // Las dos cosas pasaban en las copias que esto reemplaza.
+          unselectedLabelStyle: labelStyle,
+          labelPadding: const EdgeInsets.symmetric(
+            horizontal: TreinoSegmentedPillTokens.labelPadding,
+          ),
+          onTap: widget.onTap,
+          tabs: [
+            for (final label in widget.labels)
+              Tab(
+                height: segmentHeight,
+                // `FittedBox` subsume las tres estrategias de overflow que
+                // convivían: encoge antes que desbordar.
+                //
+                // Ojo con las tres propiedades del `Text`: adentro de un
+                // `FittedBox` son INERTES. `RenderFittedBox` layoutea al hijo con
+                // `BoxConstraints()` vacío, o sea ancho infinito, así que nunca
+                // hay wrap que `softWrap: false` pueda evitar, nunca hay segunda
+                // línea que `maxLines` recorte y nunca hay overflow que `fade`
+                // atenúe. Quien evita el desborde es el `scaleDown`.
+                //
+                // Se conservan igual porque `workout_screen_test.dart` las
+                // asertea desde antes de esta migración, y porque describen la
+                // intención si alguien saca el `FittedBox`. No agregues tests
+                // sobre ellas: pasarían por construcción sin verificar nada.
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.fade,
+                    textAlign: TextAlign.center,
+                  ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }

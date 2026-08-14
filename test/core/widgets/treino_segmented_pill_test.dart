@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/app/theme/tokens/components/treino_focus_tokens.dart';
 import 'package:treino/app/theme/tokens/components/treino_segmented_pill_tokens.dart';
 import 'package:treino/core/widgets/treino_segmented_pill.dart';
 
@@ -101,6 +103,40 @@ void main() {
       );
     });
 
+    testWidgets('el foco de teclado dibuja un anillo en la pista',
+        (tester) async {
+      // El overlay de foco de TabBar no se ve sobre la celda ACTIVA: la tinta
+      // de Material se pinta debajo del subárbol y el thumb opaco la tapa. Sin
+      // este anillo, un usuario de teclado que activa una pestaña se queda sin
+      // indicador justo donde está parado — WCAG 2.4.7.
+      await tester.pumpWidget(
+        _wrap(const TreinoSegmentedPill(labels: _labels)),
+      );
+
+      BoxDecoration trackDecoration() => tester
+          .widget<Container>(
+            find
+                .ancestor(
+                  of: find.byType(TabBar),
+                  matching: find.byType(Container),
+                )
+                .first,
+          )
+          .decoration! as BoxDecoration;
+
+      expect(trackDecoration().boxShadow, isNull,
+          reason: 'sin foco no hay anillo');
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pumpAndSettle();
+
+      final focused = trackDecoration().boxShadow;
+      expect(focused, isNotNull,
+          reason: 'con foco de teclado tiene que haber '
+              'anillo visible en la pista');
+      expect(focused!.single.spreadRadius, TreinoFocusTokens.ringWidth);
+    });
+
     testWidgets('cada celda llega al área tapeable mínima', (tester) async {
       // Las cuatro copias que esto reemplaza estaban en 38-40pt, por debajo
       // del mínimo de plataforma. Es la mitad "no lo alcanzo" de #646.
@@ -149,12 +185,18 @@ void main() {
       // criterio que workout_screen_test.dart, que también verifica una sola.
       expect(find.text(_labels.first).hitTestable(), findsOneWidget);
 
-      for (final label in _labels) {
-        final text = tester.widget<Text>(find.text(label));
-        expect(text.maxLines, 1);
-        expect(text.softWrap, isFalse);
-        expect(text.overflow, TextOverflow.fade);
-      }
+      // Lo que se verifica es que la etiqueta ENTRE en su celda, no que tenga
+      // tal o cual propiedad seteada. `maxLines`, `softWrap` y `overflow` son
+      // inertes adentro de un `FittedBox` —layoutea con ancho infinito— así
+      // que asertarlas pasaría por construcción sin comprobar nada. Ver el
+      // comentario en treino_segmented_pill.dart.
+      final segment = tester.getSize(find.byType(Tab).first);
+      final label = tester.getSize(find.text(_labels.first));
+      expect(
+        label.width,
+        lessThanOrEqualTo(segment.width),
+        reason: 'la etiqueta desborda su celda a escala 3.2',
+      );
     });
 
     testWidgets('el tap mueve el índice del controller ambiente',

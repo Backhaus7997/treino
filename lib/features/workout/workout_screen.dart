@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/theme/app_motion.dart';
-import '../../app/theme/app_palette.dart';
 import '../../core/widgets/motion/treino_fade_slide_in.dart';
+import '../../core/widgets/treino_segmented_pill.dart';
 import '../profile/application/user_providers.dart';
 import '../profile/domain/user_role.dart';
 import 'presentation/widgets/historial_section.dart';
@@ -64,65 +64,19 @@ class _AthleteWorkout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    final theme = Theme.of(context);
-    final textScaler = MediaQuery.textScalerOf(context);
-    final labelStyle = theme.textTheme.labelLarge?.copyWith(
-      fontWeight: FontWeight.w700,
-      letterSpacing: 0.5,
-    );
-    final scaledLabelHeight = textScaler.scale(labelStyle?.fontSize ?? 14) *
-        (labelStyle?.height ?? 1.2);
-    final tabHeight =
-        scaledLabelHeight + 20 < 40 ? 40.0 : scaledLabelHeight + 20;
-    final scrollTabs = textScaler.scale(1) > 1.3;
-
     return DefaultTabController(
       length: _labels.length,
       initialIndex: _resolveInitialIndex(initialTab),
-      child: Column(
+      child: const Column(
         children: [
-          // Segmented pill control — mirrors TrainerCoachView's sub-tab
-          // language (week tabs, bottom-bar pill).
-          Container(
-            margin: const EdgeInsets.fromLTRB(20, 10, 20, 0),
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: palette.bgCard,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: palette.textMuted.withValues(alpha: 0.12),
-              ),
-            ),
-            child: TabBar(
-              isScrollable: scrollTabs,
-              tabAlignment: scrollTabs ? TabAlignment.start : TabAlignment.fill,
-              dividerColor: Colors.transparent,
-              indicatorSize: TabBarIndicatorSize.tab,
-              indicator: BoxDecoration(
-                color: palette.accent,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              splashBorderRadius: BorderRadius.circular(20),
-              labelColor: palette.bg,
-              unselectedLabelColor: palette.textMuted,
-              labelStyle: labelStyle,
-              tabs: [
-                for (final label in _labels)
-                  Tab(
-                    height: tabHeight,
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      softWrap: false,
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-              ],
-            ),
+          // El alto y el modo scroll ahora los resuelve el componente — la
+          // lógica de textScaler que vivía acá se universalizó al kit (#646).
+          Padding(
+            padding: EdgeInsets.fromLTRB(20, 10, 20, 0),
+            child: TreinoSegmentedPill(labels: _labels),
           ),
-          const SizedBox(height: 8),
-          const Expanded(
+          SizedBox(height: 8),
+          Expanded(
             child: TabBarView(
               // Swipeable on purpose — same gesture language the tab had in
               // the rankings era.
