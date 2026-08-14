@@ -440,6 +440,7 @@ Viven en `lib/core/widgets/`:
 - `AppBackground` — Container con fondo `bg`.
 - `TreinoIcon` — wrapper semántico sobre Phosphor (regular + fill).
 - `TreinoBottomBar` — tab bar de 5 ítems.
+- `TreinoSegmentedPill` — control segmentado de sub-navegación (TU ENTRENO/PLANTILLAS, FEED/RANKINGS, ALUMNOS/AGENDA, PRESENCIAL/ONLINE). Lee el `DefaultTabController` ambiente; no lo posee. Casi nada es parametrizable a propósito: las 4 copias que reemplaza habían divergido en radio, alto, tipografía y overflow. Tokens en `TreinoSegmentedPillTokens`, que documenta por qué el contorno es más fuerte que el de las cards (WCAG 1.4.11, #646).
 - `TreinoStateSwitcher` — transición animada entre estados async (loading/error/data).
 - `TreinoFadeSlideIn` — entrada one-shot fade+slide para secciones eager.
 - `TreinoTappable` — feedback de presión para CTAs, cards y tiles propios.
