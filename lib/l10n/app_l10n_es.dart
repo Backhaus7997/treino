@@ -2863,7 +2863,10 @@ class AppL10nEs extends AppL10n {
 
   @override
   String dashboardAlertBannerSummary(
-      int vencidos, int solicitudes, int inactivos) {
+    int vencidos,
+    int solicitudes,
+    int inactivos,
+  ) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,
@@ -3461,6 +3464,141 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get followListOpenFollowingA11y => 'Ver seguidos';
+
+  @override
+  String get onboardingCardDismiss => 'ENTENDIDO';
+
+  @override
+  String get onboardingCardAthleteHomeTitle => 'TU RESUMEN DEL DÍA';
+
+  @override
+  String get onboardingCardAthleteHomeBody =>
+      'Acá ves qué te toca entrenar hoy, cómo venís esta semana y tu racha. Si dejaste una sesión a medias, te la ofrece para retomar.';
+
+  @override
+  String get onboardingCardAthleteWorkoutTitle => 'ACÁ ARRANCA TU ENTRENO';
+
+  @override
+  String get onboardingCardAthleteWorkoutBody =>
+      'Tenés tres formas de conseguir una rutina:';
+
+  @override
+  String get onboardingCardAthleteWorkoutBullet1 =>
+      'El plan de tu entrenador, ya armado y asignado a vos';
+
+  @override
+  String get onboardingCardAthleteWorkoutBullet2 =>
+      'Una plantilla de TREINO, lista para usar';
+
+  @override
+  String get onboardingCardAthleteWorkoutBullet3 =>
+      'Tu propia rutina, armada ejercicio por ejercicio';
+
+  @override
+  String get onboardingCardAthleteFeedTitle => 'LA PARTE SOCIAL';
+
+  @override
+  String get onboardingCardAthleteFeedBody =>
+      'Publicá tus entrenamientos y seguí a tus amigos. Al lado tenés Rankings:';
+
+  @override
+  String get onboardingCardAthleteFeedBullet1 =>
+      'Te compara con la gente de tu gym';
+
+  @override
+  String get onboardingCardAthleteFeedBullet2 =>
+      'Es opcional: si no lo activás, ni aparecés ni ves a nadie';
+
+  @override
+  String get onboardingCardAthleteCoachTitle => 'TU ENTRENADOR';
+
+  @override
+  String get onboardingCardAthleteCoachBody =>
+      'Buscá y contratá un entrenador cerca tuyo. Vos controlás qué ve de vos:';
+
+  @override
+  String get onboardingCardAthleteCoachBullet1 =>
+      'Tus entrenamientos los ve apenas aceptás el vínculo';
+
+  @override
+  String get onboardingCardAthleteCoachBullet2 =>
+      'Tus datos personales y medidas, solo si los activás en Perfil › Privacidad';
+
+  @override
+  String get onboardingCardAthleteProfileTitle => 'TU CUENTA';
+
+  @override
+  String get onboardingCardAthleteProfileBody =>
+      'Tus datos, tus medidas y tu privacidad. Acá decidís qué comparte tu perfil público y qué ve tu entrenador.';
+
+  @override
+  String get onboardingCardTrainerHomeTitle => 'TU DÍA';
+
+  @override
+  String get onboardingCardTrainerHomeBody =>
+      'Tus próximas sesiones, quién entrenó hoy, la actividad reciente de tus alumnos y lo que tenés por cobrar.';
+
+  @override
+  String get onboardingCardTrainerWorkoutTitle => 'TUS PLANTILLAS';
+
+  @override
+  String get onboardingCardTrainerWorkoutBody =>
+      'Tu biblioteca de plantillas propias y el atajo para asignarle un plan a un alumno. El editor completo está en Coach Hub, desde la compu.';
+
+  @override
+  String get onboardingCardTrainerFeedTitle => 'LA COMUNIDAD';
+
+  @override
+  String get onboardingCardTrainerFeedBody =>
+      'El feed social de TREINO. Podés seguir lo que publican tus alumnos y publicar vos también.';
+
+  @override
+  String get onboardingCardTrainerCoachTitle => 'ALUMNOS Y AGENDA';
+
+  @override
+  String get onboardingCardTrainerCoachBody =>
+      'Acá trabajás con tus alumnos. Lo primero que conviene saber:';
+
+  @override
+  String get onboardingCardTrainerCoachBullet1 =>
+      'El alumno te manda la solicitud a vos desde su app, no al revés';
+
+  @override
+  String get onboardingCardTrainerCoachBullet2 =>
+      'Abrí un alumno para ver su plan, sus series, su progreso y el chat';
+
+  @override
+  String get onboardingCardTrainerCoachBullet3 =>
+      'En AGENDA creás turnos sueltos o series que se repiten';
+
+  @override
+  String get onboardingCardTrainerProfileTitle => 'TU PERFIL PROFESIONAL';
+
+  @override
+  String get onboardingCardTrainerProfileBody =>
+      'Así te ven los alumnos que te buscan. Desde acá también:';
+
+  @override
+  String get onboardingCardTrainerProfileBullet1 =>
+      'Aceptás las solicitudes entrantes de alumnos nuevos';
+
+  @override
+  String get onboardingCardTrainerProfileBullet2 =>
+      'Configurás tu disponibilidad horaria';
+
+  @override
+  String get onboardingTourSkip => 'SALTAR';
+
+  @override
+  String get onboardingTourNext => 'SIGUIENTE';
+
+  @override
+  String get onboardingTourFinish => 'COMENZAR';
+
+  @override
+  String onboardingTourProgress(int current, int total) {
+    return 'Paso $current de $total';
+  }
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -6320,7 +6458,10 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String dashboardAlertBannerSummary(
-      int vencidos, int solicitudes, int inactivos) {
+    int vencidos,
+    int solicitudes,
+    int inactivos,
+  ) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,
@@ -6917,4 +7058,139 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get followListOpenFollowingA11y => 'Ver seguidos';
+
+  @override
+  String get onboardingCardDismiss => 'ENTENDIDO';
+
+  @override
+  String get onboardingCardAthleteHomeTitle => 'TU RESUMEN DEL DÍA';
+
+  @override
+  String get onboardingCardAthleteHomeBody =>
+      'Acá ves qué te toca entrenar hoy, cómo venís esta semana y tu racha. Si dejaste una sesión a medias, te la ofrece para retomar.';
+
+  @override
+  String get onboardingCardAthleteWorkoutTitle => 'ACÁ ARRANCA TU ENTRENO';
+
+  @override
+  String get onboardingCardAthleteWorkoutBody =>
+      'Tenés tres formas de conseguir una rutina:';
+
+  @override
+  String get onboardingCardAthleteWorkoutBullet1 =>
+      'El plan de tu entrenador, ya armado y asignado a vos';
+
+  @override
+  String get onboardingCardAthleteWorkoutBullet2 =>
+      'Una plantilla de TREINO, lista para usar';
+
+  @override
+  String get onboardingCardAthleteWorkoutBullet3 =>
+      'Tu propia rutina, armada ejercicio por ejercicio';
+
+  @override
+  String get onboardingCardAthleteFeedTitle => 'LA PARTE SOCIAL';
+
+  @override
+  String get onboardingCardAthleteFeedBody =>
+      'Publicá tus entrenamientos y seguí a tus amigos. Al lado tenés Rankings:';
+
+  @override
+  String get onboardingCardAthleteFeedBullet1 =>
+      'Te compara con la gente de tu gym';
+
+  @override
+  String get onboardingCardAthleteFeedBullet2 =>
+      'Es opcional: si no lo activás, ni aparecés ni ves a nadie';
+
+  @override
+  String get onboardingCardAthleteCoachTitle => 'TU ENTRENADOR';
+
+  @override
+  String get onboardingCardAthleteCoachBody =>
+      'Buscá y contratá un entrenador cerca tuyo. Vos controlás qué ve de vos:';
+
+  @override
+  String get onboardingCardAthleteCoachBullet1 =>
+      'Tus entrenamientos los ve apenas aceptás el vínculo';
+
+  @override
+  String get onboardingCardAthleteCoachBullet2 =>
+      'Tus datos personales y medidas, solo si los activás en Perfil › Privacidad';
+
+  @override
+  String get onboardingCardAthleteProfileTitle => 'TU CUENTA';
+
+  @override
+  String get onboardingCardAthleteProfileBody =>
+      'Tus datos, tus medidas y tu privacidad. Acá decidís qué comparte tu perfil público y qué ve tu entrenador.';
+
+  @override
+  String get onboardingCardTrainerHomeTitle => 'TU DÍA';
+
+  @override
+  String get onboardingCardTrainerHomeBody =>
+      'Tus próximas sesiones, quién entrenó hoy, la actividad reciente de tus alumnos y lo que tenés por cobrar.';
+
+  @override
+  String get onboardingCardTrainerWorkoutTitle => 'TUS PLANTILLAS';
+
+  @override
+  String get onboardingCardTrainerWorkoutBody =>
+      'Tu biblioteca de plantillas propias y el atajo para asignarle un plan a un alumno. El editor completo está en Coach Hub, desde la compu.';
+
+  @override
+  String get onboardingCardTrainerFeedTitle => 'LA COMUNIDAD';
+
+  @override
+  String get onboardingCardTrainerFeedBody =>
+      'El feed social de TREINO. Podés seguir lo que publican tus alumnos y publicar vos también.';
+
+  @override
+  String get onboardingCardTrainerCoachTitle => 'ALUMNOS Y AGENDA';
+
+  @override
+  String get onboardingCardTrainerCoachBody =>
+      'Acá trabajás con tus alumnos. Lo primero que conviene saber:';
+
+  @override
+  String get onboardingCardTrainerCoachBullet1 =>
+      'El alumno te manda la solicitud a vos desde su app, no al revés';
+
+  @override
+  String get onboardingCardTrainerCoachBullet2 =>
+      'Abrí un alumno para ver su plan, sus series, su progreso y el chat';
+
+  @override
+  String get onboardingCardTrainerCoachBullet3 =>
+      'En AGENDA creás turnos sueltos o series que se repiten';
+
+  @override
+  String get onboardingCardTrainerProfileTitle => 'TU PERFIL PROFESIONAL';
+
+  @override
+  String get onboardingCardTrainerProfileBody =>
+      'Así te ven los alumnos que te buscan. Desde acá también:';
+
+  @override
+  String get onboardingCardTrainerProfileBullet1 =>
+      'Aceptás las solicitudes entrantes de alumnos nuevos';
+
+  @override
+  String get onboardingCardTrainerProfileBullet2 =>
+      'Configurás tu disponibilidad horaria';
+
+  @override
+  String get onboardingTourSkip => 'SALTAR';
+
+  @override
+  String get onboardingTourNext => 'SIGUIENTE';
+
+  @override
+  String get onboardingTourFinish => 'COMENZAR';
+
+  @override
+  String onboardingTourProgress(int current, int total) {
+    return 'Paso $current de $total';
+  }
 }

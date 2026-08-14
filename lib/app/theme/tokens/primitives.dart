@@ -214,6 +214,19 @@ abstract final class AppDecorativePalettes {
     Color(0xFF14B8A6), // teal
     Color(0xFFF97316), // naranja
   ];
+
+  /// Sombra proyectada del marco de teléfono del onboarding
+  /// (`OnboardingDevicePreview`).
+  ///
+  /// Decorativa y **deliberadamente invariante al tema**, igual que el bezel
+  /// blanco que la proyecta: ese marco representa el chasis físico de un
+  /// teléfono, no UI de la app, así que no sigue a la paleta. Por eso no es
+  /// `AppPalette.shadow` ni un primitivo semántico.
+  ///
+  /// El valor coincide con [AppColorPrimitives.ink900] por casualidad
+  /// cromática, no por parentesco: si el ink de marca cambia, esta sombra no
+  /// tiene por qué seguirlo.
+  static const Color deviceFrameShadow = Color(0xFF0F1513);
 }
 
 /// Capa 1 — Tokens de spacing del sistema de diseño TREINO.

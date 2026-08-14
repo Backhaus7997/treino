@@ -3,21 +3,37 @@
   "notFoundBody": "La ruta que buscás no existe o el enlace es inválido.",
   "notFoundCta": "Volver al inicio",
   "homeAthleteFirstRunTitle": "Arrancá tu entrenamiento",
-  "@homeAthleteFirstRunTitle": {"description": "Home first-run empty-state title for an athlete with no routine (usability finding 6)."},
+  "@homeAthleteFirstRunTitle": {
+    "description": "Home first-run empty-state title for an athlete with no routine (usability finding 6)."
+  },
   "homeAthleteFirstRunBody": "Creá tu primera rutina o buscá un entrenador para empezar.",
-  "@homeAthleteFirstRunBody": {"description": "Home first-run empty-state body offering both the create-routine and find-trainer paths (finding 6)."},
+  "@homeAthleteFirstRunBody": {
+    "description": "Home first-run empty-state body offering both the create-routine and find-trainer paths (finding 6)."
+  },
   "homeAthleteFirstRunCreateCta": "CREAR RUTINA",
-  "@homeAthleteFirstRunCreateCta": {"description": "Home first-run primary CTA to create a routine (finding 6)."},
+  "@homeAthleteFirstRunCreateCta": {
+    "description": "Home first-run primary CTA to create a routine (finding 6)."
+  },
   "homeAthleteFirstRunFindTrainerCta": "Buscar entrenador",
-  "@homeAthleteFirstRunFindTrainerCta": {"description": "Home first-run secondary CTA to browse trainers (finding 6)."},
+  "@homeAthleteFirstRunFindTrainerCta": {
+    "description": "Home first-run secondary CTA to browse trainers (finding 6)."
+  },
   "homeEstaSemanaTitle": "ESTA SEMANA",
-  "@homeEstaSemanaTitle": {"description": "Home 'Esta Semana' card section title (skeleton, error and loaded states)."},
+  "@homeEstaSemanaTitle": {
+    "description": "Home 'Esta Semana' card section title (skeleton, error and loaded states)."
+  },
   "homeEstaSemanaLoadError": "No pudimos cargar tus insights.",
-  "@homeEstaSemanaLoadError": {"description": "Home 'Esta Semana' card error message shown when weekly insights fail to load."},
+  "@homeEstaSemanaLoadError": {
+    "description": "Home 'Esta Semana' card error message shown when weekly insights fail to load."
+  },
   "homeEstaSemanaHeaderPill": "RACHA ACTUAL",
-  "@homeEstaSemanaHeaderPill": {"description": "Home 'Esta Semana' card header pill label when the athlete has an active streak."},
+  "@homeEstaSemanaHeaderPill": {
+    "description": "Home 'Esta Semana' card header pill label when the athlete has an active streak."
+  },
   "homeEstaSemanaHeaderPillEmpty": "PRIMER PASO",
-  "@homeEstaSemanaHeaderPillEmpty": {"description": "Home 'Esta Semana' card header pill label in the empty state (no sessions yet)."},
+  "@homeEstaSemanaHeaderPillEmpty": {
+    "description": "Home 'Esta Semana' card header pill label in the empty state (no sessions yet)."
+  },
   "homeEstaSemanaWeekMonth": "SEM {week} · {month}",
   "@homeEstaSemanaWeekMonth": {
     "placeholders": {
@@ -38,13 +54,21 @@
     }
   },
   "homeEstaSemanaStreakSubtextTrained": "No rompas la racha — entrenaste hoy.",
-  "@homeEstaSemanaStreakSubtextTrained": {"description": "Home 'Esta Semana' card streak subtext shown when the athlete already trained today."},
+  "@homeEstaSemanaStreakSubtextTrained": {
+    "description": "Home 'Esta Semana' card streak subtext shown when the athlete already trained today."
+  },
   "homeEstaSemanaStreakSubtextPending": "No rompas la racha — entrená hoy.",
-  "@homeEstaSemanaStreakSubtextPending": {"description": "Home 'Esta Semana' card streak subtext shown when the athlete hasn't trained today yet."},
+  "@homeEstaSemanaStreakSubtextPending": {
+    "description": "Home 'Esta Semana' card streak subtext shown when the athlete hasn't trained today yet."
+  },
   "homeEstaSemanaPeriodWeek": "SEMANA",
-  "@homeEstaSemanaPeriodWeek": {"description": "Home 'Esta Semana' card period card label for the current week count."},
+  "@homeEstaSemanaPeriodWeek": {
+    "description": "Home 'Esta Semana' card period card label for the current week count."
+  },
   "homeEstaSemanaPeriodMonth": "MES",
-  "@homeEstaSemanaPeriodMonth": {"description": "Home 'Esta Semana' card period card label for the current month count."},
+  "@homeEstaSemanaPeriodMonth": {
+    "description": "Home 'Esta Semana' card period card label for the current month count."
+  },
   "homeEstaSemanaPeriodUnit": "{count, plural, =1{entreno} other{entrenos}}",
   "@homeEstaSemanaPeriodUnit": {
     "placeholders": {
@@ -54,21 +78,37 @@
     }
   },
   "homeEstaSemanaEmptyTitle": "TU RACHA\nEMPIEZA ACÁ",
-  "@homeEstaSemanaEmptyTitle": {"description": "Home 'Esta Semana' card empty-state title for an athlete with zero sessions."},
+  "@homeEstaSemanaEmptyTitle": {
+    "description": "Home 'Esta Semana' card empty-state title for an athlete with zero sessions."
+  },
   "homeEstaSemanaEmptyBody": "Cada entrenamiento alimenta tu racha. Hacé el primero y empezá a construir tu progreso.",
-  "@homeEstaSemanaEmptyBody": {"description": "Home 'Esta Semana' card empty-state body copy encouraging the first workout."},
+  "@homeEstaSemanaEmptyBody": {
+    "description": "Home 'Esta Semana' card empty-state body copy encouraging the first workout."
+  },
   "homeEstaSemanaEmptyCta": "EXPLORAR RUTINAS  →",
-  "@homeEstaSemanaEmptyCta": {"description": "Home 'Esta Semana' card empty-state CTA button navigating to routines."},
+  "@homeEstaSemanaEmptyCta": {
+    "description": "Home 'Esta Semana' card empty-state CTA button navigating to routines."
+  },
   "homeEstaSemanaInsightsCta": "VER INSIGHTS  →",
-  "@homeEstaSemanaInsightsCta": {"description": "Home 'Esta Semana' card CTA button navigating to the insights hub (/home/insights). The whole card was already tappable but carried no visible affordance, so the destination was undiscoverable."},
+  "@homeEstaSemanaInsightsCta": {
+    "description": "Home 'Esta Semana' card CTA button navigating to the insights hub (/home/insights). The whole card was already tappable but carried no visible affordance, so the destination was undiscoverable."
+  },
   "homeEstaSemanaHeaderPillResume": "A RETOMAR",
-  "@homeEstaSemanaHeaderPillResume": {"description": "Home 'Esta Semana' card header pill label when the athlete has history but zero sessions this week (#551)."},
+  "@homeEstaSemanaHeaderPillResume": {
+    "description": "Home 'Esta Semana' card header pill label when the athlete has history but zero sessions this week (#551)."
+  },
   "homeEstaSemanaResumeTitle": "TU RACHA\nTE ESPERA",
-  "@homeEstaSemanaResumeTitle": {"description": "Home 'Esta Semana' card resume-state title for an athlete with past sessions but none this week."},
+  "@homeEstaSemanaResumeTitle": {
+    "description": "Home 'Esta Semana' card resume-state title for an athlete with past sessions but none this week."
+  },
   "homeEstaSemanaResumeBody": "Ya tenés historial construido. Esta semana todavía está en cero — retomá hoy y seguí sumando progreso.",
-  "@homeEstaSemanaResumeBody": {"description": "Home 'Esta Semana' card resume-state body copy encouraging a returning athlete to train again."},
+  "@homeEstaSemanaResumeBody": {
+    "description": "Home 'Esta Semana' card resume-state body copy encouraging a returning athlete to train again."
+  },
   "homeEstaSemanaResumeCta": "VOLVER A ENTRENAR  →",
-  "@homeEstaSemanaResumeCta": {"description": "Home 'Esta Semana' card resume-state CTA button navigating to routines."},
+  "@homeEstaSemanaResumeCta": {
+    "description": "Home 'Esta Semana' card resume-state CTA button navigating to routines."
+  },
   "@@locale": "es_AR",
   "authSplashTagline": "ENTRENÁ. COMPARTÍ. CRECÉ.",
   "authWelcomeEyebrow": "ENTRENAMIENTO · GYM · COACH",
@@ -424,7 +464,9 @@
   "@templateRatingsCount": {
     "description": "How many people rated the template, next to the average score.",
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "templateRatingsMineEmpty": "¿Qué te pareció?",
@@ -2187,7 +2229,9 @@
   "@dashboardGreeting": {
     "description": "Welcome greeting shown in the Coach Hub web dashboard WelcomeCard. {name} is the trainer's first name in uppercase.",
     "placeholders": {
-      "name": { "type": "String" }
+      "name": {
+        "type": "String"
+      }
     }
   },
   "dashboardGreetingPrefix": "BUENAS, ",
@@ -2198,9 +2242,15 @@
   "@dashboardSummaryLine": {
     "description": "Dashboard WelcomeCard summary line combining sessions today, pending requests, and overdue payments.",
     "placeholders": {
-      "sessions": { "type": "int" },
-      "paraRevisar": { "type": "int" },
-      "pagos": { "type": "int" }
+      "sessions": {
+        "type": "int"
+      },
+      "paraRevisar": {
+        "type": "int"
+      },
+      "pagos": {
+        "type": "int"
+      }
     }
   },
   "dashboardQuickActionNuevoAlumno": "Nuevo alumno",
@@ -2215,7 +2265,9 @@
   "@dashboardQuickActionMensajes": {
     "description": "Quick action button label in the Coach Hub web dashboard WelcomeCard showing unread message count.",
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "dashboardQuickActionImportarPlan": "Importar plan",
@@ -2242,7 +2294,9 @@
   "@dashboardKpiPorCobrar": {
     "description": "KPI tile label for overdue payments including count in the Coach Hub web dashboard.",
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "dashboardPlaceholderSoon": "Próximamente",
@@ -2289,16 +2343,24 @@
   "@dashboardAlertBannerSummary": {
     "description": "Alert banner composed summary line showing vencidos, pending requests, and inactive athletes counts.",
     "placeholders": {
-      "vencidos": { "type": "int" },
-      "solicitudes": { "type": "int" },
-      "inactivos": { "type": "int" }
+      "vencidos": {
+        "type": "int"
+      },
+      "solicitudes": {
+        "type": "int"
+      },
+      "inactivos": {
+        "type": "int"
+      }
     }
   },
   "dashboardAdherenceValue": "{pct}%",
   "@dashboardAdherenceValue": {
     "description": "Formatted adherencia percentage value shown in the adherencia ring and KPI tile once the aggregate provider has data.",
     "placeholders": {
-      "pct": { "type": "int" }
+      "pct": {
+        "type": "int"
+      }
     }
   },
   "insightsMonthlyReportTile": "Reporte mensual",
@@ -2876,67 +2938,241 @@
     }
   },
   "notificationHistoryTitle": "NOTIFICACIONES",
-  "@notificationHistoryTitle": {"description": "Título de la pantalla de historial de notificaciones."},
+  "@notificationHistoryTitle": {
+    "description": "Título de la pantalla de historial de notificaciones."
+  },
   "notificationHistoryEmpty": "Todavía no tenés notificaciones",
-  "@notificationHistoryEmpty": {"description": "Estado vacío del historial de notificaciones."},
+  "@notificationHistoryEmpty": {
+    "description": "Estado vacío del historial de notificaciones."
+  },
   "notificationHistoryError": "No pudimos cargar tus notificaciones.",
-  "@notificationHistoryError": {"description": "Estado de error del historial de notificaciones."},
+  "@notificationHistoryError": {
+    "description": "Estado de error del historial de notificaciones."
+  },
   "notificationPendingRequests": "{count, plural, =1{1 solicitud de seguidor pendiente} other{{count} solicitudes de seguidor pendientes}}",
-  "@notificationPendingRequests": {"description": "Acceso compacto a solicitudes de amistad pendientes.", "placeholders": {"count": {"type": "int"}}},
+  "@notificationPendingRequests": {
+    "description": "Acceso compacto a solicitudes de amistad pendientes.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "notificationBellA11y": "Abrir notificaciones",
-  "@notificationBellA11y": {"description": "Etiqueta accesible de la campanita de notificaciones del feed."},
+  "@notificationBellA11y": {
+    "description": "Etiqueta accesible de la campanita de notificaciones del feed."
+  },
   "notificationBellWithCountA11y": "Abrir notificaciones, {count} pendientes",
-  "@notificationBellWithCountA11y": {"description": "Etiqueta accesible de la campanita con su badge combinado.", "placeholders": {"count": {"type": "int"}}},
+  "@notificationBellWithCountA11y": {
+    "description": "Etiqueta accesible de la campanita con su badge combinado.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "postDetailTitle": "PUBLICACIÓN",
-  "@postDetailTitle": {"description": "Título de la pantalla de post individual del feed."},
+  "@postDetailTitle": {
+    "description": "Título de la pantalla de post individual del feed."
+  },
   "postDetailUnavailable": "Este post ya no está disponible.",
-  "@postDetailUnavailable": {"description": "Estado seguro mostrado cuando el post no existe, fue borrado o no se puede leer."},
+  "@postDetailUnavailable": {
+    "description": "Estado seguro mostrado cuando el post no existe, fue borrado o no se puede leer."
+  },
   "feedUnfollowConfirmTitle": "¿Dejar de seguir a {name}?",
-  "@feedUnfollowConfirmTitle": {"description": "Título del sheet de confirmación para dejar de seguir.", "placeholders": {"name": {"type": "String"}}},
+  "@feedUnfollowConfirmTitle": {
+    "description": "Título del sheet de confirmación para dejar de seguir.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "feedUnfollowConfirmAction": "DEJAR DE SEGUIR",
-  "@feedUnfollowConfirmAction": {"description": "Botón que confirma dejar de seguir."},
+  "@feedUnfollowConfirmAction": {
+    "description": "Botón que confirma dejar de seguir."
+  },
   "feedUnfollowDismiss": "CANCELAR",
-  "@feedUnfollowDismiss": {"description": "Botón que descarta el sheet de dejar de seguir."},
+  "@feedUnfollowDismiss": {
+    "description": "Botón que descarta el sheet de dejar de seguir."
+  },
   "feedCancelRequestConfirmTitle": "¿Cancelar la solicitud a {name}?",
-  "@feedCancelRequestConfirmTitle": {"description": "Título del sheet para cancelar una solicitud enviada.", "placeholders": {"name": {"type": "String"}}},
+  "@feedCancelRequestConfirmTitle": {
+    "description": "Título del sheet para cancelar una solicitud enviada.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "feedCancelRequestConfirmAction": "CANCELAR SOLICITUD",
-  "@feedCancelRequestConfirmAction": {"description": "Botón que confirma cancelar la solicitud enviada."},
+  "@feedCancelRequestConfirmAction": {
+    "description": "Botón que confirma cancelar la solicitud enviada."
+  },
   "feedCancelRequestDismiss": "VOLVER",
-  "@feedCancelRequestDismiss": {"description": "Botón que descarta el sheet de cancelar solicitud. Dice VOLVER y no CANCELAR para no chocar con el botón que SÍ cancela la solicitud."},
+  "@feedCancelRequestDismiss": {
+    "description": "Botón que descarta el sheet de cancelar solicitud. Dice VOLVER y no CANCELAR para no chocar con el botón que SÍ cancela la solicitud."
+  },
   "feedFollowButtonFollowA11y": "Seguir a esta persona",
-  "@feedFollowButtonFollowA11y": {"description": "Semantics del pill en estado SEGUIR."},
+  "@feedFollowButtonFollowA11y": {
+    "description": "Semantics del pill en estado SEGUIR."
+  },
   "feedFollowButtonFollowingA11y": "Siguiendo. Tocá para dejar de seguir",
-  "@feedFollowButtonFollowingA11y": {"description": "Semantics del pill en estado SIGUIENDO."},
+  "@feedFollowButtonFollowingA11y": {
+    "description": "Semantics del pill en estado SIGUIENDO."
+  },
   "feedFollowButtonRequestedA11y": "Solicitud enviada. Tocá para cancelarla",
-  "@feedFollowButtonRequestedA11y": {"description": "Semantics del pill en estado SOLICITUD ENVIADA."},
+  "@feedFollowButtonRequestedA11y": {
+    "description": "Semantics del pill en estado SOLICITUD ENVIADA."
+  },
   "feedFollowButtonAcceptA11y": "Aceptar la solicitud de seguidor",
-  "@feedFollowButtonAcceptA11y": {"description": "Semantics del pill en estado ACEPTAR."},
+  "@feedFollowButtonAcceptA11y": {
+    "description": "Semantics del pill en estado ACEPTAR."
+  },
   "feedFollowStartedSuccess": "Ahora seguís a esta persona.",
-  "@feedFollowStartedSuccess": {"description": "Confirmación al seguir a una cuenta pública (auto-aceptada)."},
+  "@feedFollowStartedSuccess": {
+    "description": "Confirmación al seguir a una cuenta pública (auto-aceptada)."
+  },
   "feedSegmentFollowing": "SEGUIDORES",
-  "@feedSegmentFollowing": {"description": "Pill del segmento del feed que muestra posts de a quienes seguís."},
+  "@feedSegmentFollowing": {
+    "description": "Pill del segmento del feed que muestra posts de a quienes seguís."
+  },
   "feedEmptyFollowing": "Todavía no hay posts de a quienes seguís",
-  "@feedEmptyFollowing": {"description": "Estado vacío del feed SEGUIDORES."},
+  "@feedEmptyFollowing": {
+    "description": "Estado vacío del feed SEGUIDORES."
+  },
   "chatBlockedComposerNotice": "Para escribirle, esta persona tiene que seguirte.",
-  "@chatBlockedComposerNotice": {"description": "Aviso persistente sobre el composer cuando el destinatario no sigue al usuario y por lo tanto el servidor deniega el envío (REQ-FOLLOW-021)."},
+  "@chatBlockedComposerNotice": {
+    "description": "Aviso persistente sobre el composer cuando el destinatario no sigue al usuario y por lo tanto el servidor deniega el envío (REQ-FOLLOW-021)."
+  },
   "chatBlockedComposerHintA11y": "No podés escribir en este chat",
-  "@chatBlockedComposerHintA11y": {"description": "Semantics del composer deshabilitado por falta de permiso."},
+  "@chatBlockedComposerHintA11y": {
+    "description": "Semantics del composer deshabilitado por falta de permiso."
+  },
   "followListTabFollowers": "SEGUIDORES",
-  "@followListTabFollowers": {"description": "Pill de la lista de seguidores en la pantalla de seguidores/seguidos."},
+  "@followListTabFollowers": {
+    "description": "Pill de la lista de seguidores en la pantalla de seguidores/seguidos."
+  },
   "followListTabFollowing": "SIGUIENDO",
-  "@followListTabFollowing": {"description": "Pill de la lista de seguidos en la pantalla de seguidores/seguidos."},
+  "@followListTabFollowing": {
+    "description": "Pill de la lista de seguidos en la pantalla de seguidores/seguidos."
+  },
   "followListEmptyFollowers": "Todavía no tiene seguidores",
-  "@followListEmptyFollowers": {"description": "Estado vacío de la lista de seguidores de otra persona."},
+  "@followListEmptyFollowers": {
+    "description": "Estado vacío de la lista de seguidores de otra persona."
+  },
   "followListEmptyFollowersSelf": "Todavía no tenés seguidores",
-  "@followListEmptyFollowersSelf": {"description": "Estado vacío de la lista de seguidores propia."},
+  "@followListEmptyFollowersSelf": {
+    "description": "Estado vacío de la lista de seguidores propia."
+  },
   "followListEmptyFollowing": "Todavía no sigue a nadie",
-  "@followListEmptyFollowing": {"description": "Estado vacío de la lista de seguidos de otra persona."},
+  "@followListEmptyFollowing": {
+    "description": "Estado vacío de la lista de seguidos de otra persona."
+  },
   "followListEmptyFollowingSelf": "Todavía no seguís a nadie",
-  "@followListEmptyFollowingSelf": {"description": "Estado vacío de la lista de seguidos propia."},
+  "@followListEmptyFollowingSelf": {
+    "description": "Estado vacío de la lista de seguidos propia."
+  },
   "followListLoadError": "No pudimos cargar la lista. Intentá de nuevo.",
-  "@followListLoadError": {"description": "Error al cargar la lista de seguidores o seguidos."},
+  "@followListLoadError": {
+    "description": "Error al cargar la lista de seguidores o seguidos."
+  },
   "followListOpenFollowersA11y": "Ver seguidores",
-  "@followListOpenFollowersA11y": {"description": "Semantics del contador de SEGUIDORES del perfil, que abre la lista."},
+  "@followListOpenFollowersA11y": {
+    "description": "Semantics del contador de SEGUIDORES del perfil, que abre la lista."
+  },
   "followListOpenFollowingA11y": "Ver seguidos",
-  "@followListOpenFollowingA11y": {"description": "Semantics del contador de SIGUIENDO del perfil, que abre la lista."}
+  "@followListOpenFollowingA11y": {
+    "description": "Semantics del contador de SIGUIENDO del perfil, que abre la lista."
+  },
+  "onboardingCardDismiss": "ENTENDIDO",
+  "@onboardingCardDismiss": {
+    "description": "Única salida de la card de onboarding de un módulo. Al tocarla se persiste el flag y la card no vuelve."
+  },
+  "onboardingCardAthleteHomeTitle": "TU RESUMEN DEL DÍA",
+  "@onboardingCardAthleteHomeTitle": {
+    "description": "Card de INICIO para el alumno."
+  },
+  "onboardingCardAthleteHomeBody": "Acá ves qué te toca entrenar hoy, cómo venís esta semana y tu racha. Si dejaste una sesión a medias, te la ofrece para retomar.",
+  "onboardingCardAthleteWorkoutTitle": "ACÁ ARRANCA TU ENTRENO",
+  "@onboardingCardAthleteWorkoutTitle": {
+    "description": "Card de ENTRENAR para el alumno. Los tres caminos a una rutina no están explicados en ningún lado de la app."
+  },
+  "onboardingCardAthleteWorkoutBody": "Tenés tres formas de conseguir una rutina:",
+  "onboardingCardAthleteWorkoutBullet1": "El plan de tu entrenador, ya armado y asignado a vos",
+  "onboardingCardAthleteWorkoutBullet2": "Una plantilla de TREINO, lista para usar",
+  "onboardingCardAthleteWorkoutBullet3": "Tu propia rutina, armada ejercicio por ejercicio",
+  "onboardingCardAthleteFeedTitle": "LA PARTE SOCIAL",
+  "@onboardingCardAthleteFeedTitle": {
+    "description": "Card de FEED para el alumno. RANKINGS es una tab rotulada al lado, no una página escondida."
+  },
+  "onboardingCardAthleteFeedBody": "Publicá tus entrenamientos y seguí a tus amigos. Al lado tenés Rankings:",
+  "onboardingCardAthleteFeedBullet1": "Te compara con la gente de tu gym",
+  "onboardingCardAthleteFeedBullet2": "Es opcional: si no lo activás, ni aparecés ni ves a nadie",
+  "onboardingCardAthleteCoachTitle": "TU ENTRENADOR",
+  "@onboardingCardAthleteCoachTitle": {
+    "description": "Card de COACH para el alumno. Distingue session_shares (automático) de profile_shares (opt-in manual)."
+  },
+  "onboardingCardAthleteCoachBody": "Buscá y contratá un entrenador cerca tuyo. Vos controlás qué ve de vos:",
+  "onboardingCardAthleteCoachBullet1": "Tus entrenamientos los ve apenas aceptás el vínculo",
+  "onboardingCardAthleteCoachBullet2": "Tus datos personales y medidas, solo si los activás en Perfil › Privacidad",
+  "onboardingCardAthleteProfileTitle": "TU CUENTA",
+  "@onboardingCardAthleteProfileTitle": {
+    "description": "Card de PERFIL para el alumno."
+  },
+  "onboardingCardAthleteProfileBody": "Tus datos, tus medidas y tu privacidad. Acá decidís qué comparte tu perfil público y qué ve tu entrenador.",
+  "onboardingCardTrainerHomeTitle": "TU DÍA",
+  "@onboardingCardTrainerHomeTitle": {
+    "description": "Card de INICIO para el entrenador."
+  },
+  "onboardingCardTrainerHomeBody": "Tus próximas sesiones, quién entrenó hoy, la actividad reciente de tus alumnos y lo que tenés por cobrar.",
+  "onboardingCardTrainerWorkoutTitle": "TUS PLANTILLAS",
+  "@onboardingCardTrainerWorkoutTitle": {
+    "description": "Card de ENTRENAR para el entrenador."
+  },
+  "onboardingCardTrainerWorkoutBody": "Tu biblioteca de plantillas propias y el atajo para asignarle un plan a un alumno. El editor completo está en Coach Hub, desde la compu.",
+  "onboardingCardTrainerFeedTitle": "LA COMUNIDAD",
+  "@onboardingCardTrainerFeedTitle": {
+    "description": "Card de FEED para el entrenador. Ojo: el trainer NO tiene la tab RANKINGS."
+  },
+  "onboardingCardTrainerFeedBody": "El feed social de TREINO. Podés seguir lo que publican tus alumnos y publicar vos también.",
+  "onboardingCardTrainerCoachTitle": "ALUMNOS Y AGENDA",
+  "@onboardingCardTrainerCoachTitle": {
+    "description": "Card de COACH para el entrenador. Corrige el modo de falla #1: el PF que espera con el roster vacío."
+  },
+  "onboardingCardTrainerCoachBody": "Acá trabajás con tus alumnos. Lo primero que conviene saber:",
+  "onboardingCardTrainerCoachBullet1": "El alumno te manda la solicitud a vos desde su app, no al revés",
+  "onboardingCardTrainerCoachBullet2": "Abrí un alumno para ver su plan, sus series, su progreso y el chat",
+  "onboardingCardTrainerCoachBullet3": "En AGENDA creás turnos sueltos o series que se repiten",
+  "onboardingCardTrainerProfileTitle": "TU PERFIL PROFESIONAL",
+  "@onboardingCardTrainerProfileTitle": {
+    "description": "Card de PERFIL para el entrenador."
+  },
+  "onboardingCardTrainerProfileBody": "Así te ven los alumnos que te buscan. Desde acá también:",
+  "onboardingCardTrainerProfileBullet1": "Aceptás las solicitudes entrantes de alumnos nuevos",
+  "onboardingCardTrainerProfileBullet2": "Configurás tu disponibilidad horaria",
+  "onboardingTourSkip": "SALTAR",
+  "@onboardingTourSkip": {
+    "description": "Saltea el tour de bienvenida. Visible desde la primera slide."
+  },
+  "onboardingTourNext": "SIGUIENTE",
+  "@onboardingTourNext": {
+    "description": "Avanza a la siguiente slide del tour."
+  },
+  "onboardingTourFinish": "COMENZAR",
+  "@onboardingTourFinish": {
+    "description": "CTA de la última slide; cierra el tour y deja usar la app."
+  },
+  "onboardingTourProgress": "Paso {current} de {total}",
+  "@onboardingTourProgress": {
+    "description": "Etiqueta de lector de pantalla del indicador de progreso. Las barras son decorativas.",
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  }
 }

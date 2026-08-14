@@ -36,6 +36,8 @@ import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 
+import '../helpers/onboarding_test_helpers.dart';
+
 class _MockUser extends Mock implements User {}
 
 class _StubAuthNotifier extends AuthNotifier {
@@ -50,6 +52,7 @@ class _StubAuthNotifier extends AuthNotifier {
 }
 
 UserProfile _trainerProfile() => UserProfile(
+      onboardingSeen: allSurfacesSeen(),
       uid: 'test-uid',
       email: 'trainer@example.com',
       displayName: 'Mateo',
@@ -59,6 +62,7 @@ UserProfile _trainerProfile() => UserProfile(
     );
 
 UserProfile _athleteProfile() => UserProfile(
+      onboardingSeen: allSurfacesSeen(),
       uid: 'test-uid',
       email: 'athlete@example.com',
       displayName: 'Tincho',

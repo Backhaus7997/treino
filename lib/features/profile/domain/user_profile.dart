@@ -108,6 +108,21 @@ class UserProfile with _$UserProfile {
     // pausados=0.5) que el CF mantiene para que UI/rules lean sin agregar.
     TrainerSubscription? subscription,
     double? weightedLoad,
+
+    // ── Welcome tour seen-flags (issue #627) ────────────────────────────
+    // Map of `OnboardingSurface.wireKey` → version of the tour that user
+    // has already seen on that surface. Absent/empty ⇒ nothing seen yet, so
+    // existing accounts need no backfill and no migration.
+    //
+    // ONE ENTRY PER SURFACE, not a single global flag: a trainer who saw the
+    // mobile tour must still get the Coach Hub web one. Versioned per entry so
+    // a future redesign can re-show a single surface without touching data.
+    //
+    // Owner-writeable and owner-read only — no Cloud Function, no rules change
+    // (`users/{uid}` has no key allowlist; see firestore.rules:65-80).
+    // Read via `OnboardingSurface.shouldShow`, written via
+    // `OnboardingSurface.markedIn` — never index this map with a raw string.
+    @Default(<String, int>{}) Map<String, int> onboardingSeen,
   }) = _UserProfile;
 
   factory UserProfile.fromJson(Map<String, Object?> json) =>

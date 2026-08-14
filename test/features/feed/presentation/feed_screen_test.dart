@@ -40,6 +40,8 @@ import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
 
+import '../../../helpers/onboarding_test_helpers.dart';
+
 class _MockUser extends Mock implements User {}
 
 User _fakeUser(String uid) {
@@ -119,6 +121,10 @@ UserProfile _makeProfile({String? gymId, UserRole role = UserRole.athlete}) =>
       createdAt: DateTime.utc(2026, 1, 1),
       updatedAt: DateTime.utc(2026, 1, 1),
       gymId: gymId,
+      // These tests are about the feed, not onboarding (#627). Without this the
+      // FEED card renders above the pill tabs and pushes content out of the
+      // test viewport.
+      onboardingSeen: allSurfacesSeen(),
     );
 
 Widget _wrapProvider(Widget w, List<Override> overrides) => ProviderScope(
