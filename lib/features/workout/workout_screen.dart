@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/theme/app_motion.dart';
 import '../../app/theme/app_palette.dart';
+import '../../core/analytics/sub_tab_analytics.dart';
 import '../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../profile/application/user_providers.dart';
 import '../profile/domain/user_role.dart';
@@ -59,6 +60,13 @@ class _AthleteWorkout extends StatelessWidget {
   final String? initialTab;
 
   static const _labels = <String>['TU ENTRENO', 'PLANTILLAS'];
+
+  /// Slugs de analytics — estables, en el orden del [TabBarView]. No son los
+  /// labels: esos cambian con el copy y con el idioma. Y "PLANTILLAS" además
+  /// está en discusión en #638, así que atarse al texto sería atarse a algo
+  /// que ya se sabe que va a cambiar.
+  static const _analyticsSurface = 'workout';
+  static const _analyticsTabs = <String>['tu-entreno', 'plantillas'];
 
   static int _resolveInitialIndex(String? tab) => tab == 'plantillas' ? 1 : 0;
 
@@ -122,11 +130,17 @@ class _AthleteWorkout extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
+          // TU ENTRENO y PLANTILLAS son las dos la ruta `/workout`: mismo
+          // punto ciego que Feed. Envuelve las PÁGINAS, no el pill.
           const Expanded(
-            child: TabBarView(
-              // Swipeable on purpose — same gesture language the tab had in
-              // the rankings era.
-              children: [_TuEntrenoPage(), PlantillasTab()],
+            child: SubTabAnalytics(
+              surface: _analyticsSurface,
+              tabs: _analyticsTabs,
+              child: TabBarView(
+                // Swipeable on purpose — same gesture language the tab had in
+                // the rankings era.
+                children: [_TuEntrenoPage(), PlantillasTab()],
+              ),
             ),
           ),
         ],
