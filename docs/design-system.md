@@ -76,7 +76,8 @@ Container(color: p.accent);
 
 ### AppSpacing
 
-Escala **cerrada**: `8 · 12 · 14 · 18 · 20` px. No existen `s4`, `s16` ni `s24`.
+Escala **cerrada** para separar elementos: `8 · 12 · 14 · 18 · 20` px. No existen
+`s4`, `s16` ni `s24`.
 
 | Token | Valor | Uso típico |
 |---|---|---|
@@ -85,6 +86,7 @@ Escala **cerrada**: `8 · 12 · 14 · 18 · 20` px. No existen `s4`, `s16` ni `s
 | `AppSpacing.s14` | `14.0` | Padding de secciones compactas |
 | `AppSpacing.s18` | `18.0` | Padding horizontal de pantallas |
 | `AppSpacing.s20` | `20.0` | Padding de hero cards, secciones amplias |
+| `AppSpacing.hairline` | `4.0` | **Excepción** — ver abajo |
 
 ```dart
 // ✅ BIEN
@@ -93,6 +95,35 @@ Padding(padding: EdgeInsets.symmetric(horizontal: AppSpacing.s18));
 // ❌ MAL — valores fuera de escala
 Padding(padding: EdgeInsets.all(16));
 ```
+
+#### La excepción: `hairline`
+
+La escala cerrada gobierna el espacio **entre elementos que compone el layout**.
+No sabe expresar dos casos sub-8 que igual existen, y para esos está `hairline`:
+
+1. **Separaciones ópticas** entre cosas que se leen como una sola unidad —
+   valor-a-label, ícono-a-texto, título-a-subtítulo.
+2. **Gutters internos de un componente del kit**, cuando dos capas del mismo
+   control se tocan. El caso vivo es `TreinoSegmentedPill`: los 4px entre el
+   contorno de la pista y el thumb.
+
+La distinción es **de dueño del espacio**. Si lo posee un componente y nadie de
+afuera puede razonar sobre él, es `hairline`. Si separa cosas que el layout
+acomoda, es la escala cerrada. En la duda, escala cerrada.
+
+```dart
+// ✅ BIEN — geometría interna del control
+Container(padding: EdgeInsets.all(AppSpacing.hairline), child: TabBar(...));
+
+// ❌ MAL — esto es layout, va a la escala
+Column(children: [a, SizedBox(height: AppSpacing.hairline), b]);
+```
+
+El caso 2 se agregó con #646. Antes la regla prohibía todo padding sub-8, así
+que el gutter no tenía token válido y las cinco copias del control segmentado lo
+resolvían con `EdgeInsets.all(4)` crudo — exactamente lo que `hairline` existe
+para evitar. **No agregues más excepciones sin ampliar esta sección**: un
+micro-token ad-hoc por componente es cómo se pierde una escala.
 
 ### AppRadius
 
