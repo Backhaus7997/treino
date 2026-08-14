@@ -68,6 +68,20 @@ abstract class AnalyticsService {
   /// cardinalidad del evento: un valor distinto por cada id, y ningún reporte
   /// agregable.
   Future<void> logScreenViewed({required String route});
+
+  /// Una página de sub-navegación quedó visible.
+  ///
+  /// El `screen_view` de rutas no alcanza para esto: FEED y
+  /// RANKINGS son las dos la ruta `/feed`, y TU ENTRENO y PLANTILLAS las dos
+  /// `/workout`. Son páginas de un `TabBarView`, no rutas — para el router
+  /// serían la misma pantalla.
+  ///
+  /// [surface] es el contenedor (`feed`, `workout`, `feed_segments`) y [tab]
+  /// la página dentro de él (`rankings`, `plantillas`, `gym`...).
+  Future<void> logSubTabViewed({
+    required String surface,
+    required String tab,
+  });
 }
 
 /// Implementación real basada en Firebase Analytics.
@@ -171,6 +185,19 @@ class FirebaseAnalyticsService implements AnalyticsService {
   @override
   Future<void> logScreenViewed({required String route}) =>
       _analytics.logScreenView(screenName: route);
+
+  @override
+  Future<void> logSubTabViewed({
+    required String surface,
+    required String tab,
+  }) =>
+      _analytics.logEvent(
+        name: 'sub_tab_viewed',
+        parameters: {
+          'surface': surface,
+          'tab': tab,
+        },
+      );
 }
 
 /// [AnalyticsService] que no hace nada.
@@ -224,6 +251,12 @@ class NoopAnalyticsService implements AnalyticsService {
 
   @override
   Future<void> logScreenViewed({required String route}) async {}
+
+  @override
+  Future<void> logSubTabViewed({
+    required String surface,
+    required String tab,
+  }) async {}
 }
 
 /// Instancia de Firebase Analytics.
