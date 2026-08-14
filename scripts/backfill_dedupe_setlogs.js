@@ -121,6 +121,14 @@ const admin = require('firebase-admin');
 const fs = require('fs');
 const path = require('path');
 
+// La DECISIÓN —qué se saltea, qué se borra, qué volumen queda— vive en un
+// módulo aparte y TESTEADO. Este script borra datos de producción: lo sutil
+// tiene que poder medirse sin Firestore y sin emulador, en milisegundos.
+// Ver `scripts/lib/dedupe_setlogs_plan.js` y su test.
+//
+// Acá queda lo único que no se puede evitar: leer, respaldar y escribir.
+const { paraRespaldo, planSesion } = require('./lib/dedupe_setlogs_plan');
+
 if (process.env.FIRESTORE_EMULATOR_HOST) {
   admin.initializeApp({ projectId: 'treino-dev' });
 } else {
@@ -147,32 +155,9 @@ const APPLY = process.argv.includes('--apply');
 const uidArgIndex = process.argv.indexOf('--uid');
 const ONLY_UID = uidArgIndex !== -1 ? process.argv[uidArgIndex + 1] : null;
 
-/** La identidad lógica de una serie. La misma clave que usan los dos clientes. */
-const claveLogica = (data) => `${data.exerciseId}__${data.setNumber}`;
-
-/** Σ reps × kilos — la MISMA fórmula que `SessionState.totalVolumeKg`,
- *  `_sumVolume` de Home y `WorkoutCoordinator.totalVolume` del reloj. */
-const volumen = (docs) =>
-  docs.reduce((sum, d) => sum + (d.reps ?? 0) * (d.weightKg ?? 0), 0);
-
-/** Si dos documentos de la misma serie dicen cosas distintas.
- *  Compara SOLO lo que cargó el atleta. `completedAt` difiere por definición
- *  (son dos escrituras) y `exerciseName` es un string de display. */
-const enConflicto = (a, b) => (a.reps ?? 0) !== (b.reps ?? 0) ||
-  (a.weightKg ?? 0) !== (b.weightKg ?? 0) ||
-  (a.rpe ?? null) !== (b.rpe ?? null);
-
-/** Serializa un doc para el respaldo con los Timestamp marcados, para que el
- *  restore pueda rehidratarlos. */
-const paraRespaldo = (data) => {
-  const out = {};
-  for (const [k, val] of Object.entries(data)) {
-    out[k] = val instanceof admin.firestore.Timestamp
-      ? { __timestamp__: val.toDate().toISOString() }
-      : val;
-  }
-  return out;
-};
+/** Cómo reconocer un Timestamp de Firestore. Se le pasa a `paraRespaldo` para
+ *  que el módulo de la decisión no tenga que arrastrar `firebase-admin`. */
+const aFecha = (v) => (v instanceof admin.firestore.Timestamp ? v.toDate() : null);
 
 const RESPALDO = path.join(__dirname, `dedupe-setlogs-backup-${Date.now()}.json`);
 let respaldoAbierto = false;
@@ -210,112 +195,51 @@ function volcarRespaldo(entrada) {
       const logsSnap = await sesion.ref.collection('setLogs').get();
       if (logsSnap.empty) continue;
 
-      // ── Salvaguarda 3: documentos malformados ────────────────────────────
-      const malformado = logsSnap.docs.find((d) => {
-        const x = d.data();
-        return typeof x.exerciseId !== 'string' || !x.exerciseId ||
-          typeof x.setNumber !== 'number';
-      });
-      if (malformado) {
+      // El snapshot se reduce a lo único que la decisión mira. `doc` viaja de
+      // vuelta adentro para poder borrar por referencia sin volver a buscar.
+      const plan = planSesion(
+        logsSnap.docs.map((d) => ({
+          id: d.id,
+          data: d.data(),
+          createTimeMs: d.createTime.toMillis(),
+          doc: d,
+        })),
+        sesion.data().totalVolumeKg ?? 0,
+      );
+
+      if (plan.tipo === 'vacia' || plan.tipo === 'sana') continue;
+
+      // Las salteadas son las que necesitan mirada humana: renumeración,
+      // conflictos de reps/kilos/RPE, o documentos malformados. Ver las
+      // salvaguardas en el módulo de la decisión.
+      if (plan.tipo === 'salteada') {
         salteadas.push({
-          sesion: sesion.id, motivo: 'documento sin exerciseId/setNumber',
-          detalle: malformado.id,
+          sesion: sesion.id, motivo: plan.motivo, detalle: plan.detalle,
         });
         continue;
       }
 
-      // ── Salvaguarda 1: evidencia de renumeración ─────────────────────────
-      // Un id determinístico `X__n` cuyo campo `setNumber` ya no es n, o una
-      // numeración que no es densa 1..N por ejercicio. Ver el bloque de arriba:
-      // acá es donde el agrupado por campos resucitaría una serie borrada.
-      const renumerados = [];
-      const porEjercicio = new Map();
-      for (const d of logsSnap.docs) {
-        const x = d.data();
-        const m = /^(.*)__(\d+)$/.exec(d.id);
-        if (m && Number(m[2]) !== x.setNumber) {
-          renumerados.push(`${d.id} tiene setNumber=${x.setNumber}`);
-        }
-        if (!porEjercicio.has(x.exerciseId)) porEjercicio.set(x.exerciseId, new Set());
-        porEjercicio.get(x.exerciseId).add(x.setNumber);
-      }
-      const noDenso = [];
-      for (const [ex, nums] of porEjercicio) {
-        const orden = [...nums].sort((a, b) => a - b);
-        const esperado = Array.from({ length: orden.length }, (_, i) => i + 1);
-        if (orden.join(',') !== esperado.join(',')) noDenso.push(`${ex}:[${orden}]`);
-      }
-      if (renumerados.length > 0 || noDenso.length > 0) {
-        salteadas.push({
-          sesion: sesion.id, motivo: 'evidencia de renumeración',
-          detalle: [...renumerados, ...noDenso].join(' | '),
+      const califica = sesion.data().status === 'finished' &&
+        sesion.data().wasFullyCompleted === true;
+
+      // Salvaguarda 4: desajuste SIN duplicados. Tiene otras causas y
+      // recalcularlo sería otra migración. Se reporta y se deja quieto.
+      if (plan.tipo === 'desajuste-sin-duplicados') {
+        desajustesSinDuplicados.push({
+          sesion: sesion.id, guardado: plan.volumenGuardado,
+          real: plan.volumenReal, califica,
         });
-        continue;
-      }
-
-      // ── Agrupar por identidad lógica ─────────────────────────────────────
-      const porClave = new Map();
-      for (const d of logsSnap.docs) {
-        const k = claveLogica(d.data());
-        if (!porClave.has(k)) porClave.set(k, []);
-        porClave.get(k).push(d);
-      }
-      for (const grupo of porClave.values()) {
-        grupo.sort((a, b) => a.createTime.toMillis() - b.createTime.toMillis());
-      }
-
-      // ── Salvaguarda 2: conflictos ────────────────────────────────────────
-      let conflicto = null;
-      for (const [k, grupo] of porClave) {
-        if (grupo.length < 2) continue;
-        const base = grupo[0].data();
-        for (const otro of grupo.slice(1)) {
-          if (enConflicto(base, otro.data())) {
-            conflicto = `${k}: ` + grupo
-              .map((g) => `${g.id}(${g.data().reps}×${g.data().weightKg}kg` +
-                `${g.data().rpe != null ? ` rpe${g.data().rpe}` : ''})`)
-              .join(' vs ');
-          }
-        }
-      }
-      if (conflicto) {
-        salteadas.push({
-          sesion: sesion.id, motivo: 'reps/kilos/RPE distintos', detalle: conflicto,
-        });
-        continue;
-      }
-
-      const sobrantes = [];
-      const sobrevivientes = [];
-      for (const grupo of porClave.values()) {
-        sobrevivientes.push(grupo[0].data());
-        sobrantes.push(...grupo.slice(1));
-      }
-
-      const volumenReal = volumen(sobrevivientes);
-      const volumenGuardado = sesion.data().totalVolumeKg ?? 0;
-      const volumenDifiere = Math.abs(volumenReal - volumenGuardado) > 0.001;
-
-      // ── Salvaguarda 4: sin duplicados no se toca el volumen ──────────────
-      if (sobrantes.length === 0) {
-        if (volumenDifiere) {
-          desajustesSinDuplicados.push({
-            sesion: sesion.id, guardado: volumenGuardado, real: volumenReal,
-            califica: sesion.data().status === 'finished' &&
-              sesion.data().wasFullyCompleted === true,
-          });
-        }
         continue;
       }
 
       sesionesTocadas++;
-      docsBorrados += sobrantes.length;
-      if (volumenDifiere) {
+      docsBorrados += plan.borrar.length;
+      if (plan.volumenDifiere) {
         cambiosVolumen.push({
-          sesion: sesion.id, guardado: volumenGuardado, real: volumenReal,
-          delta: volumenReal - volumenGuardado, duplicados: sobrantes.length,
-          califica: sesion.data().status === 'finished' &&
-            sesion.data().wasFullyCompleted === true,
+          sesion: sesion.id, guardado: plan.volumenGuardado,
+          real: plan.volumenReal,
+          delta: plan.volumenReal - plan.volumenGuardado,
+          duplicados: plan.borrar.length, califica,
         });
       }
 
@@ -325,10 +249,12 @@ function volcarRespaldo(entrada) {
       // de corrida deje rastro de todo lo que ya se eliminó.
       volcarRespaldo({
         sesionPath: sesion.ref.path,
-        totalVolumeKgAnterior: volumenGuardado,
-        totalVolumeKgNuevo: volumenDifiere ? volumenReal : volumenGuardado,
-        borrados: sobrantes.map((d) => ({
-          path: d.ref.path, data: paraRespaldo(d.data()),
+        totalVolumeKgAnterior: plan.volumenGuardado,
+        totalVolumeKgNuevo: plan.volumenDifiere
+          ? plan.volumenReal
+          : plan.volumenGuardado,
+        borrados: plan.borrar.map(({ doc }) => ({
+          path: doc.ref.path, data: paraRespaldo(doc.data(), aFecha),
         })),
       });
 
@@ -336,9 +262,9 @@ function volcarRespaldo(entrada) {
       // nada. Sin esto, morir en el medio dejaba la sesión sin duplicados y con
       // el volumen viejo — y la re-corrida ya no la reconocía como afectada.
       const batch = db.batch();
-      for (const d of sobrantes) batch.delete(d.ref);
-      if (volumenDifiere) {
-        batch.set(sesion.ref, { totalVolumeKg: volumenReal }, { merge: true });
+      for (const { doc } of plan.borrar) batch.delete(doc.ref);
+      if (plan.volumenDifiere) {
+        batch.set(sesion.ref, { totalVolumeKg: plan.volumenReal }, { merge: true });
       }
       await batch.commit();
     }
