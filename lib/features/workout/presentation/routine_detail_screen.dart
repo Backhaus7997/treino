@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/utils/kg_format.dart';
@@ -641,7 +642,7 @@ class _SupersetBlock extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
       decoration: BoxDecoration(
         color: palette.highlight.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: palette.highlight),
       ),
       child: Column(
@@ -876,7 +877,7 @@ class _AssignedByChip extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
         color: palette.accent.withValues(alpha: 0.20),
-        borderRadius: BorderRadius.circular(9999),
+        borderRadius: BorderRadius.circular(AppRadius.full),
       ),
       child: Text(
         label,
@@ -903,7 +904,7 @@ class _DayChipBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
         color: palette.accent.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(9999),
+        borderRadius: BorderRadius.circular(AppRadius.full),
       ),
       child: Text(
         text,
@@ -1180,7 +1181,7 @@ class _StartActionButton extends StatelessWidget {
           backgroundColor: palette.accent,
           minimumSize: const Size.fromHeight(56),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(9999),
+            borderRadius: BorderRadius.circular(AppRadius.full),
           ),
         ),
         child: Text(
@@ -1209,7 +1210,7 @@ class _PlanCompleteBanner extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: palette.accent.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: palette.accent),
       ),
       child: Row(
@@ -1246,7 +1247,7 @@ class _CompletedDayChip extends StatelessWidget {
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(9999),
+        borderRadius: BorderRadius.circular(AppRadius.full),
         border: Border.all(color: palette.border),
       ),
       child: Row(
@@ -1448,7 +1449,7 @@ class _RoutineLoadingSkeleton extends StatelessWidget {
                         height: 76,
                         decoration: BoxDecoration(
                           color: palette.bgCard,
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                         ),
                       ),
                     ),

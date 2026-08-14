@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/motion/treino_tappable.dart';
@@ -94,7 +95,7 @@ class RoutineCard extends StatelessWidget {
       height: 40,
       decoration: BoxDecoration(
         color: tint.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         border: Border.all(
           color: tint.withValues(alpha: 0.3),
           width: 1,
@@ -109,7 +110,7 @@ class RoutineCard extends StatelessWidget {
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
           color: palette.bgCard,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           border: Border.all(color: tint.withValues(alpha: 0.35), width: 1),
           boxShadow: [
             BoxShadow(
