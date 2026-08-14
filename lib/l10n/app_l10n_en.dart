@@ -3398,4 +3398,20 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get followListOpenFollowingA11y => 'View following';
+
+  @override
+  String routineCardDaysPerWeek(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '$days days/week',
+      one: '1 day/week',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String routineCardMinutes(String value) {
+    return '$value min';
+  }
 }

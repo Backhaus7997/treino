@@ -6164,6 +6164,18 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Ver seguidos'**
   String get followListOpenFollowingA11y;
+
+  /// Días por semana en la línea de metadata de la tarjeta de rutina.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{days, plural, =1{1 día/sem} other{{days} días/sem}}'**
+  String routineCardDaysPerWeek(int days);
+
+  /// Duración estimada por sesión en la tarjeta de rutina. El valor ya viene con el prefijo ~ cuando es calculado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{value} min'**
+  String routineCardMinutes(String value);
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

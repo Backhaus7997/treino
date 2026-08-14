@@ -886,5 +886,9 @@
   "followListOpenFollowersA11y": "Ver seguidores",
   "@followListOpenFollowersA11y": {"description": "Semantics del contador de SEGUIDORES del perfil, que abre la lista."},
   "followListOpenFollowingA11y": "Ver seguidos",
-  "@followListOpenFollowingA11y": {"description": "Semantics del contador de SIGUIENDO del perfil, que abre la lista."}
+  "@followListOpenFollowingA11y": {"description": "Semantics del contador de SIGUIENDO del perfil, que abre la lista."},
+  "routineCardDaysPerWeek": "{days, plural, =1{1 día/sem} other{{days} días/sem}}",
+  "@routineCardDaysPerWeek": {"placeholders": {"days": {"type": "int"}}},
+  "routineCardMinutes": "{value} min",
+  "@routineCardMinutes": {"placeholders": {"value": {"type": "String"}}}
 }
