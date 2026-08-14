@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../app/theme/app_palette.dart';
 import '../../core/widgets/motion/treino_state_switcher.dart';
@@ -63,9 +64,9 @@ class TrainerCoachView extends StatelessWidget {
               indicatorSize: TabBarIndicatorSize.tab,
               indicator: BoxDecoration(
                 color: palette.accent,
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(AppRadius.lg),
               ),
-              splashBorderRadius: BorderRadius.circular(20),
+              splashBorderRadius: BorderRadius.circular(AppRadius.lg),
               labelColor: palette.bg,
               unselectedLabelColor: palette.textMuted,
               labelStyle: theme.textTheme.labelLarge?.copyWith(
@@ -203,7 +204,8 @@ class _ActiveAlumnoCard extends ConsumerWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: palette.bgCard,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.lg)),
         title: Text(
           title,
           style: GoogleFonts.barlowCondensed(
@@ -273,11 +275,11 @@ class _ActiveAlumnoCard extends ConsumerWidget {
 
     return InkWell(
       onTap: () => context.push('/coach/athlete/${link.athleteId}'),
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(AppRadius.md),
       child: Container(
         decoration: BoxDecoration(
           color: palette.bgCard,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           border: Border.all(color: palette.border, width: 1),
         ),
         padding: const EdgeInsets.all(14),
@@ -316,7 +318,7 @@ class _ActiveAlumnoCard extends ConsumerWidget {
                         foregroundColor: palette.bg,
                         minimumSize: const Size.fromHeight(40),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(9999),
+                          borderRadius: BorderRadius.circular(AppRadius.full),
                         ),
                       ),
                       child: Text(
@@ -346,7 +348,7 @@ class _ActiveAlumnoCard extends ConsumerWidget {
                         foregroundColor: palette.accent,
                         minimumSize: const Size.fromHeight(40),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(9999),
+                          borderRadius: BorderRadius.circular(AppRadius.full),
                         ),
                       ),
                       child: Text(
@@ -380,7 +382,7 @@ class _ActiveAlumnoCard extends ConsumerWidget {
                   foregroundColor: palette.textMuted,
                   minimumSize: const Size.fromHeight(40),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(9999),
+                    borderRadius: BorderRadius.circular(AppRadius.full),
                   ),
                 ),
                 child: Text(
@@ -511,7 +513,7 @@ class _StatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(9999),
+        borderRadius: BorderRadius.circular(AppRadius.full),
         border: Border.all(color: color, width: 1),
       ),
       child: Text(
