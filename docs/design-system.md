@@ -385,7 +385,7 @@ Container(color: palette.accent);
 
 Tokens disponibles: `accent`, `highlight`, `bg`, `bgCard`, `border`, `borderHover`, `textPrimary`, `textMuted`, `sage`, `espresso`, `danger`, `warning`, `onDanger`, `scrimDark`.
 
-El test `test/app/theme/tokens/no_hex_scan_test.dart` falla si se agrega un HEX fuera de la allowlist (primitives.dart + app_palette.dart). Este test corre en CI.
+El test `test/app/theme/tokens/no_hex_scan_test.dart` falla si se agrega un HEX fuera de la allowlist (hoy: sólo `primitives.dart` — `app_palette.dart` salió de la lista en WU-02). Este test corre en CI.
 
 ### 2. Nunca PhosphorIcons directo
 
