@@ -502,7 +502,10 @@ class _InsetCard extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      // 14, not the handoff's 16: the spacing scale is 8 · 12 · 14 · 18 · 20
+      // and excludes 16 by name (AGENTS.md). 14 also matches the vertical
+      // rhythm the steps already sit on.
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         // Derived from a semantic token instead of a light/dark literal pair:
         // 5% of the text colour over the sheet lands on the handoff's #F2F2F0
@@ -526,8 +529,8 @@ class _InsetCard extends StatelessWidget {
           const SizedBox(height: 12),
           if (step.layout == TemplatesOnboardingOptionLayout.wrap)
             Wrap(
-              spacing: 9,
-              runSpacing: 9,
+              spacing: 8,
+              runSpacing: 8,
               children: [
                 for (final option in step.options)
                   _OptionPill(
@@ -624,7 +627,11 @@ class _OptionPill extends StatelessWidget {
           curve: AppMotion.standard,
           // 44pt minimum touch target (a11y, #619).
           constraints: const BoxConstraints(minHeight: 44),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          // 18 rather than the handoff's 16: 16 is off the spacing scale
+          // (AGENTS.md), and of the two neighbours only 18 keeps a pill
+          // visibly wider than it is padded — 14 would sit 2px off the
+          // vertical and read as a square with rounded ends.
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
           decoration: BoxDecoration(
             color: isSelected
                 ? palette.accent
@@ -687,7 +694,7 @@ class _OptionRow extends StatelessWidget {
           curve: AppMotion.standard,
           width: double.infinity,
           constraints: const BoxConstraints(minHeight: 44),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
           decoration: BoxDecoration(
             color: palette.bgCard,
             borderRadius: BorderRadius.circular(9999),
