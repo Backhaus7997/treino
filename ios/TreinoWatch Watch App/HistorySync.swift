@@ -15,24 +15,22 @@ import Foundation
 ///
 /// IDEMPOTENCIA — la parte que importa:
 ///
-/// El teléfono escribe las series con ids autogenerados, así que no se puede
-/// deduplicar por id contra lo que él escribe. El reloj usa en cambio un id
-/// DETERMINÍSTICO (`exerciseId__setNumber`), que resuelve el caso que de verdad
-/// importa: reintentar una escritura que fallo no duplica nada, porque la
-/// segunda pisa a la primera en vez de crear un doc nuevo.
+/// El teléfono escribe las series con ids autogenerados y el reloj con uno
+/// DETERMINÍSTICO (`exerciseId__setNumber`). Los dos espacios de ids son
+/// disjuntos, así que **por id no se puede deduplicar nada entre clientes**: el
+/// que escribe segundo no tiene contra qué comparar y crea un documento nuevo.
+/// Medido en el emulador el 2026-08-11: en las 7 sesiones inspeccionadas los
+/// documentos duplicados tenían todos `createTime == updateTime`, o sea que
+/// ninguna escritura pisó nunca a otra.
 ///
-/// Para el caso cruzado —que el teléfono ya haya cargado esa misma serie— la
-/// defensa es otra: al adoptar una sesión existente, el reloj LEE las series ya
-/// cargadas y las marca como hechas, así no vuelve a ofrecerlas.
+/// El id determinístico sí resuelve el caso PROPIO: reintentar una escritura que
+/// falló no duplica, porque la segunda pisa a la primera.
+///
+/// Para el caso CRUZADO la deduplicación no puede vivir en el id: vive en
+/// `resolveSetLogWriteTarget`, que decide dónde escribir mirando la identidad
+/// LÓGICA de lo que el historial ya tiene. `WorkoutCoordinator.sync` lee el
+/// historial ANTES de subir lo pendiente justamente para poder consultarla.
 enum HistorySync {
-
-    /// Id determinístico de una serie escrita por el reloj.
-    ///
-    /// Doble guion bajo como separador para que un exerciseId con guion bajo no
-    /// genere colisiones entre `a_1` serie 0 y `a` serie 1.
-    static func setLogId(exerciseId: String, setNumber: Int) -> String {
-        "\(exerciseId)__\(setNumber)"
-    }
 
     /// Busca una sesión ACTIVA del mismo día, o crea una nueva.
     ///
@@ -245,21 +243,22 @@ enum HistorySync {
         )
     }
 
-    /// Escribe una serie. Idempotente: el id determinístico hace que reintentar
-    /// pise el doc anterior en vez de duplicarlo.
+    /// Escribe una serie en el documento `docId`.
+    ///
+    /// El id lo elige QUIEN LLAMA, con `resolveSetLogWriteTarget`, no esta
+    /// funcion. Decidir donde escribir necesita saber que hay en el historial, y
+    /// eso es una lectura que `WorkoutCoordinator.sync` ya hace. Derivarlo aca a
+    /// ciegas de `exerciseId__setNumber` era lo que dejaba DOS documentos de la
+    /// misma serie cuando el telefono la habia cargado antes: su id autogenerado
+    /// no coincide con el deterministico, asi que no habia nada que pisar.
     static func writeSetLog(
         client: FirestoreREST,
         uid: String,
         sessionId: String,
+        docId: String,
         exerciseName: String,
         set: LoggedSet
     ) async throws {
-        // Si la serie YA existe en el historial se actualiza ESE documento. El
-        // telefono la habria escrito con id autogenerado, y usar el
-        // deterministico del reloj dejaria dos docs de la misma serie — el
-        // atleta la veria marcada dos veces en el celular.
-        let docId = set.remoteDocId
-            ?? setLogId(exerciseId: set.exerciseId, setNumber: set.setNumber)
         let fields: [String: Any] = [
             "id": ["stringValue": docId],
             "exerciseId": ["stringValue": set.exerciseId],

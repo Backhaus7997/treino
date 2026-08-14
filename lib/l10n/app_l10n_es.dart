@@ -612,6 +612,68 @@ class AppL10nEs extends AppL10n {
   String get workoutPostAutoCompleteText => '¡Terminé mi entreno! 💪';
 
   @override
+  String get wellbeingCheckInTitle => '¿CÓMO TE SENTISTE?';
+
+  @override
+  String get wellbeingCheckInOptional => 'Opcional. Podés saltearlo.';
+
+  @override
+  String get wellbeingFeelingVeryBad => 'Muy mal';
+
+  @override
+  String get wellbeingFeelingBad => 'Mal';
+
+  @override
+  String get wellbeingFeelingNeutral => 'Normal';
+
+  @override
+  String get wellbeingFeelingGood => 'Bien';
+
+  @override
+  String get wellbeingFeelingGreat => 'Muy bien';
+
+  @override
+  String get wellbeingPainQuestion => '¿Tuviste dolor o molestia?';
+
+  @override
+  String get wellbeingPainYes => 'SÍ';
+
+  @override
+  String get wellbeingPainNo => 'NO';
+
+  @override
+  String get wellbeingPainAreasQuestion => '¿En qué zona?';
+
+  @override
+  String get wellbeingPainAreasHint => 'Podés marcar más de una.';
+
+  @override
+  String get wellbeingNoteLabel => 'Nota (opcional)';
+
+  @override
+  String get wellbeingNoteHint => 'Algo que quieras recordar de hoy';
+
+  @override
+  String get wellbeingMedicalDisclaimer =>
+      'Si el dolor persiste, consultá a un profesional de la salud.';
+
+  @override
+  String get wellbeingSaveButton => 'GUARDAR';
+
+  @override
+  String get wellbeingSkipButton => 'AHORA NO';
+
+  @override
+  String get wellbeingSavedLabel => 'REGISTRADO';
+
+  @override
+  String get wellbeingEditButton => 'Editar';
+
+  @override
+  String get wellbeingSaveError =>
+      'No pudimos guardar tu registro. Probá de nuevo.';
+
+  @override
   String get shareWorkoutComposerTitle => 'COMPARTIR ENTRENO';
 
   @override
@@ -1694,6 +1756,17 @@ class AppL10nEs extends AppL10n {
   String get routineEditorDialogConfirm => '';
 
   @override
+  String get routineEditorCopyPrescriptionTitle => '¿Copiar sets?';
+
+  @override
+  String routineEditorCopyPrescriptionBody(String sourceExercise) {
+    return 'Se reemplazarán los sets de este ejercicio por los de «$sourceExercise».';
+  }
+
+  @override
+  String get routineEditorSlotMenuCopyPrevious => 'Copiar sets del anterior';
+
+  @override
   String get routineEditorSlotMenuReplace => 'Cambiar ejercicio';
 
   @override
@@ -1710,6 +1783,30 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get routineEditorAddSet => '+ Agregar set';
+
+  @override
+  String get routineEditorFillKgA11y =>
+      'Replicar el peso del primer set en todos';
+
+  @override
+  String get routineEditorFillKgApplied => 'Peso replicado en todos los sets.';
+
+  @override
+  String get routineEditorFillKgEmpty =>
+      'Introduce el peso del primer set para poder replicarlo.';
+
+  @override
+  String get routineEditorFillKgUndo => 'Deshacer';
+
+  @override
+  String routineEditorKgStepIncreaseA11y(String amount) {
+    return 'Sumar $amount kilos al peso';
+  }
+
+  @override
+  String routineEditorKgStepDecreaseA11y(String amount) {
+    return 'Restar $amount kilos al peso';
+  }
 
   @override
   String get routineEditorMeasureReps => 'Reps';
@@ -3978,6 +4075,68 @@ class AppL10nEsAr extends AppL10nEs {
   String get workoutPostAutoCompleteText => '¡Terminé mi entreno! 💪';
 
   @override
+  String get wellbeingCheckInTitle => '¿CÓMO TE SENTISTE?';
+
+  @override
+  String get wellbeingCheckInOptional => 'Opcional. Podés saltearlo.';
+
+  @override
+  String get wellbeingFeelingVeryBad => 'Muy mal';
+
+  @override
+  String get wellbeingFeelingBad => 'Mal';
+
+  @override
+  String get wellbeingFeelingNeutral => 'Normal';
+
+  @override
+  String get wellbeingFeelingGood => 'Bien';
+
+  @override
+  String get wellbeingFeelingGreat => 'Muy bien';
+
+  @override
+  String get wellbeingPainQuestion => '¿Tuviste dolor o molestia?';
+
+  @override
+  String get wellbeingPainYes => 'SÍ';
+
+  @override
+  String get wellbeingPainNo => 'NO';
+
+  @override
+  String get wellbeingPainAreasQuestion => '¿En qué zona?';
+
+  @override
+  String get wellbeingPainAreasHint => 'Podés marcar más de una.';
+
+  @override
+  String get wellbeingNoteLabel => 'Nota (opcional)';
+
+  @override
+  String get wellbeingNoteHint => 'Algo que quieras recordar de hoy';
+
+  @override
+  String get wellbeingMedicalDisclaimer =>
+      'Si el dolor persiste, consultá a un profesional de la salud.';
+
+  @override
+  String get wellbeingSaveButton => 'GUARDAR';
+
+  @override
+  String get wellbeingSkipButton => 'AHORA NO';
+
+  @override
+  String get wellbeingSavedLabel => 'REGISTRADO';
+
+  @override
+  String get wellbeingEditButton => 'Editar';
+
+  @override
+  String get wellbeingSaveError =>
+      'No pudimos guardar tu registro. Probá de nuevo.';
+
+  @override
   String get shareWorkoutComposerTitle => 'COMPARTIR ENTRENO';
 
   @override
@@ -5060,6 +5219,17 @@ class AppL10nEsAr extends AppL10nEs {
   String get routineEditorDialogConfirm => 'Confirmar';
 
   @override
+  String get routineEditorCopyPrescriptionTitle => '¿Copiar sets?';
+
+  @override
+  String routineEditorCopyPrescriptionBody(String sourceExercise) {
+    return 'Se van a reemplazar los sets de este ejercicio por los de «$sourceExercise».';
+  }
+
+  @override
+  String get routineEditorSlotMenuCopyPrevious => 'Copiar sets del anterior';
+
+  @override
   String get routineEditorSlotMenuReplace => 'Cambiar ejercicio';
 
   @override
@@ -5076,6 +5246,30 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get routineEditorAddSet => '+ Agregar set';
+
+  @override
+  String get routineEditorFillKgA11y =>
+      'Replicar el peso del primer set en todos';
+
+  @override
+  String get routineEditorFillKgApplied => 'Peso replicado en todos los sets.';
+
+  @override
+  String get routineEditorFillKgEmpty =>
+      'Cargá el peso del primer set para poder replicarlo.';
+
+  @override
+  String get routineEditorFillKgUndo => 'Deshacer';
+
+  @override
+  String routineEditorKgStepIncreaseA11y(String amount) {
+    return 'Sumar $amount kilos al peso';
+  }
+
+  @override
+  String routineEditorKgStepDecreaseA11y(String amount) {
+    return 'Restar $amount kilos al peso';
+  }
 
   @override
   String get routineEditorMeasureReps => 'Reps';

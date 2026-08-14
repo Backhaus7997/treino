@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:flutter/widgets.dart' show AppLifecycleListener;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -91,24 +93,101 @@ final watchActiveRoutineNudgeProvider = Provider<void>((ref) {
   );
 });
 
+/// Si vale la pena volver a intentar la entrega de la credencial.
+///
+/// `notSupported` y `noWatchPaired` NO son errores: no hay reloj al que
+/// entregarle nada y reintentar sería ruido para siempre. `delivered` tampoco,
+/// obviamente. Los otros dos son TRANSITORIOS y por eso se reintentan:
+///
+/// - `deliveryFailed` es el caso del HANDOFF §8.6:
+///   `WCErrorCodeWatchAppNotInstalled` mientras el companion todavía se está
+///   instalando en la muñeca. Se resuelve solo en minutos.
+/// - `mintFailed` es red, App Check o la CF caída. También pasa.
+@visibleForTesting
+bool watchCredentialShouldRetry(WatchCredentialOutcome outcome) =>
+    outcome == WatchCredentialOutcome.deliveryFailed ||
+    outcome == WatchCredentialOutcome.mintFailed;
+
+/// Registra un callback para cuando la app vuelve a primer plano.
+typedef AppResumeHook = void Function(void Function() onResume);
+
+/// Cómo engancharse a que la app vuelva a primer plano.
+///
+/// Va por provider y no con un `AppLifecycleListener` suelto por dos razones,
+/// las dos aprendidas al escribir esto:
+///
+/// 1. `AppLifecycleListener` exige `WidgetsBinding.instance`, así que crearlo
+///    dentro del provider lo vuelve ILEGIBLE desde un test unitario — rompía
+///    tres tests que ya existían.
+/// 2. Inyectable, el reintento se puede MEDIR: el test dispara el resume a mano
+///    y verifica que se reintentó. Con el listener real solo se podría testear
+///    la política, no la conducta.
+final appResumeHookProvider = Provider<AppResumeHook>((ref) {
+  return (onResume) {
+    final listener = AppLifecycleListener(onResume: onResume);
+    ref.onDispose(listener.dispose);
+  };
+});
+
 final watchCredentialLifecycleProvider = Provider<void>((ref) {
+  // Lo último que pasó, para no reintentar cuando no hace falta.
+  var ultimo = WatchCredentialOutcome.notSupported;
+  var enVuelo = false;
+
+  Future<void> entregar(String uid) async {
+    if (enVuelo) return;
+    enVuelo = true;
+    try {
+      ultimo = await ref
+          .read(watchCredentialServiceProvider)
+          .deliverCredential(uid: uid);
+    } catch (_) {
+      ultimo = WatchCredentialOutcome.deliveryFailed;
+    } finally {
+      enVuelo = false;
+    }
+  }
+
   ref.listen<AsyncValue<User?>>(
     authStateChangesProvider,
     (prev, next) {
       next.whenData((user) {
         if (user == null) return;
-        final service = ref.read(watchCredentialServiceProvider);
         // Fire-and-forget: esto corre en el camino crítico del arranque, así
         // que no se lo hace esperar ni se le deja tirar. Quedarse sin
         // credencial de reloj es una degradación aceptable; tumbar la app por
         // eso, no.
-        unawaited(
-          service.deliverCredential(uid: user.uid).catchError(
-                (_) => WatchCredentialOutcome.deliveryFailed,
-              ),
-        );
+        unawaited(entregar(user.uid));
       });
     },
     fireImmediately: true,
   );
+
+  // ── Reintento al volver a primer plano (HANDOFF §8.6) ────────────────────
+  //
+  // La entrega era de UN SOLO DISPARO, atada al cambio de estado de sesión —
+  // o sea, en la práctica, al arranque en frío. Si fallaba ahí, el atleta se
+  // quedaba sin credencial en el reloj hasta desloguearse o reinstalar, y el
+  // companion no podía hacer NADA: sin credencial no habla Firestore.
+  //
+  // El caso típico es el más frustrante: instalás la app del reloj desde el
+  // teléfono, la entrega sale antes de que el companion termine de instalarse,
+  // `updateApplicationContext` tira `WatchAppNotInstalled`, y nadie vuelve a
+  // intentar. La muñeca queda inservible hasta que se te ocurre reinstalar.
+  //
+  // El disparador correcto sería un evento de `WCSession` (activación,
+  // `sessionWatchStateDidChange`), pero el plugin NO los expone a Dart: su
+  // `SessionDelegate` los tiene vacíos. El mejor evento que sí tenemos es
+  // volver a primer plano, que además es exactamente cuando el atleta acaba de
+  // terminar de instalar la app en el reloj y vuelve al teléfono.
+  //
+  // Solo reintenta si lo último fue un fallo TRANSITORIO: sin reloj emparejado
+  // no se reintenta nunca, que si no sería un viaje a la CF en cada foreground
+  // de la enorme mayoría de usuarios, que no tienen reloj.
+  ref.read(appResumeHookProvider)(() {
+    if (!watchCredentialShouldRetry(ultimo)) return;
+    final user = ref.read(authStateChangesProvider).valueOrNull;
+    if (user == null) return;
+    unawaited(entregar(user.uid));
+  });
 });

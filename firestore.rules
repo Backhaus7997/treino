@@ -1484,7 +1484,25 @@ service cloud.firestore {
 
     // Daily check-in sub-collection (Fase 4 Etapa 6, REQ-WRC-004).
     // Doc id is the local date key 'YYYY-MM-DD' — one doc per day per user,
-    // providing natural dedup. Location-adjacent data: owner-only R/W.
+    // providing natural dedup: a second check-in the same day OVERWRITES the
+    // first. That is the design, not an accident.
+    //
+    // First real consumer (#643 slice 1): the post-session wellbeing check-in
+    // (lib/features/checkins/) — how the athlete felt, pain yes/no + zone in
+    // the MuscleGroup vocabulary, and an optional free note. Owner-only R/W
+    // was already the right stance and stays untouched: this is the most
+    // sensitive data the app stores. It is never mirrored to
+    // userPublicProfiles and never shared with a trainer — sharing it would
+    // need its own explicit opt-in and its own issue.
+    //
+    // ⚠️ The path was originally reserved for a location-adjacent GYM
+    // check-in (see the still-orphaned checkIn* l10n keys, "¿ESTÁS EN EL GYM
+    // HOY?"). That feature has no client code. If it ever lands it must NOT
+    // reuse this document: same uid + same date would collide.
+    //
+    // Deliberately NO shape validation: slices 2-3 of #643 still add fields,
+    // and a `hasOnly` here would reproduce the forward-compat trap documented
+    // in #635.
     match /users/{uid}/checkIns/{date} {
       allow read, write: if request.auth != null
                          && request.auth.uid == uid;

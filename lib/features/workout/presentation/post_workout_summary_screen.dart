@@ -10,7 +10,11 @@ import '../../../core/utils/kg_format.dart';
 import '../../../core/widgets/motion/treino_confetti.dart';
 import '../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../core/widgets/motion/treino_success_check.dart';
+import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../checkins/application/check_in_providers.dart';
+import '../../checkins/domain/check_in.dart';
+import '../../checkins/presentation/post_session_check_in_sheet.dart';
 import '../application/post_workout_notifier.dart';
 import '../application/session_highlights.dart';
 import '../application/session_muscle_distribution.dart';
@@ -229,25 +233,10 @@ class _LoadedBody extends StatelessWidget {
           _PrsSlot(session: session, highlights: highlights),
           _ExercisesSlot(highlights: highlights),
 
-          // Mood row — 5 emojis, visual only (decorative, non-interactive).
-          // Flexible + FittedBox per emoji: when a glyph measures wider than
-          // expected (tofu .notdef, large font scale) the row scales down
-          // instead of overflowing (#456).
-          TreinoFadeSlideIn(
-            delay: AppMotion.stagger(5),
-            child: const ExcludeSemantics(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  Flexible(child: _MoodEmoji('😞')),
-                  Flexible(child: _MoodEmoji('😕')),
-                  Flexible(child: _MoodEmoji('😐')),
-                  Flexible(child: _MoodEmoji('🙂')),
-                  Flexible(child: _MoodEmoji('😄')),
-                ],
-              ),
-            ),
-          ),
+          // Check-in post-sesión (#643 slice 1). La fila de emojis dejó de ser
+          // decorativa: cada nivel ABRE el registro con esa sensación ya
+          // elegida, así el tap que abre el sheet no se pierde.
+          _CheckInSlot(sessionId: session.id),
           const SizedBox(height: 40),
 
           // LISTO button (filled)
@@ -376,27 +365,199 @@ class _ExercisesSlot extends StatelessWidget {
   }
 }
 
-// ── Mood emoji ────────────────────────────────────────────────────────────────
+// ── Check-in post-sesión (#643 slice 1) ──────────────────────────────────────
+
+/// Paso SALTABLE de registro subjetivo: cómo se sintió el usuario.
+///
+/// Es un paso, no un formulario: tocar un nivel abre el sheet con esa
+/// sensación ya elegida, y no tocar nada no cuesta nada — LISTO y COMPARTIR
+/// siguen justo debajo, sin gate. El momento post-entreno es cuando el usuario
+/// quiere irse; un paso obligatorio acá no genera datos, genera abandono del
+/// cierre de la sesión, que es el dato que hoy sí tenemos.
+///
+/// Best-effort en la lectura, igual que los demás slots async de esta pantalla:
+/// si el check-in del día no carga (o falla), se muestra el prompt normal —
+/// nunca un spinner ni un error que tape el resumen.
+class _CheckInSlot extends ConsumerWidget {
+  const _CheckInSlot({required this.sessionId});
+
+  final String sessionId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    final uid = ref.watch(currentUidProvider) ?? '';
+    // Fecha LOCAL: el que entrena a las 22:00 en Córdoba espera que cuente
+    // para HOY, no para el día de UTC.
+    final date = checkInDateKey(DateTime.now());
+    final existing = uid.isEmpty
+        ? null
+        : ref.watch(checkInByDateProvider((uid: uid, date: date))).valueOrNull;
+
+    Future<void> open(CheckInFeeling? feeling) => showPostSessionCheckInSheet(
+          context,
+          sessionId: sessionId,
+          initialFeeling: feeling,
+          existing: existing,
+        );
+
+    return TreinoFadeSlideIn(
+      delay: AppMotion.stagger(5),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            l10n.wellbeingCheckInTitle,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: 18,
+              color: palette.textPrimary,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (existing == null) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                for (final feeling in CheckInFeeling.displayOrder)
+                  Flexible(
+                    child: _MoodEmoji(
+                      feeling: feeling,
+                      onTap: () => open(feeling),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              l10n.wellbeingCheckInOptional,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.barlow(
+                fontSize: 13,
+                color: palette.textMuted,
+              ),
+            ),
+          ] else
+            _CheckInRecorded(
+              checkIn: existing,
+              onEdit: () => open(existing.feeling),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Estado "ya registrado": el día tiene check-in y el sheet abre precargado.
+///
+/// El id del documento es la fecha, así que un segundo registro del mismo día
+/// PISA al anterior. Mostrarlo en vez de sobrescribir a ciegas es la
+/// diferencia entre un dedup y una pérdida de dato silenciosa.
+class _CheckInRecorded extends StatelessWidget {
+  const _CheckInRecorded({required this.checkIn, required this.onEdit});
+
+  final CheckIn checkIn;
+  final VoidCallback onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Flexible(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              checkIn.feeling.emoji,
+              style: const TextStyle(
+                fontSize: 24,
+                fontFamilyFallback: ['Apple Color Emoji'],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Flexible(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              l10n.wellbeingSavedLabel,
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
+                color: palette.accent,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ),
+        ),
+        TextButton(
+          onPressed: onEdit,
+          child: Text(
+            l10n.wellbeingEditButton,
+            style: GoogleFonts.barlow(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: palette.textMuted,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 class _MoodEmoji extends StatelessWidget {
-  const _MoodEmoji(this.emoji);
+  const _MoodEmoji({required this.feeling, required this.onTap});
+
+  final CheckInFeeling feeling;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: feelingLabel(AppL10n.of(context), feeling),
+      child: TreinoTappable(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          child: _MoodGlyph(feeling.emoji),
+        ),
+      ),
+    );
+  }
+}
+
+/// Flexible + FittedBox por glifo: cuando un emoji mide más ancho de lo
+/// esperado (tofu .notdef, font scale grande) la fila escala en vez de
+/// desbordar (#456).
+class _MoodGlyph extends StatelessWidget {
+  const _MoodGlyph(this.emoji);
 
   final String emoji;
 
   @override
   Widget build(BuildContext context) {
-    return FittedBox(
-      fit: BoxFit.scaleDown,
-      child: Text(
-        emoji,
-        // #456: on the iOS simulator (iPhone 16e / iOS 26.3) these glyphs can
-        // render as tofu "?" — the theme's Barlow families carry no emoji and
-        // the automatic platform fallback doesn't kick in there (likely an
-        // engine/Impeller simulator issue). The explicit fallback pins the
-        // system emoji font; physical-device verification is still pending.
-        style: const TextStyle(
-          fontSize: 28,
-          fontFamilyFallback: ['Apple Color Emoji'],
+    return ExcludeSemantics(
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          emoji,
+          // #456: on the iOS simulator (iPhone 16e / iOS 26.3) these glyphs can
+          // render as tofu "?" — the theme's Barlow families carry no emoji and
+          // the automatic platform fallback doesn't kick in there (likely an
+          // engine/Impeller simulator issue). The explicit fallback pins the
+          // system emoji font; physical-device verification is still pending.
+          style: const TextStyle(
+            fontSize: 28,
+            fontFamilyFallback: ['Apple Color Emoji'],
+          ),
         ),
       ),
     );

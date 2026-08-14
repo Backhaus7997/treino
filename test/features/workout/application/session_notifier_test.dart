@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
+import 'package:treino/core/utils/network_timeouts.dart';
 import 'package:treino/features/workout/application/session_init.dart';
 import 'package:treino/features/workout/application/session_notifier.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
@@ -63,11 +64,15 @@ ProviderContainer _makeContainer({
   required MockSessionRepository repo,
   required String uid,
   Routine? routine,
+  Duration? ioTimeout,
 }) {
   return ProviderContainer(
     overrides: [
       sessionRepositoryProvider.overrideWithValue(repo),
       currentUidProvider.overrideWithValue(uid),
+      // La cota real es de 15s: un test que la espere de verdad no se corre.
+      if (ioTimeout != null)
+        firestoreReadTimeoutProvider.overrideWithValue(ioTimeout),
       // Analytics is fired post-finishSession; override con fake para evitar
       // que FirebaseAnalytics.instance se invoque sin Firebase init en tests.
       analyticsServiceProvider.overrideWithValue(FakeAnalyticsService()),
@@ -82,6 +87,136 @@ ProviderContainer _makeContainer({
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 void main() {
+  // ── Un día sin ejercicios presentes no puede dar un índice negativo ──────
+  //
+  // Los dos paths de build filtran los slots por `isPresentInWeek` (periodización,
+  // REQ-WPRES-021). Un día cuyos slots estén TODOS ausentes en esa semana deja la
+  // lista vacía, y `day.slots.length - 1` daba -1 como `currentExerciseIndex`.
+  test('un día sin slots presentes en la semana no deja el índice en -1',
+      () async {
+    final repo = MockSessionRepository();
+    // El slot existe solo en la semana 0; la sesión va a ser de la semana 1.
+    final routine = makeRoutine(
+      numWeeks: 2,
+      days: [
+        makeDay(slots: [
+          makeSlot(exerciseId: 'e1', activeWeeks: const [0])
+        ])
+      ],
+    );
+
+    // Va por RETOMAR y no por empezar: `_buildFresh` fija el índice en 0 a mano,
+    // así que el -1 solo puede salir de `_buildResume`, que sí lo calcula.
+    final session = makeSession(id: 's7', weekNumber: 1);
+    when(() => repo.getActive('u1')).thenAnswer((_) async => session);
+    when(() => repo.listSetLogs(uid: 'u1', sessionId: 's7'))
+        .thenAnswer((_) async => <SetLog>[]);
+
+    final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
+    addTearDown(container.dispose);
+
+    const init = ResumeSession(sessionId: 's7');
+    final state = await container.read(sessionNotifierProvider(init).future);
+
+    expect(
+      state.day.slots,
+      isEmpty,
+      reason: 'precondición del test: el filtro de presencia deja el día vacío',
+    );
+    expect(
+      state.currentExerciseIndex,
+      greaterThanOrEqualTo(0),
+      reason: 'un índice negativo se usa para indexar la lista de ejercicios',
+    );
+  });
+
+  // ── El build de la sesión no puede quedarse colgado ──────────────────────
+  //
+  // Medido en el simulador el 2026-08-12: el player quedó en el spinner más de
+  // 2 minutos al retomar, sin una sola excepción en el log. `_buildResume`
+  // esperaba tres lecturas de Firestore SIN cota, y un `get()` que no resuelve
+  // —ni devuelve ni tira— deja el AsyncNotifier en `AsyncLoading` para siempre:
+  // sin error, sin reintento y sin salida.
+  //
+  // El test no reproduce el stall de red (no se pudo provocar a pedido en tres
+  // intentos dirigidos); reproduce lo que el stall PROVOCA, que es lo que hay
+  // que volver imposible: un future que nunca completa.
+  group('SessionNotifier — las lecturas del build están acotadas', () {
+    test('un getActive que nunca resuelve termina en error, no colgado',
+        () async {
+      final repo = MockSessionRepository();
+      final routine = makeRoutine();
+
+      // Nunca completa: es exactamente el `get()` que se queda a medias.
+      when(() => repo.getActive('u1'))
+          .thenAnswer((_) => Completer<Session?>().future);
+
+      final container = _makeContainer(
+        repo: repo,
+        uid: 'u1',
+        routine: routine,
+        ioTimeout: const Duration(milliseconds: 50),
+      );
+      addTearDown(container.dispose);
+
+      const init = ResumeSession(sessionId: 's42');
+      final sub = container.listen(sessionNotifierProvider(init), (_, __) {});
+      addTearDown(sub.close);
+
+      // Se espera con holgura sobre la cota y se MIRA el estado, en vez de
+      // await-ear el future: sin el arreglo ese await no vuelve nunca y el test
+      // moriría por timeout del runner en vez de fallar con un mensaje útil.
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+
+      final estado = container.read(sessionNotifierProvider(init));
+      expect(
+        estado.hasError,
+        isTrue,
+        reason: 'sin cota el estado se queda en AsyncLoading para siempre: el '
+            'atleta ve un spinner infinito sobre un entreno ya empezado, sin '
+            'error que reintentar',
+      );
+      expect(estado.error, isA<TimeoutException>());
+    });
+
+    test('un fetch de rutina que nunca resuelve tampoco cuelga el arranque',
+        () async {
+      final repo = MockSessionRepository();
+
+      when(() => repo.create(
+            uid: any(named: 'uid'),
+            routineId: any(named: 'routineId'),
+            routineName: any(named: 'routineName'),
+            startedAt: any(named: 'startedAt'),
+            dayNumber: any(named: 'dayNumber'),
+            weekNumber: any(named: 'weekNumber'),
+          )).thenAnswer((_) async => makeSession());
+
+      final container = ProviderContainer(
+        overrides: [
+          sessionRepositoryProvider.overrideWithValue(repo),
+          currentUidProvider.overrideWithValue('u1'),
+          analyticsServiceProvider.overrideWithValue(FakeAnalyticsService()),
+          firestoreReadTimeoutProvider
+              .overrideWithValue(const Duration(milliseconds: 50)),
+          routineByIdProvider('r1')
+              .overrideWith((ref) => Completer<Routine?>().future),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      const init = FreshSession(routineId: 'r1', dayNumber: 1);
+      final sub = container.listen(sessionNotifierProvider(init), (_, __) {});
+      addTearDown(sub.close);
+
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+
+      final estado = container.read(sessionNotifierProvider(init));
+      expect(estado.hasError, isTrue);
+      expect(estado.error, isA<TimeoutException>());
+    });
+  });
+
   setUpAll(() {
     registerFallbackValue(makeSession());
     registerFallbackValue(makeSetLog());
@@ -1404,6 +1539,107 @@ void main() {
         reason: 'survivor above the gap must renumber from 3 to 2',
       );
       expect(state.setCountOverride['e1'], equals(2));
+    });
+
+    test(
+        'el snapshot que llega durante el await NO renumera la sobreviviente '
+        'dos veces', () async {
+      final repo = MockSessionRepository();
+      final routine = makeRoutine(
+        days: [
+          makeDay(slots: [makeSlot(exerciseId: 'e1', targetSets: 3)])
+        ],
+      );
+      final session = makeSession();
+
+      when(() => repo.create(
+            uid: any(named: 'uid'),
+            routineId: any(named: 'routineId'),
+            routineName: any(named: 'routineName'),
+            startedAt: any(named: 'startedAt'),
+            dayNumber: any(named: 'dayNumber'),
+            weekNumber: any(named: 'weekNumber'),
+          )).thenAnswer((_) async => session);
+      when(() => repo.addSetLog(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            setLog: any(named: 'setLog'),
+          )).thenAnswer(
+        (inv) async => inv.namedArguments[const Symbol('setLog')] as dynamic,
+      );
+      when(() => repo.deleteSetLog(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            setLogId: any(named: 'setLogId'),
+          )).thenAnswer((_) async {});
+
+      final controller = StreamController<List<SetLog>>.broadcast();
+      repo.setLogsStream = controller.stream;
+
+      // Firestore entrega el snapshot de la PROPIA escritura por compensación
+      // de latencia: llega ANTES de que el `await updateSetLog` resuelva, con la
+      // sobreviviente ya renumerada. Es exactamente lo que pasa corriendo.
+      when(() => repo.updateSetLog(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            setLog: any(named: 'setLog'),
+          )).thenAnswer((_) async {
+        controller.add([
+          makeSetLog(exerciseId: 'e1', setNumber: 1, id: 'l1'),
+          makeSetLog(exerciseId: 'e1', setNumber: 2, id: 'l3'),
+        ]);
+        // Deja correr el listener ANTES de que removeSet siga.
+        await Future<void>.delayed(Duration.zero);
+      });
+
+      final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
+      addTearDown(container.dispose);
+      addTearDown(controller.close);
+
+      final init = FreshSession(routineId: routine.id, dayNumber: 1);
+      // Suscripción viva: el provider es autoDispose y sin listener se descarta
+      // entre lecturas, así que el stream no llegaría a tocar este estado.
+      final sub = container.listen(sessionNotifierProvider(init), (_, __) {});
+      addTearDown(sub.close);
+      await container.read(sessionNotifierProvider(init).future);
+      final notifier = container.read(sessionNotifierProvider(init).notifier);
+      final slot = routine.days.first.slots.first;
+
+      await notifier
+          .logSet(makeSetLog(exerciseId: 'e1', setNumber: 1, id: 'l1'));
+      await notifier
+          .logSet(makeSetLog(exerciseId: 'e1', setNumber: 2, id: 'l2'));
+      await notifier
+          .logSet(makeSetLog(exerciseId: 'e1', setNumber: 3, id: 'l3'));
+
+      final target = container
+          .read(sessionNotifierProvider(init))
+          .value!
+          .setLogs
+          .firstWhere((l) => l.id == 'l2');
+
+      await notifier.removeSet(slot, target);
+
+      final logs = container.read(sessionNotifierProvider(init)).value!.setLogs;
+
+      expect(
+        logs.firstWhere((l) => l.id == 'l3').setNumber,
+        equals(2),
+        reason: 'la sobreviviente se renumera UNA vez: 3 → 2. Con un delta se '
+            'aplicaba dos veces (stream 3→2, map 2→1) y quedaba en 1.',
+      );
+      expect(
+        logs.map((l) => l.setNumber).toSet().length,
+        equals(logs.length),
+        reason: 'dos series del mismo ejercicio con el mismo setNumber no '
+            'existen: la fila 2 se dibujaba sin tildar aunque la serie estaba '
+            'en Firestore, y la 3 se ofrecía para cargar.',
+      );
+      expect(
+        logs.map((l) => l.setNumber).toList()..sort(),
+        equals(<int>[1, 2]),
+        reason: 'numeración densa 1..N después de borrar la del medio',
+      );
     });
 
     test(

@@ -11,6 +11,8 @@ import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/features/checkins/application/check_in_providers.dart';
+import 'package:treino/features/checkins/domain/check_in.dart';
 import 'package:treino/features/feed/domain/post_privacy.dart';
 import 'package:treino/features/insights/domain/radar_axis.dart';
 import 'package:treino/features/insights/presentation/widgets/muscle_distribution_radar.dart';
@@ -106,6 +108,7 @@ Widget _buildWithRouter({
   SessionHighlights highlights = emptySessionHighlights,
   bool reduceMotion = false,
   double? textScale,
+  CheckIn? existingCheckIn,
 }) {
   final router = GoRouter(
     initialLocation: '/workout/session-summary/s1',
@@ -149,6 +152,11 @@ Widget _buildWithRouter({
     // history (Firestore) from inside a widget test.
     sessionHighlightsProvider.overrideWith(
       (ref, key) => Future.value(highlights),
+    ),
+    // Always overridden: el paso de check-in (#643) lee el registro del día y
+    // el provider real iría a Firestore desde un widget test.
+    checkInByDateProvider.overrideWith(
+      (ref, key) => Future.value(existingCheckIn),
     ),
     currentUidProvider.overrideWithValue('u1'),
     if (notifierOverride != null)
@@ -545,6 +553,83 @@ void main() {
             RegExp(r'[\u{1F600}-\u{1F64F}]', unicode: true).hasMatch(t.data!))
         .toList();
     expect(emojiTexts.length, equals(5));
+  });
+
+  // ── Check-in post-sesión (#643 slice 1) ──────────────────────────────────
+  //
+  // La fila de emojis dejó de ser decorativa: ahora es el paso SALTABLE de
+  // registro. Lo que estos tests protegen es el "saltable de verdad" — el
+  // resumen no puede quedar detrás de un formulario.
+
+  testWidgets('check-in: el paso se anuncia como opcional', (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('¿CÓMO TE SENTISTE?'), findsOneWidget);
+    expect(find.text('Opcional. Podés saltearlo.'), findsOneWidget);
+  });
+
+  testWidgets(
+      'check-in: tocar un nivel abre el sheet con esa sensación ya elegida',
+      (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('😄'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('😄'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('GUARDAR'), findsOneWidget);
+    expect(find.text('¿Tuviste dolor o molestia?'), findsOneWidget);
+    // GUARDAR habilitado ⇒ el nivel del tap llegó precargado al sheet; sin
+    // eso el botón arrancaría deshabilitado y el tap se habría perdido.
+    expect(
+      tester.widget<FilledButton>(find.byType(FilledButton).last).onPressed,
+      isNotNull,
+    );
+  });
+
+  testWidgets('check-in: saltear no bloquea el cierre — LISTO sigue navegando',
+      (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+    ));
+    await tester.pumpAndSettle();
+
+    // Sin tocar el check-in: el camino crítico (cerrar la sesión) queda
+    // exactamente como estaba.
+    await tester.ensureVisible(find.text('LISTO'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('LISTO'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('workout-home'), findsOneWidget);
+  });
+
+  testWidgets(
+      'check-in: con registro del día muestra REGISTRADO en vez de la escala',
+      (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+      existingCheckIn: CheckIn(
+        date: checkInDateKey(DateTime.now()),
+        feeling: CheckInFeeling.bien,
+        recordedAt: DateTime.now().toUtc(),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('REGISTRADO'), findsOneWidget);
+    expect(find.text('Editar'), findsOneWidget);
+    // El id del doc es la fecha: un segundo registro pisa al primero. Mostrar
+    // el que ya existe es lo que evita que eso sea una pérdida silenciosa.
+    expect(find.text('😞'), findsNothing);
+    expect(find.text('🙂'), findsOneWidget);
   });
 
   // ── #456 regression: mood row must never overflow ────────────────────────

@@ -82,11 +82,21 @@ Es Flutter.
 
 ## 🔑 Destrabar el provisioning del reloj para HealthKit
 
+> ## ✅ RESUELTO (2026-08-12)
+>
+> El App ID se creó con HealthKit tildado. Verificado con
+> `bash scripts/verify_watch_provisioning.sh`, y confirmado por el lado del
+> build: `xcodebuild -destination 'generic/platform=watchOS'` da
+> `BUILD SUCCEEDED` y el `.xcent` de **dispositivo** —que antes salía vacío—
+> ahora trae `com.apple.developer.healthkit = true`.
+>
+> El reloj ya se puede firmar e instalar en hardware. El paso a paso queda
+> abajo porque el mismo trámite hace falta en cualquier cuenta o bundle nuevo.
+
 **Prerequisito manual: hay que tocar el portal de Apple Developer — no es
-automatizable desde un agente ni desde CI.** Bloquea probar en un Apple Watch
-real, pero **no** bloquea escribir, verificar ni mergear el código: las tres
-fases del change `watch-workout-session` se verificaron en simulador, incluido
-el ritmo cardíaco.
+automatizable desde un agente ni desde CI.** No bloquea escribir, verificar ni
+mergear código: las cuatro fases del change `watch-workout-session` se
+verificaron en simulador, incluido el ritmo cardíaco.
 
 La cuenta es **Individual** (visto en Xcode → Signing & Capabilities, Team
 "Martin Backhaus (Individual)"), así que el titular puede hacerlo solo: no hay

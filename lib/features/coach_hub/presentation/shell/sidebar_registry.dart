@@ -4,7 +4,10 @@ import 'package:treino/features/coach_hub/presentation/sections/alumnos/routes.d
 import 'package:treino/features/coach_hub/presentation/sections/biblioteca/routes.dart';
 import 'package:treino/features/coach_hub/presentation/sections/chat/routes.dart';
 import 'package:treino/features/coach_hub/presentation/sections/dashboard/routes.dart';
+import 'package:treino/features/coach_hub/presentation/sections/invitaciones/routes.dart';
+import 'package:treino/features/coach_hub/presentation/sections/nutricion/routes.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/routes.dart';
+import 'package:treino/features/coach_hub/presentation/sections/perfil_publico/routes.dart';
 import 'package:treino/features/coach_hub/presentation/sections/rutinas/routes.dart';
 
 import 'sidebar_item.dart';
@@ -31,18 +34,55 @@ import 'sidebar_item.dart';
 /// punto de entrada del editor de rutinas web (elegí alumno → editor), llevando
 /// el total a 8. Mismo flujo que mobile ("Asignar rutina"), expuesto también
 /// desde el menú lateral.
-const List<SidebarItem> sidebarRegistry = [
+///
+/// **Solicitudes re-agregado (Fase 4 WU-06, ADR-F4-04)**: Invitaciones
+/// (copia de usuario "Solicitudes") vuelve al grupo GESTIÓN, inmediatamente
+/// después de Alumnos, con badge real de pendientes
+/// (`invitacionesPendingCountProvider`) — llevando el total a 9.
+/// Re-exposición parcial de la reducción W2, justificada porque Fase 4
+/// entrega la bandeja real (antes era `ProximamenteScreen`). Nota: el
+/// registro deja de ser `const` (pasa a `final`) porque
+/// `invitacionesSidebarItems` tampoco lo es — su `badgeProvider` referencia
+/// un provider real, no evaluable en tiempo de compilación.
+///
+/// **Nutrición re-agregada (Fase 6 WU-06, ADR-F6-07)**: la overview
+/// cross-alumno de planes (Fase 6 WU-04, antes solo alcanzable por URL
+/// directa) vuelve al grupo RECURSOS, inmediatamente después de Biblioteca
+/// — simetría con la re-exposición de Solicitudes en ADR-F4-04 — llevando
+/// el total a 10.
+///
+/// **Perfil público agregado (Fase 11 WU-01, ADR-F11-01)**: nueva sección
+/// que muestra al PF cómo lo ven los alumnos potenciales en TREINO Coach
+/// Discovery; se agrega al grupo GESTIÓN inmediatamente después de Chat
+/// (adyacente, sin header nuevo) — llevando el total a 11.
+final List<SidebarItem> sidebarRegistry = [
   // GESTIÓN — surfaces multi-alumno del día a día del PF
   ...dashboardSidebarItems,
   ...alumnosSidebarItems,
+  ...invitacionesSidebarItems,
   ...agendaSidebarItems,
   ...chatSidebarItems,
+  ...perfilPublicoSidebarItems,
 
   // RECURSOS — bibliotecas del PF y finanzas
   ...bibliotecaSidebarItems,
+  ...nutricionSidebarItems,
   ...rutinasSidebarItems,
   ...pagosSidebarItems,
 
   // AJUSTES (pinneado al fondo, fuera de grupo visual)
   ...ajustesSidebarItems,
 ];
+
+/// Devuelve el [SidebarItem] de `sidebarRegistry` cuya `route` matchea
+/// [location] (exacta o como prefijo `route/...`), o `null` si ninguna
+/// matchea. Misma regla de "activo" que usa el sidebar para resaltar el
+/// ítem; el top bar la reusa para el título de sección (REQ-SH-007).
+SidebarItem? activeSidebarItem(String location) {
+  for (final item in sidebarRegistry) {
+    if (location == item.route || location.startsWith('${item.route}/')) {
+      return item;
+    }
+  }
+  return null;
+}
