@@ -44,8 +44,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app/theme/app_theme.dart';
+import 'features/auth/application/auth_providers.dart';
 import 'features/watch/application/wear_pairing_providers.dart';
 import 'features/watch/application/wear_rest_providers.dart';
+import 'features/watch/application/wear_today_providers.dart';
 import 'features/watch/presentation/wear/wear_root.dart';
 import 'features/watch/presentation/wear/wear_view_models.dart';
 import 'features/watch/presentation/wear/wear_workout_view_model.dart';
@@ -86,7 +88,28 @@ const _appCheckDebug = bool.fromEnvironment('APPCHECK_DEBUG');
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await _arrancarFirebase();
-  runApp(const ProviderScope(child: TreinoWearApp()));
+  runApp(
+    ProviderScope(
+      overrides: [
+        // ── La costura que abre el dominio entero ────────────────────────────
+        //
+        // Casi TODA la capa de aplicación de workout/home es reusable tal cual:
+        // no tiene UI adentro, no toca BuildContext y depende del uid como
+        // parámetro. El único acoplamiento estructural al teléfono es este
+        // provider, que por defecto pasa por `AuthService` — y ese constructor
+        // arrastra google_sign_in y sign_in_with_apple, que en una muñeca no
+        // se usan jamás.
+        //
+        // El reloj lee `FirebaseAuth` derecho. Con esta sola línea,
+        // currentUidProvider → assignedRoutines → sessionsByUid →
+        // todaysRoutine funcionan sin tocar una línea del dominio.
+        authStateChangesProvider.overrideWith(
+          (ref) => ref.watch(firebaseAuthProvider).authStateChanges(),
+        ),
+      ],
+      child: const TreinoWearApp(),
+    ),
+  );
 }
 
 /// Deja el reloj listo para hablar con Firebase por su cuenta.
@@ -197,26 +220,16 @@ class _WearHomeState extends ConsumerState<_WearHome> {
     });
   }
 
-  // ── DATOS DE MUESTRA ──────────────────────────────────────────────────────
+  // ── DATOS DE MUESTRA QUE TODAVÍA QUEDAN ───────────────────────────────────
   //
-  // TODO(wear): reemplazar por la cadena real — credencial minteada por el
-  // teléfono, Firestore con listeners, resolución del entreno del día. Existen
-  // para poder MIRAR cada pantalla y validarla contra la de watchOS antes de
-  // invertir en esa cadena.
-
-  static const _muestraHoy = WearTodaysWorkout(
-    dayName: 'Empuje',
-    routineName: 'Full Body 3 días',
-    weekNumber: 1,
-    numWeeks: 4,
-    exercises: [
-      WearExercisePreview(name: 'Sentadilla con barra', setCount: 4),
-      WearExercisePreview(name: 'Press de banca', setCount: 4),
-      WearExercisePreview(name: 'Remo con barra', setCount: 3),
-      WearExercisePreview(name: 'Elevaciones laterales', setCount: 3),
-      WearExercisePreview(name: 'Plancha', setCount: 1),
-    ],
-  );
+  // HOY ya sale de Firestore (`wearTodaysWorkoutProvider`). Falta cablear las
+  // listas laterales y el entreno en curso.
+  //
+  // Las listas NO se pueden resolver con `unifiedRoutinesProvider`: ese
+  // provider ESCRIBE `activeRoutineId` al leerse (adopción perezosa), así que
+  // el reloj podría cambiarle la rutina activa al atleta con sólo deslizar a
+  // una página. Hay que componer `assignedRoutinesProvider` +
+  // `userCreatedRoutinesProvider`, que no escriben nada.
 
   static const _muestraPlanes = [
     WearRoutineSummary(
@@ -256,10 +269,15 @@ class _WearHomeState extends ConsumerState<_WearHome> {
     final pairing = ref.watch(wearPairingProvider);
     _arrancarServicioSiCorresponde(pairing);
 
+    // HOY ya sale de Firestore. Mientras carga se pasa null, que es el mismo
+    // estado que "no hay entreno resuelto" — la pantalla ya lo contempla.
+    final hoy = ref.watch(wearTodaysWorkoutProvider);
+
     return WearRoot(
       pairing: pairing,
       session: _session,
-      workout: _muestraHoy,
+      workout: hoy.valueOrNull,
+      workoutFailed: hoy.hasError,
       plans: _muestraPlanes,
       templates: _muestraPlantillas,
       selectedRoutine: _selected,
