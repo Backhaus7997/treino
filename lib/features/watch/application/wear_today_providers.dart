@@ -19,10 +19,23 @@ import '../presentation/wear/wear_view_models.dart';
 ///
 /// Lo único que queda acá es TRADUCIR, y eso vive en [wearTodaysWorkoutFrom],
 /// que es pura y testeable sin Firestore.
-final wearTodaysWorkoutProvider =
-    Provider.autoDispose<AsyncValue<WearTodaysWorkout?>>((ref) {
-  return ref.watch(todaysRoutineProvider).whenData(
-        (todays) => todays == null ? null : wearTodaysWorkoutFrom(todays),
+///
+/// ## Los cuatro estados son cuatro, no dos
+///
+/// Devuelve un [WearTodayState] y no un `WearTodaysWorkout?` porque el nullable
+/// colapsaba "cargando" con "resolvió y no hay entreno". La pantalla elegía
+/// "cargando" y dejaba el spinner girando para siempre — medido en el reloj.
+///
+/// `todaysRoutineProvider` devuelve null de forma LEGÍTIMA: cuando el atleta
+/// tiene varias rutinas y ninguna marcada como activa, o cuando no tiene
+/// ninguna. Eso no es una demora ni una falla, y merece su propio cartel.
+final wearTodayStateProvider = Provider.autoDispose<WearTodayState>((ref) {
+  return ref.watch(todaysRoutineProvider).when(
+        loading: () => const WearTodayLoading(),
+        error: (_, __) => const WearTodayFailed(),
+        data: (todays) => todays == null
+            ? const WearTodayEmpty()
+            : WearTodayReady(wearTodaysWorkoutFrom(todays)),
       );
 });
 

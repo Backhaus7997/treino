@@ -57,12 +57,12 @@ import 'firebase_options.dart';
 /// Host de los emuladores visto DESDE el reloj.
 ///
 /// `10.0.2.2` es la Mac vista desde un emulador de Android (incluido el de
-/// Wear OS). En un reloj FÍSICO hay que tunelizar y pasar `localhost`:
+/// Wear OS). En un reloj FÍSICO hay que tunelizar con adb y pasar `127.0.0.1`:
 ///
 /// ```
 /// adb -s <reloj> reverse tcp:8080 tcp:8080
 /// adb -s <reloj> reverse tcp:9099 tcp:9099
-/// flutter run ... --dart-define=EMULATOR_HOST=localhost
+/// flutter run ... --dart-define=EMULATOR_HOST=127.0.0.1
 /// ```
 ///
 /// El túnel no es capricho: `network_security_config.xml` habilita HTTP en
@@ -144,12 +144,28 @@ Future<void> _arrancarFirebase() async {
     );
 
     if (_useEmulator) {
-      // Los mismos puertos que `lib/main.dart`. El host se pasa explícito y no
-      // se delega en la reescritura de FlutterFire (`localhost` → `10.0.2.2`)
-      // porque esa reescritura sólo ocurre en el EMULADOR: en un reloj físico
-      // `localhost` es el reloj y la request no sale nunca.
-      FirebaseFirestore.instance.useFirestoreEmulator(_emulatorHost, 8080);
-      await FirebaseAuth.instance.useAuthEmulator(_emulatorHost, 9099);
+      // `automaticHostMapping: false` NO es opcional acá, y costó una corrida
+      // en el reloj descubrirlo.
+      //
+      // FlutterFire reescribe el host a `10.0.2.2` cuando vale `localhost` O
+      // `127.0.0.1`, y lo hace en TODO Android — no sólo en el emulador
+      // (firebase_core/src/port_mapping.dart, `getMappedHost`). En un reloj
+      // físico tunelizado con `adb reverse` eso rompe el túnel: la request sale
+      // hacia una IP que en la muñeca no existe, y el error que llega no
+      // nombra la reescritura, sólo dice
+      // `Failed to connect to /10.0.2.2:9099`.
+      //
+      // Apagándola, [_emulatorHost] significa exactamente lo que dice.
+      FirebaseFirestore.instance.useFirestoreEmulator(
+        _emulatorHost,
+        8080,
+        automaticHostMapping: false,
+      );
+      await FirebaseAuth.instance.useAuthEmulator(
+        _emulatorHost,
+        9099,
+        automaticHostMapping: false,
+      );
       debugPrint('[wear-boot] emuladores en $_emulatorHost (8080/9099)');
     }
 
@@ -222,7 +238,7 @@ class _WearHomeState extends ConsumerState<_WearHome> {
 
   // ── DATOS DE MUESTRA QUE TODAVÍA QUEDAN ───────────────────────────────────
   //
-  // HOY ya sale de Firestore (`wearTodaysWorkoutProvider`). Falta cablear las
+  // HOY ya sale de Firestore (`wearTodayStateProvider`). Falta cablear las
   // listas laterales y el entreno en curso.
   //
   // Las listas NO se pueden resolver con `unifiedRoutinesProvider`: ese
@@ -269,15 +285,14 @@ class _WearHomeState extends ConsumerState<_WearHome> {
     final pairing = ref.watch(wearPairingProvider);
     _arrancarServicioSiCorresponde(pairing);
 
-    // HOY ya sale de Firestore. Mientras carga se pasa null, que es el mismo
-    // estado que "no hay entreno resuelto" — la pantalla ya lo contempla.
-    final hoy = ref.watch(wearTodaysWorkoutProvider);
+    // HOY ya sale de Firestore, y con los cuatro estados distinguibles: sin
+    // esto, "no hay plan activo" se veía como un spinner eterno.
+    final hoy = ref.watch(wearTodayStateProvider);
 
     return WearRoot(
       pairing: pairing,
       session: _session,
-      workout: hoy.valueOrNull,
-      workoutFailed: hoy.hasError,
+      today: hoy,
       plans: _muestraPlanes,
       templates: _muestraPlantillas,
       selectedRoutine: _selected,

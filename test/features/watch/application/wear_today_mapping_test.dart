@@ -1,6 +1,11 @@
+import 'dart:async';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/features/home/application/todays_routine_provider.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/watch/application/wear_today_providers.dart';
+import 'package:treino/features/watch/presentation/wear/wear_view_models.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_day.dart';
 import 'package:treino/features/workout/domain/routine_slot.dart';
@@ -183,5 +188,71 @@ void main() {
 
     expect(w.exercises, isEmpty);
     expect(w.exerciseCount, 0);
+  });
+
+  group('los cuatro estados de HOY son distinguibles', () {
+    WearTodayState estadoCon(
+      Override override,
+    ) {
+      final container = ProviderContainer(overrides: [override]);
+      addTearDown(container.dispose);
+      return container.read(wearTodayStateProvider);
+    }
+
+    test('mientras resuelve, está cargando', () {
+      expect(
+        estadoCon(
+          // Un future que nunca completa: el provider queda en loading.
+          todaysRoutineProvider
+              .overrideWith((ref) => Completer<TodaysRoutine?>().future),
+        ),
+        isA<WearTodayLoading>(),
+      );
+    });
+
+    test('si resuelve SIN entreno, dice que no hay plan activo', () async {
+      // El caso que motivó todo esto. `todaysRoutineProvider` devuelve null de
+      // forma legítima —varias rutinas sin ninguna activa, o ninguna rutina— y
+      // antes eso se veía como un spinner eterno, indistinguible de un problema
+      // de red. Costó una sesión de diagnóstico en el reloj.
+      final container = ProviderContainer(
+        overrides: [todaysRoutineProvider.overrideWith((ref) async => null)],
+      );
+      addTearDown(container.dispose);
+      await container.read(todaysRoutineProvider.future);
+
+      expect(container.read(wearTodayStateProvider), isA<WearTodayEmpty>());
+    });
+
+    test('si falla, lo dice; no se queda cargando', () async {
+      final container = ProviderContainer(
+        overrides: [
+          todaysRoutineProvider
+              .overrideWith((ref) async => throw Exception('x'))
+        ],
+      );
+      addTearDown(container.dispose);
+      await container.read(todaysRoutineProvider.future).catchError(
+            (_) => null,
+          );
+
+      expect(container.read(wearTodayStateProvider), isA<WearTodayFailed>());
+    });
+
+    test('con entreno, lo entrega ya traducido', () async {
+      final container = ProviderContainer(
+        overrides: [
+          todaysRoutineProvider.overrideWith(
+            (ref) async => _hoy(slots: [_slot('Sentadilla')]),
+          )
+        ],
+      );
+      addTearDown(container.dispose);
+      await container.read(todaysRoutineProvider.future);
+
+      final estado = container.read(wearTodayStateProvider);
+      expect(estado, isA<WearTodayReady>());
+      expect((estado as WearTodayReady).workout.dayName, 'Empuje');
+    });
   });
 }

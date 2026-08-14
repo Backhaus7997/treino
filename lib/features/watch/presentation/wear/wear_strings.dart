@@ -54,6 +54,13 @@ class WearStrings {
   static const routineLoadFailed = 'No se pudo cargar tu rutina';
   static const noExercisesThisWeek = 'Sin ejercicios esta semana';
 
+  /// Resolvió bien y no hay entreno: el atleta no tiene plan activo.
+  ///
+  /// Manda a PLANES y no al teléfono porque activar se puede desde la muñeca:
+  /// es la página de al lado. Mandarlo al celular sería pedirle que vaya a
+  /// buscarlo teniendo la solución a un deslizamiento.
+  static const noActivePlan = 'Sin plan activo. Elegí uno en PLANES.';
+
   /// Abreviatura de semana. Sólo se muestra en planes periodizados.
   static const weekAbbrev = 'Sem';
 

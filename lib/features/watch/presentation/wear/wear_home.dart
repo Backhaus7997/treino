@@ -28,20 +28,18 @@ import 'wear_view_models.dart';
 class WearHome extends StatelessWidget {
   const WearHome({
     super.key,
-    required this.workout,
+    required this.today,
     required this.plans,
     required this.templates,
     required this.onStartToday,
     required this.onSelectRoutine,
-    this.workoutFailed = false,
   });
 
-  final WearTodaysWorkout? workout;
+  final WearTodayState today;
   final List<WearRoutineSummary> plans;
   final List<WearRoutineSummary> templates;
   final VoidCallback onStartToday;
   final void Function(WearRoutineSummary, WearRoutineListKind) onSelectRoutine;
-  final bool workoutFailed;
 
   @override
   Widget build(BuildContext context) {
@@ -51,11 +49,7 @@ class WearHome extends StatelessWidget {
           firstItem: WearItemType.text,
           lastItem: WearItemType.card,
           children: [
-            WearTodaySection(
-              workout: workout,
-              failed: workoutFailed,
-              onStart: onStartToday,
-            ),
+            WearTodaySection(state: today, onStart: onStartToday),
           ],
         ),
         WearRoundScaffold.list(

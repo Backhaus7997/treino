@@ -66,6 +66,53 @@ class WearExercisePreview {
   String get setsLabel => setCount == 1 ? '1 serie' : '$setCount series';
 }
 
+/// En qué estado está la pantalla HOY.
+///
+/// ## Por qué un tipo y no un `WearTodaysWorkout?` con banderas
+///
+/// Antes eran un nullable más un `failed`, y ese diseño tenía un agujero: `null`
+/// significaba las DOS cosas —"todavía cargando" y "resolvió, y no hay entreno
+/// para hoy"—. La pantalla no puede distinguirlas, así que elegía la primera y
+/// mostraba el spinner **para siempre**.
+///
+/// No es hipotético: se vio en el reloj, y costó una sesión de diagnóstico
+/// porque una espera infinita es indistinguible de un problema de red.
+///
+/// ⚠️ **Acá el companion de Wear se aparta a propósito del de watchOS.**
+/// `TodayPage` de `ContentView.swift` tiene el mismo hueco: si no hay workout y
+/// no hay error, cae al `else` con "Cargando tu rutina…". Un atleta sin plan
+/// activo se queda mirando girar la ruedita en la muñeca. Es un defecto, no una
+/// decisión, y no se replica. Si algún día se arregla del lado Apple, esta es
+/// la forma que conviene copiar.
+sealed class WearTodayState {
+  const WearTodayState();
+}
+
+/// Todavía se está resolviendo.
+class WearTodayLoading extends WearTodayState {
+  const WearTodayLoading();
+}
+
+/// No se pudo cargar. Es un error: reintentar tiene sentido.
+class WearTodayFailed extends WearTodayState {
+  const WearTodayFailed();
+}
+
+/// Resolvió bien y NO hay entreno: el atleta no tiene plan activo.
+///
+/// Es un estado legítimo, no una falla. Pasa cuando hay varias rutinas y
+/// ninguna marcada como activa, o cuando no hay ninguna.
+class WearTodayEmpty extends WearTodayState {
+  const WearTodayEmpty();
+}
+
+/// Hay entreno.
+class WearTodayReady extends WearTodayState {
+  const WearTodayReady(this.workout);
+
+  final WearTodaysWorkout workout;
+}
+
 /// Cuál de las dos listas laterales.
 enum WearRoutineListKind {
   /// Planes a nombre del atleta: los del PF y los que se armó él.

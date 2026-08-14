@@ -23,7 +23,7 @@ class WearRoot extends StatelessWidget {
     super.key,
     required this.pairing,
     required this.session,
-    required this.workout,
+    required this.today,
     required this.plans,
     required this.templates,
     required this.onStartToday,
@@ -33,7 +33,6 @@ class WearRoot extends StatelessWidget {
     required this.onStartRoutine,
     required this.onActivateRoutine,
     required this.onLogSet,
-    this.workoutFailed = false,
   });
 
   final WearPairingState pairing;
@@ -41,10 +40,10 @@ class WearRoot extends StatelessWidget {
   /// Entreno EN CURSO, o null. Si no es null, gana sobre todo.
   final WearWorkoutSnapshot? session;
 
-  final WearTodaysWorkout? workout;
+  /// Estado de la pantalla HOY: cargando, sin plan activo, falló, o el entreno.
+  final WearTodayState today;
   final List<WearRoutineSummary> plans;
   final List<WearRoutineSummary> templates;
-  final bool workoutFailed;
 
   final VoidCallback onStartToday;
   final void Function(WearRoutineSummary, WearRoutineListKind) onSelectRoutine;
@@ -112,10 +111,9 @@ class WearRoot extends StatelessWidget {
         }
 
         return WearHome(
-          workout: workout,
+          today: today,
           plans: plans,
           templates: templates,
-          workoutFailed: workoutFailed,
           onStartToday: onStartToday,
           onSelectRoutine: onSelectRoutine,
         );

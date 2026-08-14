@@ -20,31 +20,42 @@ import 'wear_widgets.dart';
 class WearTodaySection extends StatelessWidget {
   const WearTodaySection({
     super.key,
-    required this.workout,
+    required this.state,
     required this.onStart,
-    this.failed = false,
   });
 
-  /// Null mientras carga.
-  final WearTodaysWorkout? workout;
+  final WearTodayState state;
   final VoidCallback onStart;
-  final bool failed;
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
 
-    if (failed) {
-      return WearStatusMessage(
-        icon: TreinoIcon.arrowRight,
-        text: WearStrings.routineLoadFailed,
-        tint: palette.warning,
-      );
-    }
+    // El `switch` exhaustivo sobre el sellado es medio punto del cambio: si
+    // mañana se agrega un estado, esto no compila hasta que se decida qué
+    // dibujar. Antes un estado nuevo se caía silenciosamente en el spinner.
+    final WearTodaysWorkout w;
+    switch (state) {
+      case WearTodayLoading():
+        return const WearLoading(text: WearStrings.loadingRoutine);
 
-    final w = workout;
-    if (w == null) {
-      return const WearLoading(text: WearStrings.loadingRoutine);
+      case WearTodayFailed():
+        return WearStatusMessage(
+          icon: TreinoIcon.arrowRight,
+          text: WearStrings.routineLoadFailed,
+          tint: palette.warning,
+        );
+
+      case WearTodayEmpty():
+        // NO es un error, así que no va teñido de warning: no hay nada roto,
+        // sólo falta elegir plan.
+        return const WearStatusMessage(
+          icon: TreinoIcon.dumbbell,
+          text: WearStrings.noActivePlan,
+        );
+
+      case WearTodayReady(:final workout):
+        w = workout;
     }
 
     return Column(
