@@ -18,6 +18,11 @@ const SRC = join(__dirname, "..");
 const DEPLOYED_CALLABLES = [
   { file: "delete-account.ts", symbol: "deleteAccountHandler" },
   { file: "add-alias.ts", symbol: "addAlias" },
+  // La única callable que entrega credenciales renovables era la única que este
+  // guard no cubría: se le podía sacar `enforceAppCheck` y la suite seguía en
+  // verde. Es la que más lo necesita — el token que mintea sale del teléfono y
+  // vive una hora en el reloj.
+  { file: "mint-watch-credential.ts", symbol: "mintWatchCredential" },
 ];
 
 describe("QA-SEC-006: App Check enforcement on deployed callables", () => {

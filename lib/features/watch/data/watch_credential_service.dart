@@ -1,4 +1,5 @@
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 
 import '../domain/watch_credential_payload.dart';
 import 'watch_bridge.dart';
@@ -78,10 +79,13 @@ class WatchCredentialService {
   Future<WatchCredentialOutcome> deliverCredential(
       {required String uid}) async {
     if (!await _bridge.isSupported) {
-      return WatchCredentialOutcome.notSupported;
+      return _rastro(WatchCredentialOutcome.notSupported);
     }
     if (!await _bridge.isPaired) {
-      return WatchCredentialOutcome.noWatchPaired;
+      // OJO al diagnosticar: en Android esto NO pregunta si hay un reloj
+      // emparejado. El plugin lista las apps companion instaladas en el
+      // TELÉFONO; si ninguna está visible da false aunque el reloj esté ahí.
+      return _rastro(WatchCredentialOutcome.noWatchPaired);
     }
 
     final String customToken;
@@ -96,13 +100,22 @@ class WatchCredentialService {
       );
       final token = result.data['customToken'];
       if (token is! String || token.isEmpty) {
-        return WatchCredentialOutcome.mintFailed;
+        debugPrint('[watch-cred] $callableName devolvió un customToken '
+            'inusable (${token.runtimeType}).');
+        return _rastro(WatchCredentialOutcome.mintFailed);
       }
       customToken = token;
-    } catch (_) {
-      // Incluye FirebaseFunctionsException (no autenticado, App Check, red).
+    } on FirebaseFunctionsException catch (e) {
+      // El sospechoso número uno acá es App Check: la CF lo exige
+      // (`enforceAppCheck: true`) y un APK sideloadeado con debug keys no puede
+      // atestar con Play Integrity. Ese caso llega como `unauthenticated` y sin
+      // el código a la vista es indistinguible de "no hay sesión".
+      debugPrint('[watch-cred] $callableName falló — ${e.code}: ${e.message}');
+      return _rastro(WatchCredentialOutcome.mintFailed);
+    } catch (e) {
       // Quedarse sin credencial de reloj no debe tumbar nada del teléfono.
-      return WatchCredentialOutcome.mintFailed;
+      debugPrint('[watch-cred] $callableName falló — $e');
+      return _rastro(WatchCredentialOutcome.mintFailed);
     }
 
     final payload = WatchCredentialPayload(
@@ -116,10 +129,37 @@ class WatchCredentialService {
 
     try {
       await _bridge.updateApplicationContext(payload.toJson());
-    } catch (_) {
-      return WatchCredentialOutcome.deliveryFailed;
+    } catch (e) {
+      debugPrint('[watch-cred] no se pudo publicar la credencial — $e');
+      return _rastro(WatchCredentialOutcome.deliveryFailed);
     }
 
-    return WatchCredentialOutcome.delivered;
+    return _rastro(
+      WatchCredentialOutcome.delivered,
+      detalle: 'uid=$uid, customToken de ${customToken.length} caracteres',
+    );
+  }
+
+  /// Deja rastro del resultado y lo devuelve tal cual.
+  ///
+  /// Existe porque hasta acá la cadena entera fallaba **en silencio**: dos
+  /// `catch` mudos y un outcome que sólo veía el provider. Con App Check de por
+  /// medio el resultado observable de una configuración rota era exactamente
+  /// cero, y la prueba de punta a punta se debuggeaba mirando una muñeca.
+  ///
+  /// Sin guard de `kDebugMode` a propósito: las corridas contra el reloj se
+  /// hacen en PROFILE (HANDOFF §4.8), donde ese flag es false y un log guardado
+  /// no existiría justo cuando hace falta.
+  ///
+  /// **Nunca** se loguea el token, sólo su longitud: alcanza para distinguir
+  /// "vino vacío" de "vino bien" sin dejar una credencial viva en logcat.
+  WatchCredentialOutcome _rastro(
+    WatchCredentialOutcome outcome, {
+    String? detalle,
+  }) {
+    debugPrint(
+      '[watch-cred] ${outcome.name}${detalle == null ? '' : ' — $detalle'}',
+    );
+    return outcome;
   }
 }
