@@ -206,6 +206,56 @@ mutación que lo salteaba, y por eso las dos series duplicadas sobrevivían.
   no, los toques caen fuera del botón y parece que la app no responde.
 - **`-sdk iphonesimulator` pisa el SDKROOT de TODOS los targets** y compila el
   reloj contra iOS, dando errores falsos. Usar `-destination`.
+- **Un target tiene que declarar su propio `SUPPORTED_PLATFORMS`.** El template de
+  Flutter lo setea en `iphoneos` a nivel PROYECTO, pero **sólo en Release y
+  Profile — en Debug no está**. El target del reloj declaraba `SDKROOT = watchos`
+  y heredaba el resto: en Debug Xcode derivaba `watchos watchsimulator` y andaba;
+  en Release el `iphoneos` heredado le ganaba y Xcode resolvía la plataforma del
+  reloj como iOS. Síntoma: `actool` corría con `--platform iphoneos` sobre un
+  catálogo con idioms `watch` y el build moría con *"the app icon set named
+  AppIcon did not have any applicable content"* apuntando a la carpeta del reloj,
+  **que estaba perfecta**. El ícono nunca fue la causa: el target entero se
+  compilaba contra iOS, y por eso también aparecían errores de disponibilidad de
+  Swift (`'onChange(of:initial:_:)' is only available in iOS 17.0 or newer`) —
+  esos NO eran falsos, eran el bug. Arreglado en `2d05fa02`. Se diagnostica en
+  segundos, sin builds de 20 minutos:
+  ```
+  xcodebuild -showBuildSettings -project ios/Runner.xcodeproj \
+    -target "TreinoWatch Watch App" -configuration Debug|Release \
+    | rg SUPPORTED_PLATFORMS
+  ```
+- **`flutter build ios --simulator` NO arranca sin `-d`** mientras haya companion
+  de reloj: *"A device ID is required to build an app with a watchOS companion
+  app"*. Muere antes de compilar una línea, así que un "falló el build" ahí no
+  dice absolutamente nada sobre el código.
+- **El exit code de un comando piped o en background MIENTE.** `xcodebuild | tail`
+  devuelve el de `tail`; `cmd; echo EXIT=$?` lanzado en background devuelve el del
+  `echo`. Un `firebase deploy` que salió con 2 se reportó como 0 y casi pasa por
+  bueno. Capturar el código REAL dentro del log, o buscar `BUILD SUCCEEDED`.
+  (`timeout` tampoco existe en macOS: es `gtimeout`, de coreutils.)
+- **App Attest NO funciona con un build firmado para desarrollo.** `flutter build
+  ios --release` compila Dart en release pero firma con el perfil de desarrollo:
+  `aps-environment=development`, `get-task-allow=true` y sin el entitlement
+  `com.apple.developer.devicecheck.appattest-environment`. iOS atestigua entonces
+  contra el ambiente *development* de Apple y Firebase valida contra *production*.
+  Resultado: `mintWatchCredential` (que tiene `enforceAppCheck: true`) rechaza con
+  *"Decoding App Check token failed"*, `deliverCredential` se lo traga en su
+  `catch (_)`, y **el reloj nunca recibe credencial sin un solo error visible**.
+  Para probar en hardware real: o TestFlight, o `AppleProvider.debug` sin
+  commitear con el token registrado en Console — esto último deja
+  `enforceAppCheck` PRENDIDO en el servidor, que es lo que uno quiere.
+- **Firebase hace públicas las callables Gen2 con `invokerIamDisabled`, NO con un
+  binding `allUsers → run.invoker`.** Ese campo sólo se ve en la API v2 de Cloud
+  Run: `gcloud run services describe` devuelve la representación knative v1 y no
+  lo muestra, así que dos servicios que se comportan distinto se ven idénticos.
+  Una callable puede figurar en `functions:list` y **no ser invocable**.
+  Distinguir por la FORMA de la respuesta: **403 HTML** = el frontend de Google
+  bloquea antes del contenedor; **401 JSON `UNAUTHENTICATED`** = contestó la
+  función (ese 401 es el resultado CORRECTO sin token de Auth). Se arregla con
+  `gcloud run services update <servicio-en-minúsculas> --no-invoker-iam-check`.
+- **`CFBundleIconName` en watchOS vive ANIDADO** bajo `CFBundleIcons →
+  CFBundlePrimaryIcon`, no en la raíz del plist. `plutil -extract CFBundleIconName`
+  contra la raíz da un falso negativo.
 - La suite completa a veces tira caídas del runner (`Cannot close sink while
   adding stream`, SIGTERM) por contención de recursos. Confirmar corriendo los
   archivos aislados antes de creer que es el código.
@@ -263,14 +313,36 @@ Inspeccionar Firestore sin pasar por la app:
   `home_screen.dart` tiene su propio aviso al reloj porque ahí el notifier ni
   siquiera está vivo.
 
+### Verificado el 2026-08-13 (build de release, `2d05fa02`)
+
+- **La rama vuelve a generar builds de release.** `flutter build ios --release`
+  verde en 467.7s. El reloj embebido reporta `platform WATCHOS / minos 26.2 /
+  sdk 26.2`, y el build de simulador reporta `WATCHOSSIMULATOR` — las dos mitades
+  de `SUPPORTED_PLATFORMS` quedaron ejercitadas, ninguna supuesta.
+- **La app corre SUELTA en un iPhone físico**, sin cable ni debugger (PID vivo tras
+  el lanzamiento con `devicectl`). Esto es lo que destraba medir en hardware real
+  lo que el simulador no puede dar.
+- `mintWatchCredential` **desplegada y alcanzable** en `treino-dev`. Verificado el
+  recorrido completo de la sonda: `404` (no existía) → `403` (desplegada pero sin
+  invocador) → `401 JSON UNAUTHENTICATED` (correcto). Ver la trampa de
+  `invokerIamDisabled` en §5.
+
 ### Implementado pero NUNCA verificado corriendo
 
-- (vacío por ahora — al cerrar algo, moverlo arriba con lo que se midió)
+- **El handoff de credencial al reloj, end-to-end.** El teléfono SÍ llama a la
+  función (3 invocaciones medidas en los logs de Cloud Run), lo que además prueba
+  que `isPaired` da true. Pero **App Check rechaza el token** porque el build está
+  firmado para desarrollo — ver §5. Hasta resolver eso, nada de lo que dependa de
+  la credencial del reloj se puede probar en hardware.
+- **Que el descanso siga corriendo con la muñeca baja.** Es el corazón del ciclo de
+  HealthKit y hoy está medido SOLO en simulador (0 segundos perdidos en 72). El
+  simulador no puede responder esta pregunta.
 
 ### Quality gates al último commit
 
 `flutter analyze` 0 issues · conformidad Swift 50 casos · tests puros del reloj
-87 chequeos · typecheck del reloj limpio.
+95 chequeos · typecheck del reloj limpio. Los cuatro con exit code 0 verificado
+aparte (ver la trampa de exit codes en §5).
 
 Dos corredores nuevos desde el traspaso original:
 `bash scripts/test_watch_swift.sh` (lógica pura del reloj, segundos) y el
@@ -280,15 +352,33 @@ fixture `conformance/set_log_identity.json`.
 
 ## 8. Deuda conocida — NO es de este ciclo
 
-1. **Sesiones abandonadas se acumulan para siempre.** `getActive` devuelve la
-   más nueva y nada cierra las viejas. Es la causa de fondo del "me marca el
-   entreno como pendiente".
+1. ~~**Sesiones abandonadas se acumulan para siempre.**~~ — **RESUELTA en
+   `558759f1`**, verificada en código el 2026-08-13. `getActive` mira las 10
+   `active` más nuevas (`_staleActiveSweep`, `session_repository.dart:49`) y
+   **cierra con un write real** (`status: finished`, `wasFullyCompleted: false`,
+   `:366-375`) todo lo que pase de `maxWorkoutDuration` = 8h. No es un filtro en
+   memoria. Cubierto por tests en `session_repository_test.dart:212-314`.
+   ⚠️ **Pero el barrido lo dispara SÓLO el teléfono.** El reloj tiene su propia
+   `HistorySync.findAnyActiveSession` (`HistorySync.swift:80-114`), sin filtro de
+   status y **sin corte por antigüedad**: un atleta que use sólo el reloj no barre
+   nada y puede adoptar una sesión de hace días. Ahí sigue habiendo deuda.
+   Además drena de a 10 por lectura, y el `catch` de `:376-383` es best-effort.
 2. **`racha` / `workoutsCount`** los escribe el cliente del teléfono en
    `SessionRepository.finish`, así que terminar desde el reloj los deja
    desactualizados. Candidato: moverlos a `rankingAggregateOnSession`.
-3. **No hay salida de un entreno que no podés completar.** "Terminar" solo
-   aparece con todas las series marcadas (pedido del dueño). Si te lesionás,
-   la sesión queda abierta para siempre. Conviene un gesto menos accesible.
+3. ~~**No hay salida de un entreno que no podés completar.**~~ — **RESUELTA en
+   `558759f1`**, verificada en código el 2026-08-13. `WorkoutView.swift:57-87`
+   muestra "Abandonar entreno" en la rama donde antes sólo había un texto muerto,
+   detrás de un `confirmationDialog` (`:91-103`). `abandon()` delega en `finish()`
+   (`WorkoutCoordinator.swift:304-306`), que cierra la sesión con
+   `wasFullyCompleted: false`. En el teléfono nunca fue deuda.
+   ⚠️ **Dos huecos que quedan, y el primero muerde justo en el escenario de la
+   deuda**: (a) `WorkoutCoordinator.swift:318` corta con
+   `if !current.pendingSets.isEmpty { return }`, así que **si te lesionás sin
+   conectividad el abandono es un no-op SILENCIOSO** — el diálogo se cierra y la
+   sesión sigue abierta; (b) el `syncError` del `catch` de `:337-339` **no lo
+   renderiza ninguna vista** (`rg syncError` sólo aparece en el coordinator),
+   contra el teléfono que sí ofrece Reintentar (`session_player_screen.dart:324`).
 4. **El duplicado del estado local se tapó con un invariante**, no con la causa
    raíz. Si vuelve a aparecer algo relacionado, **instrumentar el notifier** en
    vez de sumar defensas.
@@ -300,16 +390,45 @@ fixture `conformance/set_log_identity.json`.
    candado se sacó y `planComplete` quedó como señal, con REPETIR de acción.
    El reloj rota igual que Home, así que son consistentes.
    **Antes de "arreglar" algo del avance de plan, leer `openspec/changes/`.**
-6. `WCErrorCodeWatchAppNotInstalled` al entregar la credencial no tiene
-   reintento.
-7. Sin confirmar si `WCSession` exige algún capability nuevo en Signing &
-   Capabilities.
-8. `ios/Runner.xcodeproj/project.pbxproj` lo reescribe Flutter en cada build.
-9. **Los duplicados que YA existen no se limpian.** El arreglo de la rama
-   `fix/watch-sync-bugs` es preventivo, no migratorio. Medido el 2026-08-12 en
-   el emulador: 24 documentos de más en 13 de 77 sesiones, **11.450 kg
-   fantasma**. Si algún usuario real los tiene, su volumen histórico y su
-   posición en rankings siguen inflados. Falta decidir si va un backfill.
+6. ~~`WCErrorCodeWatchAppNotInstalled` al entregar la credencial no tiene
+   reintento.~~ — **RESUELTA**, verificada en código el 2026-08-13. Hay reintento
+   por resume en `watch_credential_providers.dart:107-109`, que corta bien en
+   `notSupported` / `noWatchPaired` / `delivered` para no pegarle a la CF en cada
+   foreground.
+   ⚠️ **Cubre por superconjunto, no por detección**: el `catch (_)` de
+   `watch_credential_service.dart:119` colapsa ese error con cualquier otro, y no
+   hay alternativa realista porque el plugin sólo expone el `WCErrorCode` dentro
+   de `localizedDescription`. **Race NO cubierta**: `WCSession.activate()` es
+   asíncrono; si el primer `deliverCredential` corre antes de que active,
+   `isPaired` da false → `noWatchPaired` → **nunca se reintenta, ni en resume**.
+   Sólo se confirma en dispositivo real.
+7. **Sin confirmar si `WCSession` exige algún capability nuevo en Signing &
+   Capabilities.** SIGUE ABIERTA — una sesión la dio por cerrada, se verificó el
+   2026-08-13 y **la afirmación era falsa**: `docs/setup/watchos-target.md:279-284`
+   y `state.yaml:153-156` siguen diciendo "sin verificar". Lo único que el repo
+   sostiene es más débil: hoy **no hay ningún entitlement de WatchConnectivity en
+   ningún target** y el reloj compila así. Eso no lo prueba — un capability
+   faltante no rompe la compilación (`test_watch_capabilities.sh:12-15` documenta
+   exactamente ese modo de falla), y el build de simulador no firma contra el App
+   ID del portal. **Se cierra firmando el reloj para un Apple Watch físico**, no
+   leyendo código.
+8. ~~`ios/Runner.xcodeproj/project.pbxproj` lo reescribe Flutter en cada build.~~
+   — **DESMENTIDA por medición el 2026-08-13.** Un `flutter build ios --release`
+   completo NO lo tocó: `git diff --stat` devolvió exactamente las 3 líneas
+   agregadas a mano. Los fixes de build settings sobreviven a los builds de
+   Flutter; no hace falta reaplicarlos.
+9. **Los duplicados que YA existen no se limpian.** Medido el 2026-08-12 en el
+   emulador: 24 documentos de más en 13 de 77 sesiones, **11.450 kg fantasma**.
+   ⚠️ Corrección al texto anterior, que decía "falta decidir si va un backfill":
+   **la decisión ya se tomó y el backfill ya está escrito** —
+   `scripts/backfill_dedupe_setlogs.js`, ~400 líneas con respaldo, batch atómico
+   por sesión, idempotencia y restore, commiteado el 2026-08-13. También corrige
+   `totalVolumeKg`, que es lo único que leen rankings e insights. Lo que queda es
+   **APLICARLO**, y a propósito todavía no se hizo: el propio script exige
+   (`:76-92`) que primero salga la app con el fix preventivo y que el padrón
+   actualice, porque correrlo antes vuelve a ensuciar todo.
+   ⚠️ **Riesgo vivo más grande que los 24 documentos: el script no tiene NI UN
+   test.** Borra datos de producción y no hay nada que lo cubra, ni sobre emulador.
 10. **El dedupe de escritura NO es atómico.** La secuencia `get` → (el reloj
     escribe) → `set` sigue siendo posible; lo que cambia es el TAMAÑO de la
     ventana, de 37 segundos medidos a un round-trip. Cerrarla del todo pide una
