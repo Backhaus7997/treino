@@ -300,14 +300,32 @@ void main() {
     });
   });
 
-  group(
-      'CTA "Registrar pago" persiste de verdad (REQ-PAGW-ACTION-003, '
-      'ADR-F9-06 — remediación CRITICAL-1 verify ronda 1)', () {
-    // Antes de esta pieza, `_onRegistrarPago` abría RegistrarPagoDialog y
-    // descartaba el resultado: el trainer completaba el form, tocaba
-    // "Registrar" y NO se persistía nada. Este test falla contra la
-    // implementación vieja (repo.add nunca se llamaba) y pasa contra la
-    // nueva (picker de alumno → registrarPago → repo.add real).
+  group('PagosScreen _onRegistrarPago persistence', () {
+    late _MockPaymentRepo mockRepo;
+
+    setUpAll(() {
+      registerFallbackValue(
+        Payment(
+          id: '',
+          trainerId: 'trainer-1',
+          athleteId: 'athlete-1',
+          amountArs: 1000,
+          concept: 'test',
+          status: PaymentStatus.paid,
+          createdAt: DateTime.utc(2026, 1, 1),
+        ),
+      );
+    });
+
+    setUp(() {
+      mockRepo = _MockPaymentRepo();
+      when(() => mockRepo.add(any())).thenAnswer((_) async {});
+    });
+
+    // Full round trip: open the dialog from the header button, fill it in,
+    // confirm → the caller (_onRegistrarPago) must build and persist a real
+    // Payment via paymentRepositoryProvider.add. Covers the wiring between
+    // the dialog's RegistrarPagoResult and the screen's write path.
     testWidgets(
         'SCENARIO — fill dialog + Registrar → repo.add called with a paid '
         'Payment for the selected athlete', (tester) async {
@@ -315,32 +333,14 @@ void main() {
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
 
-      final mockRepo = _MockPaymentRepo();
-      when(() => mockRepo.add(any())).thenAnswer((_) async {});
-
-      final link = TrainerLink(
-        id: 'l1',
-        trainerId: 'trainer-1',
-        athleteId: 'athlete-1',
-        status: TrainerLinkStatus.active,
-        requestedAt: DateTime.utc(2026, 1, 1),
-      );
-
-      await tester.pumpWidget(_wrap(
-        const PagosScreen(),
-        overrides: [
-          ..._emptyOverrides(),
-          paymentRepositoryProvider.overrideWithValue(mockRepo),
-          currentUidProvider.overrideWithValue('trainer-1'),
-          trainerLinksStreamProvider
-              .overrideWith((ref) => Stream.value([link])),
-          userPublicProfilesBatchProvider.overrideWith(
-            (ref, key) async => {
-              'athlete-1': const UserPublicProfile(
-                uid: 'athlete-1',
-                displayName: 'Juana Pérez',
-              ),
-            },
+      await tester.pumpWidget(
+        _wrap(
+          const PagosScreen(),
+          overrides: _emptyOverrides(
+            links: [_link('athlete-1', TrainerLinkStatus.active)],
+            profiles: [_prof('athlete-1', 'Ana Activa')],
+            repo: mockRepo,
+            trainerId: 'trainer-1',
           ),
         ),
       );

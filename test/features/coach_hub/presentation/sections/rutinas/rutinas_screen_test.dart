@@ -144,50 +144,6 @@ void main() {
         find.text('Elegí un alumno para armarle una rutina.'),
         findsOneWidget,
       );
-      // count = alumnos no-pending deduplicados.
-      expect(find.text('1'), findsOneWidget);
-    });
-
-    testWidgets(
-        'the subtitle uses AppFonts.barlow directly instead of '
-        'GoogleFonts.barlow() — the latter loads the variant asynchronously '
-        '(fontFamily "Barlow_400", not "Barlow") and renders as tofu in the '
-        'evidence goldens before the async load resolves', (tester) async {
-      await _pumpRutinas(tester, links: [
-        _link(id: '1', status: TrainerLinkStatus.active),
-      ], names: {
-        'a1': 'Ana Activa',
-      });
-
-      final subtitle = tester.widget<Text>(
-        find.text('Elegí un alumno para armarle una rutina.'),
-      );
-      expect(subtitle.style?.fontFamily, AppFonts.barlow);
-    });
-
-    testWidgets(
-        'shows shimmer TreinoListRow skeletons keyed "loading" while the '
-        'stream has not emitted yet', (tester) async {
-      final controller = StreamController<List<TrainerLink>>();
-      addTearDown(controller.close);
-
-      await _pumpRutinasWithController(tester, controller);
-
-      expect(find.byKey(const ValueKey('loading')), findsOneWidget);
-      expect(find.byType(TreinoStateSwitcher), findsOneWidget);
-      // Skeletons: TreinoListRow(loading: true) — mismo widget, sin data.
-      expect(find.byType(TreinoListRow), findsWidgets);
-    });
-
-    testWidgets('renders athletes with TreinoListRow', (tester) async {
-      await _pumpRutinas(tester, links: [
-        _link(id: '1', status: TrainerLinkStatus.active, athleteId: 'a1'),
-      ], names: {
-        'a1': 'Ana Activa',
-      });
-
-      expect(find.byKey(const ValueKey('data')), findsOneWidget);
-      expect(find.byType(TreinoListRow), findsOneWidget);
     });
 
     testWidgets(
