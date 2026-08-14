@@ -3368,21 +3368,21 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get templatesOnboardingStep1Body =>
-      'Pick what you can keep up. We rank the catalog by fit — we never hide templates.';
+      'Pick what you can keep up. We save your answer to personalise what we recommend.';
 
   @override
   String get templatesOnboardingStep1Label => 'Days per week';
 
   @override
   String get templatesOnboardingStep1Hint =>
-      'The catalog starts at 3 days: if you pick 2, we show the closest match and say why.';
+      'No answer filters the catalog: you will keep seeing every template.';
 
   @override
   String get templatesOnboardingStep2Title => 'How long is your session?';
 
   @override
   String get templatesOnboardingStep2Body =>
-      '45 real minutes beat an ideal hour. With no duration on record, a template stays neutral.';
+      '45 real minutes beat an ideal hour. Pick the time you actually have.';
 
   @override
   String get templatesOnboardingStep2Label => 'Minutes per session';
@@ -3392,17 +3392,17 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get templatesOnboardingStep3Body =>
-      'Nobody picks by split, they pick by what for. It is the strongest signal in how the grid is ordered.';
+      'Nobody picks by split, they pick by what for. It is the answer that tells us most about what you are after.';
 
   @override
   String get templatesOnboardingStep3Label => 'Goal';
 
   @override
-  String get templatesOnboardingStep4Title => 'It stays a filter, not an exam';
+  String get templatesOnboardingStep4Title => 'This is not an exam';
 
   @override
   String get templatesOnboardingStep4Body =>
-      'Your answers sit on top of PLANTILLAS. Change one and the order recalculates, without repeating the flow.';
+      'We save your answers to your profile. This one is optional: leave it empty if you have no preference.';
 
   @override
   String get templatesOnboardingStep4Label => 'Zones to prioritise · optional';

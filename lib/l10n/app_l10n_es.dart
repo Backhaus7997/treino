@@ -3428,21 +3428,21 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get templatesOnboardingStep1Body =>
-      'Elegí lo que vas a sostener. Ordenamos el catálogo por afinidad — nunca escondemos plantillas.';
+      'Elegí lo que vas a sostener. Guardamos tu respuesta para personalizar lo que te recomendamos.';
 
   @override
   String get templatesOnboardingStep1Label => 'Días por semana';
 
   @override
   String get templatesOnboardingStep1Hint =>
-      'El catálogo arranca en 3 días: si elegís 2, mostramos lo más cercano con el motivo a la vista.';
+      'Ninguna respuesta filtra el catálogo: vas a seguir viendo todas las plantillas.';
 
   @override
   String get templatesOnboardingStep2Title => '¿Cuánto dura tu sesión?';
 
   @override
   String get templatesOnboardingStep2Body =>
-      '45 minutos reales pesan más que una hora ideal. Sin dato de duración, la plantilla queda neutra.';
+      '45 minutos reales valen más que una hora ideal. Elegí el tiempo que tenés de verdad.';
 
   @override
   String get templatesOnboardingStep2Label => 'Minutos por sesión';
@@ -3452,18 +3452,17 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get templatesOnboardingStep3Body =>
-      'Nadie elige por split, elige por para qué. Es el dato que más pesa en el orden de la grilla.';
+      'Nadie elige por split, elige por para qué. Es la respuesta que más nos dice sobre lo que buscás.';
 
   @override
   String get templatesOnboardingStep3Label => 'Objetivo';
 
   @override
-  String get templatesOnboardingStep4Title =>
-      'Queda como filtro, no como examen';
+  String get templatesOnboardingStep4Title => 'Esto no es un examen';
 
   @override
   String get templatesOnboardingStep4Body =>
-      'Tus respuestas quedan arriba de PLANTILLAS. Cambiás una y el orden se recalcula, sin repetir el flujo.';
+      'Guardamos tus respuestas en tu perfil. Esta es opcional: dejala vacía si no tenés preferencia.';
 
   @override
   String get templatesOnboardingStep4Label => 'Zonas a priorizar · opcional';
@@ -6958,21 +6957,21 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get templatesOnboardingStep1Body =>
-      'Elegí lo que vas a sostener. Ordenamos el catálogo por afinidad — nunca escondemos plantillas.';
+      'Elegí lo que vas a sostener. Guardamos tu respuesta para personalizar lo que te recomendamos.';
 
   @override
   String get templatesOnboardingStep1Label => 'Días por semana';
 
   @override
   String get templatesOnboardingStep1Hint =>
-      'El catálogo arranca en 3 días: si elegís 2, mostramos lo más cercano con el motivo a la vista.';
+      'Ninguna respuesta filtra el catálogo: vas a seguir viendo todas las plantillas.';
 
   @override
   String get templatesOnboardingStep2Title => '¿Cuánto dura tu sesión?';
 
   @override
   String get templatesOnboardingStep2Body =>
-      '45 minutos reales pesan más que una hora ideal. Sin dato de duración, la plantilla queda neutra.';
+      '45 minutos reales valen más que una hora ideal. Elegí el tiempo que tenés de verdad.';
 
   @override
   String get templatesOnboardingStep2Label => 'Minutos por sesión';
@@ -6982,18 +6981,17 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get templatesOnboardingStep3Body =>
-      'Nadie elige por split, elige por para qué. Es el dato que más pesa en el orden de la grilla.';
+      'Nadie elige por split, elige por para qué. Es la respuesta que más nos dice sobre lo que buscás.';
 
   @override
   String get templatesOnboardingStep3Label => 'Objetivo';
 
   @override
-  String get templatesOnboardingStep4Title =>
-      'Queda como filtro, no como examen';
+  String get templatesOnboardingStep4Title => 'Esto no es un examen';
 
   @override
   String get templatesOnboardingStep4Body =>
-      'Tus respuestas quedan arriba de PLANTILLAS. Cambiás una y el orden se recalcula, sin repetir el flujo.';
+      'Guardamos tus respuestas en tu perfil. Esta es opcional: dejala vacía si no tenés preferencia.';
 
   @override
   String get templatesOnboardingStep4Label => 'Zonas a priorizar · opcional';
