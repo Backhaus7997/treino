@@ -7,6 +7,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../../app/theme/app_motion.dart';
 import '../../../../../app/theme/app_palette.dart';
@@ -360,15 +361,15 @@ class _AppointmentDetailDialogState
           filled: true,
           fillColor: palette.bg,
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
             borderSide: BorderSide(color: palette.border),
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
             borderSide: BorderSide(color: palette.border),
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
             borderSide: BorderSide(color: palette.accent, width: 1.5),
           ),
         );
@@ -429,7 +430,7 @@ class _AppointmentDetailDialogState
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             decoration: BoxDecoration(
               color: palette.bg,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
               border: Border.all(color: palette.border),
             ),
             child: Row(
@@ -576,7 +577,8 @@ class _AppointmentDetailDialogState
 
     return AlertDialog(
       backgroundColor: palette.bgCard,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg)),
       titlePadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
       contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
       actionsPadding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
@@ -599,7 +601,7 @@ class _AppointmentDetailDialogState
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: palette.highlight.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(9999),
+                borderRadius: BorderRadius.circular(AppRadius.full),
                 border: Border.all(color: palette.highlight),
               ),
               child: Text(
@@ -908,7 +910,8 @@ Future<bool> confirmActionDialog(
     context: context,
     builder: (ctx) => AlertDialog(
       backgroundColor: palette.bgCard,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg)),
       title: Text(
         title,
         style: GoogleFonts.barlowCondensed(

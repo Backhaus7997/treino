@@ -588,15 +588,15 @@ class _Composer extends StatelessWidget {
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
                   borderSide: BorderSide(color: palette.border),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
                   borderSide: BorderSide(color: palette.border),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
                   borderSide: BorderSide(color: palette.accent),
                 ),
               ),
@@ -616,7 +616,7 @@ class _Composer extends StatelessWidget {
                 color: sending
                     ? palette.accent.withValues(alpha: 0.5)
                     : palette.accent,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
               ),
               child: sending
                   ? SizedBox(

@@ -6,6 +6,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
@@ -176,7 +177,7 @@ class _CustomExerciseFormDialogState
     return Dialog(
       backgroundColor: palette.bgCard,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.all(Radius.circular(20)),
+        borderRadius: BorderRadius.all(Radius.circular(AppRadius.lg)),
       ),
       child: SizedBox(
         width: 480,
@@ -338,7 +339,7 @@ class _CustomExerciseFormDialogState
                         alpha: 0.3,
                       ),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(9999),
+                        borderRadius: BorderRadius.circular(AppRadius.full),
                       ),
                       padding: const EdgeInsets.symmetric(horizontal: 22),
                     ),

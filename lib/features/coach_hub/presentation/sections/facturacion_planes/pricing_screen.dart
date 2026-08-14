@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../../app/theme/app_palette.dart';
 import '../../../../../core/widgets/motion/treino_tappable.dart';
@@ -261,7 +262,7 @@ class _EnterpriseBanner extends StatelessWidget {
       decoration: BoxDecoration(
         color: palette.bgCard,
         border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: Wrap(
         alignment: WrapAlignment.spaceBetween,
@@ -304,7 +305,7 @@ class _EnterpriseBanner extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
               decoration: BoxDecoration(
                 border: Border.all(color: palette.accent),
-                borderRadius: BorderRadius.circular(9999),
+                borderRadius: BorderRadius.circular(AppRadius.full),
               ),
               child: Text(
                 'CONTACTANOS', // i18n: Fase W3
@@ -487,7 +488,7 @@ class _PlanCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
             decoration: BoxDecoration(
               color: palette.accent,
-              borderRadius: BorderRadius.circular(9999),
+              borderRadius: BorderRadius.circular(AppRadius.full),
             ),
             child: Text(
               'MÁS POPULAR', // i18n: Fase W3
@@ -527,7 +528,7 @@ class _PlanCtaButton extends StatelessWidget {
         alignment: Alignment.center,
         decoration: BoxDecoration(
           border: Border.all(color: palette.border),
-          borderRadius: BorderRadius.circular(9999),
+          borderRadius: BorderRadius.circular(AppRadius.full),
         ),
         child: Text(
           'TU PLAN ACTUAL', // i18n: Fase W3
@@ -557,7 +558,7 @@ class _PlanCtaButton extends StatelessWidget {
             border: Border.all(
               color: filled ? palette.accent : palette.border,
             ),
-            borderRadius: BorderRadius.circular(9999),
+            borderRadius: BorderRadius.circular(AppRadius.full),
           ),
           child: Text(
             isFree ? 'GRATIS' : 'ELEGIR PLAN', // i18n: Fase W3
