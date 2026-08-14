@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../../../app/theme/app_palette.dart';
+import '../../../../../../app/theme/tokens/primitives.dart';
 import '../../../../../../core/widgets/firebase_storage_video_player.dart';
 
 /// Burbuja de un mensaje individual en el detail pane.
@@ -100,7 +100,8 @@ class ChatMessageBubble extends StatelessWidget {
                       color: palette.bg.withValues(alpha: 0.4),
                       child: Text(
                         'No pudimos cargar la imagen', // i18n: Fase W2
-                        style: GoogleFonts.barlow(
+                        style: TextStyle(
+                          fontFamily: AppFonts.barlow,
                           fontWeight: FontWeight.w500,
                           fontSize: 13,
                           color: palette.textMuted,
@@ -131,7 +132,8 @@ class ChatMessageBubble extends StatelessWidget {
                   ),
                   child: Text(
                     mediaPlaceholderLabel!,
-                    style: GoogleFonts.barlow(
+                    style: TextStyle(
+                      fontFamily: AppFonts.barlow,
                       fontWeight: FontWeight.w500,
                       fontSize: 13,
                       color: palette.textMuted,
@@ -143,7 +145,8 @@ class ChatMessageBubble extends StatelessWidget {
               if (text.isNotEmpty)
                 Text(
                   text,
-                  style: GoogleFonts.barlow(
+                  style: TextStyle(
+                    fontFamily: AppFonts.barlow,
                     fontWeight: FontWeight.w400,
                     fontSize: 14,
                     height: 1.35,
@@ -157,7 +160,8 @@ class ChatMessageBubble extends StatelessWidget {
                 children: [
                   Text(
                     DateFormat('HH:mm').format(createdAt.toLocal()),
-                    style: GoogleFonts.barlow(
+                    style: TextStyle(
+                      fontFamily: AppFonts.barlow,
                       fontWeight: FontWeight.w400,
                       fontSize: 10,
                       color: metaColor,
