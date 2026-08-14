@@ -128,8 +128,12 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.tab);
       await tester.pump();
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-      await tester.pump();
-      await tester.pump(); // deja emitir el StreamProvider de prefs
+      // pumpAndSettle, no pumps sueltos: el cuerpo del tab va dentro de un
+      // TreinoStateSwitcher, que mantiene el hijo SALIENTE en el árbol
+      // mientras dura el cross-fade. Con dos pumps, Cuenta y Notificaciones
+      // conviven un instante y el findsNothing de abajo falla por timing, no
+      // porque el tab no haya cambiado.
+      await tester.pumpAndSettle();
 
       expect(find.text('NOTIFICACIONES'), findsOneWidget);
       expect(find.text('INFORMACIÓN PERSONAL'), findsNothing);
