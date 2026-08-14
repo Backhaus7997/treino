@@ -140,4 +140,31 @@ void main() {
 
     expect(tapped, isTrue);
   });
+
+  testWidgets('avatar → Semantics(image) con a11yAvatarLabel(nombre)',
+      (tester) async {
+    final handle = tester.ensureSemantics();
+    final entry = (
+      link: _link(),
+      plan: _plan(meals: 2),
+      planLoading: false,
+    );
+
+    await tester.pumpWidget(_buildRow(entry: entry));
+    await tester.pump();
+
+    final l10n = AppL10n.of(tester.element(find.text('Ana García')));
+    // El label del avatar puede fundirse con el fallback de inicial en el
+    // mismo SemanticsNode (mismo criterio que solicitud_card_test
+    // SCENARIO-SC-04) — se valida con RegExp (substring) en vez de igualdad
+    // exacta.
+    expect(
+      find.bySemanticsLabel(RegExp(RegExp.escape(
+        l10n.a11yAvatarLabel('Ana García'),
+      ))),
+      findsOneWidget,
+    );
+
+    handle.dispose();
+  });
 }
