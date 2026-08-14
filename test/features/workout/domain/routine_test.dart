@@ -7,6 +7,53 @@ import 'package:treino/features/workout/domain/routine_visibility.dart';
 
 void main() {
   group('Routine', () {
+    // ── summary: leído de Firestore, nunca escrito por el cliente (#648) ────
+    //
+    // Esta pareja de tests es lo que mantiene el campo FUERA de
+    // firestore.rules. Si `toJson` empezara a incluirlo, los `hasOnly` de las
+    // rutinas user-created y trainer-assigned lo rechazarían y TODA edición de
+    // rutina fallaría con permission-denied — el modo de falla de #563.
+
+    test('#648: summary se lee desde Firestore', () {
+      final decoded = Routine.fromJson(const {
+        'id': 'ppl-beginner',
+        'name': 'Push Pull Legs — Principiante',
+        'level': 'beginner',
+        'days': <Object?>[],
+        'summary': 'Empujar, tirar y piernas.',
+      });
+
+      expect(decoded.summary, 'Empujar, tirar y piernas.');
+    });
+
+    test('#648: summary NUNCA sale en toJson — es lo que evita tocar las rules',
+        () {
+      const routine = Routine(
+        id: 'r1',
+        name: 'Rutina',
+        level: ExperienceLevel.beginner,
+        days: [],
+        summary: 'Una explicación en criollo.',
+      );
+
+      expect(
+        routine.toJson().containsKey('summary'),
+        isFalse,
+        reason: 'un payload con summary rompe el hasOnly de firestore.rules',
+      );
+    });
+
+    test('#648: summary ausente deserializa a null, sin romper', () {
+      final decoded = Routine.fromJson(const {
+        'id': 'r1',
+        'name': 'Rutina',
+        'level': 'beginner',
+        'days': <Object?>[],
+      });
+
+      expect(decoded.summary, isNull);
+    });
+
     test('SCENARIO-049: required-only roundtrip, nullable fields null', () {
       const routine = Routine(
         id: 'ppl-beginner',

@@ -331,7 +331,7 @@
   "workoutMisRutinasConfirmConfirm": "",
   "workoutMisRutinasArchiveSuccess": "",
   "workoutMisRutinasArchiveError": "",
-  "workoutSplitFallback": "",
+  "workoutSplitFallback": "Free-form routine",
   "workoutPickerMuscleFilter": "",
   "workoutPickerEquipmentFilter": "",
   "workoutPickerMuscleSheetTitle": "",

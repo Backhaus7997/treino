@@ -935,7 +935,7 @@ class AppL10nEs extends AppL10n {
   String get templateRatingSheetError => 'No pudimos guardar tu calificación.';
 
   @override
-  String get workoutSplitFallback => 'Sin split';
+  String get workoutSplitFallback => 'Rutina libre';
 
   @override
   String get workoutPickerMuscleFilter => 'Músculos';
@@ -4410,7 +4410,7 @@ class AppL10nEsAr extends AppL10nEs {
   String get templateRatingSheetError => 'No pudimos guardar tu calificación.';
 
   @override
-  String get workoutSplitFallback => 'Sin split';
+  String get workoutSplitFallback => 'Rutina libre';
 
   @override
   String get workoutPickerMuscleFilter => 'Músculos';

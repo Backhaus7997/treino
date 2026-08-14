@@ -890,5 +890,6 @@
   "routineCardDaysPerWeek": "{days, plural, =1{1 día/sem} other{{days} días/sem}}",
   "@routineCardDaysPerWeek": {"placeholders": {"days": {"type": "int"}}},
   "routineCardMinutes": "{value} min",
-  "@routineCardMinutes": {"placeholders": {"value": {"type": "String"}}}
+  "@routineCardMinutes": {"placeholders": {"value": {"type": "String"}}},
+  "workoutSplitFallback": "Rutina libre"
 }

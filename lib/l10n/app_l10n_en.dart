@@ -908,7 +908,7 @@ class AppL10nEn extends AppL10n {
   String get templateRatingSheetError => 'We couldn\'t save your rating.';
 
   @override
-  String get workoutSplitFallback => '';
+  String get workoutSplitFallback => 'Free-form routine';
 
   @override
   String get workoutPickerMuscleFilter => '';

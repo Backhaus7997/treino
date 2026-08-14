@@ -479,7 +479,7 @@
   "@templateRatingSheetError": {
     "description": "SnackBar shown when saving a rating fails."
   },
-  "workoutSplitFallback": "Sin split",
+  "workoutSplitFallback": "Rutina libre",
   "workoutPickerMuscleFilter": "Músculos",
   "workoutPickerEquipmentFilter": "Equipamiento",
   "workoutPickerMuscleSheetTitle": "Grupo muscular",

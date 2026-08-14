@@ -1793,7 +1793,7 @@ abstract class AppL10n {
   /// No description provided for @workoutSplitFallback.
   ///
   /// In es_AR, this message translates to:
-  /// **'Sin split'**
+  /// **'Rutina libre'**
   String get workoutSplitFallback;
 
   /// No description provided for @workoutPickerMuscleFilter.
