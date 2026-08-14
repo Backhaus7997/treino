@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/analytics/analytics_service.dart';
+import '../core/analytics/route_analytics.dart';
 import '../features/auth/application/auth_providers.dart';
 import '../features/notifications/application/notification_providers.dart';
 import '../features/notifications/application/notification_router.dart';
@@ -53,6 +55,9 @@ class TreinoApp extends ConsumerStatefulWidget {
 class _TreinoAppState extends ConsumerState<TreinoApp> {
   late final GoRouter _router;
 
+  /// Loguea `screen_view` en cada navegación. Se detacha en [dispose].
+  late final RouteAnalytics _routeAnalytics;
+
   /// Foreground message subscription — cancelled on dispose.
   StreamSubscription<RemoteMessage>? _fgSub;
 
@@ -64,6 +69,13 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
     super.initState();
     final refresh = ref.read(routerRefreshNotifierProvider);
     _router = buildRouter(refreshListenable: refresh, read: ref.read);
+
+    // Analytics de navegación (#666). Sin esto la app no emite UN solo evento
+    // de qué pantalla se usa, y ese dato no es recuperable retroactivamente.
+    _routeAnalytics = RouteAnalytics(
+      router: _router,
+      analytics: ref.read(analyticsServiceProvider),
+    )..attach();
 
     // (c) Eagerly read fcmLifecycleProvider to register the auth-state listener
     //     for the app lifetime. Without this, all of PR#2a is dead code —
@@ -105,6 +117,7 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
 
   @override
   void dispose() {
+    _routeAnalytics.detach();
     _fgSub?.cancel();
     _bgSub?.cancel();
     super.dispose();
