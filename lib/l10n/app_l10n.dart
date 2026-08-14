@@ -6741,10 +6741,10 @@ abstract class AppL10n {
   /// **'¿Cuántos días podés entrenar?'**
   String get templatesOnboardingStep1Title;
 
-  /// No description provided for @templatesOnboardingStep1Body.
+  /// Paso 1, bajada. NO promete que la grilla se ordene: en este PR las respuestas sólo se persisten, el ranking por afinidad llega con #635 PR#3. Cuando ese ranking exista, esta copy se actualiza junto con él.
   ///
   /// In es_AR, this message translates to:
-  /// **'Elegí lo que vas a sostener. Ordenamos el catálogo por afinidad — nunca escondemos plantillas.'**
+  /// **'Elegí lo que vas a sostener. Guardamos tu respuesta para personalizar lo que te recomendamos.'**
   String get templatesOnboardingStep1Body;
 
   /// No description provided for @templatesOnboardingStep1Label.
@@ -6753,10 +6753,10 @@ abstract class AppL10n {
   /// **'Días por semana'**
   String get templatesOnboardingStep1Label;
 
-  /// Aclara que 2 días no vacía la grilla: el catálogo arranca en 3 y se muestra lo más cercano.
+  /// Aclara que responder no vacía la grilla. Cierto hoy (nada consume las respuestas) y después del ranking (#635 PR#3), que ordena pero nunca esconde.
   ///
   /// In es_AR, this message translates to:
-  /// **'El catálogo arranca en 3 días: si elegís 2, mostramos lo más cercano con el motivo a la vista.'**
+  /// **'Ninguna respuesta filtra el catálogo: vas a seguir viendo todas las plantillas.'**
   String get templatesOnboardingStep1Hint;
 
   /// Paso 2. Pregunta por duración de sesión.
@@ -6768,7 +6768,7 @@ abstract class AppL10n {
   /// No description provided for @templatesOnboardingStep2Body.
   ///
   /// In es_AR, this message translates to:
-  /// **'45 minutos reales pesan más que una hora ideal. Sin dato de duración, la plantilla queda neutra.'**
+  /// **'45 minutos reales valen más que una hora ideal. Elegí el tiempo que tenés de verdad.'**
   String get templatesOnboardingStep2Body;
 
   /// No description provided for @templatesOnboardingStep2Label.
@@ -6786,7 +6786,7 @@ abstract class AppL10n {
   /// No description provided for @templatesOnboardingStep3Body.
   ///
   /// In es_AR, this message translates to:
-  /// **'Nadie elige por split, elige por para qué. Es el dato que más pesa en el orden de la grilla.'**
+  /// **'Nadie elige por split, elige por para qué. Es la respuesta que más nos dice sobre lo que buscás.'**
   String get templatesOnboardingStep3Body;
 
   /// No description provided for @templatesOnboardingStep3Label.
@@ -6795,16 +6795,16 @@ abstract class AppL10n {
   /// **'Objetivo'**
   String get templatesOnboardingStep3Label;
 
-  /// Paso 4. Zonas a priorizar; opcional. El título aclara que no es un examen.
+  /// Paso 4. Zonas a priorizar; opcional. El título baja la presión de la última pregunta. NO dice 'queda como filtro': nada de esto filtra la grilla.
   ///
   /// In es_AR, this message translates to:
-  /// **'Queda como filtro, no como examen'**
+  /// **'Esto no es un examen'**
   String get templatesOnboardingStep4Title;
 
-  /// No description provided for @templatesOnboardingStep4Body.
+  /// Paso 4, bajada. NO promete controles para editar las respuestas desde PLANTILLAS: todavía no existen. Actualizar cuando #635 PR#3 los agregue.
   ///
   /// In es_AR, this message translates to:
-  /// **'Tus respuestas quedan arriba de PLANTILLAS. Cambiás una y el orden se recalcula, sin repetir el flujo.'**
+  /// **'Guardamos tus respuestas en tu perfil. Esta es opcional: dejala vacía si no tenés preferencia.'**
   String get templatesOnboardingStep4Body;
 
   /// No description provided for @templatesOnboardingStep4Label.

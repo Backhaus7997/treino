@@ -262,7 +262,7 @@ void main() {
         await _tapAndSettle(tester, templatesOnboardingCtaKey);
       }
 
-      expect(find.text('QUEDA COMO FILTRO, NO COMO EXAMEN'), findsOneWidget);
+      expect(find.text('ESTO NO ES UN EXAMEN'), findsOneWidget);
       expect(find.byKey(templatesOnboardingSkipKey), findsOneWidget);
     });
   });

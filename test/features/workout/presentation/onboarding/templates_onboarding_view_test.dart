@@ -83,7 +83,7 @@ void main() {
       );
       expect(find.text('Días por semana'), findsOneWidget);
       expect(
-        find.textContaining('El catálogo arranca en 3 días'),
+        find.textContaining('Ninguna respuesta filtra el catálogo'),
         findsOneWidget,
       );
     });
@@ -188,7 +188,7 @@ void main() {
       await _pumpView(tester);
       await _advanceTo(tester, 4);
 
-      expect(find.text('QUEDA COMO FILTRO, NO COMO EXAMEN'), findsOneWidget);
+      expect(find.text('ESTO NO ES UN EXAMEN'), findsOneWidget);
       expect(find.text('Zonas a priorizar · opcional'), findsOneWidget);
 
       for (final label in const [
@@ -410,7 +410,7 @@ void main() {
 
       await fling(tester, -300);
 
-      expect(find.text('QUEDA COMO FILTRO, NO COMO EXAMEN'), findsOneWidget);
+      expect(find.text('ESTO NO ES UN EXAMEN'), findsOneWidget);
       expect(_finished, isNull, reason: 'a swipe must not persist anything');
     });
 
