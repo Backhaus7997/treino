@@ -2,6 +2,7 @@ import 'dart:developer' as developer;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../auth/application/auth_providers.dart';
 import '../../profile/application/user_providers.dart';
 import '../../profile/domain/user_role.dart';
 import '../domain/onboarding_surface.dart';
@@ -18,10 +19,23 @@ import '../domain/onboarding_surface.dart';
 ///     start.
 ///
 /// Lives at the root [ProviderScope] so widget re-mounts do not resurrect it.
-/// Resets only on cold start. Mirrors `permissionGateAttemptedProvider`
-/// (ADR-PN-012).
+/// Mirrors `permissionGateAttemptedProvider` (ADR-PN-012).
+///
+/// Scoped to the SIGNED-IN USER, not to the process. "This tour was dismissed"
+/// is a fact about a person, and the root scope outlives a sign-out: without
+/// the uid watch, an athlete who signed out without killing the app left the
+/// next one to sign in unable to see a tour their own document says they never
+/// saw. Watching the uid rebuilds the provider — and so empties the set — on
+/// every change of who is signed in.
+///
+/// `select` on the uid rather than the whole auth state: the stream re-emits
+/// for reasons that are not a change of person, and a reset per token refresh
+/// would resurrect a tour mid-session.
 final onboardingDismissedProvider =
-    StateProvider<Set<OnboardingSurface>>((ref) => <OnboardingSurface>{});
+    StateProvider<Set<OnboardingSurface>>((ref) {
+  ref.watch(authStateChangesProvider.select((auth) => auth.valueOrNull?.uid));
+  return <OnboardingSurface>{};
+});
 
 /// True while the tour is on screen.
 final onboardingTourOpenProvider = StateProvider<bool>((ref) => false);
