@@ -357,12 +357,13 @@ Inspeccionar Firestore sin pasar por la app:
 ### Quality gates al último commit
 
 `flutter analyze` 0 issues · conformidad Swift 50 casos · tests puros del reloj
-95 chequeos · typecheck del reloj limpio. Los cuatro con exit code 0 verificado
-aparte (ver la trampa de exit codes en §5).
+**111 chequeos** · typecheck del reloj limpio · **backfill 22 tests**. Los cinco
+con exit code 0 verificado aparte (ver la trampa de exit codes en §5).
 
-Dos corredores nuevos desde el traspaso original:
-`bash scripts/test_watch_swift.sh` (lógica pura del reloj, segundos) y el
-fixture `conformance/set_log_identity.json`.
+Tres corredores nuevos desde el traspaso original:
+`bash scripts/test_watch_swift.sh` (lógica pura del reloj, segundos), el
+fixture `conformance/set_log_identity.json`, y `npm test` desde `scripts/`
+(la decisión del backfill de duplicados, sin Firestore).
 
 ---
 
@@ -374,11 +375,19 @@ fixture `conformance/set_log_identity.json`.
    **cierra con un write real** (`status: finished`, `wasFullyCompleted: false`,
    `:366-375`) todo lo que pase de `maxWorkoutDuration` = 8h. No es un filtro en
    memoria. Cubierto por tests en `session_repository_test.dart:212-314`.
-   ⚠️ **Pero el barrido lo dispara SÓLO el teléfono.** El reloj tiene su propia
-   `HistorySync.findAnyActiveSession` (`HistorySync.swift:80-114`), sin filtro de
-   status y **sin corte por antigüedad**: un atleta que use sólo el reloj no barre
-   nada y puede adoptar una sesión de hace días. Ahí sigue habiendo deuda.
-   Además drena de a 10 por lectura, y el `catch` de `:376-383` es best-effort.
+   ~~⚠️ Pero el barrido lo dispara SÓLO el teléfono.~~ — **CERRADO.** El reloj
+   ahora aplica la MISMA política: `StaleSessionRules.decidir` (archivo nuevo)
+   decide qué adoptar y qué cerrar, y `findAnyActiveSession` la usa y cierra las
+   colgadas con `HistorySync.closeStaleSession` (los mismos campos que escribe
+   `getActive`: `status`, `finishedAt`, `wasFullyCompleted: false`, y nada más).
+   El corte se DERIVA de `WorkoutDurationRules.maxMinutos`, no se copia, así que
+   los dos lados no se pueden separar sin que caiga un test.
+   Medido en el host: 9 chequeos en `ios/watch_tests/main.swift`
+   (`runStaleSessions`), con control negativo — sacando el corte se ponen rojos 5,
+   incluido "una sesión de hace tres días NO se adopta".
+   Sigue drenando de a 10 por lectura, y el cierre es best-effort igual que en el
+   teléfono. **NO verificado corriendo en la muñeca**: la regla está medida, el
+   write no.
 2. **`racha` / `workoutsCount`** los escribe el cliente del teléfono en
    `SessionRepository.finish`, así que terminar desde el reloj los deja
    desactualizados. Candidato: moverlos a `rankingAggregateOnSession`.
@@ -388,13 +397,20 @@ fixture `conformance/set_log_identity.json`.
    detrás de un `confirmationDialog` (`:91-103`). `abandon()` delega en `finish()`
    (`WorkoutCoordinator.swift:304-306`), que cierra la sesión con
    `wasFullyCompleted: false`. En el teléfono nunca fue deuda.
-   ⚠️ **Dos huecos que quedan, y el primero muerde justo en el escenario de la
-   deuda**: (a) `WorkoutCoordinator.swift:318` corta con
-   `if !current.pendingSets.isEmpty { return }`, así que **si te lesionás sin
-   conectividad el abandono es un no-op SILENCIOSO** — el diálogo se cierra y la
-   sesión sigue abierta; (b) el `syncError` del `catch` de `:337-339` **no lo
-   renderiza ninguna vista** (`rg syncError` sólo aparece en el coordinator),
-   contra el teléfono que sí ofrece Reintentar (`session_player_screen.dart:324`).
+   ~~⚠️ Dos huecos que quedan~~ — **CERRADOS los dos.** El coordinator publica
+   ahora `closeFailure` (`WorkoutCloseFailure`, archivo nuevo), que distingue
+   `seriesSinSubir(n)` de `historialNoRespondio`, y `WorkoutView` lo renderiza en
+   un banner naranja con **Reintentar** — el mismo contrato que
+   `_showFinishError` del teléfono. `syncError` se queda como detalle técnico
+   para diagnóstico; lo que ve el atleta es el motivo y la salida.
+   El cartel se limpia solo cuando la cola se drena en un `sync()` de fondo.
+   Medido en el host: 6 chequeos (`runCloseFeedback`).
+   ⚠️ **NO verificado corriendo**: el banner no se vio en la muñeca todavía. Lo
+   que está medido es el mensaje, no el render.
+   ⚠️ Efecto lateral conocido: `finish()` llama a `stopRest()` antes de intentar
+   cerrar, así que un abandono fallido deja al atleta sin el descanso que estaba
+   corriendo. Ya pasaba antes —en silencio—; ahora al menos se entera de que
+   sigue en el entreno.
 4. **El duplicado del estado local se tapó con un invariante**, no con la causa
    raíz. Si vuelve a aparecer algo relacionado, **instrumentar el notifier** en
    vez de sumar defensas.
@@ -414,10 +430,23 @@ fixture `conformance/set_log_identity.json`.
    ⚠️ **Cubre por superconjunto, no por detección**: el `catch (_)` de
    `watch_credential_service.dart:119` colapsa ese error con cualquier otro, y no
    hay alternativa realista porque el plugin sólo expone el `WCErrorCode` dentro
-   de `localizedDescription`. **Race NO cubierta**: `WCSession.activate()` es
-   asíncrono; si el primer `deliverCredential` corre antes de que active,
-   `isPaired` da false → `noWatchPaired` → **nunca se reintenta, ni en resume**.
-   Sólo se confirma en dispositivo real.
+   de `localizedDescription`.
+   ~~**Race NO cubierta**~~ — **CERRADA en código.** `noWatchPaired` pasó a
+   reintentable, y el arranque hace hasta `watchPairingRaceRetries` (2)
+   re-chequeos con `watchPairingRaceDelay` (2s) antes de creerle a un `isPaired`
+   que puede haber respondido antes de la activación.
+   ⚠️ **El motivo por el que estaba excluido era FALSO**, y por eso se pagaba de
+   más: decía que reintentar sería "un viaje a la CF en cada foreground", pero
+   `deliverCredential` corta en `isPaired` **antes** de tocar `_functions` —
+   `watch_credential_service_test.dart:54` ya lo afirmaba con un `verifyNever`
+   sobre `httpsCallable`. Un reintento sin reloj cuesta un MethodChannel.
+   El reintento por resume no alcanzaba solo: la race pasa en el arranque en
+   frío y un atleta que abre la app y la usa **puede no generar un resume en toda
+   la sesión**. Por eso los reintentos van en el arranque, no en el resume.
+   Cierra además el caso de emparejar el reloj con la app ya abierta.
+   Medido con control negativo en las dos mitades (la reclasificación y el bucle
+   acotado), 4 tests nuevos. **Sigue sin confirmarse en dispositivo real**: lo
+   que está medido es la política, no el timing verdadero de `WCSession`.
 7. **Sin confirmar si `WCSession` exige algún capability nuevo en Signing &
    Capabilities.** SIGUE ABIERTA — una sesión la dio por cerrada, se verificó el
    2026-08-13 y **la afirmación era falsa**: `docs/setup/watchos-target.md:279-284`
@@ -443,8 +472,37 @@ fixture `conformance/set_log_identity.json`.
    **APLICARLO**, y a propósito todavía no se hizo: el propio script exige
    (`:76-92`) que primero salga la app con el fix preventivo y que el padrón
    actualice, porque correrlo antes vuelve a ensuciar todo.
-   ⚠️ **Riesgo vivo más grande que los 24 documentos: el script no tiene NI UN
-   test.** Borra datos de producción y no hay nada que lo cubra, ni sobre emulador.
+   ~~⚠️ Riesgo vivo más grande que los 24 documentos: el script no tiene NI UN
+   test.~~ — **CERRADO.** La DECISIÓN se extrajo a `scripts/lib/dedupe_setlogs_plan.js`
+   (`planSesion`, puro, sin Firestore) y tiene **22 tests** en
+   `scripts/test/dedupe_setlogs_plan.test.js` (`node:test`, sin dependencias
+   nuevas; `npm test` desde `scripts/`). Cubren las cuatro salvaguardas, la
+   idempotencia, quién sobrevive por `createTime`, el contrato `__timestamp__`
+   con el restore, y el caso real `ZTjx8jVA6Ru5vCVLLy5x` (3850 en documentos,
+   2200 reales, 1650 en el campo).
+   El refactor está MEDIDO, no supuesto: original y refactorizado corridos con
+   `--dry-run` contra el emulador sobre 100 sesiones dan **salida idéntica byte a
+   byte**. Control negativo: desactivando las salvaguardas 1 y 2 se ponen rojos 4
+   tests.
+
+   ⚠️ **HALLAZGO NUEVO — decidir ANTES de correr `--apply`.** Escribiendo los
+   tests apareció que la salvaguarda 1 **no cubre el ejemplo que ella misma
+   documenta** cuando las series son idénticas. El reloj nunca renumera sus
+   sombras, así que `press__2` sigue con `setNumber=2`, la numeración queda densa
+   {1,2,3}, y `enConflicto` no ve nada porque los valores son iguales. Resultado
+   medido: se borra la serie 3 REAL renumerada y sobrevive la serie que el atleta
+   BORRÓ, con el volumen subiendo de 1000 a 1500.
+   La salvaguarda 1 sí cubre la OTRA forma (cuando el renumerado es un id
+   determinístico) y la 2 cubre el caso de valores distintos; el cruce queda
+   afuera de las dos.
+   **No se arregló a propósito**: desde el estado final de los documentos ese
+   caso es indistinguible de uno legítimo (reloj escribió 4 series, teléfono 3 —
+   que es la mayor parte del valor del script). Cerrarlo pide una señal nueva:
+   `completedAt`, que en un duplicado real difiere 1-6 segundos (medido, §del
+   ciclo) y acá difiere lo que tardó una serie entera. Es una decisión de
+   política sobre un script que borra producción, no un bugfix.
+   Queda fijado en el test `⚠️ renumeración CON series idénticas`, que hoy afirma
+   la conducta actual y se pone rojo el día que alguien agregue la salvaguarda.
 10. **El dedupe de escritura NO es atómico.** La secuencia `get` → (el reloj
     escribe) → `set` sigue siendo posible; lo que cambia es el TAMAÑO de la
     ventana, de 37 segundos medidos a un round-trip. Cerrarla del todo pide una
