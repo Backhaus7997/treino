@@ -5,10 +5,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/features/watch/application/wear_pairing_providers.dart';
 import 'package:treino/features/watch/data/wear_credential_exchanger.dart';
+import 'package:treino/features/watch/data/wear_credential_receiver.dart';
 import 'package:treino/features/watch/domain/wear_credential.dart';
 import 'package:treino/features/watch/presentation/wear/wear_view_models.dart';
 
 class _MockExchanger extends Mock implements WearCredentialExchanger {}
+
+class _MockReceiver extends Mock implements WearCredentialReceiver {}
 
 void main() {
   late _MockExchanger exchanger;
@@ -192,6 +195,35 @@ void main() {
 
       enVuelo.complete();
       await pumpEventQueue();
+    });
+  });
+
+  group('cableado con la Data Layer', () {
+    test('lo que publica el teléfono llega hasta el canje', () async {
+      // Este test NO sobreescribe `wearCredentialSourceProvider`: lo deja real
+      // para que ejercite el cableado que instaló A2. Sin él, todos los tests
+      // de arriba seguirían verdes con la fuente desconectada del transporte —
+      // que era exactamente el estado anterior.
+      final receiver = _MockReceiver();
+      when(() => receiver.credentials).thenAnswer((_) => credenciales.stream);
+      when(() => exchanger.currentUid).thenReturn(null);
+
+      final container = ProviderContainer(
+        overrides: [
+          wearCredentialExchangerProvider.overrideWithValue(exchanger),
+          wearCredentialReceiverProvider.overrideWithValue(receiver),
+        ],
+      );
+      addTearDown(container.dispose);
+      container.listen(wearPairingProvider, (_, __) {});
+
+      credenciales.add(
+        const WearCredential(customToken: 'tok-data-layer', uid: 'atleta-3'),
+      );
+      await pumpEventQueue();
+
+      verify(() => exchanger.exchange('tok-data-layer')).called(1);
+      expect(container.read(wearPairingProvider), WearPairingState.exchanging);
     });
   });
 }

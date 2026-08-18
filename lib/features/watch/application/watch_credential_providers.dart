@@ -9,13 +9,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../firebase_options.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../profile/application/user_providers.dart' show userProfileProvider;
-import '../data/watch_bridge.dart';
 import '../data/watch_credential_service.dart';
 import '../data/watch_nudge_service.dart';
-
-/// Envoltorio sobre `WatchConnectivity`. Se sobreescribe en tests vía
-/// `ProviderScope.overrides`.
-final watchBridgeProvider = Provider<WatchBridge>((ref) => WatchBridge());
+import 'watch_bridge_provider.dart';
 
 /// Instancia de Cloud Functions en la región donde vive `mintWatchCredential`.
 ///

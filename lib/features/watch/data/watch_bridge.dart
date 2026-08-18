@@ -14,17 +14,13 @@ import 'package:watch_connectivity/watch_connectivity.dart';
 /// asumidos: `isPaired`/`isReachable` son `Future<bool>` — **no** streams, como
 /// suponía el diseño original del ciclo `watch-connectivity`.
 ///
-/// Android/Wear OS NO está soportado en v1, pero **la razón cambió**. Antes
-/// decía acá que la firma de release seguía en debug keys; eso caducó con
-/// `chore(android): firmar el release con la upload key`. Hoy
-/// `android/app/build.gradle.kts` tiene un `signingConfigs.create("release")`
-/// real — aunque condicionado a que exista `android/key.properties`, que no
-/// está versionado: sin ese archivo el build sigue cayendo a la firma de debug.
-/// El requisito del paquete (que reloj y teléfono compartan clave de firma) se
-/// cumple solo cuando ambos se compilan con la misma config.
+/// Este puente lo usan LOS DOS lados: el teléfono para publicar la credencial
+/// y el reloj para recibirla. En Wear la Data Layer exige que ambos APKs
+/// compartan `applicationId` **y clave de firma**; `android/key.properties` no
+/// está versionado, así que el release cae a debug keys y mezclar un teléfono
+/// bajado de Play con un reloj sideloadeado deja el canal mudo, sin error.
 ///
-/// Lo que SÍ sigue vigente: en Android sin companion instalado `isPaired`
-/// devuelve false y todo esto queda inerte, que es el comportamiento deseado.
+/// ⚠️ `isPaired` NO significa lo mismo en las dos plataformas. Ver su doc.
 class WatchBridge {
   WatchBridge({WatchConnectivity? connectivity})
       : _connectivity = connectivity ?? WatchConnectivity();
@@ -35,14 +31,22 @@ class WatchBridge {
   /// cualquier plataforma que no sea móvil.
   Future<bool> get isSupported => _connectivity.isSupported;
 
-  /// Si hay un reloj emparejado con este teléfono.
+  /// En iOS: si hay un Apple Watch emparejado. En **Android: otra pregunta**.
   ///
-  /// Ojo en Android: el paquete documenta que ahí NO se puede saber si hay un
-  /// reloj emparejado — chequea si están instaladas las apps de Wear OS o
-  /// Galaxy Wearable. Semántica distinta, otra razón para no soportarlo en v1.
+  /// Verificado en `WatchConnectivityPlugin.kt`: en Android esto lista las apps
+  /// COMPANION instaladas en el teléfono (Wear OS, la nueva `wear.companion`,
+  /// Galaxy Wearable) y devuelve si hay alguna. No consulta un solo nodo. O
+  /// sea que responde "¿este teléfono podría tener un reloj?", no "¿lo tiene?".
+  ///
+  /// Por eso quien decide si vale la pena mintear NO se apoya sólo en esto —
+  /// ver `WatchCredentialService`.
   Future<bool> get isPaired => _connectivity.isPaired;
 
   /// Si la contraparte está alcanzable AHORA.
+  ///
+  /// En Android sí sale de la red de verdad: `nodeClient.connectedNodes`. Es la
+  /// única prueba POSITIVA de que hay un reloj del otro lado, pero es
+  /// transitoria — un reloj apagado o fuera de rango da false.
   Future<bool> get isReachable => _connectivity.isReachable;
 
   /// Estado "actual" hacia el reloj. Se pisa, persiste, y no requiere que el
@@ -65,5 +69,23 @@ class WatchBridge {
   /// El contexto de ida y el de vuelta son independientes: cada lado tiene el
   /// suyo, así que el reloj publicando esfuerzo no pisa la credencial que el
   /// teléfono publica hacia él.
+  ///
+  /// ⚠️ Sólo trae lo que llega MIENTRAS hay alguien escuchando. Para lo que ya
+  /// estaba escrito antes de abrir la app, ver [receivedApplicationContexts].
   Stream<Map<String, dynamic>> get contextStream => _connectivity.contextStream;
+
+  /// Los contextos que la contraparte YA dejó escritos, se hayan recibido antes
+  /// de abrir esta app o no.
+  ///
+  /// Es lo que hace posible el arranque en frío, y no es un lujo: la credencial
+  /// se publica como DataItem desde el teléfono ANTES de que nadie abra la app
+  /// del reloj. Ese DataItem persiste, pero [contextStream] sólo reenvía
+  /// eventos `TYPE_CHANGED` recibidos con el plugin ya enganchado — o sea que
+  /// un reloj que sólo escuchara el stream esperaría PARA SIEMPRE una
+  /// credencial que ya estaba ahí.
+  ///
+  /// En Wear devuelve un mapa por cada nodo que haya publicado contexto; en
+  /// watchOS, a lo sumo uno.
+  Future<List<Map<String, dynamic>>> get receivedApplicationContexts =>
+      _connectivity.receivedApplicationContexts;
 }

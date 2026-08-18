@@ -2,8 +2,10 @@ import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/wear_credential_exchanger.dart';
+import '../data/wear_credential_receiver.dart';
 import '../domain/wear_credential.dart';
 import '../presentation/wear/wear_view_models.dart';
+import 'watch_bridge_provider.dart';
 
 /// Costura sobre `FirebaseAuth`. Se sobreescribe en tests vía overrides.
 final wearCredentialExchangerProvider = Provider<WearCredentialExchanger>(
@@ -17,14 +19,15 @@ final wearAuthUidProvider = StreamProvider<String?>(
 
 // ── De dónde sale la credencial ──────────────────────────────────────────────
 //
-// Éste es el punto de corte entre A1 y A2, y la razón por la que las dos
-// incógnitas se pueden atacar por separado.
+// Éste fue el punto de corte entre A1 y A2, y es la razón por la que las dos
+// incógnitas se pudieron atacar por separado: el canje primero, con el token
+// entrando a mano, y el transporte después.
 //
-//   A1 (acá): el token entra por --dart-define. Cero transporte, así que un
-//             fallo sólo puede ser del canje. Es lo que se quiere aislar.
-//   A2:       este mismo provider se sobreescribe por el adaptador de la Data
-//             Layer, que siembra con `receivedApplicationContexts` y mergea
-//             `contextStream`. La máquina de estados no se entera.
+// Hoy manda la Data Layer. El `--dart-define` sigue existiendo como BANCO DE
+// PRUEBAS, no como camino de producción: es lo único que permite ejercitar el
+// canje entero en un reloj SIN teléfono al lado — o, al revés, decidir en una
+// corrida si lo que falló fue el transporte o el canje. Perderlo sería perder
+// la mitad del instrumental de diagnóstico.
 //
 // Para conseguir un token a mano, con los emuladores arriba:
 //   firebase emulators:start --only firestore,auth,functions
@@ -33,20 +36,31 @@ final wearAuthUidProvider = StreamProvider<String?>(
 const _tokenInyectado = String.fromEnvironment('WEAR_CUSTOM_TOKEN');
 const _uidInyectado = String.fromEnvironment('WEAR_UID');
 
+/// El adaptador de la Data Layer. Se sobreescribe en tests.
+final wearCredentialReceiverProvider = Provider<WearCredentialReceiver>(
+  (ref) => WearCredentialReceiver(bridge: ref.watch(watchBridgeProvider)),
+);
+
 /// La credencial que llega al reloj.
 ///
-/// En A1 emite a lo sumo UNA vez, y sólo si se pasaron los dos `--dart-define`.
-/// Sin ellos el stream queda vacío y el reloj se queda en `waitingForPairing`,
-/// que es exactamente lo que tiene que pasar en un reloj sin teléfono.
+/// Sale de la Data Layer, salvo que se hayan pasado los dos `--dart-define`,
+/// en cuyo caso gana el token inyectado y el transporte ni se toca. La
+/// inyección es EXPLÍCITA por definición —hay que escribirla en la línea de
+/// build— así que respetarla no puede sorprender a nadie, y deja el camino real
+/// como default.
+///
+/// Si no hay ninguno de los dos, el stream no emite y el reloj se queda en
+/// `waitingForPairing`, que es exactamente lo que tiene que pasar mientras el
+/// teléfono no haya publicado nada.
 final wearCredentialSourceProvider = StreamProvider<WearCredential>((ref) {
-  if (_tokenInyectado.isEmpty || _uidInyectado.isEmpty) {
-    return const Stream<WearCredential>.empty();
+  if (_tokenInyectado.isNotEmpty && _uidInyectado.isNotEmpty) {
+    debugPrint('[wear-pairing] credencial inyectada por --dart-define '
+        '(uid=$_uidInyectado) — la Data Layer NO se consulta');
+    return Stream.value(
+      const WearCredential(customToken: _tokenInyectado, uid: _uidInyectado),
+    );
   }
-  debugPrint('[wear-pairing] credencial inyectada por --dart-define '
-      '(uid=$_uidInyectado)');
-  return Stream.value(
-    const WearCredential(customToken: _tokenInyectado, uid: _uidInyectado),
-  );
+  return ref.watch(wearCredentialReceiverProvider).credentials;
 });
 
 /// Estado del emparejamiento. Manda sobre toda la app del reloj.
