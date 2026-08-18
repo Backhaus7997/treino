@@ -92,6 +92,82 @@ android {
     }
 }
 
+// El reloj no dibuja NI UNA imagen de ejercicio. La pantalla HOY lista nombres
+// (denormalizados en `RoutineSlot.exerciseName`) y la de entreno muestra series.
+// Medido con rg sobre `lib/features/watch/`: cero `Image.asset`, cero
+// `AssetImage`, cero `rootBundle`.
+//
+// Pero `pubspec.yaml` declara los assets de forma global, sin distincion por
+// flavor, asi que el APK del reloj se llevaba entero el catalogo del telefono:
+// 18.20 MiB de `assets/exercises` (26 PNGs; `plank.png` sola pesa 2.80 MiB) +
+// 8.46 MiB de `assets/muscles` (11 PNGs). Van `Stored` en el zip, sin comprimir,
+// asi que el peso del APK baja exactamente esos 26.66 MiB.
+//
+// Medido con builds LIMPIOS de `--flavor wear --target-platform android-arm64`
+// (el APK que se instala al reloj), antes -> despues:
+//   debug   153.33 MiB -> 126.67 MiB  (-17.4%)
+//   profile  93.53 MiB ->  66.87 MiB  (-28.5%)
+//
+// OJO al medir: `ls -l` sobre un APK RE-empaquetado miente. AGP repackagea
+// incremental —reemplaza entradas en el lugar y deja huecos de ceros— asi que un
+// APK incremental daba 281.70 MiB con 128.44 MiB de gaps internos. Comparar
+// siempre builds limpios, o sumar los tamanios comprimidos de `unzip -v`.
+//
+// Se excluyen del `Copy` que inyecta `flutter_assets` dentro de los merged
+// assets del variant. El scope al reloj es POR CONSTRUCCION: la tarea se llama
+// `copyFlutterAssets${variant}` (FlutterPlugin.kt), o sea que el nombre lleva el
+// flavor adentro y el flavor `phone` no se entera de nada.
+//
+// Se hace aca y NO con `androidResources.ignoreAssetsPattern` por dos razones:
+// ese patron es global en AGP —no admite scope por variant— y encima corre
+// durante el merge de assets, mientras que `flutter_assets` los inyecta esta
+// tarea DESPUES del merge.
+//
+// OJO con lo que NO se saca: `assets/fonts/` se queda. `main_wear.dart` importa
+// `app/theme/app_theme.dart`, que usa `GoogleFonts.barlow*`, y google_fonts
+// resuelve las familias buscandolas en el AssetManifest. Sin las fuentes
+// bundleadas se las baja por red, que es justo lo que el pubspec viene a evitar.
+//
+// Sabido y aceptado: `AssetManifest.bin` lo genera la herramienta de Flutter
+// antes de esta tarea, asi que sigue listando las PNGs que aca se sacan. En el
+// reloj es inofensivo porque nadie las busca nunca. Si algun dia la UI del reloj
+// dibuja una imagen, el sintoma va a ser un asset faltante en runtime, no un
+// error de build.
+val phoneOnlyAssetPatterns =
+    listOf(
+        "flutter_assets/assets/exercises/**",
+        "flutter_assets/assets/muscles/**"
+    )
+
+tasks.withType<Copy>().configureEach {
+    if (name.startsWith("copyFlutterAssetsWear")) {
+        exclude(phoneOnlyAssetPatterns)
+    }
+}
+
+// `copyFlutterAssets{Variant}` es un detalle interno del plugin de Gradle de
+// Flutter. Si un upgrade lo renombra, el `configureEach` de arriba deja de
+// matchear EN SILENCIO y el APK del reloj vuelve a cargar los ~27 MB de imagenes
+// sin que nadie se entere. Este chequeo lo convierte en un build roto, que es lo
+// que corresponde: si empaquetas el reloj, la exclusion existe o no hay build.
+gradle.taskGraph.whenReady {
+    val wearVariantsBeingPackaged =
+        allTasks
+            .mapNotNull {
+                Regex("^package(Wear(?:Debug|Profile|Release))$").find(it.name)?.groupValues?.get(1)
+            }.toSet()
+    wearVariantsBeingPackaged.forEach { variant ->
+        val copyTaskName = "copyFlutterAssets$variant"
+        check(allTasks.any { it.name == copyTaskName }) {
+            "No se encontro la tarea `$copyTaskName` en el task graph. La exclusion de " +
+                "assets del flavor `wear` (android/app/build.gradle.kts) cuelga de ese " +
+                "nombre, que es interno del plugin de Gradle de Flutter. Si un upgrade lo " +
+                "renombro, actualiza el prefijo `copyFlutterAssetsWear` — sin eso el APK " +
+                "del reloj se lleva ~27 MB de imagenes que no usa."
+        }
+    }
+}
+
 dependencies {
     // `wearImplementation` = SOLO el flavor `wear`. El APK del teléfono no
     // carga nada de esto: no tiene sensores de muñeca ni corre entrenos.
