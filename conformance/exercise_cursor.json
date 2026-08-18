@@ -1,0 +1,74 @@
+{
+  "rule": "exercise-cursor",
+  "source_of_truth": "lib/features/workout/domain/exercise_cursor.dart",
+  "description": "En que ejercicio tiene que estar parado el cliente durante un entreno, dado cuantas series pide el plan por ejercicio y cuantas hay cargadas. Contrato compartido entre la implementacion Dart (telefono y reloj Wear OS) y la Swift (reloj Apple). La regla es SIEMPRE ABSOLUTA: se recalcula, nunca se aplica un delta.",
+  "inputs": {
+    "plannedSets": "Cuantas series pide el plan por ejercicio, en orden. Lista vacia = entreno sin ejercicios.",
+    "loggedSets": "Cuantas series hay cargadas por ejercicio, en el MISMO orden. Puede ser mas corta que plannedSets: las que falten se asumen 0. Puede tener valores MAYORES que el plan (series agregadas desde el telefono)."
+  },
+  "expect": {
+    "index": "Indice 0-based del primer ejercicio incompleto. Si estan todos completos, el ULTIMO indice. Con plannedSets vacia, 0 — nunca negativo."
+  },
+  "cases": [
+    {
+      "name": "sin nada cargado, el primero",
+      "why": "Arranque de un entreno nuevo.",
+      "given": { "plannedSets": [4, 3, 3], "loggedSets": [0, 0, 0] },
+      "expect": { "index": 0 }
+    },
+    {
+      "name": "con el primero completo, pasa al segundo",
+      "why": "El avance normal de a un ejercicio.",
+      "given": { "plannedSets": [4, 3, 3], "loggedSets": [4, 0, 0] },
+      "expect": { "index": 1 }
+    },
+    {
+      "name": "dos ejercicios completados de una: salta los DOS",
+      "why": "EL CASO DEL BUG. El telefono completo dos ejercicios mientras el reloj no miraba. Con un delta el cursor avanzaba UN paso y quedaba clavado en un ejercicio ya terminado, sin fila tocable y sin boton de Terminar.",
+      "given": { "plannedSets": [4, 3, 3], "loggedSets": [4, 3, 0] },
+      "expect": { "index": 2 }
+    },
+    {
+      "name": "con todo completo se queda en el ultimo",
+      "why": "El atleta tiene que ver que termino, no una pantalla vacia. Y un indice fuera de rango se usaria para indexar.",
+      "given": { "plannedSets": [4, 3, 3], "loggedSets": [4, 3, 3] },
+      "expect": { "index": 2 }
+    },
+    {
+      "name": "si el telefono borro una serie del primero, el cursor VUELVE ahi",
+      "why": "El cursor tiene que poder RETROCEDER: ese ejercicio dejo de estar completo. Con un delta era inexpresable.",
+      "given": { "plannedSets": [4, 3, 3], "loggedSets": [3, 3, 3] },
+      "expect": { "index": 0 }
+    },
+    {
+      "name": "series de mas no traban el cursor",
+      "why": "El atleta puede agregar series desde el telefono mas alla del plan. Comparar con != en vez de < dejaria el cursor trabado para siempre en ese ejercicio.",
+      "given": { "plannedSets": [4, 3], "loggedSets": [5, 1] },
+      "expect": { "index": 1 }
+    },
+    {
+      "name": "sin ejercicios el cursor es 0, jamas negativo",
+      "why": "Devolver length-1 sobre una lista vacia daria -1, y ese indice se usa para indexar.",
+      "given": { "plannedSets": [], "loggedSets": [] },
+      "expect": { "index": 0 }
+    },
+    {
+      "name": "una lista de cargadas mas corta no rompe",
+      "why": "El historial puede venir incompleto; las entradas que falten se asumen en 0 en vez de reventar.",
+      "given": { "plannedSets": [4, 3, 3], "loggedSets": [4] },
+      "expect": { "index": 1 }
+    },
+    {
+      "name": "una lista de cargadas mas larga tampoco rompe",
+      "why": "El recorrido lo manda el PLAN. Entradas de sobra en el historial se ignoran en vez de correr el indice.",
+      "given": { "plannedSets": [4, 3], "loggedSets": [5, 1, 9] },
+      "expect": { "index": 1 }
+    },
+    {
+      "name": "un ejercicio con cero series planificadas cuenta como completo",
+      "why": "Pasa de verdad con la periodizacion: una semana de descarga se autoriza como vacia y ese slot queda con cero series. Si el cursor se parara ahi, el atleta no podria avanzar ni terminar el entreno.",
+      "given": { "plannedSets": [0, 3], "loggedSets": [0, 0] },
+      "expect": { "index": 1 }
+    }
+  ]
+}

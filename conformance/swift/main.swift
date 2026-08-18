@@ -340,6 +340,66 @@ private func runSetLogIdentity(fixtureURL: URL) {
     }
 }
 
+// MARK: - exercise_cursor
+
+private func runExerciseCursor(fixtureURL: URL) {
+    guard let data = try? Data(contentsOf: fixtureURL) else {
+        fail("No se pudo leer \(fixtureURL.path). Los fixtures son el contrato "
+            + "con la implementación Dart: si el archivo no está, ese contrato "
+            + "no existe.")
+        return
+    }
+
+    guard
+        let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+        let rule = json["rule"] as? String,
+        let cases = json["cases"] as? [[String: Any]]
+    else {
+        fail("\(fixtureURL.lastPathComponent) no tiene la forma esperada.")
+        return
+    }
+
+    guard rule == "exercise-cursor" else {
+        fail("Se esperaba rule 'exercise-cursor' y vino '\(rule)'.")
+        return
+    }
+
+    guard !cases.isEmpty else {
+        fail("\(fixtureURL.lastPathComponent) no tiene casos.")
+        return
+    }
+
+    for testCase in cases {
+        totalCases += 1
+        let name = testCase["name"] as? String ?? "(sin nombre)"
+
+        guard
+            let given = testCase["given"] as? [String: Any],
+            let planificadas = given["plannedSets"] as? [Int],
+            let cargadas = given["loggedSets"] as? [Int],
+            let expected = testCase["expect"] as? [String: Any],
+            let expectedIndex = expected["index"] as? Int
+        else {
+            fail("  · \"\(name)\": el caso no tiene la forma esperada.")
+            continue
+        }
+
+        let actual = firstUnfinishedExerciseIndex(
+            seriesPlanificadas: planificadas, seriesCargadas: cargadas
+        )
+
+        if actual != expectedIndex {
+            fail("""
+              · "\(name)"
+                  planificadas: \(planificadas)
+                  cargadas:     \(cargadas)
+                  esperado: índice \(expectedIndex)
+                  obtenido: índice \(actual)
+            """)
+        }
+    }
+}
+
 // MARK: - main
 
 // El script pasa la raíz de `conformance/` como primer argumento.
@@ -353,6 +413,7 @@ runRoutineSelection(fixtureURL: conformanceDir.appendingPathComponent("routine_s
 runSetResolution(fixtureURL: conformanceDir.appendingPathComponent("set_resolution.json"))
 runSessionCounting(fixtureURL: conformanceDir.appendingPathComponent("session_counting.json"))
 runSetLogIdentity(fixtureURL: conformanceDir.appendingPathComponent("set_log_identity.json"))
+runExerciseCursor(fixtureURL: conformanceDir.appendingPathComponent("exercise_cursor.json"))
 
 if failures.isEmpty {
     print("✓ conformidad Swift: \(totalCases) casos, todos en verde")
