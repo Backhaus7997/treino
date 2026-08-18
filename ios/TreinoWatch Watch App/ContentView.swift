@@ -115,10 +115,26 @@ struct TodayPage: View {
             if let workout = coordinator.todaysWorkout {
                 TodaysWorkoutView(workout: workout)
             } else if coordinator.workoutError != nil {
+                // El ícono de recargar ERA decorativo: un `Image` sin `Button`
+                // ni gesto. Prometía una salida que no existía, y la única
+                // recarga real era salir de la página y volver. Ahora acciona.
                 StatusMessage(
                     icon: "arrow.clockwise",
                     text: "No se pudo cargar tu rutina",
-                    tint: .orange
+                    tint: .orange,
+                    actionTitle: "Reintentar"
+                ) {
+                    Task { await coordinator.loadTodaysWorkout() }
+                }
+            } else if coordinator.workoutLoaded {
+                // Cargó bien y no hay nada que mostrar. Antes este caso caía en
+                // el spinner de abajo —`todaysWorkout` y `workoutError` los dos
+                // en nil— y giraba para siempre: un atleta sin rutina asignada
+                // no tenía forma de saber que la carga ya había terminado.
+                StatusMessage(
+                    icon: "calendar",
+                    text: "No tenés una rutina activa.\nActivá una desde el teléfono.",
+                    tint: .secondary
                 )
             } else {
                 VStack(spacing: 8) {
@@ -233,6 +249,11 @@ struct StatusMessage: View {
     let text: String
     var tint: Color = .primary
 
+    /// Título del botón. Nil deja el mensaje sin acción, que es lo correcto
+    /// cuando no hay nada que reintentar.
+    var actionTitle: String?
+    var action: (() -> Void)?
+
     var body: some View {
         VStack(spacing: 8) {
             Image(systemName: icon)
@@ -241,6 +262,14 @@ struct StatusMessage: View {
             Text(text)
                 .font(.footnote)
                 .multilineTextAlignment(.center)
+
+            if let actionTitle, let action {
+                Button(actionTitle, action: action)
+                    .font(.caption2)
+                    .buttonStyle(.bordered)
+                    .tint(tint)
+                    .padding(.top, 4)
+            }
         }
         .padding()
     }

@@ -8,6 +8,7 @@
 import Combine
 import Foundation
 import WatchConnectivity
+import os
 
 /// Estado de credencial del reloj, para que la UI sepa qué mostrar.
 enum WatchAuthState: Equatable {
@@ -40,6 +41,26 @@ final class CredentialCoordinator: NSObject, ObservableObject {
 
     /// Diagnóstico de la carga del entreno. No se le muestra al usuario.
     @Published private(set) var workoutError: String?
+
+    /// Si la carga del entreno ya TERMINÓ, con o sin resultado.
+    ///
+    /// Sin esta bandera, "todavía cargando" y "cargó y no hay rutina activa" son
+    /// indistinguibles desde la vista: en los dos casos `todaysWorkout` y
+    /// `workoutError` están en nil, y la pantalla se quedaba girando para
+    /// siempre. Un atleta sin rutina asignada veía un spinner eterno.
+    @Published private(set) var workoutLoaded = false
+
+    /// El error de carga TAMBIÉN va a `os_log`, no sólo a `workoutError`.
+    ///
+    /// `workoutError` vive en memoria y no se muestra: sin esto, el status HTTP
+    /// y el body que trae `FirestoreError.http` se descartaban sin dejar rastro
+    /// ni en un sysdiagnose. Un índice compuesto faltante —que Firestore
+    /// reporta con un 400 y un mensaje explícito— costó una tarde de
+    /// diagnóstico a ciegas porque ese texto nunca se escribía a ningún lado.
+    private let log = Logger(
+        subsystem: "com.backhaus.treino.watchkitapp",
+        category: "credential"
+    )
 
     /// Sube cada vez que el TELÉFONO avisa que algo cambió.
     ///
@@ -170,8 +191,14 @@ final class CredentialCoordinator: NSObject, ObservableObject {
                 uid: credential.uid
             )
             workoutError = nil
+            workoutLoaded = true
         } catch {
             workoutError = String(describing: error)
+            // `error` es privacy-sensitive por defecto en os_log y saldría como
+            // "<private>", que es exactamente el silencio que esto viene a
+            // romper. Va explícito: son mensajes de Firestore, no datos del
+            // atleta.
+            log.error("No se pudo cargar el entreno de hoy: \(String(describing: error), privacy: .public)")
         }
     }
 }

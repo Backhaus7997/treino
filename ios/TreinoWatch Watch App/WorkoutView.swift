@@ -72,18 +72,30 @@ struct WorkoutView: View {
                         // teléfono a mano, antes no había ningún gesto: la
                         // sesión quedaba abierta para siempre.
                         //
-                        // Deliberadamente POCO accesible, que es lo que pidió el
-                        // dueño: chico, gris, sin tinte destructivo y debajo del
-                        // texto. El botón de arriba se gana marcando series; a
-                        // este hay que buscarlo. Y no ejecuta nada por sí solo —
-                        // pide confirmación, igual que el teléfono.
+                        // VISIBILIDAD, revisada por el dueño el 2026-08-18 con
+                        // la app corriendo en la muñeca: "casi ni lo veo, lo vi
+                        // de pedo". La versión original era deliberadamente poco
+                        // accesible —texto plano de 10pt en gris, pegado debajo
+                        // de otra línea gris— y en pantalla resultó invisible,
+                        // no discreta.
+                        //
+                        // El criterio nuevo es que se ENCUENTRE sin que se TOQUE
+                        // sin querer, y son dos cosas distintas:
+                        //   - Se encuentra: forma de botón (`.bordered`), que lo
+                        //     despega del texto de arriba, y tamaño legible.
+                        //   - No se toca sin querer: sigue ABAJO de todo y
+                        //     separado, el destructivo de verdad ("Terminar")
+                        //     se gana marcando series, y sobre todo NO EJECUTA
+                        //     NADA por sí solo — abre un `confirmationDialog`.
+                        //     Esa confirmación es la defensa real contra el
+                        //     toque accidental; la invisibilidad nunca lo fue.
                         Button("Abandonar entreno") {
                             confirmandoAbandono = true
                         }
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                        .buttonStyle(.plain)
-                        .padding(.top, 6)
+                        .font(.caption2)
+                        .buttonStyle(.bordered)
+                        .tint(.secondary)
+                        .padding(.top, 12)
                     }
 
                     // Por que NO se cerro el entreno.
