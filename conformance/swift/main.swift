@@ -400,6 +400,97 @@ private func runExerciseCursor(fixtureURL: URL) {
     }
 }
 
+// MARK: - set_log_write_target
+
+private func runSetLogWriteTarget(fixtureURL: URL) {
+    guard let data = try? Data(contentsOf: fixtureURL) else {
+        fail("No se pudo leer \(fixtureURL.path). Los fixtures son el contrato "
+            + "con la implementación Dart: si el archivo no está, ese contrato "
+            + "no existe.")
+        return
+    }
+
+    guard
+        let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+        let rule = json["rule"] as? String,
+        let cases = json["cases"] as? [[String: Any]]
+    else {
+        fail("\(fixtureURL.lastPathComponent) no tiene la forma esperada.")
+        return
+    }
+
+    guard rule == "set-log-write-target" else {
+        fail("Se esperaba rule 'set-log-write-target' y vino '\(rule)'.")
+        return
+    }
+
+    guard !cases.isEmpty else {
+        fail("\(fixtureURL.lastPathComponent) no tiene casos.")
+        return
+    }
+
+    for testCase in cases {
+        totalCases += 1
+        let name = testCase["name"] as? String ?? "(sin nombre)"
+
+        guard
+            let given = testCase["given"] as? [String: Any],
+            let exerciseId = given["exerciseId"] as? String,
+            let setNumber = given["setNumber"] as? Int,
+            let rawRemote = given["remote"] as? [[String: Any]],
+            let expected = testCase["expect"] as? [String: Any],
+            let expectedKind = expected["kind"] as? String,
+            let expectedDocId = expected["docId"] as? String
+        else {
+            fail("  · \"\(name)\": el caso no tiene la forma esperada.")
+            continue
+        }
+
+        var remote: [RemoteSetLogRef] = []
+        var malformado = false
+        for raw in rawRemote {
+            guard
+                let docId = raw["docId"] as? String,
+                let rExerciseId = raw["exerciseId"] as? String,
+                let rSetNumber = raw["setNumber"] as? Int
+            else {
+                malformado = true
+                break
+            }
+            remote.append(
+                RemoteSetLogRef(docId: docId, exerciseId: rExerciseId, setNumber: rSetNumber)
+            )
+        }
+        if malformado {
+            fail("  · \"\(name)\": una entrada de `remote` no tiene la forma esperada.")
+            continue
+        }
+
+        let actual = resolveSetLogWriteTarget(
+            exerciseId: exerciseId, setNumber: setNumber, remote: remote
+        )
+
+        let actualKind: String
+        let actualDocId: String
+        switch actual {
+        case let .alreadyThere(docId):
+            actualKind = "alreadyThere"
+            actualDocId = docId
+        case let .write(docId):
+            actualKind = "write"
+            actualDocId = docId
+        }
+
+        if actualKind != expectedKind || actualDocId != expectedDocId {
+            fail("""
+              · "\(name)"
+                  esperado: \(expectedKind) → \(expectedDocId)
+                  obtenido: \(actualKind) → \(actualDocId)
+            """)
+        }
+    }
+}
+
 // MARK: - main
 
 // El script pasa la raíz de `conformance/` como primer argumento.
@@ -414,6 +505,7 @@ runSetResolution(fixtureURL: conformanceDir.appendingPathComponent("set_resoluti
 runSessionCounting(fixtureURL: conformanceDir.appendingPathComponent("session_counting.json"))
 runSetLogIdentity(fixtureURL: conformanceDir.appendingPathComponent("set_log_identity.json"))
 runExerciseCursor(fixtureURL: conformanceDir.appendingPathComponent("exercise_cursor.json"))
+runSetLogWriteTarget(fixtureURL: conformanceDir.appendingPathComponent("set_log_write_target.json"))
 
 if failures.isEmpty {
     print("✓ conformidad Swift: \(totalCases) casos, todos en verde")

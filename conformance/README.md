@@ -63,6 +63,7 @@ fuera de rango) son justo los que alguien va a querer "arreglar" sin entender.
 | `session_counting.json` | Si una sesión cuenta como entrenamiento HECHO — la **entrada** de `plan_advance` | `lib/features/workout/domain/session.dart` | `ios/TreinoWatch Watch App/SessionCounting.swift` |
 | `set_log_identity.json` | Qué id de documento le toca a una serie, y cuándo un doc en esa ruta es de verdad esa serie | `lib/features/workout/domain/set_log_identity.dart` | `ios/TreinoWatch Watch App/SetLogIdentity.swift` |
 | `exercise_cursor.json` | En qué ejercicio queda parado el cliente durante un entreno — **siempre absoluto, nunca un delta** | `lib/features/workout/domain/exercise_cursor.dart` | `ios/TreinoWatch Watch App/ExerciseCursor.swift` |
+| `set_log_write_target.json` | Dónde escribe un **reloj** una serie: adoptar la que ya está, o un id propio antes que pisar otra | `lib/features/workout/domain/set_log_identity.dart` | `ios/TreinoWatch Watch App/SetLogIdentity.swift` |
 
 ## La lección que costó cuatro bugs
 
