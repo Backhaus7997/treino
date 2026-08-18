@@ -279,7 +279,14 @@ class _RestBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final color = finished ? palette.highlight : palette.accent;
+    // Como en watchOS: el tiempo es texto NORMAL y sólo «Saltar» va en acento.
+    // Pintarlo todo de verde competía con los círculos de las series, que son
+    // lo que el atleta viene a tocar.
+    //
+    // La única divergencia es al VENCER, que allá no existe: ahí sí cambia de
+    // color, porque el reloj se mira de reojo y el color se lee antes que un
+    // número.
+    final color = finished ? palette.highlight : palette.textPrimary;
     final segundos = (remainingMs / 1000).ceil();
 
     return Row(
@@ -289,9 +296,9 @@ class _RestBar extends StatelessWidget {
         const SizedBox(width: 8),
         Text(
           '${segundos}s',
-          style: GoogleFonts.barlowCondensed(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
+          style: GoogleFonts.barlow(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
             height: 1,
             color: color,
             // Tabulares: sin esto el ancho baila al pasar de 100 a 99 y la
