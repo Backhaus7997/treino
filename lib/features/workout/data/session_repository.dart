@@ -504,26 +504,33 @@ class SessionRepository {
   /// Devuelve la serie escrita, o **null** si ya estaba en el historial — en ese
   /// caso no se toca nada, porque reescribirla podría pisar una corrección que
   /// el atleta hizo en el teléfono.
+  ///
+  /// ## [knownRemote]: el historial que quien llama YA tiene
+  ///
+  /// Pasarlo evita releer la colección, y eso importa más de lo que parece. Sin
+  /// él, marcar n series cuesta n(n-1)/2 lecturas de documento —para un entreno
+  /// de 30 series, más de 400— porque cada escritura relee TODO el historial.
+  ///
+  /// El companion de Apple no hace eso: `WorkoutCoordinator.sync` lee el
+  /// historial UNA vez y resuelve todas las series pendientes contra ese
+  /// snapshot. El §4.3 del HANDOFF fija el ORDEN —leer antes de escribir— no la
+  /// granularidad; leer por cada serie es endurecerlo a cuadrático sin que nadie
+  /// lo pidiera.
+  ///
+  /// El reloj Wear tiene algo que watchOS no: un listener vivo sobre `setLogs`.
+  /// Su vista está, como mucho, un push atrás —mediana medida de 206 ms— y
+  /// además el teléfono tiene su propia defensa de adopción en [addSetLog]. Esa
+  /// ventana es aceptable; cuatrocientas lecturas por entreno en una muñeca, no.
+  ///
+  /// Sin [knownRemote] se relee, para que un llamador sin listener siga siendo
+  /// correcto.
   Future<SetLog?> addSetLogFromWatch({
     required String uid,
     required String sessionId,
     required SetLog setLog,
+    List<RemoteSetLogRef>? knownRemote,
   }) async {
-    final snapshot = await _setLogs(uid, sessionId).get();
-    final remote = <RemoteSetLogRef>[];
-    for (final doc in snapshot.docs) {
-      final data = doc.data();
-      final exerciseId = data['exerciseId'];
-      final setNumber = data['setNumber'];
-      if (exerciseId is! String || setNumber is! int) continue;
-      remote.add(
-        RemoteSetLogRef(
-          docId: doc.id,
-          exerciseId: exerciseId,
-          setNumber: setNumber,
-        ),
-      );
-    }
+    final remote = knownRemote ?? await _leerHistorial(uid, sessionId);
 
     final target = resolveSetLogWriteTarget(
       exerciseId: setLog.exerciseId,
@@ -536,6 +543,31 @@ class SessionRepository {
     final withId = setLog.copyWith(id: target.docId);
     await _setLogs(uid, sessionId).doc(target.docId).set(withId.toJson());
     return withId;
+  }
+
+  /// El historial de la sesión, reducido a lo que decide dónde escribir.
+  Future<List<RemoteSetLogRef>> _leerHistorial(
+    String uid,
+    String sessionId,
+  ) async {
+    final snapshot = await _setLogs(uid, sessionId).get();
+    final remote = <RemoteSetLogRef>[];
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+      final exerciseId = data['exerciseId'];
+      final setNumber = data['setNumber'];
+      // Un documento corrupto o a medio escribir se saltea: no puede impedir
+      // que el atleta marque una serie.
+      if (exerciseId is! String || setNumber is! int) continue;
+      remote.add(
+        RemoteSetLogRef(
+          docId: doc.id,
+          exerciseId: exerciseId,
+          setNumber: setNumber,
+        ),
+      );
+    }
+    return remote;
   }
 
   // ─── updateSetLog ───────────────────────────────────────────────────────

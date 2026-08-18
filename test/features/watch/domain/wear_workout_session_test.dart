@@ -39,6 +39,7 @@ List<WearLoggedSet> _marcadas(String id, int hasta,
     [
       for (var n = 1; n <= hasta; n++)
         WearLoggedSet(
+          docId: '${id}__$n',
           exerciseId: id,
           setNumber: n,
           reps: reps,
@@ -105,8 +106,13 @@ void main() {
         logged: [
           ..._marcadas('press', 2),
           // El duplicado: misma identidad lógica, otro documento.
+          // Otro documento, misma identidad lógica.
           const WearLoggedSet(
-              exerciseId: 'press', setNumber: 2, reps: 8, weightKg: 90),
+              docId: 'auto-xyz',
+              exerciseId: 'press',
+              setNumber: 2,
+              reps: 8,
+              weightKg: 90),
         ],
       );
 

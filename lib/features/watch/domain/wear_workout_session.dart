@@ -9,11 +9,20 @@ import 'wear_workout_plan.dart';
 /// que es donde ese acoplamiento ya vive.
 class WearLoggedSet {
   const WearLoggedSet({
+    required this.docId,
     required this.exerciseId,
     required this.setNumber,
     required this.reps,
     required this.weightKg,
   });
+
+  /// El documento que la contiene.
+  ///
+  /// Se guarda porque `resolveSetLogWriteTarget` lo necesita: sin él no se
+  /// puede detectar que la ruta determinística quedó ocupada por OTRA serie
+  /// —el caso que evita destruir un dato del atleta— y todo el contrato se
+  /// vuelve inaplicable desde acá.
+  final String docId;
 
   final String exerciseId;
   final int setNumber;

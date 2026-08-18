@@ -6,8 +6,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../workout/application/routine_providers.dart';
 import '../../workout/application/session_providers.dart'
     show currentUidProvider, sessionRepositoryProvider;
+import '../../workout/application/session_duration.dart'
+    show maxWorkoutDuration;
 import '../../workout/domain/session.dart';
 import '../../workout/domain/set_log.dart';
+import '../../workout/domain/set_log_identity.dart';
 import '../domain/wear_workout_plan.dart';
 import '../domain/wear_workout_session.dart';
 import '../presentation/wear/wear_view_models.dart';
@@ -203,6 +206,7 @@ class WearSessionNotifier extends Notifier<WearSessionState> {
               logged: [
                 for (final s in series)
                   WearLoggedSet(
+                    docId: s.id,
                     exerciseId: s.exerciseId,
                     setNumber: s.setNumber,
                     reps: s.reps,
@@ -219,6 +223,158 @@ class WearSessionNotifier extends Notifier<WearSessionState> {
         // Sacarlo de Running por un corte de red le borraria al atleta la
         // pantalla en medio de una serie.
       },
+    );
+  }
+
+  /// Marca una serie del entreno.
+  ///
+  /// [exerciseId] lo pasa la FILA, no se resuelve del cursor. Entre que la fila
+  /// se dibuja y el atleta la toca puede llegar un snapshot del teléfono que
+  /// mueva el cursor, y la serie terminaría escrita en OTRO ejercicio.
+  ///
+  /// Es idempotente por identidad lógica: dos toques sobre la misma serie
+  /// escriben una sola vez. El guard es POR SERIE y no global —a diferencia del
+  /// `_isLoggingSet` del teléfono— porque en la muñeca marcar dos series
+  /// seguidas rápido es normal, y un candado global se comería la segunda.
+  Future<void> logSet({
+    required String exerciseId,
+    required int setNumber,
+  }) async {
+    final actual = state;
+    if (actual is! WearSessionRunning) return;
+    final sesion = actual.session;
+
+    final identidad = '${exerciseId}__$setNumber';
+    // Ya marcada, o con una escritura en vuelo. `identities` incluye `pending`.
+    if (sesion.identities.contains(identidad)) return;
+
+    final ejercicio = _ejercicioDe(sesion, exerciseId);
+    if (ejercicio == null) return;
+    if (setNumber < 1 || setNumber > ejercicio.sets.length) return;
+    final spec = ejercicio.sets[setNumber - 1];
+
+    final uid = _uid;
+    if (uid == null || uid.isEmpty) return;
+
+    // El círculo se llena en el toque: la escritura tiene un viaje de red por
+    // delante y esperar a que vuelva se siente roto en la muñeca.
+    _set(
+      WearSessionRunning(
+        sesion.copyWith(pending: {...sesion.pending, identidad}),
+      ),
+    );
+
+    try {
+      await ref.read(sessionRepositoryProvider).addSetLogFromWatch(
+        uid: uid,
+        sessionId: sesion.sessionId,
+        setLog: SetLog(
+          id: '',
+          exerciseId: exerciseId,
+          exerciseName: ejercicio.exerciseName,
+          setNumber: setNumber,
+          // Con un rango se registra el MÁXIMO: es el objetivo del plan.
+          // Misma regla que watchOS; el atleta corrige desde el teléfono.
+          reps: spec.reps ?? spec.repsMax ?? spec.repsMin ?? 0,
+          weightKg: spec.weightKg ?? 0,
+          completedAt: DateTime.now(),
+        ),
+        // El historial que el listener ya trajo. Sin esto, cada serie
+        // releería la colección entera. Ver `addSetLogFromWatch`.
+        knownRemote: [
+          for (final l in sesion.logged)
+            RemoteSetLogRef(
+              docId: l.docId,
+              exerciseId: l.exerciseId,
+              setNumber: l.setNumber,
+            ),
+        ],
+      );
+    } catch (e) {
+      debugPrint('[wear-session] no se pudo marcar $identidad — $e');
+    } finally {
+      // Sale de pending pase lo que pase. Si la escritura falló, el círculo se
+      // vacía — que es honesto: la serie NO quedó guardada. Si salió bien, el
+      // listener ya la trajo y `logged` la sostiene.
+      _sacarDePending(identidad);
+    }
+  }
+
+  /// Cierra el entreno como COMPLETADO.
+  ///
+  /// Sólo se ofrece con todas las series de todos los ejercicios hechas
+  /// (`isFullyCompleted`), que es pedido del dueño: tenerlo a la vista antes
+  /// invita a cerrar el entreno de más.
+  Future<void> finish() => _cerrar(completo: true);
+
+  /// Abandona el entreno sin completarlo.
+  ///
+  /// Existe porque sin esto una lesión deja la sesión abierta para siempre y el
+  /// atleta sin salida si no tiene el teléfono a mano — la deuda §8.3 del
+  /// companion de Apple, que allá ya se cerró.
+  Future<void> abandon() => _cerrar(completo: false);
+
+  Future<void> _cerrar({required bool completo}) async {
+    final actual = state;
+    if (actual is! WearSessionRunning) return;
+    final sesion = actual.session;
+
+    final uid = _uid;
+    if (uid == null || uid.isEmpty) return;
+
+    final ahora = DateTime.now();
+    try {
+      await ref.read(sessionRepositoryProvider).finish(
+            uid: uid,
+            sessionId: sesion.sessionId,
+            finishedAt: ahora,
+            totalVolumeKg: sesion.totalVolumeKg,
+            durationMin: _duracionMin(sesion.startedAt, ahora),
+            wasFullyCompleted: completo,
+          );
+    } catch (e) {
+      debugPrint('[wear-session] no se pudo cerrar el entreno — $e');
+      // Se queda en Running: si la escritura falló, la sesión sigue abierta en
+      // Firestore y sacar al atleta de la pantalla le mentiría.
+      return;
+    }
+
+    _series?.cancel();
+    _series = null;
+    _set(const WearSessionIdle());
+  }
+
+  /// Minutos del entreno, redondeados hacia arriba y con el mismo tope que usa
+  /// el teléfono.
+  ///
+  /// No hay timer: un tick por segundo en un ARM de 32 bits es un rebuild por
+  /// segundo durante todo el entreno. Como el número sólo hace falta al cerrar,
+  /// se calcula ahí.
+  int _duracionMin(DateTime desde, DateTime hasta) {
+    final segundos = hasta
+        .difference(desde)
+        .inSeconds
+        .clamp(0, maxWorkoutDuration.inSeconds);
+    return (segundos + 59) ~/ 60;
+  }
+
+  WearPlannedExercise? _ejercicioDe(WearWorkoutSession s, String exerciseId) {
+    for (final e in s.plan.exercises) {
+      if (e.exerciseId == exerciseId) return e;
+    }
+    return null;
+  }
+
+  void _sacarDePending(String identidad) {
+    final actual = state;
+    if (actual is! WearSessionRunning) return;
+    if (!actual.session.pending.contains(identidad)) return;
+    _set(
+      WearSessionRunning(
+        actual.session.copyWith(
+          pending: {...actual.session.pending}..remove(identidad),
+        ),
+      ),
     );
   }
 

@@ -229,6 +229,140 @@ void main() {
     });
   });
 
+  group('marcar series', () {
+    Future<WearSessionRunning> arrancado(ProviderContainer c) async {
+      await pumpEventQueue();
+      await c.read(wearSessionProvider.notifier).start(hoy);
+      await pumpEventQueue();
+      return c.read(wearSessionProvider) as WearSessionRunning;
+    }
+
+    Future<List<Map<String, dynamic>>> docsDeSeries(String sessionId) async {
+      final snap = await firestore
+          .collection('users')
+          .doc(uid)
+          .collection('sessions')
+          .doc(sessionId)
+          .collection('setLogs')
+          .get();
+      return [for (final d in snap.docs) d.data()];
+    }
+
+    test('escribe con id determinístico y mueve el cursor', () async {
+      final c = contenedor();
+      final corriendo = await arrancado(c);
+      final sid = corriendo.session.sessionId;
+
+      final n = c.read(wearSessionProvider.notifier);
+      for (var i = 1; i <= 4; i++) {
+        await n.logSet(exerciseId: 'press', setNumber: i);
+      }
+      await pumpEventQueue();
+
+      final docs = await docsDeSeries(sid);
+      expect(docs.length, 4);
+      expect(
+        [for (final d in docs) d['id']],
+        containsAll(['press__1', 'press__2', 'press__3', 'press__4']),
+      );
+
+      final s = (c.read(wearSessionProvider) as WearSessionRunning).session;
+      expect(s.isFullyCompleted, isTrue);
+    });
+
+    // Ojo con lo que prueba: el documento único lo garantiza el id
+    // DETERMINÍSTICO —dos toques escriben la misma ruta—, no el guard de
+    // `pending`. Se comprobó mutando: sacar el guard deja este test en verde.
+    // El guard igual se queda, pero su valor es otro: evita el viaje de red
+    // redundante, y en una muñeca el doble toque es frecuente.
+    test('dos toques sobre la misma serie dejan UN documento', () async {
+      final c = contenedor();
+      final corriendo = await arrancado(c);
+      final n = c.read(wearSessionProvider.notifier);
+
+      await Future.wait([
+        n.logSet(exerciseId: 'press', setNumber: 1),
+        n.logSet(exerciseId: 'press', setNumber: 1),
+      ]);
+      await pumpEventQueue();
+
+      expect((await docsDeSeries(corriendo.session.sessionId)).length, 1);
+    });
+
+    test('con un rango se registra el MÁXIMO, igual que watchOS', () async {
+      final c = contenedor();
+      final corriendo = await arrancado(c);
+      await c
+          .read(wearSessionProvider.notifier)
+          .logSet(exerciseId: 'press', setNumber: 1);
+      await pumpEventQueue();
+
+      final docs = await docsDeSeries(corriendo.session.sessionId);
+      // El slot es targetRepsMin 8 / targetRepsMax 12.
+      expect(docs.single['reps'], 12);
+    });
+
+    test('una serie que no existe en el plan no escribe nada', () async {
+      final c = contenedor();
+      final corriendo = await arrancado(c);
+      final n = c.read(wearSessionProvider.notifier);
+
+      await n.logSet(exerciseId: 'press', setNumber: 99);
+      await n.logSet(exerciseId: 'inventado', setNumber: 1);
+      await pumpEventQueue();
+
+      expect(await docsDeSeries(corriendo.session.sessionId), isEmpty);
+    });
+  });
+
+  group('cerrar el entreno', () {
+    test('terminar lo marca completo y vuelve a HOY', () async {
+      final c = contenedor();
+      await pumpEventQueue();
+      await c.read(wearSessionProvider.notifier).start(hoy);
+      await pumpEventQueue();
+
+      final n = c.read(wearSessionProvider.notifier);
+      for (var i = 1; i <= 4; i++) {
+        await n.logSet(exerciseId: 'press', setNumber: i);
+      }
+      await pumpEventQueue();
+      await n.finish();
+      await pumpEventQueue();
+
+      expect(c.read(wearSessionProvider), isA<WearSessionIdle>());
+      expect(await sesionesActivas(), 0);
+
+      final snap = await firestore
+          .collection('users')
+          .doc(uid)
+          .collection('sessions')
+          .get();
+      final doc = snap.docs.single.data();
+      expect(doc['wasFullyCompleted'], isTrue);
+      // 4 series de 12 reps x 0 kg (el slot no tiene peso objetivo).
+      expect(doc['totalVolumeKg'], 0.0);
+    });
+
+    test('abandonar cierra sin marcarlo completo', () async {
+      final c = contenedor();
+      await pumpEventQueue();
+      await c.read(wearSessionProvider.notifier).start(hoy);
+      await pumpEventQueue();
+
+      await c.read(wearSessionProvider.notifier).abandon();
+      await pumpEventQueue();
+
+      expect(c.read(wearSessionProvider), isA<WearSessionIdle>());
+      final snap = await firestore
+          .collection('users')
+          .doc(uid)
+          .collection('sessions')
+          .get();
+      expect(snap.docs.single.data()['wasFullyCompleted'], isFalse);
+    });
+  });
+
   test('el historial en vivo mueve el cursor', () async {
     final c = contenedor();
     await pumpEventQueue();
