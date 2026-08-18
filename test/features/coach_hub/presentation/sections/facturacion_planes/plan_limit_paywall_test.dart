@@ -10,6 +10,7 @@ Widget _harness(
   SubscriptionTier tier, {
   PlanLimitReason reason = PlanLimitReason.planLimit,
   SubscriptionStatus? subscriptionStatus,
+  String? billingRoute,
 }) {
   final router = GoRouter(
     initialLocation: '/',
@@ -25,12 +26,18 @@ Widget _harness(
                   currentTier: tier,
                   reason: reason,
                   subscriptionStatus: subscriptionStatus,
+                  billingRoute: billingRoute,
                 ),
                 child: const Text('open'),
               ),
             ),
           ),
         ),
+      ),
+      GoRoute(
+        path: '/ajustes',
+        builder: (_, __) =>
+            const Scaffold(body: Center(child: Text('AJUSTES'))),
       ),
       GoRoute(
         path: '/facturacion/planes',
@@ -140,6 +147,42 @@ void main() {
     expect(find.text('REGULARIZAR'), findsOneWidget);
     expect(find.text('PLAN A MEDIDA'), findsNothing);
     expect(find.text('CONTACTANOS'), findsNothing);
+  });
+
+  // Regresion: el modal se dispara TAMBIEN desde la app movil, que no tiene
+  // pantalla de facturacion. Antes el CTA navegaba a '/ajustes' fijo y ahi
+  // moria contra una ruta inexistente: el mensaje era correcto y el boton no
+  // hacia nada. Ahora la ruta es explicita y su ausencia se explica.
+
+  testWidgets('REGULARIZAR sin billingRoute avisa en vez de navegar',
+      (tester) async {
+    await tester.pumpWidget(_harness(
+      SubscriptionTier.plan1,
+      reason: PlanLimitReason.subscriptionInactive,
+    ));
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('REGULARIZAR'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SnackBar), findsOneWidget);
+    expect(find.text('AJUSTES'), findsNothing);
+  });
+
+  testWidgets('REGULARIZAR con billingRoute navega ahi', (tester) async {
+    await tester.pumpWidget(_harness(
+      SubscriptionTier.plan1,
+      reason: PlanLimitReason.subscriptionInactive,
+      billingRoute: '/ajustes',
+    ));
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('REGULARIZAR'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('AJUSTES'), findsOneWidget);
   });
 
   testWidgets('reason por defecto es plan-limit — comportamiento intacto',

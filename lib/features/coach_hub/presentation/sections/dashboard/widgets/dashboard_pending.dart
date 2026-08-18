@@ -239,6 +239,9 @@ class _PendingRequestTileState extends ConsumerState<_PendingRequestTile> {
           reason: failure.reason == 'subscription-inactive'
               ? PlanLimitReason.subscriptionInactive
               : PlanLimitReason.planLimit,
+          // El Coach Hub SI tiene vista de facturacion; la app movil no, y
+          // por eso el default es null (ver showPlanLimitPaywall).
+          billingRoute: '/ajustes',
         ),
       );
     } on LinkPromotionFailure$PromotionPrecondition {

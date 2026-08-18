@@ -34,6 +34,7 @@ Future<void> showPlanLimitPaywall(
   required SubscriptionTier currentTier,
   PlanLimitReason reason = PlanLimitReason.planLimit,
   SubscriptionStatus? subscriptionStatus,
+  String? billingRoute,
 }) {
   return showDialog<void>(
     context: context,
@@ -42,6 +43,7 @@ Future<void> showPlanLimitPaywall(
       currentTier: currentTier,
       reason: reason,
       subscriptionStatus: subscriptionStatus,
+      billingRoute: billingRoute,
     ),
   );
 }
@@ -51,11 +53,17 @@ class _PlanLimitPaywallDialog extends StatelessWidget {
     required this.currentTier,
     this.reason = PlanLimitReason.planLimit,
     this.subscriptionStatus,
+    this.billingRoute,
   });
 
   final SubscriptionTier currentTier;
   final PlanLimitReason reason;
   final SubscriptionStatus? subscriptionStatus;
+
+  /// Ruta a la vista de facturacion. NULL = esta superficie no tiene una (la
+  /// app movil no tiene pantalla de facturacion), y entonces el CTA explica
+  /// en vez de navegar a una ruta inexistente y morir.
+  final String? billingRoute;
 
   @override
   Widget build(BuildContext context) {
@@ -125,6 +133,7 @@ class _PlanLimitPaywallDialog extends StatelessWidget {
               _PrimaryCta(
                 hasNext: next != null,
                 isInactive: isInactive,
+                billingRoute: billingRoute,
                 palette: palette,
               ),
               const SizedBox(height: 10),
@@ -326,11 +335,13 @@ class _PrimaryCta extends StatelessWidget {
   const _PrimaryCta({
     required this.hasNext,
     required this.isInactive,
+    required this.billingRoute,
     required this.palette,
   });
 
   final bool hasNext;
   final bool isInactive;
+  final String? billingRoute;
   final AppPalette palette;
 
   @override
@@ -338,12 +349,26 @@ class _PrimaryCta extends StatelessWidget {
     if (isInactive) {
       return TreinoTappable(
         onTap: () {
+          final route = billingRoute;
           Navigator.of(context).pop();
-          // Facturación TREINO vive como tab dentro de /ajustes; todavía no
-          // hay deep-link al tab. NUNCA mandar a /facturacion/planes acá: es
-          // la página de upsell, el mensaje opuesto al que necesita.
-          // TODO(PR2): deep-link a /ajustes?tab=facturacion cuando exista.
-          context.push('/ajustes');
+          if (route == null) {
+            // Superficie sin vista de facturacion (la app movil no tiene
+            // ninguna). Antes esto navegaba a '/ajustes' fijo y en movil moria
+            // contra una ruta inexistente: el modal decia lo correcto y el
+            // boton no hacia nada. Mejor decirlo que fingirlo.
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Regularizá tu suscripción desde TREINO web.',
+                ), // i18n: Fase W3
+              ),
+            );
+            return;
+          }
+          // NUNCA mandar a /facturacion/planes acá: es la página de upsell, el
+          // mensaje opuesto al que necesita quien ya pagó.
+          // TODO(producto): deep-link al tab de Facturación cuando exista.
+          context.push(route);
         },
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 13),
