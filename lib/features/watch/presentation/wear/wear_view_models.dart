@@ -30,14 +30,28 @@ enum WearPairingState {
 /// Réplica de `TodaysWorkout` de watchOS, con lo que la vista previa necesita.
 class WearTodaysWorkout {
   const WearTodaysWorkout({
+    required this.routineId,
     required this.dayName,
+    required this.dayNumber,
     required this.routineName,
     required this.exercises,
     required this.weekNumber,
     required this.numWeeks,
   });
 
+  /// La rutina resuelta. No se muestra: es lo que hace falta para CREAR la
+  /// sesión al tocar «Empezar», sin volver a leer nada.
+  final String routineId;
+
   final String dayName;
+
+  /// 1-based, igual que `RoutineDay.dayNumber`. Tampoco se muestra.
+  ///
+  /// Va junto con [weekNumber] a `SessionRepository.create`, y desde ahí la
+  /// posición la manda la SESIÓN — nunca se recalcula. Ver
+  /// `wearWorkoutPlanFrom`.
+  final int dayNumber;
+
   final String routineName;
   final List<WearExercisePreview> exercises;
 

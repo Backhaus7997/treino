@@ -63,6 +63,10 @@ void main() {
       expect(w.dayName, 'Empuje');
       expect(w.routineName, 'Full Body 3 días');
       expect(w.numWeeks, 4);
+      // No se muestran: son lo que hace falta para CREAR la sesión al tocar
+      // «Empezar», sin volver a leer la rutina.
+      expect(w.routineId, 'r1');
+      expect(w.dayNumber, 1);
       // 0-based de punta a punta. El +1 lo hace la pantalla; convertirlo acá
       // mostraría la semana corrida.
       expect(w.weekNumber, 2);

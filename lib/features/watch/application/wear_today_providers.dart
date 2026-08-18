@@ -67,7 +67,9 @@ WearTodaysWorkout wearTodaysWorkoutFrom(TodaysRoutine todays) {
   final week = todays.weekNumber;
 
   return WearTodaysWorkout(
+    routineId: todays.routine.id,
     dayName: todays.day.name,
+    dayNumber: todays.dayNumber,
     routineName: todays.routine.name,
     // 0-based de punta a punta: `TodaysRoutine.weekNumber` y
     // `WearTodaysWorkout.weekNumber` significan lo mismo, y el +1 lo hace
