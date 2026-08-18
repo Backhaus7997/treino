@@ -20,7 +20,6 @@ class WearWorkoutSnapshot {
     required this.loggedSetNumbers,
     required this.restSeconds,
     required this.isFullyCompleted,
-    this.pendingUploadCount = 0,
   });
 
   /// Mitad de la identidad de cada serie de este ejercicio.
@@ -42,9 +41,6 @@ class WearWorkoutSnapshot {
 
   /// Números de serie (1-based) ya marcados.
   final Set<int> loggedSetNumbers;
-
-  /// Series marcadas que todavía no subieron. En watchOS se muestran en naranja.
-  final int pendingUploadCount;
 
   /// Descanso de ESTE ejercicio, en segundos.
   ///
@@ -120,6 +116,5 @@ WearWorkoutSnapshot? wearSnapshotFrom(WearWorkoutSession session) {
     },
     restSeconds: actual.restSeconds,
     isFullyCompleted: session.isFullyCompleted,
-    pendingUploadCount: session.pending.length,
   );
 }

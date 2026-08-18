@@ -99,10 +99,6 @@ class WearWorkoutScreen extends ConsumerWidget {
             service.startRest(snapshot.restSeconds);
           },
         ),
-        if (snapshot.pendingUploadCount > 0) ...[
-          const SizedBox(height: 8),
-          _PendingUpload(count: snapshot.pendingUploadCount),
-        ],
         const SizedBox(height: 12),
         _FinishHint(
           puedeTerminar: snapshot.isFullyCompleted,
@@ -407,29 +403,6 @@ class _SetRow extends StatelessWidget {
     return Opacity(
       opacity: tappable ? 1 : 0.5,
       child: tappable ? _WearTapTarget(onTap: onTap, child: row) : row,
-    );
-  }
-}
-
-/// Series marcadas que todavía no subieron.
-class _PendingUpload extends StatelessWidget {
-  const _PendingUpload({required this.count});
-
-  final int count;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(TreinoIcon.arrowRight, size: 11, color: palette.warning),
-        const SizedBox(width: 8),
-        Text(
-          '$count ${WearStrings.pendingUpload}',
-          style: GoogleFonts.barlow(fontSize: 11, color: palette.warning),
-        ),
-      ],
     );
   }
 }

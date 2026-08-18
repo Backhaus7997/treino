@@ -21,9 +21,6 @@ class WearStrings {
   /// Unidad de energía activa.
   static const kcalUnit = 'kcal';
 
-  /// Series marcadas que todavía no subieron a Firestore.
-  static const pendingUpload = 'sin subir';
-
   /// Por qué no aparece "Terminar" todavía.
   ///
   /// Pedido del dueño, documentado en `WorkoutView.swift`: el botón sólo sale

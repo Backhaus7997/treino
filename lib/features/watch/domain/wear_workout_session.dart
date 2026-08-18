@@ -69,9 +69,15 @@ class WearWorkoutSession {
   /// Identidades lógicas con una escritura EN VUELO.
   ///
   /// Cuentan como marcadas para que el círculo se llene en el toque y no
-  /// después del viaje a la red: `addSetLogFromWatch` lee el historial antes de
-  /// escribir, así que hay un round trip por delante. Si la escritura falla,
-  /// la identidad sale de acá y el círculo se vacía — que es honesto.
+  /// después del viaje a la red. Si la escritura falla, la identidad sale de acá
+  /// y el círculo se vacía — que es honesto.
+  ///
+  /// **Sólo sirve para eso.** No hay cartel de «sin subir»: se sacó, porque en
+  /// Wear no existe una cola offline propia. Firestore la maneja solo, y el
+  /// cartel se limpiaba cuando la escritura era visible LOCALMENTE, no cuando el
+  /// servidor la confirmaba — o sea que decía «subido» estando encolada, que es
+  /// el único caso donde el dato habría importado. En watchOS el cartel sí tiene
+  /// sentido: allá la cola está escrita a mano.
   final Set<String> pending;
 
   /// Las series marcadas, por identidad lógica.

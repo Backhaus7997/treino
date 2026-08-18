@@ -466,12 +466,14 @@ void main() {
     });
   });
 
-  test('el cartel de «sin subir» se limpia con el historial, no con el await',
-      () async {
-    // El bug que vio el dueño: el cartel iba a 1, 2, 3... y no bajaba nunca.
-    // `set()` de Firestore no completa hasta que el servidor confirma, asi que
-    // sin red el `finally` que limpiaba `pending` NO corre. Se simula con una
-    // escritura que nunca vuelve.
+  test('lo que está en vuelo lo drena el historial, no el await', () async {
+    // Vino de un bug que vio el dueño con el cartel de «sin subir» —iba a 1, 2,
+    // 3 y no bajaba— y sobrevive al cartel, que ya se sacó: `pending` sigue
+    // siendo lo que llena el círculo en el toque, y si no drenara, un círculo
+    // marcado por una escritura que falló quedaría verde para siempre.
+    //
+    // `set()` de Firestore no completa hasta que el servidor confirma, así que
+    // sin red el `finally` NO corre. Se simula con una escritura que no vuelve.
     final colgada = Completer<SetLog?>();
     final repoLento = _RepoQueNoVuelve(repo, colgada.future);
 
