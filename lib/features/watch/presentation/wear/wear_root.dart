@@ -35,6 +35,8 @@ class WearRoot extends StatelessWidget {
     required this.onLogSet,
     required this.onFinish,
     required this.onAbandon,
+    this.routineActionBusy = false,
+    this.routineActionError,
   });
 
   final WearPairingState pairing;
@@ -60,6 +62,13 @@ class WearRoot extends StatelessWidget {
   ///
   /// El `exerciseId` viaja con el toque; ver `WearWorkoutScreen.onLogSet`.
   final void Function(String exerciseId, int setNumber) onLogSet;
+
+  /// Si «Empezar» o «Activar» están en curso. La hoja muestra el spinner y no
+  /// acepta otro toque.
+  final bool routineActionBusy;
+
+  /// Qué salió mal en la última acción del detalle, o null.
+  final String? routineActionError;
 
   /// Cierra el entreno como completado.
   final VoidCallback onFinish;
@@ -111,6 +120,8 @@ class WearRoot extends StatelessWidget {
             onStart: onStartRoutine,
             onActivate: onActivateRoutine,
             onClose: onCloseDetail,
+            busy: routineActionBusy,
+            errorMessage: routineActionError,
           );
         }
 

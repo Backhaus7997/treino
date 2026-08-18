@@ -86,6 +86,12 @@ class WearStrings {
   // ── Detalle de rutina ───────────────────────────────────────────────────
   static const activate = 'Activar';
 
+  /// Qué salió mal en «Empezar» o «Activar».
+  ///
+  /// Genérico a propósito: en la muñeca no hay espacio para explicar, y el
+  /// detalle exacto ya está en el log con tag `[wear-session]`.
+  static const actionFailed = 'No se pudo. Probá de nuevo.';
+
   /// Por qué «Empezar» y «Activar» son cosas distintas.
   ///
   /// Texto tomado literal de `RoutineDetailView.swift`: el atleta tiene que

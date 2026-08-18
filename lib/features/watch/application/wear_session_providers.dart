@@ -5,7 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../workout/application/routine_providers.dart';
 import '../../workout/application/session_providers.dart'
-    show currentUidProvider, sessionRepositoryProvider;
+    show currentUidProvider, sessionRepositoryProvider, sessionsByUidProvider;
+import '../../workout/domain/plan_advance.dart';
 import '../../workout/application/session_duration.dart'
     show maxWorkoutDuration;
 import '../../workout/domain/session.dart';
@@ -168,6 +169,97 @@ class WearSessionNotifier extends Notifier<WearSessionState> {
     } catch (e) {
       debugPrint('[wear-session] no se pudo empezar — $e');
       _set(const WearSessionFailed('no se pudo empezar el entreno'));
+    }
+  }
+
+  /// Empieza una rutina que NO es la de hoy, desde las listas laterales.
+  ///
+  /// ## La posición sale de ESA rutina, no del día 1
+  ///
+  /// El día y la semana se calculan con las sesiones terminadas de esta misma
+  /// rutina, así que una plantilla ya empezada **retoma donde iba**. Es la regla
+  /// de `startNow` en `RoutineListView.swift`, y arrancar siempre del día 1
+  /// haría que el atleta repita el primer día cada vez que entra por la lista.
+  ///
+  /// Adopta antes de crear, igual que [start]: la razón está en el encabezado de
+  /// la clase y no cambia por venir de otra pantalla.
+  ///
+  /// Devuelve false si no se pudo abrir, para que el detalle muestre el error en
+  /// vez de cerrarse como si hubiera funcionado.
+  Future<bool> startRoutine(String routineId) async {
+    if (state is WearSessionRunning || state is WearSessionOpening) {
+      return false;
+    }
+
+    final uid = _uid;
+    if (uid == null || uid.isEmpty) return false;
+
+    _set(const WearSessionOpening());
+    final repo = ref.read(sessionRepositoryProvider);
+
+    try {
+      final abierta = await repo.getActive(uid);
+      if (abierta != null) {
+        debugPrint('[wear-session] ya habia un entreno abierto '
+            '${abierta.id}: se adopta en vez de empezar $routineId');
+        await _abrir(uid, abierta);
+        return state is WearSessionRunning;
+      }
+
+      final rutina = await ref.read(routineByIdProvider(routineId).future);
+      if (rutina == null || rutina.days.isEmpty) {
+        _set(const WearSessionFailed('no se encontró la rutina'));
+        return false;
+      }
+
+      // La última sesión TERMINADA de esta rutina manda la posición. El
+      // historial ya viene ordenado por startedAt descendente.
+      final historial = await ref.read(sessionsByUidProvider(uid).future);
+      Session? ultima;
+      for (final s in historial) {
+        if (s.routineId == routineId && s.countsAsWorkout) {
+          ultima = s;
+          break;
+        }
+      }
+
+      final posicion = nextPlanPosition(
+        lastFinished: ultima == null
+            ? null
+            : (dayNumber: ultima.dayNumber, weekNumber: ultima.weekNumber),
+        numDays: rutina.days.length,
+        numWeeks: rutina.numWeeks,
+      );
+
+      // Un día sin ejercicios presentes esta semana —una descarga, por ejemplo—
+      // no se puede entrenar. Mejor decirlo que abrir una pantalla vacía; misma
+      // guarda que `startNow` de watchOS.
+      final plan = wearWorkoutPlanFrom(
+        routine: rutina,
+        dayNumber: posicion.dayNumber,
+        weekNumber: posicion.weekNumber,
+      );
+      if (plan == null || plan.exercises.isEmpty) {
+        _set(const WearSessionFailed('esta rutina no tiene ejercicios hoy'));
+        return false;
+      }
+
+      final creada = await repo.create(
+        uid: uid,
+        routineId: routineId,
+        routineName: rutina.name,
+        startedAt: DateTime.now(),
+        dayNumber: posicion.dayNumber,
+        weekNumber: posicion.weekNumber,
+      );
+      debugPrint('[wear-session] entreno creado desde la lista ${creada.id} '
+          '(día ${creada.dayNumber}, semana ${creada.weekNumber})');
+      await _abrir(uid, creada);
+      return state is WearSessionRunning;
+    } catch (e) {
+      debugPrint('[wear-session] no se pudo empezar $routineId — $e');
+      _set(const WearSessionFailed('no se pudo empezar el entreno'));
+      return false;
     }
   }
 

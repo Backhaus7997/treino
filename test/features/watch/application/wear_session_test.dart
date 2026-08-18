@@ -303,6 +303,110 @@ void main() {
     });
   });
 
+  group('empezar desde las listas laterales', () {
+    test('la posición sale de las sesiones de ESA rutina, no del día 1',
+        () async {
+      // Regla de `startNow` en RoutineListView.swift: una plantilla ya empezada
+      // RETOMA donde iba. Arrancar siempre del día 1 haría que el atleta repita
+      // el primero cada vez que entra por la lista.
+      //
+      // Se siembra un día 1 terminado de r1, así que lo que toca es el día 2.
+      final s = await repo.create(
+        uid: uid,
+        routineId: 'r1',
+        routineName: 'Fuerza Base',
+        startedAt: DateTime.utc(2026, 8, 17, 9),
+        dayNumber: 1,
+        weekNumber: 0,
+      );
+      await repo.finish(
+        uid: uid,
+        sessionId: s.id,
+        finishedAt: DateTime.utc(2026, 8, 17, 10),
+        totalVolumeKg: 100,
+        durationMin: 30,
+        wasFullyCompleted: true,
+      );
+
+      final c = contenedor();
+      await pumpEventQueue();
+
+      final ok = await c.read(wearSessionProvider.notifier).startRoutine('r1');
+      await pumpEventQueue();
+
+      expect(ok, isTrue);
+      final abierta =
+          (c.read(wearSessionProvider) as WearSessionRunning).session;
+      expect(abierta.plan.dayNumber, 2, reason: 'retoma donde iba');
+      expect(abierta.plan.dayName, 'Tirón');
+    });
+
+    test('sin historial de esa rutina arranca en el día 1', () async {
+      final c = contenedor();
+      await pumpEventQueue();
+
+      final ok = await c.read(wearSessionProvider.notifier).startRoutine('r1');
+      await pumpEventQueue();
+
+      expect(ok, isTrue);
+      expect(
+        (c.read(wearSessionProvider) as WearSessionRunning)
+            .session
+            .plan
+            .dayName,
+        'Empuje',
+      );
+    });
+
+    test('si ya hay un entreno abierto lo ADOPTA en vez de crear otro',
+        () async {
+      // El mismo guard que `start`: dos activas hacen que el barrido cierre la
+      // del teléfono, con el atleta adentro.
+      //
+      // El entreno aparece DESPUÉS de abrir el reloj a propósito: si se sembrara
+      // antes, lo taparía la adopción del arranque y este test pasaría igual sin
+      // el guard. Comprobado — la primera versión lo hacía.
+      final c = contenedor();
+      await pumpEventQueue();
+      expect(c.read(wearSessionProvider), isA<WearSessionIdle>());
+
+      await repo.create(
+        uid: uid,
+        routineId: 'r1',
+        routineName: 'Fuerza Base',
+        startedAt: DateTime.utc(2026, 8, 18, 9),
+        dayNumber: 2,
+        weekNumber: 0,
+      );
+
+      await c.read(wearSessionProvider.notifier).startRoutine('r1');
+      await pumpEventQueue();
+
+      expect(await sesionesActivas(), 1);
+      expect(
+        (c.read(wearSessionProvider) as WearSessionRunning)
+            .session
+            .plan
+            .dayName,
+        'Tirón',
+        reason: 'adoptó la que estaba, día 2',
+      );
+    });
+
+    test('una rutina que no existe no abre nada y lo reporta', () async {
+      final c = contenedor(sinRutina: true);
+      await pumpEventQueue();
+
+      final ok = await c.read(wearSessionProvider.notifier).startRoutine('r9');
+      await pumpEventQueue();
+
+      expect(ok, isFalse);
+      expect(c.read(wearSessionProvider), isA<WearSessionFailed>());
+      expect(await sesionesActivas(), 0,
+          reason: 'no se creó una sesión huérfana');
+    });
+  });
+
   group('cuando no se puede abrir', () {
     test('una rutina que ya no existe lo dice, no se cuelga', () async {
       final c = contenedor(sinRutina: true);

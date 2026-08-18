@@ -56,6 +56,7 @@ import 'features/watch/application/wear_pairing_providers.dart';
 import 'features/watch/application/wear_routine_list_providers.dart';
 import 'features/watch/application/wear_today_providers.dart';
 import 'features/watch/presentation/wear/wear_root.dart';
+import 'features/watch/presentation/wear/wear_strings.dart';
 import 'features/watch/presentation/wear/wear_view_models.dart';
 import 'features/watch/presentation/wear/wear_workout_view_model.dart';
 import 'firebase_options.dart';
@@ -219,6 +220,43 @@ class _WearHomeState extends ConsumerState<_WearHome> {
   /// Rutina abierta en el detalle, o null.
   (WearRoutineSummary, WearRoutineListKind)? _selected;
 
+  /// Si hay una acción del detalle en curso, y qué falló en la última.
+  ///
+  /// Va en `setState` y no en un provider a propósito: es estado de
+  /// PRESENTACIÓN de una hoja que se cierra —quién muestra el spinner— y no
+  /// sobrevive a nada. Estado de negocio, el de la sesión, vive en su notifier.
+  bool _accionEnCurso = false;
+  String? _accionError;
+
+  /// Corre una acción del detalle mostrando el spinner, y cierra la hoja sólo si
+  /// salió bien.
+  ///
+  /// Mismo criterio que `perform` de `RoutineListView.swift`: si falla, la hoja
+  /// se queda abierta con el error, porque cerrarla le diría al atleta que
+  /// funcionó.
+  Future<void> _correrAccion(Future<bool> Function() accion) async {
+    if (_accionEnCurso) return;
+    setState(() {
+      _accionEnCurso = true;
+      _accionError = null;
+    });
+    var ok = false;
+    try {
+      ok = await accion();
+    } catch (e) {
+      debugPrint('[wear] la acción del detalle falló — $e');
+    }
+    if (!mounted) return;
+    setState(() {
+      _accionEnCurso = false;
+      if (ok) {
+        _selected = null;
+      } else {
+        _accionError = WearStrings.actionFailed;
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final pairing = ref.watch(wearPairingProvider);
@@ -256,13 +294,39 @@ class _WearHomeState extends ConsumerState<_WearHome> {
           );
         }
       },
-      onSelectRoutine: (r, k) => setState(() => _selected = (r, k)),
-      onCloseDetail: () => setState(() => _selected = null),
-      // TODO(wear): empezar desde una rutina de las listas laterales todavía no
-      // resuelve su plan — las listas siguen siendo datos de muestra, así que
-      // esas rutinas no existen. Se cablea junto con las listas.
-      onStartRoutine: () => setState(() => _selected = null),
-      onActivateRoutine: () => setState(() => _selected = null),
+      onSelectRoutine: (r, k) => setState(() {
+        _selected = (r, k);
+        _accionError = null;
+      }),
+      onCloseDetail: () => setState(() {
+        _selected = null;
+        _accionError = null;
+      }),
+      routineActionBusy: _accionEnCurso,
+      routineActionError: _accionError,
+      onStartRoutine: () {
+        final elegida = _selected;
+        if (elegida == null) return;
+        unawaited(
+          _correrAccion(
+            () => ref
+                .read(wearSessionProvider.notifier)
+                .startRoutine(elegida.$1.id),
+          ),
+        );
+      },
+      // Activar NO arranca el entreno: cambia una preferencia y nada más. Ver
+      // `wearActivateRoutineProvider`.
+      onActivateRoutine: () {
+        final elegida = _selected;
+        if (elegida == null) return;
+        unawaited(
+          _correrAccion(() async {
+            await ref.read(wearActivateRoutineProvider)(elegida.$1.id);
+            return true;
+          }),
+        );
+      },
       onLogSet: (exerciseId, setNumber) => unawaited(
         ref.read(wearSessionProvider.notifier).logSet(
               exerciseId: exerciseId,

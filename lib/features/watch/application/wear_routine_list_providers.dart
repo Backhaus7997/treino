@@ -5,6 +5,8 @@ import '../../workout/application/routine_providers.dart';
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../../workout/application/user_routines_providers.dart';
+import '../../profile/application/user_providers.dart'
+    show userRepositoryProvider;
 import '../../workout/domain/routine.dart';
 import '../../workout/domain/routine_source.dart';
 import '../presentation/wear/wear_view_models.dart';
@@ -110,3 +112,32 @@ WearRoutineList _combinar(List<AsyncValue<List<Routine>>> fuentes) {
   if (todasFallaron) return const WearRoutineList.failed();
   return const WearRoutineList.loading();
 }
+
+/// Marca una rutina como la activa del atleta.
+///
+/// Escribe el MISMO campo que el teléfono (`users/{uid}.activeRoutineId`), así
+/// que el cambio se ve en los dos lados. HOY se actualiza solo: su provider
+/// escucha el perfil, no hace falta invalidar nada.
+///
+/// **No arranca el entreno**, y eso es deliberado —regla portada de
+/// `RoutineListView.swift`—: activar es cambiar una preferencia, y encadenarle
+/// un entreno haría imposible cambiar de plan sin ponerte a entrenar.
+///
+/// ⚠️ Sólo tiene sentido sobre PLANES. `resolveActiveRoutineId` busca el
+/// marcador dentro de las listas de asignadas y auto-creadas, así que escribir
+/// el id de una PLANTILLA es una escritura que sale bien y **no hace nada**: el
+/// atleta ve "listo" y HOY le sigue mostrando la rutina de antes. El gate está
+/// en la UI (`WearRoutineDetail` sólo ofrece Activar en planes) y se documenta
+/// acá para que nadie lo llame desde otro lado.
+final wearActivateRoutineProvider =
+    Provider<Future<void> Function(String routineId)>((ref) {
+  return (routineId) async {
+    final uid = ref.read(currentUidProvider);
+    if (uid == null || uid.isEmpty) {
+      throw StateError('no hay sesión para activar una rutina');
+    }
+    await ref.read(userRepositoryProvider).update(uid, {
+      'activeRoutineId': routineId,
+    });
+  };
+});
