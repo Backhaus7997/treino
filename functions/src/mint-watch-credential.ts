@@ -91,10 +91,31 @@ export async function runMintWatchCredential(
  * Region southamerica-east1, igual que el resto de los callables del proyecto.
  */
 export const mintWatchCredential = functions.onCall(
-  // App Check enforced: esta funcion entrega credenciales renovables, asi que
-  // el gate de atestacion es defensa en profundidad sobre request.auth. Mismo
-  // criterio que addAlias (QA-SEC-006).
-  { region: "southamerica-east1", enforceAppCheck: true },
+  // App Check DESACTIVADO temporalmente (2026-08-18), decision del dueno.
+  //
+  // POR QUE: App Attest no emite token valido ni en un build de TestFlight
+  // firmado para distribucion. Medido: la funcion devuelve 401 con
+  // "Decoding App Check token failed" tanto con firma de desarrollo como con
+  // firma de distribucion, asi que el reloj nunca recibe credencial y se queda
+  // en "vinculando" para siempre. `deliverCredential` traga el error en su
+  // catch (_), asi que el sintoma no se parece en nada a la causa.
+  //
+  // POR QUE ES ACEPTABLE HOY: el enforcement de App Check esta UNENFORCED en
+  // TODO el proyecto — verificado contra la API el 2026-08-18:
+  //   firestore.googleapis.com        -> UNENFORCED
+  //   identitytoolkit.googleapis.com  -> UNENFORCED
+  // Esta funcion era lo UNICO que lo exigia. La data de los atletas ya se lee
+  // y escribe sin atestacion, asi que el gate aca no cerraba una puerta que
+  // estuviera cerrada en otro lado.
+  //
+  // LO QUE SIGUE PROTEGIENDO: `request.auth` es obligatorio y el uid sale
+  // unicamente del token verificado (ver abajo). No se puede pedir credencial
+  // para otro atleta.
+  //
+  // PARA RESTAURARLO: volver a `enforceAppCheck: true` cuando App Attest emita
+  // token. El arreglo de fondo pide instrumentar el cliente y subir un build
+  // nuevo; hasta entonces esto queda como deuda, no como decision de diseno.
+  { region: "southamerica-east1", enforceAppCheck: false },
   async (request): Promise<{ customToken: string }> => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Authentication required.");
