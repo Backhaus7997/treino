@@ -38,29 +38,6 @@ final class WorkoutCoordinator: ObservableObject {
     /// hay pendientes, no el detalle.
     @Published private(set) var syncError: String?
 
-    /// En que anda la adopcion de un entreno que abrio el telefono.
-    ///
-    /// Existe porque la UI no puede distinguir "no hay entreno" de "todavia no
-    /// terminamos de buscarlo", y esos dos estados se ven IGUAL: la pantalla de
-    /// HOY con el boton "Empezar" activo. Durante los ~5 viajes de red que
-    /// tarda la adopcion, el atleta puede tocarlo y crear una SEGUNDA sesion
-    /// para el mismo entreno.
-    ///
-    /// NO alcanza con el delegate de lanzamiento (`WatchLaunchDelegate`): ese
-    /// solo cubre el arranque EN FRIO, y en watchOS la app casi siempre resume
-    /// en vez de arrancar. Esto cubre los dos caminos porque cuelga de la
-    /// adopcion misma, no de como entro la app.
-    enum AdoptionPhase {
-        /// Nada en curso.
-        case idle
-        /// Buscando si hay una sesion remota. Todavia no sabemos si existe.
-        case searching
-        /// La encontramos y estamos resolviendo la rutina y las series.
-        case resolving
-    }
-
-    @Published private(set) var adoptionPhase: AdoptionPhase = .idle
-
     /// Por que no se pudo CERRAR el entreno, si es que no se pudo.
     ///
     /// Existe aparte de `syncError` porque son dos cosas distintas: `syncError`
@@ -133,20 +110,11 @@ final class WorkoutCoordinator: ObservableObject {
     /// remota del mismo día en vez de crear otra.
     func adoptRemoteSessionIfAny() async {
         guard session == nil, let makeClient, let makeWorkout else { return }
-        // `defer` y no una asignacion al final: los `return` tempranos de abajo
-        // dejarian la fase colgada, y una fase colgada tapa HOY para siempre.
-        adoptionPhase = .searching
-        defer { adoptionPhase = .idle }
         do {
             let (client, uid) = try await makeClient()
             guard let remote = try await HistorySync.findAnyActiveSession(
                 client: client, uid: uid
             ) else { return }
-
-            // Recien ACA sabemos que hay un entreno. Antes de esto la UI no
-            // debe prometer nada: podria no haber ninguno, y "Preparando tu
-            // entreno..." parpadeando en cada foreground seria mentira.
-            adoptionPhase = .resolving
 
             // Los ejercicios salen de LA RUTINA Y LA POSICIÓN DE ESA SESIÓN.
             // La rutina puede no ser la activa (el atleta arrancó una plantilla
