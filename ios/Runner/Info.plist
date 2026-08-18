@@ -51,6 +51,8 @@
 	-->
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Necesitamos tu ubicación para mostrarte entrenadores cerca tuyo.</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>TREINO no lee tus datos de Salud. Este permiso existe únicamente para poder abrir tu Apple Watch cuando empezás un entrenamiento desde el teléfono.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>TREINO usa Salud para abrir tu Apple Watch cuando empezás un entrenamiento desde el teléfono.</string>
 	<key>NSCameraUsageDescription</key>
