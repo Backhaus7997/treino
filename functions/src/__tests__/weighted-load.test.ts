@@ -2,6 +2,9 @@
  * Unit tests for the fractional weighted-load math (paywall PR1). No infra.
  */
 
+import * as fs from "fs";
+import * as path from "path";
+
 import {
   canAccept,
   computeWeightedLoad,
@@ -101,4 +104,38 @@ describe("round2", () => {
     expect(round2(0.3)).toBe(0.5);
     expect(round2(0.2)).toBe(0.0);
   });
+});
+
+/**
+ * Golden fixture shared with the Dart mirror
+ * (`test/features/coach/domain/weighted_load_parity_test.dart`), both reading
+ * `weighted-load-cases.json`. Read via fs.readFileSync + JSON.parse rather
+ * than `resolveJsonModule` — see design D-3.
+ *
+ * Includes the H1 regression case: a single athlete with a blocked-active
+ * link AND an entitled-paused link. Deduping BEFORE filtering `blocked`
+ * (the pre-fix order) picks the blocked-active row as "heaviest" and then
+ * drops it, sub-counting to 0 instead of the correct 0.5.
+ */
+interface WeightedLoadCase {
+  name: string;
+  links: WeightedLink[];
+  expected: number;
+}
+
+const fixturePath = path.join(
+  __dirname,
+  "../subscriptions/weighted-load-cases.json",
+);
+const goldenCases: WeightedLoadCase[] = JSON.parse(
+  fs.readFileSync(fixturePath, "utf8"),
+);
+
+describe("computeWeightedLoad — golden fixture (TS/Dart parity, H1 regression)", () => {
+  it.each(goldenCases.map((c): [string, WeightedLoadCase] => [c.name, c]))(
+    "%s",
+    (_name, c) => {
+      expect(computeWeightedLoad(c.links)).toBe(c.expected);
+    },
+  );
 });

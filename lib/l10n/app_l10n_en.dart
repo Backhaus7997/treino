@@ -2172,10 +2172,26 @@ class AppL10nEn extends AppL10n {
       'We couldn\'t resume the link.';
 
   @override
+  String get coachHubDashboardResumePrecondition =>
+      'This link is no longer available.';
+
+  @override
+  String get coachHubDashboardResumeUnavailable =>
+      'Check your connection and try again.';
+
+  @override
   String get coachHubDashboardAcceptSuccess => 'Link accepted.';
 
   @override
   String get coachHubDashboardAcceptError => 'We couldn\'t accept the link.';
+
+  @override
+  String get coachHubDashboardAcceptPrecondition =>
+      'This request is no longer available.';
+
+  @override
+  String get coachHubDashboardAcceptUnavailable =>
+      'Check your connection and try again.';
 
   @override
   String get coachHubDashboardRejectSuccess => 'Request rejected.';

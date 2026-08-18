@@ -12,6 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
+import 'package:treino/features/coach/data/trainer_link_promotion_service.dart';
 import 'package:treino/features/coach/data/trainer_link_repository.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
@@ -21,6 +22,9 @@ import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 class _MockRepo extends Mock implements TrainerLinkRepository {}
+
+class _MockPromotionService extends Mock
+    implements TrainerLinkPromotionService {}
 
 TrainerLink _link(
   String athleteId,
@@ -45,6 +49,7 @@ Future<void> _pump(
   List<TrainerLink>? links,
   List<UserPublicProfile> profiles = const [],
   TrainerLinkRepository? repo,
+  TrainerLinkPromotionService? promotionService,
   // `false` cuando el stream de links queda colgado en loading a propósito
   // (TreinoShimmer corre en loop infinito — pumpAndSettle no termina nunca).
   bool settle = true,
@@ -67,6 +72,9 @@ Future<void> _pump(
           (ref, uid) => Stream.value(profileByUid[uid]),
         ),
         if (repo != null) trainerLinkRepositoryProvider.overrideWithValue(repo),
+        if (promotionService != null)
+          trainerLinkPromotionServiceProvider
+              .overrideWithValue(promotionService),
       ],
       child: MaterialApp(
         theme: theme ?? AppTheme.dark(),
@@ -394,22 +402,22 @@ void main() {
 
   group('InvitacionesScreen — acciones aceptar/rechazar', () {
     testWidgets(
-        'aceptar → dialog de confirmación → repo.accept + snackbar de éxito',
+        'aceptar → dialog de confirmación → svc.accept + snackbar de éxito',
         (tester) async {
-      final repo = _MockRepo();
-      when(() => repo.accept(any())).thenAnswer((_) async {});
+      final svc = _MockPromotionService();
+      when(() => svc.accept(any())).thenAnswer((_) async {});
 
       await _pump(
         tester,
         links: [_link('a1', TrainerLinkStatus.pending, id: 'l1')],
         profiles: [_prof('a1', 'Ana García')],
-        repo: repo,
+        promotionService: svc,
       );
 
       await tester.tap(find.byKey(const Key('accept_l1')));
       await tester.pumpAndSettle();
 
-      verifyNever(() => repo.accept(any()));
+      verifyNever(() => svc.accept(any()));
       expect(find.byKey(const Key('dialog_primary_button')), findsOneWidget);
 
       // No pumpAndSettle: tras aceptar, la tarjeta queda `busy` (spinner
@@ -418,9 +426,9 @@ void main() {
       await tester.tap(find.byKey(const Key('dialog_primary_button')));
       await tester.pump(); // cierra el dialog
       await tester.pump(const Duration(milliseconds: 300)); // anim de cierre
-      await tester.pump(); // resuelve el Future de repo.accept + snackbar
+      await tester.pump(); // resuelve el Future de svc.accept + snackbar
 
-      verify(() => repo.accept('l1')).called(1);
+      verify(() => svc.accept('l1')).called(1);
       expect(find.text('Vínculo aceptado.'), findsOneWidget);
     });
 
@@ -449,15 +457,15 @@ void main() {
       expect(find.text('Solicitud rechazada.'), findsOneWidget);
     });
 
-    testWidgets('cancelar el diálogo NO llama al repo', (tester) async {
-      final repo = _MockRepo();
-      when(() => repo.accept(any())).thenAnswer((_) async {});
+    testWidgets('cancelar el diálogo NO llama a la callable', (tester) async {
+      final svc = _MockPromotionService();
+      when(() => svc.accept(any())).thenAnswer((_) async {});
 
       await _pump(
         tester,
         links: [_link('a1', TrainerLinkStatus.pending, id: 'l1')],
         profiles: [_prof('a1', 'Ana García')],
-        repo: repo,
+        promotionService: svc,
       );
 
       await tester.tap(find.byKey(const Key('accept_l1')));
@@ -465,7 +473,7 @@ void main() {
       await tester.tap(find.byKey(const Key('dialog_secondary_button')));
       await tester.pumpAndSettle();
 
-      verifyNever(() => repo.accept(any()));
+      verifyNever(() => svc.accept(any()));
     });
   });
 }

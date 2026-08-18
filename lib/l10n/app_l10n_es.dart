@@ -2223,10 +2223,26 @@ class AppL10nEs extends AppL10n {
       'No pudimos reanudar el vínculo.';
 
   @override
+  String get coachHubDashboardResumePrecondition =>
+      'Este vínculo ya no está disponible.';
+
+  @override
+  String get coachHubDashboardResumeUnavailable =>
+      'Revisá tu conexión y probá de nuevo.';
+
+  @override
   String get coachHubDashboardAcceptSuccess => 'Vínculo aceptado.';
 
   @override
   String get coachHubDashboardAcceptError => 'No pudimos aceptar el vínculo.';
+
+  @override
+  String get coachHubDashboardAcceptPrecondition =>
+      'Esta solicitud ya no está disponible.';
+
+  @override
+  String get coachHubDashboardAcceptUnavailable =>
+      'Revisá tu conexión y probá de nuevo.';
 
   @override
   String get coachHubDashboardRejectSuccess => 'Solicitud rechazada.';
@@ -5699,10 +5715,26 @@ class AppL10nEsAr extends AppL10nEs {
       'No pudimos reanudar el vínculo.';
 
   @override
+  String get coachHubDashboardResumePrecondition =>
+      'Este vínculo ya no está disponible.';
+
+  @override
+  String get coachHubDashboardResumeUnavailable =>
+      'Revisá tu conexión y probá de nuevo.';
+
+  @override
   String get coachHubDashboardAcceptSuccess => 'Vínculo aceptado.';
 
   @override
   String get coachHubDashboardAcceptError => 'No pudimos aceptar el vínculo.';
+
+  @override
+  String get coachHubDashboardAcceptPrecondition =>
+      'Esta solicitud ya no está disponible.';
+
+  @override
+  String get coachHubDashboardAcceptUnavailable =>
+      'Revisá tu conexión y probá de nuevo.';
 
   @override
   String get coachHubDashboardRejectSuccess => 'Solicitud rechazada.';

@@ -6,7 +6,12 @@ import 'package:treino/features/coach_hub/presentation/sections/facturacion_plan
 
 /// Monta un botón que abre el paywall para [tier], dentro de un router mínimo
 /// (el CTA "VER PLANES" hace context.push).
-Widget _harness(SubscriptionTier tier) {
+Widget _harness(
+  SubscriptionTier tier, {
+  PlanLimitReason reason = PlanLimitReason.planLimit,
+  SubscriptionStatus? subscriptionStatus,
+  String? billingRoute,
+}) {
   final router = GoRouter(
     initialLocation: '/',
     routes: [
@@ -16,12 +21,23 @@ Widget _harness(SubscriptionTier tier) {
           body: Builder(
             builder: (ctx) => Center(
               child: ElevatedButton(
-                onPressed: () => showPlanLimitPaywall(ctx, currentTier: tier),
+                onPressed: () => showPlanLimitPaywall(
+                  ctx,
+                  currentTier: tier,
+                  reason: reason,
+                  subscriptionStatus: subscriptionStatus,
+                  billingRoute: billingRoute,
+                ),
                 child: const Text('open'),
               ),
             ),
           ),
         ),
+      ),
+      GoRoute(
+        path: '/ajustes',
+        builder: (_, __) =>
+            const Scaffold(body: Center(child: Text('AJUSTES'))),
       ),
       GoRoute(
         path: '/facturacion/planes',
@@ -85,5 +101,97 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('LLEGASTE AL LÍMITE DE TU PLAN'), findsNothing);
+  });
+
+  // ── Rama subscription-inactive (paywall Fase 7, PR4, diseño D-2) ─────────
+  //
+  // Son DOS problemas de producto distintos. `plan-limit` = "creciste, comprá
+  // más". `subscription-inactive` = "tu derecho está suspendido, regularizá".
+  // Un PF con plan2 pago pero suscripción `paused` tiene el límite efectivo de
+  // Free: ofrecerle un upsell (o el plan a-medida del tope) es el mensaje
+  // equivocado en el peor momento.
+
+  Future<void> openInactive(
+    WidgetTester tester,
+    SubscriptionTier tier, {
+    SubscriptionStatus status = SubscriptionStatus.paused,
+  }) async {
+    await tester.pumpWidget(_harness(
+      tier,
+      reason: PlanLimitReason.subscriptionInactive,
+      subscriptionStatus: status,
+    ));
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('subscription-inactive → regularizar, sin upsell ni precio',
+      (tester) async {
+    await openInactive(tester, SubscriptionTier.plan1);
+
+    expect(find.text('REGULARIZAR'), findsOneWidget);
+    // Nada de upsell: no se le vende un plan a quien ya pagó uno.
+    expect(find.textContaining('PASATE A'), findsNothing);
+    // Sin precio-héroe — el precio no es la pregunta acá.
+    expect(find.text('12.000'), findsNothing);
+    expect(find.text('22.000'), findsNothing);
+    expect(find.text('VER PLANES'), findsNothing);
+  });
+
+  testWidgets('subscription-inactive en plan2 NO cae en el plan a medida',
+      (tester) async {
+    // El tope de tier es irrelevante cuando el problema es el cobro: `reason`
+    // manda sobre `currentTier`.
+    await openInactive(tester, SubscriptionTier.plan2);
+
+    expect(find.text('REGULARIZAR'), findsOneWidget);
+    expect(find.text('PLAN A MEDIDA'), findsNothing);
+    expect(find.text('CONTACTANOS'), findsNothing);
+  });
+
+  // Regresion: el modal se dispara TAMBIEN desde la app movil, que no tiene
+  // pantalla de facturacion. Antes el CTA navegaba a '/ajustes' fijo y ahi
+  // moria contra una ruta inexistente: el mensaje era correcto y el boton no
+  // hacia nada. Ahora la ruta es explicita y su ausencia se explica.
+
+  testWidgets('REGULARIZAR sin billingRoute avisa en vez de navegar',
+      (tester) async {
+    await tester.pumpWidget(_harness(
+      SubscriptionTier.plan1,
+      reason: PlanLimitReason.subscriptionInactive,
+    ));
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('REGULARIZAR'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SnackBar), findsOneWidget);
+    expect(find.text('AJUSTES'), findsNothing);
+  });
+
+  testWidgets('REGULARIZAR con billingRoute navega ahi', (tester) async {
+    await tester.pumpWidget(_harness(
+      SubscriptionTier.plan1,
+      reason: PlanLimitReason.subscriptionInactive,
+      billingRoute: '/ajustes',
+    ));
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('REGULARIZAR'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('AJUSTES'), findsOneWidget);
+  });
+
+  testWidgets('reason por defecto es plan-limit — comportamiento intacto',
+      (tester) async {
+    // La firma es ADITIVA: los callsites viejos (paywall_preview_screen)
+    // siguen compilando y renderizando exactamente igual.
+    await open(tester, SubscriptionTier.free);
+
+    expect(find.text('PASATE A PLAN 1'), findsOneWidget);
+    expect(find.text('REGULARIZAR'), findsNothing);
   });
 }
