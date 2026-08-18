@@ -10,6 +10,12 @@ import SwiftUI
 
 @main
 struct TreinoWatch_Watch_AppApp: App {
+    /// Recibe el lanzamiento que dispara el telefono con `startWatchApp(with:)`.
+    /// Ver `WatchLaunchDelegate.swift` para por que hace falta.
+    @WKApplicationDelegateAdaptor(WatchLaunchDelegate.self)
+    private var launchDelegate
+
+    @StateObject private var launchIntent = WatchLaunchIntent.shared
     @StateObject private var coordinator = CredentialCoordinator()
     @StateObject private var workoutCoordinator = WorkoutCoordinator()
 
@@ -31,6 +37,7 @@ struct TreinoWatch_Watch_AppApp: App {
                 .environmentObject(coordinator)
                 .environmentObject(workoutCoordinator)
                 .environmentObject(workoutSession)
+                .environmentObject(launchIntent)
                 // Activa WatchConnectivity y recupera la credencial guardada.
                 // Va acá y no en el init del coordinator para que el trabajo
                 // arranque con la escena viva, no durante la construcción.
@@ -59,12 +66,26 @@ struct TreinoWatch_Watch_AppApp: App {
                             weekNumber: week
                         )
                     }
+                    // Si nos lanzo el telefono, la sesion de HealthKit se
+                    // abre YA, antes de cualquier viaje de red. Es la razon por
+                    // la que watchOS nos desperto, y `begin()` es sincrono e
+                    // idempotente: la llamada posterior de
+                    // `WorkoutCoordinator.adoptRemoteSessionIfAny` es no-op.
+                    if launchIntent.pendingWorkout != nil {
+                        workoutSession.begin()
+                    }
+
                     coordinator.start()
                     // Recupera un entreno a medias. Ya no espera a que se
                     // resuelva la rutina ACTIVA: la sesión guardada sabe de qué
                     // rutina es y se re-resuelve sola, así que un entreno
                     // arrancado desde una plantilla también sobrevive.
                     await workoutCoordinator.restore()
+
+                    // La adopcion TERMINO, con o sin sesion encontrada. Se
+                    // limpia la intencion para que "Preparando tu entreno..." no
+                    // quede colgado si no habia nada que adoptar.
+                    launchIntent.clear()
                 }
                 // Relee la rutina al volver a primer plano. Sin esto el reloj
                 // solo la leia al arrancar la app: si el atleta cambiaba su

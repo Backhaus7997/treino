@@ -11,6 +11,7 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject private var coordinator: CredentialCoordinator
     @EnvironmentObject private var workoutCoordinator: WorkoutCoordinator
+    @EnvironmentObject private var launchIntent: WatchLaunchIntent
 
     var body: some View {
         switch coordinator.state {
@@ -33,6 +34,19 @@ struct ContentView: View {
                 // páginas laterales, para no ofrecerle al atleta arrancar otra
                 // rutina mientras está a mitad de esta.
                 WorkoutView()
+            } else if launchIntent.pendingWorkout != nil {
+                // Nos lanzó el teléfono y la adopción todavía no terminó.
+                //
+                // Sin esta rama caeríamos en `WatchHome`, que dibuja HOY con el
+                // botón "Empezar" ACTIVO durante los cinco viajes de red que
+                // tarda la adopción. El atleta ve el reloj abrirse solo, toca lo
+                // único accionable que hay en pantalla, y crea una SEGUNDA
+                // sesión para el mismo entreno. Ver `WatchLaunchDelegate.swift`.
+                VStack(spacing: 8) {
+                    ProgressView()
+                    Text("Preparando tu entreno…").font(.footnote)
+                }
+                .padding()
             } else {
                 WatchHome()
             }
