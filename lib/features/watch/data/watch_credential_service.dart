@@ -42,7 +42,8 @@ enum WatchCredentialOutcome {
 ///
 /// FLUJO
 /// -----
-///   1. ¿Hay reloj? Si no, cortar acá — no se mintea credencial al pedo.
+///   1. ¿Hay reloj? Si no, cortar acá — no se mintea credencial al pedo. Ver
+///      [_hayReloj]: la pregunta no se responde igual en las dos plataformas.
 ///   2. Llamar a `mintWatchCredential` (mintea SOLO para el uid autenticado).
 ///   3. Mandar el payload por `updateApplicationContext`, que persiste y se
 ///      entrega cuando el reloj se reconecte.
@@ -81,10 +82,7 @@ class WatchCredentialService {
     if (!await _bridge.isSupported) {
       return _rastro(WatchCredentialOutcome.notSupported);
     }
-    if (!await _bridge.isPaired) {
-      // OJO al diagnosticar: en Android esto NO pregunta si hay un reloj
-      // emparejado. El plugin lista las apps companion instaladas en el
-      // TELÉFONO; si ninguna está visible da false aunque el reloj esté ahí.
+    if (!await _hayReloj()) {
       return _rastro(WatchCredentialOutcome.noWatchPaired);
     }
 
@@ -138,6 +136,41 @@ class WatchCredentialService {
       WatchCredentialOutcome.delivered,
       detalle: 'uid=$uid, customToken de ${customToken.length} caracteres',
     );
+  }
+
+  /// Si vale la pena mintearle credencial a este teléfono.
+  ///
+  /// Parece una pregunta sola y son DOS, porque `isPaired` no significa lo
+  /// mismo de los dos lados:
+  ///
+  /// - **iOS**: `WCSession.isPaired` es literal — hay un Apple Watch
+  ///   emparejado. Alcanza y sobra, y por eso es lo primero que se consulta.
+  /// - **Android**: `isPaired` lista las apps COMPANION instaladas en el
+  ///   teléfono (verificado en `WatchConnectivityPlugin.kt`). Responde "¿este
+  ///   teléfono podría tener un reloj?", no "¿lo tiene?". La única prueba
+  ///   POSITIVA que expone el plugin es `connectedNodes`, o sea [isReachable].
+  ///
+  /// Por eso el OR, y en este orden. No es un cinturón con tiradores: es que
+  /// ninguna de las dos señales, sola, responde bien en las dos plataformas.
+  ///
+  /// El OR es estrictamente MÁS permisivo que preguntar sólo por `isPaired`,
+  /// así que no puede bloquear nada que hoy funcione — sólo destapar el caso
+  /// contrario, que es el caro: un reloj conectado de verdad, con el chequeo de
+  /// apps instaladas dando false, y `deliverCredential` cortando en
+  /// `noWatchPaired` sin un solo error a la vista. La muñeca queda esperando
+  /// una credencial que nadie llegó a pedir.
+  ///
+  /// Lo que NO se hace acá es exigir alcanzabilidad: `updateApplicationContext`
+  /// persiste y se entrega al reconectar, así que un reloj apagado o fuera de
+  /// rango igual recibe lo que se publique ahora. Cortar por no estar alcanzable
+  /// perdería justo eso.
+  ///
+  /// Costo cuando efectivamente no hay reloj: una llamada más por MethodChannel,
+  /// local y barata. El viaje a la Cloud Function sigue sin ocurrir — este
+  /// chequeo va ANTES.
+  Future<bool> _hayReloj() async {
+    if (await _bridge.isPaired) return true;
+    return _bridge.isReachable;
   }
 
   /// Deja rastro del resultado y lo devuelve tal cual.
