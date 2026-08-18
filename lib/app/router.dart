@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/widgets/treino_bottom_bar.dart';
+import '../features/coach_hub/presentation/sections/facturacion_planes/pricing_screen.dart';
 import '../features/auth/application/auth_providers.dart';
 import '../features/auth/presentation/forgot_password_screen.dart';
 import '../features/auth/presentation/login_screen.dart';
@@ -256,6 +257,20 @@ GoRouter buildRouter({
         pageBuilder: (_, __) => _noAnim(const ProfileUnavailableScreen()),
       ),
 
+      // ─── Paywall — pricing page (paywall Fase 7, PR4) ─────────────────────
+      // El modal de limite (`showPlanLimitPaywall`) se dispara TAMBIEN desde
+      // la app movil: `TrainerDashboardTab` (home del PF) y
+      // `trainer_coach_view` son moviles, y su CTA "VER PLANES" navega aca.
+      // Sin esta ruta el modal se abre bien pero el boton muere contra una
+      // ruta inexistente — el paywall quedaria roto en la mitad del producto.
+      //
+      // `PricingScreen` ya es responsive (tiene rama < 820px), pero en el
+      // Coach Hub el Scaffold lo provee el shell (ADR-CHW-005), asi que aca
+      // hay que envolverlo.
+      GoRoute(
+        path: '/facturacion/planes',
+        builder: (context, state) => const Scaffold(body: PricingScreen()),
+      ),
       // ─── Session player — TOP-LEVEL ROUTES (outside ShellRoute) ───────────
       // El player es immersive: oculta la bottom bar durante el entrenamiento.
       // Diseño §9.1. Las 3 rutas son auth-gated via authRedirect.
