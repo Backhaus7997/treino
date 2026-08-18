@@ -70,6 +70,19 @@ dynamic reflectDelegate(SessionRepository real, Invocation i) {
 
 const uid = 'atleta-1';
 
+/// Una sesión abierta hace poco.
+///
+/// ⚠️ RELATIVO al ahora, nunca una fecha fija. `getActive` cierra las activas de
+/// más de `maxWorkoutDuration` (8 h) y devuelve null, así que una fecha absoluta
+/// convierte estos tests en bombas de tiempo: pasan a la mañana y fallan a la
+/// tarde del MISMO día, cuando el reloj de pared cruza el umbral. Pasó.
+DateTime get _reciente =>
+    DateTime.now().toUtc().subtract(const Duration(minutes: 30));
+
+/// Una sesión de ayer, ya terminada. Ésta SÍ puede ser vieja: `getActive` sólo
+/// mira las activas, y el cálculo de posición quiere justamente historial.
+DateTime get _viejo => DateTime.now().toUtc().subtract(const Duration(days: 1));
+
 RoutineSlot _slot(String nombre, {int series = 3, int rest = 60}) =>
     RoutineSlot(
       exerciseId: nombre,
@@ -172,7 +185,7 @@ void main() {
         uid: uid,
         routineId: 'r1',
         routineName: 'Fuerza Base',
-        startedAt: DateTime.utc(2026, 8, 18, 9),
+        startedAt: _reciente,
         dayNumber: 2,
         weekNumber: 0,
       );
@@ -207,7 +220,7 @@ void main() {
         uid: uid,
         routineId: 'r1',
         routineName: 'Fuerza Base',
-        startedAt: DateTime.utc(2026, 8, 18, 9),
+        startedAt: _reciente,
         dayNumber: 2,
         weekNumber: 0,
       );
@@ -241,7 +254,7 @@ void main() {
         uid: uid,
         routineId: 'r1',
         routineName: 'Fuerza Base',
-        startedAt: DateTime.utc(2026, 8, 18, 9),
+        startedAt: _reciente,
         dayNumber: 2,
         weekNumber: 0,
       );
@@ -265,7 +278,7 @@ void main() {
         uid: uid,
         routineId: 'r1',
         routineName: 'Fuerza Base',
-        startedAt: DateTime.utc(2026, 8, 18, 9),
+        startedAt: _reciente,
         dayNumber: 2,
         weekNumber: 0,
       );
@@ -315,14 +328,14 @@ void main() {
         uid: uid,
         routineId: 'r1',
         routineName: 'Fuerza Base',
-        startedAt: DateTime.utc(2026, 8, 17, 9),
+        startedAt: _viejo,
         dayNumber: 1,
         weekNumber: 0,
       );
       await repo.finish(
         uid: uid,
         sessionId: s.id,
-        finishedAt: DateTime.utc(2026, 8, 17, 10),
+        finishedAt: _viejo.add(const Duration(hours: 1)),
         totalVolumeKg: 100,
         durationMin: 30,
         wasFullyCompleted: true,
@@ -374,7 +387,7 @@ void main() {
         uid: uid,
         routineId: 'r1',
         routineName: 'Fuerza Base',
-        startedAt: DateTime.utc(2026, 8, 18, 9),
+        startedAt: _reciente,
         dayNumber: 2,
         weekNumber: 0,
       );
@@ -423,7 +436,7 @@ void main() {
         uid: uid,
         routineId: 'r1',
         routineName: 'Fuerza Base',
-        startedAt: DateTime.utc(2026, 8, 18, 9),
+        startedAt: _reciente,
         dayNumber: 9,
         weekNumber: 0,
       );
@@ -557,7 +570,7 @@ void main() {
         uid: uid,
         routineId: 'r1',
         routineName: 'Fuerza Base',
-        startedAt: DateTime.utc(2026, 8, 18, 9),
+        startedAt: _reciente,
         dayNumber: 2,
         weekNumber: 0,
       );

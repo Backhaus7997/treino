@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../workout/application/assigned_routine_providers.dart';
@@ -136,8 +139,24 @@ final wearActivateRoutineProvider =
     if (uid == null || uid.isEmpty) {
       throw StateError('no hay sesión para activar una rutina');
     }
-    await ref.read(userRepositoryProvider).update(uid, {
-      'activeRoutineId': routineId,
-    });
+    // NO se espera el ack del servidor, y esa es toda la diferencia entre que
+    // esto funcione o no en una muñeca.
+    //
+    // El `Future` de una escritura de Firestore completa cuando el SERVIDOR
+    // confirma. Sin red no completa nunca, y el detalle se quedaba en
+    // «cargando» para siempre — con la rutina igual activada, porque el caché
+    // local la aplicó al instante. El atleta veía un spinner eterno sobre un
+    // cambio que YA había pasado.
+    //
+    // `activeRoutineId` no es campo público del perfil, así que `update` no lee
+    // nada antes de escribir: la aplicación local es inmediata.
+    unawaited(
+      ref.read(userRepositoryProvider).update(uid, {
+        'activeRoutineId': routineId,
+      }).catchError(
+        (Object e) =>
+            debugPrint('[wear] la rutina activa no llegó al servidor — $e'),
+      ),
+    );
   };
 });

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../workout/application/routine_providers.dart';
 import '../../workout/application/session_providers.dart'
     show currentUidProvider, sessionRepositoryProvider, sessionsByUidProvider;
+import '../../workout/data/session_repository.dart';
 import '../../workout/domain/plan_advance.dart';
 import '../../workout/application/session_duration.dart'
     show maxWorkoutDuration;
@@ -147,7 +148,7 @@ class WearSessionNotifier extends Notifier<WearSessionState> {
 
     try {
       // ADOPTAR PRIMERO. Ver el encabezado de la clase.
-      final abierta = await repo.getActive(uid);
+      final abierta = await _adoptable(repo, uid);
       if (abierta != null) {
         debugPrint('[wear-session] adoptando el entreno abierto '
             '${abierta.id} (día ${abierta.dayNumber})');
@@ -162,6 +163,7 @@ class WearSessionNotifier extends Notifier<WearSessionState> {
         startedAt: DateTime.now(),
         dayNumber: hoy.dayNumber,
         weekNumber: hoy.weekNumber,
+        waitForServer: false,
       );
       debugPrint('[wear-session] entreno creado ${creada.id} '
           '(día ${creada.dayNumber}, semana ${creada.weekNumber})');
@@ -198,7 +200,7 @@ class WearSessionNotifier extends Notifier<WearSessionState> {
     final repo = ref.read(sessionRepositoryProvider);
 
     try {
-      final abierta = await repo.getActive(uid);
+      final abierta = await _adoptable(repo, uid);
       if (abierta != null) {
         debugPrint('[wear-session] ya habia un entreno abierto '
             '${abierta.id}: se adopta en vez de empezar $routineId');
@@ -251,6 +253,7 @@ class WearSessionNotifier extends Notifier<WearSessionState> {
         startedAt: DateTime.now(),
         dayNumber: posicion.dayNumber,
         weekNumber: posicion.weekNumber,
+        waitForServer: false,
       );
       debugPrint('[wear-session] entreno creado desde la lista ${creada.id} '
           '(día ${creada.dayNumber}, semana ${creada.weekNumber})');
@@ -262,6 +265,19 @@ class WearSessionNotifier extends Notifier<WearSessionState> {
       return false;
     }
   }
+
+  /// Busca un entreno abierto, pero con TOPE.
+  ///
+  /// `getActive` es una lectura que va al servidor primero, así que sin red se
+  /// cuelga y con ella se cuelga toda la pantalla.
+  ///
+  /// Si vence el tope se propaga el error en vez de devolver null, y eso es
+  /// deliberado: devolver null diría «no hay ninguno» y el llamador crearía una
+  /// segunda sesión. Dos activas hacen que el próximo barrido cierre la que NO
+  /// es más nueva —la del teléfono, con el atleta adentro y series cargadas—.
+  /// Fallar y que el atleta reintente es mucho más barato que eso.
+  Future<Session?> _adoptable(SessionRepository repo, String uid) =>
+      repo.getActive(uid).timeout(const Duration(seconds: 6));
 
   /// Resuelve el plan de [sesion] y engancha el historial en vivo.
   Future<void> _abrir(String uid, Session sesion) async {

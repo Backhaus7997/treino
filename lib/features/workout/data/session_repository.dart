@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:developer' as developer;
 
 import 'package:cloud_firestore/cloud_firestore.dart'
@@ -59,6 +60,19 @@ class SessionRepository {
 
   // ─── create ─────────────────────────────────────────────────────────────
 
+  /// Crea la sesión.
+  ///
+  /// [waitForServer] en false devuelve apenas la escritura se aplica al caché
+  /// LOCAL, sin esperar el ack del servidor. Es lo que necesita el reloj: el
+  /// `Future` de `set()` no completa hasta que Firestore confirma, y sin red no
+  /// completa NUNCA — el atleta tocaba «Empezar» y la app quedaba en «cargando»
+  /// para siempre, con el entreno igual creado localmente.
+  ///
+  /// El id no depende del servidor: sale de `doc()`, que lo genera en el
+  /// cliente. Así que la sesión que se devuelve es válida en los dos modos.
+  ///
+  /// El teléfono sigue esperando por defecto: ahí un fallo de escritura tiene
+  /// que poder propagarse, y la pantalla puede mostrarlo.
   Future<Session> create({
     required String uid,
     required String routineId,
@@ -66,6 +80,7 @@ class SessionRepository {
     required DateTime startedAt,
     int dayNumber = 1,
     int weekNumber = 0,
+    bool waitForServer = true,
   }) async {
     final ref = _sessions(uid).doc();
     final session = Session(
@@ -81,7 +96,21 @@ class SessionRepository {
       dayNumber: dayNumber,
       weekNumber: weekNumber,
     );
-    await ref.set(session.toJson());
+    final escritura = ref.set(session.toJson());
+    if (waitForServer) {
+      await escritura;
+    } else {
+      // La escritura ya se aplicó al caché al llamar a `set`. Lo que se saltea
+      // es la confirmación del servidor, que Firestore reintenta solo.
+      unawaited(
+        escritura.catchError(
+          (Object e) => developer.log(
+            'create: la sesión no llegó al servidor todavía — $e',
+            name: 'SessionRepository',
+          ),
+        ),
+      );
+    }
     return session;
   }
 

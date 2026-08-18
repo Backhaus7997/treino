@@ -242,7 +242,19 @@ class _WearHomeState extends ConsumerState<_WearHome> {
     });
     var ok = false;
     try {
-      ok = await accion();
+      // ⚠️ El TOPE no es defensa de más: es lo que evita que la app se trabe
+      // entera.
+      //
+      // Sin él, una acción que no vuelve deja `_accionEnCurso` en true PARA
+      // SIEMPRE: el detalle muestra «cargando» eterno y el guard de arriba
+      // rechaza todo toque posterior. El dueño lo vio exacto — activaba una
+      // rutina, quedaba cargando, y desde ahí ninguna otra rutina volvía a
+      // mostrar sus botones.
+      //
+      // La causa de fondo ya está arreglada donde nace (las escrituras del
+      // reloj no esperan el ack del servidor), pero esto se queda igual: una
+      // pantalla que se traba sin salida es peor que una acción que falla.
+      ok = await accion().timeout(const Duration(seconds: 8));
     } catch (e) {
       debugPrint('[wear] la acción del detalle falló — $e');
     }

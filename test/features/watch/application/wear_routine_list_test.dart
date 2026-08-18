@@ -10,7 +10,13 @@ import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/application/user_routines_providers.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_day.dart';
+import 'package:treino/features/profile/application/user_providers.dart'
+    show userRepositoryProvider;
+import 'package:treino/features/profile/data/user_repository.dart';
 import 'package:treino/features/workout/domain/routine_source.dart';
+import 'package:mocktail/mocktail.dart';
+
+class _RepoQueNoConfirma extends Mock implements UserRepository {}
 
 const uid = 'atleta-1';
 
@@ -28,6 +34,8 @@ Routine _r(String id, RoutineSource source, {int dias = 3, int semanas = 1}) =>
     );
 
 void main() {
+  setUpAll(() => registerFallbackValue(<String, Object?>{}));
+
   group('la chapita sale del origen', () {
     test('la tabla completa, igual que watchOS', () {
       // Misma tabla que `RoutineOrigin.badge` de RoutineCatalog.swift: si acá
@@ -125,6 +133,35 @@ void main() {
       expect(lista.isLoading, isTrue);
       expect(lista.routines, isEmpty);
     });
+  });
+
+  test('activar VUELVE aunque el servidor no confirme', () async {
+    // El bug que vio el dueño: tocaba Activar y quedaba en «cargando» para
+    // siempre, con la rutina IGUAL activada — el caché local la aplicó al
+    // instante y la promesa esperaba un ack que no llegaba. Y como la bandera
+    // del detalle no se apagaba, desde ahí ninguna otra rutina volvía a mostrar
+    // sus botones.
+    final nuncaConfirma = _RepoQueNoConfirma();
+    when(() => nuncaConfirma.update(any(), any()))
+        .thenAnswer((_) => Completer<void>().future);
+
+    final c = ProviderContainer(
+      overrides: [
+        currentUidProvider.overrideWithValue(uid),
+        userRepositoryProvider.overrideWithValue(nuncaConfirma),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    // Si esto esperara el ack, el test colgaría acá.
+    await c.read(wearActivateRoutineProvider)('r1').timeout(
+          const Duration(seconds: 2),
+          onTimeout: () => fail('activar esperó la confirmación del servidor'),
+        );
+
+    // Y la escritura igual se disparó: se aplica al caché local sola.
+    verify(() => nuncaConfirma.update(uid, {'activeRoutineId': 'r1'}))
+        .called(1);
   });
 
   test('PLANTILLAS: la comunidad va primero y el catálogo después', () async {
