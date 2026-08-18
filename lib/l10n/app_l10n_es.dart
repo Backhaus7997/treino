@@ -2229,6 +2229,14 @@ class AppL10nEs extends AppL10n {
   String get coachHubDashboardAcceptError => 'No pudimos aceptar el vínculo.';
 
   @override
+  String get coachHubDashboardAcceptPrecondition =>
+      'Esta solicitud ya no está disponible.';
+
+  @override
+  String get coachHubDashboardAcceptUnavailable =>
+      'Revisá tu conexión y probá de nuevo.';
+
+  @override
   String get coachHubDashboardRejectSuccess => 'Solicitud rechazada.';
 
   @override
@@ -5703,6 +5711,14 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get coachHubDashboardAcceptError => 'No pudimos aceptar el vínculo.';
+
+  @override
+  String get coachHubDashboardAcceptPrecondition =>
+      'Esta solicitud ya no está disponible.';
+
+  @override
+  String get coachHubDashboardAcceptUnavailable =>
+      'Revisá tu conexión y probá de nuevo.';
 
   @override
   String get coachHubDashboardRejectSuccess => 'Solicitud rechazada.';

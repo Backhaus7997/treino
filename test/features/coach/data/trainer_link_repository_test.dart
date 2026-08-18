@@ -16,6 +16,19 @@ void main() {
     repo = TrainerLinkRepository(firestore: firestore);
   });
 
+  // `accept()` moved to the `acceptTrainerLink` callable (Fase 7, PR4, slice
+  // 2) and was removed from TrainerLinkRepository — see
+  // trainer_link_promotion_service_test.dart for its coverage. This helper
+  // replaces the old `repo.accept(linkId)` calls used as fixture setup
+  // throughout this file (pending → active) with the equivalent direct write
+  // the CF performs, so the pause/resume/terminate/decline/list/watch tests
+  // below don't need a real callable.
+  Future<void> activateLink(String linkId) =>
+      firestore.collection('trainer_links').doc(linkId).update({
+        'status': 'active',
+        'acceptedAt': Timestamp.fromDate(DateTime.now().toUtc()),
+      });
+
   // ─── request ──────────────────────────────────────────────────────────────
 
   group('request', () {
@@ -55,42 +68,6 @@ void main() {
     });
   });
 
-  // ─── accept ───────────────────────────────────────────────────────────────
-
-  group('accept', () {
-    test('transiciona pending → active y setea acceptedAt', () async {
-      final link = await repo.request(
-        trainerId: trainerId,
-        athleteId: athleteId,
-      );
-      await repo.accept(link.id);
-
-      final snap =
-          await firestore.collection('trainer_links').doc(link.id).get();
-      expect(snap.data()!['status'], 'active');
-      expect(snap.data()!['acceptedAt'], isA<Timestamp>());
-    });
-
-    test('rechaza accept sobre status terminated', () async {
-      final link = await repo.request(
-        trainerId: trainerId,
-        athleteId: athleteId,
-      );
-      await repo.decline(link.id);
-      expect(
-        () => repo.accept(link.id),
-        throwsA(isA<StateError>()),
-      );
-    });
-
-    test('rechaza accept sobre doc inexistente', () async {
-      expect(
-        () => repo.accept('nonexistent'),
-        throwsA(isA<StateError>()),
-      );
-    });
-  });
-
   // ─── decline ──────────────────────────────────────────────────────────────
 
   group('decline', () {
@@ -113,7 +90,7 @@ void main() {
         trainerId: trainerId,
         athleteId: athleteId,
       );
-      await repo.accept(link.id);
+      await activateLink(link.id);
       expect(
         () => repo.decline(link.id),
         throwsA(isA<StateError>()),
@@ -129,7 +106,7 @@ void main() {
         trainerId: trainerId,
         athleteId: athleteId,
       );
-      await repo.accept(link.id);
+      await activateLink(link.id);
       await repo.terminate(link.id, reason: 'changed-mind');
 
       final snap =
@@ -143,7 +120,7 @@ void main() {
         trainerId: trainerId,
         athleteId: athleteId,
       );
-      await repo.accept(link.id);
+      await activateLink(link.id);
       await repo.terminate(link.id);
 
       final snap =
@@ -181,7 +158,7 @@ void main() {
     test('filtra por status cuando se pasa el parámetro', () async {
       final l1 = await repo.request(trainerId: trainerId, athleteId: 'a1');
       await repo.request(trainerId: trainerId, athleteId: 'a2');
-      await repo.accept(l1.id);
+      await activateLink(l1.id);
 
       final active = await repo.listForTrainer(
         trainerId,
@@ -228,7 +205,7 @@ void main() {
           trainerId: trainerId,
           athleteId: athleteId,
         );
-        await repo.accept(link.id);
+        await activateLink(link.id);
 
         final before =
             await firestore.collection('trainer_links').doc(link.id).get();
@@ -307,7 +284,7 @@ void main() {
           trainerId: trainerId,
           athleteId: athleteId,
         );
-        await repo.accept(link.id);
+        await activateLink(link.id);
 
         // WHEN llamamos pause(linkId)
         await repo.pause(link.id);
@@ -328,7 +305,7 @@ void main() {
           trainerId: trainerId,
           athleteId: athleteId,
         );
-        await repo.accept(link.id);
+        await activateLink(link.id);
         await repo.pause(link.id);
 
         // WHEN pause se llama de nuevo
@@ -348,7 +325,7 @@ void main() {
           trainerId: trainerId,
           athleteId: athleteId,
         );
-        await repo.accept(link.id);
+        await activateLink(link.id);
         await repo.terminate(link.id);
 
         // WHEN pause se llama sobre terminated
@@ -379,7 +356,7 @@ void main() {
           trainerId: trainerId,
           athleteId: athleteId,
         );
-        await repo.accept(link.id);
+        await activateLink(link.id);
 
         // Capture acceptedAt before pause
         final snapBefore =
@@ -412,7 +389,7 @@ void main() {
           trainerId: trainerId,
           athleteId: athleteId,
         );
-        await repo.accept(link.id);
+        await activateLink(link.id);
 
         // WHEN resume se llama sobre active
         // THEN lanza StateError
@@ -431,7 +408,7 @@ void main() {
           trainerId: trainerId,
           athleteId: athleteId,
         );
-        await repo.accept(link.id);
+        await activateLink(link.id);
         await repo.terminate(link.id);
 
         // WHEN resume se llama sobre terminated
@@ -470,7 +447,7 @@ void main() {
       await Future.delayed(const Duration(milliseconds: 10));
       expect(emissions.first, ['pending']);
 
-      await repo.accept(link.id);
+      await activateLink(link.id);
       await Future.delayed(const Duration(milliseconds: 10));
       expect(emissions.last, ['active']);
 

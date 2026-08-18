@@ -43,31 +43,6 @@ class TrainerLinkRepository {
     return link;
   }
 
-  // ─── accept ─────────────────────────────────────────────────────────────
-  //
-  // Transición pending → active. Valida estado actual antes de update.
-
-  Future<void> accept(String linkId) async {
-    final docRef = _links.doc(linkId);
-    final snap = await docRef.get();
-    if (!snap.exists) {
-      throw StateError('Vínculo $linkId no existe');
-    }
-    final current = _fromDoc(snap);
-    if (current == null) {
-      throw StateError('Vínculo $linkId no se pudo deserializar');
-    }
-    if (current.status != TrainerLinkStatus.pending) {
-      throw StateError(
-        'accept solo se permite sobre status=pending (actual: ${current.status.toJson()})',
-      );
-    }
-    await docRef.update({
-      'status': TrainerLinkStatusX(TrainerLinkStatus.active).toJson(),
-      'acceptedAt': Timestamp.fromDate(DateTime.now().toUtc()),
-    });
-  }
-
   // ─── decline ────────────────────────────────────────────────────────────
   //
   // Transición pending → terminated con razón 'declined'. Lo usa el PF

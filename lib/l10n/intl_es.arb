@@ -393,6 +393,8 @@
   "coachHubDashboardResumeLinkError": "No pudimos reanudar el vínculo.",
   "coachHubDashboardAcceptSuccess": "Vínculo aceptado.",
   "coachHubDashboardAcceptError": "No pudimos aceptar el vínculo.",
+  "coachHubDashboardAcceptPrecondition": "Esta solicitud ya no está disponible.",
+  "coachHubDashboardAcceptUnavailable": "Revisá tu conexión y probá de nuevo.",
   "coachHubDashboardRejectSuccess": "Solicitud rechazada.",
   "coachHubDashboardRejectError": "No pudimos rechazar la solicitud.",
   "coachHubDashboardTerminationReasonDeclined": "Rechazado por el entrenador",
