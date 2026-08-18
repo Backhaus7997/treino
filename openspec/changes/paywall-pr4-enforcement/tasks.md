@@ -5,10 +5,10 @@
 | Field | Value |
 |-------|-------|
 | Estimated changed lines | ~1300-1700 total (S1 350-450, S2 450-550, S3 250-350, S4 250-350) |
-| ACTUAL slice 1 | **~1297 lines** (prod ~378, tests ~758, fixture 104) — 3x the forecast. The forecast counted production code only; tests are the bulk. Split into PR1a/1b/1c rather than taking a `size:exception`. Re-check S2-S4 forecasts against this same bias before implementing. |
+| ACTUAL slices 1-2 | Slice 1: **1297** vs 350-450 forecast. Slice 2: **998** vs 450-550. Ratio consistente **~2.2x** — el forecast contaba solo produccion, los tests son el grueso. APLICAR ese factor a S3/S4 antes de implementar. |
 | 400-line budget risk | High |
 | Chained PRs recommended | Yes |
-| Suggested split | PR1 → PR2 → PR3 → PR4 (strictly linear, per slice order) |
+| Suggested split | PR1a→PR1b→PR1c→PR2a→PR2b→PR2c→PR3→PR4 (strictly linear) |
 | Delivery strategy | ask-on-risk |
 | Chain strategy | feature-branch-chain (decided in proposal D5) |
 
@@ -26,8 +26,10 @@ Tracker branch: `feat/paywall-pr4-enforcement` (accumulates integration; only th
 | PR1a | H1 TS↔Dart parity fix + shared golden fixture (+ SDD artifacts) | `fix/coach-weighted-load-parity` | tracker | ISSUE-1, `type:fix` |
 | PR1b | `syncTrainerLoad` transactional gate helper + fake-tx double | `feat/coach-weighted-load-gate-helper` | PR1a branch | ISSUE-1b, `type:feature` |
 | PR1c | `linkLoadReconcile` trigger + `index.ts` export | `feat/coach-weighted-load-reconcile-trigger` | PR1b branch | ISSUE-1c, `type:feature` |
-| PR2 | `acceptTrainerLink` CF, subscription-inactive paywall branch, both accept callsites, drop `.accept()` | `feat/coach-accept-trainer-link-gate` | PR1c branch | ISSUE-2, `type:feature` |
-| PR3 | `resumeTrainerLink` CF, both resume callsites (H2, H4), drop `.resume()` | `feat/coach-resume-trainer-link-gate` | PR2 branch | ISSUE-3, `type:feature` |
+| PR2a | subscription-inactive paywall branch (`reason` + `_ReactivateBox`) | `feat/coach-paywall-subscription-inactive` | PR1c branch | ISSUE-2a, `type:feature` |
+| PR2b | `acceptTrainerLink` callable + `index.ts` export | `feat/coach-accept-trainer-link-callable` | PR2a branch | ISSUE-2b, `type:feature` |
+| PR2c | Dart promotion service + both accept callsites + drop `repository.accept` | `feat/coach-accept-migrate-callsites` | PR2b branch | ISSUE-2c, `type:feature` |
+| PR3 | `resumeTrainerLink` CF, both resume callsites (H2, H4), drop `.resume()` | `feat/coach-resume-trainer-link-gate` | PR2c branch | ISSUE-3, `type:feature` |
 | PR4 | `firestore.rules` split clause, test flips, `test:rules` regex fix (H3), comment cleanup | `fix/infra-firestore-rules-promotion-lock` | PR3 branch | ISSUE-4, `type:fix` |
 
 Strictly linear — each slice merges leaving the system consistent and deployable; PR2/PR3 don't touch `firestore.rules`, so old app builds keep working.
@@ -53,22 +55,22 @@ Branch `fix/coach-weighted-load-parity` · base tracker · ~350-450 lines
 
 ## Slice 2 — `acceptTrainerLink` gate end-to-end
 
-Branch `feat/coach-accept-trainer-link-gate` · base PR1 branch · ~450-550 lines
+Partido en PR2a/PR2b/PR2c (ver mapa arriba) · base PR1c · **998 lineas reales**
 
-- [ ] 2.1 [RED][LOCAL] Widget test — `plan_limit_paywall.dart` additive `reason`/`subscriptionStatus`; `_ReactivateBox` branch (subscription-inactive copy is a placeholder, TODO pending product review); existing 3 callsites (`paywall_preview_screen.dart:47/55/63`) still compile untouched.
-- [ ] 2.2 [GREEN][LOCAL] Implement additive signature + `_ReactivateBox` in `.../facturacion_planes/plan_limit_paywall.dart` (~80-100 lines, per D-2).
-- [ ] 2.3 [RED][LOCAL] `functions/src/__tests__/accept-trainer-link.test.ts` — onCall wrapper, auth/App Check passthrough, calls `syncTrainerLoad` with `expectedFromStatus:'pending'`.
-- [ ] 2.4 [GREEN][LOCAL] Implement `functions/src/subscriptions/accept-trainer-link.ts` (`southamerica-east1`, `enforceAppCheck:true`), log `{event:'link-promoted-cf'}` on success.
-- [ ] 2.5 Export `acceptTrainerLink` in `functions/src/index.ts`.
-- [ ] 2.6 [RED][LOCAL] Dart unit tests (mocktail) — `FirebaseFunctionsException` → `sealed LinkPromotionFailure` mapping; Android `Map<Object?,Object?>` details cast gotcha, field-by-field parse, never throws.
-- [ ] 2.7 [GREEN][LOCAL] Implement `lib/features/coach/data/trainer_link_promotion_service.dart` — `sealed LinkPromotionFailure`/`PlanLimitReached`/`$Precondition`/`$Unavailable` (plain Dart, Hard Constraint #3), `accept(linkId)`.
-- [ ] 2.8 Register provider in `lib/features/coach_hub/application/cf_providers.dart` (reuse `cloudFunctionsProvider`).
-- [ ] 2.9 [RED][LOCAL] Widget test — `trainer_dashboard_tab.dart` accept callsite: 3 branches (PlanLimitReached→paywall, $Precondition/$Unavailable→snackbars), `_busy` always resets, `mounted` guard.
-- [ ] 2.10 [GREEN][LOCAL] Migrate `lib/features/coach/presentation/trainer_dashboard_tab.dart:423` off `TrainerLinkRepository.accept`.
-- [ ] 2.11 [RED][LOCAL] Widget test — `coach_hub_dashboard_screen.dart` accept callsite: same 3 branches + 2 new l10n keys.
-- [ ] 2.12 [GREEN][LOCAL] Migrate `.../sections/dashboard/coach_hub_dashboard_screen.dart:1218`.
-- [ ] 2.13 Delete `TrainerLinkRepository.accept` from `lib/features/coach/data/trainer_link_repository.dart` — any missed callsite is now a compile error (D-4 safety net).
-- [ ] 2.14 [QUALITY GATE] `flutter analyze` 0 issues · `dart format .` · `flutter test` green · `npm --prefix functions test` green (local suites).
+- [x] 2.1 [RED][LOCAL] Widget test — `plan_limit_paywall.dart` additive `reason`/`subscriptionStatus`; `_ReactivateBox` branch (subscription-inactive copy is a placeholder, TODO pending product review); existing 3 callsites (`paywall_preview_screen.dart:47/55/63`) still compile untouched.
+- [x] 2.2 [GREEN][LOCAL] Implement additive signature + `_ReactivateBox` in `.../facturacion_planes/plan_limit_paywall.dart` (~80-100 lines, per D-2).
+- [x] 2.3 [RED][LOCAL] `functions/src/__tests__/accept-trainer-link.test.ts` — onCall wrapper, auth/App Check passthrough, calls `syncTrainerLoad` with `expectedFromStatus:'pending'`.
+- [x] 2.4 [GREEN][LOCAL] Implement `functions/src/subscriptions/accept-trainer-link.ts` (`southamerica-east1`, `enforceAppCheck:true`), log `{event:'link-promoted-cf'}` on success.
+- [x] 2.5 Export `acceptTrainerLink` in `functions/src/index.ts`.
+- [x] 2.6 [RED][LOCAL] Dart unit tests (mocktail) — `FirebaseFunctionsException` → `sealed LinkPromotionFailure` mapping; Android `Map<Object?,Object?>` details cast gotcha, field-by-field parse, never throws.
+- [x] 2.7 [GREEN][LOCAL] Implement `lib/features/coach/data/trainer_link_promotion_service.dart` — `sealed LinkPromotionFailure`/`PlanLimitReached`/`$Precondition`/`$Unavailable` (plain Dart, Hard Constraint #3), `accept(linkId)`.
+- [x] 2.8 Register provider in `lib/features/coach_hub/application/cf_providers.dart` (reuse `cloudFunctionsProvider`).
+- [x] 2.9 [RED][LOCAL] Widget test — `trainer_dashboard_tab.dart` accept callsite: 3 branches (PlanLimitReached→paywall, $Precondition/$Unavailable→snackbars), `_busy` always resets, `mounted` guard.
+- [x] 2.10 [GREEN][LOCAL] Migrate `lib/features/coach/presentation/trainer_dashboard_tab.dart:423` off `TrainerLinkRepository.accept`.
+- [x] 2.11 [RED][LOCAL] Widget test — `coach_hub_dashboard_screen.dart` accept callsite: same 3 branches + 2 new l10n keys.
+- [x] 2.12 [GREEN][LOCAL] Migrate `.../sections/dashboard/coach_hub_dashboard_screen.dart:1218`.
+- [x] 2.13 Delete `TrainerLinkRepository.accept` from `lib/features/coach/data/trainer_link_repository.dart` — any missed callsite is now a compile error (D-4 safety net).
+- [x] 2.14 [QUALITY GATE] `flutter analyze` 0 issues · `dart format .` · `flutter test` green · `npm --prefix functions test` green (local suites).
 - [ ] 2.15 [MANUAL] Open PR #2 targeting PR1 branch, link ISSUE-2 (`status:approved`, `type:feature`), 📍PR2 dependency diagram, confirm diff excludes PR1 changes.
 
 ## Slice 3 — `resumeTrainerLink` gate end-to-end (H2 + H4)
