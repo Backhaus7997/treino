@@ -136,6 +136,37 @@ enum WearRoutineListKind {
   templates,
 }
 
+/// Una de las listas laterales, con su estado de carga.
+///
+/// Existe para no volver a colapsar «cargando» con «vacío», que en HOY se veía
+/// como un spinner eterno. `WearRoutineSection` ya sabía distinguirlos —tiene
+/// `isLoading` y `failed`— pero nadie le pasaba los datos.
+///
+/// La política de la sección, que este tipo habilita: los datos viejos ganan
+/// sobre un cartel. Si hay algo que mostrar, se muestra, aunque la recarga haya
+/// fallado; el aviso de error sólo sale si no hay NADA.
+class WearRoutineList {
+  const WearRoutineList({
+    required this.routines,
+    this.isLoading = false,
+    this.failed = false,
+  });
+
+  const WearRoutineList.loading()
+      : routines = const [],
+        isLoading = true,
+        failed = false;
+
+  const WearRoutineList.failed()
+      : routines = const [],
+        isLoading = false,
+        failed = true;
+
+  final List<WearRoutineSummary> routines;
+  final bool isLoading;
+  final bool failed;
+}
+
 /// Una rutina en las listas laterales.
 class WearRoutineSummary {
   const WearRoutineSummary({

@@ -36,8 +36,8 @@ class WearHome extends StatelessWidget {
   });
 
   final WearTodayState today;
-  final List<WearRoutineSummary> plans;
-  final List<WearRoutineSummary> templates;
+  final WearRoutineList plans;
+  final WearRoutineList templates;
   final VoidCallback onStartToday;
   final void Function(WearRoutineSummary, WearRoutineListKind) onSelectRoutine;
 
@@ -58,7 +58,9 @@ class WearHome extends StatelessWidget {
           children: [
             WearRoutineSection(
               kind: WearRoutineListKind.plans,
-              routines: plans,
+              routines: plans.routines,
+              isLoading: plans.isLoading,
+              failed: plans.failed,
               onSelect: (r) => onSelectRoutine(r, WearRoutineListKind.plans),
             ),
           ],
@@ -69,7 +71,9 @@ class WearHome extends StatelessWidget {
           children: [
             WearRoutineSection(
               kind: WearRoutineListKind.templates,
-              routines: templates,
+              routines: templates.routines,
+              isLoading: templates.isLoading,
+              failed: templates.failed,
               onSelect: (r) =>
                   onSelectRoutine(r, WearRoutineListKind.templates),
             ),

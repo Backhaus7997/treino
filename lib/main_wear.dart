@@ -53,6 +53,7 @@ import 'app/theme/app_theme.dart';
 import 'features/watch/application/wear_session_providers.dart';
 import 'features/auth/application/auth_providers.dart';
 import 'features/watch/application/wear_pairing_providers.dart';
+import 'features/watch/application/wear_routine_list_providers.dart';
 import 'features/watch/application/wear_today_providers.dart';
 import 'features/watch/presentation/wear/wear_root.dart';
 import 'features/watch/presentation/wear/wear_view_models.dart';
@@ -218,36 +219,6 @@ class _WearHomeState extends ConsumerState<_WearHome> {
   /// Rutina abierta en el detalle, o null.
   (WearRoutineSummary, WearRoutineListKind)? _selected;
 
-  // ── DATOS DE MUESTRA QUE TODAVÍA QUEDAN ───────────────────────────────────
-  //
-  // HOY y el ENTRENO ya salen de Firestore. Falta cablear las listas
-  // laterales.
-  //
-  // Las listas NO se pueden resolver con `unifiedRoutinesProvider`: ese
-  // provider ESCRIBE `activeRoutineId` al leerse (adopción perezosa), así que
-  // el reloj podría cambiarle la rutina activa al atleta con sólo deslizar a
-  // una página. Hay que componer `assignedRoutinesProvider` +
-  // `userCreatedRoutinesProvider`, que no escriben nada.
-
-  static const _muestraPlanes = [
-    WearRoutineSummary(
-      id: 'p1',
-      name: 'Full Body 3 días',
-      dayCount: 3,
-      numWeeks: 4,
-      badge: 'PF',
-    ),
-    WearRoutineSummary(
-        id: 'p2', name: 'Fuerza básica', dayCount: 4, numWeeks: 1),
-  ];
-
-  static const _muestraPlantillas = [
-    WearRoutineSummary(
-        id: 't1', name: 'Push Pull Legs', dayCount: 6, numWeeks: 1),
-    WearRoutineSummary(
-        id: 't2', name: 'Full Body principiante', dayCount: 3, numWeeks: 1),
-  ];
-
   @override
   Widget build(BuildContext context) {
     final pairing = ref.watch(wearPairingProvider);
@@ -259,6 +230,11 @@ class _WearHomeState extends ConsumerState<_WearHome> {
     // El entreno también. La pantalla recibe la VISTA del ejercicio actual,
     // proyectada del modelo completo en cada build: por eso el cursor avanza
     // solo y no hay ningún delta que mantener.
+    // Las listas laterales, ya desde Firestore. Se componen a mano y NO con
+    // `unifiedRoutinesProvider`, que escribe `activeRoutineId` al leerse.
+    final planes = ref.watch(wearPlansProvider);
+    final plantillas = ref.watch(wearTemplatesProvider);
+
     final entreno = ref.watch(wearSessionProvider);
     final snapshot = entreno is WearSessionRunning
         ? wearSnapshotFrom(entreno.session)
@@ -268,8 +244,8 @@ class _WearHomeState extends ConsumerState<_WearHome> {
       pairing: pairing,
       session: snapshot,
       today: hoy,
-      plans: _muestraPlanes,
-      templates: _muestraPlantillas,
+      plans: planes,
+      templates: plantillas,
       selectedRoutine: _selected,
       onStartToday: () {
         // Sólo se puede empezar lo que ya está resuelto. `start` adopta el

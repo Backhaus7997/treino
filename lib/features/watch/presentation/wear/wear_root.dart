@@ -44,8 +44,8 @@ class WearRoot extends StatelessWidget {
 
   /// Estado de la pantalla HOY: cargando, sin plan activo, falló, o el entreno.
   final WearTodayState today;
-  final List<WearRoutineSummary> plans;
-  final List<WearRoutineSummary> templates;
+  final WearRoutineList plans;
+  final WearRoutineList templates;
 
   final VoidCallback onStartToday;
   final void Function(WearRoutineSummary, WearRoutineListKind) onSelectRoutine;
