@@ -267,6 +267,9 @@ class _WearHomeState extends ConsumerState<_WearHome> {
   ];
 
   static const _sesionInicial = WearWorkoutSnapshot(
+    exerciseId: 'sentadilla-con-barra',
+    restSeconds: 90,
+    isFullyCompleted: false,
     exerciseName: 'Sentadilla con barra',
     exerciseIndex: 0,
     exerciseCount: 5,

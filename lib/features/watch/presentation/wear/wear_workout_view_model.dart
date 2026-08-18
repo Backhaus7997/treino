@@ -1,4 +1,5 @@
 import '../../../workout/domain/set_spec.dart';
+import '../../domain/wear_workout_session.dart';
 
 /// Lo que la pantalla de entreno del reloj necesita saber, y nada más.
 ///
@@ -10,14 +11,25 @@ import '../../../workout/domain/set_spec.dart';
 /// la sesión, y después se testea sin levantar red.
 class WearWorkoutSnapshot {
   const WearWorkoutSnapshot({
+    required this.exerciseId,
     required this.exerciseName,
     required this.exerciseIndex,
     required this.exerciseCount,
     required this.dayName,
     required this.sets,
     required this.loggedSetNumbers,
+    required this.restSeconds,
+    required this.isFullyCompleted,
     this.pendingUploadCount = 0,
   });
+
+  /// Mitad de la identidad de cada serie de este ejercicio.
+  ///
+  /// Lo lleva el snapshot —y no lo resuelve quien marca— para cerrar una
+  /// carrera real: entre que la fila se dibuja y el atleta la toca puede llegar
+  /// un snapshot del teléfono que mueva el cursor, y la serie terminaría
+  /// escrita en OTRO ejercicio.
+  final String exerciseId;
 
   final String exerciseName;
 
@@ -33,6 +45,20 @@ class WearWorkoutSnapshot {
 
   /// Series marcadas que todavía no subieron. En watchOS se muestran en naranja.
   final int pendingUploadCount;
+
+  /// Descanso de ESTE ejercicio, en segundos.
+  ///
+  /// Sale de `RoutineSlot.restSeconds`. Va en el snapshot y no se busca al
+  /// marcar por el mismo motivo que [exerciseId]: la última serie de un
+  /// ejercicio arranca el descanso y ACTO SEGUIDO el cursor avanza, así que
+  /// leerlo después daría el descanso del ejercicio siguiente.
+  final int restSeconds;
+
+  /// Si están todas las series de TODOS los ejercicios del entreno.
+  ///
+  /// Es del ENTRENO, no de este ejercicio: es la condición de «Terminar», y por
+  /// eso un snapshot de un solo ejercicio nunca pudo calcularla.
+  final bool isFullyCompleted;
 
   bool isLogged(int setNumber) => loggedSetNumbers.contains(setNumber);
 
@@ -51,15 +77,14 @@ class WearWorkoutSnapshot {
     return null;
   }
 
-  /// Si están todas las series de este ejercicio.
-  ///
-  /// OJO: en watchOS "Terminar" exige TODAS las series de TODOS los ejercicios
-  /// (`workout.isFullyCompleted`). Acá sólo se sabe del ejercicio actual hasta
-  /// que se cablee la sesión completa, así que esto NO alcanza para habilitar
-  /// el botón de terminar.
-  bool get isCurrentExerciseComplete => nextSetNumber == null;
-
   /// Devuelve una copia con [setNumber] marcada.
+  ///
+  /// ⚠️ **SE BORRA EN LA SLICE QUE CABLEA LA SESIÓN REAL.** Es un delta a nivel
+  /// presentación —la misma trampa del §4.5 del HANDOFF— y sobrevive sólo
+  /// porque todavía la usan los datos de muestra de `main_wear.dart`. Un
+  /// snapshot de UN ejercicio no puede expresar "el teléfono BORRÓ la serie 2",
+  /// que es justo uno de los casos que cubre `conformance/exercise_cursor.json`.
+  /// Lo que manda es [wearSnapshotFrom], que recalcula del modelo entero.
   ///
   /// Existe porque sin esto la app NO FUNCIONA, literal: el tap arrancaba el
   /// descanso y nadie agregaba nunca a [loggedSetNumbers], asi que el circulo
@@ -70,6 +95,9 @@ class WearWorkoutSnapshot {
   /// Es idempotente: volver a marcar una serie ya marcada no cambia nada, igual
   /// que en watchOS.
   WearWorkoutSnapshot withLogged(int setNumber) => WearWorkoutSnapshot(
+        exerciseId: exerciseId,
+        restSeconds: restSeconds,
+        isFullyCompleted: isFullyCompleted,
         exerciseName: exerciseName,
         exerciseIndex: exerciseIndex,
         exerciseCount: exerciseCount,
@@ -78,4 +106,50 @@ class WearWorkoutSnapshot {
         loggedSetNumbers: {...loggedSetNumbers, setNumber},
         pendingUploadCount: pendingUploadCount,
       );
+}
+
+/// Proyecta el entreno completo a lo que la pantalla dibuja: el ejercicio
+/// actual.
+///
+/// ## Por qué el snapshot se DERIVA en vez de crecer
+///
+/// La tentación era hacer `WearWorkoutSnapshot` multi-ejercicio. No se hizo, y
+/// por cuatro razones:
+///
+/// 1. Los widgets ya leen exactamente esta proyección. Crecer el snapshot los
+///    obligaría a todos a escribir `snapshot.exercises[snapshot.index]...`.
+/// 2. Derivar deja la regla pura y testeable sin bombear widgets.
+/// 3. **«Siempre absoluto» sale gratis**: la proyección se recalcula del modelo
+///    entero en cada build, así que no hay dónde meter un delta. Ése es el
+///    punto: `withLogged` existía justamente porque el snapshot era el estado.
+/// 4. Simetría con watchOS, que guarda `workout` + `currentExerciseIndex` y la
+///    vista lee `workout.currentExercise`. Es el mismo corte.
+///
+/// Devuelve null si el plan no tiene ejercicios. No es defensivo de más: una
+/// semana de descarga puede dejar un día entero sin ejercicios presentes, y
+/// entonces no hay ejercicio actual que dibujar.
+WearWorkoutSnapshot? wearSnapshotFrom(WearWorkoutSession session) {
+  final ejercicios = session.plan.exercises;
+  if (ejercicios.isEmpty) return null;
+
+  final indice = session.currentExerciseIndex;
+  final actual = ejercicios[indice];
+  final marcadas = session.identities;
+
+  return WearWorkoutSnapshot(
+    exerciseId: actual.exerciseId,
+    exerciseName: actual.exerciseName,
+    exerciseIndex: indice,
+    exerciseCount: ejercicios.length,
+    dayName: session.plan.dayName,
+    sets: actual.sets,
+    // Sólo las de ESTE ejercicio, y por identidad lógica.
+    loggedSetNumbers: {
+      for (var n = 1; n <= actual.sets.length; n++)
+        if (marcadas.contains('${actual.exerciseId}__$n')) n,
+    },
+    restSeconds: actual.restSeconds,
+    isFullyCompleted: session.isFullyCompleted,
+    pendingUploadCount: session.pending.length,
+  );
 }
