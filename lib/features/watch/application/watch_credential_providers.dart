@@ -11,6 +11,7 @@ import '../../auth/application/auth_providers.dart';
 import '../../profile/application/user_providers.dart' show userProfileProvider;
 import '../data/watch_bridge.dart';
 import '../data/watch_credential_service.dart';
+import '../data/watch_launcher_service.dart';
 import '../data/watch_nudge_service.dart';
 
 /// Envoltorio sobre `WatchConnectivity`. Se sobreescribe en tests vía
@@ -64,6 +65,14 @@ final watchCredentialServiceProvider = Provider<WatchCredentialService>((ref) {
 /// Servicio que le avisa al reloj que relea.
 final watchNudgeServiceProvider = Provider<WatchNudgeService>(
   (ref) => WatchNudgeService(bridge: ref.watch(watchBridgeProvider)),
+);
+
+/// Servicio que ABRE la app del reloj al arrancar un entreno desde el teléfono.
+///
+/// Separado de [watchNudgeServiceProvider] porque el nudge exige
+/// alcanzabilidad y este caso es justo el contrario: el reloj está cerrado.
+final watchLauncherServiceProvider = Provider<WatchLauncherService>(
+  (ref) => WatchLauncherService(bridge: ref.watch(watchBridgeProvider)),
 );
 
 /// Avisa al reloj cada vez que cambia la rutina activa del atleta.
