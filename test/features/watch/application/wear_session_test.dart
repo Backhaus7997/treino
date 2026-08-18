@@ -1,8 +1,11 @@
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
+import 'package:treino/features/watch/application/wear_rest_providers.dart';
 import 'package:treino/features/watch/application/wear_session_providers.dart';
+import 'package:treino/features/watch/data/wear_workout_service.dart';
 import 'package:treino/features/watch/presentation/wear/wear_view_models.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
@@ -11,6 +14,8 @@ import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_day.dart';
 import 'package:treino/features/workout/domain/routine_slot.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
+
+class _MockWorkoutService extends Mock implements WearWorkoutService {}
 
 const uid = 'atleta-1';
 
@@ -53,10 +58,15 @@ const hoy = WearTodaysWorkout(
 void main() {
   late FakeFirebaseFirestore firestore;
   late SessionRepository repo;
+  late _MockWorkoutService nativo;
 
   setUp(() {
     firestore = FakeFirebaseFirestore();
     repo = SessionRepository(firestore: firestore);
+    nativo = _MockWorkoutService();
+    when(() => nativo.startWorkout()).thenAnswer((_) async => true);
+    when(() => nativo.stopWorkout()).thenAnswer((_) async {});
+    when(() => nativo.cancelRest()).thenAnswer((_) async {});
   });
 
   /// [sinRutina] distingue "no la pasaron" de "la rutina NO existe". Con un
@@ -68,6 +78,7 @@ void main() {
         sessionRepositoryProvider.overrideWithValue(repo),
         routineByIdProvider
             .overrideWith((ref, id) async => sinRutina ? null : rutina),
+        wearWorkoutServiceProvider.overrideWithValue(nativo),
       ],
     );
     addTearDown(c.dispose);
@@ -214,6 +225,7 @@ void main() {
           currentUidProvider.overrideWith((ref) => ref.watch(uidTardio)),
           sessionRepositoryProvider.overrideWithValue(repo),
           routineByIdProvider.overrideWith((ref, id) async => rutina),
+          wearWorkoutServiceProvider.overrideWithValue(nativo),
         ],
       );
       addTearDown(c.dispose);
@@ -351,6 +363,55 @@ void main() {
       await pumpEventQueue();
 
       expect(await docsDeSeries(corriendo.session.sessionId), isEmpty);
+    });
+  });
+
+  group('el nativo sigue el ciclo del ENTRENO, no el de la app', () {
+    test('al abrir un entreno se limpia el descanso y arranca el servicio',
+        () async {
+      // El bug que reportó el dueño: abandonar y volver a empezar dejaba el
+      // temporizador corriendo donde había quedado, con CERO series marcadas.
+      // El deadline vive persistido en el nativo para sobrevivir a que se
+      // destruya la Activity, así que hay que limpiarlo explícitamente.
+      final c = contenedor();
+      await pumpEventQueue();
+      await c.read(wearSessionProvider.notifier).start(hoy);
+      await pumpEventQueue();
+
+      verify(() => nativo.cancelRest()).called(1);
+      verify(() => nativo.startWorkout()).called(1);
+    });
+
+    test('al cerrarlo se apaga el servicio y se limpia el descanso', () async {
+      // Y con el servicio se apaga ExerciseSessionController, que es lo que
+      // cuenta pulso y calorías. Antes arrancaba con el EMPAREJAMIENTO y no
+      // paraba nunca, así que las calorías no eran del entreno.
+      final c = contenedor();
+      await pumpEventQueue();
+      await c.read(wearSessionProvider.notifier).start(hoy);
+      await pumpEventQueue();
+      await c.read(wearSessionProvider.notifier).abandon();
+      await pumpEventQueue();
+
+      verify(() => nativo.stopWorkout()).called(1);
+      verify(() => nativo.cancelRest()).called(2);
+    });
+
+    test('adoptar un entreno abierto también prepara el nativo', () async {
+      await repo.create(
+        uid: uid,
+        routineId: 'r1',
+        routineName: 'Fuerza Base',
+        startedAt: DateTime.utc(2026, 8, 18, 9),
+        dayNumber: 2,
+        weekNumber: 0,
+      );
+
+      final c = contenedor();
+      await pumpEventQueue();
+
+      expect(c.read(wearSessionProvider), isA<WearSessionRunning>());
+      verify(() => nativo.startWorkout()).called(1);
     });
   });
 

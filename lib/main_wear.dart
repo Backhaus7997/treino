@@ -53,7 +53,6 @@ import 'app/theme/app_theme.dart';
 import 'features/watch/application/wear_session_providers.dart';
 import 'features/auth/application/auth_providers.dart';
 import 'features/watch/application/wear_pairing_providers.dart';
-import 'features/watch/application/wear_rest_providers.dart';
 import 'features/watch/application/wear_today_providers.dart';
 import 'features/watch/presentation/wear/wear_root.dart';
 import 'features/watch/presentation/wear/wear_view_models.dart';
@@ -201,12 +200,13 @@ class TreinoWearApp extends StatelessWidget {
   }
 }
 
-/// Arranca el foreground service en cuanto hay emparejamiento resuelto.
+/// La raíz de la app del reloj.
 ///
-/// Va acá y no en `main()` a propósito: la precondición de runtime del
-/// foreground service tipo `health` es *while-in-use*, así que tiene que
-/// arrancarlo una Activity VISIBLE. Desde un receiver con la app cerrada tira
-/// `SecurityException`.
+/// El foreground service NO se arranca acá: lo enciende `WearSessionNotifier`
+/// cuando se abre un entreno, y lo apaga al cerrarlo. Antes arrancaba con el
+/// emparejamiento —o sea al abrir la app— y eso dejaba una notificación
+/// permanente y Health Services corriendo para mirar la pantalla de HOY, con
+/// las calorías acumulando desde antes del entreno.
 class _WearHome extends ConsumerStatefulWidget {
   const _WearHome();
 
@@ -217,27 +217,6 @@ class _WearHome extends ConsumerStatefulWidget {
 class _WearHomeState extends ConsumerState<_WearHome> {
   /// Rutina abierta en el detalle, o null.
   (WearRoutineSummary, WearRoutineListKind)? _selected;
-
-  /// Que el servicio ya se haya pedido. Sólo se arranca UNA vez.
-  bool _servicioArrancado = false;
-
-  /// Levanta el foreground service, pero recién con el emparejamiento resuelto.
-  ///
-  /// Antes se arrancaba incondicionalmente en el `initState`, y estaba bien
-  /// mientras `pairing` estaba clavado en `ready`. Ahora que la máquina es de
-  /// verdad, arrancarlo ahí levantaría el servicio —y su notificación
-  /// permanente— para mostrar la pantalla de "abrí la app en el teléfono". Es
-  /// una regresión de batería que este cambio habilitaba sin querer.
-  ///
-  /// Sin el servicio la app se congela con la muñeca baja: medido, 22.6% de
-  /// cobertura del tiempo despierto contra 100.0% con el servicio puesto.
-  void _arrancarServicioSiCorresponde(WearPairingState pairing) {
-    if (_servicioArrancado || pairing != WearPairingState.ready) return;
-    _servicioArrancado = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(wearWorkoutServiceProvider).startWorkout();
-    });
-  }
 
   // ── DATOS DE MUESTRA QUE TODAVÍA QUEDAN ───────────────────────────────────
   //
@@ -272,7 +251,6 @@ class _WearHomeState extends ConsumerState<_WearHome> {
   @override
   Widget build(BuildContext context) {
     final pairing = ref.watch(wearPairingProvider);
-    _arrancarServicioSiCorresponde(pairing);
 
     // HOY ya sale de Firestore, y con los cuatro estados distinguibles: sin
     // esto, "no hay plan activo" se veía como un spinner eterno.

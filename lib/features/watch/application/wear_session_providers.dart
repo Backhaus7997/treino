@@ -14,6 +14,7 @@ import '../../workout/domain/set_log_identity.dart';
 import '../domain/wear_workout_plan.dart';
 import '../domain/wear_workout_session.dart';
 import '../presentation/wear/wear_view_models.dart';
+import 'wear_rest_providers.dart';
 
 /// En qué anda el entreno del reloj.
 ///
@@ -200,6 +201,43 @@ class WearSessionNotifier extends Notifier<WearSessionState> {
     );
 
     _escucharSeries(uid, sesion.id);
+    await _prepararNativo();
+  }
+
+  /// Deja el lado nativo en el estado que corresponde a un entreno que EMPIEZA.
+  ///
+  /// Dos cosas, y las dos son bugs que se vieron en el reloj:
+  ///
+  /// 1. **Se limpia el descanso.** El deadline vive persistido en el nativo
+  ///    (`RestStore`) para sobrevivir a que se destruya la Activity, así que un
+  ///    descanso que quedó de un entreno abandonado seguía corriendo en el
+  ///    siguiente — con CERO series marcadas, que es absurdo.
+  /// 2. **Se arranca el foreground service acá y no antes.** Es lo que enciende
+  ///    `ExerciseSessionController`, o sea pulso y calorías. Arrancaba con el
+  ///    EMPAREJAMIENTO, así que las calorías se acumulaban desde que se abría la
+  ///    app y el número no era del entreno. Además dejaba una notificación
+  ///    permanente y Health Services corriendo para mirar la pantalla de HOY.
+  Future<void> _prepararNativo() async {
+    final service = ref.read(wearWorkoutServiceProvider);
+    try {
+      await service.cancelRest();
+      await service.startWorkout();
+    } catch (e) {
+      // Sin servicio el entreno igual funciona; lo que se degrada es el
+      // keep-alive. Tumbarlo por esto seria peor.
+      debugPrint('[wear-session] no se pudo preparar el nativo — $e');
+    }
+  }
+
+  /// Y lo deja como corresponde a un entreno que TERMINA.
+  Future<void> _soltarNativo() async {
+    final service = ref.read(wearWorkoutServiceProvider);
+    try {
+      await service.cancelRest();
+      await service.stopWorkout();
+    } catch (e) {
+      debugPrint('[wear-session] no se pudo soltar el nativo — $e');
+    }
   }
 
   /// El historial en vivo. **Es la única fuente de `logged`.**
@@ -363,6 +401,7 @@ class WearSessionNotifier extends Notifier<WearSessionState> {
 
     _series?.cancel();
     _series = null;
+    await _soltarNativo();
     _set(const WearSessionIdle());
   }
 
