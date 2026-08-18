@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,8 +16,57 @@ import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_day.dart';
 import 'package:treino/features/workout/domain/routine_slot.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
+import 'package:treino/features/workout/domain/set_log_identity.dart';
 
 class _MockWorkoutService extends Mock implements WearWorkoutService {}
+
+/// Un repo cuyo `addSetLogFromWatch` NUNCA completa, como pasa cuando Firestore
+/// no puede confirmar contra el servidor. Todo lo demás delega.
+class _RepoQueNoVuelve implements SessionRepository {
+  _RepoQueNoVuelve(this._real, this._colgada);
+
+  final SessionRepository _real;
+  final Future<SetLog?> _colgada;
+
+  @override
+  Future<SetLog?> addSetLogFromWatch({
+    required String uid,
+    required String sessionId,
+    required SetLog setLog,
+    List<RemoteSetLogRef>? knownRemote,
+  }) =>
+      _colgada;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      reflectDelegate(_real, invocation);
+}
+
+/// Delegación manual: `SessionRepository` no es una interfaz chica y sólo hace
+/// falta redirigir lo que el notifier usa.
+dynamic reflectDelegate(SessionRepository real, Invocation i) {
+  final n = i.memberName.toString();
+  if (n.contains('getActive')) {
+    return real.getActive(i.positionalArguments.first as String);
+  }
+  if (n.contains('create')) {
+    return real.create(
+      uid: i.namedArguments[#uid] as String,
+      routineId: i.namedArguments[#routineId] as String,
+      routineName: i.namedArguments[#routineName] as String,
+      startedAt: i.namedArguments[#startedAt] as DateTime,
+      dayNumber: i.namedArguments[#dayNumber] as int? ?? 1,
+      weekNumber: i.namedArguments[#weekNumber] as int? ?? 0,
+    );
+  }
+  if (n.contains('watchSetLogs')) {
+    return real.watchSetLogs(
+      uid: i.namedArguments[#uid] as String,
+      sessionId: i.namedArguments[#sessionId] as String,
+    );
+  }
+  throw UnimplementedError('sin delegar: \$n');
+}
 
 const uid = 'atleta-1';
 
@@ -413,6 +464,69 @@ void main() {
       expect(c.read(wearSessionProvider), isA<WearSessionRunning>());
       verify(() => nativo.startWorkout()).called(1);
     });
+  });
+
+  test('el cartel de «sin subir» se limpia con el historial, no con el await',
+      () async {
+    // El bug que vio el dueño: el cartel iba a 1, 2, 3... y no bajaba nunca.
+    // `set()` de Firestore no completa hasta que el servidor confirma, asi que
+    // sin red el `finally` que limpiaba `pending` NO corre. Se simula con una
+    // escritura que nunca vuelve.
+    final colgada = Completer<SetLog?>();
+    final repoLento = _RepoQueNoVuelve(repo, colgada.future);
+
+    final c = ProviderContainer(
+      overrides: [
+        currentUidProvider.overrideWithValue(uid),
+        sessionRepositoryProvider.overrideWithValue(repoLento),
+        routineByIdProvider.overrideWith((ref, id) async => rutina),
+        wearWorkoutServiceProvider.overrideWithValue(nativo),
+      ],
+    );
+    addTearDown(c.dispose);
+    c.listen(wearSessionProvider, (_, __) {});
+    await pumpEventQueue();
+
+    await c.read(wearSessionProvider.notifier).start(hoy);
+    await pumpEventQueue();
+    final sid =
+        (c.read(wearSessionProvider) as WearSessionRunning).session.sessionId;
+
+    unawaited(
+      c.read(wearSessionProvider.notifier).logSet(
+            exerciseId: 'press',
+            setNumber: 1,
+          ),
+    );
+    await pumpEventQueue();
+
+    // En vuelo: el círculo ya se llenó, y el cartel lo dice.
+    expect(
+      (c.read(wearSessionProvider) as WearSessionRunning).session.pending,
+      {'press__1'},
+    );
+
+    // La serie aparece en el historial —la escritura local se aplicó al caché—
+    // aunque la promesa del servidor siga colgada.
+    await repo.addSetLogFromWatch(
+      uid: uid,
+      sessionId: sid,
+      setLog: SetLog(
+        id: '',
+        exerciseId: 'press',
+        exerciseName: 'press',
+        setNumber: 1,
+        reps: 6,
+        weightKg: 80,
+        completedAt: DateTime.utc(2026, 8, 18, 10),
+      ),
+    );
+    await pumpEventQueue();
+
+    final s = (c.read(wearSessionProvider) as WearSessionRunning).session;
+    expect(s.pending, isEmpty, reason: 'lo drena el historial, no el await');
+    // El día 1 de la rutina de prueba tiene UN ejercicio.
+    expect(s.loggedSets, [1]);
   });
 
   group('cerrar el entreno', () {

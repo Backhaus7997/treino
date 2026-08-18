@@ -260,19 +260,42 @@ class WearSessionNotifier extends Notifier<WearSessionState> {
         if (actual is! WearSessionRunning) return;
         if (actual.session.sessionId != sessionId) return;
 
+        final nuevas = [
+          for (final s in series)
+            WearLoggedSet(
+              docId: s.id,
+              exerciseId: s.exerciseId,
+              setNumber: s.setNumber,
+              reps: s.reps,
+              weightKg: s.weightKg,
+            ),
+        ];
+
+        // ⚠️ ACÁ se drena `pending`, y no en el `finally` de `logSet`.
+        //
+        // `set()` de Firestore NO completa hasta que el servidor confirma. Sin
+        // red —y una muñeca pierde red todo el tiempo— la escritura queda en la
+        // cola local y ese `await` no vuelve NUNCA: el `finally` no corre, la
+        // identidad se queda en `pending` para siempre, y el cartel de «sin
+        // subir» va creciendo con cada serie. Lo vio el dueño.
+        //
+        // La compensación de latencia de Firestore aplica la escritura al caché
+        // al instante y el listener la refleja en milisegundos, sin esperar al
+        // servidor. Así que la señal correcta de «ya no está en vuelo» es que la
+        // serie APAREZCA en el historial, no que una promesa vuelva.
+        //
+        // Y es idempotente por construcción: se recalcula del historial entero
+        // en cada snapshot, sin deltas.
+        final visibles = {for (final l in nuevas) l.logicalId};
+
         _set(
           WearSessionRunning(
             actual.session.copyWith(
-              logged: [
-                for (final s in series)
-                  WearLoggedSet(
-                    docId: s.id,
-                    exerciseId: s.exerciseId,
-                    setNumber: s.setNumber,
-                    reps: s.reps,
-                    weightKg: s.weightKg,
-                  ),
-              ],
+              logged: nuevas,
+              pending: {
+                for (final id in actual.session.pending)
+                  if (!visibles.contains(id)) id,
+              },
             ),
           ),
         );
@@ -353,9 +376,14 @@ class WearSessionNotifier extends Notifier<WearSessionState> {
     } catch (e) {
       debugPrint('[wear-session] no se pudo marcar $identidad — $e');
     } finally {
-      // Sale de pending pase lo que pase. Si la escritura falló, el círculo se
-      // vacía — que es honesto: la serie NO quedó guardada. Si salió bien, el
-      // listener ya la trajo y `logged` la sostiene.
+      // Red de seguridad, no el camino principal: si la escritura completó y el
+      // listener ya la trajo, esto no hace nada. Lo que importa es el caso de
+      // ERROR, donde la serie nunca va a aparecer en el historial y hay que
+      // sacarla de `pending` para que el círculo se vacíe — que es honesto,
+      // porque la serie NO quedó guardada.
+      //
+      // Ojo: sin red este `finally` NO CORRE, porque el `await` de arriba no
+      // vuelve. Por eso el drenaje real vive en el listener.
       _sacarDePending(identidad);
     }
   }
