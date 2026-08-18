@@ -35,6 +35,8 @@
 /// achicada: es redonda, se mira de reojo y con una mano ocupada.
 library;
 
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -44,6 +46,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app/theme/app_theme.dart';
+import 'features/watch/application/wear_session_providers.dart';
 import 'features/auth/application/auth_providers.dart';
 import 'features/watch/application/wear_pairing_providers.dart';
 import 'features/watch/application/wear_rest_providers.dart';
@@ -51,7 +54,6 @@ import 'features/watch/application/wear_today_providers.dart';
 import 'features/watch/presentation/wear/wear_root.dart';
 import 'features/watch/presentation/wear/wear_view_models.dart';
 import 'features/watch/presentation/wear/wear_workout_view_model.dart';
-import 'features/workout/domain/set_spec.dart';
 import 'firebase_options.dart';
 
 /// Host de los emuladores visto DESDE el reloj.
@@ -212,9 +214,6 @@ class _WearHomeState extends ConsumerState<_WearHome> {
   /// Rutina abierta en el detalle, o null.
   (WearRoutineSummary, WearRoutineListKind)? _selected;
 
-  /// Entreno EN CURSO, o null. Arranca en null: el atleta ve HOY primero.
-  WearWorkoutSnapshot? _session;
-
   /// Que el servicio ya se haya pedido. Sólo se arranca UNA vez.
   bool _servicioArrancado = false;
 
@@ -238,8 +237,8 @@ class _WearHomeState extends ConsumerState<_WearHome> {
 
   // ── DATOS DE MUESTRA QUE TODAVÍA QUEDAN ───────────────────────────────────
   //
-  // HOY ya sale de Firestore (`wearTodayStateProvider`). Falta cablear las
-  // listas laterales y el entreno en curso.
+  // HOY y el ENTRENO ya salen de Firestore. Falta cablear las listas
+  // laterales.
   //
   // Las listas NO se pueden resolver con `unifiedRoutinesProvider`: ese
   // provider ESCRIBE `activeRoutineId` al leerse (adopción perezosa), así que
@@ -266,23 +265,6 @@ class _WearHomeState extends ConsumerState<_WearHome> {
         id: 't2', name: 'Full Body principiante', dayCount: 3, numWeeks: 1),
   ];
 
-  static const _sesionInicial = WearWorkoutSnapshot(
-    exerciseId: 'sentadilla-con-barra',
-    restSeconds: 90,
-    isFullyCompleted: false,
-    exerciseName: 'Sentadilla con barra',
-    exerciseIndex: 0,
-    exerciseCount: 5,
-    dayName: 'Empuje',
-    sets: [
-      SetSpec(weightKg: 60, reps: 12),
-      SetSpec(weightKg: 60, reps: 12),
-      SetSpec(weightKg: 70, reps: 10),
-      SetSpec(weightKg: 70, repsMin: 8, repsMax: 10),
-    ],
-    loggedSetNumbers: {1},
-  );
-
   @override
   Widget build(BuildContext context) {
     final pairing = ref.watch(wearPairingProvider);
@@ -292,25 +274,43 @@ class _WearHomeState extends ConsumerState<_WearHome> {
     // esto, "no hay plan activo" se veía como un spinner eterno.
     final hoy = ref.watch(wearTodayStateProvider);
 
+    // El entreno también. La pantalla recibe la VISTA del ejercicio actual,
+    // proyectada del modelo completo en cada build: por eso el cursor avanza
+    // solo y no hay ningún delta que mantener.
+    final entreno = ref.watch(wearSessionProvider);
+    final snapshot = entreno is WearSessionRunning
+        ? wearSnapshotFrom(entreno.session)
+        : null;
+
     return WearRoot(
       pairing: pairing,
-      session: _session,
+      session: snapshot,
       today: hoy,
       plans: _muestraPlanes,
       templates: _muestraPlantillas,
       selectedRoutine: _selected,
-      onStartToday: () => setState(() => _session = _sesionInicial),
+      onStartToday: () {
+        // Sólo se puede empezar lo que ya está resuelto. `start` adopta el
+        // entreno que el teléfono tenga abierto antes de crear uno.
+        if (hoy is WearTodayReady) {
+          unawaited(
+            ref.read(wearSessionProvider.notifier).start(hoy.workout),
+          );
+        }
+      },
       onSelectRoutine: (r, k) => setState(() => _selected = (r, k)),
       onCloseDetail: () => setState(() => _selected = null),
-      onStartRoutine: () => setState(() {
-        _selected = null;
-        _session = _sesionInicial;
-      }),
+      // TODO(wear): empezar desde una rutina de las listas laterales todavía no
+      // resuelve su plan — las listas siguen siendo datos de muestra, así que
+      // esas rutinas no existen. Se cablea junto con las listas.
+      onStartRoutine: () => setState(() => _selected = null),
       onActivateRoutine: () => setState(() => _selected = null),
-      // Ésta es la línea que faltaba y hacía que "no funcionaran los
-      // botones": el tap arrancaba el descanso y nadie marcaba nunca la
-      // serie, así que el círculo era imposible de llenar.
-      onLogSet: (n) => setState(() => _session = _session?.withLogged(n)),
+      onLogSet: (exerciseId, setNumber) => unawaited(
+        ref.read(wearSessionProvider.notifier).logSet(
+              exerciseId: exerciseId,
+              setNumber: setNumber,
+            ),
+      ),
     );
   }
 }

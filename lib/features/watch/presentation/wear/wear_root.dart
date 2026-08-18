@@ -55,7 +55,9 @@ class WearRoot extends StatelessWidget {
   final VoidCallback onActivateRoutine;
 
   /// Marca una serie del entreno en curso.
-  final void Function(int setNumber) onLogSet;
+  ///
+  /// El `exerciseId` viaja con el toque; ver `WearWorkoutScreen.onLogSet`.
+  final void Function(String exerciseId, int setNumber) onLogSet;
 
   @override
   Widget build(BuildContext context) {

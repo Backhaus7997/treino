@@ -76,36 +76,6 @@ class WearWorkoutSnapshot {
     }
     return null;
   }
-
-  /// Devuelve una copia con [setNumber] marcada.
-  ///
-  /// ⚠️ **SE BORRA EN LA SLICE QUE CABLEA LA SESIÓN REAL.** Es un delta a nivel
-  /// presentación —la misma trampa del §4.5 del HANDOFF— y sobrevive sólo
-  /// porque todavía la usan los datos de muestra de `main_wear.dart`. Un
-  /// snapshot de UN ejercicio no puede expresar "el teléfono BORRÓ la serie 2",
-  /// que es justo uno de los casos que cubre `conformance/exercise_cursor.json`.
-  /// Lo que manda es [wearSnapshotFrom], que recalcula del modelo entero.
-  ///
-  /// Existe porque sin esto la app NO FUNCIONA, literal: el tap arrancaba el
-  /// descanso y nadie agregaba nunca a [loggedSetNumbers], asi que el circulo
-  /// era imposible de llenar. El dueno lo reporto como "no funcionan los
-  /// botones para marcar un ejercicio hecho" y tenia razon — el toque
-  /// registraba, no habia nada cableado atras.
-  ///
-  /// Es idempotente: volver a marcar una serie ya marcada no cambia nada, igual
-  /// que en watchOS.
-  WearWorkoutSnapshot withLogged(int setNumber) => WearWorkoutSnapshot(
-        exerciseId: exerciseId,
-        restSeconds: restSeconds,
-        isFullyCompleted: isFullyCompleted,
-        exerciseName: exerciseName,
-        exerciseIndex: exerciseIndex,
-        exerciseCount: exerciseCount,
-        dayName: dayName,
-        sets: sets,
-        loggedSetNumbers: {...loggedSetNumbers, setNumber},
-        pendingUploadCount: pendingUploadCount,
-      );
 }
 
 /// Proyecta el entreno completo a lo que la pantalla dibuja: el ejercicio

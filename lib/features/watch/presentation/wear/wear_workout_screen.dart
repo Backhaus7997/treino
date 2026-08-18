@@ -44,7 +44,12 @@ class WearWorkoutScreen extends ConsumerWidget {
 
   /// Marca la serie. **Sin esto la pantalla no hace nada**: durante un rato el
   /// tap sólo arrancaba el descanso y el círculo nunca se llenaba.
-  final void Function(int setNumber) onLogSet;
+  ///
+  /// Lleva el `exerciseId` del snapshot que se dibujó, y no se resuelve del
+  /// cursor al marcar: entre que la fila aparece y el atleta la toca puede
+  /// llegar un snapshot del teléfono que mueva el cursor, y la serie quedaría
+  /// escrita en OTRO ejercicio.
+  final void Function(String exerciseId, int setNumber) onLogSet;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -78,7 +83,7 @@ class WearWorkoutScreen extends ConsumerWidget {
             // En el reloj la confirmación táctil no es adorno: el atleta
             // marca sin mirar, con la mano ocupada.
             HapticFeedback.selectionClick();
-            onLogSet(setNumber);
+            onLogSet(snapshot.exerciseId, setNumber);
             service.startRest(_restSecondsFor(setNumber));
           },
         ),
