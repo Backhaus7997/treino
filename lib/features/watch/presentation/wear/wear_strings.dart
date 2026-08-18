@@ -32,6 +32,21 @@ class WearStrings {
   /// mojada y el botón a un toque del último círculo que se marcó.
   static const finishHint = 'Marcá todas las series para terminar';
 
+  /// Cierra el entreno como COMPLETADO. Sólo aparece con todo marcado.
+  static const finish = 'Terminar';
+
+  /// La salida para un entreno que no se puede completar.
+  ///
+  /// Chico, gris y sin tinte destructivo a propósito: existe para una lesión o
+  /// un imprevisto, no para usarse por costumbre. Sin esto, el atleta que se
+  /// lastima sin el teléfono a mano deja la sesión abierta para siempre.
+  static const abandon = 'Abandonar';
+
+  /// La confirmación. Abandonar no se deshace.
+  static const abandonConfirm = '¿Abandonar el entreno?';
+  static const abandonYes = 'Sí, abandonar';
+  static const abandonNo = 'Seguir entrenando';
+
   /// NO existe un placeholder de "sin dato" a propósito. Cuando no hay pulso ni
   /// calorías no se dibuja NADA: ni un guion, ni un cero, ni un aviso. Una
   /// lectura negada por el atleta es indistinguible de "todavía no hay datos",

@@ -11,6 +11,7 @@ import '../../domain/watch_effort.dart';
 import 'wear_round_scaffold.dart';
 import 'wear_set_format.dart';
 import 'wear_strings.dart';
+import 'wear_widgets.dart';
 import 'wear_workout_view_model.dart';
 
 /// La pantalla de entrenamiento del companion de Wear OS.
@@ -38,6 +39,8 @@ class WearWorkoutScreen extends ConsumerWidget {
     super.key,
     required this.snapshot,
     required this.onLogSet,
+    required this.onFinish,
+    required this.onAbandon,
   });
 
   final WearWorkoutSnapshot snapshot;
@@ -50,6 +53,12 @@ class WearWorkoutScreen extends ConsumerWidget {
   /// llegar un snapshot del teléfono que mueva el cursor, y la serie quedaría
   /// escrita en OTRO ejercicio.
   final void Function(String exerciseId, int setNumber) onLogSet;
+
+  /// Cierra el entreno como completado.
+  final VoidCallback onFinish;
+
+  /// Lo abandona sin completarlo. Ya viene confirmado.
+  final VoidCallback onAbandon;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -92,7 +101,11 @@ class WearWorkoutScreen extends ConsumerWidget {
           _PendingUpload(count: snapshot.pendingUploadCount),
         ],
         const SizedBox(height: 12),
-        const _FinishHint(),
+        _FinishHint(
+          puedeTerminar: snapshot.isFullyCompleted,
+          onFinish: onFinish,
+          onAbandon: () => _confirmarAbandono(context, onAbandon),
+        ),
       ],
     );
   }
@@ -416,18 +429,125 @@ class _PendingUpload extends StatelessWidget {
 /// a cerrar el entreno de más, sobre todo con la muñeca mojada y el botón a un
 /// toque del último círculo que se marcó.
 ///
-/// Hasta que se cablee la sesión completa acá sólo se sabe del ejercicio
-/// actual, que NO alcanza. Así que por ahora siempre se muestra la leyenda.
-class _FinishHint extends StatelessWidget {
-  const _FinishHint();
+/// Pregunta antes de abandonar, y sólo entonces avisa.
+///
+/// Abandonar no se deshace: cierra la sesión con `wasFullyCompleted: false`. En
+/// una muñeca, con la mano transpirada, un toque perdido no puede costar un
+/// entreno.
+Future<void> _confirmarAbandono(
+  BuildContext context,
+  VoidCallback onAbandon,
+) async {
+  final confirmado = await showDialog<bool>(
+    context: context,
+    builder: (_) => const _AbandonDialog(),
+  );
+  if (confirmado ?? false) onAbandon();
+}
+
+/// La confirmación, a pantalla completa.
+///
+/// No es un diálogo chico con dos botones al lado: en 438 px eso deja objetivos
+/// de toque por debajo del mínimo. Ocupa la pantalla y apila, con «seguir
+/// entrenando» PRIMERO — es la salida segura, y es la que el pulgar encuentra.
+class _AbandonDialog extends StatelessWidget {
+  const _AbandonDialog();
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    return Text(
-      WearStrings.finishHint,
-      textAlign: TextAlign.center,
-      style: GoogleFonts.barlow(fontSize: 10, color: palette.textMuted),
+    return Dialog.fullscreen(
+      backgroundColor: palette.bg,
+      child: WearRoundScaffold.centered(
+        children: [
+          Text(
+            WearStrings.abandonConfirm,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.barlowCondensed(
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+              color: palette.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 18),
+          WearButton(
+            label: WearStrings.abandonNo,
+            onTap: () => Navigator.of(context).pop(false),
+          ),
+          const SizedBox(height: 12),
+          WearButton(
+            label: WearStrings.abandonYes,
+            tint: palette.warning,
+            onTap: () => Navigator.of(context).pop(true),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// El cierre del entreno: Terminar cuando se puede, y siempre una salida.
+///
+/// **Terminar exige TODAS las series de TODOS los ejercicios**, no las del
+/// ejercicio actual. Es pedido del dueño y la razón es de producto: tenerlo a
+/// la vista antes invita a cerrar el entreno de más. Por eso `isFullyCompleted`
+/// mira el entreno entero — y por eso un snapshot de un solo ejercicio nunca
+/// pudo calcularlo.
+///
+/// **Abandonar está siempre**, y es la otra mitad del pedido. Sin él, el atleta
+/// que se lesiona sin el teléfono a mano deja la sesión abierta para siempre:
+/// era la deuda §8.3 del companion de Apple. Va chico, gris y sin tinte
+/// destructivo —existe para un imprevisto, no para usarse por costumbre— y pide
+/// confirmación, porque no se deshace.
+class _FinishHint extends StatelessWidget {
+  const _FinishHint({
+    required this.puedeTerminar,
+    required this.onFinish,
+    required this.onAbandon,
+  });
+
+  final bool puedeTerminar;
+  final VoidCallback onFinish;
+  final VoidCallback onAbandon;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    return Column(
+      children: [
+        if (puedeTerminar)
+          WearButton(label: WearStrings.finish, onTap: onFinish)
+        else
+          Text(
+            WearStrings.finishHint,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.barlow(fontSize: 10, color: palette.textMuted),
+          ),
+        const SizedBox(height: 18),
+        _AbandonLink(onTap: onAbandon),
+      ],
+    );
+  }
+}
+
+/// La salida discreta. Deliberadamente poco vistosa.
+class _AbandonLink extends StatelessWidget {
+  const _AbandonLink({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return _WearTapTarget(
+      onTap: onTap,
+      child: Center(
+        child: Text(
+          WearStrings.abandon,
+          style: GoogleFonts.barlow(fontSize: 11, color: palette.textMuted),
+        ),
+      ),
     );
   }
 }

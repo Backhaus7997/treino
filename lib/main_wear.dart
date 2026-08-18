@@ -17,11 +17,15 @@
 ///   --dart-define=APPCHECK_DEBUG=true
 /// ```
 ///
-/// ⚠️ Ese combo sólo funciona en **debug**. El permiso de HTTP en claro vive en
-/// `android/app/src/debug/`, así que un build de PROFILE no llega a los
-/// emuladores: `src/profile/AndroidManifest.xml` declara INTERNET y nada más.
-/// Para probar en profile —que es lo que pide el HANDOFF §4.8— hay que ir
-/// contra PRODUCCIÓN, y ahí `APPCHECK_DEBUG=true` deja de ser opcional.
+/// Funciona en **debug y en profile**: el permiso de HTTP en claro vive en
+/// `src/main/res/xml/` y lo referencian los manifests de los dos. El de release
+/// NO lo referencia, así que un APK publicable sigue rechazando texto plano.
+///
+/// Para el reloj conviene **profile**, y no sólo por lo que dice el HANDOFF
+/// §4.8 —debug es JIT y en un ARM de 32 bits explica buena parte de cualquier
+/// lentitud percibida—: el APK de debug pesa 221 MB contra 57 en profile con
+/// `--target-platform android-arm`, y esa transferencia por Wi-Fi al reloj se
+/// corta a la mitad.
 ///
 /// ## Qué comparte con el teléfono y qué no
 ///
@@ -311,6 +315,11 @@ class _WearHomeState extends ConsumerState<_WearHome> {
               setNumber: setNumber,
             ),
       ),
+      onFinish: () =>
+          unawaited(ref.read(wearSessionProvider.notifier).finish()),
+      // La pantalla ya pidió confirmación antes de llegar acá.
+      onAbandon: () =>
+          unawaited(ref.read(wearSessionProvider.notifier).abandon()),
     );
   }
 }

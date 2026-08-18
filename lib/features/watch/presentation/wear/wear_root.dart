@@ -33,6 +33,8 @@ class WearRoot extends StatelessWidget {
     required this.onStartRoutine,
     required this.onActivateRoutine,
     required this.onLogSet,
+    required this.onFinish,
+    required this.onAbandon,
   });
 
   final WearPairingState pairing;
@@ -58,6 +60,12 @@ class WearRoot extends StatelessWidget {
   ///
   /// El `exerciseId` viaja con el toque; ver `WearWorkoutScreen.onLogSet`.
   final void Function(String exerciseId, int setNumber) onLogSet;
+
+  /// Cierra el entreno como completado.
+  final VoidCallback onFinish;
+
+  /// Lo abandona sin completarlo. La pantalla ya confirma antes de llamarlo.
+  final VoidCallback onAbandon;
 
   @override
   Widget build(BuildContext context) {
@@ -109,7 +117,12 @@ class WearRoot extends StatelessWidget {
         final current = session;
         if (current != null) {
           // Entreno en curso: sin páginas laterales.
-          return WearWorkoutScreen(snapshot: current, onLogSet: onLogSet);
+          return WearWorkoutScreen(
+            snapshot: current,
+            onLogSet: onLogSet,
+            onFinish: onFinish,
+            onAbandon: onAbandon,
+          );
         }
 
         return WearHome(
