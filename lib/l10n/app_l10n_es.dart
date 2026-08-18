@@ -2331,6 +2331,16 @@ class AppL10nEs extends AppL10n {
   String get coachHubAlumnosStatusDebt => 'Con deuda';
 
   @override
+  String get coachHubAlumnosStatusBlocked => 'Bloqueado';
+
+  @override
+  String get coachHubAlumnosFilterBloqueados => 'Bloqueados';
+
+  @override
+  String get coachHubAlumnosBlockedHint =>
+      'Superaste el límite de tu plan. Este alumno no cuenta y no puedes trabajar con él hasta que regularices.';
+
+  @override
   String get coachHubAlumnosStatusPaused => 'Pausado';
 
   @override
@@ -5821,6 +5831,16 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get coachHubAlumnosStatusDebt => 'Con deuda';
+
+  @override
+  String get coachHubAlumnosStatusBlocked => 'Bloqueado';
+
+  @override
+  String get coachHubAlumnosFilterBloqueados => 'Bloqueados';
+
+  @override
+  String get coachHubAlumnosBlockedHint =>
+      'Superaste el límite de tu plan. Este alumno no cuenta y no podés trabajar con él hasta que regularices.';
 
   @override
   String get coachHubAlumnosStatusPaused => 'Pausado';
