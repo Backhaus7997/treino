@@ -81,11 +81,33 @@ class WearSessionNotifier extends Notifier<WearSessionState> {
       _series?.cancel();
     });
 
+    // ⚠️ El uid llega ASÍNCRONO, y esto costó una corrida en el reloj.
+    //
+    // `currentUidProvider` sale de `authStateChangesProvider`, que es un stream:
+    // cuando este notifier se construye, Firebase Auth todavía no restauró la
+    // sesión y el uid es null. Leerlo UNA sola vez acá —que es lo que hacía—
+    // daba null en todo arranque en frío, la adopción volvía en silencio, y el
+    // reloj mostraba HOY teniendo un entreno abierto. Se recuperaba sólo si el
+    // atleta tocaba Empezar, porque ese camino corre mucho después.
+    //
+    // Se ESCUCHA. `fireImmediately` cubre el arranque en caliente, donde el uid
+    // ya está.
+    ref.listen<String?>(
+      currentUidProvider,
+      (previo, nuevo) {
+        if (nuevo == null || nuevo.isEmpty) return;
+        if (previo == nuevo) return;
+        // En microtask porque `fireImmediately` dispara este listener DENTRO
+        // del build, y `_adoptarSiHay` mira `state` — que todavía no existe.
+        // Riverpod tira "Tried to read the state of an uninitialized provider".
+        unawaited(Future<void>.microtask(() => _adoptarSiHay(nuevo)));
+      },
+      fireImmediately: true,
+    );
+
     // Adoptar es asíncrono, así que el estado inicial es Idle y la adopción lo
     // corrige. Arrancar en Opening haría parpadear un spinner en el caso
     // normal, que es no tener ningún entreno abierto.
-    unawaited(_adoptarSiHay());
-
     return const WearSessionIdle();
   }
 
@@ -93,9 +115,9 @@ class WearSessionNotifier extends Notifier<WearSessionState> {
 
   /// Si el atleta ya tiene un entreno abierto —lo empezó en el teléfono, o el
   /// reloj se reinició en medio— el reloj se suma a ÉSE.
-  Future<void> _adoptarSiHay() async {
-    final uid = _uid;
-    if (uid == null || uid.isEmpty) return;
+  Future<void> _adoptarSiHay(String uid) async {
+    // No pisar un entreno que ya se abrió por otro camino.
+    if (state is! WearSessionIdle) return;
 
     try {
       final abierta = await ref.read(sessionRepositoryProvider).getActive(uid);

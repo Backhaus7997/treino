@@ -193,6 +193,45 @@ void main() {
       expect((estado as WearSessionRunning).session.plan.dayName, 'Tirón');
     });
 
+    test('si el uid llega TARDE, igual adopta', () async {
+      // La carrera que se vio en el reloj. `currentUidProvider` sale de
+      // authStateChangesProvider, que es un stream: cuando el notifier se
+      // construye, Firebase Auth todavía no restauró la sesión y el uid es
+      // null. Leerlo una sola vez dejaba al reloj mostrando HOY con un entreno
+      // abierto, y sólo se recuperaba tocando Empezar.
+      await repo.create(
+        uid: uid,
+        routineId: 'r1',
+        routineName: 'Fuerza Base',
+        startedAt: DateTime.utc(2026, 8, 18, 9),
+        dayNumber: 2,
+        weekNumber: 0,
+      );
+
+      final uidTardio = StateProvider<String?>((ref) => null);
+      final c = ProviderContainer(
+        overrides: [
+          currentUidProvider.overrideWith((ref) => ref.watch(uidTardio)),
+          sessionRepositoryProvider.overrideWithValue(repo),
+          routineByIdProvider.overrideWith((ref, id) async => rutina),
+        ],
+      );
+      addTearDown(c.dispose);
+      c.listen(wearSessionProvider, (_, __) {});
+
+      await pumpEventQueue();
+      expect(c.read(wearSessionProvider), isA<WearSessionIdle>(),
+          reason: 'sin uid todavía no hay nada que adoptar');
+
+      // Firebase Auth restaura la sesión.
+      c.read(uidTardio.notifier).state = uid;
+      await pumpEventQueue();
+
+      final estado = c.read(wearSessionProvider);
+      expect(estado, isA<WearSessionRunning>());
+      expect((estado as WearSessionRunning).session.plan.dayName, 'Tirón');
+    });
+
     test('sin nada abierto se queda en HOY', () async {
       final c = contenedor();
       await pumpEventQueue();
