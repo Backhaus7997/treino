@@ -1,10 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart'
-    show
-        CollectionReference,
-        DocumentSnapshot,
-        FieldValue,
-        FirebaseFirestore,
-        Timestamp;
+    show CollectionReference, DocumentSnapshot, FirebaseFirestore, Timestamp;
 
 import '../domain/trainer_link.dart';
 import '../domain/trainer_link_status.dart';
@@ -153,32 +148,13 @@ class TrainerLinkRepository {
     });
   }
 
-  // ─── resume ─────────────────────────────────────────────────────────────
+  // ─── resume: MOVIDO AL SERVIDOR ──────────────────────────────────────────
   //
-  // Transición paused → active. Limpia pausedAt (FieldValue.delete()).
-  // Preserva acceptedAt — el vínculo NO se considera nuevo.
-  // Lanza StateError si el doc no existe o el status actual != paused.
-
-  Future<void> resume(String linkId) async {
-    final docRef = _links.doc(linkId);
-    final snap = await docRef.get();
-    if (!snap.exists) {
-      throw StateError('Vínculo $linkId no existe');
-    }
-    final current = _fromDoc(snap);
-    if (current == null) {
-      throw StateError('Vínculo $linkId no se pudo deserializar');
-    }
-    if (current.status != TrainerLinkStatus.paused) {
-      throw StateError(
-        'resume solo se permite sobre status=paused (actual: ${current.status.toJson()})',
-      );
-    }
-    await docRef.update({
-      'status': TrainerLinkStatusX(TrainerLinkStatus.active).toJson(),
-      'pausedAt': FieldValue.delete(),
-    });
-  }
+  // La transición paused → active vive ahora en la CF `resumeTrainerLink`
+  // (paywall Fase 7, PR4), igual que `accept`. Son las DOS transiciones que
+  // suben el peso ponderado, y desde el cliente el límite era inaplicable.
+  // El helper del server limpia `pausedAt` y preserva `acceptedAt`, igual que
+  // hacía este método. Usá `TrainerLinkPromotionService.resume`.
 
   // ─── listForTrainer ─────────────────────────────────────────────────────
 

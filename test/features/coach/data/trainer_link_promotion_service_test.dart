@@ -20,16 +20,20 @@ void main() {
 
   late MockFirebaseFunctions mockFunctions;
   late MockHttpsCallable mockCallable;
+  late MockHttpsCallable mockResumeCallable;
   late MockHttpsCallableResult mockResult;
   late TrainerLinkPromotionService sut;
 
   setUp(() {
     mockFunctions = MockFirebaseFunctions();
     mockCallable = MockHttpsCallable();
+    mockResumeCallable = MockHttpsCallable();
     mockResult = MockHttpsCallableResult();
 
     when(() => mockFunctions.httpsCallable('acceptTrainerLink'))
         .thenReturn(mockCallable);
+    when(() => mockFunctions.httpsCallable('resumeTrainerLink'))
+        .thenReturn(mockResumeCallable);
 
     sut = TrainerLinkPromotionService(functions: mockFunctions);
   });
@@ -234,6 +238,149 @@ void main() {
 
       await expectLater(
         () => sut.accept('link-1'),
+        throwsA(isA<LinkPromotionFailure$PromotionUnavailable>()),
+      );
+    });
+  });
+
+  // ── resume — Fase 7 PR4 slice 3: resumeTrainerLink callable client wrapper.
+  // Same error contract as accept (resume-trainer-link.ts mirrors
+  // accept-trainer-link.ts) — `_mapException`/`_parsePlanLimit` are reused,
+  // not duplicated, so these groups pin the wiring to the right callable
+  // name rather than re-testing the mapping logic itself.
+
+  group('TrainerLinkPromotionService.resume — success', () {
+    test('calls resumeTrainerLink callable with {linkId} and returns void',
+        () async {
+      when(() => mockResumeCallable.call<Map<String, dynamic>>(any()))
+          .thenAnswer((_) async {
+        when(() => mockResult.data)
+            .thenReturn({'status': 'ok', 'weightedLoad': 3, 'limit': 7});
+        return mockResult;
+      });
+
+      await sut.resume('link-1');
+
+      verify(() => mockResumeCallable
+          .call<Map<String, dynamic>>({'linkId': 'link-1'})).called(1);
+    });
+  });
+
+  group('TrainerLinkPromotionService.resume — resource-exhausted', () {
+    test(
+        'well-formed Map<String, dynamic> details parses to '
+        'LinkPromotionFailure\$PlanLimitReached', () async {
+      when(() => mockResumeCallable.call<Map<String, dynamic>>(any()))
+          .thenThrow(
+        FirebaseFunctionsException(
+          code: 'resource-exhausted',
+          message: 'Weighted-load limit reached.',
+          details: const <String, dynamic>{
+            'reason': 'plan-limit',
+            'tier': 'plan1',
+            'limit': 7,
+            'currentLoad': 6.5,
+            'projectedLoad': 7.5,
+          },
+        ),
+      );
+
+      try {
+        await sut.resume('link-1');
+        fail('expected LinkPromotionFailure\$PlanLimitReached');
+      } on LinkPromotionFailure$PlanLimitReached catch (e) {
+        expect(e.reason, 'plan-limit');
+        expect(e.tier, SubscriptionTier.plan1);
+        expect(e.limit, 7);
+        expect(e.currentLoad, 6.5);
+        expect(e.projectedLoad, 7.5);
+      }
+    });
+
+    test(
+        'malformed details (missing fields) degrades to '
+        'LinkPromotionFailure\$PromotionUnavailable instead of throwing',
+        () async {
+      when(() => mockResumeCallable.call<Map<String, dynamic>>(any()))
+          .thenThrow(
+        FirebaseFunctionsException(
+          code: 'resource-exhausted',
+          message: 'Weighted-load limit reached.',
+          details: const <String, dynamic>{'reason': 'plan-limit'},
+        ),
+      );
+
+      await expectLater(
+        () => sut.resume('link-1'),
+        throwsA(isA<LinkPromotionFailure$PromotionUnavailable>()),
+      );
+    });
+  });
+
+  group('TrainerLinkPromotionService.resume — failed-precondition', () {
+    test('wrong-status maps to LinkPromotionFailure\$PromotionPrecondition',
+        () async {
+      when(() => mockResumeCallable.call<Map<String, dynamic>>(any()))
+          .thenThrow(
+        FirebaseFunctionsException(
+          code: 'failed-precondition',
+          message: 'wrong-status',
+          details: null,
+        ),
+      );
+
+      await expectLater(
+        () => sut.resume('link-1'),
+        throwsA(isA<LinkPromotionFailure$PromotionPrecondition>()),
+      );
+    });
+
+    for (final code in ['not-found', 'permission-denied']) {
+      test('$code maps to LinkPromotionFailure\$PromotionPrecondition',
+          () async {
+        when(() => mockResumeCallable.call<Map<String, dynamic>>(any()))
+            .thenThrow(
+          FirebaseFunctionsException(
+            code: code,
+            message: 'boom',
+            details: null,
+          ),
+        );
+
+        await expectLater(
+          () => sut.resume('link-1'),
+          throwsA(isA<LinkPromotionFailure$PromotionPrecondition>()),
+        );
+      });
+    }
+  });
+
+  group('TrainerLinkPromotionService.resume — other errors', () {
+    test('invalid-argument maps to LinkPromotionFailure\$PromotionUnavailable',
+        () async {
+      when(() => mockResumeCallable.call<Map<String, dynamic>>(any()))
+          .thenThrow(
+        FirebaseFunctionsException(
+          code: 'invalid-argument',
+          message: 'boom',
+          details: null,
+        ),
+      );
+
+      await expectLater(
+        () => sut.resume('link-1'),
+        throwsA(isA<LinkPromotionFailure$PromotionUnavailable>()),
+      );
+    });
+
+    test(
+        'non-Firebase exception maps to LinkPromotionFailure\$PromotionUnavailable',
+        () async {
+      when(() => mockResumeCallable.call<Map<String, dynamic>>(any()))
+          .thenThrow(Exception('network error'));
+
+      await expectLater(
+        () => sut.resume('link-1'),
         throwsA(isA<LinkPromotionFailure$PromotionUnavailable>()),
       );
     });

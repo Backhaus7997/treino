@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +11,7 @@ import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
+import 'package:treino/features/coach/data/trainer_link_promotion_service.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/chat/chat_section_screen.dart'
@@ -20,6 +23,7 @@ import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pa
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pagos_estado.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/payment_format.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
+import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_limit_paywall.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
 import '../../../../../l10n/app_l10n.dart';
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart';
@@ -938,11 +942,21 @@ class _TappableDotLabel extends StatelessWidget {
   }
 }
 
-class _RowActions extends ConsumerWidget {
+class _RowActions extends ConsumerStatefulWidget {
   const _RowActions({required this.link, required this.palette});
 
   final TrainerLink link;
   final AppPalette palette;
+
+  @override
+  ConsumerState<_RowActions> createState() => _RowActionsState();
+}
+
+class _RowActionsState extends ConsumerState<_RowActions> {
+  // Reanudar puede fallar el gate de peso ponderado (paywall Fase 7, PR4),
+  // asi que ya no es fire-and-forget: necesita estado para no permitir
+  // doble submit y para poder avisar cuando el server rechaza.
+  bool _busy = false;
 
   Future<void> _pause(BuildContext context, WidgetRef ref) async {
     final l10n = AppL10n.of(context);
@@ -953,11 +967,53 @@ class _RowActions extends ConsumerWidget {
       confirmLabel: l10n.coachHubActionPause,
     );
     if (!ok) return;
-    await ref.read(trainerLinkRepositoryProvider).pause(link.id);
+    await ref.read(trainerLinkRepositoryProvider).pause(widget.link.id);
   }
 
-  Future<void> _resume(WidgetRef ref) =>
-      ref.read(trainerLinkRepositoryProvider).resume(link.id);
+  Future<void> _resume() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    final l10n = AppL10n.of(context);
+    try {
+      await ref
+          .read(trainerLinkPromotionServiceProvider)
+          .resume(widget.link.id);
+    } on LinkPromotionFailure$PlanLimitReached catch (failure) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      unawaited(
+        showPlanLimitPaywall(
+          context,
+          currentTier: failure.tier,
+          reason: failure.reason == 'subscription-inactive'
+              ? PlanLimitReason.subscriptionInactive
+              : PlanLimitReason.planLimit,
+        ),
+      );
+      return;
+    } on LinkPromotionFailure$PromotionPrecondition {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      _showError(l10n.coachHubDashboardResumePrecondition);
+      return;
+    } catch (_) {
+      // Catch-all a proposito, NO acotado a LinkPromotionFailure (QA H5):
+      // lo que quede afuera de la jerarquia sellada igual tiene que
+      // resetear _busy y avisar, o la accion queda muerta sin explicacion.
+      if (!mounted) return;
+      setState(() => _busy = false);
+      _showError(l10n.coachHubDashboardResumeUnavailable);
+      return;
+    }
+    if (mounted) setState(() => _busy = false);
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
 
   Future<void> _terminate(BuildContext context, WidgetRef ref) async {
     final l10n = AppL10n.of(context);
@@ -970,7 +1026,7 @@ class _RowActions extends ConsumerWidget {
     if (!ok) return;
     await ref
         .read(trainerLinkRepositoryProvider)
-        .terminate(link.id, reason: 'trainer-terminated');
+        .terminate(widget.link.id, reason: 'trainer-terminated');
   }
 
   /// Resuelve (o crea) el chat 1-1 con el alumno vía [chatForOtherUidProvider]
@@ -984,15 +1040,16 @@ class _RowActions extends ConsumerWidget {
     // getOrCreate resuelve — con `if (!context.mounted) return` la navegación
     // se perdía silenciosamente (bug reportado en revisión en vivo).
     final router = GoRouter.of(context);
-    final chat = await ref.read(chatForOtherUidProvider(link.athleteId).future);
+    final chat =
+        await ref.read(chatForOtherUidProvider(widget.link.athleteId).future);
     ref.read(selectedChatIdProvider.notifier).state = chat.chatId;
     router.go('/chat');
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
-    final status = link.status;
+    final status = widget.link.status;
     // Acciones rápidas — SIEMPRE visibles (no dependen del estado del
     // vínculo, a diferencia de pausar/reanudar/terminar más abajo): el kit
     // (`CoachHubDataTable`) no propaga hover a `cellWidgets`, así que no hay
@@ -1001,23 +1058,23 @@ class _RowActions extends ConsumerWidget {
       _IconAction(
         icon: TreinoIcon.chat,
         tooltip: 'Chat', // i18n
-        color: palette.textMuted,
+        color: widget.palette.textMuted,
         onPressed: () => _openChat(context, ref),
       ),
       _IconAction(
         icon: TreinoIcon.dumbbell,
         tooltip: 'Rutinas', // i18n
-        color: palette.textMuted,
-        onPressed: () => context.go('/rutinas/${link.athleteId}'),
+        color: widget.palette.textMuted,
+        onPressed: () => context.go('/rutinas/${widget.link.athleteId}'),
       ),
       _IconAction(
         icon: TreinoIcon.money,
         tooltip: 'Registrar pago', // i18n
-        color: palette.textMuted,
+        color: widget.palette.textMuted,
         // Reusa `registrarPago` de la sección Pagos (mismo diálogo +
         // `paymentRepositoryProvider.add`) — evita duplicar el flujo de alta
         // de un pago ad-hoc ya resuelto ahí.
-        onPressed: () => registrarPago(context, ref, link.athleteId),
+        onPressed: () => registrarPago(context, ref, widget.link.athleteId),
       ),
     ];
     // #568: las operaciones de VINCULO (pausar / reanudar / terminar) van en
@@ -1033,7 +1090,7 @@ class _RowActions extends ConsumerWidget {
       ));
     } else if (status == TrainerLinkStatus.paused) {
       menuItems.add(PopupMenuItem(
-        value: () => _resume(ref),
+        value: () => _resume(),
         child: Text(l10n.coachHubActionResume),
       ));
     }
@@ -1047,7 +1104,8 @@ class _RowActions extends ConsumerWidget {
     if (menuItems.isNotEmpty) {
       buttons.add(PopupMenuButton<VoidCallback>(
         tooltip: l10n.coachHubAlumnosRowActionsA11y,
-        icon: Icon(TreinoIcon.dotsThree, size: 18, color: palette.textMuted),
+        icon: Icon(TreinoIcon.dotsThree,
+            size: 18, color: widget.palette.textMuted),
         onSelected: (action) => action(),
         itemBuilder: (_) => menuItems,
       ));
