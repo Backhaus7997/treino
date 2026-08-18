@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  SOLO DEBUG. Vive en src/debug/, así que no entra en el APK de release.
+  SOLO DEBUG Y PROFILE. El archivo vive en src/main/res/ para que lo vean los
+  dos source sets, pero LO REFERENCIAN sólo los manifests de debug y de profile:
+  el de release no lo nombra, así que un APK de release sigue rechazando texto
+  plano. Un recurso sin referencia no hace nada.
+
+  Estaba en src/debug/ y se mudó porque probar en PROFILE es lo que pide el
+  HANDOFF §4.8 —debug es JIT y en un ARM de 32 bits explica buena parte de
+  cualquier lentitud percibida— y desde profile no se llegaba a los emuladores.
 
   Android 9+ bloquea HTTP en claro por defecto. Los emuladores de Firebase
   (firestore 8080, auth 9099, functions 5001) hablan HTTP plano, y FlutterFire

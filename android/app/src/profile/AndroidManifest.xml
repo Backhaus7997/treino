@@ -4,4 +4,14 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+
+    <!-- Habilita HTTP en claro contra los emuladores de Firebase, igual que
+         debug. Hace falta porque el reloj se prueba en PROFILE (HANDOFF §4.8) y
+         sin esto un build de profile no llega a los emuladores: el error que
+         sale es `Cleartext HTTP traffic ... not permitted` y no nombra la causa.
+
+         El XML vive en src/main/res/ para que lo vean los dos source sets. Que
+         el recurso EXISTA en release es inofensivo: release no lo referencia,
+         asi que sigue rechazando texto plano. -->
+    <application android:networkSecurityConfig="@xml/network_security_config" />
 </manifest>
