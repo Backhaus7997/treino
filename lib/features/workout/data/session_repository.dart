@@ -481,6 +481,63 @@ class SessionRepository {
     return withId;
   }
 
+  // ─── addSetLogFromWatch ─────────────────────────────────────────────────
+
+  /// Escribe una serie marcada desde un RELOJ.
+  ///
+  /// Es un camino aparte de [addSetLog] a propósito, y la diferencia importa:
+  /// [addSetLog] es el camino del TELÉFONO, que ADOPTA el documento del reloj si
+  /// está y si no crea uno con id autogenerado. Un reloj escribiendo por ahí
+  /// sería invisible para esa adopción — el teléfono no lo encontraría en la
+  /// ruta determinística— y volverían los duplicados que costaron 24 documentos
+  /// de más y 11.450 kg fantasma.
+  ///
+  /// **Lee el historial ANTES de escribir, y ese orden es parte del contrato.**
+  /// Estaba al revés en el companion de Apple y por eso no había nada que
+  /// adoptar (HANDOFF §4.3). El estado local no sirve para decidir esto: es tan
+  /// fresco como el último snapshot que llegó, y la ventana medida entre los dos
+  /// clientes fue de 37 segundos.
+  ///
+  /// Dónde escribir lo decide [resolveSetLogWriteTarget], que está bajo el
+  /// contrato compartido de `conformance/set_log_write_target.json`.
+  ///
+  /// Devuelve la serie escrita, o **null** si ya estaba en el historial — en ese
+  /// caso no se toca nada, porque reescribirla podría pisar una corrección que
+  /// el atleta hizo en el teléfono.
+  Future<SetLog?> addSetLogFromWatch({
+    required String uid,
+    required String sessionId,
+    required SetLog setLog,
+  }) async {
+    final snapshot = await _setLogs(uid, sessionId).get();
+    final remote = <RemoteSetLogRef>[];
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+      final exerciseId = data['exerciseId'];
+      final setNumber = data['setNumber'];
+      if (exerciseId is! String || setNumber is! int) continue;
+      remote.add(
+        RemoteSetLogRef(
+          docId: doc.id,
+          exerciseId: exerciseId,
+          setNumber: setNumber,
+        ),
+      );
+    }
+
+    final target = resolveSetLogWriteTarget(
+      exerciseId: setLog.exerciseId,
+      setNumber: setLog.setNumber,
+      remote: remote,
+    );
+
+    if (target is SetLogAlreadyThere) return null;
+
+    final withId = setLog.copyWith(id: target.docId);
+    await _setLogs(uid, sessionId).doc(target.docId).set(withId.toJson());
+    return withId;
+  }
+
   // ─── updateSetLog ───────────────────────────────────────────────────────
 
   /// Overwrites an existing SetLog doc with new values. Used by the inline
