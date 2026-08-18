@@ -47,6 +47,10 @@ export { syncSharedProfile } from "./profile/sync-shared-profile";
 // accurate for display after client-side pause/terminate/decline/cancel —
 // the gate itself (syncTrainerLoad) never trusts this field.
 export { linkLoadReconcile } from "./subscriptions/link-load-reconcile";
+// Paywall Fase 7, PR4 (ISSUE-2): server-authoritative pending -> active.
+// Replaces TrainerLinkRepository.accept(); firestore.rules locks the
+// client-side path shut in slice 4, AFTER app adoption (see runbook M.4).
+export { acceptTrainerLink } from "./subscriptions/accept-trainer-link";
 // SHELVED (gym-google-places, Plan B): resolveGymPlace cannot be deployed —
 // GCP project treino-dev sits under org code-assurance.com, whose
 // Domain-Restricted-Sharing policy blocks a publicly-invokable (allUsers)
