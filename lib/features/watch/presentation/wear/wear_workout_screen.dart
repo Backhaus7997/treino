@@ -78,9 +78,8 @@ class WearWorkoutScreen extends ConsumerWidget {
         _EffortRow(effort: effort),
         if (rest != null) ...[
           const SizedBox(height: 8),
-          _RestRing(
+          _RestBar(
             remainingMs: rest.remainingMs,
-            totalMs: _restSecondsFor(1) * 1000,
             finished: rest.finished,
             onSkip: service.cancelRest,
           ),
@@ -93,7 +92,11 @@ class WearWorkoutScreen extends ConsumerWidget {
             // marca sin mirar, con la mano ocupada.
             HapticFeedback.selectionClick();
             onLogSet(snapshot.exerciseId, setNumber);
-            service.startRest(_restSecondsFor(setNumber));
+            // El descanso del ejercicio que se está DIBUJANDO. Se toma del
+            // snapshot y no se busca al marcar porque la última serie arranca
+            // el descanso y acto seguido el cursor avanza: leerlo después daría
+            // el del ejercicio siguiente.
+            service.startRest(snapshot.restSeconds);
           },
         ),
         if (snapshot.pendingUploadCount > 0) ...[
@@ -109,10 +112,6 @@ class WearWorkoutScreen extends ConsumerWidget {
       ],
     );
   }
-
-  /// TODO(wear): tiene que salir de `exercise.restSeconds`, como en watchOS.
-  /// Fijo hasta que se cablee la sesión real.
-  int _restSecondsFor(int setNumber) => 90;
 }
 
 /// Nombre del ejercicio y su posición. Lo más grande de la pantalla.
@@ -252,64 +251,69 @@ class _EffortStat extends StatelessWidget {
 /// Un anillo dice lo mismo con menos: el arco ES el tiempo que queda, se lee de
 /// reojo sin procesar dígitos, y todo el círculo es tocable — sin `Spacer`, sin
 /// hack de área mínima.
-class _RestRing extends StatelessWidget {
-  const _RestRing({
+/// El descanso, como una barra sobre las series.
+///
+/// **Réplica de `restBanner` de `WorkoutView.swift`**: ícono, los segundos que
+/// quedan, y «Saltar». Antes era un anillo de 64 px centrado, que se comía la
+/// altura justo donde tienen que estar las series que el atleta va a marcar —
+/// en una pantalla de 206 dp eso es medio entreno fuera de vista.
+///
+/// El separador es FIJO y la fila va centrada, en vez de empujar «Saltar» al
+/// borde con un `Spacer` como hace el Swift. Es preferencia del dueño, y acá
+/// además ayuda: pegado al bisel, en una pantalla redonda, el objetivo de toque
+/// se recorta.
+///
+/// Vencido cambia de color en vez de desaparecer: el atleta mira el reloj de
+/// reojo, sin enfocar, y el color se lee antes que un número.
+class _RestBar extends StatelessWidget {
+  const _RestBar({
     required this.remainingMs,
-    required this.totalMs,
     required this.finished,
     required this.onSkip,
   });
 
-  static const double _size = 64;
-
   final int remainingMs;
-  final int totalMs;
   final bool finished;
   final VoidCallback onSkip;
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    // Vencido pinta con `highlight`: el cambio de color se lee de reojo, sin
-    // enfocar la vista, que es como se mira un reloj a mitad de entreno.
     final color = finished ? palette.highlight : palette.accent;
-    final progress =
-        totalMs <= 0 ? 0.0 : (remainingMs / totalMs).clamp(0.0, 1.0);
+    final segundos = (remainingMs / 1000).ceil();
 
-    return Center(
-      child: GestureDetector(
-        onTap: onSkip,
-        behavior: HitTestBehavior.opaque,
-        child: SizedBox(
-          width: _size,
-          height: _size,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              SizedBox.expand(
-                child: CircularProgressIndicator(
-                  value: progress,
-                  strokeWidth: 4,
-                  // El arco se VACÍA a medida que pasa el tiempo, no se llena:
-                  // "lo que queda" es la pregunta del atleta, no "lo que pasó".
-                  backgroundColor: color.withValues(alpha: 0.18),
-                  valueColor: AlwaysStoppedAnimation(color),
-                ),
-              ),
-              Text(
-                '${(remainingMs / 1000).ceil()}',
-                style: GoogleFonts.barlowCondensed(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  height: 1,
-                  color: color,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-            ],
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(TreinoIcon.timer, size: 14, color: color),
+        const SizedBox(width: 8),
+        Text(
+          '${segundos}s',
+          style: GoogleFonts.barlowCondensed(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            height: 1,
+            color: color,
+            // Tabulares: sin esto el ancho baila al pasar de 100 a 99 y la
+            // fila entera se corre sola.
+            fontFeatures: const [FontFeature.tabularFigures()],
           ),
         ),
-      ),
+        const SizedBox(width: 18),
+        _WearTapTarget(
+          onTap: onSkip,
+          child: Center(
+            child: Text(
+              WearStrings.restSkip,
+              style: GoogleFonts.barlow(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: palette.accent,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
