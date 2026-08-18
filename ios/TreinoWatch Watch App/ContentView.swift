@@ -34,14 +34,22 @@ struct ContentView: View {
                 // páginas laterales, para no ofrecerle al atleta arrancar otra
                 // rutina mientras está a mitad de esta.
                 WorkoutView()
-            } else if launchIntent.pendingWorkout != nil {
+            } else if workoutCoordinator.adoptionPhase == .resolving
+                        || launchIntent.pendingWorkout != nil {
                 // Nos lanzó el teléfono y la adopción todavía no terminó.
                 //
                 // Sin esta rama caeríamos en `WatchHome`, que dibuja HOY con el
-                // botón "Empezar" ACTIVO durante los cinco viajes de red que
-                // tarda la adopción. El atleta ve el reloj abrirse solo, toca lo
-                // único accionable que hay en pantalla, y crea una SEGUNDA
-                // sesión para el mismo entreno. Ver `WatchLaunchDelegate.swift`.
+                // botón "Empezar" ACTIVO durante los ~5 viajes de red que tarda
+                // la adopción. El atleta ve el reloj abrirse solo, toca lo único
+                // accionable que hay en pantalla, y crea una SEGUNDA sesión para
+                // el mismo entreno.
+                //
+                // Cuelga de `adoptionPhase` y NO sólo del delegate: en watchOS
+                // la app casi siempre RESUME en vez de arrancar en frío, y en
+                // ese camino el `.task` de `TreinoWatchApp` no vuelve a correr
+                // — sólo el handler de `scenePhase`. El delegate quedó como
+                // refuerzo para el arranque en frío, donde además abre HealthKit
+                // antes de cualquier red.
                 VStack(spacing: 8) {
                     ProgressView()
                     Text("Preparando tu entreno…").font(.footnote)
@@ -205,10 +213,15 @@ struct TodaysWorkoutView: View {
                     .foregroundStyle(.secondary)
                     .padding(.top, 6)
             } else {
+                // Deshabilitado desde el PRIMER instante de la adopción, no
+                // sólo cuando ya sabemos que hay sesión: entre que empieza a
+                // buscar y que la encuentra hay dos viajes de red, y en esa
+                // ventana este botón sigue siendo la causa del duplicado.
                 Button("Empezar") { workoutCoordinator.start(workout: workout) }
                     .font(.caption)
                     .tint(.green)
                     .padding(.top, 6)
+                    .disabled(workoutCoordinator.adoptionPhase != .idle)
 
                 DayExerciseList(exercises: workout.exercises)
                     .padding(.top, 10)
