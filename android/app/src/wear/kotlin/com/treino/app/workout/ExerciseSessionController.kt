@@ -9,6 +9,7 @@ import androidx.health.services.client.data.Availability
 import androidx.health.services.client.data.DataType
 import androidx.health.services.client.data.ExerciseConfig
 import androidx.health.services.client.data.ExerciseLapSummary
+import androidx.health.services.client.data.ExerciseTrackedStatus
 import androidx.health.services.client.data.ExerciseType
 import androidx.health.services.client.data.ExerciseUpdate
 import androidx.health.services.client.data.WarmUpConfig
@@ -146,6 +147,16 @@ object ExerciseSessionController {
         }
         started = true
 
+        // El contador arranca de CERO en cada entreno.
+        //
+        // `CALORIES_TOTAL` de Health Services es acumulado DEL EJERCICIO, y
+        // `kcalAccumulated` sobrevive mientras viva el proceso — este objeto es
+        // un singleton. Sin este reseteo, abandonar y volver a empezar mostraba
+        // el total del entreno anterior: el dueño lo vio en 915 kcal recién
+        // arrancado.
+        latest = null
+        kcalAccumulated = null
+
         val exerciseClient = HealthServices.getClient(context).exerciseClient
         client = exerciseClient
 
@@ -157,6 +168,25 @@ object ExerciseSessionController {
                 // encima del de otra app se la pisa sin avisarle al atleta.
                 val info = exerciseClient.getCurrentExerciseInfo()
                 Log.i(TAG, "estado actual: ${info.exerciseTrackedStatus}")
+
+                // Y si el nuestro TODAVÍA está en curso, se cierra ANTES de
+                // arrancar el nuevo. Ésta es la otra mitad del bug: `stop()`
+                // lanza `endExercise()` en una corrutina y vuelve enseguida, así
+                // que abandonar y volver a empezar rápido arrancaba encima de un
+                // ejercicio que se estaba cerrando. Health Services seguía
+                // contando el mismo, y las calorías del entreno nuevo nacían con
+                // el total del viejo.
+                //
+                // Se hace acá y no en `stop()` porque acá se puede ESPERAR: es
+                // la corrutina que necesita el estado limpio.
+                if (info.exerciseTrackedStatus == ExerciseTrackedStatus.OWNED_EXERCISE_IN_PROGRESS) {
+                    Log.i(TAG, "habia un ejercicio nuestro abierto: se cierra antes de arrancar")
+                    try {
+                        exerciseClient.endExercise()
+                    } catch (e: Exception) {
+                        Log.w(TAG, "no se pudo cerrar el ejercicio anterior", e)
+                    }
+                }
 
                 exerciseClient.setUpdateCallback(callback)
 
