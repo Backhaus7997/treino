@@ -1,11 +1,17 @@
 name: CI
 
-# Corre en cada PR a main y en cada push a main. El objetivo: que NINGÚN merge
+# Corre en CADA PR (sea cual sea su base) y en cada push a main. El objetivo: que NINGÚN merge
 # que no compile o que rompa tests pueda entrar a main (los breakages de #150 y
 # #152/#153 habrían sido frenados acá).
+#
+# El filtro `branches: [main]` en pull_request se saco a proposito: con el, una
+# cadena de PRs encadenados (cada uno con base en el anterior, convencion
+# chained-pr) NO corria CI en ningun eslabon salvo el primero. La cadena entera
+# llegaba sin verificar hasta el PR final contra main, y ahi se validaban miles
+# de lineas de una sola vez — justo lo que la cadena venia a evitar. `push`
+# sigue acotado a main, y el `concurrency` de abajo ya cancela runs viejos.
 on:
   pull_request:
-    branches: [main]
   push:
     branches: [main]
 
