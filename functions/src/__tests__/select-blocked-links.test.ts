@@ -6,7 +6,7 @@
  * efectivo, devuelve a quien conservar y a quien bloquear.
  */
 
-import { selectLinksToBlock, BlockableLink } from "../subscriptions/select-blocked-links";
+import { selectLinksToBlock, reconcileEntitlements, BlockableLink } from "../subscriptions/select-blocked-links";
 
 const link = (o: Partial<BlockableLink> & { id: string }): BlockableLink => ({
   athleteId: `a-${o.id}`,
@@ -112,5 +112,73 @@ describe("selectLinksToBlock", () => {
       link({ id: "conFecha", acceptedAtMs: 100 }),
     ];
     expect(selectLinksToBlock(links, 1).block).toEqual(["sinFecha"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Reconciliacion en DOS direcciones.
+//
+// Bloquear solo no alcanza: un PF que vuelve a pagar recupera cupo, y si nadie
+// restaura los vinculos queda roto para siempre. La CF necesita saber tanto a
+// quien bloquear como a quien devolver.
+// ---------------------------------------------------------------------------
+
+describe("reconcileEntitlements", () => {
+  it("con cupo de sobra devuelve a los bloqueados", () => {
+    const links = [
+      link({ id: "act", acceptedAtMs: 900 }),
+      link({ id: "bloq", entitlement: "blocked", acceptedAtMs: 800 }),
+    ];
+    const r = reconcileEntitlements(links, 7);
+    expect(r.unblock).toEqual(["bloq"]);
+    expect(r.block).toEqual([]);
+  });
+
+  it("devuelve solo lo que entra: los mas recientes primero", () => {
+    // Limite 2, uno activo (1.0) + tres bloqueados. Entra uno solo.
+    const links = [
+      link({ id: "act", acceptedAtMs: 900 }),
+      link({ id: "b_nuevo", entitlement: "blocked", acceptedAtMs: 800 }),
+      link({ id: "b_medio", entitlement: "blocked", acceptedAtMs: 500 }),
+      link({ id: "b_viejo", entitlement: "blocked", acceptedAtMs: 100 }),
+    ];
+    const r = reconcileEntitlements(links, 2);
+    expect(r.unblock).toEqual(["b_nuevo"]);
+    expect(r.block).toEqual([]);
+    expect(r.keptLoad).toBe(2.0);
+  });
+
+  it("estado estable no produce escrituras (idempotente)", () => {
+    // Si el barrido diario reporta cambios sobre un estado ya correcto,
+    // escribe todos los dias lo mismo y ensucia el historial.
+    const links = [
+      link({ id: "act", acceptedAtMs: 900 }),
+      link({ id: "act2", acceptedAtMs: 800 }),
+      link({ id: "bloq", entitlement: "blocked", acceptedAtMs: 100 }),
+    ];
+    const r = reconcileEntitlements(links, 2);
+    expect(r.block).toEqual([]);
+    expect(r.unblock).toEqual([]);
+  });
+
+  it("bloquea y desbloquea en la misma pasada si hace falta", () => {
+    // Limite 1. El bloqueado es MAS reciente que el activo: hay que devolver
+    // el bloqueado y bloquear al activo viejo.
+    const links = [
+      link({ id: "viejo_activo", acceptedAtMs: 100 }),
+      link({ id: "nuevo_bloq", entitlement: "blocked", acceptedAtMs: 900 }),
+    ];
+    const r = reconcileEntitlements(links, 1);
+    expect(r.unblock).toEqual(["nuevo_bloq"]);
+    expect(r.block).toEqual(["viejo_activo"]);
+  });
+
+  it("terminated bloqueado no se devuelve (ya no es alumno)", () => {
+    const links = [
+      link({ id: "term", status: "terminated", entitlement: "blocked", acceptedAtMs: 900 }),
+    ];
+    const r = reconcileEntitlements(links, 7);
+    expect(r.unblock).toEqual([]);
+    expect(r.block).toEqual([]);
   });
 });

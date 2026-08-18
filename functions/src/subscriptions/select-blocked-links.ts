@@ -99,3 +99,71 @@ export function selectLinksToBlock(
 
   return { block, keptLoad: round2(keptLoad) };
 }
+
+export interface EntitlementReconciliation {
+  /** ids que pasan a `blocked`. */
+  block: string[];
+  /** ids que vuelven a `entitled`. */
+  unblock: string[];
+  /** carga ponderada resultante. */
+  keptLoad: number;
+}
+
+/**
+ * Reconciliacion en DOS direcciones: que bloquear y que devolver.
+ *
+ * Bloquear solo no alcanza. Un PF que vuelve a pagar recupera cupo, y sin
+ * devolucion queda roto para siempre — con alumnos bloqueados que ya no
+ * tendrian por que estarlo.
+ *
+ * A diferencia de [selectLinksToBlock], los ya bloqueados SI son candidatos:
+ * compiten por el cupo con todos los demas segun el mismo criterio (mas
+ * reciente primero). Si el estado ya es correcto no devuelve nada, asi el
+ * barrido diario no escribe todos los dias lo mismo.
+ */
+export function reconcileEntitlements(
+  links: BlockableLink[],
+  limit: number,
+): EntitlementReconciliation {
+  const candidates = links.filter(
+    (l) => l.status === "active" || l.status === "paused",
+  );
+
+  const byAthlete = new Map<string, BlockableLink>();
+  for (const l of candidates) {
+    const prev = byAthlete.get(l.athleteId);
+    if (!prev || STATUS_WEIGHT[l.status] > STATUS_WEIGHT[prev.status]) {
+      byAthlete.set(l.athleteId, l);
+    }
+  }
+
+  const ordered = [...byAthlete.values()].sort((a, b) => {
+    const at = a.acceptedAtMs ?? Number.NEGATIVE_INFINITY;
+    const bt = b.acceptedAtMs ?? Number.NEGATIVE_INFINITY;
+    if (at !== bt) return bt - at;
+    return a.id.localeCompare(b.id);
+  });
+
+  const kept = new Set<string>();
+  let keptLoad = 0;
+  for (const l of ordered) {
+    const w = STATUS_WEIGHT[l.status];
+    if (round2(keptLoad + w) <= limit) {
+      keptLoad = round2(keptLoad + w);
+      kept.add(l.id);
+    }
+  }
+
+  // Solo se reportan CAMBIOS: lo que ya esta en su estado correcto no genera
+  // escritura. Sin esto, el barrido diario reescribiria los mismos campos
+  // indefinidamente.
+  const block: string[] = [];
+  const unblock: string[] = [];
+  for (const l of ordered) {
+    const isBlocked = l.entitlement === "blocked";
+    if (kept.has(l.id) && isBlocked) unblock.push(l.id);
+    if (!kept.has(l.id) && !isBlocked) block.push(l.id);
+  }
+
+  return { block, unblock, keptLoad: round2(keptLoad) };
+}
