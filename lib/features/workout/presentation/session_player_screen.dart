@@ -24,6 +24,7 @@ import '../application/session_providers.dart';
 import '../application/session_state.dart';
 import '../domain/routine.dart';
 import '../domain/routine_slot.dart';
+import '../domain/superset_blocks.dart';
 import '../domain/set_enums.dart';
 import '../domain/set_limits.dart';
 import '../domain/set_log.dart';
@@ -64,29 +65,21 @@ typedef BlockInfo = ({List<RoutineSlot> slots, bool isSuperset});
 
 /// Splits the day's slots into ordered blocks (standalone or superset groups).
 /// A lone slot tagged with a supersetGroup falls back to standalone.
-List<BlockInfo> buildBlocks(List<RoutineSlot> slots) {
-  final blocks = <BlockInfo>[];
-  var i = 0;
-  while (i < slots.length) {
-    final group = slots[i].supersetGroup;
-    if (group != null) {
-      var scan = i;
-      final members = <RoutineSlot>[];
-      while (scan < slots.length && slots[scan].supersetGroup == group) {
-        members.add(slots[scan]);
-        scan++;
-      }
-      if (members.length >= 2) {
-        blocks.add((slots: members, isSuperset: true));
-        i = scan;
-        continue;
-      }
-    }
-    blocks.add((slots: [slots[i]], isSuperset: false));
-    i++;
-  }
-  return blocks;
-}
+/// El agrupamiento en sí vive en `superset_blocks.dart`, o sea en DOMINIO.
+///
+/// Estaba acá adentro, y por eso el companion de Wear no lo vio nunca: aplanaba
+/// los slots del día en una lista lineal y trataba una superserie A/B/C como
+/// tres ejercicios sueltos. Ahora los dos lados leen la misma definición de
+/// bloque y no pueden volver a divergir. Esta función sólo la envuelve en el
+/// tipo que consume la pantalla.
+List<BlockInfo> buildBlocks(List<RoutineSlot> slots) => [
+      for (final posiciones
+          in supersetBlockIndices([for (final s in slots) s.supersetGroup]))
+        (
+          slots: [for (final i in posiciones) slots[i]],
+          isSuperset: posiciones.length >= 2,
+        ),
+    ];
 
 /// Returns true if a standalone block (single slot) is fully completed.
 /// [week] is the 0-based active week (from [SessionState.activeWeek]).
@@ -2664,7 +2657,8 @@ class _WatchEffortRow extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (display.bpm != null) ...[
-                Icon(TreinoIcon.heartRate, size: 12, color: palette.reactionLike),
+                Icon(TreinoIcon.heartRate,
+                    size: 12, color: palette.reactionLike),
                 const SizedBox(width: 4),
                 Text(
                   '${display.bpm}',
@@ -2678,7 +2672,8 @@ class _WatchEffortRow extends ConsumerWidget {
               if (display.bpm != null && display.kcal != null)
                 const SizedBox(width: 12),
               if (display.kcal != null) ...[
-                Icon(TreinoIcon.calories, size: 12, color: palette.reactionFire),
+                Icon(TreinoIcon.calories,
+                    size: 12, color: palette.reactionFire),
                 const SizedBox(width: 4),
                 Text(
                   '${display.kcal} kcal',
