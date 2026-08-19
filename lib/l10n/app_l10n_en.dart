@@ -2278,6 +2278,16 @@ class AppL10nEn extends AppL10n {
   String get coachHubAlumnosStatusDebt => 'Overdue';
 
   @override
+  String get coachHubAlumnosStatusBlocked => 'Blocked';
+
+  @override
+  String get coachHubAlumnosFilterBloqueados => 'Blocked';
+
+  @override
+  String get coachHubAlumnosBlockedHint =>
+      'You are over your plan limit. This athlete does not count and you cannot work with them until you resolve it.';
+
+  @override
   String get coachHubAlumnosStatusPaused => 'Paused';
 
   @override

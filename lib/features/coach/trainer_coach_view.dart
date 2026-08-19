@@ -14,6 +14,7 @@ import '../workout/application/session_providers.dart' show currentUidProvider;
 import 'application/trainer_link_providers.dart';
 import 'data/trainer_link_promotion_service.dart';
 import 'domain/trainer_link.dart';
+import 'domain/trainer_link_entitlement.dart';
 import 'domain/trainer_link_status.dart';
 import 'presentation/trainer_agenda_tab.dart';
 
@@ -282,6 +283,11 @@ class _ActiveAlumnoCard extends ConsumerWidget {
     final palette = AppPalette.of(context);
     final pubAsync = ref.watch(userPublicProfileProvider(link.athleteId));
     final isPaused = link.status == TrainerLinkStatus.paused;
+    // Bloqueado por el limite del plan del PF (paywall Fase 7). MANDA sobre
+    // pausado: es lo unico accionable, y lo unico que explica por que este
+    // alumno no cuenta. El ALUMNO no pierde nada — conserva rutinas,
+    // historial y chat; el que tiene que regularizar es el PF.
+    final isBlocked = link.entitlement == TrainerLinkEntitlement.blocked;
     final hasUnread = ref.watch(hasUnreadFromProvider(link.athleteId));
 
     return InkWell(
@@ -298,12 +304,22 @@ class _ActiveAlumnoCard extends ConsumerWidget {
           children: [
             _UserHeader(
               pubAsync: pubAsync,
-              subtitle: isPaused
-                  ? 'Vínculo pausado · ${_formatAcceptedAt(link)}'
-                  : 'Vinculado desde ${_formatAcceptedAt(link)}',
-              statusBadge: isPaused
-                  ? _StatusBadge(label: 'PAUSADO', color: palette.textMuted)
-                  : null,
+              subtitle: isBlocked
+                  ? 'Bloqueado por el límite de tu plan' // i18n: Fase W3
+                  : isPaused
+                      ? 'Vínculo pausado · ${_formatAcceptedAt(link)}'
+                      : 'Vinculado desde ${_formatAcceptedAt(link)}',
+              statusBadge: isBlocked
+                  ? _StatusBadge(
+                      label: 'BLOQUEADO', // i18n: Fase W3
+                      color: palette.highlight,
+                    )
+                  : isPaused
+                      ? _StatusBadge(
+                          label: 'PAUSADO',
+                          color: palette.textMuted,
+                        )
+                      : null,
               hasUnread: hasUnread,
               unreadDotKey: Key('unread-dot-${link.athleteId}'),
             ),

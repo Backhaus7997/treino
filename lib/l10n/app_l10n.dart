@@ -4262,6 +4262,24 @@ abstract class AppL10n {
   /// **'Con deuda'**
   String get coachHubAlumnosStatusDebt;
 
+  /// Coach Hub alumnos — status badge for a link blocked by the trainer plan limit (paywall Fase 7 downgrade). NOT the athlete fault: the trainer subscription lapsed.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Bloqueado'**
+  String get coachHubAlumnosStatusBlocked;
+
+  /// Coach Hub web alumnos section — filter chip for athletes blocked by the plan limit.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Bloqueados'**
+  String get coachHubAlumnosFilterBloqueados;
+
+  /// Coach Hub alumnos — tooltip explaining why an athlete is blocked and that the trainer must fix their subscription.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Superaste el límite de tu plan. Este alumno no cuenta y no podés trabajar con él hasta que regularices.'**
+  String get coachHubAlumnosBlockedHint;
+
   /// Coach Hub web alumnos section — status badge for paused athletes.
   ///
   /// In es_AR, this message translates to:
