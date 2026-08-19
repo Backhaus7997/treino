@@ -59,10 +59,26 @@ class WearWorkoutService {
   /// capricho: sin eso el dispositivo entra en Doze y la alarma se difiere
   /// —medido, +21m10s—, así que el aviso nunca llega. Con el wakelock acotado
   /// al descanso, el error medido fue de 8 ms.
-  Future<void> startRest(int seconds) => _channel.invokeMethod<void>(
-        'startRest',
-        {'seconds': seconds, 'wakeLock': true},
-      );
+  ///
+  /// Con [seconds] en cero o menos NO arranca nada: cancela el que hubiera.
+  ///
+  /// No es defensa de más, es un bug que se vio en la muñeca. Un ejercicio sin
+  /// descanso configurado llega acá con 0, y el nativo persistía igual un
+  /// deadline —que nace VENCIDO—. Como `restState()` sólo devuelve null cuando
+  /// no hay deadline guardado, la barra aparecía en estado "terminado" apenas
+  /// se marcaba una serie, y se quedaba ahí. El dueño lo describió como que
+  /// "se buguea, como si quisiese aparecer".
+  ///
+  /// Cancelar y no simplemente ignorar es a propósito: si venía corriendo el
+  /// descanso del ejercicio anterior, marcar una serie del que no tiene
+  /// descanso significa que el atleta ya volvió a entrenar.
+  Future<void> startRest(int seconds) {
+    if (seconds <= 0) return cancelRest();
+    return _channel.invokeMethod<void>(
+      'startRest',
+      {'seconds': seconds, 'wakeLock': true},
+    );
+  }
 
   Future<void> cancelRest() => _channel.invokeMethod<void>('cancelRest');
 
