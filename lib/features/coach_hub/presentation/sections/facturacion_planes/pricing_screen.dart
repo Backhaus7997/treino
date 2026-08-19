@@ -1,21 +1,87 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../../app/theme/app_palette.dart';
 import '../../../../../core/widgets/motion/treino_tappable.dart';
+import '../../../../../core/widgets/treino_icon.dart';
 import '../../../../coach/domain/subscription_tier.dart';
 import '../../../../profile/application/user_providers.dart';
 
-/// Pricing page del paywall PF→TREINO (Fase 7, PR3 UI).
+/// Umbral entre el layout ancho (Coach Hub web) y el apilado del teléfono.
+///
+/// Se mide sobre el ancho TOTAL de la pantalla. Antes vivía adentro de
+/// [_PlanCards] y medía el ancho ya padeado (~48px menos), pero ahora el
+/// header, el toggle y el pie también cambian de tamaño según el ancho, así
+/// que la decisión tiene que tomarse UNA sola vez y arriba de todo — dos
+/// LayoutBuilder con el mismo número es una forma cara de que algún día no
+/// coincidan. El corte cae lejos de cualquier viewport de teléfono y de
+/// cualquier ventana útil del Coach Hub, así que los ~48px de corrimiento no
+/// mueven a nadie de layout.
+const double _kNarrowBreakpoint = 820;
+
+/// Host de `/facturacion/planes` en la app MÓVIL.
+///
+/// [PricingScreen] es SOLO contenido: en el Coach Hub web el chrome (Scaffold,
+/// SafeArea, sidebar para navegar) lo pone el shell (ADR-CHW-005). En móvil no
+/// hay shell, y la ruta montaba un `Scaffold(body: PricingScreen())` pelado —
+/// o sea, en un teléfono con notch el título se dibujaba DEBAJO de la barra de
+/// estado y no había forma de volver salvo el gesto del sistema.
+///
+/// Por qué AppBar transparente y no una flecha propia arriba a la izquierda:
+/// el header del diseño va CENTRADO, y meter la flecha en la misma fila lo
+/// descentra. El AppBar además ya reserva el inset del notch, por eso el body
+/// va con `SafeArea(top: false)` — solo queda cuidar el borde inferior (barra
+/// de gestos). Es el mismo patrón de `notification_history_screen`: AppBar
+/// transparente + [TreinoIcon.back], sin inventar nada nuevo.
+///
+/// Vive acá y no en el router porque es chrome de ESTA pantalla (el AppBar de
+/// 56px es parte de cómo se llega a los 64 de padTop del diseño). El router
+/// queda como tabla de rutas.
+class PricingRouteScreen extends StatelessWidget {
+  const PricingRouteScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          // Al paywall se llega con `push` desde "VER PLANES", así que casi
+          // siempre hay a dónde volver. El fallback cubre el deep-link directo
+          // a la URL, donde `pop` no tiene destino y dejaría al PF encerrado.
+          onPressed: () =>
+              context.canPop() ? context.pop() : context.go('/coach'),
+          icon: Icon(TreinoIcon.back, color: palette.textPrimary),
+          tooltip: 'Volver', // i18n: Fase W3
+        ),
+      ),
+      body: const SafeArea(top: false, child: PricingScreen()),
+    );
+  }
+}
+
+/// Pricing page del paywall PF→TREINO (Fase 7, PR3 UI + PR4 móvil).
 ///
 /// Estilo inspirado en pricing pages SaaS (ref Rela/Fibrit) adaptado a la
 /// identidad Mint Magenta: precio-héroe gigante, card recomendada ELEVADA con
 /// cinta "MÁS POPULAR", toggle Mensual/Anual centrado con "Ahorrá 2 meses".
 ///
-/// Se abre desde "CAMBIAR PLAN" en Facturación. El botón "ELEGIR PLAN" está
-/// MOCKEADO en este PR (aviso "próximamente") — el flujo real de Mercado Pago
-/// se cablea cuando la cuenta MP esté lista. Precios de [kTierPricesArs].
+/// Dos layouts, no uno responsive a medias: ancho (Coach Hub web, grilla 2x2)
+/// y angosto (teléfono, tarjetas apiladas con el precio y el rango de alumnos
+/// en dos columnas). Ver [_WideBody] y [_NarrowBody].
+///
+/// Solo contenido — el Scaffold lo pone `coachHubPage` en web y
+/// [PricingRouteScreen] en móvil.
+///
+/// Se abre desde "CAMBIAR PLAN" en Facturación y desde el CTA "VER PLANES" del
+/// modal de límite. El botón "ELEGIR PLAN" está MOCKEADO en este PR (aviso
+/// "próximamente") — el flujo real de Mercado Pago se cablea cuando la cuenta
+/// MP esté lista. Precios de [kTierPricesArs].
 class PricingScreen extends ConsumerStatefulWidget {
   const PricingScreen({super.key});
 
@@ -33,6 +99,48 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
         ref.watch(userProfileProvider).valueOrNull?.subscription?.tier ??
             SubscriptionTier.free;
 
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        void onCycleChanged(bool v) => setState(() => _annual = v);
+
+        if (constraints.maxWidth < _kNarrowBreakpoint) {
+          return _NarrowBody(
+            annual: _annual,
+            currentTier: currentTier,
+            palette: palette,
+            onCycleChanged: onCycleChanged,
+          );
+        }
+        return _WideBody(
+          annual: _annual,
+          currentTier: currentTier,
+          palette: palette,
+          onCycleChanged: onCycleChanged,
+        );
+      },
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Layout ancho — Coach Hub web
+// ---------------------------------------------------------------------------
+
+class _WideBody extends StatelessWidget {
+  const _WideBody({
+    required this.annual,
+    required this.currentTier,
+    required this.palette,
+    required this.onCycleChanged,
+  });
+
+  final bool annual;
+  final SubscriptionTier currentTier;
+  final AppPalette palette;
+  final ValueChanged<bool> onCycleChanged;
+
+  @override
+  Widget build(BuildContext context) {
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(24, 32, 24, 48),
       child: Column(
@@ -56,15 +164,16 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
           ),
           const SizedBox(height: 28),
           _CycleToggle(
-            annual: _annual,
+            annual: annual,
             palette: palette,
-            onChanged: (v) => setState(() => _annual = v),
+            onChanged: onCycleChanged,
           ),
           const SizedBox(height: 40),
-          _PlanCardsRow(
-            annual: _annual,
+          _PlanCards(
+            annual: annual,
             currentTier: currentTier,
             palette: palette,
+            narrow: false,
           ),
           const SizedBox(height: 24),
           Text(
@@ -80,7 +189,7 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
 }
 
 /// Toggle Mensual / Anual centrado, con "Ahorrá 2 meses" arriba y el
-/// seleccionado subrayado en mint (patrón de la referencia).
+/// seleccionado subrayado en mint (patrón de la referencia web).
 class _CycleToggle extends StatelessWidget {
   const _CycleToggle({
     required this.annual,
@@ -171,90 +280,293 @@ class _CycleOption extends StatelessWidget {
   }
 }
 
-/// Fila de las 3 cards. La recomendada (Plan 1) va elevada. En anchos chicos
-/// (< 820px) se apilan verticalmente.
-class _PlanCardsRow extends StatelessWidget {
-  const _PlanCardsRow({
+// ---------------------------------------------------------------------------
+// Layout angosto — teléfono (artboard D: stack vertical)
+// ---------------------------------------------------------------------------
+
+/// Artboard D, medido sobre un viewport de 390x844.
+///
+/// Los números fuera de la escala del proyecto (8·12·14·18·20) vienen del
+/// artboard y se dejan crudos igual que en el resto del paywall: 38 y 46 son
+/// alturas de control táctil, 9.5/10.5/11.5/13.5 son tamaños tipográficos del
+/// diseño y 3/4/10 son paddings de píldoras que en la escala quedarían el
+/// doble de gordos de lo que el diseño pide.
+class _NarrowBody extends StatelessWidget {
+  const _NarrowBody({
     required this.annual,
     required this.currentTier,
     required this.palette,
+    required this.onCycleChanged,
   });
 
   final bool annual;
   final SubscriptionTier currentTier;
   final AppPalette palette;
+  final ValueChanged<bool> onCycleChanged;
 
   @override
   Widget build(BuildContext context) {
-    _PlanCard card(SubscriptionTier tier, {required bool recommended}) =>
-        _PlanCard(
-          tier: tier,
-          annual: annual,
-          isCurrent: currentTier == tier,
-          recommended: recommended,
-          palette: palette,
-        );
+    return SingleChildScrollView(
+      // 20 lateral (escala). Arriba van 8 y no los 64 del artboard porque el
+      // AppBar de [PricingRouteScreen] ya se comió 56: 56 + 8 = 64.
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
+      child: Column(
+        children: [
+          Text(
+            // Dos líneas a propósito (artboard D). En una sola, "PLANES Y
+            // PRECIOS" en Barlow Condensed 30 cruza la pantalla como una tira
+            // fina y deja de leerse como título.
+            'PLANES Y\nPRECIOS', // i18n: Fase W3
+            style: GoogleFonts.barlowCondensed(
+              color: palette.textPrimary,
+              fontSize: 30,
+              fontWeight: FontWeight.w800,
+              height: 1.05,
+              letterSpacing: 1.0,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Pagás según cuántos alumnos activos tengas. '
+            'Cambiá de plan cuando quieras.', // i18n: Fase W3
+            style: TextStyle(
+              color: palette.textMuted,
+              fontSize: 13.5,
+              height: 1.35,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          _SavingsChip(palette: palette),
+          const SizedBox(height: 12),
+          _NarrowCycleToggle(
+            annual: annual,
+            palette: palette,
+            onChanged: onCycleChanged,
+          ),
+          const SizedBox(height: 20),
+          _PlanCards(
+            annual: annual,
+            currentTier: currentTier,
+            palette: palette,
+            narrow: true,
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Renovación automática. Podés cancelar cuando quieras '
+            'desde Facturación.', // i18n: Fase W3
+            style: TextStyle(color: palette.textMuted, fontSize: 11.5),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}
 
-    // Se ITERA sobre el enum a proposito. Antes las tres tarjetas estaban
-    // escritas a mano (free, plan1, plan2), asi que agregar un tier al enum
-    // NO lo hacia aparecer aca: el compilador exige exhaustividad en los
-    // switch, pero no dice nada de una lista literal. Plan 3 se agrego y la
-    // pricing page siguio mostrando tres planes, en silencio.
+/// Píldora "¡Ahorrá 2 meses con el anual!" sobre el toggle.
+///
+/// En móvil el ahorro es un chip y no un texto suelto como en web: al lado de
+/// un toggle segmentado, un texto pelado se lee como parte del control.
+class _SavingsChip extends StatelessWidget {
+  const _SavingsChip({required this.palette});
+
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: palette.accent.withValues(alpha: 0.08),
+        border: Border.all(color: palette.accent.withValues(alpha: 0.33)),
+        borderRadius: BorderRadius.circular(9999),
+      ),
+      child: Text(
+        '¡Ahorrá 2 meses con el anual!', // i18n: Fase W3
+        style: TextStyle(
+          color: palette.accent,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+        ),
+        textAlign: TextAlign.center,
+      ),
+    );
+  }
+}
+
+/// Toggle segmentado MENSUAL / ANUAL a todo el ancho (artboard D).
+class _NarrowCycleToggle extends StatelessWidget {
+  const _NarrowCycleToggle({
+    required this.annual,
+    required this.palette,
+    required this.onChanged,
+  });
+
+  final bool annual;
+  final AppPalette palette;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        border: Border.all(color: palette.border),
+        borderRadius: BorderRadius.circular(9999),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _NarrowCycleOption(
+              label: 'MENSUAL', // i18n: Fase W3
+              selected: !annual,
+              palette: palette,
+              onTap: () => onChanged(false),
+            ),
+          ),
+          Expanded(
+            child: _NarrowCycleOption(
+              label: 'ANUAL', // i18n: Fase W3
+              selected: annual,
+              palette: palette,
+              onTap: () => onChanged(true),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NarrowCycleOption extends StatelessWidget {
+  const _NarrowCycleOption({
+    required this.label,
+    required this.selected,
+    required this.palette,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final AppPalette palette;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return TreinoTappable(
+      onTap: onTap,
+      child: Container(
+        // minHeight y no height: con textScale grande el label crece y una
+        // altura fija lo recortaría.
+        constraints: const BoxConstraints(minHeight: 38),
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          // El activo invierte: fondo claro (textPrimary) y texto oscuro (bg).
+          color: selected ? palette.textPrimary : Colors.transparent,
+          borderRadius: BorderRadius.circular(9999),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.barlowCondensed(
+            color: selected ? palette.bg : palette.textMuted,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.2, // 0.1em
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Tarjetas — una por tier, en los dos layouts
+// ---------------------------------------------------------------------------
+
+/// Las tarjetas de plan: grilla 2x2 en ancho, stack vertical en angosto.
+class _PlanCards extends StatelessWidget {
+  const _PlanCards({
+    required this.annual,
+    required this.currentTier,
+    required this.palette,
+    required this.narrow,
+  });
+
+  final bool annual;
+  final SubscriptionTier currentTier;
+  final AppPalette palette;
+  final bool narrow;
+
+  @override
+  Widget build(BuildContext context) {
     const recommended = SubscriptionTier.plan1;
-    final cards = {
+
+    // Se ITERA sobre el enum a proposito, y para los DOS layouts. Antes las
+    // tarjetas estaban escritas a mano (free, plan1, plan2), asi que agregar un
+    // tier al enum NO lo hacia aparecer aca: el compilador exige exhaustividad
+    // en los switch, pero no dice nada de una lista literal. Plan 3 se agrego y
+    // la pricing page siguio mostrando tres planes, en silencio.
+    final cards = <SubscriptionTier, Widget>{
       for (final tier in SubscriptionTier.values)
-        tier: card(tier, recommended: tier == recommended),
+        tier: narrow
+            ? _NarrowPlanCard(
+                tier: tier,
+                annual: annual,
+                isCurrent: currentTier == tier,
+                recommended: tier == recommended,
+                palette: palette,
+              )
+            : _PlanCard(
+                tier: tier,
+                annual: annual,
+                isCurrent: currentTier == tier,
+                recommended: tier == recommended,
+                palette: palette,
+              ),
     };
 
-    // El ancho por tarjeta lo fija el precio-heroe (Barlow Condensed grande).
-    // Con cuatro planes ya no entran en una fila salvo en pantallas anchas:
-    // a ~1165px utiles se pasaba 55px. Por eso hay tres layouts y no dos.
     const tiers = SubscriptionTier.values;
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final w = constraints.maxWidth;
+    if (narrow) {
+      // Apilado: la recomendada primero (mas visible en el teléfono, donde el
+      // resto de las tarjetas queda abajo del fold).
+      final ordered = [recommended, ...tiers.where((t) => t != recommended)];
+      return Column(
+        children: [
+          for (var i = 0; i < ordered.length; i++) ...[
+            if (i > 0) const SizedBox(height: 12),
+            cards[ordered[i]]!,
+          ],
+        ],
+      );
+    }
 
-        if (w < 820) {
-          // Apilado: la recomendada primero (mas visible en mobile).
-          final ordered = [
-            recommended,
-            ...tiers.where((t) => t != recommended),
-          ];
-          return Column(
+    // Grilla 2x2 para todo lo ancho. NO hay variante de cuatro en fila: el
+    // ancho por tarjeta lo fija el precio-heroe (Barlow Condensed grande) y
+    // pide ~360px, o sea que cuatro necesitarian ~1500px utiles. Achicar el
+    // precio para que entren seria sacrificar justo lo que la tarjeta tiene
+    // para decir.
+    Widget fila(List<SubscriptionTier> par) => IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              for (var i = 0; i < ordered.length; i++) ...[
-                if (i > 0) const SizedBox(height: 16),
-                cards[ordered[i]]!,
+              for (var i = 0; i < par.length; i++) ...[
+                if (i > 0) const SizedBox(width: 16),
+                Expanded(child: cards[par[i]]!),
               ],
             ],
-          );
-        }
-
-        // Grilla 2x2 para todo lo ancho. NO hay variante de cuatro en fila:
-        // el ancho por tarjeta lo fija el precio-heroe (Barlow Condensed
-        // grande) y pide ~360px, o sea que cuatro necesitarian ~1500px utiles.
-        // Achicar el precio para que entren seria sacrificar justo lo que la
-        // tarjeta tiene para decir.
-        Widget fila(List<SubscriptionTier> par) => IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (var i = 0; i < par.length; i++) ...[
-                    if (i > 0) const SizedBox(width: 16),
-                    Expanded(child: cards[par[i]]!),
-                  ],
-                ],
-              ),
-            );
-        return Column(
-          children: [
-            fila(tiers.take(2).toList()),
-            const SizedBox(height: 16),
-            fila(tiers.skip(2).toList()),
-          ],
+          ),
         );
-      },
+    return Column(
+      children: [
+        fila(tiers.take(2).toList()),
+        const SizedBox(height: 16),
+        fila(tiers.skip(2).toList()),
+      ],
     );
   }
 }
@@ -273,7 +585,9 @@ String _tierName(SubscriptionTier tier) => switch (tier) {
       SubscriptionTier.plan2 => ('8-15', 'alumnos'), // i18n: Fase W3
       // "+15" y no "∞": sigue la serie de las otras tarjetas (2 · 3-7 ·
       // 8-15) y se lee de una. El simbolo quedaba chico y ajeno en Barlow
-      // Condensed, y obligaba a interpretar en vez de leer.
+      // Condensed, y obligaba a interpretar en vez de leer. Ojo que el limite
+      // de plan3 en `kTierWeightLimits` es `null` — la etiqueta se decide acá,
+      // nunca interpolando el limite.
       SubscriptionTier.plan3 => ('+15', 'alumnos'), // i18n: Fase W3
     };
 
@@ -288,6 +602,28 @@ String _formatArs(int amount) {
   return buf.toString();
 }
 
+/// Envoltorio obligatorio del precio-héroe.
+///
+/// El Row del precio es `mainAxisSize.min` y sus hijos no son `Flexible`: con
+/// textScale alto se pasa del ancho de la tarjeta y tira RenderFlex overflow
+/// (las rayas amarillas, no un ellipsis). `scaleDown` lo achica en lugar de
+/// recortarlo, que es lo correcto acá: un precio cortado ("39.0…") MIENTE,
+/// uno más chico sigue siendo cierto.
+class _PriceFit extends StatelessWidget {
+  const _PriceFit({required this.alignment, required this.child});
+
+  final Alignment alignment;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: alignment,
+        child: child,
+      );
+}
+
+/// Tarjeta del layout ancho: todo centrado en una columna.
 class _PlanCard extends StatelessWidget {
   const _PlanCard({
     required this.tier,
@@ -343,31 +679,35 @@ class _PlanCard extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           // Precio-héroe: "$" chico arriba a la izquierda del número gigante.
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(top: 8, right: 2),
-                child: Text(
-                  '\$',
-                  style: GoogleFonts.barlowCondensed(
-                    color: palette.textPrimary,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w600,
+          _PriceFit(
+            alignment: Alignment.center,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 8, right: 2),
+                  child: Text(
+                    '\$',
+                    style: GoogleFonts.barlowCondensed(
+                      color: palette.textPrimary,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-              ),
-              Text(
-                _formatArs(amount),
-                style: GoogleFonts.barlowCondensed(
-                  color: palette.textPrimary,
-                  fontSize: 52,
-                  fontWeight: FontWeight.w800,
-                  height: 1.0,
+                Text(
+                  _formatArs(amount),
+                  style: GoogleFonts.barlowCondensed(
+                    color: palette.textPrimary,
+                    fontSize: 52,
+                    fontWeight: FontWeight.w800,
+                    height: 1.0,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           const SizedBox(height: 6),
           Text(
@@ -424,24 +764,263 @@ class _PlanCard extends StatelessWidget {
         Padding(padding: const EdgeInsets.only(top: 14), child: card),
         Positioned(
           top: 0,
-          child: Container(
+          child: _PopularBadge(
+            palette: palette,
+            fontSize: 12,
+            letterSpacing: 0.8,
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
-            decoration: BoxDecoration(
-              color: palette.accent,
-              borderRadius: BorderRadius.circular(9999),
-            ),
-            child: Text(
-              'MÁS POPULAR', // i18n: Fase W3
-              style: GoogleFonts.barlowCondensed(
-                color: palette.bg,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.8,
-              ),
-            ),
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Tarjeta del layout angosto (artboard D): dos columnas —plan + precio a la
+/// izquierda, caja de alumnos a la derecha— y el CTA a todo el ancho abajo.
+///
+/// Es una tarjeta distinta y no la ancha "apretada": apilar la de escritorio
+/// dejaba una columna centrada altísima donde el precio y el rango de alumnos
+/// quedaban a media pantalla de distancia, y había que scrollear una tarjeta
+/// entera para comparar dos planes.
+class _NarrowPlanCard extends StatelessWidget {
+  const _NarrowPlanCard({
+    required this.tier,
+    required this.annual,
+    required this.isCurrent,
+    required this.recommended,
+    required this.palette,
+  });
+
+  final SubscriptionTier tier;
+  final bool annual;
+  final bool isCurrent;
+  final bool recommended;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    final price = kTierPricesArs[tier];
+    final amount = price == null ? 0 : (annual ? price.annual : price.monthly);
+    final cycleLabel = annual ? 'POR AÑO' : 'POR MES'; // i18n: Fase W3
+    final (studentsNum, studentsLabel) = _tierStudents(tier);
+
+    final card = Container(
+      width: double.infinity,
+      // 18 de padding (escala). La recomendada abre a 24 arriba para que la
+      // etiqueta "MÁS POPULAR" no se le siente encima al nombre del plan.
+      padding: EdgeInsets.fromLTRB(18, recommended ? 24 : 18, 18, 18),
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        border: Border.all(
+          color: recommended ? palette.accent : palette.border,
+          width: recommended ? 1.5 : 1,
+        ),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: recommended
+            ? [
+                BoxShadow(
+                  color: palette.accent.withValues(alpha: 0.12),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                ),
+              ]
+            : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _tierName(tier),
+                      style: GoogleFonts.barlowCondensed(
+                        color:
+                            recommended ? palette.accent : palette.textPrimary,
+                        fontSize: 19,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _PriceFit(
+                      alignment: Alignment.centerLeft,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(
+                            '\$',
+                            style: GoogleFonts.barlowCondensed(
+                              color: palette.textPrimary,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            _formatArs(amount),
+                            style: GoogleFonts.barlowCondensed(
+                              color: palette.textPrimary,
+                              fontSize: 36,
+                              fontWeight: FontWeight.w800,
+                              height: 1.0,
+                              // Cifras de ancho fijo: al cambiar mensual↔anual
+                              // el número no "salta" dígito por dígito.
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      price == null
+                          ? 'SIEMPRE GRATIS'
+                          : cycleLabel, // i18n: Fase W3
+                      style: GoogleFonts.barlowCondensed(
+                        color: palette.textMuted,
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              _StudentsBox(
+                number: studentsNum,
+                label: studentsLabel,
+                recommended: recommended,
+                palette: palette,
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          _PlanCtaButton(
+            isCurrent: isCurrent,
+            recommended: recommended,
+            isFree: price == null,
+            palette: palette,
+            minHeight: 46,
+          ),
+        ],
+      ),
+    );
+
+    if (!recommended) return card;
+
+    // La etiqueta se sale 10px del borde superior, arriba a la izquierda: el
+    // card se baja 10 y la etiqueta se ancla en el tope del Stack.
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Padding(padding: const EdgeInsets.only(top: 10), child: card),
+        Positioned(
+          top: 0,
+          left: 18,
+          child: _PopularBadge(
+            palette: palette,
+            fontSize: 9.5,
+            letterSpacing: 1.14, // 0.12em
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Caja compacta con el rango de alumnos, a la derecha del precio.
+class _StudentsBox extends StatelessWidget {
+  const _StudentsBox({
+    required this.number,
+    required this.label,
+    required this.recommended,
+    required this.palette,
+  });
+
+  final String number;
+  final String label;
+  final bool recommended;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        // bg (no bgCard): la caja se hunde dentro de la tarjeta en vez de
+        // flotar sobre ella.
+        color: palette.bg,
+        border: Border.all(color: palette.border),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            number,
+            style: GoogleFonts.barlowCondensed(
+              color: recommended ? palette.accent : palette.textPrimary,
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              height: 1.0,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(color: palette.textMuted, fontSize: 10.5),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Etiqueta "MÁS POPULAR". Misma píldora en los dos layouts, distinta escala.
+class _PopularBadge extends StatelessWidget {
+  const _PopularBadge({
+    required this.palette,
+    required this.fontSize,
+    required this.letterSpacing,
+    required this.padding,
+  });
+
+  final AppPalette palette;
+  final double fontSize;
+  final double letterSpacing;
+  final EdgeInsets padding;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: padding,
+      decoration: BoxDecoration(
+        color: palette.accent,
+        borderRadius: BorderRadius.circular(9999),
+      ),
+      child: Text(
+        'MÁS POPULAR', // i18n: Fase W3
+        style: GoogleFonts.barlowCondensed(
+          color: palette.bg,
+          fontSize: fontSize,
+          fontWeight: FontWeight.w800,
+          letterSpacing: letterSpacing,
+        ),
+      ),
     );
   }
 }
@@ -452,6 +1031,7 @@ class _PlanCtaButton extends StatelessWidget {
     required this.recommended,
     required this.isFree,
     required this.palette,
+    this.minHeight = 0,
   });
 
   final bool isCurrent;
@@ -459,11 +1039,16 @@ class _PlanCtaButton extends StatelessWidget {
   final bool isFree;
   final AppPalette palette;
 
+  /// Altura MÍNIMA (no fija): el artboard móvil pide 46, pero con textScale
+  /// alto el label crece y el botón tiene que poder crecer con él.
+  final double minHeight;
+
   @override
   Widget build(BuildContext context) {
     if (isCurrent) {
       return Container(
         width: double.infinity,
+        constraints: BoxConstraints(minHeight: minHeight),
         padding: const EdgeInsets.symmetric(vertical: 12),
         alignment: Alignment.center,
         decoration: BoxDecoration(
@@ -491,6 +1076,7 @@ class _PlanCtaButton extends StatelessWidget {
         onTap: enabled ? () => _showComingSoon(context) : null,
         child: Container(
           width: double.infinity,
+          constraints: BoxConstraints(minHeight: minHeight),
           padding: const EdgeInsets.symmetric(vertical: 12),
           alignment: Alignment.center,
           decoration: BoxDecoration(
