@@ -256,72 +256,127 @@ void _maybeShowResumePrompt(
     showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (dialogCtx) => ResumeSessionModal(
-        session: session,
-        onContinue: () {
-          Navigator.of(dialogCtx, rootNavigator: true).pop();
-          context.push('/workout/session/resume/${session.id}');
-        },
-        onDiscard: () async {
-          final repo = ref.read(sessionRepositoryProvider);
-          // QA-WKT-011: clamp the discarded session's duration with the same
-          // policy SessionNotifier uses (recover from the set-log timeline, cap
-          // at maxWorkoutDuration) instead of raw wall-clock minutes — a session
-          // left open overnight was persisting durationMin well over 480.
-          final elapsedSecs = sanitizedActiveSessionElapsedSeconds(
-            session: session,
-            setLogs: record.setLogs,
-            now: DateTime.now(),
+      // ⚠️ El diálogo se cierra SOLO cuando su sujeto deja de existir.
+      //
+      // Sin esto, terminar el entreno DESDE EL RELOJ dejaba este modal abierto
+      // sobre una sesión que ya no está activa. Y como es `barrierDismissible:
+      // false`, el atleta quedaba encerrado con dos salidas y las dos malas:
+      // CONTINUAR tiraba `StateError` en `_buildResume` (pantalla en blanco), y
+      // DESCARTAR le pisaba el volumen y la duración a un entreno YA TERMINADO
+      // con datos viejos, dejándolo sin contar. Se reportó como "se borra del
+      // historial": no se borraba, se mutilaba.
+      //
+      // Va como `Consumer` y no como estado de `_AthleteHome` a propósito: el
+      // diálogo se apaga solo, sin convertir un `ConsumerWidget` caliente en
+      // stateful ni rastrear rutas desde afuera.
+      builder: (dialogCtx) => Consumer(
+        builder: (consumerCtx, dialogRef, _) {
+          dialogRef
+              .listen<AsyncValue<({Session session, List<SetLog> setLogs})?>>(
+            activeSessionForUidProvider,
+            (_, next) {
+              // `loading` no cierra: durante un refetch el valor es transitorio
+              // y cerrar ahí haría parpadear el diálogo.
+              if (next.isLoading) return;
+              final vigente = next.valueOrNull?.session.id;
+              if (vigente == session.id) return;
+              if (dialogCtx.mounted) {
+                Navigator.of(dialogCtx, rootNavigator: true).pop();
+              }
+            },
           );
-          final durationMin = elapsedSecs <= 0 ? 1 : (elapsedSecs + 59) ~/ 60;
-          try {
-            await repo
-                .finish(
-                  uid: session.uid,
-                  sessionId: session.id,
-                  finishedAt: DateTime.now(),
-                  totalVolumeKg: _sumVolume(record.setLogs),
-                  durationMin: durationMin,
-                )
-                .timeout(const Duration(seconds: 15));
-          } catch (_) {
-            // QA-WKT-011: the write can throw or (offline) stall indefinitely.
-            // Don't leave the barrierDismissible:false dialog stuck with an
-            // unhandled exception — close it and surface a retryable error.
-            if (dialogCtx.mounted) {
-              Navigator.of(dialogCtx, rootNavigator: true).pop();
-            }
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(AppL10n.of(context).workoutDiscardError),
-                ),
-              );
-            }
-            return;
-          }
-          // _AthleteHome may have been disposed during the finish() write
-          // (user navigated away). Invalidating through a torn-down ref throws,
-          // so guard on the host context before touching ref again.
-          if (!context.mounted) return;
-          if (dialogCtx.mounted) {
-            Navigator.of(dialogCtx, rootNavigator: true).pop();
-          }
-          ref.invalidate(activeSessionForUidProvider);
-          // El reloj no tiene listeners: sin este aviso descartar acá cerraba
-          // la sesión en Firestore y en el teléfono, pero la muñeca se quedaba
-          // con la pantalla de entreno abierta sobre algo que ya no existe.
-          // El aviso desde `SessionNotifier` no cubre este camino: acá el
-          // notifier ni siquiera está vivo.
-          unawaited(
-            ref.read(watchNudgeServiceProvider).nudge(
-                  reason: WatchNudgeService.reasonWorkoutFinished,
-                ),
-          );
+          return _resumeModal(context, ref, dialogCtx, session, record);
         },
       ),
     );
   });
+}
+
+/// El modal en sí, extraído para que el `Consumer` de arriba quede legible.
+Widget _resumeModal(
+  BuildContext context,
+  WidgetRef ref,
+  BuildContext dialogCtx,
+  Session session,
+  ({Session session, List<SetLog> setLogs}) record,
+) {
+  return ResumeSessionModal(
+    session: session,
+    onContinue: () {
+      Navigator.of(dialogCtx, rootNavigator: true).pop();
+      context.push('/workout/session/resume/${session.id}');
+    },
+    onDiscard: () async {
+      final repo = ref.read(sessionRepositoryProvider);
+      // Carrera: el atleta puede tocar DESCARTAR en el mismo instante en
+      // que el reloj termina el entreno. Sin esta relectura, `finish()`
+      // pisaría los totales de una sesión ya cerrada. El cierre automático
+      // del diálogo cubre el caso normal; esto cubre el toque simultáneo.
+      final vigente = await repo.getActive(session.uid).catchError(
+            (_) => null,
+          );
+      if (vigente == null || vigente.id != session.id) {
+        if (dialogCtx.mounted) {
+          Navigator.of(dialogCtx, rootNavigator: true).pop();
+        }
+        return;
+      }
+      // QA-WKT-011: clamp the discarded session's duration with the same
+      // policy SessionNotifier uses (recover from the set-log timeline, cap
+      // at maxWorkoutDuration) instead of raw wall-clock minutes — a session
+      // left open overnight was persisting durationMin well over 480.
+      final elapsedSecs = sanitizedActiveSessionElapsedSeconds(
+        session: session,
+        setLogs: record.setLogs,
+        now: DateTime.now(),
+      );
+      final durationMin = elapsedSecs <= 0 ? 1 : (elapsedSecs + 59) ~/ 60;
+      try {
+        await repo
+            .finish(
+              uid: session.uid,
+              sessionId: session.id,
+              finishedAt: DateTime.now(),
+              totalVolumeKg: _sumVolume(record.setLogs),
+              durationMin: durationMin,
+            )
+            .timeout(const Duration(seconds: 15));
+      } catch (_) {
+        // QA-WKT-011: the write can throw or (offline) stall indefinitely.
+        // Don't leave the barrierDismissible:false dialog stuck with an
+        // unhandled exception — close it and surface a retryable error.
+        if (dialogCtx.mounted) {
+          Navigator.of(dialogCtx, rootNavigator: true).pop();
+        }
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(AppL10n.of(context).workoutDiscardError),
+            ),
+          );
+        }
+        return;
+      }
+      // _AthleteHome may have been disposed during the finish() write
+      // (user navigated away). Invalidating through a torn-down ref throws,
+      // so guard on the host context before touching ref again.
+      if (!context.mounted) return;
+      if (dialogCtx.mounted) {
+        Navigator.of(dialogCtx, rootNavigator: true).pop();
+      }
+      ref.invalidate(activeSessionForUidProvider);
+      // El reloj no tiene listeners: sin este aviso descartar acá cerraba
+      // la sesión en Firestore y en el teléfono, pero la muñeca se quedaba
+      // con la pantalla de entreno abierta sobre algo que ya no existe.
+      // El aviso desde `SessionNotifier` no cubre este camino: acá el
+      // notifier ni siquiera está vivo.
+      unawaited(
+        ref.read(watchNudgeServiceProvider).nudge(
+              reason: WatchNudgeService.reasonWorkoutFinished,
+            ),
+      );
+    },
+  );
 }
 
 double _sumVolume(List<SetLog> logs) =>
