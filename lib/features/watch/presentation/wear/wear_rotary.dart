@@ -110,10 +110,36 @@ class _WearRotaryScrollState extends State<WearRotaryScroll>
   /// y a 90 Hz: con un porcentaje fijo, una pantalla más rápida alcanzaría el
   /// destino antes y el mismo giro se sentiría distinto según el reloj.
   ///
-  /// 35 ms es el compromiso medido: más bajo vuelve a escalonarse —el frame
-  /// consume casi toda la muesca—, y más alto se siente elástico, como si la
-  /// lista viniera atrasada respecto del dedo.
-  static const double _followTau = 0.035;
+  /// ## Es ADAPTATIVO, y ésa es la segunda vuelta
+  ///
+  /// Con tau fijo en 35 ms los saltos se fueron, pero girando DESPACIO seguían
+  /// viéndose cortes. La causa es geométrica y no de suavizado: una muesca se
+  /// reparte en ~3 tau ≈ 100 ms, y si las muescas llegan cada 200 ms quedan
+  /// 100 ms de pantalla QUIETA entre una y otra. El movimiento era suave dentro
+  /// de cada muesca y el hueco estaba en el medio.
+  ///
+  /// Por eso el reparto dura lo que dura el intervalo REAL entre muescas: si
+  /// girás lento, cada muesca se estira hasta que llega la siguiente y el
+  /// movimiento no se corta nunca; si girás rápido, tau se achica y la lista
+  /// sigue respondiendo al toque.
+  static double _tauPara(double intervalo) =>
+      (intervalo * _fraccionDelIntervalo).clamp(_tauMin, _tauMax);
+
+  /// Qué parte del intervalo entre muescas ocupa el reparto.
+  ///
+  /// Un tercio: `1 - e^(-3)` es el 95%, así que con tau = intervalo/3 la muesca
+  /// termina de aplicarse justo cuando llega la siguiente. Más alto se
+  /// solaparían y la lista quedaría siempre atrasada; más bajo reaparece el
+  /// hueco.
+  static const double _fraccionDelIntervalo = 1 / 3;
+
+  /// Piso: girando muy rápido el reparto no puede volverse instantáneo, que es
+  /// volver al salto por muesca.
+  static const double _tauMin = 0.030;
+
+  /// Techo: con la corona quieta el intervalo tiende a infinito, y sin tope la
+  /// última muesca tardaría eternidades en aplicarse.
+  static const double _tauMax = 0.12;
 
   /// Por debajo de esto el resto se aplica de una y se considera alcanzado.
   /// Sin este piso, la persecución exponencial nunca llega a cero y el ticker
@@ -144,6 +170,15 @@ class _WearRotaryScrollState extends State<WearRotaryScroll>
 
   Ticker? _ticker;
   Duration _lastTick = Duration.zero;
+
+  /// Cuánto tardó en llegar la última muesca. Es lo que fija el ritmo del
+  /// reparto — ver [_tauPara].
+  final _entreMuescas = Stopwatch();
+
+  /// El intervalo vigente, suavizado. Una muesca fuera de tiempo no puede
+  /// cambiar el ritmo de golpe: eso se vería como un tirón, que es justo lo que
+  /// se está sacando.
+  double _intervalo = 0.12;
 
   /// Arrastre en curso. El MISMO tipo que produce un dedo.
   Drag? _drag;
@@ -196,6 +231,16 @@ class _WearRotaryScrollState extends State<WearRotaryScroll>
     // frames que siguen. Ver [_pending].
     _pending += delta;
 
+    // El ritmo del giro, medido. La corona no emite a frecuencia fija.
+    if (_entreMuescas.isRunning) {
+      final medido =
+          (_entreMuescas.elapsedMicroseconds / 1e6).clamp(0.008, 0.400);
+      _intervalo = _intervalo * 0.6 + medido * 0.4;
+    }
+    _entreMuescas
+      ..reset()
+      ..start();
+
     _drag ??= c.position.drag(
       DragStartDetails(globalPosition: Offset.zero),
       () => _drag = null,
@@ -230,7 +275,7 @@ class _WearRotaryScrollState extends State<WearRotaryScroll>
         : ((elapsed - _lastTick).inMicroseconds / 1e6).clamp(1 / 240, 0.05);
     _lastTick = elapsed;
 
-    var step = _pending * (1 - math.exp(-dt / _followTau));
+    var step = _pending * (1 - math.exp(-dt / _tauPara(_intervalo)));
     if (_pending.abs() < _epsilon) step = _pending;
     _pending -= step;
 
@@ -259,6 +304,7 @@ class _WearRotaryScrollState extends State<WearRotaryScroll>
   }
 
   void _pararTicker() {
+    _entreMuescas.stop();
     if (_ticker?.isActive ?? false) _ticker!.stop();
     _lastTick = Duration.zero;
   }
