@@ -515,6 +515,7 @@ runSetLogDeletion()
 runExerciseCursor()
 runSupersetCursor()
 runTokenFreshness()
+runCountdown()
 runStaleSessions()
 runCloseFeedback()
 
@@ -1197,4 +1198,51 @@ private func runTokenFreshness() {
         TokenFreshness.shouldRefresh(emitidoEn: t0, ahora: t0.addingTimeInterval(-10)),
         "hora corrida hacia atras: se renueva en vez de quedarse con un token eterno"
     )
+}
+// MARK: - Cuenta regresiva
+//
+// Los ejercicios POR TIEMPO se cronometran y se marcan solos al llegar a cero.
+// La cuenta va contra el RELOJ DE PARED y no por ticks: si el sistema estrangula
+// la app, un contador de ticks se atrasa y una plancha de 60s dura 70.
+
+private func runCountdown() {
+    let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+    let fin = t0.addingTimeInterval(60)
+
+    checkEqual(CountdownRules.remaining(endsAt: fin, now: t0), 60, "recien arrancado faltan 60")
+    checkEqual(CountdownRules.remaining(endsAt: fin, now: t0.addingTimeInterval(30)), 30, "a mitad faltan 30")
+    checkEqual(CountdownRules.remaining(endsAt: fin, now: fin), 0, "en el instante de fin no falta nada")
+    checkEqual(
+        CountdownRules.remaining(endsAt: fin, now: fin.addingTimeInterval(120)),
+        0,
+        "pasado el fin nunca da negativo: un negativo indexaria o se mostraria como texto roto"
+    )
+
+    // El redondeo hacia ARRIBA es la regla: mientras quede una fraccion, la
+    // serie no termino. Mostrar 0 con tiempo restante invitaria a cortar antes.
+    checkEqual(
+        CountdownRules.remaining(endsAt: fin, now: fin.addingTimeInterval(-0.4)),
+        1,
+        "con menos de un segundo restante todavia falta 1, no 0"
+    )
+    check(
+        !CountdownRules.isFinished(endsAt: fin, now: fin.addingTimeInterval(-0.4)),
+        "y por lo tanto NO esta terminada"
+    )
+    check(
+        CountdownRules.isFinished(endsAt: fin, now: fin),
+        "terminada justo en el instante de fin"
+    )
+
+    // Saltar ticks no atrasa la cuenta: es la razon de ser del reloj de pared.
+    checkEqual(
+        CountdownRules.remaining(endsAt: fin, now: t0.addingTimeInterval(59)),
+        1,
+        "un salto de 59s de golpe da 1, no 59: la cuenta no depende de cuantos ticks corrieron"
+    )
+
+    checkEqual(CountdownRules.display(remaining: 45), "45", "bajo un minuto va sin cero a la izquierda")
+    checkEqual(CountdownRules.display(remaining: 60), "1:00", "un minuto justo")
+    checkEqual(CountdownRules.display(remaining: 90), "1:30", "minuto y medio")
+    checkEqual(CountdownRules.display(remaining: 0), "0", "cero")
 }

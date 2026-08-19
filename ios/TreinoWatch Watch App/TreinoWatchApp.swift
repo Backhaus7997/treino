@@ -100,6 +100,21 @@ struct TreinoWatch_Watch_AppApp: App {
                 // No se refresca durante un entreno en curso: cambiar los
                 // ejercicios abajo del atleta a mitad de serie seria peor que
                 // mostrar un dato viejo.
+                // La intencion de lanzamiento se apaga apenas deja de tener
+                // sentido, y NO solo al final del `.task`.
+                //
+                // Bug reportado: al ABANDONAR el entreno desde el reloj, la
+                // pantalla quedaba en "Preparando tu entreno..." para siempre.
+                // La sesion pasaba a nil, `.task` no vuelve a correr en un
+                // resume, y la intencion vieja seguia puesta: `ContentView`
+                // caia en esa rama y no salia nunca mas.
+                //
+                // Se limpia cuando aparece una sesion (ya aterrizamos, la
+                // intencion cumplio) y cuando desaparece (se termino o se
+                // abandono, no hay nada que preparar).
+                .onChange(of: workoutCoordinator.session == nil) { _, _ in
+                    launchIntent.clear()
+                }
                 .onChange(of: scenePhase) { _, phase in
                     guard phase == .active else { return }
                     Task {
@@ -119,6 +134,10 @@ struct TreinoWatch_Watch_AppApp: App {
                             // la rutina: si lo hay, el reloj tiene que entrar
                             // en modo entreno, no mostrar "Empezar".
                             await workoutCoordinator.adoptRemoteSessionIfAny()
+                            // El intento TERMINO, haya encontrado o no. En un
+                            // resume el `.task` no corre, asi que si no se
+                            // limpia aca la intencion queda colgada.
+                            launchIntent.clear()
                             if workoutCoordinator.session == nil {
                                 await coordinator.loadTodaysWorkout()
                             }

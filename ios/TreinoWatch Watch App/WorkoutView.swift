@@ -28,7 +28,15 @@ struct WorkoutView: View {
     @State private var confirmandoAbandono = false
 
     var body: some View {
-        if let exercise = workout.currentExercise, let session = workout.session {
+        // El cronometro de un ejercicio POR TIEMPO gana sobre todo lo demas.
+        //
+        // Pedido del dueno: que tome prioridad en la pantalla y que hasta que no
+        // termine no se pueda marcar la serie. Con la pantalla tomada no hay
+        // ninguna fila que tocar, asi que la regla se cumple por construccion en
+        // vez de por un `disabled` que hay que acordarse de poner.
+        if let cuenta = workout.durationSet {
+            durationTimerScreen(cuenta)
+        } else if let exercise = workout.currentExercise, let session = workout.session {
             ScrollView {
                 VStack(spacing: 6) {
                     header(exercise: exercise, session: session)
@@ -160,6 +168,47 @@ struct WorkoutView: View {
                     .multilineTextAlignment(.center)
             }
         }
+    }
+
+    /// La cuenta regresiva de un ejercicio por tiempo, a pantalla completa.
+    ///
+    /// No hay boton de "hecho": al llegar a cero la serie se marca SOLA y el
+    /// reloj vibra. Un ejercicio por tiempo no se completa por decision del
+    /// atleta, se completa cuando pasa el tiempo.
+    private func durationTimerScreen(_ cuenta: WorkoutCoordinator.DurationSet) -> some View {
+        VStack(spacing: 8) {
+            Text(nombreDe(cuenta.exerciseId))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .minimumScaleFactor(0.7)
+
+            Text(CountdownRules.display(remaining: workout.durationRemaining))
+                .font(.system(size: 46, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .minimumScaleFactor(0.5)
+                .foregroundStyle(.green)
+
+            Text("serie \(cuenta.setNumber) · \(cuenta.totalSeconds)s")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
+            // Salida sin cargar la serie. Sin esto, un toque equivocado deja al
+            // atleta mirando una cuenta que no pidio y sin forma de volver.
+            Button("Cancelar") { workout.cancelDurationSet() }
+                .font(.caption2)
+                .buttonStyle(.bordered)
+                .tint(.secondary)
+                .padding(.top, 6)
+        }
+        .padding()
+    }
+
+    /// El nombre del ejercicio del cronometro. Se busca por id porque el cursor
+    /// puede haberse movido mientras corre la cuenta.
+    private func nombreDe(_ exerciseId: String) -> String {
+        workout.exercises.first { $0.exerciseId == exerciseId }?.exerciseName
+            ?? "Ejercicio"
     }
 
     /// Ritmo cardiaco y calorias, en una sola fila.
@@ -322,18 +371,36 @@ struct WorkoutView: View {
             // una fila sin prescripción: el reloj no ofrece cargar una serie de
             // la que no sabe el objetivo. Agregar series es del teléfono.
             let tappable = !done && setNumber == nextSet && spec != nil
+            // Un ejercicio POR TIEMPO no se marca: se cronometra.
+            //
+            // El toque arranca la cuenta en vez de cargar la serie, y la serie
+            // se carga sola al llegar a cero. Marcarla a mano permitiria darla
+            // por hecha sin haberla hecho, que es justo lo que el dueno pidio
+            // evitar.
+            let porTiempo = (spec?.durationSeconds ?? 0) > 0
             Button {
                 guard let spec else { return }
-                workout.logSet(
-                    exerciseId: exercise.exerciseId,
-                    setNumber: setNumber,
-                    spec: spec,
-                    restSeconds: exercise.restSeconds
-                )
+                if porTiempo {
+                    workout.startDurationSet(
+                        exerciseId: exercise.exerciseId,
+                        setNumber: setNumber,
+                        spec: spec,
+                        restSeconds: exercise.restSeconds
+                    )
+                } else {
+                    workout.logSet(
+                        exerciseId: exercise.exerciseId,
+                        setNumber: setNumber,
+                        spec: spec,
+                        restSeconds: exercise.restSeconds
+                    )
+                }
             } label: {
                 HStack(spacing: 6) {
-                    Image(systemName: done ? "checkmark.circle.fill" : "circle")
-                        .foregroundStyle(done ? .green : .secondary)
+                    Image(systemName: done
+                            ? "checkmark.circle.fill"
+                            : (porTiempo && tappable ? "timer" : "circle"))
+                        .foregroundStyle(done ? .green : (porTiempo && tappable ? .green : .secondary))
                     Text("\(setNumber)")
                         .font(.caption2)
                         .foregroundStyle(.secondary)

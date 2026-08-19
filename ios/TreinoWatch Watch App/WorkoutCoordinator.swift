@@ -34,6 +34,27 @@ final class WorkoutCoordinator: ObservableObject {
     /// Segundos que faltan del descanso, o nil si no hay descanso corriendo.
     @Published private(set) var restRemaining: Int?
 
+    /// Un ejercicio POR TIEMPO en curso.
+    ///
+    /// Mientras esto no sea nil la pantalla la toma el cronometro: la serie no
+    /// se puede marcar a mano, y al llegar a cero se marca SOLA. Pedido del
+    /// dueno: un ejercicio por tiempo no se "completa" por decision del atleta,
+    /// se completa cuando pasa el tiempo.
+    struct DurationSet: Equatable {
+        let exerciseId: String
+        let setNumber: Int
+        let totalSeconds: Int
+        let spec: SetSpec
+        let restSeconds: Int
+        /// Instante de fin. Se guarda el FIN y no lo que falta: ver
+        /// `CountdownRules` para por que no se cuenta por ticks.
+        let endsAt: Date
+    }
+
+    @Published private(set) var durationSet: DurationSet?
+    @Published private(set) var durationRemaining: Int = 0
+    private var durationTimer: Timer?
+
     /// Ultima falla de sincronizacion, para diagnostico. La UI solo muestra que
     /// hay pendientes, no el detalle.
     @Published private(set) var syncError: String?
@@ -791,6 +812,71 @@ final class WorkoutCoordinator: ObservableObject {
     /// El plan original lo descartaba porque mandar un tick por segundo desde
     /// el teléfono saturaba el canal. Acá no aplica: el reloj es autónomo y
     /// tiene el estado, así que contar no cuesta tráfico (Locked Decision #8).
+    /// Arranca el cronometro de un ejercicio por tiempo.
+    ///
+    /// NO se dispara solo al llegar al ejercicio: lo arranca el atleta. Empezar
+    /// a contar sin que este listo seria peor que no contar.
+    func startDurationSet(
+        exerciseId: String,
+        setNumber: Int,
+        spec: SetSpec,
+        restSeconds: Int
+    ) {
+        guard let seconds = spec.durationSeconds, seconds > 0, durationSet == nil else { return }
+        stopRest()
+        let fin = Date().addingTimeInterval(TimeInterval(seconds))
+        durationSet = DurationSet(
+            exerciseId: exerciseId,
+            setNumber: setNumber,
+            totalSeconds: seconds,
+            spec: spec,
+            restSeconds: restSeconds,
+            endsAt: fin
+        )
+        durationRemaining = seconds
+        durationTimer?.invalidate()
+        durationTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self, let actual = self.durationSet else { return }
+                // Se recalcula contra el reloj de pared en cada tick: si el
+                // sistema se salteo ticks, la cuenta sigue siendo correcta.
+                self.durationRemaining = CountdownRules.remaining(
+                    endsAt: actual.endsAt, now: Date()
+                )
+                if CountdownRules.isFinished(endsAt: actual.endsAt, now: Date()) {
+                    self.completeDurationSet()
+                }
+            }
+        }
+    }
+
+    /// Corta el cronometro SIN cargar la serie.
+    ///
+    /// Existe porque sin salida un toque equivocado dejaria al atleta mirando
+    /// una cuenta que no pidio, sin forma de volver.
+    func cancelDurationSet() {
+        durationTimer?.invalidate()
+        durationTimer = nil
+        durationSet = nil
+        durationRemaining = 0
+    }
+
+    /// Llego a cero: vibra y carga la serie sola.
+    private func completeDurationSet() {
+        guard let actual = durationSet else { return }
+        durationTimer?.invalidate()
+        durationTimer = nil
+        durationSet = nil
+        durationRemaining = 0
+        Haptics.durationSetCompleted()
+        logSet(
+            exerciseId: actual.exerciseId,
+            setNumber: actual.setNumber,
+            spec: actual.spec,
+            restSeconds: actual.restSeconds
+        )
+    }
+
     private func startRest(seconds: Int) {
         stopRest()
         guard seconds > 0 else { return }
@@ -800,6 +886,10 @@ final class WorkoutCoordinator: ObservableObject {
                 guard let self, let remaining = self.restRemaining else { return }
                 if remaining <= 1 {
                     self.stopRest()
+                    // Antes el descanso terminaba en SILENCIO: habia que mirar
+                    // la pantalla para enterarse, que es justo lo que un reloj
+                    // viene a evitar.
+                    Haptics.restFinished()
                 } else {
                     self.restRemaining = remaining - 1
                 }
