@@ -195,47 +195,64 @@ class _PlanCardsRow extends StatelessWidget {
           palette: palette,
         );
 
-    final free = card(SubscriptionTier.free, recommended: false);
-    final plan1 = card(SubscriptionTier.plan1, recommended: true);
-    final plan2 = card(SubscriptionTier.plan2, recommended: false);
+    // Se ITERA sobre el enum a proposito. Antes las tres tarjetas estaban
+    // escritas a mano (free, plan1, plan2), asi que agregar un tier al enum
+    // NO lo hacia aparecer aca: el compilador exige exhaustividad en los
+    // switch, pero no dice nada de una lista literal. Plan 3 se agrego y la
+    // pricing page siguio mostrando tres planes, en silencio.
+    const recommended = SubscriptionTier.plan1;
+    final cards = {
+      for (final tier in SubscriptionTier.values)
+        tier: card(tier, recommended: tier == recommended),
+    };
+
+    // El ancho por tarjeta lo fija el precio-heroe (Barlow Condensed grande).
+    // Con cuatro planes ya no entran en una fila salvo en pantallas anchas:
+    // a ~1165px utiles se pasaba 55px. Por eso hay tres layouts y no dos.
+    const tiers = SubscriptionTier.values;
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (constraints.maxWidth < 820) {
-          // Apilado: la recomendada primero (más visible en mobile).
+        final w = constraints.maxWidth;
+
+        if (w < 820) {
+          // Apilado: la recomendada primero (mas visible en mobile).
+          final ordered = [
+            recommended,
+            ...tiers.where((t) => t != recommended),
+          ];
           return Column(
             children: [
-              plan1,
-              const SizedBox(height: 16),
-              free,
-              const SizedBox(height: 16),
-              plan2,
+              for (var i = 0; i < ordered.length; i++) ...[
+                if (i > 0) const SizedBox(height: 16),
+                cards[ordered[i]]!,
+              ],
             ],
           );
         }
-        // Fila con la card del medio elevada: las laterales llevan padding
-        // top que las "baja" respecto a la recomendada.
-        return IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 24),
-                  child: free,
-                ),
+
+        // Grilla 2x2 para todo lo ancho. NO hay variante de cuatro en fila:
+        // el ancho por tarjeta lo fija el precio-heroe (Barlow Condensed
+        // grande) y pide ~360px, o sea que cuatro necesitarian ~1500px utiles.
+        // Achicar el precio para que entren seria sacrificar justo lo que la
+        // tarjeta tiene para decir.
+        Widget fila(List<SubscriptionTier> par) => IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = 0; i < par.length; i++) ...[
+                    if (i > 0) const SizedBox(width: 16),
+                    Expanded(child: cards[par[i]]!),
+                  ],
+                ],
               ),
-              const SizedBox(width: 16),
-              Expanded(child: plan1),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 24),
-                  child: plan2,
-                ),
-              ),
-            ],
-          ),
+            );
+        return Column(
+          children: [
+            fila(tiers.take(2).toList()),
+            const SizedBox(height: 16),
+            fila(tiers.skip(2).toList()),
+          ],
         );
       },
     );
