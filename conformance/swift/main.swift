@@ -26,6 +26,22 @@ private func fail(_ message: String) {
     failures.append(message)
 }
 
+/// Lee un entero de 64 bits del fixture.
+///
+/// `as? Int` alcanzaría en este corredor, que compila en el host — y ese es
+/// justamente el problema. En watchOS `Int` es de 32 bits (arm64_32) y los
+/// milisegundos desde epoch rondan 1,8e12, así que ahí ese cast devolvería nil
+/// y la regla no correría nunca. Leerlos como `Int64` acá mantiene el corredor
+/// bajo la misma disciplina que el código del reloj.
+private func int64(_ any: Any?) -> Int64? {
+    (any as? NSNumber)?.int64Value
+}
+
+/// Un instante a partir de milisegundos desde epoch.
+private func fecha(desdeMs ms: Int64) -> Date {
+    Date(timeIntervalSince1970: TimeInterval(ms) / 1000)
+}
+
 // MARK: - plan_advance
 
 private func runPlanAdvance(fixtureURL: URL) {
@@ -433,6 +449,68 @@ private func runSupersetOrder(fixtureURL: URL) {
     }
 }
 
+// MARK: - duration_timer
+
+private func runDurationTimer(fixtureURL: URL) {
+    guard let data = try? Data(contentsOf: fixtureURL) else {
+        fail("No se pudo leer \(fixtureURL.path). Los fixtures son el contrato "
+            + "con la implementación Dart: si el archivo no está, ese contrato "
+            + "no existe.")
+        return
+    }
+
+    guard
+        let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+        let rule = json["rule"] as? String,
+        let cases = json["cases"] as? [[String: Any]]
+    else {
+        fail("\(fixtureURL.lastPathComponent) no tiene la forma esperada.")
+        return
+    }
+
+    guard rule == "duration-timer" else {
+        fail("Se esperaba rule 'duration-timer' y vino '\(rule)'.")
+        return
+    }
+
+    guard !cases.isEmpty else {
+        fail("\(fixtureURL.lastPathComponent) no tiene casos.")
+        return
+    }
+
+    for testCase in cases {
+        totalCases += 1
+        let name = testCase["name"] as? String ?? "(sin nombre)"
+
+        guard
+            let given = testCase["given"] as? [String: Any],
+            let expected = testCase["expect"] as? [String: Any],
+            let endsAtMs = int64(given["endsAtMs"]),
+            let nowMs = int64(given["nowMs"]),
+            let expectedRemaining = expected["remaining"] as? Int,
+            let expectedFinished = expected["finished"] as? Bool
+        else {
+            fail("Caso '\(name)' mal formado.")
+            continue
+        }
+
+        let endsAt = fecha(desdeMs: endsAtMs)
+        let now = fecha(desdeMs: nowMs)
+
+        let restante = CountdownRules.remaining(endsAt: endsAt, now: now)
+        if restante != expectedRemaining {
+            fail("Caso '\(name)': segundos restantes — se esperaba "
+                + "\(expectedRemaining) y vino \(restante).")
+        }
+
+        let termino = CountdownRules.isFinished(endsAt: endsAt, now: now)
+        if termino != expectedFinished {
+            fail("Caso '\(name)': terminada — se esperaba \(expectedFinished) "
+                + "y vino \(termino).")
+        }
+    }
+}
+
 // MARK: - main
 
 // El script pasa la raíz de `conformance/` como primer argumento.
@@ -447,6 +525,7 @@ runSetResolution(fixtureURL: conformanceDir.appendingPathComponent("set_resoluti
 runSessionCounting(fixtureURL: conformanceDir.appendingPathComponent("session_counting.json"))
 runSetLogIdentity(fixtureURL: conformanceDir.appendingPathComponent("set_log_identity.json"))
 runSupersetOrder(fixtureURL: conformanceDir.appendingPathComponent("superset_order.json"))
+runDurationTimer(fixtureURL: conformanceDir.appendingPathComponent("duration_timer.json"))
 
 if failures.isEmpty {
     print("✓ conformidad Swift: \(totalCases) casos, todos en verde")

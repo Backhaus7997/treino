@@ -61,6 +61,9 @@ fuera de rango) son justo los que alguien va a querer "arreglar" sin entender.
 | `routine_selection.json` | Cuál rutina es la activa del atleta | `lib/features/workout/domain/routine_selection.dart` | `ios/TreinoWatch Watch App/RoutineSelection.swift` |
 | `set_resolution.json` | Qué series le tocan en un ejercicio, por semana | `lib/features/workout/domain/routine_slot.dart` | `ios/TreinoWatch Watch App/SetResolution.swift` |
 | `session_counting.json` | Si una sesión cuenta como entrenamiento HECHO — la **entrada** de `plan_advance` | `lib/features/workout/domain/session.dart` | `ios/TreinoWatch Watch App/SessionCounting.swift` |
+| `set_log_identity.json` | Qué identidad lógica tiene una serie cargada, para que los dos clientes no la dupliquen | `lib/features/workout/domain/set_log_identity.dart` | `ios/TreinoWatch Watch App/SetLogIdentity.swift` |
+| `superset_order.json` | Qué celda (ejercicio + serie) toca AHORA dentro de una superserie | `lib/features/workout/domain/superset_order.dart` | `ios/TreinoWatch Watch App/SupersetOrder.swift` |
+| `duration_timer.json` | Cuánto falta de un ejercicio POR TIEMPO y si terminó — contra el reloj de pared | `lib/features/workout/domain/duration_timer.dart` | `ios/TreinoWatch Watch App/CountdownRules.swift` |
 
 ## La lección que costó cuatro bugs
 
