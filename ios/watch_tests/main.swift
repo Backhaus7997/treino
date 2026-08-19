@@ -510,6 +510,7 @@ runHeartRateRounding()
 runActiveEnergyDisplay()
 runWorkoutDuration()
 runEffortBroadcast()
+runEffortTimerBroadcast()
 runSetLogWriteTarget()
 runSetLogDeletion()
 runExerciseCursor()
@@ -539,6 +540,49 @@ exit(1)
 //
 // Estas reglas deciden CUANDO vale la pena mandar. Son puras y se testean en el
 // host; el envio en si vive en `EffortRelay.swift`.
+
+private func runEffortTimerBroadcast() {
+    let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+    let crono = EffortSnapshot.RunningTimer(
+        exerciseId: "plancha", totalSeconds: 60, endsAt: t0.addingTimeInterval(60)
+    )
+
+    // Un cronometro corriendo YA es algo que mostrar, aunque no haya pulso.
+    let soloCrono = EffortSnapshot(bpm: nil, kcal: nil, timer: crono)
+    check(!soloCrono.isEmpty, "un cronometro sin pulso no es un payload vacio")
+    check(
+        EffortBroadcastRules.shouldSend(last: nil, actual: soloCrono, now: t0),
+        "arrancar el cronometro se manda aunque no haya llegado ningun pulso"
+    )
+
+    // Y APAGARLO tambien, aunque quede vacio: si no, el telefono sigue
+    // contando hasta cero algo que el atleta ya cancelo.
+    let vacio = EffortSnapshot(bpm: nil, kcal: nil, timer: nil)
+    check(
+        EffortBroadcastRules.shouldSend(
+            last: (payload: soloCrono, at: t0), actual: vacio, now: t0
+        ),
+        "cancelar el cronometro se avisa aunque el payload quede vacio"
+    )
+
+    // Pero un vacio que NO apaga nada sigue sin mandarse.
+    check(
+        !EffortBroadcastRules.shouldSend(
+            last: (payload: EffortSnapshot(bpm: 140, kcal: 10), at: t0),
+            actual: vacio, now: t0
+        ),
+        "un vacio sin cronometro previo no justifica un envio"
+    )
+
+    // El payload lleva el INSTANTE DE FIN, no lo que falta.
+    let payload = soloCrono.context(measuredAt: t0)
+    checkEqual(payload["timerExerciseId"] as? String, "plancha", "va el ejercicio")
+    checkEqual(payload["timerTotalSeconds"] as? Int, 60, "van los segundos totales")
+    check(
+        payload["timerEndsAtMs"] is Int64,
+        "el fin viaja como Int64: con Int trapea en arm64_32, igual que measuredAtMs"
+    )
+}
 
 private func runEffortBroadcast() {
     let t0 = Date(timeIntervalSince1970: 1_700_000_000)

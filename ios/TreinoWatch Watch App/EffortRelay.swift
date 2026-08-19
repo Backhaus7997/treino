@@ -45,8 +45,14 @@ final class EffortRelay {
     ///
     /// La decision de si corresponde vive en `EffortBroadcastRules`, sin
     /// WatchConnectivity, para poder testearla en el host.
-    func publish(bpm: Int?, kcal: Int?, measuredAt: Date, now: Date = Date()) {
-        let actual = EffortSnapshot(bpm: bpm, kcal: kcal)
+    func publish(
+        bpm: Int?,
+        kcal: Int?,
+        measuredAt: Date,
+        timer: EffortSnapshot.RunningTimer? = nil,
+        now: Date = Date()
+    ) {
+        let actual = EffortSnapshot(bpm: bpm, kcal: kcal, timer: timer)
         guard EffortBroadcastRules.shouldSend(last: last, actual: actual, now: now) else {
             return
         }

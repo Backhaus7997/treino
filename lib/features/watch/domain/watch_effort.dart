@@ -27,7 +27,14 @@
 library;
 
 class WatchEffort {
-  const WatchEffort({this.bpm, this.kcal, this.measuredAt});
+  const WatchEffort({
+    this.bpm,
+    this.kcal,
+    this.measuredAt,
+    this.timerEndsAt,
+    this.timerTotalSeconds,
+    this.timerExerciseId,
+  });
 
   /// Discrimina este payload de cualquier otro que viaje por el mismo canal.
   ///
@@ -50,6 +57,17 @@ class WatchEffort {
   /// de lo que es.
   final DateTime? measuredAt;
 
+  /// Cuándo termina el ejercicio POR TIEMPO que corre en el reloj.
+  ///
+  /// Viaja el INSTANTE DE FIN y no los segundos restantes: así el teléfono
+  /// calcula la cuenta solo, sin tráfico por segundo, y un envío que llega
+  /// tarde —el reloj throttlea a 5s— sigue mostrando el número correcto.
+  ///
+  /// Null significa que no hay cronómetro corriendo.
+  final DateTime? timerEndsAt;
+  final int? timerTotalSeconds;
+  final String? timerExerciseId;
+
   /// Si trae al menos una medición.
   bool get isEmpty => bpm == null && kcal == null;
 
@@ -69,12 +87,27 @@ class WatchEffort {
     if (context['kind'] != kind) return null;
 
     final ms = context['measuredAtMs'];
-    if (ms is! int) return null; // Sin momento no se puede juzgar la antigüedad.
+    // Sin momento no se puede juzgar la antigüedad.
+    if (ms is! int) {
+      return null;
+    }
 
     final rawBpm = context['bpm'];
     final rawKcal = context['kcal'];
 
+    // El cronómetro del reloj. Defensivo igual que el resto: si falta o viene
+    // mal formado, simplemente no hay cronómetro — nunca tira.
+    final rawEnds = context['timerEndsAtMs'];
+    final rawTotal = context['timerTotalSeconds'];
+    final rawTimerId = context['timerExerciseId'];
+
     return WatchEffort(
+      timerEndsAt: rawEnds is int
+          ? DateTime.fromMillisecondsSinceEpoch(rawEnds, isUtc: true)
+          : null,
+      timerTotalSeconds: rawTotal is int && rawTotal > 0 ? rawTotal : null,
+      timerExerciseId:
+          rawTimerId is String && rawTimerId.isNotEmpty ? rawTimerId : null,
       // Un bpm de 0 no es una medición: es un sensor que no enganchó.
       bpm: rawBpm is int && rawBpm > 0 ? rawBpm : null,
       // Un kcal de 0 SÍ es un dato cierto — todavía no se midió consumo.
@@ -89,13 +122,27 @@ class WatchEffort {
       other is WatchEffort &&
       other.bpm == bpm &&
       other.kcal == kcal &&
-      other.measuredAt == measuredAt;
+      other.measuredAt == measuredAt &&
+      // Los campos del cronómetro TIENEN que estar acá: el notifier compara
+      // por igualdad para decidir si re-renderiza, y sin esto un payload que
+      // solo cambia el cronómetro se descartaría por "igual al anterior".
+      other.timerEndsAt == timerEndsAt &&
+      other.timerTotalSeconds == timerTotalSeconds &&
+      other.timerExerciseId == timerExerciseId;
 
   @override
-  int get hashCode => Object.hash(bpm, kcal, measuredAt);
+  int get hashCode => Object.hash(
+        bpm,
+        kcal,
+        measuredAt,
+        timerEndsAt,
+        timerTotalSeconds,
+        timerExerciseId,
+      );
 
   @override
-  String toString() => 'WatchEffort(bpm: $bpm, kcal: $kcal, at: $measuredAt)';
+  String toString() => 'WatchEffort(bpm: $bpm, kcal: $kcal, at: $measuredAt, '
+      'timerEndsAt: $timerEndsAt)';
 }
 
 /// Qué mostrar en el player.
@@ -103,7 +150,9 @@ class WatchEffortDisplay {
   const WatchEffortDisplay({this.bpm, this.kcal});
 
   /// Nada que mostrar: no se dibuja fila, ni vacía.
-  const WatchEffortDisplay.nada() : bpm = null, kcal = null;
+  const WatchEffortDisplay.nada()
+      : bpm = null,
+        kcal = null;
 
   final int? bpm;
   final int? kcal;

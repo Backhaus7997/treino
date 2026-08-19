@@ -21,7 +21,33 @@ struct EffortSnapshot: Equatable {
     let bpm: Int?
     let kcal: Int?
 
-    var isEmpty: Bool { bpm == nil && kcal == nil }
+    /// Un ejercicio POR TIEMPO corriendo en el reloj, para que el telefono
+    /// muestre la misma cuenta.
+    ///
+    /// Viaja ACA y no en su propio contexto porque el reloj tiene UN SOLO
+    /// `applicationContext` de salida: mandarlo aparte PISARIA el pulso.
+    ///
+    /// Se manda el INSTANTE DE FIN y no lo que falta. Asi el telefono calcula
+    /// la cuenta solo, sin trafico por segundo, y un envio que llega tarde
+    /// —el throttle es de 5s— sigue mostrando el numero correcto.
+    struct RunningTimer: Equatable {
+        let exerciseId: String
+        let totalSeconds: Int
+        let endsAt: Date
+    }
+
+    let timer: RunningTimer?
+
+    init(bpm: Int?, kcal: Int?, timer: RunningTimer? = nil) {
+        self.bpm = bpm
+        self.kcal = kcal
+        self.timer = timer
+    }
+
+    /// Un cronometro corriendo YA es algo que mostrar, aunque no haya pulso ni
+    /// calorias. Sin esto el envio se descartaba por vacio y el telefono no se
+    /// enteraba nunca del cronometro.
+    var isEmpty: Bool { bpm == nil && kcal == nil && timer == nil }
 
     /// El diccionario que viaja por WatchConnectivity.
     ///
@@ -51,6 +77,13 @@ struct EffortSnapshot: Equatable {
         ]
         if let bpm { payload["bpm"] = bpm }
         if let kcal { payload["kcal"] = kcal }
+        if let timer {
+            payload["timerExerciseId"] = timer.exerciseId
+            payload["timerTotalSeconds"] = timer.totalSeconds
+            // Int64 por lo mismo que measuredAtMs: en arm64_32 `Int` son 32
+            // bits y los milisegundos desde 1970 no entran — trapea.
+            payload["timerEndsAtMs"] = Int64(timer.endsAt.timeIntervalSince1970 * 1000)
+        }
         return payload
     }
 }
@@ -73,6 +106,17 @@ enum EffortBroadcastRules {
         actual: EffortSnapshot,
         now: Date
     ) -> Bool {
+        // APAGAR un cronometro que el telefono cree que sigue corriendo SI vale
+        // un envio, aunque el payload quede vacio.
+        //
+        // Sin esto: el atleta CANCELA el cronometro antes de que llegue el
+        // primer pulso, el snapshot queda sin bpm, sin kcal y sin timer, se
+        // descarta por vacio, y el telefono sigue contando hasta cero algo que
+        // ya no existe. Se corrige solo al vencer, pero mientras tanto miente.
+        if actual.isEmpty, let last, last.payload.timer != nil {
+            return true
+        }
+
         // Nada que mostrar: el telefono ya sabe no dibujar nada.
         guard !actual.isEmpty else { return false }
 

@@ -888,6 +888,7 @@ class _SessionStatsCard extends StatelessWidget {
                       color: palette.accent,
                     ),
                   ),
+                  const _WatchTimerRow(),
                   const _WatchEffortRow(),
                 ],
               ),
@@ -2642,6 +2643,90 @@ class _AbandonConfirmDialog extends StatelessWidget {
 /// cada pocos segundos, y metiendolo inline haria rebuild de toda la cabecera
 /// del player —incluido el cronometro y la barra de progreso— por un dato
 /// secundario. Asi el rebuild queda acotado a esta fila.
+/// La cuenta regresiva de un ejercicio por tiempo que corre EN EL RELOJ.
+///
+/// El reloj manda el INSTANTE DE FIN, no los segundos restantes, así que acá se
+/// calcula la cuenta sola. Eso hace que no haga falta tráfico por segundo entre
+/// los dispositivos, y que un envío que llega tarde —el reloj throttlea a 5s—
+/// muestre igual el número correcto.
+///
+/// Es stateful porque hay que redibujar cada segundo: el notifier del esfuerzo
+/// solo emite cuando llega un payload nuevo, y entre payload y payload la
+/// cuenta tiene que seguir bajando.
+class _WatchTimerRow extends ConsumerStatefulWidget {
+  const _WatchTimerRow();
+
+  @override
+  ConsumerState<_WatchTimerRow> createState() => _WatchTimerRowState();
+}
+
+class _WatchTimerRowState extends ConsumerState<_WatchTimerRow> {
+  Timer? _tick;
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    super.dispose();
+  }
+
+  /// Arranca o corta el tick según haya o no cuenta viva.
+  ///
+  /// No se deja corriendo siempre: un timer por segundo en la pantalla más
+  /// caliente de la app, para no mostrar nada, es exactamente el tipo de
+  /// rebuild que este proyecto evita.
+  void _syncTick(bool debeCorrer) {
+    if (debeCorrer && _tick == null) {
+      _tick = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() {});
+      });
+    } else if (!debeCorrer && _tick != null) {
+      _tick!.cancel();
+      _tick = null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final notifier = ref.watch(watchEffortNotifierProvider);
+
+    return ValueListenableBuilder<WatchEffort?>(
+      valueListenable: notifier,
+      builder: (context, effort, _) {
+        final endsAt = effort?.timerEndsAt;
+        final restante = endsAt == null
+            ? 0
+            : endsAt.difference(DateTime.now().toUtc()).inSeconds;
+
+        // Vencido o inexistente: nada que mostrar. Que se apague solo al llegar
+        // a cero es la red contra un "se apagó" que no llegue.
+        final vivo = endsAt != null && restante > 0;
+        WidgetsBinding.instance.addPostFrameCallback((_) => _syncTick(vivo));
+        if (!vivo) return const SizedBox.shrink();
+
+        return Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(TreinoIcon.timer, size: 12, color: palette.accent),
+              const SizedBox(width: 4),
+              Text(
+                _formatMMSS(restante),
+                style: GoogleFonts.barlow(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                  color: palette.accent,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _WatchEffortRow extends ConsumerWidget {
   const _WatchEffortRow();
 

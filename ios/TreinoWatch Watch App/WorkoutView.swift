@@ -193,6 +193,11 @@ struct WorkoutView: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
 
+            // El pulso tambien acá: es el dato que el atleta mira mientras
+            // aguanta, y esta pantalla le tapa la otra. Sin esto, arrancar el
+            // cronometro le sacaba de la vista lo unico que estaba mirando.
+            effortRow()
+
             // Salida sin cargar la serie. Sin esto, un toque equivocado deja al
             // atleta mirando una cuenta que no pidio y sin forma de volver.
             Button("Cancelar") { workout.cancelDurationSet() }

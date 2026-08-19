@@ -112,8 +112,21 @@ struct TreinoWatch_Watch_AppApp: App {
                 // Se limpia cuando aparece una sesion (ya aterrizamos, la
                 // intencion cumplio) y cuando desaparece (se termino o se
                 // abandono, no hay nada que preparar).
-                .onChange(of: workoutCoordinator.session == nil) { _, _ in
+                .onChange(of: workoutCoordinator.session == nil) { _, sinSesion in
                     launchIntent.clear()
+
+                    // Al TERMINAR o abandonar, se relee la rutina.
+                    //
+                    // Reportado por el dueno: despues de terminar habia que
+                    // salir y volver a entrar a la app —o bajar y levantar la
+                    // muneca— para que apareciera el dia siguiente. El dia lo
+                    // resuelve `loadTodaysWorkout` contra el historial, y eso
+                    // solo corria al arrancar la app o al volver a primer
+                    // plano. Terminar un entreno CAMBIA el historial, asi que
+                    // es exactamente el momento de releer.
+                    if sinSesion {
+                        Task { await coordinator.loadTodaysWorkout() }
+                    }
                 }
                 .onChange(of: scenePhase) { _, phase in
                     guard phase == .active else { return }
@@ -158,6 +171,12 @@ struct TreinoWatch_Watch_AppApp: App {
                 .onChange(of: workoutSession.activeEnergy) { _, _ in
                     publicarEsfuerzo()
                 }
+                // Arrancar o cortar el cronometro tambien publica: si no, el
+                // telefono se enteraria recien con el proximo dato de pulso, y
+                // al TERMINAR no se enteraria nunca de que dejo de correr.
+                .onChange(of: workoutCoordinator.durationSet) { _, _ in
+                    publicarEsfuerzo()
+                }
                 // Al cerrarse el entreno se olvida lo ultimo enviado, para que
                 // el proximo no se coma el primer envio por parecerse.
                 .onChange(of: workoutSession.phase) { _, phase in
@@ -185,12 +204,32 @@ struct TreinoWatch_Watch_AppApp: App {
         let hr = workoutSession.heartRate
         let energia = workoutSession.activeEnergy
         let fechas = [hr?.takenAt, energia?.takenAt].compactMap { $0 }
-        guard let medido = fechas.max() else { return }
+
+        let cronometro = workoutCoordinator.durationSet.map {
+            EffortSnapshot.RunningTimer(
+                exerciseId: $0.exerciseId,
+                totalSeconds: $0.totalSeconds,
+                endsAt: $0.endsAt
+            )
+        }
+
+        // Sin mediciones Y sin cronometro no hay nada que contar.
+        //
+        // Antes se cortaba solo con las mediciones, asi que un cronometro que
+        // arrancaba ANTES del primer pulso —lo normal en los primeros segundos
+        // de un entreno— no se enviaba nunca y el telefono no se enteraba.
+        guard !fechas.isEmpty || cronometro != nil else { return }
+
+        // Con mediciones se fecha con la MAS RECIENTE, porque la regla de
+        // antiguedad del telefono se apoya en ese timestamp. Sin mediciones se
+        // fecha ahora: el dato que viaja es el cronometro, y ese es actual.
+        let medido = fechas.max() ?? Date()
 
         effortRelay.publish(
             bpm: hr?.bpm,
             kcal: energia?.kcal,
-            measuredAt: medido
+            measuredAt: medido,
+            timer: cronometro
         )
     }
 }
