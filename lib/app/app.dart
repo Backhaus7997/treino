@@ -9,6 +9,7 @@ import '../features/auth/application/auth_providers.dart';
 import '../features/notifications/application/notification_providers.dart';
 import '../features/notifications/application/notification_router.dart';
 import '../features/watch/application/watch_credential_providers.dart';
+import '../features/watch/application/watch_effort_notifier.dart';
 import '../l10n/app_l10n.dart';
 import 'locale_resolver.dart';
 import 'root_scaffold_messenger.dart';
@@ -83,6 +84,14 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
     //      la muñeca. Best-effort: si el reloj no está alcanzable el aviso se
     //      pierde y el reloj se pone al día solo, como antes.
     ref.read(watchActiveRoutineNudgeProvider);
+    // El canal de escucha al reloj vive mientras vive la app, no solo mientras
+    // esté abierta la pantalla del player.
+    //
+    // Antes solo lo miraban dos filas DENTRO del player, así que el teléfono
+    // dejaba de escuchar al reloj apenas salías de ahí — y volvía a empezar de
+    // cero al entrar. Un cronómetro arrancado en la muñeca con el teléfono en
+    // Home no llegaba nunca.
+    ref.read(watchEffortNotifierProvider);
 
     // (a) Attach foreground SnackBar listener. (ADR-PN-010, REQ-PN-HANDLER-001)
     final fcm = ref.read(fcmServiceProvider);

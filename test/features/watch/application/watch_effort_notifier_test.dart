@@ -99,6 +99,69 @@ void main() {
     contextos.add(payload(bpm: 128, at: t));
     await Future<void>.delayed(Duration.zero);
 
-    expect(notifier.value?.bpm, 128, reason: 'sigue escuchando después del error');
+    expect(notifier.value?.bpm, 128,
+        reason: 'sigue escuchando después del error');
+  });
+
+  test('siembra con lo que YA habia llegado antes de existir', () async {
+    // El caso real que se reporto: el reloj publica un cronometro corriendo y
+    // el telefono no muestra nada, porque `contextStream` solo emite contextos
+    // NUEVOS y el notifier nacio despues. Sin leer lo ya recibido, ese dato se
+    // pierde para siempre y la pantalla queda vacia sin ningun error.
+    final ya = DateTime.utc(2026, 8, 19, 12);
+    final notifier = WatchEffortNotifier(
+      contextStream: contextos.stream,
+      recibidos: Future.value([
+        payload(bpm: 132, at: ya),
+      ]),
+    );
+    addTearDown(notifier.dispose);
+
+    await Future<void>.delayed(Duration.zero);
+    expect(notifier.value?.bpm, 132);
+  });
+
+  test('lo que llega por el stream le gana a la siembra', () async {
+    final viejo = DateTime.utc(2026, 8, 19, 12);
+    final nuevo = DateTime.utc(2026, 8, 19, 12, 5);
+    final notifier = WatchEffortNotifier(
+      contextStream: contextos.stream,
+      // Una siembra que resuelve TARDE no puede pisar un dato mas fresco que
+      // ya entro por el stream.
+      recibidos: Future<List<Map<String, dynamic>>>.delayed(
+        const Duration(milliseconds: 20),
+        () => [payload(bpm: 100, at: viejo)],
+      ),
+    );
+    addTearDown(notifier.dispose);
+
+    contextos.add(payload(bpm: 155, at: nuevo));
+    await Future<void>.delayed(const Duration(milliseconds: 40));
+
+    expect(notifier.value?.bpm, 155);
+  });
+
+  test('el cronometro del reloj viaja en el mismo payload', () async {
+    final at = DateTime.utc(2026, 8, 19, 12);
+    final fin = DateTime.utc(2026, 8, 19, 12, 1);
+    final notifier = WatchEffortNotifier(contextStream: contextos.stream);
+    addTearDown(notifier.dispose);
+
+    contextos.add({
+      'kind': WatchEffort.kind,
+      'bpm': 140,
+      'measuredAtMs': at.millisecondsSinceEpoch,
+      'timerEndsAtMs': fin.millisecondsSinceEpoch,
+      'timerTotalSeconds': 60,
+      'timerExerciseId': 'plancha',
+    });
+    await Future<void>.delayed(Duration.zero);
+
+    expect(notifier.value?.timerEndsAt, fin);
+    expect(notifier.value?.timerTotalSeconds, 60);
+    expect(notifier.value?.timerExerciseId, 'plancha');
+    // Y el pulso sigue llegando por el mismo payload: van juntos porque el
+    // reloj tiene UN SOLO applicationContext de salida.
+    expect(notifier.value?.bpm, 140);
   });
 }

@@ -60,4 +60,12 @@ class WatchBridge {
   /// suyo, así que el reloj publicando esfuerzo no pisa la credencial que el
   /// teléfono publica hacia él.
   Stream<Map<String, dynamic>> get contextStream => _connectivity.contextStream;
+
+  /// Los contextos que YA llegaron del reloj.
+  ///
+  /// `contextStream` solo emite los NUEVOS: sin esto, un estado publicado por
+  /// el reloj antes de que el teléfono empezara a escuchar se pierde para
+  /// siempre, y la pantalla queda vacía sin ningún error.
+  Future<List<Map<String, dynamic>>> get receivedApplicationContexts =>
+      _connectivity.receivedApplicationContexts;
 }

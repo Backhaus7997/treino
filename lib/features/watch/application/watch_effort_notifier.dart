@@ -18,8 +18,32 @@ import '../domain/watch_effort.dart';
 /// player. Un rebuild de todo el player cada 5 segundos por un dato secundario
 /// sería exactamente lo que `docs/performance.md` pide evitar.
 class WatchEffortNotifier extends ValueNotifier<WatchEffort?> {
-  WatchEffortNotifier({required Stream<Map<String, dynamic>> contextStream})
-      : super(null) {
+  WatchEffortNotifier({
+    required Stream<Map<String, dynamic>> contextStream,
+    Future<List<Map<String, dynamic>>>? recibidos,
+  }) : super(null) {
+    // Lo que YA llegó, antes de que existiera esta suscripción.
+    //
+    // `contextStream` solo emite contextos NUEVOS. Si el reloj publicó su
+    // estado —pulso, calorías, o un cronómetro corriendo— antes de que este
+    // notifier existiera, ese dato no se emite nunca más y el teléfono no
+    // muestra nada. Pasaba siempre: el notifier nace cuando se abre el player,
+    // y el reloj suele haber publicado mucho antes.
+    if (recibidos != null) {
+      unawaited(
+        recibidos.then((lista) {
+          // Si el stream ya trajo algo más fresco, no se pisa con lo viejo.
+          if (value != null) return;
+          for (final ctx in lista) {
+            final effort = WatchEffort.tryParse(ctx);
+            if (effort != null) value = effort;
+          }
+        }).catchError((Object _) {
+          // Que no se pueda leer lo ya recibido no puede tumbar el canal.
+        }),
+      );
+    }
+
     _sub = contextStream.listen(
       _onContext,
       // Un error del canal de plataforma NO puede matar la suscripción: si se
@@ -50,7 +74,10 @@ class WatchEffortNotifier extends ValueNotifier<WatchEffort?> {
 /// El notifier, vivo mientras haya alguien mirando.
 final watchEffortNotifierProvider = Provider<WatchEffortNotifier>((ref) {
   final bridge = WatchBridge();
-  final notifier = WatchEffortNotifier(contextStream: bridge.contextStream);
+  final notifier = WatchEffortNotifier(
+    contextStream: bridge.contextStream,
+    recibidos: bridge.receivedApplicationContexts,
+  );
   ref.onDispose(notifier.dispose);
   return notifier;
 });
