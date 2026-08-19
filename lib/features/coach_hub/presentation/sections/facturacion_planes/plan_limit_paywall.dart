@@ -111,8 +111,8 @@ class _PlanLimitPaywallDialog extends StatelessWidget {
                     ? 'Mientras tu suscripción no esté al día, tu cuenta '
                         'funciona con el límite del plan Free. Ningún alumno '
                         'se elimina.' // i18n: Fase W3
-                    : 'Tu plan ${_tierName(currentTier)} incluye hasta '
-                        '${currentTier.weightLimit} alumnos. Para sumar más, '
+                    : 'Tu plan ${_tierName(currentTier)} incluye '
+                        '${_cupoTexto(currentTier)}. Para sumar más, '
                         'subí de plan.', // i18n: Fase W3
                 textAlign: TextAlign.center,
                 style: TextStyle(color: palette.textMuted, fontSize: 14),
@@ -224,7 +224,9 @@ class _UpsellBox extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Hasta ${nextTier.weightLimit} alumnos', // i18n: Fase W3
+            nextTier.isUnlimited
+                ? 'Alumnos sin límite' // i18n: Fase W3
+                : 'Hasta ${nextTier.weightLimit} alumnos', // i18n: Fase W3
             style: TextStyle(
               color: palette.textMuted,
               fontSize: 13,
@@ -313,7 +315,7 @@ class _ReactivateBox extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             // TODO(producto): copy placeholder — pendiente de revisión.
-            'Reactivalo y volvés a tus ${currentTier.weightLimit} alumnos '
+            'Reactivalo y volvés a tus ${_cupoTexto(currentTier)} '
             'al instante.', // i18n: Fase W3
             textAlign: TextAlign.center,
             style: TextStyle(color: palette.textMuted, fontSize: 13),
@@ -434,6 +436,16 @@ String _statusName(SubscriptionStatus status) => switch (status) {
       SubscriptionStatus.paused => 'pausada', // i18n: Fase W3
       SubscriptionStatus.cancelled => 'cancelada', // i18n: Fase W3
     };
+
+/// Cupo del tier en texto.
+///
+/// `weightLimit == null` (plan3) NO es un dato faltante: significa SIN
+/// LÍMITE. Interpolarlo directo renderiza la palabra «null» — y eso fue
+/// exactamente lo que se publicó: el upsell al plan más caro decía
+/// «Hasta null alumnos». Cualquier lugar que muestre el cupo pasa por acá.
+String _cupoTexto(SubscriptionTier tier) => tier.isUnlimited
+    ? 'alumnos sin límite' // i18n: Fase W3
+    : '${tier.weightLimit} alumnos'; // i18n: Fase W3
 
 String _tierName(SubscriptionTier tier) => switch (tier) {
       SubscriptionTier.free => 'Free', // i18n: Fase W3
