@@ -15,6 +15,7 @@ import 'package:treino/features/workout/data/session_repository.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_day.dart';
 import 'package:treino/features/workout/domain/routine_slot.dart';
+import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/domain/set_log_identity.dart';
 
@@ -42,6 +43,27 @@ class _RepoQueNoVuelve implements SessionRepository {
       reflectDelegate(_real, invocation);
 }
 
+/// Cuenta las consultas por la sesión activa. Es lo único que distingue
+/// "el guard cortó" de "el guard no existe": sin contar llamadas, un test que
+/// mire sólo el estado final pasa igual, porque con dos sesiones activas
+/// `getActive` falla y el notifier se queda donde estaba. Se descubrió mutando.
+class _RepoEspia implements SessionRepository {
+  _RepoEspia(this._real);
+
+  final SessionRepository _real;
+  int consultasDeActiva = 0;
+
+  @override
+  Future<Session?> getActive(String uid, {DateTime? now}) {
+    consultasDeActiva++;
+    return _real.getActive(uid, now: now);
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      reflectDelegate(_real, invocation);
+}
+
 /// Delegación manual: `SessionRepository` no es una interfaz chica y sólo hace
 /// falta redirigir lo que el notifier usa.
 dynamic reflectDelegate(SessionRepository real, Invocation i) {
@@ -57,6 +79,28 @@ dynamic reflectDelegate(SessionRepository real, Invocation i) {
       startedAt: i.namedArguments[#startedAt] as DateTime,
       dayNumber: i.namedArguments[#dayNumber] as int? ?? 1,
       weekNumber: i.namedArguments[#weekNumber] as int? ?? 0,
+    );
+  }
+  if (n.contains('watchRevision')) {
+    return real.watchRevision(
+      i.positionalArguments.first as String,
+      limit: i.namedArguments[#limit] as int?,
+    );
+  }
+  if (n.contains('watchSessionFinished')) {
+    return real.watchSessionFinished(
+      uid: i.namedArguments[#uid] as String,
+      sessionId: i.namedArguments[#sessionId] as String,
+    );
+  }
+  if (n.contains('finish')) {
+    return real.finish(
+      uid: i.namedArguments[#uid] as String,
+      sessionId: i.namedArguments[#sessionId] as String,
+      finishedAt: i.namedArguments[#finishedAt] as DateTime,
+      totalVolumeKg: i.namedArguments[#totalVolumeKg] as double,
+      durationMin: i.namedArguments[#durationMin] as int,
+      wasFullyCompleted: i.namedArguments[#wasFullyCompleted] as bool,
     );
   }
   if (n.contains('watchSetLogs')) {
@@ -726,5 +770,106 @@ void main() {
     final s = (c.read(wearSessionProvider) as WearSessionRunning).session;
     expect(s.loggedSets, [4]);
     expect(s.isFullyCompleted, isTrue);
+  });
+
+  group('lo que pasa en el teléfono llega al reloj', () {
+    test(
+        'un entreno abierto desde el teléfono aparece SOLO, sin reabrir la app',
+        () async {
+      // El reloj arranca sin nada. Antes la adopción corría una única vez, al
+      // llegar el uid, así que lo que abriera el teléfono después no se veía
+      // hasta reabrir la app a mano.
+      final c = contenedor();
+      await pumpEventQueue();
+      expect(c.read(wearSessionProvider), isA<WearSessionIdle>());
+
+      // Esto es exactamente lo que hace el teléfono al tocar Empezar.
+      await repo.create(
+        uid: uid,
+        routineId: 'r1',
+        routineName: 'Fuerza Base',
+        startedAt: _reciente,
+        dayNumber: 2,
+        weekNumber: 0,
+      );
+      await pumpEventQueue();
+      await pumpEventQueue();
+
+      final estado = c.read(wearSessionProvider);
+      expect(estado, isA<WearSessionRunning>());
+      // Y con la posición de la SESIÓN, no con la que tocaría hoy.
+      expect((estado as WearSessionRunning).session.plan.dayNumber, 2);
+    });
+
+    test('abandonar desde el teléfono devuelve el reloj a HOY', () async {
+      final c = contenedor();
+      await pumpEventQueue();
+      await c.read(wearSessionProvider.notifier).start(hoy);
+      await pumpEventQueue();
+      final abierto = c.read(wearSessionProvider);
+      expect(abierto, isA<WearSessionRunning>());
+      final sessionId = (abierto as WearSessionRunning).session.sessionId;
+
+      // El teléfono lo cierra. El reloj no tocó nada.
+      await repo.finish(
+        uid: uid,
+        sessionId: sessionId,
+        finishedAt: DateTime.now().toUtc(),
+        totalVolumeKg: 0,
+        durationMin: 5,
+        wasFullyCompleted: false,
+      );
+      await pumpEventQueue();
+      await pumpEventQueue();
+
+      expect(c.read(wearSessionProvider), isA<WearSessionIdle>());
+      // Y el nativo se soltó: sin esto quedaría el foreground service vivo y
+      // Health Services midiendo un entreno que ya no existe.
+      verify(() => nativo.stopWorkout()).called(1);
+    });
+
+    test('con un entreno en curso, una novedad NO dispara otra consulta',
+        () async {
+      // Se cuentan CONSULTAS y no el estado final. Mirando sólo el estado, el
+      // test pasaba aun quitando el guard: con dos sesiones activas `getActive`
+      // falla y el notifier se queda donde estaba por otro motivo. Contar es lo
+      // que distingue "el guard cortó" de "se salvó de casualidad".
+      final espia = _RepoEspia(repo);
+      final c = ProviderContainer(
+        overrides: [
+          currentUidProvider.overrideWithValue(uid),
+          sessionRepositoryProvider.overrideWithValue(espia),
+          routineByIdProvider.overrideWith((ref, id) async => rutina),
+          wearWorkoutServiceProvider.overrideWithValue(nativo),
+        ],
+      );
+      addTearDown(c.dispose);
+      c.listen(wearSessionProvider, (_, __) {});
+      await pumpEventQueue();
+
+      await c.read(wearSessionProvider.notifier).start(hoy);
+      await pumpEventQueue();
+      final propio =
+          (c.read(wearSessionProvider) as WearSessionRunning).session.sessionId;
+
+      espia.consultasDeActiva = 0;
+
+      // Algo cambia en la colección mientras el reloj entrena.
+      await repo.create(
+        uid: uid,
+        routineId: 'r1',
+        routineName: 'Fuerza Base',
+        startedAt: _reciente,
+        dayNumber: 2,
+        weekNumber: 0,
+      );
+      await pumpEventQueue();
+      await pumpEventQueue();
+
+      expect(espia.consultasDeActiva, 0);
+      final estado = c.read(wearSessionProvider);
+      expect(estado, isA<WearSessionRunning>());
+      expect((estado as WearSessionRunning).session.sessionId, propio);
+    });
   });
 }

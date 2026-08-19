@@ -75,13 +75,56 @@ final wearSessionProvider =
 /// caro del lado Apple.
 class WearSessionNotifier extends Notifier<WearSessionState> {
   StreamSubscription<List<SetLog>>? _series;
+
+  /// Cambios en la colección de sesiones del atleta.
+  ///
+  /// Es lo que hace que el reloj ENTRE SOLO al entreno que se abrió en el
+  /// teléfono. Antes la adopción corría una única vez, cuando llegaba el uid —
+  /// o sea en la práctica al abrir la app—, así que arrancar desde el celular
+  /// no se veía en la muñeca hasta reabrirla a mano.
+  ///
+  /// El companion de Apple tiene el mismo límite (`adoptRemoteSessionIfAny` se
+  /// llama desde `restore()`), pero allá no hay alternativa: watchOS no tiene
+  /// SDK de Firestore y habla REST. Wear sí lo tiene, así que acá se puede
+  /// escuchar de verdad en vez de resincronizar al abrir.
+  StreamSubscription<int>? _novedades;
+
+  /// Que la sesión abierta se haya cerrado DESDE AFUERA.
+  ///
+  /// El caso que reportó el dueño: abandonaba desde el teléfono y el reloj
+  /// seguía mostrando el entreno, con la única salida de reabrir la app.
+  StreamSubscription<bool>? _cierreRemoto;
+
   var _muerto = false;
+
+  /// Si hay una adopción EN VUELO.
+  ///
+  /// No es paranoia: `watchRevision` entrega el snapshot inicial apenas alguien
+  /// se suscribe, así que al llegar el uid salían DOS adopciones casi
+  /// simultáneas —la directa y la del primer evento del stream—. El guard de
+  /// `state is! WearSessionIdle` no las separa, porque ninguna de las dos
+  /// alcanzó todavía a mover el estado: entre el `getActive` y el `_abrir` hay
+  /// dos `await`.
+  ///
+  /// El resultado era el entreno abierto dos veces y `startWorkout` llamado
+  /// doble. Lo destaparon tres tests que ya existían, contando llamadas al
+  /// servicio nativo.
+  var _adoptando = false;
+
+  /// Idem para el camino de salida. Entre el chequeo de estado y el `_set` de
+  /// [_soltarLocal] hay un `await` —apagar el nativo—, y en esa ventana entran
+  /// las dos vías: la local, que cierra el entreno, y la remota, que se entera
+  /// de esa misma escritura. Sin un flag SÍNCRONO el servicio se apagaba dos
+  /// veces.
+  var _soltando = false;
 
   @override
   WearSessionState build() {
     ref.onDispose(() {
       _muerto = true;
       _series?.cancel();
+      _novedades?.cancel();
+      _cierreRemoto?.cancel();
     });
 
     // ⚠️ El uid llega ASÍNCRONO, y esto costó una corrida en el reloj.
@@ -103,7 +146,10 @@ class WearSessionNotifier extends Notifier<WearSessionState> {
         // En microtask porque `fireImmediately` dispara este listener DENTRO
         // del build, y `_adoptarSiHay` mira `state` — que todavía no existe.
         // Riverpod tira "Tried to read the state of an uninitialized provider".
-        unawaited(Future<void>.microtask(() => _adoptarSiHay(nuevo)));
+        unawaited(Future<void>.microtask(() {
+          _escucharNovedades(nuevo);
+          return _adoptarSiHay(nuevo);
+        }));
       },
       fireImmediately: true,
     );
@@ -121,7 +167,10 @@ class WearSessionNotifier extends Notifier<WearSessionState> {
   Future<void> _adoptarSiHay(String uid) async {
     // No pisar un entreno que ya se abrió por otro camino.
     if (state is! WearSessionIdle) return;
+    // Ni duplicar el que se está abriendo AHORA. Ver [_adoptando].
+    if (_adoptando) return;
 
+    _adoptando = true;
     try {
       final abierta = await ref.read(sessionRepositoryProvider).getActive(uid);
       if (abierta == null) return;
@@ -130,6 +179,8 @@ class WearSessionNotifier extends Notifier<WearSessionState> {
       debugPrint('[wear-session] no se pudo adoptar el entreno abierto — $e');
       // Se queda en Idle a propósito: no poder adoptar no es no poder entrenar.
       // El atleta todavía puede tocar Empezar, y ese camino vuelve a intentar.
+    } finally {
+      _adoptando = false;
     }
   }
 
@@ -309,7 +360,85 @@ class WearSessionNotifier extends Notifier<WearSessionState> {
     );
 
     _escucharSeries(uid, sesion.id);
+    _escucharCierreRemoto(uid, sesion.id);
     await _prepararNativo();
+  }
+
+  /// Mira la colección de sesiones y adopta lo que aparezca.
+  ///
+  /// Se apoya en `watchRevision`, que ya existía como señal barata: no trae
+  /// documentos, sólo avisa que algo cambió. Cuando avisa, y **sólo si el reloj
+  /// está en Idle**, se vuelve a preguntar por la activa.
+  ///
+  /// Quién decide si corresponde adoptar es `_adoptarSiHay`, no este listener:
+  /// ahí viven los dos guards —estado y adopción en vuelo— y ahí se chequean
+  /// ANTES de cualquier consulta. Repetirlos acá era ruido, y se notó al mutar:
+  /// sacar la copia no rompía ningún test porque no cambiaba nada.
+  ///
+  /// Las series NO viven en esta colección sino en una subcolección, así que
+  /// marcar una serie no produce ruido acá.
+  void _escucharNovedades(String uid) {
+    _novedades?.cancel();
+    _novedades = ref
+        .read(sessionRepositoryProvider)
+        .watchRevision(uid, limit: _sesionesQueSeMiran)
+        .listen(
+      (_) {
+        if (_muerto) return;
+        unawaited(_adoptarSiHay(uid));
+      },
+      onError: (Object e) =>
+          debugPrint('[wear-session] el canal de novedades se quejó — $e'),
+    );
+  }
+
+  /// Cuántas sesiones alcanza con vigilar para enterarse de una nueva.
+  ///
+  /// La activa es siempre de las más recientes, y `watchRevision` ordena por
+  /// `startedAt` descendente. Acotarlo mantiene barato el listener en un reloj.
+  static const int _sesionesQueSeMiran = 5;
+
+  /// Suelta el entreno si lo cerraron desde el teléfono.
+  ///
+  /// `watchSessionFinished` ya existía —la usa el teléfono para el caso
+  /// simétrico, cuando el reloj cierra un entreno que el celular tiene
+  /// abierto— y emite tanto si la sesión se marcó terminada como si dejó de
+  /// existir.
+  void _escucharCierreRemoto(String uid, String sessionId) {
+    _cierreRemoto?.cancel();
+    _cierreRemoto = ref
+        .read(sessionRepositoryProvider)
+        .watchSessionFinished(uid: uid, sessionId: sessionId)
+        .listen(
+      (terminada) {
+        if (_muerto || !terminada) return;
+        debugPrint('[wear-session] el entreno se cerró desde afuera');
+        unawaited(_soltarLocal());
+      },
+      onError: (Object e) =>
+          debugPrint('[wear-session] el canal de cierre se quejó — $e'),
+    );
+  }
+
+  /// Vuelve a HOY: corta los listeners, apaga el nativo y limpia el estado.
+  ///
+  /// Es IDEMPOTENTE a propósito. Cerrar desde el reloj escribe en Firestore, y
+  /// esa misma escritura hace emitir a [_escucharCierreRemoto]: sin el guard,
+  /// el camino local y el remoto apagarían el servicio dos veces.
+  Future<void> _soltarLocal() async {
+    if (state is WearSessionIdle) return;
+    if (_soltando) return;
+    _soltando = true;
+    _series?.cancel();
+    _series = null;
+    _cierreRemoto?.cancel();
+    _cierreRemoto = null;
+    try {
+      await _soltarNativo();
+      _set(const WearSessionIdle());
+    } finally {
+      _soltando = false;
+    }
   }
 
   /// Deja el lado nativo en el estado que corresponde a un entreno que EMPIEZA.
@@ -535,10 +664,7 @@ class WearSessionNotifier extends Notifier<WearSessionState> {
       return;
     }
 
-    _series?.cancel();
-    _series = null;
-    await _soltarNativo();
-    _set(const WearSessionIdle());
+    await _soltarLocal();
   }
 
   /// Minutos del entreno, redondeados hacia arriba y con el mismo tope que usa
