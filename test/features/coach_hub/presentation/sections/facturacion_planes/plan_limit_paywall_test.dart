@@ -113,6 +113,59 @@ void main() {
     expect(find.text('LLEGASTE AL LÍMITE DE TU PLAN'), findsNothing);
   });
 
+  // ── Cupo ilimitado en el copy ────────────────────────────────────────────
+  //
+  // REGRESIÓN REAL, publicada en main: `weightLimit` es `null` para plan3, y
+  // se interpolaba directo. El upsell al plan MÁS CARO decía «Hasta null
+  // alumnos». El test que había verificaba el título («PASATE A PLAN 3») y el
+  // precio, pero no el renglón de abajo — pasaba verde con la pantalla rota.
+  //
+  // Estos tests miran el CUERPO, y hay uno que barre las tres ramas buscando
+  // la palabra literal.
+
+  testWidgets('el upsell a Plan 3 no dice «null»', (tester) async {
+    await open(tester, SubscriptionTier.plan2);
+
+    expect(find.text('PASATE A PLAN 3'), findsOneWidget);
+    expect(find.text('Alumnos sin límite'), findsOneWidget);
+    expect(find.textContaining('null'), findsNothing);
+  });
+
+  testWidgets('el aviso de suscripción suspendida en Plan 3 no dice «null»',
+      (tester) async {
+    await tester.pumpWidget(_harness(
+      SubscriptionTier.plan3,
+      reason: PlanLimitReason.subscriptionInactive,
+    ));
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('sin límite'), findsWidgets);
+    expect(find.textContaining('null'), findsNothing);
+  });
+
+  testWidgets('NINGUNA rama del paywall dice «null», en ningún tier',
+      (tester) async {
+    // Barrido: 4 tiers × 2 motivos. Cualquier interpolación nueva de un campo
+    // nullable en el copy se cae acá, no en producción.
+    for (final tier in SubscriptionTier.values) {
+      for (final reason in PlanLimitReason.values) {
+        await tester.pumpWidget(_harness(tier, reason: reason));
+        await tester.tap(find.text('open'));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.textContaining('null'),
+          findsNothing,
+          reason: 'el paywall renderiza «null» con tier=$tier reason=$reason',
+        );
+
+        await tester.tap(find.text('Ahora no'));
+        await tester.pumpAndSettle();
+      }
+    }
+  });
+
   // ── Rama subscription-inactive (paywall Fase 7, PR4, diseño D-2) ─────────
   //
   // Son DOS problemas de producto distintos. `plan-limit` = "creciste, comprá
