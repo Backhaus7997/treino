@@ -75,6 +75,15 @@ final class WorkoutCoordinator: ObservableObject {
     /// para no acoplar este coordinator al de credenciales.
     var makeClient: (() async throws -> (FirestoreREST, String))?
 
+    /// Se llama cuando Firestore rechaza por credencial. Lo cablea
+    /// `TreinoWatchApp` a `CredentialCoordinator.invalidateIdToken`.
+    ///
+    /// Desde que el idToken se cachea (`TokenFreshness`), un token que muere
+    /// antes de tiempo —credencial revocada, reloj con la hora corrida— dejaria
+    /// al reloj rebotando contra un 401 hasta que venza el TTL. Esto lo corta
+    /// en el primer rechazo.
+    var onAuthFailure: (() -> Void)?
+
     /// Cómo resolver el entreno de una rutina en una POSICIÓN dada del plan.
     ///
     /// Toma día y semana explícitos —no los calcula— porque se usa sobre
@@ -683,6 +692,10 @@ final class WorkoutCoordinator: ObservableObject {
             }
         } catch {
             syncError = String(describing: error)
+            if case FirestoreREST.FirestoreError.http(let status, _) = error,
+               status == 401 || status == 403 {
+                onAuthFailure?()
+            }
         }
     }
 

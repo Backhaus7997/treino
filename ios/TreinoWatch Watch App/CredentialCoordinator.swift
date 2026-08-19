@@ -97,20 +97,47 @@ final class CredentialCoordinator: NSObject, ObservableObject {
         handle(applicationContext: session.receivedApplicationContext)
     }
 
-    /// Devuelve un idToken fresco para hablar con Firestore.
+    /// El idToken vigente y cuando se emitió. Ver `TokenFreshness`.
+    private var idTokenCacheado: (token: String, emitidoEn: Date)?
+
+    /// Devuelve un idToken para hablar con Firestore, reusando el vigente.
     ///
-    /// Cada llamada renueva: los idTokens duran una hora y la renovación es
-    /// barata comparada con manejar expiración a mano y equivocarse.
+    /// ANTES renovaba en CADA llamada. Eso ponía un POST completo a
+    /// securetoken delante de cada sincronización — o sea, delante de cada
+    /// serie marcada. Medido: 4 viajes de red en serie antes de que la serie
+    /// existiera en Firestore, y este era el primero de los cuatro. Se reportó
+    /// como "tarda mucho en verse en el teléfono".
+    ///
+    /// El token dura 3600s; se reusa hasta 3000s. La decisión de cuándo
+    /// renovar vive en `TokenFreshness`, aparte y pura, porque acá no se puede
+    /// medir.
     func freshIdToken() async throws -> String {
+        if let cache = idTokenCacheado,
+           !TokenFreshness.shouldRefresh(emitidoEn: cache.emitidoEn, ahora: Date()) {
+            return cache.token
+        }
+
         guard let credential = CredentialStore.load() else {
             throw FirebaseAuthREST.AuthError.malformedResponse
         }
-        return try await FirebaseAuthREST.refreshIdToken(
+        let token = try await FirebaseAuthREST.refreshIdToken(
             refreshToken: credential.refreshToken,
             apiKey: credential.apiKey,
             host: credential.authEmulatorHost.map { "\($0)/securetoken.googleapis.com" }
                 ?? "https://securetoken.googleapis.com"
         )
+        idTokenCacheado = (token: token, emitidoEn: Date())
+        return token
+    }
+
+    /// Descarta el token cacheado.
+    ///
+    /// Se llama cuando Firestore contesta 401: el token puede haber muerto
+    /// antes de tiempo (credencial revocada, reloj con la hora corrida). Sin
+    /// esto, un token invalidado dejaría al reloj rebotando hasta que venza el
+    /// TTL.
+    func invalidateIdToken() {
+        idTokenCacheado = nil
     }
 
     /// Procesa un contexto entrante. Ignora en silencio lo que no sea un

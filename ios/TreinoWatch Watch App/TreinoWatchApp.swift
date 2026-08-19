@@ -53,6 +53,11 @@ struct TreinoWatch_Watch_AppApp: App {
                     workoutCoordinator.makeClient = {
                         try await coordinator.firestoreClient()
                     }
+                    // Un 401 tira el token cacheado en vez de dejar al reloj
+                    // rebotando hasta que venza el TTL. Ver `TokenFreshness`.
+                    workoutCoordinator.onAuthFailure = {
+                        coordinator.invalidateIdToken()
+                    }
                     workoutCoordinator.makeWorkout = { routineId, day, week in
                         let (client, uid) = try await coordinator.firestoreClient()
                         // Posición EXPLÍCITA: la sesión ya existe y su día lo

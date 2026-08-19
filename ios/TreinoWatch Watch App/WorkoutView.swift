@@ -41,13 +41,20 @@ struct WorkoutView: View {
 
                     setsList(exercise: exercise, session: session)
 
-                    if !session.pendingSets.isEmpty {
-                        Label("\(session.pendingSets.count) sin subir",
-                              systemImage: "arrow.up.circle")
-                            .font(.caption2)
-                            .foregroundStyle(.orange)
-                            .padding(.top, 2)
-                    }
+                    // El cartel "N sin subir" se saco por pedido del dueno
+                    // (2026-08-19): aparecia en cada serie marcada y ensuciaba
+                    // la pantalla.
+                    //
+                    // No deja al atleta ciego: el caso PELIGROSO —abandonar un
+                    // entreno con series sin subir, que es un no-op silencioso—
+                    // tiene su propio banner explicito en `WorkoutCloseFeedback`
+                    // ("Falta subir N series. El entreno sigue abierto") con
+                    // boton de reintentar. Ese aviso llega cuando importa, en
+                    // vez de estar prendido todo el tiempo.
+                    //
+                    // Y la causa de fondo se ataco en el mismo commit: con el
+                    // idToken cacheado las series suben en menos viajes, asi que
+                    // la cola casi no existe.
 
                     // Terminar aparece SOLO con todas las series de todos los
                     // ejercicios cargadas. Pedido del dueño: tenerlo siempre a

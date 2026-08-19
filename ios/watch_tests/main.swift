@@ -514,6 +514,7 @@ runSetLogWriteTarget()
 runSetLogDeletion()
 runExerciseCursor()
 runSupersetCursor()
+runTokenFreshness()
 runStaleSessions()
 runCloseFeedback()
 
@@ -1163,4 +1164,37 @@ private func runSupersetCursor() {
 
     // Lista vacia: no puede reventar indexando.
     checkEqual(cursorPosition([]).exerciseIndex, 0, "lista vacia devuelve 0 sin reventar")
+}
+// MARK: - Frescura del idToken
+//
+// El token se renovaba en CADA sincronizacion: un POST completo delante de cada
+// serie marcada. Estos chequeos fijan cuando corresponde renovar.
+
+private func runTokenFreshness() {
+    let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+
+    check(
+        TokenFreshness.shouldRefresh(emitidoEn: nil, ahora: t0),
+        "sin token cacheado siempre se renueva"
+    )
+    check(
+        !TokenFreshness.shouldRefresh(emitidoEn: t0, ahora: t0.addingTimeInterval(60)),
+        "un token de hace un minuto se reusa: ese era el viaje tirado en cada serie"
+    )
+    check(
+        !TokenFreshness.shouldRefresh(emitidoEn: t0, ahora: t0.addingTimeInterval(2999)),
+        "justo antes del TTL todavia sirve"
+    )
+    check(
+        TokenFreshness.shouldRefresh(emitidoEn: t0, ahora: t0.addingTimeInterval(3000)),
+        "cumplido el TTL se renueva"
+    )
+    check(
+        TokenFreshness.ttl < 3600,
+        "el TTL deja margen contra los 3600s reales: vencer en vuelo es peor que renovar de mas"
+    )
+    check(
+        TokenFreshness.shouldRefresh(emitidoEn: t0, ahora: t0.addingTimeInterval(-10)),
+        "hora corrida hacia atras: se renueva en vez de quedarse con un token eterno"
+    )
 }
