@@ -73,7 +73,20 @@ export async function runResumeTrainerLink(
 }
 
 export const resumeTrainerLink = functions.onCall(
-  { region: "southamerica-east1", enforceAppCheck: true },
+  // SIN enforceAppCheck a proposito. El Coach Hub web NO activa App Check:
+  // main.dart lo saltea explicitamente en web (`if (!kIsWeb)`) y
+  // main_coach_hub.dart no lo activa nunca. Con el flag puesto, cada accept
+  // desde la web —que es donde el PF realmente trabaja— seria rechazado.
+  //
+  // Precedente que lo confirma: `addAlias` SI tiene el flag y se llama desde
+  // el Coach Hub web (coach_hub_plan_preview_screen.dart), con el error
+  // TRAGADO en un debugPrint. Falla siempre y nadie se entero.
+  //
+  // Esto no baja la guardia: la funcion valida request.auth, que el caller
+  // sea el trainer del vinculo, y el estado de origen. App Check es defensa
+  // en profundidad, no la cerradura. Se vuelve a poner —aca y en addAlias—
+  // cuando se active App Check en web (ReCaptcha + site key en consola).
+  { region: "southamerica-east1" },
   async (request): Promise<ResumeTrainerLinkResult> => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Authentication required.");
