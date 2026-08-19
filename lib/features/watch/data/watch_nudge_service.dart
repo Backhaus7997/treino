@@ -58,9 +58,16 @@ class WatchNudgeService {
   Future<bool> nudge({String reason = reasonActiveRoutine}) async {
     try {
       if (!await _bridge.isSupported) return false;
-      if (!await _bridge.isPaired) return false;
       // Sin alcanzabilidad no se intenta: `sendMessage` fallaría igual, y el
       // reloj se va a poner al día solo cuando el atleta lo mire.
+      //
+      // Y `isReachable` es la ÚNICA condición que hace falta. Antes había
+      // además un `isPaired`, y en Android eso no pregunta si hay un reloj:
+      // lista las apps companion instaladas en el TELÉFONO. Un nodo conectado
+      // con el chequeo de apps dando false cortaba el aviso sin motivo — y ese
+      // aviso es lo que despierta al companion cuando el atleta arranca el
+      // entreno desde el celular. Un reloj alcanzable es, por definición, un
+      // reloj que está.
       if (!await _bridge.isReachable) return false;
       await _bridge.sendMessage({'kind': kind, 'reason': reason});
       return true;

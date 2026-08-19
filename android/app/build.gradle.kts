@@ -182,6 +182,15 @@ dependencies {
     // 1.0.0 es la última ESTABLE. La última publicada es 1.1.0-rc02; se
     // arranca en estable y se evalúa después.
     "wearImplementation"("androidx.health:health-services-client:1.0.0")
+
+    // La Data Layer API. El plugin `watch_connectivity` ya la trae con `api`,
+    // pero acá se declara EXPLÍCITA porque el código del app la usa directo
+    // —`WorkoutLaunchService` extiende `WearableListenerService`— y depender de
+    // la transitividad de un plugin para compilar código propio es frágil: el
+    // día que el plugin cambie a `implementation`, esto deja de compilar por un
+    // motivo que no se ve en ningún lado. Misma versión que el plugin, para no
+    // forzar una resolución de conflicto.
+    "wearImplementation"("com.google.android.gms:play-services-wearable:19.0.0")
 }
 
 flutter {

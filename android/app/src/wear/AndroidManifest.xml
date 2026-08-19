@@ -63,6 +63,13 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Es la precondicion del `setFullScreenIntent` con el que el reloj se
+         abre solo cuando el atleta arranca el entreno desde el telefono. Sin
+         esto la notificacion se muestra igual, pero NO trae la app al frente:
+         degrada a "tocala para entrar", que es justo lo que se quiere evitar.
+         Ver WorkoutLaunchService. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+
     <!-- El aviso del descanso vibra. NO se declaran SCHEDULE_EXACT_ALARM ni
          USE_EXACT_ALARM a propósito: la variante de setExact con
          OnAlarmListener no los exige. El primero viene denegado por default
@@ -91,5 +98,30 @@
             android:name="com.treino.app.workout.WorkoutForegroundService"
             android:exported="false"
             android:foregroundServiceType="health" />
+
+        <!-- Abre el companion cuando el entreno arranca en el TELEFONO.
+             Va en el manifest y no se registra desde Dart a proposito: el
+             listener del plugin `watch_connectivity` solo vive mientras la app
+             del reloj esta corriendo, y el caso que hay que cubrir es
+             exactamente el contrario — la app cerrada, el atleta tocando
+             Empezar en el celular.
+
+             `exported=true` es obligatorio: quien lo instancia es Play
+             Services, otro proceso. El `permission` lo acota a el y a nadie
+             mas.
+
+             El intent-filter NO declara pathPrefix. El plugin manda el mensaje
+             con path `watch_connectivity`, SIN barra inicial, y un
+             `pathPrefix="/watch_connectivity"` no matchearia. El filtro fino se
+             hace en Kotlin, mirando `kind` y `reason`. -->
+        <service
+            android:name="com.treino.app.workout.WorkoutLaunchService"
+            android:exported="true"
+            android:permission="com.google.android.gms.permission.BIND_WEARABLE_LISTENER">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data android:scheme="wear" android:host="*" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>
