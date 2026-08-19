@@ -539,6 +539,34 @@ exit(1)
 
 private func runEffortBroadcast() {
     let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+
+    // ── El crash de los milisegundos ────────────────────────────────────────
+    //
+    // watchOS corre arm64_32 y ahi `Int` es de 32 bits. Los milisegundos desde
+    // 1970 (~1,79e12) exceden Int32 por ~832 veces, y `Int(Double)` TRAPEA
+    // cuando no entra: mata el proceso. El reloj crasheaba con EXC_BREAKPOINT
+    // en el primer dato de pulso de cada entreno.
+    //
+    // ESTE TEST NO PUEDE REPRODUCIR EL TRAP: corre en el host, donde `Int` es
+    // de 64 bits y la conversion es perfectamente valida. Lo unico observable
+    // desde aca es el TIPO — y alcanza, porque `Int64` es lo que hace que en el
+    // reloj tampoco trape. Si alguien vuelve a poner `Int`, este check se cae
+    // en el host antes de llegar a una muneca.
+    let payload = EffortSnapshot(bpm: 140, kcal: 50).context(measuredAt: t0)
+    check(
+        payload["measuredAtMs"] is Int64,
+        "measuredAtMs viaja como Int64: con Int trapea en arm64_32 (32 bits)"
+    )
+    checkEqual(
+        payload["measuredAtMs"] as? Int64,
+        1_700_000_000_000,
+        "measuredAtMs en milisegundos"
+    )
+    check(
+        1_700_000_000_000 > Int64(Int32.max),
+        "el valor real excede Int32: por eso el tipo importa y no es cosmetico"
+    )
+
     let a = EffortSnapshot(bpm: 140, kcal: 50)
     let b = EffortSnapshot(bpm: 145, kcal: 52)
 
