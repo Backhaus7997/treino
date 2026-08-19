@@ -10,14 +10,24 @@
  * 16+ tier is Fase 2 and lives nowhere yet.
  */
 
-export type SubscriptionTier = "free" | "plan1" | "plan2";
+export type SubscriptionTier = "free" | "plan1" | "plan2" | "plan3";
 export type SubscriptionCycle = "monthly" | "annual";
 
-/** Weighted-load limit per tier (active=1.0, paused=0.5 count toward it). */
-export const TIER_WEIGHT_LIMITS: Record<SubscriptionTier, number> = {
+/**
+ * Weighted-load limit per tier (active=1.0, paused=0.5 count toward it).
+ *
+ * `null` = SIN LIMITE (plan3). Se eligio null y no Infinity ni un numero
+ * gigante a proposito: con null, cualquier sitio que compare carga <= limite y
+ * se olvide del caso NO COMPILA. El tipo obliga a decidir en cada lugar.
+ * Infinity haria que las comparaciones "funcionen solas", pero
+ * JSON.stringify(Infinity) devuelve null y se romperia en silencio al viajar
+ * al cliente. Preferimos que rompa en el build.
+ */
+export const TIER_WEIGHT_LIMITS: Record<SubscriptionTier, number | null> = {
   free: 2,
   plan1: 7,
   plan2: 15,
+  plan3: null,
 };
 
 /**
@@ -29,8 +39,15 @@ export const TIER_WEIGHT_LIMITS: Record<SubscriptionTier, number> = {
  * ACTrainers/EntrenadorPro (producto más completo), debajo de Fibrit
  * (outlier). El anual da 2 meses gratis (~17% off): `monthly × 10`.
  *
- *   Plan 1 (3-7 alumnos):  $12.000/mes · $120.000/año
- *   Plan 2 (8-15 alumnos): $22.000/mes · $220.000/año
+ *   Plan 1 (3-7 alumnos):   $12.000/mes · $120.000/año
+ *   Plan 2 (8-15 alumnos):  $22.000/mes · $220.000/año
+ *   Plan 3 (ilimitado):     $39.000/mes · $390.000/año
+ *
+ * Plan 3 mantiene el ritmo de la escalera: el salto plan1→plan2 es 1,83x y
+ * plan2→plan3 es 1,77x. Se equilibra contra plan2 alrededor de los 27 alumnos.
+ * NOTA: el diseño original preveia un tier USAGE-BASED para 16+ ("Fase 2");
+ * se opto por ilimitado plano por simplicidad, con la idea de revisarlo cuando
+ * haya datos de como se distribuyen los PF arriba de 15.
  */
 export const TIER_PRICES_ARS: Record<
   Exclude<SubscriptionTier, "free">,
@@ -38,4 +55,5 @@ export const TIER_PRICES_ARS: Record<
 > = {
   plan1: { monthly: 12000, annual: 120000 },
   plan2: { monthly: 22000, annual: 220000 },
+  plan3: { monthly: 39000, annual: 390000 },
 };

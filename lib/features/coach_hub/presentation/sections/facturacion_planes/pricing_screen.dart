@@ -66,8 +66,6 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
             currentTier: currentTier,
             palette: palette,
           ),
-          const SizedBox(height: 20),
-          _EnterpriseBanner(palette: palette),
           const SizedBox(height: 24),
           Text(
             'Renovación automática. Podés cancelar cuando quieras '
@@ -244,89 +242,11 @@ class _PlanCardsRow extends StatelessWidget {
   }
 }
 
-/// Banner para PF con más de 15 alumnos. El tier usage-based (16+, $1/alumno)
-/// es Fase 2 — este banner cubre el hueco de UX (un PF grande no queda sin
-/// opción) sin prometer lo que aún no existe. El CTA está mockeado hasta
-/// definir el canal de contacto comercial.
-class _EnterpriseBanner extends StatelessWidget {
-  const _EnterpriseBanner({required this.palette});
-
-  final AppPalette palette;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Wrap(
-        alignment: WrapAlignment.spaceBetween,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        runSpacing: 12,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '¿MÁS DE 15 ALUMNOS?', // i18n: Fase W3
-                style: GoogleFonts.barlowCondensed(
-                  color: palette.textPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                'Estamos preparando un plan a medida para vos.', // i18n: Fase W3
-                style: TextStyle(color: palette.textMuted, fontSize: 13),
-              ),
-            ],
-          ),
-          TreinoTappable(
-            onTap: () {
-              // MOCK: el canal de contacto (o el plan usage-based de Fase 2) se
-              // define más adelante. Por ahora, aviso honesto.
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Muy pronto vas a poder tener más de 15 alumnos.',
-                  ), // i18n: Fase W3
-                ),
-              );
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-              decoration: BoxDecoration(
-                border: Border.all(color: palette.accent),
-                borderRadius: BorderRadius.circular(9999),
-              ),
-              child: Text(
-                'CONTACTANOS', // i18n: Fase W3
-                style: GoogleFonts.barlowCondensed(
-                  color: palette.accent,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.6,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 String _tierName(SubscriptionTier tier) => switch (tier) {
       SubscriptionTier.free => 'FREE', // i18n: Fase W3
       SubscriptionTier.plan1 => 'PLAN 1', // i18n: Fase W3
       SubscriptionTier.plan2 => 'PLAN 2', // i18n: Fase W3
+      SubscriptionTier.plan3 => 'PLAN 3', // i18n: Fase W3
     };
 
 /// (numeroAlumnos, labelAlumnos) para el bloque de features.
@@ -334,6 +254,8 @@ String _tierName(SubscriptionTier tier) => switch (tier) {
       SubscriptionTier.free => ('2', 'alumnos'), // i18n: Fase W3
       SubscriptionTier.plan1 => ('3-7', 'alumnos'), // i18n: Fase W3
       SubscriptionTier.plan2 => ('8-15', 'alumnos'), // i18n: Fase W3
+      // Sin numero: el valor del plan es justamente que no hay cuenta.
+      SubscriptionTier.plan3 => ('∞', 'alumnos'), // i18n: Fase W3
     };
 
 /// Formatea un monto ARS con separador de miles (12.000).

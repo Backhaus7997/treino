@@ -60,7 +60,8 @@ export interface SyncTrainerLoadInput {
 export interface SyncTrainerLoadResult {
   trainerId: string;
   weightedLoad: number;
-  limit: number;
+  /** `null` = sin limite (plan3). */
+  limit: number | null;
   /** True only when this call actually flipped a link to 'active'. */
   promoted: boolean;
 }
@@ -88,6 +89,9 @@ export function promotionDenialReason(
 ): PromotionDenialReason {
   const tier: SubscriptionTier = sub?.tier ?? "free";
   const nominalLimit = TIER_WEIGHT_LIMITS[tier];
+  // Tier sin limite nominal (plan3): si igual llegamos aca es porque el
+  // limite EFECTIVO es finito, o sea que la suscripcion no esta al dia.
+  if (nominalLimit === null) return "subscription-inactive";
   return limit < nominalLimit ? "subscription-inactive" : "plan-limit";
 }
 
@@ -205,7 +209,14 @@ export async function syncTrainerLoad(
         : currentLinks;
     const projectedLoad = computeWeightedLoad(projectedLinks as unknown as WeightedLink[]);
 
-    if (promotion && !alreadyActive && projectedLoad > limit) {
+    // limit === null ⇒ plan3, sin tope: no hay nada contra que comparar y el
+    // gate no deniega nunca. El tipo obliga a este chequeo explicito.
+    if (
+      promotion &&
+      !alreadyActive &&
+      limit !== null &&
+      projectedLoad > limit
+    ) {
       const reason = promotionDenialReason(sub, limit);
       throw new HttpsError(
         "resource-exhausted",

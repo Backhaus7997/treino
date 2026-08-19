@@ -439,6 +439,7 @@ String _tierName(SubscriptionTier tier) => switch (tier) {
       SubscriptionTier.free => 'Free', // i18n: Fase W3
       SubscriptionTier.plan1 => 'Plan 1', // i18n: Fase W3
       SubscriptionTier.plan2 => 'Plan 2', // i18n: Fase W3
+      SubscriptionTier.plan3 => 'Plan 3', // i18n: Fase W3
     };
 
 String _formatArs(int amount) {

@@ -28,7 +28,8 @@ import { reconcileEntitlements, BlockableLink } from "./select-blocked-links";
 
 export interface SyncEntitlementsResult {
   trainerId: string;
-  limit: number;
+  /** `null` = sin limite (plan3). */
+  limit: number | null;
   blocked: string[];
   unblocked: string[];
   weightedLoad: number;

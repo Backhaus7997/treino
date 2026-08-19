@@ -34,7 +34,8 @@ export interface ResumeTrainerLinkResult {
   /** `noop` when the link was already active (idempotent retry). */
   status: "ok" | "noop";
   weightedLoad: number;
-  limit: number;
+  /** `null` = sin limite (plan3). */
+  limit: number | null;
 }
 
 /**

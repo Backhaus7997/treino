@@ -96,17 +96,10 @@ void main() {
     expect(find.textContaining('Ahorrá 2 meses'), findsOneWidget);
   });
 
-  testWidgets('banner "más de 15 alumnos" con CTA contactanos', (tester) async {
-    await pumpDesktop(tester);
-
-    expect(find.text('¿MÁS DE 15 ALUMNOS?'), findsOneWidget);
-    expect(find.text('CONTACTANOS'), findsOneWidget);
-
-    await tester.tap(find.text('CONTACTANOS'));
-    await tester.pump();
-
-    expect(find.textContaining('más de 15 alumnos'), findsOneWidget);
-  });
+  // El banner "¿MÁS DE 15 ALUMNOS?" se eliminó al agregar el Plan 3.
+  // Existía porque no había respuesta arriba de 15; mantenerlo junto al plan
+  // ilimitado le diría al PF "próximamente" al lado del plan que ya se lo
+  // resuelve.
 
   testWidgets('el tier actual muestra "TU PLAN ACTUAL"', (tester) async {
     await pumpDesktop(tester, profile: _trainer(tier: SubscriptionTier.plan1));

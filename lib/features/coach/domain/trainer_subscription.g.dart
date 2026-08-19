@@ -12,7 +12,7 @@ _$TrainerSubscriptionImpl _$$TrainerSubscriptionImplFromJson(
       tier: $enumDecode(_$SubscriptionTierEnumMap, json['tier']),
       status: $enumDecode(_$SubscriptionStatusEnumMap, json['status']),
       cycle: $enumDecodeNullable(_$SubscriptionCycleEnumMap, json['cycle']),
-      weightLimit: (json['weightLimit'] as num).toInt(),
+      weightLimit: (json['weightLimit'] as num?)?.toInt(),
       currentPeriodEnd: _$JsonConverterFromJson<Timestamp, DateTime>(
           json['currentPeriodEnd'], const TimestampConverter().fromJson),
       graceUntil: _$JsonConverterFromJson<Timestamp, DateTime>(
@@ -44,6 +44,7 @@ const _$SubscriptionTierEnumMap = {
   SubscriptionTier.free: 'free',
   SubscriptionTier.plan1: 'plan1',
   SubscriptionTier.plan2: 'plan2',
+  SubscriptionTier.plan3: 'plan3',
 };
 
 const _$SubscriptionStatusEnumMap = {
