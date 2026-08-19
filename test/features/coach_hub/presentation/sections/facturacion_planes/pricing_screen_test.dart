@@ -129,7 +129,10 @@ void main() {
     await pumpDesktop(tester);
 
     expect(find.text('39.000'), findsOneWidget);
-    expect(find.text('∞'), findsOneWidget);
+    // "+15" y no "∞": sigue la serie de las otras tarjetas y se lee sin
+    // interpretar.
+    expect(find.text('+15'), findsOneWidget);
+    expect(find.text('∞'), findsNothing);
   });
 
   testWidgets('el tier actual muestra "TU PLAN ACTUAL"', (tester) async {

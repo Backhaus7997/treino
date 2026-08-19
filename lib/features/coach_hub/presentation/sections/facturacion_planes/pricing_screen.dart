@@ -271,8 +271,10 @@ String _tierName(SubscriptionTier tier) => switch (tier) {
       SubscriptionTier.free => ('2', 'alumnos'), // i18n: Fase W3
       SubscriptionTier.plan1 => ('3-7', 'alumnos'), // i18n: Fase W3
       SubscriptionTier.plan2 => ('8-15', 'alumnos'), // i18n: Fase W3
-      // Sin numero: el valor del plan es justamente que no hay cuenta.
-      SubscriptionTier.plan3 => ('∞', 'alumnos'), // i18n: Fase W3
+      // "+15" y no "∞": sigue la serie de las otras tarjetas (2 · 3-7 ·
+      // 8-15) y se lee de una. El simbolo quedaba chico y ajeno en Barlow
+      // Condensed, y obligaba a interpretar en vez de leer.
+      SubscriptionTier.plan3 => ('+15', 'alumnos'), // i18n: Fase W3
     };
 
 /// Formatea un monto ARS con separador de miles (12.000).

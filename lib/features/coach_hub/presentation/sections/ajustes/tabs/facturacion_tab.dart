@@ -157,7 +157,9 @@ class _CurrentPlanCard extends StatelessWidget {
             children: [
               Text(
                 lim == null
-                    ? '${_formatLoad(load)} / ∞' // i18n: Fase W3
+                    // Contador sin techo: "N / sin límite" en vez de un
+                    // simbolo. Mismo criterio que la pricing page.
+                    ? '${_formatLoad(load)} / sin límite' // i18n: Fase W3
                     : '${_formatLoad(load)} / $lim',
                 style: GoogleFonts.barlowCondensed(
                   color: overLimit ? palette.highlight : palette.textPrimary,
