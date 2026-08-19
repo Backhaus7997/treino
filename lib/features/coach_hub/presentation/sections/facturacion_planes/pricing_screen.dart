@@ -66,8 +66,6 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
             currentTier: currentTier,
             palette: palette,
           ),
-          const SizedBox(height: 20),
-          _EnterpriseBanner(palette: palette),
           const SizedBox(height: 24),
           Text(
             'Renovación automática. Podés cancelar cuando quieras '
@@ -197,128 +195,66 @@ class _PlanCardsRow extends StatelessWidget {
           palette: palette,
         );
 
-    final free = card(SubscriptionTier.free, recommended: false);
-    final plan1 = card(SubscriptionTier.plan1, recommended: true);
-    final plan2 = card(SubscriptionTier.plan2, recommended: false);
+    // Se ITERA sobre el enum a proposito. Antes las tres tarjetas estaban
+    // escritas a mano (free, plan1, plan2), asi que agregar un tier al enum
+    // NO lo hacia aparecer aca: el compilador exige exhaustividad en los
+    // switch, pero no dice nada de una lista literal. Plan 3 se agrego y la
+    // pricing page siguio mostrando tres planes, en silencio.
+    const recommended = SubscriptionTier.plan1;
+    final cards = {
+      for (final tier in SubscriptionTier.values)
+        tier: card(tier, recommended: tier == recommended),
+    };
+
+    // El ancho por tarjeta lo fija el precio-heroe (Barlow Condensed grande).
+    // Con cuatro planes ya no entran en una fila salvo en pantallas anchas:
+    // a ~1165px utiles se pasaba 55px. Por eso hay tres layouts y no dos.
+    const tiers = SubscriptionTier.values;
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (constraints.maxWidth < 820) {
-          // Apilado: la recomendada primero (más visible en mobile).
+        final w = constraints.maxWidth;
+
+        if (w < 820) {
+          // Apilado: la recomendada primero (mas visible en mobile).
+          final ordered = [
+            recommended,
+            ...tiers.where((t) => t != recommended),
+          ];
           return Column(
             children: [
-              plan1,
-              const SizedBox(height: 16),
-              free,
-              const SizedBox(height: 16),
-              plan2,
+              for (var i = 0; i < ordered.length; i++) ...[
+                if (i > 0) const SizedBox(height: 16),
+                cards[ordered[i]]!,
+              ],
             ],
           );
         }
-        // Fila con la card del medio elevada: las laterales llevan padding
-        // top que las "baja" respecto a la recomendada.
-        return IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 24),
-                  child: free,
-                ),
+
+        // Grilla 2x2 para todo lo ancho. NO hay variante de cuatro en fila:
+        // el ancho por tarjeta lo fija el precio-heroe (Barlow Condensed
+        // grande) y pide ~360px, o sea que cuatro necesitarian ~1500px utiles.
+        // Achicar el precio para que entren seria sacrificar justo lo que la
+        // tarjeta tiene para decir.
+        Widget fila(List<SubscriptionTier> par) => IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = 0; i < par.length; i++) ...[
+                    if (i > 0) const SizedBox(width: 16),
+                    Expanded(child: cards[par[i]]!),
+                  ],
+                ],
               ),
-              const SizedBox(width: 16),
-              Expanded(child: plan1),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 24),
-                  child: plan2,
-                ),
-              ),
-            ],
-          ),
+            );
+        return Column(
+          children: [
+            fila(tiers.take(2).toList()),
+            const SizedBox(height: 16),
+            fila(tiers.skip(2).toList()),
+          ],
         );
       },
-    );
-  }
-}
-
-/// Banner para PF con más de 15 alumnos. El tier usage-based (16+, $1/alumno)
-/// es Fase 2 — este banner cubre el hueco de UX (un PF grande no queda sin
-/// opción) sin prometer lo que aún no existe. El CTA está mockeado hasta
-/// definir el canal de contacto comercial.
-class _EnterpriseBanner extends StatelessWidget {
-  const _EnterpriseBanner({required this.palette});
-
-  final AppPalette palette;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Wrap(
-        alignment: WrapAlignment.spaceBetween,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        runSpacing: 12,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '¿MÁS DE 15 ALUMNOS?', // i18n: Fase W3
-                style: GoogleFonts.barlowCondensed(
-                  color: palette.textPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                'Estamos preparando un plan a medida para vos.', // i18n: Fase W3
-                style: TextStyle(color: palette.textMuted, fontSize: 13),
-              ),
-            ],
-          ),
-          TreinoTappable(
-            onTap: () {
-              // MOCK: el canal de contacto (o el plan usage-based de Fase 2) se
-              // define más adelante. Por ahora, aviso honesto.
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Muy pronto vas a poder tener más de 15 alumnos.',
-                  ), // i18n: Fase W3
-                ),
-              );
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-              decoration: BoxDecoration(
-                border: Border.all(color: palette.accent),
-                borderRadius: BorderRadius.circular(9999),
-              ),
-              child: Text(
-                'CONTACTANOS', // i18n: Fase W3
-                style: GoogleFonts.barlowCondensed(
-                  color: palette.accent,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.6,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -327,6 +263,7 @@ String _tierName(SubscriptionTier tier) => switch (tier) {
       SubscriptionTier.free => 'FREE', // i18n: Fase W3
       SubscriptionTier.plan1 => 'PLAN 1', // i18n: Fase W3
       SubscriptionTier.plan2 => 'PLAN 2', // i18n: Fase W3
+      SubscriptionTier.plan3 => 'PLAN 3', // i18n: Fase W3
     };
 
 /// (numeroAlumnos, labelAlumnos) para el bloque de features.
@@ -334,6 +271,10 @@ String _tierName(SubscriptionTier tier) => switch (tier) {
       SubscriptionTier.free => ('2', 'alumnos'), // i18n: Fase W3
       SubscriptionTier.plan1 => ('3-7', 'alumnos'), // i18n: Fase W3
       SubscriptionTier.plan2 => ('8-15', 'alumnos'), // i18n: Fase W3
+      // "+15" y no "∞": sigue la serie de las otras tarjetas (2 · 3-7 ·
+      // 8-15) y se lee de una. El simbolo quedaba chico y ajeno en Barlow
+      // Condensed, y obligaba a interpretar en vez de leer.
+      SubscriptionTier.plan3 => ('+15', 'alumnos'), // i18n: Fase W3
     };
 
 /// Formatea un monto ARS con separador de miles (12.000).

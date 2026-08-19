@@ -55,7 +55,7 @@ function round2(n: number): number {
  */
 export function selectLinksToBlock(
   links: BlockableLink[],
-  limit: number,
+  limit: number | null,
 ): BlockSelection {
   // 1. Solo los que pesan: activos y pausados, aun entitled.
   const candidates = links.filter(
@@ -90,7 +90,8 @@ export function selectLinksToBlock(
   let keptLoad = 0;
   for (const l of ordered) {
     const w = STATUS_WEIGHT[l.status];
-    if (round2(keptLoad + w) <= limit) {
+    // limit === null ⇒ plan3, sin tope: entra todo y no se bloquea a nadie.
+    if (limit === null || round2(keptLoad + w) <= limit) {
       keptLoad = round2(keptLoad + w);
     } else {
       block.push(l.id);
@@ -123,7 +124,7 @@ export interface EntitlementReconciliation {
  */
 export function reconcileEntitlements(
   links: BlockableLink[],
-  limit: number,
+  limit: number | null,
 ): EntitlementReconciliation {
   const candidates = links.filter(
     (l) => l.status === "active" || l.status === "paused",
@@ -148,7 +149,9 @@ export function reconcileEntitlements(
   let keptLoad = 0;
   for (const l of ordered) {
     const w = STATUS_WEIGHT[l.status];
-    if (round2(keptLoad + w) <= limit) {
+    // limit === null ⇒ plan3, sin tope: todos quedan, y los que estaban
+    // bloqueados de un plan anterior se devuelven.
+    if (limit === null || round2(keptLoad + w) <= limit) {
       keptLoad = round2(keptLoad + w);
       kept.add(l.id);
     }

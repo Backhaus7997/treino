@@ -182,3 +182,52 @@ describe("reconcileEntitlements", () => {
     expect(r.block).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Plan 3 — sin limite (`limit: null`).
+//
+// El tipo obliga a contemplarlo en cada comparacion; estos tests pinean que la
+// decision sea "no bloquear nunca" y no un accidente de como se compara null.
+// ---------------------------------------------------------------------------
+
+describe("limite nulo (plan3, ilimitado)", () => {
+  it("selectLinksToBlock no bloquea a nadie, por muchos que haya", () => {
+    const links = Array.from({ length: 40 }, (_, i) =>
+      link({ id: `L${i}`, athleteId: `a${i}`, acceptedAtMs: 1000 + i }));
+    const r = selectLinksToBlock(links, null);
+    expect(r.block).toEqual([]);
+    expect(r.keptLoad).toBe(40);
+  });
+
+  it("reconcileEntitlements DEVUELVE a todos los bloqueados al subir a plan3", () => {
+    // Alguien que estaba en Free con 4 bloqueados y compra el ilimitado: los
+    // recupera a todos de una.
+    const links = [
+      link({ id: "ok1", athleteId: "a1", acceptedAtMs: 900 }),
+      link({ id: "b1", athleteId: "a2", entitlement: "blocked", acceptedAtMs: 800 }),
+      link({ id: "b2", athleteId: "a3", entitlement: "blocked", acceptedAtMs: 700 }),
+      link({ id: "b3", athleteId: "a4", entitlement: "blocked", acceptedAtMs: 600 }),
+    ];
+    const r = reconcileEntitlements(links, null);
+    expect(r.unblock.sort()).toEqual(["b1", "b2", "b3"]);
+    expect(r.block).toEqual([]);
+  });
+
+  it("con plan3 y nada bloqueado no genera escrituras", () => {
+    const links = [
+      link({ id: "a", athleteId: "a1" }),
+      link({ id: "b", athleteId: "a2" }),
+    ];
+    const r = reconcileEntitlements(links, null);
+    expect(r.block).toEqual([]);
+    expect(r.unblock).toEqual([]);
+  });
+
+  it("limite 0 NO es lo mismo que ilimitado", () => {
+    // Guarda contra el bug clasico: si alguien reemplaza el chequeo de null
+    // por un falsy (!limit), el 0 pasaria como ilimitado y nadie se bloquearia.
+    const links = [link({ id: "L1", athleteId: "a1" })];
+    expect(selectLinksToBlock(links, 0).block).toEqual(["L1"]);
+    expect(selectLinksToBlock(links, null).block).toEqual([]);
+  });
+});

@@ -74,13 +74,23 @@ void main() {
     expect(find.text('Hasta 15 alumnos'), findsOneWidget);
   });
 
-  testWidgets('desde Plan 2 (tope) → plan a medida, sin upsell',
-      (tester) async {
+  testWidgets('desde Plan 2 → upsell a Plan 3 (ilimitado)', (tester) async {
+    // Antes Plan 2 era el tope y terminaba en "PLAN A MEDIDA", un callejon sin
+    // salida para el PF que MAS paga. Con plan3 ya tiene a donde ir.
     await open(tester, SubscriptionTier.plan2);
+
+    expect(find.text('PASATE A PLAN 3'), findsOneWidget);
+    expect(find.text('39.000'), findsOneWidget);
+    expect(find.text('PLAN A MEDIDA'), findsNothing);
+  });
+
+  testWidgets('desde Plan 3 (tope real) → plan a medida', (tester) async {
+    // En la practica es inalcanzable: plan3 no tiene limite, asi que el gate
+    // nunca deniega. Queda como red por si el tier cambia.
+    await open(tester, SubscriptionTier.plan3);
 
     expect(find.text('PLAN A MEDIDA'), findsOneWidget);
     expect(find.text('CONTACTANOS'), findsOneWidget);
-    // No hay caja de upsell de otro tier.
     expect(find.textContaining('PASATE A'), findsNothing);
   });
 
