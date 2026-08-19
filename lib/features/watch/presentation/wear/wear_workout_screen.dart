@@ -13,6 +13,7 @@ import 'wear_set_format.dart';
 import 'wear_strings.dart';
 import 'wear_widgets.dart';
 import 'wear_workout_view_model.dart';
+import 'wear_fitted_text.dart';
 
 /// La pantalla de entrenamiento del companion de Wear OS.
 ///
@@ -121,20 +122,24 @@ class _Header extends StatelessWidget {
     final palette = AppPalette.of(context);
     return Column(
       children: [
-        // `minimumScaleFactor(0.7)` de Swift → FittedBox. Un nombre largo se
-        // achica antes que cortarse: leer "Press de banca incl…" de reojo no
-        // sirve de nada.
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(
-            snapshot.exerciseName,
-            textAlign: TextAlign.center,
-            style: GoogleFonts.barlowCondensed(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              height: 1.1,
-              color: palette.textPrimary,
-            ),
+        // Envuelve primero y achica después, con piso. El `FittedBox` que
+        // había acá medía el texto como UNA línea infinita y lo escalaba sin
+        // límite: "movilidad de hombros rotación interna por espalda con
+        // baston" terminaba diminuto, de borde a borde y metido en la curva de
+        // la pantalla. Ver [wearFittedFontSize].
+        WearFittedText(
+          snapshot.exerciseName,
+          maxLines: 3,
+          maxSize: 20,
+          minSize: 13,
+          // El título vive en la franja ALTA, donde el círculo ya se cierra.
+          // Ocupar todo el ancho disponible lo empuja contra el borde curvo.
+          widthFactor: 0.88,
+          styleFor: (size) => GoogleFonts.barlowCondensed(
+            fontSize: size,
+            fontWeight: FontWeight.w700,
+            height: 1.1,
+            color: palette.textPrimary,
           ),
         ),
         Text(
