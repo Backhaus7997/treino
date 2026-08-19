@@ -77,11 +77,6 @@ String _tierLabel(SubscriptionTier tier) => switch (tier) {
       SubscriptionTier.plan3 => 'Plan 3', // i18n: Fase W3
     };
 
-/// Formatea la carga ponderada: entero sin decimal (7), fracción con uno (6.5).
-String _formatLoad(double load) => load == load.roundToDouble()
-    ? load.toStringAsFixed(0)
-    : load.toStringAsFixed(1);
-
 class _CurrentPlanCard extends StatelessWidget {
   const _CurrentPlanCard({
     required this.tier,
@@ -159,8 +154,8 @@ class _CurrentPlanCard extends StatelessWidget {
                 lim == null
                     // Contador sin techo: "N / sin límite" en vez de un
                     // simbolo. Mismo criterio que la pricing page.
-                    ? '${_formatLoad(load)} / sin límite' // i18n: Fase W3
-                    : '${_formatLoad(load)} / $lim',
+                    ? '${formatWeightedLoad(load)} / sin límite' // i18n: Fase W3
+                    : '${formatWeightedLoad(load)} / $lim',
                 style: GoogleFonts.barlowCondensed(
                   color: overLimit ? palette.highlight : palette.textPrimary,
                   fontSize: 26,
