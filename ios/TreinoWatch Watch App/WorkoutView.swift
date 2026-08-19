@@ -36,6 +36,11 @@ struct WorkoutView: View {
         // vez de por un `disabled` que hay que acordarse de poner.
         if let cuenta = workout.durationSet {
             durationTimerScreen(cuenta)
+        } else if let espejo = workout.phoneTimer {
+            // El cronometro que arranco en el TELEFONO. Misma prioridad de
+            // pantalla por el mismo motivo: mientras dura la serie no hay nada
+            // que marcar.
+            phoneTimerScreen(espejo)
         } else if let exercise = workout.currentExercise, let session = workout.session {
             ScrollView {
                 VStack(spacing: 6) {
@@ -201,6 +206,48 @@ struct WorkoutView: View {
             // Salida sin cargar la serie. Sin esto, un toque equivocado deja al
             // atleta mirando una cuenta que no pidio y sin forma de volver.
             Button("Cancelar") { workout.cancelDurationSet() }
+                .font(.caption2)
+                .buttonStyle(.bordered)
+                .tint(.secondary)
+                .padding(.top, 6)
+        }
+        .padding()
+    }
+
+    /// La cuenta regresiva de una serie que arranco en el TELEFONO.
+    ///
+    /// Se ve igual que la propia salvo por dos cosas, y las dos importan:
+    ///
+    /// 1. Dice de donde viene. Sin eso el atleta no tiene como saber por que
+    ///    esta cuenta no responde al reloj.
+    /// 2. El boton OCULTA, no cancela. Cancelar de verdad la serie es del
+    ///    telefono, que es su dueno; desde aca solo se saca de la pantalla.
+    ///
+    /// Existe el boton igual —aunque el espejo se apague solo al llegar a
+    /// cero— porque el aviso de cancelacion viaja por `sendMessage` y ese exige
+    /// alcanzabilidad: si el atleta cancela en el telefono y el bluetooth se
+    /// cayo, sin salida la muneca queda tomada hasta que venza la cuenta.
+    private func phoneTimerScreen(_ espejo: PhoneTimer) -> some View {
+        VStack(spacing: 8) {
+            Text(nombreDe(espejo.exerciseId))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .minimumScaleFactor(0.7)
+
+            Text(CountdownRules.display(remaining: workout.phoneTimerRemaining))
+                .font(.system(size: 46, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .minimumScaleFactor(0.5)
+                .foregroundStyle(.green)
+
+            Text("serie \(espejo.setNumber) · en el telefono")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
+            effortRow()
+
+            Button("Ocultar") { workout.clearPhoneTimer() }
                 .font(.caption2)
                 .buttonStyle(.bordered)
                 .tint(.secondary)

@@ -55,6 +55,17 @@ final class WorkoutCoordinator: ObservableObject {
     @Published private(set) var durationRemaining: Int = 0
     private var durationTimer: Timer?
 
+    /// El cronometro que corre en el TELEFONO, espejado en la muneca.
+    ///
+    /// Vive APARTE de `durationSet` a proposito, y la diferencia no es
+    /// cosmetica: esto no tiene camino a `logSet`. El dueno de la serie es el
+    /// lado que arranco el cronometro, y si los dos la cargaran al llegar a
+    /// cero quedarian dos documentos para la misma serie. Ver
+    /// `PhoneTimerMirror.swift`.
+    @Published private(set) var phoneTimer: PhoneTimer?
+    @Published private(set) var phoneTimerRemaining: Int = 0
+    private var phoneTimerTicker: Timer?
+
     /// Ultima falla de sincronizacion, para diagnostico. La UI solo muestra que
     /// hay pendientes, no el detalle.
     @Published private(set) var syncError: String?
@@ -824,6 +835,10 @@ final class WorkoutCoordinator: ObservableObject {
     ) {
         guard let seconds = spec.durationSeconds, seconds > 0, durationSet == nil else { return }
         stopRest()
+        // El cronometro PROPIO desplaza al espejado: dos cuentas a la vez en una
+        // pantalla del tamano de una moneda no le sirven a nadie, y esta es la
+        // que ademas va a cargar la serie.
+        clearPhoneTimer()
         let fin = Date().addingTimeInterval(TimeInterval(seconds))
         durationSet = DurationSet(
             exerciseId: exerciseId,
@@ -859,6 +874,52 @@ final class WorkoutCoordinator: ObservableObject {
         durationTimer = nil
         durationSet = nil
         durationRemaining = 0
+    }
+
+    // MARK: - Espejo del cronometro del telefono
+
+    /// Aplica una orden de cronometro que mando el telefono.
+    ///
+    /// `now` es inyectable para poder medir la regla en el host.
+    func apply(phoneTimerCommand comando: PhoneTimerMirror.Command, now: Date = Date()) {
+        switch comando {
+        case .cancel:
+            clearPhoneTimer()
+
+        case .start(let timer):
+            // El cronometro propio gana: es el que va a cargar la serie, y
+            // pisarlo con un espejo la perderia.
+            guard durationSet == nil else { return }
+            // Una orden que llega tarde —el reloj estaba fuera de alcance y se
+            // entrego al reconectar— describe una serie que ya termino.
+            guard PhoneTimerMirror.shouldShow(timer, now: now) else { return }
+
+            phoneTimer = timer
+            phoneTimerRemaining = CountdownRules.remaining(endsAt: timer.endsAt, now: now)
+            phoneTimerTicker?.invalidate()
+            phoneTimerTicker = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+                Task { @MainActor in
+                    guard let self, let actual = self.phoneTimer else { return }
+                    let ahora = Date()
+                    self.phoneTimerRemaining = CountdownRules.remaining(
+                        endsAt: actual.endsAt, now: ahora
+                    )
+                    // Al llegar a cero se APAGA y nada mas. La serie la carga el
+                    // telefono, que es quien la arranco.
+                    if CountdownRules.isFinished(endsAt: actual.endsAt, now: ahora) {
+                        self.clearPhoneTimer()
+                    }
+                }
+            }
+        }
+    }
+
+    /// Saca el espejo de la pantalla. No toca nada del telefono.
+    func clearPhoneTimer() {
+        phoneTimerTicker?.invalidate()
+        phoneTimerTicker = nil
+        phoneTimer = nil
+        phoneTimerRemaining = 0
     }
 
     /// Llego a cero: vibra y carga la serie sola.

@@ -182,6 +182,14 @@ struct TreinoWatch_Watch_AppApp: App {
                 .onChange(of: workoutSession.phase) { _, phase in
                     if phase == .idle { effortRelay.reset() }
                 }
+                // El cronometro que arranco en el telefono. Se enruta aca —y no
+                // dentro de `CredentialCoordinator`— porque ese coordinador no
+                // conoce el estado del entreno: publica la senal y la vista la
+                // aplica, igual que con `externalRefresh`.
+                .onChange(of: coordinator.phoneTimerSignal) { _, signal in
+                    guard let signal else { return }
+                    workoutCoordinator.apply(phoneTimerCommand: signal.command)
+                }
                 .onChange(of: coordinator.externalRefresh) { _, _ in
                     Task {
                         if workoutCoordinator.session != nil {

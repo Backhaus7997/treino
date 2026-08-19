@@ -1647,6 +1647,7 @@ class _ExerciseSectionState extends State<_ExerciseSection> {
       Widget innerRow = isDurationSet
           ? DurationSetRow(
               key: ValueKey('dur-$setNumber-${logged?.id ?? "pending"}'),
+              exerciseId: widget.slot.exerciseId,
               setNumber: setNumber,
               targetSeconds: targetSeconds,
               isDone: isRowDone,

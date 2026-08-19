@@ -13,6 +13,7 @@ import '../data/watch_bridge.dart';
 import '../data/watch_credential_service.dart';
 import '../data/watch_launcher_service.dart';
 import '../data/watch_nudge_service.dart';
+import '../data/watch_timer_service.dart';
 
 /// Envoltorio sobre `WatchConnectivity`. Se sobreescribe en tests vía
 /// `ProviderScope.overrides`.
@@ -73,6 +74,16 @@ final watchNudgeServiceProvider = Provider<WatchNudgeService>(
 /// alcanzabilidad y este caso es justo el contrario: el reloj está cerrado.
 final watchLauncherServiceProvider = Provider<WatchLauncherService>(
   (ref) => WatchLauncherService(bridge: ref.watch(watchBridgeProvider)),
+);
+
+/// Servicio que espeja en el reloj el cronómetro arrancado en el teléfono.
+///
+/// Separado de [watchNudgeServiceProvider] aunque comparta canal y guardas: un
+/// nudge le pide al reloj que RELEA Firestore, y esto le pide que MUESTRE algo
+/// que el teléfono ya sabe. Mezclarlos haría que un cambio en la política de
+/// recarga arrastrara al cronómetro sin quererlo.
+final watchTimerServiceProvider = Provider<WatchTimerService>(
+  (ref) => WatchTimerService(bridge: ref.watch(watchBridgeProvider)),
 );
 
 /// Avisa al reloj cada vez que cambia la rutina activa del atleta.

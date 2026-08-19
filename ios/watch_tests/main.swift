@@ -497,6 +497,116 @@ private func runWorkoutDuration() {
     checkEqual(WorkoutDurationRules.maxMinutos, 8 * 60, "El techo son 8 horas, igual que en el telefono")
 }
 
+// MARK: - El cronometro que arranca en el TELEFONO, espejado en la muneca
+//
+// Llega por `sendMessage` porque el contexto de aplicacion de entrada esta
+// ocupado por la credencial del reloj, y es uno solo. El canal es COMPARTIDO
+// con el aviso de "relee", asi que el `kind` no es decorativo: sin el, un aviso
+// de recarga se leeria como un cronometro.
+//
+// La orden se ESPEJA y no se adopta: el dueno de la serie es el lado que la
+// arranco. Si el reloj la cargara al llegar a cero, y el telefono tambien,
+// quedarian dos documentos para la misma serie.
+
+private func runPhoneTimerMirror() {
+    // Milisegundos reales desde epoch: 1,8e12. NO entran en 32 bits, que es
+    // donde vive `Int` en watchOS. Con un numero chico este test no ejerceria
+    // ninguna presion sobre la trampa que crasheo el reloj (commit 3a0840cc).
+    let finMs: Int64 = 1_800_000_060_000
+    let fin = Date(timeIntervalSince1970: 1_800_000_060)
+
+    let ordenValida: [String: Any] = [
+        "kind": "watchTimer",
+        "action": "start",
+        "exerciseId": "plancha",
+        "setNumber": 2,
+        "totalSeconds": 60,
+        "endsAtMs": NSNumber(value: finMs),
+    ]
+
+    guard case .start(let timer)? = PhoneTimerMirror.parse(ordenValida) else {
+        check(false, "una orden de arranque bien formada se parsea")
+        return
+    }
+    checkEqual(timer.exerciseId, "plancha", "va el ejercicio")
+    checkEqual(timer.setNumber, 2, "va el numero de serie")
+    checkEqual(timer.totalSeconds, 60, "van los segundos totales")
+    checkEqual(
+        timer.endsAt.timeIntervalSince1970,
+        fin.timeIntervalSince1970,
+        "el instante de fin sobrevive el cruce entre lenguajes SIN truncarse"
+    )
+
+    checkEqual(
+        PhoneTimerMirror.parse([
+            "kind": "watchTimer", "action": "cancel",
+        ]),
+        .cancel,
+        "cancelar se parsea sin mas datos"
+    )
+
+    // El canal es compartido: el aviso de "relee" NO puede leerse como
+    // cronometro, ni al reves.
+    check(
+        PhoneTimerMirror.parse(["kind": "watchRefresh", "reason": "activeRoutine"]) == nil,
+        "un aviso de recarga NO es una orden de cronometro"
+    )
+    // Este es el que de verdad amarra el discriminador. El de arriba pasaba
+    // igual sin el guard de `kind` —un aviso de recarga no trae `action`, asi
+    // que caia en el default— y por eso no protegia nada: se comprobo mutando
+    // el guard y viendo que NINGUN chequeo se ponia rojo. Aca el payload ajeno
+    // trae todos los campos de un cronometro y lo unico que lo descarta es el
+    // `kind`.
+    var kindAjeno = ordenValida
+    kindAjeno["kind"] = "watchRefresh"
+    check(
+        PhoneTimerMirror.parse(kindAjeno) == nil,
+        "un payload ajeno con TODOS los campos de cronometro igual se descarta por el kind"
+    )
+    check(
+        PhoneTimerMirror.parse(["action": "start"]) == nil,
+        "sin kind no se lee nada"
+    )
+    check(
+        PhoneTimerMirror.parse(["kind": "watchTimer", "action": "loquesea"]) == nil,
+        "una accion desconocida se ignora en vez de adivinar"
+    )
+
+    // Defensivo: el payload cruza un puente entre lenguajes y un cambio del
+    // lado Dart no puede tirar la app del reloj.
+    var sinFin = ordenValida
+    sinFin["endsAtMs"] = nil
+    check(PhoneTimerMirror.parse(sinFin) == nil, "sin instante de fin no hay cuenta que mostrar")
+
+    var idVacio = ordenValida
+    idVacio["exerciseId"] = ""
+    check(PhoneTimerMirror.parse(idVacio) == nil, "un ejercicio vacio no se muestra")
+
+    var serieCero = ordenValida
+    serieCero["setNumber"] = 0
+    check(PhoneTimerMirror.parse(serieCero) == nil, "no existe la serie 0")
+
+    var duracionCero = ordenValida
+    duracionCero["totalSeconds"] = 0
+    check(PhoneTimerMirror.parse(duracionCero) == nil, "una serie de 0 segundos no es una serie")
+
+    // Una orden entregada al reconectar puede describir una serie que ya
+    // termino. Mostrar una cuenta vencida tomando la pantalla es peor que no
+    // mostrar nada: el atleta ya esta en otra.
+    check(
+        PhoneTimerMirror.shouldShow(timer, now: fin.addingTimeInterval(-1)),
+        "con un segundo por delante todavia se muestra"
+    )
+    check(
+        !PhoneTimerMirror.shouldShow(timer, now: fin),
+        "justo en el instante de fin ya no"
+    )
+    check(
+        !PhoneTimerMirror.shouldShow(timer, now: fin.addingTimeInterval(300)),
+        "una orden que llego cinco minutos tarde no toma la pantalla"
+    )
+}
+
 // MARK: - Corrida
 
 runRequestedTypes()
@@ -517,6 +627,7 @@ runExerciseCursor()
 runSupersetCursor()
 runTokenFreshness()
 runCountdown()
+runPhoneTimerMirror()
 runStaleSessions()
 runCloseFeedback()
 

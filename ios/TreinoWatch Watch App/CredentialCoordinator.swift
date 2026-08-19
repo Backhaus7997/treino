@@ -70,6 +70,20 @@ final class CredentialCoordinator: NSObject, ObservableObject {
     /// atleta toque nada.
     @Published private(set) var externalRefresh = 0
 
+    /// La ultima orden de cronometro que mando el telefono.
+    ///
+    /// Lleva numero de secuencia y no viaja sola porque `onChange` compara por
+    /// igualdad: dos cancelaciones seguidas son el mismo valor y la segunda no
+    /// dispararia nada. Mismo motivo por el que `externalRefresh` es un
+    /// contador y no un Bool.
+    struct PhoneTimerSignal: Equatable {
+        let secuencia: Int
+        let command: PhoneTimerMirror.Command
+    }
+
+    @Published private(set) var phoneTimerSignal: PhoneTimerSignal?
+    private var phoneTimerSecuencia = 0
+
     /// Arranca la sesión de WatchConnectivity y recupera lo que haya guardado.
     func start() {
         if let stored = CredentialStore.load() {
@@ -256,14 +270,23 @@ extension CredentialCoordinator: WCSessionDelegate {
 
     /// Mensaje puntual desde el teléfono.
     ///
-    /// Hoy solo se usa para el aviso de "relee": el teléfono lo manda cuando el
-    /// atleta cambia su rutina activa. Va por MENSAJE y no por contexto de
-    /// aplicación a propósito — el contexto es uno solo y se pisa entero, y ahí
-    /// vive la credencial.
+    /// Van por MENSAJE y no por contexto de aplicación a propósito — el
+    /// contexto es uno solo y se pisa entero, y ahí vive la credencial.
+    ///
+    /// Se discrimina por `kind` porque el canal es compartido: hoy lo usan el
+    /// aviso de "relee" (`watchRefresh`) y el cronómetro espejado del teléfono
+    /// (`watchTimer`). Un mensaje sin `kind` conocido se ignora entero.
     nonisolated func session(
         _ session: WCSession,
         didReceiveMessage message: [String: Any]
     ) {
+        if let comando = PhoneTimerMirror.parse(message) {
+            Task { @MainActor in
+                self.recibir(comandoDeCronometro: comando)
+            }
+            return
+        }
+
         guard message["kind"] as? String == "watchRefresh" else { return }
         Task { @MainActor in
             self.refreshFromPhone()
@@ -279,6 +302,18 @@ extension CredentialCoordinator {
     /// ejercicios NO se cambian abajo del atleta a mitad de serie. La señal
     /// para las listas se emite igual, porque esas no están en pantalla
     /// mientras entrena.
+    /// Publica la orden de cronometro para que la tome `WorkoutCoordinator`.
+    ///
+    /// Este coordinador NO aplica la orden: no conoce el estado del entreno.
+    /// Publica la senal y la vista la enruta, igual que con `externalRefresh`.
+    fileprivate func recibir(comandoDeCronometro comando: PhoneTimerMirror.Command) {
+        phoneTimerSecuencia += 1
+        phoneTimerSignal = PhoneTimerSignal(
+            secuencia: phoneTimerSecuencia,
+            command: comando
+        )
+    }
+
     fileprivate func refreshFromPhone() {
         externalRefresh += 1
         Task { await loadTodaysWorkout() }

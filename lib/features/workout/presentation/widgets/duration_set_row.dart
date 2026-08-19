@@ -9,6 +9,8 @@ import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
+import '../../../watch/application/watch_credential_providers.dart'
+    show watchTimerServiceProvider;
 import '../../application/workout_clock.dart';
 import '../../domain/duration_timer.dart';
 import 'mmss.dart';
@@ -30,15 +32,24 @@ import 'mmss.dart';
 /// a ser lo único que es: cuándo redibujar. La aritmética vive en
 /// [DurationTimerRules] y está bajo contrato compartido con el reloj en
 /// `conformance/duration_timer.json`.
+///
+/// ── Y se espeja en la muñeca ──────────────────────────────────────────────
+///
+/// Arrancar acá se lo avisa al reloj, que muestra la misma cuenta sin cargar la
+/// serie: el dueño de la serie es el lado que arrancó el cronómetro. El porqué
+/// completo está en [WatchTimerCommand].
 class DurationSetRow extends ConsumerStatefulWidget {
   const DurationSetRow({
     super.key,
+    required this.exerciseId,
     required this.setNumber,
     required this.targetSeconds,
     required this.isDone,
     required this.onDone,
   });
 
+  /// Para que el reloj sepa QUÉ está cronometrando y pueda nombrarlo.
+  final String exerciseId;
   final int setNumber;
   final int targetSeconds;
   final bool isDone;
@@ -93,6 +104,17 @@ class _DurationSetRowState extends ConsumerState<DurationSetRow> {
       _remaining = widget.targetSeconds;
     });
 
+    // Al reloj le viaja el instante de fin, así que la muñeca cuenta sola: no
+    // hay tráfico por segundo y las dos pantallas no se pueden desfasar.
+    unawaited(
+      ref.read(watchTimerServiceProvider).start(
+            exerciseId: widget.exerciseId,
+            setNumber: widget.setNumber,
+            totalSeconds: widget.targetSeconds,
+            endsAt: fin,
+          ),
+    );
+
     _tick = Timer.periodic(DurationTimerRules.tickInterval, (t) {
       if (!mounted) {
         t.cancel();
@@ -117,6 +139,8 @@ class _DurationSetRowState extends ConsumerState<DurationSetRow> {
       _tick = null;
       // Vibra para avisar que se acabó el tiempo.
       HapticFeedback.heavyImpact();
+      // Al reloj NO se le avisa: llega a cero solo, porque cuenta contra el
+      // mismo instante de fin.
       widget.onDone?.call();
     });
   }
@@ -133,6 +157,9 @@ class _DurationSetRowState extends ConsumerState<DurationSetRow> {
       _endsAt = null;
       _remaining = widget.targetSeconds;
     });
+    // Cancelar SÍ se avisa: adelanta un final que el instante de fin no
+    // anticipa. Sin esto el reloj seguiría contando algo que ya no existe.
+    unawaited(ref.read(watchTimerServiceProvider).cancel());
   }
 
   @override
