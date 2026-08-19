@@ -139,6 +139,19 @@ struct WorkoutView: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+
+            // Sin esto el atleta no tiene forma de saber que esta adentro de
+            // una superserie: la pantalla del reloj muestra UN ejercicio, y
+            // saltar de A a B entre series parece un error de la app en vez de
+            // el entrenamiento que pidio su plan.
+            if let cursor = workout.currentCursor,
+               let vuelta = cursor.round,
+               let total = cursor.totalRounds {
+                Text("SUPERSERIE · VUELTA \(vuelta)/\(total)")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.orange)
+                    .multilineTextAlignment(.center)
+            }
         }
     }
 
@@ -272,9 +285,20 @@ struct WorkoutView: View {
             .max() ?? 0
         let filas = max(exercise.sets.count, ultimaCargada, 1)
 
-        let nextSet = (1...filas).first {
-            !session.isLogged(exerciseId: exercise.exerciseId, setNumber: $0)
-        }
+        // La serie ofrecida sale del CURSOR y no del primer hueco local.
+        //
+        // En el flujo normal dan lo mismo, pero divergen cuando el estado viene
+        // desordenado —el telefono cargo series salteadas, o el reloj adelanto
+        // un miembro de la superserie— y ahi el hueco local ofreceria una serie
+        // que la regla compartida no autoriza. El cursor es la unica autoridad.
+        let cursor = workout.currentCursor
+        let esElActual = cursor.map {
+            $0.exerciseIndex < workout.exercises.count
+                && workout.exercises[$0.exerciseIndex].exerciseId == exercise.exerciseId
+        } ?? false
+        let nextSet: Int? = esElActual
+            ? cursor?.setNumber
+            : nil
         // El setNumber es 1-based para que coincida con la identidad lógica que
         // usa el teléfono.
         return ForEach(1...filas, id: \.self) { setNumber in

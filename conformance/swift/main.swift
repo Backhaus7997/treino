@@ -340,6 +340,99 @@ private func runSetLogIdentity(fixtureURL: URL) {
     }
 }
 
+// MARK: - superset_order
+
+private func runSupersetOrder(fixtureURL: URL) {
+    guard let data = try? Data(contentsOf: fixtureURL) else {
+        fail("No se pudo leer \(fixtureURL.path). Los fixtures son el contrato "
+            + "con la implementación Dart: si el archivo no está, ese contrato "
+            + "no existe.")
+        return
+    }
+
+    guard
+        let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+        let rule = json["rule"] as? String,
+        let cases = json["cases"] as? [[String: Any]]
+    else {
+        fail("\(fixtureURL.lastPathComponent) no tiene la forma esperada.")
+        return
+    }
+
+    guard rule == "superset-order" else {
+        fail("Se esperaba rule 'superset-order' y vino '\(rule)'.")
+        return
+    }
+
+    guard !cases.isEmpty else {
+        fail("\(fixtureURL.lastPathComponent) no tiene casos.")
+        return
+    }
+
+    for testCase in cases {
+        totalCases += 1
+        let name = testCase["name"] as? String ?? "(sin nombre)"
+
+        guard
+            let given = testCase["given"] as? [String: Any],
+            let expected = testCase["expect"] as? [String: Any],
+            let rawMembers = given["members"] as? [[String: Any]],
+            let expectedRounds = expected["totalRounds"] as? Int
+        else {
+            fail("Caso '\(name)' mal formado.")
+            continue
+        }
+
+        let members: [SupersetMember] = rawMembers.compactMap {
+            guard
+                let id = $0["exerciseId"] as? String,
+                let planned = $0["plannedSets"] as? Int,
+                let logged = $0["loggedSets"] as? Int
+            else { return nil }
+            return SupersetMember(exerciseId: id, plannedSets: planned, loggedSets: logged)
+        }
+        guard members.count == rawMembers.count else {
+            fail("Caso '\(name)': algún miembro está mal formado.")
+            continue
+        }
+
+        let rounds = SupersetOrder.totalRounds(members)
+        if rounds != expectedRounds {
+            fail("Caso '\(name)': vueltas totales — se esperaba \(expectedRounds) y vino \(rounds).")
+            continue
+        }
+
+        let cell = SupersetOrder.nextCell(members)
+
+        // `exerciseId: null` en el fixture significa bloque completo.
+        if expected["exerciseId"] is NSNull || expected["exerciseId"] == nil {
+            if let cell {
+                fail("Caso '\(name)': se esperaba bloque completo y vino \(cell.exerciseId) serie \(cell.setNumber).")
+            }
+            continue
+        }
+
+        guard
+            let expectedId = expected["exerciseId"] as? String,
+            let expectedSet = expected["setNumber"] as? Int,
+            let expectedRound = expected["round"] as? Int
+        else {
+            fail("Caso '\(name)': expect mal formado.")
+            continue
+        }
+
+        guard let cell else {
+            fail("Caso '\(name)': se esperaba \(expectedId) serie \(expectedSet) y vino bloque completo.")
+            continue
+        }
+
+        if cell.exerciseId != expectedId || cell.setNumber != expectedSet || cell.round != expectedRound {
+            fail("Caso '\(name)': se esperaba \(expectedId)/serie \(expectedSet)/vuelta \(expectedRound) "
+                + "y vino \(cell.exerciseId)/serie \(cell.setNumber)/vuelta \(cell.round).")
+        }
+    }
+}
+
 // MARK: - main
 
 // El script pasa la raíz de `conformance/` como primer argumento.
@@ -353,6 +446,7 @@ runRoutineSelection(fixtureURL: conformanceDir.appendingPathComponent("routine_s
 runSetResolution(fixtureURL: conformanceDir.appendingPathComponent("set_resolution.json"))
 runSessionCounting(fixtureURL: conformanceDir.appendingPathComponent("session_counting.json"))
 runSetLogIdentity(fixtureURL: conformanceDir.appendingPathComponent("set_log_identity.json"))
+runSupersetOrder(fixtureURL: conformanceDir.appendingPathComponent("superset_order.json"))
 
 if failures.isEmpty {
     print("✓ conformidad Swift: \(totalCases) casos, todos en verde")

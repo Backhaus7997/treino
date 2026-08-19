@@ -23,6 +23,7 @@ import '../application/session_notifier.dart';
 import '../application/session_providers.dart';
 import '../application/session_state.dart';
 import '../domain/routine.dart';
+import '../domain/superset_order.dart';
 import '../domain/routine_slot.dart';
 import '../domain/set_enums.dart';
 import '../domain/set_limits.dart';
@@ -1409,29 +1410,29 @@ class _SupersetSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
 
-    // Vueltas totales = el ejercicio más largo del bloque.
-    final maxRounds = entries.fold<int>(
-        0, (m, e) => plannedCountFor(e.slot) > m ? plannedCountFor(e.slot) : m);
+    // La regla del round-robin vive en `SupersetOrder`, no acá.
+    //
+    // Estaba escrita adentro de este `build()`, y por eso el reloj no podía
+    // portarla: reimplementaba el recorrido por su cuenta, ejercicio por
+    // ejercicio en vez de vuelta por vuelta, y producía 1a, 2a, 3a, 1b… El dato
+    // salía válido y el orden equivocado, que en una superserie es el
+    // entrenamiento entero. Ahora las dos implementaciones responden al mismo
+    // fixture: `conformance/superset_order.json`.
+    final miembros = [
+      for (final e in entries)
+        (
+          exerciseId: e.slot.exerciseId,
+          plannedSets: plannedCountFor(e.slot),
+          loggedSets: e.logs.length,
+        ),
+    ];
+    final maxRounds = SupersetOrder.totalRounds(miembros);
+    final celda = SupersetOrder.nextCell(miembros);
 
-    // Scan round-robin: la celda activa es el primer par (vuelta, ejercicio)
-    // que aún no fue logueado.
-    String? activeId;
-    int? activeSet;
-    var activeRound = 0;
-    outer:
-    for (var round = 1; round <= maxRounds; round++) {
-      for (final e in entries) {
-        if (round > plannedCountFor(e.slot)) continue;
-        if (e.logs.length < round) {
-          activeId = e.slot.exerciseId;
-          activeSet = round;
-          activeRound = round;
-          break outer;
-        }
-      }
-    }
-    final blockDone = activeId == null;
-    final displayRound = blockDone ? maxRounds : activeRound;
+    final String? activeId = celda?.exerciseId;
+    final int? activeSet = celda?.setNumber;
+    final blockDone = celda == null;
+    final displayRound = blockDone ? maxRounds : celda.round;
 
     final children = <Widget>[];
     for (var i = 0; i < entries.length; i++) {
@@ -2664,7 +2665,8 @@ class _WatchEffortRow extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (display.bpm != null) ...[
-                Icon(TreinoIcon.heartRate, size: 12, color: palette.reactionLike),
+                Icon(TreinoIcon.heartRate,
+                    size: 12, color: palette.reactionLike),
                 const SizedBox(width: 4),
                 Text(
                   '${display.bpm}',
@@ -2678,7 +2680,8 @@ class _WatchEffortRow extends ConsumerWidget {
               if (display.bpm != null && display.kcal != null)
                 const SizedBox(width: 12),
               if (display.kcal != null) ...[
-                Icon(TreinoIcon.calories, size: 12, color: palette.reactionFire),
+                Icon(TreinoIcon.calories,
+                    size: 12, color: palette.reactionFire),
                 const SizedBox(width: 4),
                 Text(
                   '${display.kcal} kcal',

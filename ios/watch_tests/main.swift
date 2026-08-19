@@ -513,6 +513,7 @@ runEffortBroadcast()
 runSetLogWriteTarget()
 runSetLogDeletion()
 runExerciseCursor()
+runSupersetCursor()
 runStaleSessions()
 runCloseFeedback()
 
@@ -1115,4 +1116,51 @@ private func runCloseFeedback() {
         WorkoutCloseFailure.seriesSinSubir(2).mensaje.contains("sigue abierto"),
         "El fallo por pendientes tiene que decir que el entreno sigue abierto"
     )
+}
+// MARK: - Cursor con superseries
+//
+// El reloj mostraba SOLO el primer ejercicio de la superserie y, tras marcar
+// 1a, lo unico marcable era 2a. Estos chequeos fijan el recorrido correcto,
+// que es el mismo contrato de `conformance/superset_order.json`.
+
+private func runSupersetCursor() {
+    func ej(_ id: String, _ planned: Int, _ logged: Int, _ grupo: Int?) -> CursorExercise {
+        CursorExercise(exerciseId: id, plannedSets: planned, loggedSets: logged, supersetGroup: grupo)
+    }
+
+    // A, B, C en la misma superserie, tres series cada uno.
+    let virgen = [ej("a", 3, 0, 1), ej("b", 3, 0, 1), ej("c", 3, 0, 1)]
+    checkEqual(cursorPosition(virgen).exerciseIndex, 0, "bloque virgen arranca en A")
+    checkEqual(cursorPosition(virgen).setNumber, 1, "y en la serie 1")
+    checkEqual(cursorPosition(virgen).round, 1, "vuelta 1")
+    checkEqual(cursorPosition(virgen).totalRounds, 3, "tres vueltas")
+
+    // EL BUG REPORTADO: hecha 1a, toca 1b y NO 2a.
+    let hecha1a = [ej("a", 3, 1, 1), ej("b", 3, 0, 1), ej("c", 3, 0, 1)]
+    checkEqual(cursorPosition(hecha1a).exerciseIndex, 1, "tras 1a toca B, no A otra vez")
+    checkEqual(cursorPosition(hecha1a).setNumber, 1, "y es la serie 1 de B")
+
+    // Cerrada la vuelta 1, vuelve a A con la serie 2.
+    let vuelta1 = [ej("a", 3, 1, 1), ej("b", 3, 1, 1), ej("c", 3, 1, 1)]
+    checkEqual(cursorPosition(vuelta1).exerciseIndex, 0, "cerrada la vuelta 1 vuelve a A")
+    checkEqual(cursorPosition(vuelta1).setNumber, 2, "con la serie 2")
+    checkEqual(cursorPosition(vuelta1).round, 2, "vuelta 2")
+
+    // Ejercicios SUELTOS: se sigue recorriendo ejercicio por ejercicio.
+    let sueltos = [ej("x", 3, 3, nil), ej("y", 3, 0, nil)]
+    checkEqual(cursorPosition(sueltos).exerciseIndex, 1, "sin superserie avanza al siguiente ejercicio")
+    checkEqual(cursorPosition(sueltos).setNumber, 1, "serie 1 del siguiente")
+    check(cursorPosition(sueltos).round == nil, "un ejercicio suelto no tiene vuelta")
+
+    // Un ejercicio tagueado SOLO degrada a suelto, igual que en Dart.
+    let taggeadoSolo = [ej("a", 2, 0, 7), ej("b", 2, 0, nil)]
+    checkEqual(supersetBlocks(taggeadoSolo).count, 2, "un miembro unico no forma bloque")
+
+    // Bloques CONSECUTIVOS: dos superseries distintas no se mezclan.
+    let dosBloques = [ej("a", 2, 2, 1), ej("b", 2, 2, 1), ej("c", 2, 0, 2), ej("d", 2, 0, 2)]
+    checkEqual(supersetBlocks(dosBloques).count, 2, "dos bloques separados")
+    checkEqual(cursorPosition(dosBloques).exerciseIndex, 2, "cerrado el primero pasa al segundo")
+
+    // Lista vacia: no puede reventar indexando.
+    checkEqual(cursorPosition([]).exerciseIndex, 0, "lista vacia devuelve 0 sin reventar")
 }

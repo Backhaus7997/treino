@@ -291,7 +291,14 @@ final class WorkoutCoordinator: ObservableObject {
         WorkoutSessionStore.save(current)
 
         startRest(seconds: restSeconds)
-        advanceIfExerciseDone(exerciseId: exerciseId)
+        // Se RECALCULA la posicion en vez de incrementar el indice.
+        //
+        // `advanceIfExerciseDone` solo avanzaba cuando el ejercicio actual
+        // quedaba COMPLETO, que en una superserie es exactamente lo que no hay
+        // que hacer: despues de 1a toca 1b, con A recien empezado. Recalcular
+        // cubre los dos casos con la misma regla, y ademas puede RETROCEDER si
+        // el telefono borro una serie.
+        currentExerciseIndex = firstUnfinishedIndex(in: exercises, session: current)
 
         Task { await sync() }
     }
@@ -728,31 +735,42 @@ final class WorkoutCoordinator: ObservableObject {
 
     // MARK: - Internos
 
-    /// Avanza al siguiente ejercicio cuando el actual quedó completo.
-    ///
-    /// No avanza más allá del último: quedarse ahí deja al atleta ver que
-    /// terminó, en vez de mostrarle una pantalla vacía.
-    private func advanceIfExerciseDone(exerciseId: String) {
-        guard let session, let exercise = currentExercise,
-              exercise.exerciseId == exerciseId,
-              session.loggedCount(exerciseId: exerciseId) >= exercise.sets.count,
-              currentExerciseIndex + 1 < exercises.count
-        else { return }
-        currentExerciseIndex += 1
-    }
-
     /// Delega en la regla pura de `ExerciseCursor.swift`, que es donde esta
     /// medida en el host. Aca solo se traduce el estado a numeros.
     private func firstUnfinishedIndex(
         in exercises: [WatchExercise],
         session: WorkoutSession
     ) -> Int {
-        firstUnfinishedExerciseIndex(
-            seriesPlanificadas: exercises.map { $0.sets.count },
-            seriesCargadas: exercises.map {
-                session.loggedCount(exerciseId: $0.exerciseId)
+        cursor(in: exercises, session: session).exerciseIndex
+    }
+
+    /// La celda que toca AHORA, respetando superseries.
+    ///
+    /// Antes esto delegaba en `firstUnfinishedExerciseIndex`, que recorre
+    /// ejercicio por ejercicio: correcto para ejercicios sueltos y ERRADO para
+    /// una superserie, donde la vuelta va afuera. Ver `SupersetOrder.swift` y
+    /// el contrato en `conformance/superset_order.json`.
+    func cursor(
+        in exercises: [WatchExercise],
+        session: WorkoutSession
+    ) -> CursorPosition {
+        cursorPosition(
+            exercises.map {
+                CursorExercise(
+                    exerciseId: $0.exerciseId,
+                    plannedSets: $0.sets.count,
+                    loggedSets: session.loggedCount(exerciseId: $0.exerciseId),
+                    supersetGroup: $0.supersetGroup
+                )
             }
         )
+    }
+
+    /// La posicion actual, para que la vista sepa que serie ofrecer y si esta
+    /// adentro de una superserie.
+    var currentCursor: CursorPosition? {
+        guard let session else { return nil }
+        return cursor(in: exercises, session: session)
     }
 
     /// Descanso contado LOCALMENTE por el reloj.
