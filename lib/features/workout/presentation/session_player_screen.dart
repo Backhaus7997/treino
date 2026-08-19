@@ -34,16 +34,9 @@ import '../domain/set_spec.dart';
 import 'exercise_detail_screen.dart';
 import 'widgets/bounded_number_formatter.dart';
 import 'widgets/coach_note.dart';
+import 'widgets/duration_set_row.dart';
+import 'widgets/mmss.dart';
 import 'widgets/set_entry_sheet.dart';
-
-// ── Helpers de formato ────────────────────────────────────────────────────────
-
-/// Formatea segundos totales como MM:SS (máx 99:59). Diseño §9.4.
-String _formatMMSS(int totalSeconds) {
-  final m = (totalSeconds ~/ 60).clamp(0, 99).toString().padLeft(2, '0');
-  final s = (totalSeconds % 60).toString().padLeft(2, '0');
-  return '$m:$s';
-}
 
 // ── Block gating helpers (top-level, testable) ────────────────────────────────
 
@@ -174,7 +167,7 @@ String repsDisplayText(SetSpec? spec, ExerciseMode mode) {
   if (spec.type == SetType.failure) return 'Al fallo';
   if (mode == ExerciseMode.duration) {
     final secs = spec.durationSeconds ?? 0;
-    return _formatMMSS(secs);
+    return formatMMSS(secs);
   }
   if (spec.reps != null) return '${spec.reps} reps';
   final min = spec.repsMin;
@@ -881,7 +874,7 @@ class _SessionStatsCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    _formatMMSS(state.elapsedSeconds),
+                    formatMMSS(state.elapsedSeconds),
                     style: GoogleFonts.barlowCondensed(
                       fontWeight: FontWeight.w700,
                       fontSize: 40,
@@ -1652,7 +1645,7 @@ class _ExerciseSectionState extends State<_ExerciseSection> {
           widget.onRemoveSet != null && (isRowDone || isAddedUnlogged);
 
       Widget innerRow = isDurationSet
-          ? _DurationSetRow(
+          ? DurationSetRow(
               key: ValueKey('dur-$setNumber-${logged?.id ?? "pending"}'),
               setNumber: setNumber,
               targetSeconds: targetSeconds,
@@ -2361,176 +2354,6 @@ class _RepsField extends StatelessWidget {
   }
 }
 
-// ── _DurationSetRow ───────────────────────────────────────────────────────────
-
-/// Fila de un set basado en duración.
-/// Muestra el tiempo objetivo como MM:SS y un countdown timer.
-/// "Iniciar" arranca el contador; al llegar a 0 auto-marca done con vibración.
-class _DurationSetRow extends StatefulWidget {
-  const _DurationSetRow({
-    super.key,
-    required this.setNumber,
-    required this.targetSeconds,
-    required this.isDone,
-    required this.onDone,
-  });
-
-  final int setNumber;
-  final int targetSeconds;
-  final bool isDone;
-
-  /// Called when the set is marked done. Null means not interactive.
-  final VoidCallback? onDone;
-
-  @override
-  State<_DurationSetRow> createState() => _DurationSetRowState();
-}
-
-class _DurationSetRowState extends State<_DurationSetRow> {
-  Timer? _timer;
-  int _remaining = 0;
-  bool _running = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _remaining = widget.targetSeconds;
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  void _startTimer() {
-    if (_running || widget.isDone) return;
-    setState(() => _running = true);
-    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (!mounted) {
-        t.cancel();
-        return;
-      }
-      setState(() {
-        if (_remaining > 0) {
-          _remaining--;
-        } else {
-          t.cancel();
-          _running = false;
-          // Buzz to alert the user that time is up.
-          HapticFeedback.heavyImpact();
-          // Auto-mark done when countdown reaches 0.
-          widget.onDone?.call();
-        }
-      });
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    final l10n = AppL10n.of(context);
-    final textColor = widget.isDone ? palette.textMuted : palette.textPrimary;
-    final isInteractive = widget.onDone != null && !widget.isDone;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-      decoration: BoxDecoration(
-        // bgCard (no bg): misma delimitación por-fila que _RepsSetRow.
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 20,
-            child: Text(
-              '${widget.setNumber}',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
-                color: textColor,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          // Timer display.
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _running ||
-                          (!widget.isDone && _remaining < widget.targetSeconds)
-                      ? _formatMMSS(_remaining)
-                      : _formatMMSS(widget.targetSeconds),
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 22,
-                    color: _running ? palette.accent : textColor,
-                  ),
-                ),
-                if (!widget.isDone)
-                  Text(
-                    'objetivo: ${_formatMMSS(widget.targetSeconds)}',
-                    style: GoogleFonts.barlow(
-                      fontWeight: FontWeight.w400,
-                      fontSize: 11,
-                      color: palette.textMuted,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Action button.
-          if (widget.isDone)
-            Icon(TreinoIcon.checkCircleFill, color: palette.accent, size: 22)
-          else if (!_running)
-            Semantics(
-              button: true,
-              label: l10n.sessionPlayerTimerStartA11y,
-              // TREINO Motion PR3: TreinoTappable reemplaza al
-              // GestureDetector (absorbe su onTap). onTap null cuando no es
-              // interactivo → child pelado, mismo no-op que antes.
-              child: TreinoTappable(
-                onTap: isInteractive ? _startTimer : null,
-                child: Container(
-                  constraints:
-                      const BoxConstraints(minWidth: 44, minHeight: 44),
-                  alignment: Alignment.center,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: isInteractive
-                        ? palette.accent.withValues(alpha: 0.15)
-                        : palette.bg,
-                    borderRadius: BorderRadius.circular(9999),
-                    border: Border.all(
-                      color: isInteractive ? palette.accent : palette.border,
-                    ),
-                  ),
-                  child: Text(
-                    'Iniciar',
-                    style: GoogleFonts.barlowCondensed(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                      color: isInteractive ? palette.accent : palette.textMuted,
-                    ),
-                  ),
-                ),
-              ),
-            )
-          else
-            // Timer running — show countdown-only state, no manual completion.
-            Icon(TreinoIcon.timer, color: palette.accent, size: 22),
-        ],
-      ),
-    );
-  }
-}
-
 // ── _TerminarSessionButton ────────────────────────────────────────────────────
 
 class _TerminarSessionButton extends StatelessWidget {
@@ -2712,7 +2535,7 @@ class _WatchTimerRowState extends ConsumerState<_WatchTimerRow> {
               Icon(TreinoIcon.timer, size: 12, color: palette.accent),
               const SizedBox(width: 4),
               Text(
-                _formatMMSS(restante),
+                formatMMSS(restante),
                 style: GoogleFonts.barlow(
                   fontWeight: FontWeight.w700,
                   fontSize: 12,
