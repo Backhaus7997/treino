@@ -4,12 +4,13 @@ import 'package:treino/features/watch/domain/wear_workout_session.dart';
 import 'package:treino/features/watch/presentation/wear/wear_workout_view_model.dart';
 import 'package:treino/features/workout/domain/set_spec.dart';
 
-WearPlannedExercise _ej(String id, int series, {int rest = 60}) =>
+WearPlannedExercise _ej(String id, int series, {int rest = 60, int? grupo}) =>
     WearPlannedExercise(
       exerciseId: id,
       exerciseName: id,
       sets: [for (var i = 0; i < series; i++) const SetSpec(reps: 10)],
       restSeconds: rest,
+      supersetGroup: grupo,
     );
 
 WearWorkoutPlan _plan(List<WearPlannedExercise> ejercicios) => WearWorkoutPlan(
@@ -216,6 +217,59 @@ void main() {
       // Puede pasar: una semana de descarga puede dejar el día sin ejercicios
       // presentes.
       expect(wearSnapshotFrom(_sesion(_plan([]))), isNull);
+    });
+  });
+
+  group('superserie: lo que efectivamente dibuja la pantalla', () {
+    test('la muñeca recorre 1a 1b 1c 2a 2b 2c 3a 3b 3c', () {
+      // El bug reportado en hardware: el reloj mostraba sólo el ejercicio A, y
+      // al marcar 1a ofrecía 2a — las series 1b y 1c no había forma de
+      // marcarlas. Se simula el entreno entero contra el SNAPSHOT, que es lo
+      // que la pantalla lee de verdad.
+      final plan = _plan([
+        _ej('a', 3, grupo: 1),
+        _ej('b', 3, grupo: 1),
+        _ej('c', 3, grupo: 1),
+      ]);
+
+      final marcadas = <WearLoggedSet>[];
+      final recorrido = <String>[];
+
+      for (var toque = 0; toque < 9; toque++) {
+        final snap = wearSnapshotFrom(_sesion(plan, logged: marcadas))!;
+        final serie = snap.nextSetNumber!;
+        recorrido.add('$serie${snap.exerciseName}');
+        marcadas.add(
+          WearLoggedSet(
+            docId: '${snap.exerciseId}__$serie',
+            exerciseId: snap.exerciseId,
+            setNumber: serie,
+            reps: 10,
+            weightKg: 100,
+          ),
+        );
+      }
+
+      expect(recorrido, ['1a', '1b', '1c', '2a', '2b', '2c', '3a', '3b', '3c']);
+      expect(_sesion(plan, logged: marcadas).isFullyCompleted, isTrue);
+    });
+
+    test('sin superserie sigue siendo un ejercicio por vez, de punta a punta',
+        () {
+      // La contracara: el cambio no puede alterar el entreno normal.
+      final plan = _plan([_ej('a', 2), _ej('b', 2)]);
+
+      expect(wearSnapshotFrom(_sesion(plan))!.exerciseName, 'a');
+      expect(
+        wearSnapshotFrom(_sesion(plan, logged: _marcadas('a', 1)))!
+            .exerciseName,
+        'a',
+      );
+      expect(
+        wearSnapshotFrom(_sesion(plan, logged: _marcadas('a', 2)))!
+            .exerciseName,
+        'b',
+      );
     });
   });
 }

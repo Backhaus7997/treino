@@ -1,4 +1,4 @@
-import '../../workout/domain/exercise_cursor.dart';
+import 'wear_block_cursor.dart';
 import 'wear_workout_plan.dart';
 
 /// Una serie ya cargada, con lo mínimo que el reloj necesita saber de ella.
@@ -102,11 +102,14 @@ class WearWorkoutSession {
 
   /// En qué ejercicio está parado el reloj.
   ///
-  /// Regla compartida con el companion de Apple, bajo el contrato de
-  /// `conformance/exercise_cursor.json`.
-  int get currentExerciseIndex => firstUnfinishedExerciseIndex(
+  /// Generaliza `firstUnfinishedExerciseIndex` —la regla compartida con el
+  /// companion de Apple, bajo el contrato de `conformance/exercise_cursor.json`—
+  /// para que una superserie avance en round-robin. Sin superseries devuelve
+  /// exactamente lo mismo que aquélla. Ver [wearCurrentExerciseIndex].
+  int get currentExerciseIndex => wearCurrentExerciseIndex(
         plannedSets: plan.plannedSets,
         loggedSets: loggedSets,
+        supersetGroups: plan.supersetGroups,
       );
 
   /// Si están TODAS las series de TODOS los ejercicios.

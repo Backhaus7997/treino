@@ -10,10 +10,12 @@ RoutineSlot _slot(
   String nombre, {
   int targetSets = 3,
   int restSeconds = 60,
+  int? supersetGroup,
   List<int> activeWeeks = const [],
   List<List<SetSpec>> weeklySets = const [],
 }) =>
     RoutineSlot(
+      supersetGroup: supersetGroup,
       exerciseId: nombre.toLowerCase().replaceAll(' ', '-'),
       exerciseName: nombre,
       muscleGroup: 'back',
@@ -219,5 +221,49 @@ void main() {
 
     expect(plan.exercises, isEmpty);
     expect(plan.plannedSets, isEmpty);
+  });
+
+  group('superseries', () {
+    test('el plan se trae el supersetGroup de cada slot', () {
+      // Sin esto el reloj no puede distinguir una superserie de tres ejercicios
+      // sueltos, y avanza A1→A2→A3 en vez de 1a→1b→1c.
+      final plan = wearWorkoutPlanFrom(
+        routine: _routine(days: [
+          RoutineDay(dayNumber: 1, name: 'Empuje', slots: [
+            _slot('Press', supersetGroup: 1),
+            _slot('Aperturas', supersetGroup: 1),
+            _slot('Remo'),
+          ]),
+        ]),
+        dayNumber: 1,
+        weekNumber: 0,
+      )!;
+
+      expect(plan.supersetGroups, [1, 1, null]);
+    });
+
+    test('los grupos quedan alineados con plannedSets aunque falten semanas',
+        () {
+      // Un ejercicio ausente esta semana no entra al plan, así que el grupo
+      // tampoco: si se desalinearan, el bloque agruparía ejercicios equivocados.
+      final plan = wearWorkoutPlanFrom(
+        routine: _routine(
+          numWeeks: 2,
+          days: [
+            RoutineDay(dayNumber: 1, name: 'Empuje', slots: [
+              _slot('Press', supersetGroup: 1),
+              _slot('Aperturas', supersetGroup: 1, activeWeeks: const [0]),
+              _slot('Remo', supersetGroup: 2),
+            ]),
+          ],
+        ),
+        dayNumber: 1,
+        weekNumber: 1,
+      )!;
+
+      expect([for (final e in plan.exercises) e.exerciseId], ['press', 'remo']);
+      expect(plan.supersetGroups, [1, 2]);
+      expect(plan.supersetGroups.length, plan.plannedSets.length);
+    });
   });
 }

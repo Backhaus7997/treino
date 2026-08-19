@@ -12,6 +12,7 @@ class WearPlannedExercise {
     required this.exerciseName,
     required this.sets,
     required this.restSeconds,
+    this.supersetGroup,
   });
 
   /// Sin esto no hay escritura posible: es la mitad de la identidad de la serie.
@@ -30,6 +31,13 @@ class WearPlannedExercise {
   /// `SetSpec` y es **falso**: `SetSpec` tiene seis campos y ninguno es
   /// descanso.
   final int restSeconds;
+
+  /// A qué superserie pertenece, o null si es un ejercicio suelto.
+  ///
+  /// Sale tal cual de `RoutineSlot.supersetGroup`. Sin esto el reloj no podía
+  /// distinguir una superserie A/B/C de tres ejercicios independientes, y por
+  /// eso avanzaba A1→A2→A3 en vez de 1a→1b→1c. Ver `wearCurrentExerciseIndex`.
+  final int? supersetGroup;
 }
 
 /// El entreno completo que el reloj está por ejecutar, o ejecutando.
@@ -57,8 +65,14 @@ class WearWorkoutPlan {
 
   /// Cuántas series pide el plan por ejercicio, en orden.
   ///
-  /// Es la entrada de `firstUnfinishedExerciseIndex`.
+  /// Es una de las entradas de `wearCurrentExerciseIndex`.
   List<int> get plannedSets => [for (final e in exercises) e.sets.length];
+
+  /// La superserie de cada ejercicio, en el MISMO orden que [plannedSets].
+  ///
+  /// La otra entrada del cursor. Va alineada por posición y no por id porque el
+  /// mismo ejercicio puede aparecer dos veces en un día.
+  List<int?> get supersetGroups => [for (final e in exercises) e.supersetGroup];
 }
 
 /// Resuelve el plan del día [dayNumber] en la semana [weekNumber].
@@ -111,6 +125,7 @@ WearWorkoutPlan? wearWorkoutPlanFrom({
               exerciseName: slot.exerciseName,
               sets: slot.effectiveSetsForWeek(week),
               restSeconds: slot.restSeconds,
+              supersetGroup: slot.supersetGroup,
             ),
       ],
     );
