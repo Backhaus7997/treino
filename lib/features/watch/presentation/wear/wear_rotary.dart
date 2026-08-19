@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
@@ -82,7 +84,8 @@ class WearRotaryScroll extends StatefulWidget {
   State<WearRotaryScroll> createState() => _WearRotaryScrollState();
 }
 
-class _WearRotaryScrollState extends State<WearRotaryScroll> {
+class _WearRotaryScrollState extends State<WearRotaryScroll>
+    with SingleTickerProviderStateMixin {
   /// Cuánto scroll produce una muesca.
   ///
   /// Medido en el SM-L500: cada muesca da `axis = ±1.0`, que por el
@@ -100,8 +103,47 @@ class _WearRotaryScrollState extends State<WearRotaryScroll> {
   /// como un frenazo.
   static const Duration _idleBeforeFling = Duration(milliseconds: 80);
 
+  /// Constante de tiempo con la que se persigue el pendiente, en segundos.
+  ///
+  /// Cada frame se consume la fracción `1 - e^(-dt/tau)`. Expresarlo así y no
+  /// como "un porcentaje por frame" hace que el movimiento se sienta IGUAL a 60
+  /// y a 90 Hz: con un porcentaje fijo, una pantalla más rápida alcanzaría el
+  /// destino antes y el mismo giro se sentiría distinto según el reloj.
+  ///
+  /// 35 ms es el compromiso medido: más bajo vuelve a escalonarse —el frame
+  /// consume casi toda la muesca—, y más alto se siente elástico, como si la
+  /// lista viniera atrasada respecto del dedo.
+  static const double _followTau = 0.035;
+
+  /// Por debajo de esto el resto se aplica de una y se considera alcanzado.
+  /// Sin este piso, la persecución exponencial nunca llega a cero y el ticker
+  /// quedaría vivo para siempre moviendo fracciones de píxel.
+  static const double _epsilon = 0.2;
+
   StreamSubscription<double>? _sub;
   double _dpr = 1;
+
+  /// Píxeles lógicos que la corona pidió y todavía no se aplicaron.
+  ///
+  /// ## Por qué existe: los tirones no eran falta de inercia
+  ///
+  /// El arrastre ya usaba `Drag`, así que el fling estaba. Lo que se seguía
+  /// viendo era otra cosa: **cada muesca aplicaba su desplazamiento entero en
+  /// un solo frame**. Medido en el SM-L500, una muesca son 136 px físicos = 64
+  /// lógicos, y por la sensibilidad ~54: en una pantalla de 206 dp eso es un
+  /// cuarto de pantalla de golpe. Girando despacio se ve exactamente como lo
+  /// describió el dueño — un salto por muesca — porque ES un salto por muesca,
+  /// por más física que haya después.
+  ///
+  /// La corona emite eventos discretos y la pantalla dibuja a 60/90 Hz. En vez
+  /// de volcar la muesca entera en el frame en que llega, se acumula acá y un
+  /// ticker la reparte entre los frames siguientes. El movimiento pasa de
+  /// escalonado a continuo sin tocar la física: al `Drag` se le siguen dando
+  /// updates, sólo que más chicos y más seguidos.
+  double _pending = 0;
+
+  Ticker? _ticker;
+  Duration _lastTick = Duration.zero;
 
   /// Arrastre en curso. El MISMO tipo que produce un dedo.
   Drag? _drag;
@@ -113,8 +155,6 @@ class _WearRotaryScrollState extends State<WearRotaryScroll> {
   /// el scroll frena en seco apenas se deja de girar. Ese frenazo es justo lo
   /// que se leía como "bloques".
   double _velocity = 0;
-
-  final _sinceLastNotch = Stopwatch();
 
   @override
   void initState() {
@@ -134,6 +174,7 @@ class _WearRotaryScrollState extends State<WearRotaryScroll> {
   void dispose() {
     _sub?.cancel();
     _idle?.cancel();
+    _ticker?.dispose();
     _drag?.cancel();
     super.dispose();
   }
@@ -151,45 +192,96 @@ class _WearRotaryScrollState extends State<WearRotaryScroll> {
     // (devicePixelRatio 2.125) cada muesca scrollea el doble de lo que debería.
     final delta = physical / _dpr * _sensitivity;
 
-    // Velocidad a partir del intervalo REAL entre muescas: la corona no emite a
-    // frecuencia fija. Se acota y se suaviza para que una muesca fuera de
-    // tiempo no dispare un fling desproporcionado.
-    final gap = _sinceLastNotch.isRunning
-        ? (_sinceLastNotch.elapsedMicroseconds / 1e6).clamp(0.008, 0.5)
-        : 0.5;
-    _sinceLastNotch
-      ..reset()
-      ..start();
-
-    // El signo se invierte: en el protocolo de arrastre, mover el dedo hacia
-    // ARRIBA (delta negativo) baja por la lista.
-    final instant = -delta / gap;
-    _velocity = _drag == null ? instant : _velocity * 0.7 + instant * 0.3;
+    // La muesca NO se aplica acá. Se encola, y el ticker la reparte entre los
+    // frames que siguen. Ver [_pending].
+    _pending += delta;
 
     _drag ??= c.position.drag(
       DragStartDetails(globalPosition: Offset.zero),
       () => _drag = null,
     );
-    _drag!.update(
-      DragUpdateDetails(
-        globalPosition: Offset.zero,
-        delta: Offset(0, -delta),
-        primaryDelta: -delta,
-      ),
-    );
+
+    final ticker = _ticker ??= createTicker(_onTick);
+    if (!ticker.isActive) {
+      _lastTick = Duration.zero;
+      ticker.start();
+    }
 
     // Cada muesca corre el vencimiento: un giro sostenido es UN arrastre largo,
     // no muchos cortos. Partirlo en pedazos es exactamente lo que producía los
     // frenazos entre bloques.
     _idle?.cancel();
-    _idle = Timer(_idleBeforeFling, _endDrag);
+    _idle = Timer(_idleBeforeFling, _cerrarSiYaLlego);
+  }
+
+  /// Reparte el pendiente, un poco por frame.
+  void _onTick(Duration elapsed) {
+    final drag = _drag;
+    if (drag == null) {
+      _pending = 0;
+      _pararTicker();
+      return;
+    }
+
+    // dt REAL entre frames, acotado: un frame perdido no puede producir un
+    // salto grande, que es justo lo que se está tratando de eliminar.
+    final dt = _lastTick == Duration.zero
+        ? 1 / 60
+        : ((elapsed - _lastTick).inMicroseconds / 1e6).clamp(1 / 240, 0.05);
+    _lastTick = elapsed;
+
+    var step = _pending * (1 - math.exp(-dt / _followTau));
+    if (_pending.abs() < _epsilon) step = _pending;
+    _pending -= step;
+
+    if (step != 0) {
+      // El signo se invierte: en el protocolo de arrastre, mover el dedo hacia
+      // ARRIBA (delta negativo) baja por la lista.
+      drag.update(
+        DragUpdateDetails(
+          globalPosition: Offset.zero,
+          delta: Offset(0, -step),
+          primaryDelta: -step,
+        ),
+      );
+
+      // La velocidad sale de lo que se movió DE VERDAD en este frame, no del
+      // intervalo entre muescas. Es la misma cuenta que hace un dedo, y por eso
+      // el fling que sale al soltar tiene la magnitud que el atleta espera.
+      final instant = -step / dt;
+      _velocity = _velocity * 0.75 + instant * 0.25;
+    }
+
+    if (_pending.abs() < _epsilon) {
+      _pending = 0;
+      _pararTicker();
+    }
+  }
+
+  void _pararTicker() {
+    if (_ticker?.isActive ?? false) _ticker!.stop();
+    _lastTick = Duration.zero;
+  }
+
+  /// Cierra el arrastre sólo cuando ya no queda nada por aplicar.
+  ///
+  /// Si venciera el silencio con pendiente en la mano, el fling arrancaría
+  /// desde una posición que la lista todavía no alcanzó y se vería un salto
+  /// justo al soltar — el tirón, mudado al final del gesto.
+  void _cerrarSiYaLlego() {
+    if (_pending.abs() >= _epsilon) {
+      _idle = Timer(_idleBeforeFling, _cerrarSiYaLlego);
+      return;
+    }
+    _endDrag();
   }
 
   /// Cierra el arrastre con velocidad, para que la física haga el fling.
   void _endDrag() {
     final drag = _drag;
     _drag = null;
-    _sinceLastNotch.stop();
+    _pending = 0;
+    _pararTicker();
     if (drag == null) return;
     drag.end(
       DragEndDetails(
