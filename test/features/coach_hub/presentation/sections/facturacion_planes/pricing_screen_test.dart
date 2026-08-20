@@ -194,6 +194,37 @@ void main() {
       await tester.pump();
     }
 
+    // El diseño de referencia ponía la recomendada primero para ganar el fold.
+    // Se descartó: en una lista scrolleable romper la escalera de precios
+    // obliga a reconstruirla mentalmente, que es justo lo que el PF viene a
+    // hacer acá. Este test fija el orden para que no vuelva por descuido.
+    testWidgets(
+        'las tarjetas van en orden de precio, no la recomendada primero',
+        (tester) async {
+      await pumpMobile(tester);
+
+      final esperado = SubscriptionTier.values
+          .map((t) => switch (t) {
+                SubscriptionTier.free => 'FREE',
+                SubscriptionTier.plan1 => 'PLAN 1',
+                SubscriptionTier.plan2 => 'PLAN 2',
+                SubscriptionTier.plan3 => 'PLAN 3',
+              })
+          .toList();
+
+      // Posición vertical real de cada tarjeta en pantalla.
+      final ys = [
+        for (final nombre in esperado) tester.getTopLeft(find.text(nombre)).dy,
+      ];
+
+      for (var i = 1; i < ys.length; i++) {
+        expect(
+          ys[i],
+          greaterThan(ys[i - 1]),
+          reason: '${esperado[i]} deberia ir debajo de ${esperado[i - 1]}',
+        );
+      }
+    });
     testWidgets('rendea el stack vertical, no el layout de escritorio',
         (tester) async {
       await pumpMobile(tester);

@@ -532,14 +532,19 @@ class _PlanCards extends StatelessWidget {
     const tiers = SubscriptionTier.values;
 
     if (narrow) {
-      // Apilado: la recomendada primero (mas visible en el teléfono, donde el
-      // resto de las tarjetas queda abajo del fold).
-      final ordered = [recommended, ...tiers.where((t) => t != recommended)];
+      // Apilado en ORDEN DE PRECIO (el del enum: free → plan1 → plan2 → plan3).
+      //
+      // El diseño de referencia ponía la recomendada primero para ganar el
+      // fold. Se descartó: en una lista scrolleable eso rompe la escalera y
+      // obliga al PF a reconstruirla mentalmente para comparar — que es
+      // exactamente lo que viene a hacer a esta pantalla. La recomendada ya se
+      // distingue por el borde, el glow y la etiqueta «MÁS POPULAR»; no
+      // necesita además saltearse la fila.
       return Column(
         children: [
-          for (var i = 0; i < ordered.length; i++) ...[
+          for (var i = 0; i < tiers.length; i++) ...[
             if (i > 0) const SizedBox(height: 12),
-            cards[ordered[i]]!,
+            cards[tiers[i]]!,
           ],
         ],
       );
