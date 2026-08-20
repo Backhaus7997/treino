@@ -56,6 +56,20 @@ final wearRestProvider = StreamProvider.autoDispose<WearRestState?>((ref) {
   return controller.stream;
 });
 
+/// Con qué frecuencia se relee el temporizador de EJERCICIO.
+///
+/// Mucho más seguido que el descanso, y por un motivo concreto: acá los dos
+/// números están a la vista AL MISMO TIEMPO —uno en la muñeca y otro en el
+/// teléfono— y con un tick de un segundo, sin alineación entre ambos, el
+/// desfase visible llega a casi un segundo entero aunque el dato haya cruzado
+/// instantáneo. Medido en la muñeca: se nota.
+///
+/// 200 ms deja el error por debajo de lo perceptible. El costo es acotado por
+/// construcción: sólo hay temporizador durante una serie —decenas de segundos—
+/// y es una llamada por MethodChannel que lee un `long` de preferencias, al
+/// lado de lo que ya consume Health Services midiendo el pulso.
+const _pollTimerEjercicio = Duration(milliseconds: 200);
+
 /// Temporizador del ejercicio por tiempo, o null si no hay ninguno.
 ///
 /// Mismo mecanismo que [wearRestProvider] —polling de un DEADLINE persistido, no
@@ -83,7 +97,7 @@ final wearExerciseTimerProvider =
   }
 
   unawaited(poll());
-  timer = Timer.periodic(_pollEvery, (_) => unawaited(poll()));
+  timer = Timer.periodic(_pollTimerEjercicio, (_) => unawaited(poll()));
 
   ref.onDispose(() {
     timer?.cancel();
