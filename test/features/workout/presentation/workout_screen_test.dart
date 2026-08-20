@@ -388,7 +388,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
 
       expect(find.byType(PlantillasTab), findsOneWidget);
-      expect(find.text('No hay plantillas todavía.'), findsOneWidget);
+      expect(find.text('No hay rutinas todavía.'), findsOneWidget);
       expect(find.byType(RutinasSection), findsNothing);
     });
 

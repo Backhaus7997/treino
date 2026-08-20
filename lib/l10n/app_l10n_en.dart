@@ -790,6 +790,16 @@ class AppL10nEn extends AppL10n {
   String get workoutTabExplore => 'EXPLORE';
 
   @override
+  String get workoutExploreEmptyAll => 'No routines yet.';
+
+  @override
+  String get workoutExploreEmptyLevel => 'No routines for this level.';
+
+  @override
+  String get workoutExploreLoadError =>
+      'Something went wrong loading the routines.';
+
+  @override
   String get workoutMisRutinasSectionTitle => '';
 
   @override
@@ -860,7 +870,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get templateRatingsNoneYet =>
-      'Nobody has rated this template yet. Be the first!';
+      'Nobody has rated this routine yet. Be the first!';
 
   @override
   String templateRatingsCount(int count) {
@@ -892,14 +902,14 @@ class AppL10nEn extends AppL10n {
   String get templateRatingsError => 'We couldn\'t load the comments.';
 
   @override
-  String get templateRatingSheetTitle => 'Rate this template';
+  String get templateRatingSheetTitle => 'Rate this routine';
 
   @override
   String get templateRatingSheetTitleEdit => 'Edit your rating';
 
   @override
   String get templateRatingSheetCommentHint =>
-      'Tell others how this template went (optional)';
+      'Tell others how this routine went (optional)';
 
   @override
   String get templateRatingSheetCancel => 'CANCEL';
@@ -2829,10 +2839,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String dashboardAlertBannerSummary(
-    int vencidos,
-    int solicitudes,
-    int inactivos,
-  ) {
+      int vencidos, int solicitudes, int inactivos) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,

@@ -95,7 +95,7 @@ abstract class AppL10n {
   static const List<Locale> supportedLocales = <Locale>[
     Locale('en'),
     Locale('es'),
-    Locale('es', 'AR'),
+    Locale('es', 'AR')
   ];
 
   /// No description provided for @notFoundTitle.
@@ -1574,6 +1574,24 @@ abstract class AppL10n {
   /// **'EXPLORAR'**
   String get workoutTabExplore;
 
+  /// Empty state of the EXPLORAR catalogue grid when no trainer has published anything yet and no level filter is active (#638).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No hay rutinas todavía.'**
+  String get workoutExploreEmptyAll;
+
+  /// Empty state of the EXPLORAR catalogue grid when a level filter pill is active and nothing matches it (#638).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No hay rutinas para este nivel.'**
+  String get workoutExploreEmptyLevel;
+
+  /// Error state of the EXPLORAR catalogue grid. Paired with plantillasRetryLabel as the retry CTA (#638).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Hubo un error cargando las rutinas.'**
+  String get workoutExploreLoadError;
+
   /// No description provided for @workoutMisRutinasSectionTitle.
   ///
   /// In es_AR, this message translates to:
@@ -1715,7 +1733,7 @@ abstract class AppL10n {
   /// Shown instead of the average when a published template has zero ratings.
   ///
   /// In es_AR, this message translates to:
-  /// **'Todavía nadie calificó esta plantilla. ¡Sé el primero!'**
+  /// **'Todavía nadie calificó esta rutina. ¡Sé el primero!'**
   String get templateRatingsNoneYet;
 
   /// How many people rated the template, next to the average score.
@@ -1763,7 +1781,7 @@ abstract class AppL10n {
   /// Title of the rating bottom sheet when creating a new rating.
   ///
   /// In es_AR, this message translates to:
-  /// **'Calificá esta plantilla'**
+  /// **'Calificá esta rutina'**
   String get templateRatingSheetTitle;
 
   /// Title of the rating bottom sheet when editing an existing rating.
@@ -1775,7 +1793,7 @@ abstract class AppL10n {
   /// Hint of the optional comment field in the template rating sheet, max 500 chars.
   ///
   /// In es_AR, this message translates to:
-  /// **'Contá cómo te fue con esta plantilla (opcional)'**
+  /// **'Contá cómo te fue con esta rutina (opcional)'**
   String get templateRatingSheetCommentHint;
 
   /// Cancel button of the template rating sheet.
@@ -5215,10 +5233,7 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'{vencidos, plural, =1{1 vencido} other{{vencidos} vencidos}} · {solicitudes, plural, =1{1 solicitud} other{{solicitudes} solicitudes}} · {inactivos, plural, =1{1 inactivo} other{{inactivos} inactivos}}'**
   String dashboardAlertBannerSummary(
-    int vencidos,
-    int solicitudes,
-    int inactivos,
-  );
+      int vencidos, int solicitudes, int inactivos);
 
   /// Formatted adherencia percentage value shown in the adherencia ring and KPI tile once the aggregate provider has data.
   ///
@@ -6255,9 +6270,8 @@ AppL10n lookupAppL10n(Locale locale) {
   }
 
   throw FlutterError(
-    'AppL10n.delegate failed to load unsupported locale "$locale". This is likely '
-    'an issue with the localizations generation tool. Please file an issue '
-    'on GitHub with a reproducible sample app and the gen-l10n configuration '
-    'that was used.',
-  );
+      'AppL10n.delegate failed to load unsupported locale "$locale". This is likely '
+      'an issue with the localizations generation tool. Please file an issue '
+      'on GitHub with a reproducible sample app and the gen-l10n configuration '
+      'that was used.');
 }

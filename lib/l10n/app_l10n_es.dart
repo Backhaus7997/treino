@@ -810,6 +810,15 @@ class AppL10nEs extends AppL10n {
   String get workoutTabExplore => 'EXPLORAR';
 
   @override
+  String get workoutExploreEmptyAll => 'No hay rutinas todavía.';
+
+  @override
+  String get workoutExploreEmptyLevel => 'No hay rutinas para este nivel.';
+
+  @override
+  String get workoutExploreLoadError => 'Hubo un error cargando las rutinas.';
+
+  @override
   String get workoutMisRutinasSectionTitle => 'MIS RUTINAS';
 
   @override
@@ -887,7 +896,7 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get templateRatingsNoneYet =>
-      'Todavía nadie calificó esta plantilla. ¡Sé el primero!';
+      'Todavía nadie calificó esta rutina. ¡Sé el primero!';
 
   @override
   String templateRatingsCount(int count) {
@@ -919,14 +928,14 @@ class AppL10nEs extends AppL10n {
   String get templateRatingsError => 'No pudimos cargar los comentarios.';
 
   @override
-  String get templateRatingSheetTitle => 'Califica esta plantilla';
+  String get templateRatingSheetTitle => 'Califica esta rutina';
 
   @override
   String get templateRatingSheetTitleEdit => 'Edita tu calificación';
 
   @override
   String get templateRatingSheetCommentHint =>
-      'Cuenta cómo te fue con esta plantilla (opcional)';
+      'Cuenta cómo te fue con esta rutina (opcional)';
 
   @override
   String get templateRatingSheetCancel => 'CANCELAR';
@@ -2885,10 +2894,7 @@ class AppL10nEs extends AppL10n {
 
   @override
   String dashboardAlertBannerSummary(
-    int vencidos,
-    int solicitudes,
-    int inactivos,
-  ) {
+      int vencidos, int solicitudes, int inactivos) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,
@@ -4310,6 +4316,15 @@ class AppL10nEsAr extends AppL10nEs {
   String get workoutTabExplore => 'EXPLORAR';
 
   @override
+  String get workoutExploreEmptyAll => 'No hay rutinas todavía.';
+
+  @override
+  String get workoutExploreEmptyLevel => 'No hay rutinas para este nivel.';
+
+  @override
+  String get workoutExploreLoadError => 'Hubo un error cargando las rutinas.';
+
+  @override
   String get workoutMisRutinasSectionTitle => 'MIS RUTINAS';
 
   @override
@@ -4387,7 +4402,7 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get templateRatingsNoneYet =>
-      'Todavía nadie calificó esta plantilla. ¡Sé el primero!';
+      'Todavía nadie calificó esta rutina. ¡Sé el primero!';
 
   @override
   String templateRatingsCount(int count) {
@@ -4419,14 +4434,14 @@ class AppL10nEsAr extends AppL10nEs {
   String get templateRatingsError => 'No pudimos cargar los comentarios.';
 
   @override
-  String get templateRatingSheetTitle => 'Calificá esta plantilla';
+  String get templateRatingSheetTitle => 'Calificá esta rutina';
 
   @override
   String get templateRatingSheetTitleEdit => 'Editá tu calificación';
 
   @override
   String get templateRatingSheetCommentHint =>
-      'Contá cómo te fue con esta plantilla (opcional)';
+      'Contá cómo te fue con esta rutina (opcional)';
 
   @override
   String get templateRatingSheetCancel => 'CANCELAR';
@@ -6383,10 +6398,7 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String dashboardAlertBannerSummary(
-    int vencidos,
-    int solicitudes,
-    int inactivos,
-  ) {
+      int vencidos, int solicitudes, int inactivos) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,
