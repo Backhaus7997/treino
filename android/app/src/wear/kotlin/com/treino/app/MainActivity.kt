@@ -9,6 +9,7 @@ import android.view.ViewConfiguration
 import io.flutter.plugin.common.EventChannel
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.treino.app.link.TreinoLinkPlugin
 import com.treino.app.workout.WearWorkoutPlugin
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -16,6 +17,9 @@ import io.flutter.embedding.engine.FlutterEngine
 class MainActivity : FlutterActivity() {
 
     private var wearWorkout: WearWorkoutPlugin? = null
+
+    /// El canal simétrico con el teléfono. Ver TreinoLinkPlugin.
+    private var link: TreinoLinkPlugin? = null
 
     private var rotarySink: EventChannel.EventSink? = null
 
@@ -62,6 +66,10 @@ class MainActivity : FlutterActivity() {
         // de runtime del foreground service tipo `health` es while-in-use, así
         // que arrancarlo desde un receiver con la app cerrada tira SecurityException.
         wearWorkout = WearWorkoutPlugin(
+            context = applicationContext,
+            messenger = flutterEngine.dartExecutor.binaryMessenger,
+        )
+        link = TreinoLinkPlugin(
             context = applicationContext,
             messenger = flutterEngine.dartExecutor.binaryMessenger,
         )
@@ -119,6 +127,14 @@ class MainActivity : FlutterActivity() {
             }
         if (faltantes.isEmpty()) return
         ActivityCompat.requestPermissions(this, faltantes.toTypedArray(), REQ_HEART_RATE)
+    }
+
+    override fun onDestroy() {
+        // El canal registra un listener en Play Services; sin soltarlo queda
+        // una referencia a la Activity muerta.
+        link?.dispose()
+        link = null
+        super.onDestroy()
     }
 
     private companion object {

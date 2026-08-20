@@ -16,6 +16,8 @@ import 'session_init.dart';
 import 'session_duration.dart';
 import 'session_providers.dart';
 import 'session_state.dart';
+import '../../watch/application/watch_bridge_provider.dart';
+import '../../watch/data/treino_link.dart';
 
 /// Notifier de sesión activa. Despacha Path A (FreshSession) o Path B
 /// (ResumeSession) via switch sobre el arg sellado. Diseño §3.3.
@@ -256,6 +258,18 @@ class SessionNotifier
   void _nudgeWatch(String reason) {
     try {
       unawaited(ref.read(watchNudgeServiceProvider).nudge(reason: reason));
+
+      // Y por el canal propio, que es el ÚNICO que despierta al companion con
+      // la app del reloj cerrada — el caso normal: el atleta toca Empezar en el
+      // celular y recién después mira la muñeca.
+      //
+      // Va además del aviso de arriba y no en su lugar: aquél sigue sirviendo
+      // para el reloj que ya está abierto, y son dos transportes distintos.
+      if (reason == WatchNudgeService.reasonWorkoutStarted) {
+        unawaited(
+          ref.read(treinoLinkProvider).send(TreinoLink.pathWorkoutStarted),
+        );
+      }
     } catch (_) {
       // `ref.read` tira si el notifier ya se descartó (la ruta del player puede
       // salir mientras la escritura está en vuelo — ver la nota de #497 más

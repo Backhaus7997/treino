@@ -183,14 +183,18 @@ dependencies {
     // arranca en estable y se evalúa después.
     "wearImplementation"("androidx.health:health-services-client:1.0.0")
 
-    // La Data Layer API. El plugin `watch_connectivity` ya la trae con `api`,
-    // pero acá se declara EXPLÍCITA porque el código del app la usa directo
-    // —`WorkoutLaunchService` extiende `WearableListenerService`— y depender de
-    // la transitividad de un plugin para compilar código propio es frágil: el
-    // día que el plugin cambie a `implementation`, esto deja de compilar por un
-    // motivo que no se ve en ningún lado. Misma versión que el plugin, para no
-    // forzar una resolución de conflicto.
-    "wearImplementation"("com.google.android.gms:play-services-wearable:19.0.0")
+    // La Data Layer API, para LOS DOS flavors.
+    //
+    // No es `wearImplementation` aunque suene a cosa de reloj: `TreinoLinkPlugin`
+    // vive en `src/main` y lo compilan los dos APKs, porque el canal es
+    // simétrico — el teléfono manda y escucha igual que el reloj.
+    //
+    // Se declara EXPLÍCITA aunque `watch_connectivity` ya la traiga con `api`:
+    // depender de la transitividad de un plugin para compilar código propio es
+    // frágil, y el día que ese plugin pase a `implementation` esto dejaría de
+    // compilar por un motivo invisible. Misma versión que él, para no forzar
+    // una resolución de conflicto.
+    implementation("com.google.android.gms:play-services-wearable:19.0.0")
 }
 
 flutter {

@@ -10,8 +10,7 @@ import androidx.core.app.NotificationCompat
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.WearableListenerService
 import com.treino.app.MainActivity
-import java.io.ByteArrayInputStream
-import java.io.ObjectInputStream
+import org.json.JSONObject
 
 /**
  * Abre el companion cuando el atleta arranca un entreno DESDE EL TELEFONO.
@@ -46,29 +45,21 @@ import java.io.ObjectInputStream
 class WorkoutLaunchService : WearableListenerService() {
 
     override fun onMessageReceived(event: MessageEvent) {
-        val payload = leerPayload(event.data)
-        if (payload == null) {
-            Log.i(TAG, "mensaje ilegible en ${event.path}, se ignora")
-            return
+        Log.i(TAG, "llego un mensaje en ${event.path}")
+        if (event.path != PATH_WORKOUT_STARTED) return
+
+        // El payload viaja como JSON, no como serializacion de Java: asi este
+        // servicio lo parsea sin engine de Flutter y sin ObjectInputStream.
+        val datos = try {
+            JSONObject(String(event.data, Charsets.UTF_8))
+        } catch (e: Exception) {
+            Log.w(TAG, "payload ilegible, se abre igual", e)
+            JSONObject()
         }
 
-        // El mismo contrato que usa `WatchNudgeService` del lado Dart. Por este
-        // canal viaja mas de un tipo de aviso, asi que se filtra por los dos
-        // campos y no solo por el path.
-        if (payload["kind"] != KIND_REFRESH) return
-        if (payload["reason"] != REASON_WORKOUT_STARTED) return
-
-        Log.i(TAG, "el telefono arranco un entreno: abriendo el companion")
+        Log.i(TAG, "el telefono arranco un entreno ($datos): abriendo el companion")
         abrirDirecto()
         abrirPorNotificacion()
-    }
-
-    /** El HashMap serializado que manda el plugin del otro lado. */
-    private fun leerPayload(bytes: ByteArray): Map<*, *>? = try {
-        ObjectInputStream(ByteArrayInputStream(bytes)).readObject() as? Map<*, *>
-    } catch (e: Exception) {
-        Log.w(TAG, "no se pudo deserializar el mensaje", e)
-        null
     }
 
     private fun intentDeLaApp(): Intent =
@@ -122,11 +113,8 @@ class WorkoutLaunchService : WearableListenerService() {
     companion object {
         private const val TAG = "treino-wear-launch"
 
-        /** Espeja `WatchNudgeService.kind` del lado Dart. */
-        private const val KIND_REFRESH = "watchRefresh"
-
-        /** Espeja `WatchNudgeService.reasonWorkoutStarted`. */
-        private const val REASON_WORKOUT_STARTED = "workoutStarted"
+        /** Espeja `TreinoLink.pathWorkoutStarted` del lado Dart. */
+        private const val PATH_WORKOUT_STARTED = "/treino/workout-started"
 
         private const val CANAL = "treino_workout_launch"
         private const val NOTIF_ID = 4201

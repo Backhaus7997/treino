@@ -110,17 +110,22 @@
              Services, otro proceso. El `permission` lo acota a el y a nadie
              mas.
 
-             El intent-filter NO declara pathPrefix. El plugin manda el mensaje
-             con path `watch_connectivity`, SIN barra inicial, y un
-             `pathPrefix="/watch_connectivity"` no matchearia. El filtro fino se
-             hace en Kotlin, mirando `kind` y `reason`. -->
+             El pathPrefix es `/treino` y ESO es todo el punto. Play Services
+             despacha armando `wear://<nodo>/<path>`; con el path sin barra
+             inicial que manda `watch_connectivity` la URI queda malformada y
+             ningun filtro la matchea — medido: el servicio no se desperto ni
+             una vez. Por eso los avisos van por TreinoLinkPlugin, que exige la
+             barra. -->
         <service
             android:name="com.treino.app.workout.WorkoutLaunchService"
             android:exported="true"
             android:permission="com.google.android.gms.permission.BIND_WEARABLE_LISTENER">
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
-                <data android:scheme="wear" android:host="*" />
+                <data
+                    android:scheme="wear"
+                    android:host="*"
+                    android:pathPrefix="/treino" />
             </intent-filter>
         </service>
     </application>
