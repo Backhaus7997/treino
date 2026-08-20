@@ -1,9 +1,11 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../../app/theme/app_palette.dart';
 import '../../../../../core/widgets/motion/treino_tappable.dart';
+import '../../../../../core/widgets/treino_icon.dart';
 import '../../../../coach/domain/subscription_tier.dart';
 
 /// Muestra el paywall de bloqueo cuando el PF intentó agregar un alumno que
@@ -29,6 +31,35 @@ import '../../../../coach/domain/subscription_tier.dart';
 ///   equivocado: ya compró uno.
 enum PlanLimitReason { planLimit, subscriptionInactive }
 
+/// Envoltura visual del paywall. El CONTENIDO es idéntico en las dos: lo único
+/// que cambia es cómo entra a la pantalla.
+///
+/// - [dialog] — card centrada con ancho máximo. Es la forma de WEB (Coach Hub):
+///   una app de escritorio con sidebar y ventana ancha. Un panel que sube desde
+///   el borde inferior ahí es un error de plataforma, no una decisión estética.
+/// - [sheet] — bottom sheet pegado al borde inferior, ancho completo,
+///   redondeado sólo arriba, descartable deslizando. Es la forma de MÓVIL: el
+///   pulgar llega al CTA y el gesto de descarte es el nativo del sistema.
+enum PlanLimitPaywallForm { dialog, sheet }
+
+/// Fuerza la forma del paywall. SÓLO para tests.
+///
+/// `kIsWeb` es una constante de COMPILACIÓN: bajo `flutter test` (que corre en
+/// la VM de Dart, no en un browser) vale `false` siempre y no hay forma de
+/// moverlo. Sin este seam la rama [PlanLimitPaywallForm.dialog] quedaría
+/// literalmente sin cobertura, y un test que dijera «en web es dialog» estaría
+/// verde sin haber probado nada.
+///
+/// Nadie en `lib/` lo lee ni lo escribe: el default `null` deja mandar a la
+/// plataforma. Los tests lo fijan y lo devuelven a `null` con `addTearDown`.
+@visibleForTesting
+PlanLimitPaywallForm? debugPlanLimitPaywallForm;
+
+/// Forma efectiva: el override si un test lo fijó, si no la plataforma.
+PlanLimitPaywallForm _resolveForm() =>
+    debugPlanLimitPaywallForm ??
+    (kIsWeb ? PlanLimitPaywallForm.dialog : PlanLimitPaywallForm.sheet);
+
 Future<void> showPlanLimitPaywall(
   BuildContext context, {
   required SubscriptionTier currentTier,
@@ -36,20 +67,148 @@ Future<void> showPlanLimitPaywall(
   SubscriptionStatus? subscriptionStatus,
   String? billingRoute,
 }) {
-  return showDialog<void>(
+  // Un solo contenido para las dos envolturas. Si mañana cambia el copy o el
+  // CTA, cambia UNA vez: duplicarlo garantiza que tarde o temprano web y móvil
+  // digan cosas distintas y nadie se entere hasta que lo reporte un usuario.
+  final content = _PlanLimitPaywallContent(
+    currentTier: currentTier,
+    reason: reason,
+    subscriptionStatus: subscriptionStatus,
+    billingRoute: billingRoute,
+  );
+  final barrierColor = Colors.black.withValues(alpha: 0.6);
+
+  if (_resolveForm() == PlanLimitPaywallForm.dialog) {
+    return showDialog<void>(
+      context: context,
+      barrierColor: barrierColor,
+      builder: (_) => _PlanLimitPaywallDialog(content: content),
+    );
+  }
+
+  return showModalBottomSheet<void>(
     context: context,
-    barrierColor: Colors.black.withValues(alpha: 0.6),
-    builder: (_) => _PlanLimitPaywallDialog(
-      currentTier: currentTier,
-      reason: reason,
-      subscriptionStatus: subscriptionStatus,
-      billingRoute: billingRoute,
-    ),
+    // OBLIGATORIO, no una preferencia. `showModalBottomSheet` defaultea a
+    // `useRootNavigator: false`, y en la app móvil eso lo montaría en el
+    // Navigator del ShellRoute — que vive DENTRO del `Scaffold.body` del shell
+    // (`router.dart`, `_ShellScaffold`). El sheet quedaría recortado al body,
+    // con la bottom bar flotando ENCIMA y el scrim sin taparla. Además el
+    // shell popea popups en los dos navigators al cambiar de tab
+    // (`router.dart`, `onTap` de la bottom bar), así que el sheet tiene que
+    // estar donde el `showDialog` de antes: en el raíz. `showDialog` ya
+    // defaultea a `useRootNavigator: true` — esto mantiene la paridad.
+    useRootNavigator: true,
+    // El contenido pasa la mitad de la pantalla con textScale de accesibilidad.
+    // Sin esto el sheet se topa contra el 50% y se corta.
+    isScrollControlled: true,
+    // El fondo real lo pinta `_PlanLimitPaywallSheet` en su propio Container:
+    // es la única forma de redondear SÓLO las esquinas de arriba sin que el
+    // material del sheet dibuje su rectángulo debajo.
+    backgroundColor: Colors.transparent,
+    barrierColor: barrierColor,
+    builder: (_) => _PlanLimitPaywallSheet(content: content),
   );
 }
 
+/// Envoltura DIALOG — web. Card centrada, ancho acotado, esquinas todas
+/// redondeadas.
 class _PlanLimitPaywallDialog extends StatelessWidget {
-  const _PlanLimitPaywallDialog({
+  const _PlanLimitPaywallDialog({required this.content});
+
+  final Widget content;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    return Dialog(
+      backgroundColor: palette.bgCard,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: palette.accent, width: 1.5),
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        // Scrolleable para no overflowear en ventanas de poca altura.
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(28),
+          child: content,
+        ),
+      ),
+    );
+  }
+}
+
+/// Envoltura SHEET — móvil. Sube desde abajo, ancho completo, pegado al borde
+/// inferior, redondeado sólo arriba.
+class _PlanLimitPaywallSheet extends StatelessWidget {
+  const _PlanLimitPaywallSheet({required this.content});
+
+  final Widget content;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    // Techo de altura: `isScrollControlled` habilita la pantalla entera, y sin
+    // techo un contenido alto (textScale de accesibilidad) empuja el sheet
+    // hasta desbordar. Con techo, el `SingleChildScrollView` de abajo scrollea.
+    final maxHeight = MediaQuery.sizeOf(context).height * 0.9;
+
+    return Padding(
+      // Cualquier inset del sistema (teclado incluido) empuja el sheet en vez
+      // de taparlo.
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: Container(
+        constraints: BoxConstraints(maxHeight: maxHeight),
+        decoration: BoxDecoration(
+          color: palette.bgCard,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          border: Border(
+            top: BorderSide(color: palette.accent.withValues(alpha: 0.33)),
+          ),
+        ),
+        // `bottom: true` — la barra de gestos no se come el "Ahora no".
+        // `top: false` — el sheet nunca llega a la barra de estado.
+        child: SafeArea(
+          top: false,
+          bottom: true,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 34),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Handle de arrastre: la señal de que esto se descarta
+                // deslizando, no sólo con el "Ahora no". 40x4 con `border` y
+                // radio 2 es la medida que ya usan los ~25 sheets del repo
+                // (`athlete_picker_sheet`, `set_entry_sheet`,
+                // `review_bottom_sheet`, …): otro ancho se lee como otro
+                // control.
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: palette.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Flexible(child: SingleChildScrollView(child: content)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Contenido del paywall — EL MISMO en las dos envolturas.
+///
+/// Vive separado de [_PlanLimitPaywallDialog] y [_PlanLimitPaywallSheet] a
+/// propósito: las envolturas deciden CÓMO entra a la pantalla, esto decide QUÉ
+/// dice. Un cambio de copy toca un solo lugar.
+class _PlanLimitPaywallContent extends StatelessWidget {
+  const _PlanLimitPaywallContent({
     required this.currentTier,
     this.reason = PlanLimitReason.planLimit,
     this.subscriptionStatus,
@@ -73,88 +232,86 @@ class _PlanLimitPaywallDialog extends StatelessWidget {
     // necesita regularizar, no el aviso del plan a-medida del tope.
     final next = isInactive ? null : currentTier.nextTier;
 
-    return Dialog(
-      backgroundColor: palette.bgCard,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(color: palette.accent, width: 1.5),
-      ),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 420),
-        // Scrolleable para no overflowear en ventanas de poca altura.
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Ícono + título.
-              Icon(Icons.lock_outline, size: 40, color: palette.accent),
-              const SizedBox(height: 14),
-              Text(
-                isInactive
-                    ? 'TU SUSCRIPCIÓN ESTÁ SUSPENDIDA' // i18n: Fase W3
-                    : 'LLEGASTE AL LÍMITE DE TU PLAN', // i18n: Fase W3
-                textAlign: TextAlign.center,
-                style: GoogleFonts.barlowCondensed(
-                  color: palette.textPrimary,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                isInactive
-                    // TODO(producto): copy placeholder — pendiente de revisión
-                    // antes de cerrar el PR (diseño D-2, riesgo residual 4).
-                    ? 'Mientras tu suscripción no esté al día, tu cuenta '
-                        'funciona con el límite del plan Free. Ningún alumno '
-                        'se elimina.' // i18n: Fase W3
-                    : 'Tu plan ${_tierName(currentTier)} incluye '
-                        '${_cupoTexto(currentTier)}. Para sumar más, '
-                        'subí de plan.', // i18n: Fase W3
-                textAlign: TextAlign.center,
-                style: TextStyle(color: palette.textMuted, fontSize: 14),
-              ),
-              const SizedBox(height: 22),
-              if (isInactive)
-                _ReactivateBox(
-                  currentTier: currentTier,
-                  status: subscriptionStatus,
-                  palette: palette,
-                )
-              else if (next != null)
-                _UpsellBox(nextTier: next, palette: palette)
-              else
-                _CustomPlanBox(palette: palette),
-              const SizedBox(height: 20),
-              // CTA principal.
-              _PrimaryCta(
-                hasNext: next != null,
-                isInactive: isInactive,
-                billingRoute: billingRoute,
-                palette: palette,
-              ),
-              const SizedBox(height: 10),
-              TreinoTappable(
-                onTap: () => Navigator.of(context).pop(),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: Text(
-                    'Ahora no', // i18n: Fase W3
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: palette.textMuted,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Ícono + título.
+        Center(
+          child: Container(
+            width: 58,
+            height: 58,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: palette.accent.withValues(alpha: 0.08),
+              border: Border.all(color: palette.accent.withValues(alpha: 0.33)),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Icon(TreinoIcon.lock, size: 28, color: palette.accent),
           ),
         ),
-      ),
+        const SizedBox(height: 14),
+        Text(
+          isInactive
+              ? 'TU SUSCRIPCIÓN ESTÁ SUSPENDIDA' // i18n: Fase W3
+              : 'LLEGASTE AL LÍMITE DE TU PLAN', // i18n: Fase W3
+          textAlign: TextAlign.center,
+          style: GoogleFonts.barlowCondensed(
+            color: palette.textPrimary,
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          isInactive
+              // TODO(producto): copy placeholder — pendiente de revisión
+              // antes de cerrar el PR (diseño D-2, riesgo residual 4).
+              ? 'Mientras tu suscripción no esté al día, tu cuenta '
+                  'funciona con el límite del plan Free. Ningún alumno '
+                  'se elimina.' // i18n: Fase W3
+              : 'Tu plan ${_tierName(currentTier)} incluye '
+                  '${_cupoTexto(currentTier)}. Para sumar más, '
+                  'subí de plan.', // i18n: Fase W3
+          textAlign: TextAlign.center,
+          style: TextStyle(color: palette.textMuted, fontSize: 14),
+        ),
+        const SizedBox(height: 22),
+        if (isInactive)
+          _ReactivateBox(
+            currentTier: currentTier,
+            status: subscriptionStatus,
+            palette: palette,
+          )
+        else if (next != null)
+          _UpsellBox(nextTier: next, palette: palette)
+        else
+          _CustomPlanBox(palette: palette),
+        const SizedBox(height: 20),
+        // CTA principal.
+        _PrimaryCta(
+          hasNext: next != null,
+          isInactive: isInactive,
+          billingRoute: billingRoute,
+          palette: palette,
+        ),
+        const SizedBox(height: 10),
+        TreinoTappable(
+          onTap: () => Navigator.of(context).pop(),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Text(
+              'Ahora no', // i18n: Fase W3
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: palette.textMuted,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -189,38 +346,47 @@ class _UpsellBox extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(top: 6, right: 2),
-                child: Text(
-                  '\$',
-                  style: GoogleFonts.barlowCondensed(
-                    color: palette.textPrimary,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
+          // Precio-héroe. El Row no lleva `Flexible` y con textScale alto se
+          // pasa del ancho de la caja: dentro del sheet móvil (390 pt menos
+          // los paddings) eso ya son rayas amarillas a textScale 2.0.
+          // `scaleDown` lo achica en vez de recortarlo — un precio cortado
+          // («39.0…») MIENTE, uno más chico sigue siendo cierto. Mismo
+          // criterio (y misma causa) que `_PriceFit` en la pricing page.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 6, right: 2),
+                  child: Text(
+                    '\$',
+                    style: GoogleFonts.barlowCondensed(
+                      color: palette.textPrimary,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-              ),
-              Text(
-                _formatArs(price.monthly),
-                style: GoogleFonts.barlowCondensed(
-                  color: palette.textPrimary,
-                  fontSize: 40,
-                  fontWeight: FontWeight.w800,
-                  height: 1.0,
+                Text(
+                  _formatArs(price.monthly),
+                  style: GoogleFonts.barlowCondensed(
+                    color: palette.textPrimary,
+                    fontSize: 40,
+                    fontWeight: FontWeight.w800,
+                    height: 1.0,
+                  ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(top: 18, left: 4),
-                child: Text(
-                  '/mes', // i18n: Fase W3
-                  style: TextStyle(color: palette.textMuted, fontSize: 13),
+                Padding(
+                  padding: const EdgeInsets.only(top: 18, left: 4),
+                  child: Text(
+                    '/mes', // i18n: Fase W3
+                    style: TextStyle(color: palette.textMuted, fontSize: 13),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           const SizedBox(height: 4),
           Text(
