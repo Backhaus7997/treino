@@ -1841,6 +1841,10 @@
   "@sessionDetailNoSets": {
     "description": "Empty state for session_detail_screen when setLogs is empty (finding 18)."
   },
+  "sessionFinishedOnWatch": "Terminaste este entrenamiento desde el reloj.",
+  "@sessionFinishedOnWatch": {
+    "description": "Snackbar al salir del player porque el reloj cerro el entreno. El reloj escribe en la misma sesion, asi que terminar alla termina aca."
+  },
   "sessionLogSetError": "No pudimos guardar la serie. Reintentá.",
   "@sessionLogSetError": {
     "description": "Snackbar shown when logging/updating a set fails in the session player (finding 21). Pair with a retry action."

@@ -4538,6 +4538,12 @@ abstract class AppL10n {
   /// **'Esta sesión no tiene sets registrados.'**
   String get sessionDetailNoSets;
 
+  /// Snackbar al salir del player porque el reloj cerro el entreno. El reloj escribe en la misma sesion, asi que terminar alla termina aca.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Terminaste este entrenamiento desde el reloj.'**
+  String get sessionFinishedOnWatch;
+
   /// Snackbar shown when logging/updating a set fails in the session player (finding 21). Pair with a retry action.
   ///
   /// In es_AR, this message translates to:
