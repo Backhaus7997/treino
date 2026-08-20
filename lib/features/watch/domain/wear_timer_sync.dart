@@ -34,7 +34,10 @@ int wearRemainingSeconds({
   // ignorándolo; el segundo hay que distinguirlo.
   if (transcurridoMs < 0) return seconds;
 
-  final transcurrido = transcurridoMs ~/ 1000;
+  // `round` y no `~/`: truncar deja al receptor un segundo ADELANTE del
+  // aparato que inició, y esa diferencia se ve — los dos números están a la
+  // vista al mismo tiempo, uno en la muñeca y otro en la mano.
+  final transcurrido = (transcurridoMs / 1000).round();
 
   // Más del doble de la duración no es "venció hace un rato": es un reloj mal
   // puesto. Un temporizador de 30 s que dice llevar 5 minutos no cruzó tarde.

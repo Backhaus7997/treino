@@ -17,6 +17,7 @@ import 'wear_fitted_text.dart';
 import 'dart:async';
 import 'wear_exercise_timer_screen.dart';
 import '../../application/wear_timer_sync_providers.dart';
+import '../../data/wear_workout_service.dart';
 
 /// La pantalla de entrenamiento del companion de Wear OS.
 ///
@@ -83,6 +84,29 @@ class WearWorkoutScreen extends ConsumerWidget {
     // que volver acá después de apagar la pantalla —o de que se destruya la
     // Activity— reencuentra el temporizador donde estaba. Eso es lo que hace
     // que "persista al levantar la muñeca" salga gratis.
+    // Al VENCER, la serie se marca sola y esta pantalla se va. El atleta
+    // acaba de aguantar una plancha: pedirle que confirme algo que el reloj ya
+    // sabe es trabajo de más, y el aviso ya se lo dio la vibración.
+    //
+    // Va en un `listen` y no en el build del temporizador para que dispare UNA
+    // vez, en la transición. Cancelar borra el deadline, así que la emisión
+    // siguiente llega en null y no se vuelve a entrar — el camino es
+    // idempotente por construcción, no por acordarse de un flag.
+    ref.listen<AsyncValue<WearExerciseTimer?>>(
+      wearExerciseTimerProvider,
+      (_, next) {
+        final t = next.valueOrNull;
+        if (t == null || !t.finished) return;
+
+        final n = snapshot.nextSetNumber;
+        if (n != null) onLogSet(snapshot.exerciseId, n);
+        unawaited(ref.read(wearTimerSyncProvider).cancelar());
+        // El descanso arranca igual que en una serie normal: terminar de
+        // aguantar es terminar la serie.
+        ref.read(wearWorkoutServiceProvider).startRest(snapshot.restSeconds);
+      },
+    );
+
     final timer = ref.watch(wearExerciseTimerProvider).valueOrNull;
     final ocultado = ref.watch(wearTimerOcultadoProvider);
     if (timer != null && ocultado != timer.endsAtElapsedMs) {
@@ -95,15 +119,6 @@ class WearWorkoutScreen extends ConsumerWidget {
         onCancelar: () {
           HapticFeedback.selectionClick();
           unawaited(ref.read(wearTimerSyncProvider).cancelar());
-        },
-        onListo: () {
-          HapticFeedback.selectionClick();
-          final n = snapshot.nextSetNumber;
-          if (n != null) onLogSet(snapshot.exerciseId, n);
-          unawaited(ref.read(wearTimerSyncProvider).cancelar());
-          // El descanso arranca igual que en una serie normal: terminar de
-          // aguantar es terminar la serie.
-          service.startRest(snapshot.restSeconds);
         },
       );
     }

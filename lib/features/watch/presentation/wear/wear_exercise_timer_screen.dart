@@ -32,7 +32,6 @@ class WearExerciseTimerScreen extends StatelessWidget {
     required this.timer,
     required this.effort,
     required this.onOcultar,
-    required this.onListo,
     required this.onCancelar,
   });
 
@@ -42,9 +41,6 @@ class WearExerciseTimerScreen extends StatelessWidget {
 
   /// Esconde la pantalla sin tocar el temporizador, que sigue corriendo.
   final VoidCallback onOcultar;
-
-  /// El tiempo terminó y el atleta lo da por hecho: marca la serie.
-  final VoidCallback onListo;
 
   /// Abandona el ejercicio por tiempo SIN marcar la serie.
   ///
@@ -87,11 +83,27 @@ class WearExerciseTimerScreen extends StatelessWidget {
     // El andamio también aporta el `Scaffold` —o sea el `Material`— y el inset
     // circular: sin él Flutter dibuja los textos con el subrayado amarillo de
     // "falta Material".
-    // `centered` y no `list`: la lista impone ancho COMPLETO a sus hijos, así
-    // que el `SizedBox` del anillo se ignoraba, el `Stack` se estiraba y el
-    // indicador salía ELÍPTICO. Se vio en la muñeca. El andamio centrado
-    // aporta igual el `Scaffold` —o sea el `Material`— y el inset circular.
-    return WearRoundScaffold.centered(
+    // `list` y no `centered`, y hubo que ir y volver para entenderlo.
+    //
+    // `centered` NO scrollea: cuando el contenido no entra lo recorta, y en un
+    // reloj con BISEL FÍSICO —como el SM-L500— el aro se come todavía más
+    // borde. Resultado medido en la muñeca: el nombre cortado arriba y
+    // «Cancelar» directamente inalcanzable.
+    //
+    // El intento anterior con lista había salido peor porque el `ListView`
+    // impone ancho COMPLETO en el eje cruzado: el `SizedBox` del anillo se
+    // ignoraba y el indicador salía ELÍPTICO. Eso lo resuelve el `Center`
+    // explícito de abajo, que es lo que permite volver acá y tener scroll sin
+    // deformar nada.
+    //
+    // Orden por prioridad de lectura: el tiempo y el nombre primero, después el
+    // esfuerzo, y los botones al final — son lo único que puede quedar fuera de
+    // vista, porque para eso está la corona.
+    return WearRoundScaffold.list(
+      // `card` da más aire arriba, que es lo que el bisel se come.
+      firstItem: WearItemType.text,
+      // `multiButton` deja abajo lugar para los DOS: ocultar y cancelar.
+      lastItem: WearItemType.multiButton,
       children: [
         WearFittedText(
           exerciseName,
@@ -111,8 +123,8 @@ class WearExerciseTimerScreen extends StatelessWidget {
         // ancho completo vuelve a deformar el anillo.
         Center(
           child: SizedBox(
-            width: 96,
-            height: 96,
+            width: 84,
+            height: 84,
             child: Stack(
               alignment: Alignment.center,
               children: [
@@ -131,7 +143,7 @@ class WearExerciseTimerScreen extends StatelessWidget {
                 Text(
                   _tiempo,
                   style: GoogleFonts.barlowCondensed(
-                    fontSize: 30,
+                    fontSize: 26,
                     fontWeight: FontWeight.w700,
                     height: 1,
                     color: termino ? palette.accent : palette.textPrimary,
@@ -142,18 +154,19 @@ class WearExerciseTimerScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        WearEffortRow(effort: effort),
+        WearEffortRow(effort: effort, mostrarSinDatos: true),
         const SizedBox(height: 10),
-        if (termino)
-          WearButton(label: 'Marcar serie', onTap: onListo)
-        else
-          // Ocultar NO cancela: el temporizador sigue corriendo y vibra al
-          // vencer igual. Es para poder mirar las series sin perder la cuenta.
-          WearButton(
-            label: 'Ocultar',
-            onTap: onOcultar,
-            tint: palette.textMuted,
-          ),
+        // No hay botón de «marcar»: al vencer, la serie se marca SOLA y esta
+        // pantalla se va. Pedirle al atleta que confirme algo que el reloj ya
+        // sabe es trabajo de más justo cuando está sin aire.
+        //
+        // Ocultar NO cancela: el temporizador sigue corriendo y vibra al vencer
+        // igual. Es para poder mirar las series sin perder la cuenta.
+        WearButton(
+          label: 'Ocultar',
+          onTap: onOcultar,
+          tint: palette.textMuted,
+        ),
         const SizedBox(height: 2),
         // Cancelar va como enlace y no como botón para que no compita con la
         // acción principal: salir del ejercicio es la excepción.
@@ -161,11 +174,14 @@ class WearExerciseTimerScreen extends StatelessWidget {
           behavior: HitTestBehavior.opaque,
           onTap: onCancelar,
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 12),
+            padding: const EdgeInsets.symmetric(vertical: 8),
             child: Text(
               'Cancelar',
+              // CENTRADO explícito: dentro de la lista el texto recibe el ancho
+              // completo y sin esto se pega a la izquierda. Se vio en la muñeca.
+              textAlign: TextAlign.center,
               style: GoogleFonts.barlow(
-                fontSize: 11,
+                fontSize: 12,
                 fontWeight: FontWeight.w600,
                 color: palette.danger,
               ),

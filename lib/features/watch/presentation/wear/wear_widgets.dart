@@ -179,7 +179,23 @@ class WearButton extends StatelessWidget {
 /// la de series y la del temporizador de ejercicio por tiempo. Duplicarla haría
 /// que la segunda se quedara vieja la próxima vez que se toque la primera.
 class WearEffortRow extends StatelessWidget {
-  const WearEffortRow({super.key, required this.effort});
+  const WearEffortRow({
+    super.key,
+    required this.effort,
+    this.mostrarSinDatos = false,
+  });
+
+  /// Si dibujar la fila con guiones cuando todavía no hay medición.
+  ///
+  /// En la lista de series va en false: reservar un hueco haría saltar el
+  /// layout al llegar el primer pulso, y ahí el atleta está mirando los
+  /// círculos, no el esfuerzo.
+  ///
+  /// En la pantalla del ejercicio por tiempo va en TRUE. Health Services tarda
+  /// unos segundos en entregar la primera medición, y la fila oculta hacía
+  /// pensar que el reloj no estaba midiendo nada — sobre todo entrando desde el
+  /// teléfono, donde la pantalla aparece antes que el primer dato.
+  final bool mostrarSinDatos;
 
   /// `WatchEffortDisplay` y no un tipo propio: es el MISMO modelo que usa el
   /// teléfono para el reloj de Apple. Un solo tipo para las dos plataformas.
@@ -187,9 +203,27 @@ class WearEffortRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (effort.isEmpty) return const SizedBox.shrink();
-
     final palette = AppPalette.of(context);
+    if (effort.isEmpty) {
+      if (!mostrarSinDatos) return const SizedBox.shrink();
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _WearEffortSinDato(
+            icon: TreinoIcon.heartRate,
+            iconColor: palette.danger,
+            unit: WearStrings.bpmUnit,
+          ),
+          const SizedBox(width: 12),
+          _WearEffortSinDato(
+            icon: TreinoIcon.calories,
+            iconColor: palette.warning,
+            unit: WearStrings.kcalUnit,
+          ),
+        ],
+      );
+    }
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -282,3 +316,41 @@ class _WearEffortStat extends StatelessWidget {
 ///
 /// Vencido cambia de color en vez de desaparecer: el atleta mira el reloj de
 /// reojo, sin enfocar, y el color se lee antes que un número.
+
+/// La misma fila, pero mientras el sensor todavía no entregó nada.
+class _WearEffortSinDato extends StatelessWidget {
+  const _WearEffortSinDato({
+    required this.icon,
+    required this.iconColor,
+    required this.unit,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String unit;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 12, color: iconColor),
+        const SizedBox(width: 4),
+        Text(
+          '--',
+          style: GoogleFonts.barlowCondensed(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: palette.textMuted,
+          ),
+        ),
+        const SizedBox(width: 2),
+        Text(
+          unit,
+          style: GoogleFonts.barlow(fontSize: 10, color: palette.textMuted),
+        ),
+      ],
+    );
+  }
+}
