@@ -26,6 +26,17 @@ typedef WearRestState = ({
 /// `WatchBridge` del lado de Apple: **testeabilidad** (un MethodChannel no
 /// responde en tests; una costura propia se mockea) y **contención** (cambiar
 /// el canal toca un solo archivo).
+/// Lo que el reloj necesita saber del temporizador de ejercicio.
+///
+/// [totalMs] va además de [remainingMs] porque la pantalla dibuja un anillo de
+/// progreso: sin el total no hay fracción que mostrar.
+typedef WearExerciseTimer = ({
+  int endsAtElapsedMs,
+  int totalMs,
+  int remainingMs,
+  bool finished,
+});
+
 class WearWorkoutService {
   WearWorkoutService({MethodChannel? channel})
       : _channel = channel ?? const MethodChannel(_channelName);
@@ -81,6 +92,48 @@ class WearWorkoutService {
   }
 
   Future<void> cancelRest() => _channel.invokeMethod<void>('cancelRest');
+
+  // ── Temporizador del ejercicio por tiempo ─────────────────────────────────
+  //
+  // Es OTRO temporizador, no el descanso con otro nombre. Comparten la
+  // maquinaria nativa —deadline persistido, alarma exacta, vibración— pero no
+  // el estado: con un solo store, arrancar un ejercicio por tiempo cancelaría
+  // el descanso en curso sin decir nada.
+
+  /// Arranca el temporizador del ejercicio actual.
+  ///
+  /// Con [seconds] en cero o menos no arranca nada y cancela el que hubiera,
+  /// por el mismo motivo que [startRest]: un temporizador que nace vencido sólo
+  /// ensucia la pantalla.
+  Future<void> startExerciseTimer(int seconds) {
+    if (seconds <= 0) return cancelExerciseTimer();
+    return _channel.invokeMethod<void>(
+      'startExerciseTimer',
+      {'seconds': seconds},
+    );
+  }
+
+  Future<void> cancelExerciseTimer() =>
+      _channel.invokeMethod<void>('cancelExerciseTimer');
+
+  /// El temporizador en curso, o null si no hay ninguno.
+  ///
+  /// A diferencia del descanso, esto sigue devolviendo estado DESPUÉS de vencer
+  /// —con `finished: true`— y no se borra solo. El descanso desaparece porque
+  /// su cartel ya no aporta nada; acá el atleta tiene que ver que el tiempo
+  /// terminó para recién entonces marcar la serie.
+  Future<WearExerciseTimer?> exerciseTimerState() async {
+    final r =
+        await _channel.invokeMapMethod<String, dynamic>('exerciseTimerState');
+    final endsAt = r?['endsAtElapsedMs'] as int?;
+    if (r == null || endsAt == null) return null;
+    return (
+      endsAtElapsedMs: endsAt,
+      totalMs: r['totalMs'] as int? ?? 0,
+      remainingMs: r['remainingMs'] as int? ?? 0,
+      finished: r['finished'] as bool? ?? false,
+    );
+  }
 
   /// Pulso y calorías del ejercicio en curso, o null si todavía no hay nada.
   ///

@@ -56,6 +56,43 @@ final wearRestProvider = StreamProvider.autoDispose<WearRestState?>((ref) {
   return controller.stream;
 });
 
+/// Temporizador del ejercicio por tiempo, o null si no hay ninguno.
+///
+/// Mismo mecanismo que [wearRestProvider] —polling de un DEADLINE persistido, no
+/// una cuenta regresiva en memoria— y por la misma razón: con la muñeca baja el
+/// SoC se suspende y los ticks no corren. Releyendo el deadline, el primer tick
+/// que sí corre ya trae el número correcto.
+///
+/// El aviso al vencer NO depende de este stream: lo dispara la alarma nativa,
+/// que sigue viva aunque el isolate de Dart no corra. Por eso el reloj vibra
+/// esté la pantalla del temporizador visible, oculta o apagada.
+final wearExerciseTimerProvider =
+    StreamProvider.autoDispose<WearExerciseTimer?>((ref) {
+  final service = ref.watch(wearWorkoutServiceProvider);
+
+  final controller = StreamController<WearExerciseTimer?>();
+  Timer? timer;
+
+  Future<void> poll() async {
+    try {
+      if (!controller.isClosed)
+        controller.add(await service.exerciseTimerState());
+    } on Object catch (e, st) {
+      if (!controller.isClosed) controller.addError(e, st);
+    }
+  }
+
+  unawaited(poll());
+  timer = Timer.periodic(_pollEvery, (_) => unawaited(poll()));
+
+  ref.onDispose(() {
+    timer?.cancel();
+    unawaited(controller.close());
+  });
+
+  return controller.stream;
+});
+
 /// Esfuerzo actual, ya filtrado por antigüedad.
 ///
 /// ## Por qué el umbral es más CORTO que el del teléfono

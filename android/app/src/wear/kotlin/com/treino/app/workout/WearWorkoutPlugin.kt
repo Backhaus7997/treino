@@ -47,12 +47,35 @@ class WearWorkoutPlugin(
     private val restStore = RestStore(context)
 
     /**
+     * El temporizador del EJERCICIO POR TIEMPO.
+     *
+     * Reusa entera la maquinaria del descanso —deadline persistido, defensa
+     * contra reboot, alarma exacta con wakelock, vibracion— porque el problema
+     * es el mismo: sobrevivir a que se apague la pantalla y avisar al vencer
+     * este la app visible o no.
+     *
+     * Lo que NO comparte es el estado: store y alarma propios. Con uno solo,
+     * arrancar un ejercicio por tiempo cancelaria el descanso en curso sin
+     * decir nada.
+     */
+    private val exerciseStore = RestStore(context, RestStore.PREFS_EXERCISE)
+
+    /**
      * El aviso. Separado del store a propósito: el store resuelve "qué número
      * mostrar", la alarma resuelve "cuándo avisar". Son problemas distintos y
      * medido en hardware quedó claro que uno no implica al otro — el descanso
      * llegó a cero con el número correcto y sin que sonara nada.
      */
     private val restAlarm = RestAlarm(context)
+
+    private val exerciseAlarm = RestAlarm(
+        context,
+        RestAlarm.ALARM_TAG_EXERCISE,
+        RestAlarm.WAKELOCK_TAG_EXERCISE,
+    )
+
+    /** Idem `deadlineReported`, para el temporizador de ejercicio. */
+    private var exerciseDeadlineReported = false
 
     /** Evita avisar dos veces el mismo vencimiento. */
     private var deadlineReported = false
@@ -202,6 +225,69 @@ class WearWorkoutPlugin(
                         ),
                     )
                 }
+            }
+
+            // ── Temporizador del ejercicio por tiempo ────────────────────
+            //
+            // Mismo contrato que el descanso salvo UNA diferencia, y es
+            // deliberada: al vencer NO se borra el deadline. El descanso
+            // desaparece solo porque su cartel ya no aporta nada —el aviso lo
+            // dio la vibracion— pero acá el atleta tiene que VER que el tiempo
+            // termino para recien entonces marcar la serie. Borrarlo haria
+            // desaparecer la pantalla justo cuando hay que actuar sobre ella.
+
+            "startExerciseTimer" -> {
+                val seconds = call.argument<Int>("seconds") ?: 0
+                if (seconds <= 0) {
+                    // Mismo criterio que `startRest`: un temporizador de cero
+                    // nace vencido y solo ensucia la pantalla.
+                    exerciseStore.clear()
+                    exerciseAlarm.cancel()
+                    result.success(mapOf("ok" to false, "nowElapsedMs" to now))
+                } else {
+                    val d = RestDeadline.startingAt(now, seconds * 1000L)
+                    exerciseStore.save(d)
+                    // Wakelock SIEMPRE: un ejercicio por tiempo dura lo que dura
+                    // una serie y el atleta no esta mirando el reloj. Sin esto,
+                    // Doze difiere la alarma y el aviso llega tarde o no llega.
+                    exerciseAlarm.schedule(d, holdWakeLock = true)
+                    exerciseDeadlineReported = false
+                    result.success(
+                        mapOf(
+                            "endsAtElapsedMs" to d.endsAtElapsedMs,
+                            "totalMs" to d.totalMs,
+                            "nowElapsedMs" to now,
+                        ),
+                    )
+                }
+            }
+
+            "exerciseTimerState" -> {
+                val d = exerciseStore.load(now)
+                if (d == null) {
+                    result.success(mapOf("nowElapsedMs" to now))
+                } else {
+                    if (d.isFinishedAt(now) && !exerciseDeadlineReported) {
+                        exerciseDeadlineReported = true
+                        exerciseAlarm.onDeadlineNoticedByApp(d.endsAtElapsedMs)
+                    }
+                    result.success(
+                        mapOf(
+                            "endsAtElapsedMs" to d.endsAtElapsedMs,
+                            "totalMs" to d.totalMs,
+                            "remainingMs" to d.remainingMsAt(now),
+                            "finished" to d.isFinishedAt(now),
+                            "nowElapsedMs" to now,
+                        ),
+                    )
+                }
+            }
+
+            "cancelExerciseTimer" -> {
+                exerciseStore.clear()
+                exerciseAlarm.cancel()
+                exerciseDeadlineReported = false
+                result.success(mapOf("ok" to true, "nowElapsedMs" to now))
             }
 
             "cancelRest" -> {

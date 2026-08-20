@@ -59,15 +59,34 @@ import android.util.Log
  * el isolate está dormido, mandarlo a Dart agrega latencia justo donde se está
  * midiendo puntualidad.
  */
-class RestAlarm(private val context: Context) {
+class RestAlarm(
+    private val context: Context,
+    /**
+     * Identifica ESTA alarma frente al sistema.
+     *
+     * Se parametriza por el mismo motivo que el store: el temporizador de
+     * ejercicio por tiempo reusa esta maquinaria, y dos alarmas con el mismo tag
+     * se pisan — programar una cancelaria la otra sin decir nada.
+     */
+    private val alarmTag: String = ALARM_TAG_REST,
+    private val wakeLockTag: String = WAKELOCK_TAG_REST,
+) {
 
-    private companion object {
-        const val TAG = "TreinoRestAlarm"
-        const val ALARM_TAG = "treino.rest"
+    companion object {
+        /** El descanso entre series. */
+        const val ALARM_TAG_REST = "treino.rest"
+
+        /** El ejercicio por tiempo. Tag propio para no pisar el del descanso. */
+        const val ALARM_TAG_EXERCISE = "treino.exercise"
+
         /** El prefijo `treino:` es convencion de Android para wakelocks de app. */
-        const val WAKELOCK_TAG = "treino:rest"
+        const val WAKELOCK_TAG_REST = "treino:rest"
+        const val WAKELOCK_TAG_EXERCISE = "treino:exercise"
+
+        private const val TAG = "TreinoRestAlarm"
+
         /** Margen sobre el deadline, para que el timeout no corte justo antes. */
-        const val WAKELOCK_MARGIN_MS = 5_000L
+        private const val WAKELOCK_MARGIN_MS = 5_000L
     }
 
     private val alarmManager =
@@ -135,7 +154,7 @@ class RestAlarm(private val context: Context) {
 
         if (holdWakeLock && enMs > 0) {
             val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
-            wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKELOCK_TAG).apply {
+            wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, wakeLockTag).apply {
                 setReferenceCounted(false)
                 // Timeout = lo que falta + margen. Red de seguridad: aunque
                 // nadie lo suelte, el sistema lo corta.
@@ -147,7 +166,7 @@ class RestAlarm(private val context: Context) {
         alarmManager.setExact(
             AlarmManager.ELAPSED_REALTIME_WAKEUP,
             deadline.endsAtElapsedMs,
-            ALARM_TAG,
+            alarmTag,
             listener,
             handler,
         )

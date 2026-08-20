@@ -34,25 +34,44 @@ import android.os.SystemClock
  * Se guarda además [KEY_BOOT_ID] como segunda defensa: dos reboots muy rápidos
  * podrían dejar un `elapsedRealtime` pequeño que pase el chequeo de sanidad.
  */
-class RestStore(context: Context) {
+class RestStore(
+    context: Context,
+    /**
+     * Archivo de preferencias donde vive el deadline.
+     *
+     * Se parametriza para que el temporizador de EJERCICIO POR TIEMPO pueda
+     * reusar toda esta maquinaria —deadline persistido, defensa contra reboot,
+     * borrado de basura— sin compartir estado con el descanso. Son dos
+     * temporizadores distintos y guardarlos en el mismo lugar haria que arrancar
+     * uno cancelara el otro en silencio.
+     *
+     * El default conserva el nombre historico: cambiarlo dejaria huerfano el
+     * descanso persistido de una instalacion que se actualiza en el medio.
+     */
+    prefsName: String = PREFS_REST,
+) {
 
-    private companion object {
-        const val PREFS = "treino_rest"
-        const val KEY_ENDS_AT = "endsAtElapsedMs"
-        const val KEY_TOTAL = "totalMs"
+    companion object {
+        /** El descanso entre series. */
+        const val PREFS_REST = "treino_rest"
+
+        /** El ejercicio por tiempo. */
+        const val PREFS_EXERCISE = "treino_exercise_timer"
+        private const val KEY_ENDS_AT = "endsAtElapsedMs"
+        private const val KEY_TOTAL = "totalMs"
 
         /**
          * Marca de arranque del sistema, en WALL CLOCK: `ahora - elapsedRealtime()`.
          * Se mantiene estable entre lecturas dentro del mismo boot y cambia con
          * cada reinicio, así que sirve de identificador de boot sin permisos.
          */
-        const val KEY_BOOT_ID = "bootId"
+        private const val KEY_BOOT_ID = "bootId"
 
         /** Tolerancia del boot id: el wall clock deriva y puede saltar con NTP. */
-        const val BOOT_ID_TOLERANCE_MS = 10_000L
+        private const val BOOT_ID_TOLERANCE_MS = 10_000L
     }
 
-    private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private val prefs = context.getSharedPreferences(prefsName, Context.MODE_PRIVATE)
 
     private fun currentBootId(): Long =
         System.currentTimeMillis() - SystemClock.elapsedRealtime()
