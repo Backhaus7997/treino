@@ -655,7 +655,8 @@ exit(1)
 private func runEffortTimerBroadcast() {
     let t0 = Date(timeIntervalSince1970: 1_700_000_000)
     let crono = EffortSnapshot.RunningTimer(
-        exerciseId: "plancha", totalSeconds: 60, endsAt: t0.addingTimeInterval(60)
+        exerciseId: "plancha", setNumber: 2, totalSeconds: 60,
+        endsAt: t0.addingTimeInterval(60)
     )
 
     // Un cronometro corriendo YA es algo que mostrar, aunque no haya pulso.
@@ -685,9 +686,45 @@ private func runEffortTimerBroadcast() {
         "un vacio sin cronometro previo no justifica un envio"
     )
 
+    // ── El throttle NO puede atrasar un cronometro ──────────────────────────
+    //
+    // Los tres chequeos de arriba pasan `last: nil`, que cortocircuita el
+    // throttle en la primera linea de shouldSend. O sea que NINGUNO cruzaba
+    // throttle x cronometro, y por ahi se colaba el bug: con un pulso reciente
+    // —lo normal a mitad de entreno— arrancar la cuenta caia en el throttle y
+    // tardaba hasta 5 segundos en verse en el telefono.
+    let pulsoReciente = EffortSnapshot(bpm: 140, kcal: 10)
+    let pulsoMasCrono = EffortSnapshot(bpm: 140, kcal: 10, timer: crono)
+    check(
+        EffortBroadcastRules.shouldSend(
+            last: (payload: pulsoReciente, at: t0),
+            actual: pulsoMasCrono,
+            now: t0.addingTimeInterval(1)
+        ),
+        "ARRANCAR la cuenta un segundo despues de un pulso no espera al throttle"
+    )
+    check(
+        EffortBroadcastRules.shouldSend(
+            last: (payload: pulsoMasCrono, at: t0),
+            actual: pulsoReciente,
+            now: t0.addingTimeInterval(1)
+        ),
+        "CORTAR la cuenta tampoco espera al throttle, aunque el pulso siga igual"
+    )
+    // Y el throttle sigue haciendo su trabajo con lo que SI puede esperar.
+    check(
+        !EffortBroadcastRules.shouldSend(
+            last: (payload: pulsoReciente, at: t0),
+            actual: EffortSnapshot(bpm: 141, kcal: 10),
+            now: t0.addingTimeInterval(1)
+        ),
+        "un pulso nuevo un segundo despues del anterior SI espera: es lo que el throttle viene a evitar"
+    )
+
     // El payload lleva el INSTANTE DE FIN, no lo que falta.
     let payload = soloCrono.context(measuredAt: t0)
     checkEqual(payload["timerExerciseId"] as? String, "plancha", "va el ejercicio")
+    checkEqual(payload["timerSetNumber"] as? Int, 2, "va la serie: sin esto el telefono no sabe cual de las tres corre")
     checkEqual(payload["timerTotalSeconds"] as? Int, 60, "van los segundos totales")
     check(
         payload["timerEndsAtMs"] is Int64,

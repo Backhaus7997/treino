@@ -59,7 +59,12 @@ final class EffortRelay {
 
         // Sin sesion activada no hay a donde mandar. No se activa acá: de eso ya
         // se encarga `CredentialCoordinator`, que es el WCSessionDelegate.
+        //
+        // Se loguea el corte. Antes retornaba MUDO, y ese silencio es caro:
+        // "el telefono no muestra nada" y "el reloj ni intento mandar" se ven
+        // exactamente igual desde afuera.
         guard WCSession.isSupported(), WCSession.default.activationState == .activated else {
+            log.notice("Esfuerzo NO publicado: la sesion WC no esta activada")
             return
         }
 
@@ -69,11 +74,22 @@ final class EffortRelay {
             // Se loguea el EXITO y no solo el fallo: sin esto, verificar el
             // relay de punta a punta es a ciegas — si el telefono no muestra
             // nada no se sabe si el reloj no mando o si el telefono no recibio.
-            log.notice("Esfuerzo publicado al telefono: bpm \(bpm ?? -1), kcal \(kcal ?? -1)")
+            //
+            // El cronometro va en el log porque es el dato mas dificil de
+            // verificar de los tres: el pulso y las calorias se ven en la
+            // pantalla del reloj, la cuenta espejada solo se ve en el telefono.
+            let crono = timer.map { "serie \($0.setNumber) de \($0.exerciseId), \($0.totalSeconds)s" }
+                ?? "sin cronometro"
+            log.notice("Esfuerzo publicado al telefono: bpm \(bpm ?? -1), kcal \(kcal ?? -1), \(crono, privacy: .public)")
         } catch {
             // Que el telefono no reciba el dato no es un problema del entreno.
-            // Se loguea y se sigue; el proximo intento lo reintenta solo.
-            log.debug("No se pudo publicar el esfuerzo: \(error.localizedDescription)")
+            // Se sigue; el proximo intento lo reintenta solo.
+            //
+            // Va a `.error` y no a `.debug`: `.debug` no se persiste por
+            // defecto, asi que el unico caso en que ESTE log importa —mirar
+            // despues por que no llego nada— era justo el que no quedaba
+            // grabado.
+            log.error("No se pudo publicar el esfuerzo: \(error.localizedDescription, privacy: .public)")
         }
     }
 

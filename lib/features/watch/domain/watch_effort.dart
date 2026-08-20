@@ -34,6 +34,7 @@ class WatchEffort {
     this.timerEndsAt,
     this.timerTotalSeconds,
     this.timerExerciseId,
+    this.timerSetNumber,
   });
 
   /// Discrimina este payload de cualquier otro que viaje por el mismo canal.
@@ -68,16 +69,39 @@ class WatchEffort {
   final int? timerTotalSeconds;
   final String? timerExerciseId;
 
+  /// CUÁL de las series del ejercicio se está cronometrando.
+  ///
+  /// Sin esto el teléfono sabe QUÉ ejercicio corre pero no cuál de sus series,
+  /// y con tres series por tiempo en el mismo ejercicio tendría que adivinar.
+  /// Adivinar por "la próxima sin cargar" falla justo cuando el estado viene
+  /// desordenado, que es cuando importa. Es la misma identidad lógica
+  /// —ejercicio + número de serie— que usa el resto del sistema.
+  final int? timerSetNumber;
+
+  /// Si hay un cronómetro corriendo en el reloj para [exerciseId]/[setNumber].
+  ///
+  /// Pide los TRES datos —ejercicio, serie e instante de fin— porque con
+  /// cualquiera de ellos ausente la cuenta no se puede ubicar, y una cuenta
+  /// dibujada en la fila equivocada es peor que ninguna.
+  bool timerCorreEn({required String exerciseId, required int setNumber}) =>
+      timerEndsAt != null &&
+      timerExerciseId == exerciseId &&
+      timerSetNumber == setNumber;
+
   /// Si trae al menos una medición.
   bool get isEmpty => bpm == null && kcal == null;
 
-  Map<String, dynamic> toContext() => {
-        'kind': kind,
-        if (bpm != null) 'bpm': bpm,
-        if (kcal != null) 'kcal': kcal,
-        if (measuredAt != null)
-          'measuredAtMs': measuredAt!.millisecondsSinceEpoch,
-      };
+  // Acá vivía un `toContext()`. Se borró, y el porqué vale la pena:
+  //
+  // El teléfono NUNCA escribe este payload — sólo lo lee. El que lo escribe es
+  // `EffortSnapshot.context(measuredAt:)` en Swift. `toContext()` tenía cero
+  // call sites en producción y su único uso era un test de ida y vuelta de
+  // Dart contra Dart, que además pasaba por vacuidad: no serializaba ninguno
+  // de los campos del cronómetro, así que confirmaba un contrato que no era el
+  // real. Peor que no tener nada, porque la suite se veía verde.
+  //
+  // El contrato de verdad —Swift escribe, Dart lee— vive en
+  // `conformance/effort_payload.json` y lo corren los dos lados.
 
   /// Lee un contexto entrante, o devuelve null si no es de esfuerzo.
   ///
@@ -100,6 +124,7 @@ class WatchEffort {
     final rawEnds = context['timerEndsAtMs'];
     final rawTotal = context['timerTotalSeconds'];
     final rawTimerId = context['timerExerciseId'];
+    final rawTimerSet = context['timerSetNumber'];
 
     return WatchEffort(
       timerEndsAt: rawEnds is int
@@ -108,6 +133,9 @@ class WatchEffort {
       timerTotalSeconds: rawTotal is int && rawTotal > 0 ? rawTotal : null,
       timerExerciseId:
           rawTimerId is String && rawTimerId.isNotEmpty ? rawTimerId : null,
+      // No existe la serie 0: un 0 acá es un campo sin llenar, no una serie.
+      timerSetNumber:
+          rawTimerSet is int && rawTimerSet > 0 ? rawTimerSet : null,
       // Un bpm de 0 no es una medición: es un sensor que no enganchó.
       bpm: rawBpm is int && rawBpm > 0 ? rawBpm : null,
       // Un kcal de 0 SÍ es un dato cierto — todavía no se midió consumo.
@@ -128,7 +156,8 @@ class WatchEffort {
       // solo cambia el cronómetro se descartaría por "igual al anterior".
       other.timerEndsAt == timerEndsAt &&
       other.timerTotalSeconds == timerTotalSeconds &&
-      other.timerExerciseId == timerExerciseId;
+      other.timerExerciseId == timerExerciseId &&
+      other.timerSetNumber == timerSetNumber;
 
   @override
   int get hashCode => Object.hash(
@@ -138,6 +167,7 @@ class WatchEffort {
         timerEndsAt,
         timerTotalSeconds,
         timerExerciseId,
+        timerSetNumber,
       );
 
   @override

@@ -511,6 +511,126 @@ private func runDurationTimer(fixtureURL: URL) {
     }
 }
 
+// MARK: - effort_payload
+
+/// Este contrato es ASIMETRICO: Swift ESCRIBE el diccionario y Dart lo LEE. Acá
+/// se verifica la mitad de Swift — que `EffortSnapshot.context(measuredAt:)`
+/// produzca exactamente el diccionario del fixture, clave por clave.
+private func runEffortPayload(fixtureURL: URL) {
+    guard let data = try? Data(contentsOf: fixtureURL) else {
+        fail("No se pudo leer \(fixtureURL.path). Los fixtures son el contrato "
+            + "con la implementación Dart: si el archivo no está, ese contrato "
+            + "no existe.")
+        return
+    }
+
+    guard
+        let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+        let rule = json["rule"] as? String,
+        let cases = json["cases"] as? [[String: Any]]
+    else {
+        fail("\(fixtureURL.lastPathComponent) no tiene la forma esperada.")
+        return
+    }
+
+    guard rule == "effort-payload" else {
+        fail("Se esperaba rule 'effort-payload' y vino '\(rule)'.")
+        return
+    }
+
+    guard !cases.isEmpty else {
+        fail("\(fixtureURL.lastPathComponent) no tiene casos.")
+        return
+    }
+
+    for testCase in cases {
+        totalCases += 1
+        let name = testCase["name"] as? String ?? "(sin nombre)"
+
+        guard
+            let given = testCase["given"] as? [String: Any],
+            let esperado = testCase["expect"] as? [String: Any],
+            let measuredAtMs = int64(given["measuredAtMs"])
+        else {
+            fail("Caso '\(name)' mal formado.")
+            continue
+        }
+
+        // `NSNull` es como JSONSerialization representa un null explícito del
+        // fixture; hay que distinguirlo de "la clave no está".
+        let bpm = given["bpm"] as? Int
+        let kcal = given["kcal"] as? Int
+
+        var cronometro: EffortSnapshot.RunningTimer?
+        if let t = given["timer"] as? [String: Any] {
+            guard
+                let exerciseId = t["exerciseId"] as? String,
+                let setNumber = t["setNumber"] as? Int,
+                let totalSeconds = t["totalSeconds"] as? Int,
+                let endsAtMs = int64(t["endsAtMs"])
+            else {
+                fail("Caso '\(name)': el cronómetro del fixture está mal formado.")
+                continue
+            }
+            cronometro = EffortSnapshot.RunningTimer(
+                exerciseId: exerciseId,
+                setNumber: setNumber,
+                totalSeconds: totalSeconds,
+                endsAt: fecha(desdeMs: endsAtMs)
+            )
+        }
+
+        let snapshot = EffortSnapshot(bpm: bpm, kcal: kcal, timer: cronometro)
+        let payload = snapshot.context(measuredAt: fecha(desdeMs: measuredAtMs))
+
+        // Mismo conjunto de claves, ni una de más ni una de menos. Una clave de
+        // más es tan grave como una de menos: significa que un lado manda algo
+        // que el otro no sabe que existe.
+        let clavesEsperadas = Set(esperado.keys)
+        let clavesReales = Set(payload.keys)
+        if clavesEsperadas != clavesReales {
+            let sobran = clavesReales.subtracting(clavesEsperadas).sorted()
+            let faltan = clavesEsperadas.subtracting(clavesReales).sorted()
+            fail("Caso '\(name)': las claves no coinciden — sobran \(sobran), faltan \(faltan).")
+            continue
+        }
+
+        for (clave, valorEsperado) in esperado {
+            let valorReal = payload[clave]
+            let ok: Bool
+            switch valorEsperado {
+            case let s as String:
+                ok = (valorReal as? String) == s
+            case let n as NSNumber:
+                // Los enteros viajan como Int o Int64 según la clave; comparar
+                // por valor de 64 bits cubre las dos sin perder precisión.
+                ok = int64(valorReal) == n.int64Value
+            default:
+                ok = false
+            }
+            if !ok {
+                fail("Caso '\(name)': clave '\(clave)' — se esperaba "
+                    + "\(valorEsperado) y vino \(valorReal.map { String(describing: $0) } ?? "nada").")
+            }
+        }
+
+        // TODA clave de milisegundos tiene que salir como `Int64`.
+        //
+        // Se recorre por nombre y no se chequea una sola a mano: la comparación
+        // de valores de arriba usa `int64(...)`, que en el host de 64 bits es
+        // CIEGA al tipo — un `Int64` cambiado a `Int` dejaría el corredor en
+        // verde y crashearía el reloj. Es lo único observable desde acá sobre la
+        // trampa de arm64_32.
+        for clave in esperado.keys where clave.hasSuffix("Ms") {
+            guard let valor = payload[clave] else { continue }
+            if !(valor is Int64) {
+                fail("Caso '\(name)': '\(clave)' tiene que ser Int64 y es \(type(of: valor)). "
+                    + "Con `Int` trapea en arm64_32 — ver commit 3a0840cc.")
+            }
+        }
+    }
+}
+
 // MARK: - main
 
 // El script pasa la raíz de `conformance/` como primer argumento.
@@ -526,6 +646,7 @@ runSessionCounting(fixtureURL: conformanceDir.appendingPathComponent("session_co
 runSetLogIdentity(fixtureURL: conformanceDir.appendingPathComponent("set_log_identity.json"))
 runSupersetOrder(fixtureURL: conformanceDir.appendingPathComponent("superset_order.json"))
 runDurationTimer(fixtureURL: conformanceDir.appendingPathComponent("duration_timer.json"))
+runEffortPayload(fixtureURL: conformanceDir.appendingPathComponent("effort_payload.json"))
 
 if failures.isEmpty {
     print("✓ conformidad Swift: \(totalCases) casos, todos en verde")
