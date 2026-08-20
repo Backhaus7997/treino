@@ -34,7 +34,21 @@ private func fail(_ message: String) {
 /// y la regla no correría nunca. Leerlos como `Int64` acá mantiene el corredor
 /// bajo la misma disciplina que el código del reloj.
 private func int64(_ any: Any?) -> Int64? {
-    (any as? NSNumber)?.int64Value
+    // Se prueban los tipos NATIVOS primero, y despues NSNumber.
+    //
+    // No es cinturon y tiradores: este corredor corre en CI sobre **ubuntu**, y
+    // en swift-corelibs-foundation el bridging automatico entre los enteros de
+    // Swift y `NSNumber` no es el de Darwin. Un `as? NSNumber` sobre el `Int64`
+    // que produce `EffortSnapshot.context` puede devolver nil en Linux y dejar
+    // el job en rojo por una razon que en mac es invisible.
+    //
+    // Los valores llegan de dos lugares distintos: los del fixture salen de
+    // `JSONSerialization` (NSNumber en las dos plataformas) y los del payload
+    // los produce el codigo del reloj (Int / Int64 nativos).
+    if let v = any as? Int64 { return v }
+    if let v = any as? Int { return Int64(v) }
+    if let n = any as? NSNumber { return n.int64Value }
+    return nil
 }
 
 /// Un instante a partir de milisegundos desde epoch.
@@ -598,14 +612,13 @@ private func runEffortPayload(fixtureURL: URL) {
         for (clave, valorEsperado) in esperado {
             let valorReal = payload[clave]
             let ok: Bool
-            switch valorEsperado {
-            case let s as String:
-                ok = (valorReal as? String) == s
-            case let n as NSNumber:
+            if let esperadoTexto = valorEsperado as? String {
+                ok = (valorReal as? String) == esperadoTexto
+            } else if let esperadoEntero = int64(valorEsperado) {
                 // Los enteros viajan como Int o Int64 según la clave; comparar
                 // por valor de 64 bits cubre las dos sin perder precisión.
-                ok = int64(valorReal) == n.int64Value
-            default:
+                ok = int64(valorReal) == esperadoEntero
+            } else {
                 ok = false
             }
             if !ok {
