@@ -178,9 +178,13 @@ class _PlanLimitPaywallSheet extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 // Handle de arrastre: la señal de que esto se descarta
-                // deslizando, no sólo con el "Ahora no".
+                // deslizando, no sólo con el "Ahora no". 40x4 con `border` y
+                // radio 2 es la medida que ya usan los ~25 sheets del repo
+                // (`athlete_picker_sheet`, `set_entry_sheet`,
+                // `review_bottom_sheet`, …): otro ancho se lee como otro
+                // control.
                 Container(
-                  width: 38,
+                  width: 40,
                   height: 4,
                   decoration: BoxDecoration(
                     color: palette.border,
