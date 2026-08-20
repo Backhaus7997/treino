@@ -57,6 +57,17 @@ android {
             dimension = "device"
             // Wear OS 3 = API 30. Por debajo no existe el Wear OS moderno.
             minSdk = 30
+
+            // versionCode PROPIO, en un rango que no se cruza con el del
+            // teléfono. Play distribuye los dos artefactos bajo el MISMO
+            // applicationId —los separa por el `uses-feature watch`— y exige
+            // que cada uno tenga su versionCode único: con el mismo número,
+            // el segundo que subas se rechaza.
+            //
+            // El offset de 1000 deja los dos rangos legibles de un vistazo: el
+            // teléfono va 14, 15, 16… y el reloj 1014, 1015, 1016… así que el
+            // número dice solo de qué artefacto es.
+            versionCode = flutter.versionCode + 1000
             // NADA de applicationIdSuffix: la Data Layer API exige que reloj y
             // teléfono compartan applicationId Y clave de firma. Con un sufijo,
             // el handoff de credencial deja de funcionar y el sintoma aparece
