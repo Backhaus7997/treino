@@ -114,11 +114,23 @@ class AppL10nEs extends AppL10n {
   String get authSplashTagline => 'ENTRENÁ. COMPARTÍ. CRECÉ.';
 
   @override
+  String get authBrandHeadline1Light => 'DEJA DE ';
+
+  @override
+  String get authBrandHeadline1Bold => 'IMPROVISAR.';
+
+  @override
+  String get authBrandHeadline2Light => 'EMPIEZA A ';
+
+  @override
+  String get authBrandHeadline2Bold => 'PROGRESAR.';
+
+  @override
   String get authWelcomeEyebrow => 'ENTRENAMIENTO · GYM · COACH';
 
   @override
   String get authWelcomeBody =>
-      'Cargá tu rutina, ejecutá los sets, seguí a tus pibes y encontrá un coach cerca tuyo.';
+      'Tu rutina, tus series y tus cargas en un solo lugar. Con un coach atrás si lo quieres.';
 
   @override
   String get authWelcomeCta => 'EMPEZAR';
@@ -3630,11 +3642,23 @@ class AppL10nEsAr extends AppL10nEs {
   String get authSplashTagline => 'ENTRENÁ. COMPARTÍ. CRECÉ.';
 
   @override
+  String get authBrandHeadline1Light => 'DEJÁ DE ';
+
+  @override
+  String get authBrandHeadline1Bold => 'IMPROVISAR.';
+
+  @override
+  String get authBrandHeadline2Light => 'EMPEZÁ A ';
+
+  @override
+  String get authBrandHeadline2Bold => 'PROGRESAR.';
+
+  @override
   String get authWelcomeEyebrow => 'ENTRENAMIENTO · GYM · COACH';
 
   @override
   String get authWelcomeBody =>
-      'Cargá tu rutina, ejecutá los sets, seguí a tus pibes y encontrá un coach cerca tuyo.';
+      'Tu rutina, tus series y tus cargas en un solo lugar. Con un coach atrás si lo querés.';
 
   @override
   String get authWelcomeCta => 'EMPEZAR';
