@@ -1,10 +1,12 @@
 package com.treino.app.workout
 
+import android.app.ActivityOptions
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.treino.app.MainActivity
@@ -79,7 +81,14 @@ object WorkoutLauncher {
             context,
             0,
             intentDeLaApp(context),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            // CANCEL y no UPDATE: `FLAG_UPDATE_CURRENT` reusa el PendingIntent
+            // que ya existe y sólo le refresca los extras — las opciones de
+            // arranque quedan las del original. Medido: con UPDATE, el log
+            // seguía diciendo `balAllowedByPiCreator: BSP.NONE` aunque el
+            // opt-in estuviera en el código, porque el objeto reusado se había
+            // creado sin él. Cancelar y rehacer garantiza opciones frescas.
+            PendingIntent.FLAG_CANCEL_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            opcionesDeArranque(),
         )
 
         val notif = NotificationCompat.Builder(context, CANAL)
@@ -95,6 +104,38 @@ object WorkoutLauncher {
 
         manager.notify(NOTIF_ID, notif)
     }
+
+    /**
+     * El opt-in que hace que el full-screen intent pueda abrir la pantalla.
+     *
+     * MEDIDO en el SM-L500 (Wear OS 6 / API 36), y no es nada obvio: la
+     * notificacion se mostraba bien, el SysUI de Samsung tomaba el
+     * `fullScreenIntent` e intentaba lanzar la Activity con el permiso especial
+     * del sistema de notificaciones —`realCallerStartMode:
+     * MODE_BACKGROUND_ACTIVITY_START_ALLOWED`— y aun asi Android respondia
+     * `BAL_BLOCK`. El motivo estaba en una sola linea del log:
+     *
+     *     balAllowedByPiCreator: BSP.NONE
+     *     balRequireOptInByPendingIntentCreator: true
+     *
+     * Desde Android 14 no alcanza con que QUIEN DISPARA el PendingIntent tenga
+     * permiso: el que lo CREA tiene que dar opt-in explicito. Un `PendingIntent`
+     * armado sin opciones llega como `BSP.NONE` y el sistema lo bloquea aunque
+     * todo lo demas este en orden.
+     *
+     * Devuelve null por debajo de API 34, donde esta API no existe y el
+     * comportamiento anterior ya permitia el arranque.
+     */
+    private fun opcionesDeArranque(): android.os.Bundle? =
+        if (Build.VERSION.SDK_INT >= 34) {
+            ActivityOptions.makeBasic()
+                .setPendingIntentCreatorBackgroundActivityStartMode(
+                    ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
+                )
+                .toBundle()
+        } else {
+            null
+        }
 
     private const val TAG = "treino-wear-launch"
     private const val CANAL = "treino_workout_launch"

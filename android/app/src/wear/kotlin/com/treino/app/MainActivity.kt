@@ -120,7 +120,24 @@ class MainActivity : FlutterActivity() {
         // ACTIVITY_RECOGNITION va SIEMPRE: sin el, `startExercise` falla aunque
         // el de pulso este otorgado. Y el sintoma engana, porque el pulso se ve
         // igual (lo entrega el calentamiento) y solo faltan las calorias.
-        val faltantes = listOf(heartRate, Manifest.permission.ACTIVITY_RECOGNITION)
+        //
+        // POST_NOTIFICATIONS es de RUNTIME desde Android 13, y estaba declarado
+        // en el manifest pero nadie lo pedia. MEDIDO en el SM-L500: sin el
+        // otorgado la app queda en `importance=NONE` y NINGUNA notificacion se
+        // muestra — ni siquiera una con `fullScreenIntent` y el permiso
+        // `USE_FULL_SCREEN_INTENT` concedido. O sea que el unico camino que le
+        // queda al companion para abrirse solo, cuando Android bloquea el
+        // `startActivity` en background, era inerte por un permiso que no se
+        // pedia. El sintoma no dice nada: la notificacion simplemente no
+        // aparece.
+        val permisos = mutableListOf(
+            heartRate,
+            Manifest.permission.ACTIVITY_RECOGNITION,
+        )
+        if (Build.VERSION.SDK_INT >= 33) {
+            permisos += Manifest.permission.POST_NOTIFICATIONS
+        }
+        val faltantes = permisos
             .filter {
                 ContextCompat.checkSelfPermission(this, it) !=
                     PackageManager.PERMISSION_GRANTED
