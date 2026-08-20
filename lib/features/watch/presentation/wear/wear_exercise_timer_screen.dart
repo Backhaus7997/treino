@@ -154,39 +154,44 @@ class WearExerciseTimerScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        WearEffortRow(effort: effort, mostrarSinDatos: true),
+        // `FittedBox`: la fila con las dos métricas se pasaba por décimas de
+        // píxel en la pantalla más angosta. Encogerla es preferible a que
+        // Flutter la recorte.
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: WearEffortRow(effort: effort, mostrarSinDatos: true),
+        ),
         const SizedBox(height: 10),
         // No hay botón de «marcar»: al vencer, la serie se marca SOLA y esta
         // pantalla se va. Pedirle al atleta que confirme algo que el reloj ya
         // sabe es trabajo de más justo cuando está sin aire.
         //
-        // Ocultar NO cancela: el temporizador sigue corriendo y vibra al vencer
-        // igual. Es para poder mirar las series sin perder la cuenta.
-        WearButton(
-          label: 'Ocultar',
-          onTap: onOcultar,
-          tint: palette.textMuted,
-        ),
-        const SizedBox(height: 2),
-        // Cancelar va como enlace y no como botón para que no compita con la
-        // acción principal: salir del ejercicio es la excepción.
-        GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: onCancelar,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Text(
-              'Cancelar',
-              // CENTRADO explícito: dentro de la lista el texto recibe el ancho
-              // completo y sin esto se pega a la izquierda. Se vio en la muñeca.
-              textAlign: TextAlign.center,
-              style: GoogleFonts.barlow(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: palette.danger,
+        // Los dos van en UNA FILA y no apilados. Apilados sumaban ~30 dp de
+        // alto y empujaban «Cancelar» fuera del viewport: como el `ListView` no
+        // construye lo que no se ve, el botón directamente no existía y no
+        // había forma de llegar a él ni girando la corona. Medido con un widget
+        // test a 206 dp, que es como se encontró.
+        Row(
+          children: [
+            Expanded(
+              child: WearButton(
+                // Ocultar NO cancela: el temporizador sigue corriendo y vibra
+                // al vencer igual. Es para mirar las series sin perder la
+                // cuenta.
+                label: 'Ocultar',
+                onTap: onOcultar,
+                tint: palette.textMuted,
               ),
             ),
-          ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: WearButton(
+                label: 'Cancelar',
+                onTap: onCancelar,
+                tint: palette.danger,
+              ),
+            ),
+          ],
         ),
       ],
     );
