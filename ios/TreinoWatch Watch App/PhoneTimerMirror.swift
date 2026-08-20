@@ -121,6 +121,34 @@ enum PhoneTimerMirror {
         }
     }
 
+    /// El `kind` de las ordenes que van del RELOJ al TELEFONO.
+    ///
+    /// Distinto del de ida a proposito. Los dos canales son direccionales y no
+    /// se cruzan —cada lado solo recibe los del otro— asi que reusar el mismo
+    /// `kind` seria seguro, pero un log o un breakpoint no dejarian ver de que
+    /// lado salio el mensaje. Se paga una constante por poder leerlo.
+    static let controlKind = "watchTimerControl"
+
+    /// El mensaje con el que el reloj le pide al telefono que corte su cuenta.
+    ///
+    /// Lo lee `WatchTimerControlNotifier` en
+    /// `lib/features/watch/application/watch_timer_control_notifier.dart`.
+    ///
+    /// ⚠️ **Lleva la identidad de la serie, y no es opcional.** Sin ella el
+    /// telefono no tiene forma de saber CUAL cuenta cortar y las corta todas:
+    /// con navegacion libre el atleta puede tener dos filas por tiempo activas,
+    /// y cancelar la de la muñeca le mataria tambien la plancha que esta
+    /// aguantando. Es la misma identidad logica —ejercicio + numero de serie—
+    /// que ya lleva el mensaje de ida.
+    static func cancelRequestMessage(exerciseId: String, setNumber: Int) -> [String: Any] {
+        [
+            "kind": controlKind,
+            "action": "cancel",
+            "exerciseId": exerciseId,
+            "setNumber": setNumber,
+        ]
+    }
+
     /// Si una orden de arranque todavia vale la pena mostrarla.
     ///
     /// Una orden puede llegar TARDE: `sendMessage` exige alcanzabilidad, y el

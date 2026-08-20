@@ -2543,6 +2543,20 @@ class _WatchTimerRowState extends ConsumerState<_WatchTimerRow> {
                   color: palette.accent,
                 ),
               ),
+              const SizedBox(width: 4),
+              // De dónde viene. Sin esto es un MM:SS suelto pegado abajo del
+              // cronómetro de sesión de 40px, sin nada que diga qué cuenta es
+              // ni de qué ejercicio. La cuenta de la serie se ve en su propia
+              // fila; esto es el recordatorio para cuando el atleta scrolleó y
+              // esa fila no está en pantalla.
+              Text(
+                'en el reloj',
+                style: GoogleFonts.barlow(
+                  fontWeight: FontWeight.w400,
+                  fontSize: 11,
+                  color: palette.textMuted,
+                ),
+              ),
             ],
           ),
         );

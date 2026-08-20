@@ -29,6 +29,10 @@ struct TreinoWatch_Watch_AppApp: App {
     /// ahi si el atleta agarra el celular (F4). Es un agregado: si falla, el
     /// reloj sigue mostrando todo igual.
     @State private var effortRelay = EffortRelay()
+
+    /// Le pide al telefono que corte el cronometro que arranco alla. Va por
+    /// mensaje y NO por contexto: es una orden puntual, no estado.
+    @State private var phoneTimerRelay = PhoneTimerRelay()
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
@@ -57,6 +61,15 @@ struct TreinoWatch_Watch_AppApp: App {
                     // rebotando hasta que venza el TTL. Ver `TokenFreshness`.
                     workoutCoordinator.onAuthFailure = {
                         coordinator.invalidateIdToken()
+                    }
+                    // El coordinador pide la cancelacion sin conocer
+                    // WatchConnectivity, igual que pide su cliente de Firestore.
+                    workoutCoordinator.onCancelarCronometroDelTelefono = { ejercicio, serie, fallo in
+                        phoneTimerRelay.cancelar(
+                            exerciseId: ejercicio,
+                            setNumber: serie,
+                            fallo: fallo
+                        )
                     }
                     workoutCoordinator.makeWorkout = { routineId, day, week in
                         let (client, uid) = try await coordinator.firestoreClient()
@@ -130,6 +143,22 @@ struct TreinoWatch_Watch_AppApp: App {
                 }
                 .onChange(of: scenePhase) { _, phase in
                     guard phase == .active else { return }
+
+                    // La pantalla se apago y volvio: si hay una cuenta por
+                    // tiempo corriendo, se muestra sola.
+                    //
+                    // Es el caso de uso, no un extra. El atleta esta aguantando
+                    // una plancha; el unico motivo por el que levanta la muñeca
+                    // es ver cuanto falta, y tener que buscar la pantalla en ese
+                    // momento seria absurdo.
+                    //
+                    // Se dispara en la transicion a `.active` —o sea cuando la
+                    // pantalla realmente se apago y volvio— y no en cada
+                    // redibujo: si el atleta acaba de ocultarla, no le salta
+                    // encima. Y como el espejo se apaga solo al llegar a cero,
+                    // no hay forma de que reaparezca una cuenta vencida.
+                    workoutCoordinator.mostrarPhoneTimer()
+
                     Task {
                         // Con un entreno abierto se reintenta la cola en vez de
                         // refrescar la rutina: cambiarle los ejercicios al
@@ -216,17 +245,30 @@ struct TreinoWatch_Watch_AppApp: App {
         let cronometro = workoutCoordinator.durationSet.map {
             EffortSnapshot.RunningTimer(
                 exerciseId: $0.exerciseId,
+                setNumber: $0.setNumber,
                 totalSeconds: $0.totalSeconds,
                 endsAt: $0.endsAt
             )
         }
 
-        // Sin mediciones Y sin cronometro no hay nada que contar.
+        // Acá había un `guard !fechas.isEmpty || cronometro != nil else { return }`
+        // y se sacó, porque APAGABA el aviso de apagado.
         //
-        // Antes se cortaba solo con las mediciones, asi que un cronometro que
-        // arrancaba ANTES del primer pulso —lo normal en los primeros segundos
-        // de un entreno— no se enviaba nunca y el telefono no se enteraba.
-        guard !fechas.isEmpty || cronometro != nil else { return }
+        // `HeartRateReading.bpm` y `ActiveEnergyReading.kcal` son `Int` no
+        // opcionales, asi que ese guard era la negacion EXACTA de
+        // `EffortSnapshot.isEmpty`. O sea que el snapshot vacio no llegaba nunca
+        // a `shouldSend`, y su primera rama —escrita palabra por palabra para
+        // "el atleta CANCELA el cronometro antes de que llegue el primer
+        // pulso"— era codigo muerto en produccion. Su test la ejercitaba en
+        // aislamiento y estaba en verde.
+        //
+        // Con el permiso de Salud NEGADO (degradacion firmada en D2: bpm y kcal
+        // en nil TODO el entreno) el sintoma era: arrancar la cuenta en el reloj
+        // llegaba, cancelarla no llegaba nunca, y el telefono se quedaba
+        // mostrando una cuenta fantasma hasta que vencia sola.
+        //
+        // Quien decide es `shouldSend`, que ya cubre los dos lados: deja pasar
+        // el vacio que APAGA algo y descarta el vacio que no apaga nada.
 
         // Con mediciones se fecha con la MAS RECIENTE, porque la regla de
         // antiguedad del telefono se apoya en ese timestamp. Sin mediciones se

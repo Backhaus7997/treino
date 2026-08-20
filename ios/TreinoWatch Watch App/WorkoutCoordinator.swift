@@ -66,6 +66,54 @@ final class WorkoutCoordinator: ObservableObject {
     @Published private(set) var phoneTimerRemaining: Int = 0
     private var phoneTimerTicker: Timer?
 
+    /// El espejo esta fuera de la pantalla, pero la cuenta SIGUE VIVA.
+    ///
+    /// Ocultar es una decision de PANTALLA, nunca de la serie. Antes el boton
+    /// "Ocultar" borraba el espejo entero, y eso destapaba la lista de series
+    /// con la serie sin marcar: el atleta la tocaba, el reloj arrancaba un
+    /// cronometro PROPIO sobre la misma serie, y al llegar a cero la cargaban
+    /// los dos. Dos documentos, ids distintos, ninguno puede deduplicar al
+    /// otro. La serie le quedaba repetida en el historial.
+    @Published private(set) var phoneTimerOculto = false
+
+    /// Le pide al TELEFONO que corte su cronometro. Lo inyecta `TreinoWatchApp`
+    /// para que este coordinador no tenga que importar WatchConnectivity.
+    ///
+    /// El callback se invoca SOLO si el pedido no llego. Importa: si no llego,
+    /// el telefono sigue contando y va a marcar la serie mientras el atleta
+    /// cree que la cancelo.
+    var onCancelarCronometroDelTelefono:
+        ((_ exerciseId: String, _ setNumber: Int, @escaping @MainActor () -> Void) -> Void)?
+
+    /// El ultimo pedido de cancelacion no llego al telefono.
+    ///
+    /// Se le muestra al atleta: cancelar en falso es peor que no ofrecerlo.
+    @Published var phoneTimerCancelFallo = false
+
+    /// La serie cuya cuenta espejada acaba de vencer, y cuando.
+    ///
+    /// El telefono la va a marcar —el la arranco— pero el reloj recien se entera
+    /// en el proximo `sync()`. En esa ventana la lista la muestra sin tildar, y
+    /// sin esto tocarla arrancaria una cuenta nueva: el atleta haria la plancha
+    /// dos veces.
+    ///
+    /// Es una ventana de GRACIA y no un bloqueo permanente a proposito: si el
+    /// telefono nunca llega a marcarla —se quedo sin señal, lo cerraron— la
+    /// serie tiene que volver a estar disponible. Preferimos que se pueda
+    /// rehacer a que quede trabada para siempre.
+    private var phoneTimerVencido: (exerciseId: String, setNumber: Int, cuando: Date)?
+
+    /// Cuanto dura esa gracia. Suficiente para que el telefono escriba y el
+    /// reloj sincronice, corto para no trabar una serie que hay que rehacer.
+    private static let graciaPostVencimiento: TimeInterval = 120
+
+    /// Si esa serie sigue bloqueada por haber vencido recien.
+    func estaEnGracia(exerciseId: String, setNumber: Int, now: Date = Date()) -> Bool {
+        guard let v = phoneTimerVencido else { return false }
+        guard v.exerciseId == exerciseId, v.setNumber == setNumber else { return false }
+        return now.timeIntervalSince(v.cuando) < Self.graciaPostVencimiento
+    }
+
     /// Ultima falla de sincronizacion, para diagnostico. La UI solo muestra que
     /// hay pendientes, no el detalle.
     @Published private(set) var syncError: String?
@@ -372,7 +420,16 @@ final class WorkoutCoordinator: ObservableObject {
         // al atleta sobre que esta pasando ahora.
         closeFailure = nil
 
+        // Los TRES cronometros, no solo el descanso.
+        //
+        // Antes solo se paraba el descanso, asi que abandonar con una cuenta por
+        // tiempo corriendo dejaba su ticker vivo: minutos despues la muñeca
+        // vibraba "serie completada" de un entreno que ya no existe. Y con el
+        // espejo del telefono sin limpiar, `startDurationSet` rechazaba TODA
+        // serie por tiempo del entreno siguiente.
         stopRest()
+        cancelDurationSet()
+        clearPhoneTimer()
         await sync()
 
         // Si quedan pendientes, el entreno NO se descarta: se conserva para
@@ -505,7 +562,10 @@ final class WorkoutCoordinator: ObservableObject {
                     }
                 }
 
+                // Igual que en `finish()`: los tres, no solo el descanso.
                 stopRest()
+                cancelDurationSet()
+                clearPhoneTimer()
                 session = nil
                 workout = nil
                 currentExerciseIndex = 0
@@ -833,12 +893,16 @@ final class WorkoutCoordinator: ObservableObject {
         spec: SetSpec,
         restSeconds: Int
     ) {
-        guard let seconds = spec.durationSeconds, seconds > 0, durationSet == nil else { return }
+        // `phoneTimer == nil` NO es defensa de mas: es lo que evita que existan
+        // dos cronometros sobre la misma serie.
+        //
+        // El telefono ya esta cronometrando y va a cargar la serie el. Si el
+        // reloj arrancara el suyo, al llegar a cero la cargarian los dos, con
+        // ids distintos, y el atleta la veria repetida. Cuando hay espejo, tocar
+        // la fila REENTRA a el (ver `WorkoutView`), no arranca nada.
+        guard let seconds = spec.durationSeconds, seconds > 0,
+              durationSet == nil, phoneTimer == nil else { return }
         stopRest()
-        // El cronometro PROPIO desplaza al espejado: dos cuentas a la vez en una
-        // pantalla del tamano de una moneda no le sirven a nadie, y esta es la
-        // que ademas va a cargar la serie.
-        clearPhoneTimer()
         let fin = Date().addingTimeInterval(TimeInterval(seconds))
         durationSet = DurationSet(
             exerciseId: exerciseId,
@@ -896,6 +960,10 @@ final class WorkoutCoordinator: ObservableObject {
 
             phoneTimer = timer
             phoneTimerRemaining = CountdownRules.remaining(endsAt: timer.endsAt, now: now)
+            // Una orden NUEVA se muestra: si el atleta habia ocultado la
+            // anterior, eso valia para aquella cuenta, no para esta.
+            phoneTimerOculto = false
+            phoneTimerCancelFallo = false
             phoneTimerTicker?.invalidate()
             phoneTimerTicker = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
                 Task { @MainActor in
@@ -904,9 +972,23 @@ final class WorkoutCoordinator: ObservableObject {
                     self.phoneTimerRemaining = CountdownRules.remaining(
                         endsAt: actual.endsAt, now: ahora
                     )
-                    // Al llegar a cero se APAGA y nada mas. La serie la carga el
-                    // telefono, que es quien la arranco.
                     if CountdownRules.isFinished(endsAt: actual.endsAt, now: ahora) {
+                        // VIBRA, aunque el espejo este oculto.
+                        //
+                        // La serie la carga el TELEFONO —el la arranco, el es su
+                        // dueno— pero el aviso es la razon de ser de tener esto
+                        // en la muneca: el atleta esta aguantando una plancha,
+                        // no mirando una pantalla. Y tiene que sonar igual si
+                        // saco el espejo de la vista: ocultar es una decision de
+                        // pantalla, nunca de la serie.
+                        Haptics.durationSetCompleted()
+                        // La serie queda BLOQUEADA un rato mas.
+                        //
+                        // El telefono la va a marcar, pero el reloj recien se
+                        // entera en el proximo `sync()`. En esa ventana la
+                        // lista la muestra sin tildar y tocarla arrancaria una
+                        // cuenta nueva: el atleta haria la plancha DOS VECES.
+                        self.phoneTimerVencido = (actual.exerciseId, actual.setNumber, ahora)
                         self.clearPhoneTimer()
                     }
                 }
@@ -914,12 +996,72 @@ final class WorkoutCoordinator: ObservableObject {
         }
     }
 
-    /// Saca el espejo de la pantalla. No toca nada del telefono.
+    /// Saca el espejo de la VISTA. La cuenta sigue corriendo.
+    ///
+    /// Ocultar no cancela nada ni cambia lo que va a pasar con la serie: al
+    /// llegar a cero el reloj vibra igual y el telefono la marca igual. Lo unico
+    /// que cambia es que la muneca deja de estar tomada, y la fila vuelve a
+    /// verse normal — al tocarla se vuelve a entrar a la cuenta, sincronizada.
+    func ocultarPhoneTimer() {
+        phoneTimerOculto = true
+    }
+
+    /// Vuelve a poner el espejo en pantalla.
+    func mostrarPhoneTimer() {
+        phoneTimerOculto = false
+    }
+
+    /// Cancela de verdad: corta la cuenta ACA y le pide al telefono que corte
+    /// la suya.
+    ///
+    /// El espejo se saca SOLO si el telefono recibio el pedido. Si no llego, el
+    /// telefono sigue contando y va a marcar la serie: dejar la pantalla como
+    /// si se hubiera cancelado seria mentirle al atleta, que es exactamente el
+    /// no-op silencioso que costo `WorkoutCloseFailure`.
+    func cancelarPhoneTimer() {
+        guard let actual = phoneTimer else { return }
+        guard let pedir = onCancelarCronometroDelTelefono else {
+            // Sin canal no se puede prometer nada. Se avisa en vez de fingir.
+            phoneTimerCancelFallo = true
+            return
+        }
+
+        // La cuenta NO se borra todavia, y esto es lo importante.
+        //
+        // Mientras el pedido esta en vuelo el telefono SIGUE contando: es el
+        // dueño de la serie y todavia no se entero de nada. Borrar el espejo
+        // aca abriria el guard de `startDurationSet` y la reentrada de la lista
+        // durante esa ventana, y el atleta podria arrancar una SEGUNDA cuenta
+        // sobre la misma serie.
+        //
+        // Se saca de la VISTA —que es lo unico que el atleta pidio— y se deja
+        // el estado intacto. La confirmacion llega como un `watchTimer/cancel`
+        // de vuelta desde el telefono, que cae en `apply(.cancel)` y limpia. Ese
+        // ida y vuelta TERMINA: `.cancel` no manda nada de regreso.
+        phoneTimerCancelFallo = false
+        phoneTimerOculto = true
+
+        pedir(actual.exerciseId, actual.setNumber) { [weak self] in
+            guard let self else { return }
+            // No llego: el telefono sigue contando y va a marcar la serie. Se
+            // vuelve a mostrar la cuenta —que es la verdad— con el aviso.
+            //
+            // El cartel se dibuja DENTRO de la pantalla del espejo, asi que
+            // volver a mostrarla no es cosmetico: es lo que lo hace visible.
+            guard self.phoneTimer != nil else { return }
+            self.phoneTimerOculto = false
+            self.phoneTimerCancelFallo = true
+        }
+    }
+
+    /// Olvida el espejo por completo. La cuenta dejo de existir.
     func clearPhoneTimer() {
         phoneTimerTicker?.invalidate()
         phoneTimerTicker = nil
         phoneTimer = nil
         phoneTimerRemaining = 0
+        phoneTimerOculto = false
+        phoneTimerCancelFallo = false
     }
 
     /// Llego a cero: vibra y carga la serie sola.

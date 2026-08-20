@@ -36,10 +36,13 @@ struct WorkoutView: View {
         // vez de por un `disabled` que hay que acordarse de poner.
         if let cuenta = workout.durationSet {
             durationTimerScreen(cuenta)
-        } else if let espejo = workout.phoneTimer {
+        } else if let espejo = workout.phoneTimer, !workout.phoneTimerOculto {
             // El cronometro que arranco en el TELEFONO. Misma prioridad de
             // pantalla por el mismo motivo: mientras dura la serie no hay nada
             // que marcar.
+            //
+            // Si el atleta lo oculto, la cuenta SIGUE viva —vibra igual al
+            // terminar— y esta pantalla vuelve al tocar la fila del ejercicio.
             phoneTimerScreen(espejo)
         } else if let exercise = workout.currentExercise, let session = workout.session {
             ScrollView {
@@ -247,11 +250,31 @@ struct WorkoutView: View {
 
             effortRow()
 
-            Button("Ocultar") { workout.clearPhoneTimer() }
-                .font(.caption2)
-                .buttonStyle(.bordered)
-                .tint(.secondary)
-                .padding(.top, 6)
+            if workout.phoneTimerCancelFallo {
+                // Cancelar en falso es peor que no ofrecerlo: el telefono
+                // seguiria contando y marcaria la serie mientras el atleta cree
+                // que la corto. Misma leccion que `WorkoutCloseFailure`.
+                Text("No se pudo cancelar. Usá el teléfono.")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+                    .multilineTextAlignment(.center)
+            }
+
+            HStack(spacing: 6) {
+                // OCULTAR no cancela: saca la cuenta de la pantalla y la deja
+                // corriendo. Vibra igual al terminar y la serie se marca igual;
+                // al tocar la fila del ejercicio se vuelve acá, sincronizado.
+                Button("Ocultar") { workout.ocultarPhoneTimer() }
+                    .tint(.secondary)
+
+                // CANCELAR corta de los dos lados. La orden viaja al telefono,
+                // que es el dueño de la serie.
+                Button("Cancelar") { workout.cancelarPhoneTimer() }
+                    .tint(.red)
+            }
+            .font(.caption2)
+            .buttonStyle(.bordered)
+            .padding(.top, 6)
         }
         .padding()
     }
@@ -422,7 +445,14 @@ struct WorkoutView: View {
             // Ni las hechas, ni las que están más adelante que la próxima, ni
             // una fila sin prescripción: el reloj no ofrece cargar una serie de
             // la que no sabe el objetivo. Agregar series es del teléfono.
-            let tappable = !done && setNumber == nextSet && spec != nil
+            // La gracia post-vencimiento: la cuenta del telefono llego a cero
+            // hace instantes y el reloj todavia no sincronizo la serie. Sin
+            // esto se ve sin tildar y tocarla arranca otra cuenta — el atleta
+            // hace la plancha dos veces.
+            let enGracia = workout.estaEnGracia(
+                exerciseId: exercise.exerciseId, setNumber: setNumber
+            )
+            let tappable = !done && !enGracia && setNumber == nextSet && spec != nil
             // Un ejercicio POR TIEMPO no se marca: se cronometra.
             //
             // El toque arranca la cuenta en vez de cargar la serie, y la serie
@@ -433,6 +463,23 @@ struct WorkoutView: View {
             Button {
                 guard let spec else { return }
                 if porTiempo {
+                    // Si YA hay una cuenta corriendo —la arranco el telefono y
+                    // el atleta oculto el espejo— tocar la fila REENTRA a ella
+                    // en vez de arrancar otra.
+                    //
+                    // El guard es amplio a proposito: "hay cuenta corriendo",
+                    // no "es la misma serie". Si el telefono cronometra la serie
+                    // 2 y por algun desorden el cursor apunta a otra, arrancar
+                    // una segunda cuenta dejaria dos cronometros vivos, y al
+                    // llegar a cero cada uno cargaria su serie.
+                    //
+                    // Por eso la fila se ve NORMAL mientras tanto: no hace falta
+                    // explicarle nada al atleta ni inventar un estado visual de
+                    // "bloqueada". El bloqueo vive acá.
+                    if workout.phoneTimer != nil {
+                        workout.mostrarPhoneTimer()
+                        return
+                    }
                     workout.startDurationSet(
                         exerciseId: exercise.exerciseId,
                         setNumber: setNumber,
