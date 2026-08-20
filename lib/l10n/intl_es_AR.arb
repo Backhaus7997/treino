@@ -71,8 +71,24 @@
   "@homeEstaSemanaResumeCta": {"description": "Home 'Esta Semana' card resume-state CTA button navigating to routines."},
   "@@locale": "es_AR",
   "authSplashTagline": "ENTRENÁ. COMPARTÍ. CRECÉ.",
+  "authBrandHeadline1Light": "DEJÁ DE ",
+  "@authBrandHeadline1Light": {
+    "description": "Brand headline, line 1, LIGHT half (w500). Rendered by splash_screen and welcome_screen from the same keys so the two screens can't drift apart. The trailing space is load-bearing — the light and bold halves are adjacent TextSpans, not separate widgets."
+  },
+  "authBrandHeadline1Bold": "IMPROVISAR.",
+  "@authBrandHeadline1Bold": {
+    "description": "Brand headline, line 1, BOLD half (w900). This is the punchline of the line — keep the emphasis on the payoff word, not the setup."
+  },
+  "authBrandHeadline2Light": "EMPEZÁ A ",
+  "@authBrandHeadline2Light": {
+    "description": "Brand headline, line 2, LIGHT half (w500). Trailing space is load-bearing, same as line 1."
+  },
+  "authBrandHeadline2Bold": "PROGRESAR.",
+  "@authBrandHeadline2Bold": {
+    "description": "Brand headline, line 2, BOLD half (w900). Deliberately does NOT name a modality: the old copy said 'EL HIERRO', which read as gym-only and excluded the calisthenics catalogue the app actually ships."
+  },
   "authWelcomeEyebrow": "ENTRENAMIENTO · GYM · COACH",
-  "authWelcomeBody": "Cargá tu rutina, ejecutá los sets, seguí a tus pibes y encontrá un coach cerca tuyo.",
+  "authWelcomeBody": "Tu rutina, tus series y tus cargas en un solo lugar. Con un coach atrás si lo querés.",
   "authWelcomeCta": "EMPEZAR",
   "authWelcomeHaveAccount": "Ya tengo cuenta",
   "authWelcomeSignIn": "Iniciar sesión",

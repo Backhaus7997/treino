@@ -113,10 +113,23 @@ class AppL10nEn extends AppL10n {
   String get authSplashTagline => '';
 
   @override
+  String get authBrandHeadline1Light => 'STOP ';
+
+  @override
+  String get authBrandHeadline1Bold => 'GUESSING.';
+
+  @override
+  String get authBrandHeadline2Light => 'START ';
+
+  @override
+  String get authBrandHeadline2Bold => 'PROGRESSING.';
+
+  @override
   String get authWelcomeEyebrow => '';
 
   @override
-  String get authWelcomeBody => '';
+  String get authWelcomeBody =>
+      'Your routine, your sets and your loads in one place. With a coach behind you if you want one.';
 
   @override
   String get authWelcomeCta => '';

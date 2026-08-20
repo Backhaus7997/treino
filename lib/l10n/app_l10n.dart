@@ -260,6 +260,30 @@ abstract class AppL10n {
   /// **'ENTRENÁ. COMPARTÍ. CRECÉ.'**
   String get authSplashTagline;
 
+  /// Brand headline, line 1, LIGHT half (w500). Rendered by splash_screen and welcome_screen from the same keys so the two screens can't drift apart. The trailing space is load-bearing — the light and bold halves are adjacent TextSpans, not separate widgets.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DEJÁ DE '**
+  String get authBrandHeadline1Light;
+
+  /// Brand headline, line 1, BOLD half (w900). This is the punchline of the line — keep the emphasis on the payoff word, not the setup.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'IMPROVISAR.'**
+  String get authBrandHeadline1Bold;
+
+  /// Brand headline, line 2, LIGHT half (w500). Trailing space is load-bearing, same as line 1.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'EMPEZÁ A '**
+  String get authBrandHeadline2Light;
+
+  /// Brand headline, line 2, BOLD half (w900). Deliberately does NOT name a modality: the old copy said 'EL HIERRO', which read as gym-only and excluded the calisthenics catalogue the app actually ships.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PROGRESAR.'**
+  String get authBrandHeadline2Bold;
+
   /// No description provided for @authWelcomeEyebrow.
   ///
   /// In es_AR, this message translates to:
@@ -269,7 +293,7 @@ abstract class AppL10n {
   /// No description provided for @authWelcomeBody.
   ///
   /// In es_AR, this message translates to:
-  /// **'Cargá tu rutina, ejecutá los sets, seguí a tus pibes y encontrá un coach cerca tuyo.'**
+  /// **'Tu rutina, tus series y tus cargas en un solo lugar. Con un coach atrás si lo querés.'**
   String get authWelcomeBody;
 
   /// No description provided for @authWelcomeCta.
