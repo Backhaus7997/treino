@@ -804,6 +804,12 @@ class AppL10nEs extends AppL10n {
       'Llegaste al máximo de 10 rutinas activas.';
 
   @override
+  String get workoutTabYours => 'TU ENTRENO';
+
+  @override
+  String get workoutTabExplore => 'EXPLORAR';
+
+  @override
   String get workoutMisRutinasSectionTitle => 'MIS RUTINAS';
 
   @override
@@ -2879,7 +2885,10 @@ class AppL10nEs extends AppL10n {
 
   @override
   String dashboardAlertBannerSummary(
-      int vencidos, int solicitudes, int inactivos) {
+    int vencidos,
+    int solicitudes,
+    int inactivos,
+  ) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,
@@ -4293,6 +4302,12 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get workoutSelfEditorCapReached =>
       'Llegaste al máximo de 10 rutinas activas.';
+
+  @override
+  String get workoutTabYours => 'TU ENTRENO';
+
+  @override
+  String get workoutTabExplore => 'EXPLORAR';
 
   @override
   String get workoutMisRutinasSectionTitle => 'MIS RUTINAS';
@@ -6368,7 +6383,10 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String dashboardAlertBannerSummary(
-      int vencidos, int solicitudes, int inactivos) {
+    int vencidos,
+    int solicitudes,
+    int inactivos,
+  ) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,

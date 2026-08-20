@@ -95,7 +95,7 @@ abstract class AppL10n {
   static const List<Locale> supportedLocales = <Locale>[
     Locale('en'),
     Locale('es'),
-    Locale('es', 'AR')
+    Locale('es', 'AR'),
   ];
 
   /// No description provided for @notFoundTitle.
@@ -1561,6 +1561,18 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Llegaste al máximo de 10 rutinas activas.'**
   String get workoutSelfEditorCapReached;
+
+  /// Left pill of the athlete Entrenar segmented control (page 0 — own routines + session history). Key is semantic, not a copy of the label, so a future copy change does not strand the identifier the way `plantillas*` did (#638).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TU ENTRENO'**
+  String get workoutTabYours;
+
+  /// Right pill of the athlete Entrenar segmented control (page 1 — trainer-built routine catalogue). A VERB on purpose: the left pill already owns the noun 'rutinas' via workoutMisRutinasSectionTitle, and two nouns in one toggle is what made the old 'PLANTILLAS' label test badly (#638). Keep it short — over ~12 chars the TabBar starts scrolling on small screens.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'EXPLORAR'**
+  String get workoutTabExplore;
 
   /// No description provided for @workoutMisRutinasSectionTitle.
   ///
@@ -5203,7 +5215,10 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'{vencidos, plural, =1{1 vencido} other{{vencidos} vencidos}} · {solicitudes, plural, =1{1 solicitud} other{{solicitudes} solicitudes}} · {inactivos, plural, =1{1 inactivo} other{{inactivos} inactivos}}'**
   String dashboardAlertBannerSummary(
-      int vencidos, int solicitudes, int inactivos);
+    int vencidos,
+    int solicitudes,
+    int inactivos,
+  );
 
   /// Formatted adherencia percentage value shown in the adherencia ring and KPI tile once the aggregate provider has data.
   ///
@@ -6240,8 +6255,9 @@ AppL10n lookupAppL10n(Locale locale) {
   }
 
   throw FlutterError(
-      'AppL10n.delegate failed to load unsupported locale "$locale". This is likely '
-      'an issue with the localizations generation tool. Please file an issue '
-      'on GitHub with a reproducible sample app and the gen-l10n configuration '
-      'that was used.');
+    'AppL10n.delegate failed to load unsupported locale "$locale". This is likely '
+    'an issue with the localizations generation tool. Please file an issue '
+    'on GitHub with a reproducible sample app and the gen-l10n configuration '
+    'that was used.',
+  );
 }

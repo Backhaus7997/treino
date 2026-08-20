@@ -311,6 +311,8 @@
   "workoutSelfEditorPermissionDenied": "",
   "workoutEditStubToast": "",
   "workoutSelfEditorCapReached": "",
+  "workoutTabYours": "YOUR WORKOUT",
+  "workoutTabExplore": "EXPLORE",
   "workoutMisRutinasSectionTitle": "",
   "workoutMisRutinasCta": "",
   "workoutMisRutinasCtaDisabledTooltip": "",

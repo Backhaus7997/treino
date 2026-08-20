@@ -784,6 +784,12 @@ class AppL10nEn extends AppL10n {
   String get workoutSelfEditorCapReached => '';
 
   @override
+  String get workoutTabYours => 'YOUR WORKOUT';
+
+  @override
+  String get workoutTabExplore => 'EXPLORE';
+
+  @override
   String get workoutMisRutinasSectionTitle => '';
 
   @override
@@ -2823,7 +2829,10 @@ class AppL10nEn extends AppL10n {
 
   @override
   String dashboardAlertBannerSummary(
-      int vencidos, int solicitudes, int inactivos) {
+    int vencidos,
+    int solicitudes,
+    int inactivos,
+  ) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,

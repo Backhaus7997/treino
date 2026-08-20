@@ -384,6 +384,14 @@
   "workoutSelfEditorPermissionDenied": "No tenés permisos para hacer esto. Recargá la app.",
   "workoutEditStubToast": "Pronto vas a poder editar el contenido. Por ahora podés archivar y crear de nuevo.",
   "workoutSelfEditorCapReached": "Llegaste al máximo de 10 rutinas activas.",
+  "workoutTabYours": "TU ENTRENO",
+  "@workoutTabYours": {
+    "description": "Left pill of the athlete Entrenar segmented control (page 0 — own routines + session history). Key is semantic, not a copy of the label, so a future copy change does not strand the identifier the way `plantillas*` did (#638)."
+  },
+  "workoutTabExplore": "EXPLORAR",
+  "@workoutTabExplore": {
+    "description": "Right pill of the athlete Entrenar segmented control (page 1 — trainer-built routine catalogue). A VERB on purpose: the left pill already owns the noun 'rutinas' via workoutMisRutinasSectionTitle, and two nouns in one toggle is what made the old 'PLANTILLAS' label test badly (#638). Keep it short — over ~12 chars the TabBar starts scrolling on small screens."
+  },
   "workoutMisRutinasSectionTitle": "MIS RUTINAS",
   "workoutMisRutinasCta": "CREAR RUTINA",
   "workoutMisRutinasCtaDisabledTooltip": "Llegaste al máximo de 10 rutinas activas. Archivá una para crear otra.",
