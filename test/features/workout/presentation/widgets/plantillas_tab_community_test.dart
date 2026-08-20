@@ -270,8 +270,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('SOBREVIVIENTE'), findsOneWidget);
-      expect(
-          find.text('Hubo un error cargando las plantillas.'), findsOneWidget);
+      expect(find.text('Hubo un error cargando las rutinas.'), findsOneWidget);
     });
   });
 }

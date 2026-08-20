@@ -1562,6 +1562,36 @@ abstract class AppL10n {
   /// **'Llegaste al máximo de 10 rutinas activas.'**
   String get workoutSelfEditorCapReached;
 
+  /// Left pill of the athlete Entrenar segmented control (page 0 — own routines + session history). Key is semantic, not a copy of the label, so a future copy change does not strand the identifier the way `plantillas*` did (#638).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TU ENTRENO'**
+  String get workoutTabYours;
+
+  /// Right pill of the athlete Entrenar segmented control (page 1 — trainer-built routine catalogue). A VERB on purpose: the left pill already owns the noun 'rutinas' via workoutMisRutinasSectionTitle, and two nouns in one toggle is what made the old 'PLANTILLAS' label test badly (#638). Keep it short — over ~12 chars the TabBar starts scrolling on small screens.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'EXPLORAR'**
+  String get workoutTabExplore;
+
+  /// Empty state of the EXPLORAR catalogue grid when no trainer has published anything yet and no level filter is active (#638).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No hay rutinas todavía.'**
+  String get workoutExploreEmptyAll;
+
+  /// Empty state of the EXPLORAR catalogue grid when a level filter pill is active and nothing matches it (#638).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No hay rutinas para este nivel.'**
+  String get workoutExploreEmptyLevel;
+
+  /// Error state of the EXPLORAR catalogue grid. Paired with plantillasRetryLabel as the retry CTA (#638).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Hubo un error cargando las rutinas.'**
+  String get workoutExploreLoadError;
+
   /// No description provided for @workoutMisRutinasSectionTitle.
   ///
   /// In es_AR, this message translates to:
@@ -1703,7 +1733,7 @@ abstract class AppL10n {
   /// Shown instead of the average when a published template has zero ratings.
   ///
   /// In es_AR, this message translates to:
-  /// **'Todavía nadie calificó esta plantilla. ¡Sé el primero!'**
+  /// **'Todavía nadie calificó esta rutina. ¡Sé el primero!'**
   String get templateRatingsNoneYet;
 
   /// How many people rated the template, next to the average score.
@@ -1751,7 +1781,7 @@ abstract class AppL10n {
   /// Title of the rating bottom sheet when creating a new rating.
   ///
   /// In es_AR, this message translates to:
-  /// **'Calificá esta plantilla'**
+  /// **'Calificá esta rutina'**
   String get templateRatingSheetTitle;
 
   /// Title of the rating bottom sheet when editing an existing rating.
@@ -1763,7 +1793,7 @@ abstract class AppL10n {
   /// Hint of the optional comment field in the template rating sheet, max 500 chars.
   ///
   /// In es_AR, this message translates to:
-  /// **'Contá cómo te fue con esta plantilla (opcional)'**
+  /// **'Contá cómo te fue con esta rutina (opcional)'**
   String get templateRatingSheetCommentHint;
 
   /// Cancel button of the template rating sheet.
