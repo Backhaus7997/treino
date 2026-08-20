@@ -1,15 +1,8 @@
 package com.treino.app.workout
 
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
-import android.content.Context
-import android.content.Intent
 import android.util.Log
-import androidx.core.app.NotificationCompat
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.WearableListenerService
-import com.treino.app.MainActivity
 import org.json.JSONObject
 
 /**
@@ -57,66 +50,13 @@ class WorkoutLaunchService : WearableListenerService() {
             JSONObject()
         }
 
-        Log.i(TAG, "el telefono arranco un entreno ($datos): abriendo el companion")
-        abrirDirecto()
-        abrirPorNotificacion()
+        WorkoutLauncher.abrir(this, "data layer $datos")
     }
 
-    private fun intentDeLaApp(): Intent =
-        Intent(this, MainActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        }
-
-    private fun abrirDirecto() {
-        try {
-            startActivity(intentDeLaApp())
-        } catch (e: Exception) {
-            // Cuando el sistema lo bloquea no llega por aca —lo anota y sigue—
-            // pero un SecurityException si cae, y no puede tumbar el servicio.
-            Log.w(TAG, "no se pudo abrir la app directo", e)
-        }
-    }
-
-    private fun abrirPorNotificacion() {
-        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        manager.createNotificationChannel(
-            NotificationChannel(
-                CANAL,
-                "Entreno iniciado",
-                // IMPORTANCE_HIGH es la precondicion del full-screen intent: con
-                // una importancia menor el sistema ni lo evalua.
-                NotificationManager.IMPORTANCE_HIGH,
-            )
-        )
-
-        val pending = PendingIntent.getActivity(
-            this,
-            0,
-            intentDeLaApp(),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-
-        val notif = NotificationCompat.Builder(this, CANAL)
-            .setSmallIcon(android.R.drawable.ic_media_play)
-            .setContentTitle("Entreno en curso")
-            .setContentText("Segui desde el reloj")
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_WORKOUT)
-            .setAutoCancel(true)
-            .setContentIntent(pending)
-            .setFullScreenIntent(pending, true)
-            .build()
-
-        manager.notify(NOTIF_ID, notif)
-    }
-
-    companion object {
+    private companion object {
         private const val TAG = "treino-wear-launch"
 
         /** Espeja `TreinoLink.pathWorkoutStarted` del lado Dart. */
         private const val PATH_WORKOUT_STARTED = "/treino/workout-started"
-
-        private const val CANAL = "treino_workout_launch"
-        private const val NOTIF_ID = 4201
     }
 }
