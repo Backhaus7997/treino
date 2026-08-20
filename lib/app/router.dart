@@ -264,12 +264,15 @@ GoRouter buildRouter({
       // Sin esta ruta el modal se abre bien pero el boton muere contra una
       // ruta inexistente — el paywall quedaria roto en la mitad del producto.
       //
-      // `PricingScreen` ya es responsive (tiene rama < 820px), pero en el
-      // Coach Hub el Scaffold lo provee el shell (ADR-CHW-005), asi que aca
-      // hay que envolverlo.
+      // El Scaffold lo provee el shell del Coach Hub (ADR-CHW-005), asi que en
+      // movil hay que envolverlo. `PricingRouteScreen` es ese envoltorio y vive
+      // con la pantalla: aporta SafeArea + AppBar con "volver". Montaba un
+      // `Scaffold(body: PricingScreen())` pelado, y sin SafeArea el titulo se
+      // dibujaba debajo de la barra de estado en cualquier telefono con notch,
+      // sin mas salida que el gesto del sistema.
       GoRoute(
         path: '/facturacion/planes',
-        builder: (context, state) => const Scaffold(body: PricingScreen()),
+        builder: (context, state) => const PricingRouteScreen(),
       ),
       // ─── Session player — TOP-LEVEL ROUTES (outside ShellRoute) ───────────
       // El player es immersive: oculta la bottom bar durante el entrenamiento.
