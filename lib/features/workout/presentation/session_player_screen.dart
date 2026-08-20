@@ -2397,6 +2397,14 @@ class _DurationSetRowState extends ConsumerState<_DurationSetRow> {
   /// rebotando el mismo temporizador.
   void _arrancarDesdeElReloj(int seconds) {
     if (widget.isDone) return;
+
+    // Si acá ya corre el MISMO temporizador, no se reinicia. Este listener
+    // también recibe la escritura que hizo ESTE aparato, así que sin el guard
+    // el número saltaría hacia atrás apenas Firestore devuelve el eco. Dos
+    // segundos de tolerancia: la latencia y el redondeo no son motivo para
+    // reiniciar nada.
+    if (_running && (_remaining - seconds).abs() <= 2) return;
+
     _timer?.cancel();
     setState(() {
       _remaining = seconds;

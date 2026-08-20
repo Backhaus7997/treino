@@ -3,101 +3,141 @@ import 'dart:async';
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../data/treino_link.dart';
+import '../../workout/application/session_providers.dart';
+import '../../workout/data/session_repository.dart';
 import '../data/wear_workout_service.dart';
 import '../domain/wear_timer_sync.dart';
-import 'watch_bridge_provider.dart';
 import 'wear_rest_providers.dart';
+import 'wear_session_providers.dart';
 
-/// Arranca y cancela el ejercicio por tiempo en LOS DOS aparatos.
+/// Arranca y cancela el ejercicio por tiempo, en los DOS aparatos.
 ///
-/// ## Por qué está encapsulado y no suelto en la pantalla
+/// ## Por qué por Firestore y no por la Data Layer
 ///
-/// Porque arrancar el temporizador son dos cosas —el deadline local y el aviso
-/// al otro lado— y separarlas es garantizar que alguna vez se haga una sin la
-/// otra. Un temporizador que corre en el reloj y no en el teléfono es peor que
-/// ninguno: el atleta ve dos números distintos y no sabe a cuál creerle.
+/// Dos razones, y la segunda es la que manda.
+///
+/// 1. La Data Layer exige que el reloj esté emparejado con ESE teléfono, con la
+///    app companion instalada. Medido en hardware: con un teléfono que no la
+///    tiene, el envío muere en «no hay nodos conectados» y no cruza nada.
+/// 2. **Un mensaje se pierde si el otro no está escuchando.** El caso real es
+///    justamente ése: el atleta arranca el ejercicio en el teléfono y mira el
+///    reloj un rato después. Para eso no alcanza un aviso, hace falta ESTADO —
+///    y el estado va en la sesión, que es lo que los dos aparatos ya leen.
+///
+/// El instante de arranque se guarda junto con la duración: quien lo lea
+/// descuenta lo transcurrido, así los dos muestran el mismo número en vez de
+/// quedar corridos por la latencia. Ver [wearRemainingSeconds].
 class WearTimerSync {
   const WearTimerSync({
     required WearWorkoutService service,
-    required TreinoLink link,
+    required SessionRepository repo,
+    required String? uid,
+    required String? sessionId,
   })  : _service = service,
-        _link = link;
+        _repo = repo,
+        _uid = uid,
+        _sessionId = sessionId;
 
   final WearWorkoutService _service;
-  final TreinoLink _link;
+  final SessionRepository _repo;
+  final String? _uid;
+  final String? _sessionId;
 
-  /// Arranca acá y avisa al teléfono.
+  bool get _puedeSincronizar =>
+      (_uid?.isNotEmpty ?? false) && (_sessionId?.isNotEmpty ?? false);
+
+  /// Arranca acá y lo anota en la sesión.
   ///
-  /// El aviso va con el instante de arranque además de la duración: el mensaje
-  /// tarda en cruzar y sin eso los dos aparatos mostrarían números corridos.
+  /// El temporizador local arranca SIEMPRE, aunque la escritura falle: sin red
+  /// el atleta igual tiene que poder hacer su plancha. Y la escritura no se
+  /// espera — es la lección del ciclo: nunca hacer que la UI dependa del ack
+  /// del servidor.
   Future<void> arrancar(int seconds) async {
     if (seconds <= 0) return cancelar();
     await _service.startExerciseTimer(seconds);
-    unawaited(_link.send(TreinoLink.pathTimerStarted, {
-      'seconds': seconds,
-      'startedAtEpochMs': DateTime.now().millisecondsSinceEpoch,
-    }));
+    if (!_puedeSincronizar) return;
+    unawaited(
+      _repo
+          .startExerciseTimer(
+            uid: _uid!,
+            sessionId: _sessionId!,
+            seconds: seconds,
+            startedAtMs: DateTime.now().millisecondsSinceEpoch,
+          )
+          .catchError(
+            (Object e) => debugPrint('[wear-timer] no se pudo anotar — $e'),
+          ),
+    );
   }
 
-  /// Cancela acá y avisa al teléfono.
   Future<void> cancelar() async {
     await _service.cancelExerciseTimer();
-    unawaited(_link.send(TreinoLink.pathTimerCancelled));
-  }
-
-  /// Aplica lo que llegó del otro lado, SIN reenviar.
-  ///
-  /// Reenviar sería un eco: el otro aparato volvería a avisar y los dos se
-  /// quedarían rebotando el mismo temporizador.
-  Future<void> aplicarRemoto(TreinoLinkMessage msg) async {
-    if (msg.path == TreinoLink.pathTimerCancelled) {
-      debugPrint('[wear-timer] cancelado desde el teléfono');
-      await _service.cancelExerciseTimer();
-      return;
-    }
-    if (msg.path != TreinoLink.pathTimerStarted) return;
-
-    final seconds = (msg.data['seconds'] as num?)?.toInt() ?? 0;
-    final startedAt = (msg.data['startedAtEpochMs'] as num?)?.toInt();
-    if (seconds <= 0 || startedAt == null) {
-      debugPrint('[wear-timer] payload inservible: ${msg.data}');
-      return;
-    }
-
-    final restante = wearRemainingSeconds(
-      seconds: seconds,
-      startedAtEpochMs: startedAt,
-      nowEpochMs: DateTime.now().millisecondsSinceEpoch,
+    if (!_puedeSincronizar) return;
+    unawaited(
+      _repo.clearExerciseTimer(uid: _uid!, sessionId: _sessionId!).catchError(
+            (Object e) => debugPrint('[wear-timer] no se pudo borrar — $e'),
+          ),
     );
-    if (restante <= 0) {
-      debugPrint('[wear-timer] llegó vencido, no se arranca');
-      return;
-    }
-
-    debugPrint('[wear-timer] arrancado desde el teléfono ($restante s)');
-    await _service.startExerciseTimer(restante);
   }
 }
 
-final wearTimerSyncProvider = Provider<WearTimerSync>(
-  (ref) => WearTimerSync(
+final wearTimerSyncProvider = Provider<WearTimerSync>((ref) {
+  final sesion = ref.watch(wearSessionProvider);
+  return WearTimerSync(
     service: ref.watch(wearWorkoutServiceProvider),
-    link: ref.watch(treinoLinkProvider),
-  ),
-);
+    repo: ref.watch(sessionRepositoryProvider),
+    uid: ref.watch(currentUidProvider),
+    sessionId: sesion is WearSessionRunning ? sesion.session.sessionId : null,
+  );
+});
 
-/// Escucha lo que manda el teléfono sobre el temporizador.
+/// Refleja en el reloj el temporizador anotado en la sesión.
 ///
-/// Se lee de forma EAGER en `main_wear.dart`: sin ese `ref.read` no hay nadie
-/// escuchando y la sincronización es código muerto — el mismo patrón, y el
-/// mismo riesgo, que el lifecycle de credencial del teléfono.
+/// Se lee de forma EAGER en `main_wear.dart`. Emite el valor inicial al
+/// suscribirse, así entrar al reloj DESPUÉS de haber arrancado el ejercicio en
+/// el teléfono encuentra el temporizador en curso — el caso que un mensaje no
+/// puede cubrir.
 final wearTimerInboxProvider = Provider<void>((ref) {
-  final sync = ref.watch(wearTimerSyncProvider);
-  final sub = ref.watch(treinoLinkProvider).messages.listen(
-        (msg) => unawaited(sync.aplicarRemoto(msg)),
-        onError: (Object e) =>
-            debugPrint('[wear-timer] el canal se quejó — $e'),
+  final sesion = ref.watch(wearSessionProvider);
+  if (sesion is! WearSessionRunning) return;
+  final uid = ref.watch(currentUidProvider);
+  if (uid == null || uid.isEmpty) return;
+
+  final service = ref.watch(wearWorkoutServiceProvider);
+
+  final sub = ref
+      .watch(sessionRepositoryProvider)
+      .watchExerciseTimer(uid: uid, sessionId: sesion.session.sessionId)
+      .listen(
+    (remoto) async {
+      if (remoto == null) {
+        // Se canceló del otro lado, o nunca hubo. Cancelar de más es inocuo:
+        // el nativo borra un deadline que ya no está y listo.
+        await service.cancelExerciseTimer();
+        return;
+      }
+
+      // Si acá ya corre el MISMO temporizador, no se reinicia. Sin esto, cada
+      // emisión del listener lo volvería a arrancar y el número saltaría hacia
+      // atrás una vez por escritura en la sesión.
+      final actual = await service.exerciseTimerState();
+      final restante = wearRemainingSeconds(
+        seconds: remoto.seconds,
+        startedAtEpochMs: remoto.startedAtMs,
+        nowEpochMs: DateTime.now().millisecondsSinceEpoch,
       );
+      if (restante <= 0) return;
+      if (actual != null && !actual.finished) {
+        final diferencia = (actual.remainingMs ~/ 1000 - restante).abs();
+        // Dos segundos de tolerancia: la latencia de Firestore y el redondeo no
+        // son motivo para reiniciar nada.
+        if (diferencia <= 2) return;
+      }
+
+      debugPrint('[wear-timer] sincronizado desde la sesión ($restante s)');
+      await service.startExerciseTimer(restante);
+    },
+    onError: (Object e) => debugPrint('[wear-timer] el canal se quejó — $e'),
+  );
   ref.onDispose(sub.cancel);
 });

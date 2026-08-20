@@ -5,6 +5,7 @@ import '../../../../app/theme/app_palette.dart';
 import '../../data/wear_workout_service.dart';
 import '../../domain/watch_effort.dart';
 import 'wear_fitted_text.dart';
+import 'wear_round_scaffold.dart';
 import 'wear_widgets.dart';
 
 /// La pantalla de un ejercicio POR TIEMPO mientras corre.
@@ -68,73 +69,73 @@ class WearExerciseTimerScreen extends StatelessWidget {
     final palette = AppPalette.of(context);
     final termino = timer.finished;
 
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            WearFittedText(
-              exerciseName,
-              maxLines: 2,
-              maxSize: 14,
-              minSize: 11,
-              widthFactor: 0.9,
-              styleFor: (size) => GoogleFonts.barlowCondensed(
-                fontSize: size,
-                fontWeight: FontWeight.w700,
-                height: 1.1,
-                color: palette.textMuted,
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: 118,
-              height: 118,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  // El anillo se lee ANTES que el número cuando el reloj se
-                  // mira de reojo: la posición dice cuánto falta sin leer.
-                  SizedBox.expand(
-                    child: CircularProgressIndicator(
-                      value: _progreso,
-                      strokeWidth: 6,
-                      backgroundColor: palette.bgCard,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        termino ? palette.accent : palette.highlight,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    termino ? '¡Listo!' : _tiempo,
-                    style: GoogleFonts.barlowCondensed(
-                      fontSize: termino ? 28 : 44,
-                      fontWeight: FontWeight.w700,
-                      height: 1,
-                      color: palette.textPrimary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            WearEffortRow(effort: effort),
-            const SizedBox(height: 14),
-            if (termino)
-              WearButton(label: 'Marcar serie', onTap: onListo)
-            else
-              // Ocultar NO cancela: el temporizador sigue corriendo y vibra al
-              // vencer igual. Es para poder mirar las series sin perder la
-              // cuenta.
-              WearButton(
-                label: 'Ocultar',
-                onTap: onOcultar,
-                tint: palette.textMuted,
-              ),
-          ],
+    // `centered` y no un `Center` propio: el andamio es el que aporta el
+    // `Scaffold` —o sea el `Material`— y el inset de la pantalla redonda. Sin
+    // él, Flutter dibuja los `Text` con el subrayado amarillo de "falta
+    // Material", el título se corta contra el borde de arriba y el botón se va
+    // de pantalla abajo. Se vio en la muñeca.
+    return WearRoundScaffold.centered(
+      children: [
+        WearFittedText(
+          exerciseName,
+          maxLines: 2,
+          maxSize: 13,
+          minSize: 10,
+          widthFactor: 0.9,
+          styleFor: (size) => GoogleFonts.barlowCondensed(
+            fontSize: size,
+            fontWeight: FontWeight.w700,
+            height: 1.1,
+            color: palette.textMuted,
+          ),
         ),
-      ),
+        const SizedBox(height: 8),
+        SizedBox(
+          // Medido para 206 dp de alto: con el título, el esfuerzo y el botón,
+          // un anillo más grande empuja el botón fuera de la pantalla.
+          width: 88,
+          height: 88,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // El anillo se lee ANTES que el número cuando el reloj se mira de
+              // reojo: la posición dice cuánto falta sin leer.
+              SizedBox.expand(
+                child: CircularProgressIndicator(
+                  value: _progreso,
+                  strokeWidth: 5,
+                  backgroundColor: palette.bgCard,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    termino ? palette.accent : palette.highlight,
+                  ),
+                ),
+              ),
+              Text(
+                termino ? 'LISTO' : _tiempo,
+                style: GoogleFonts.barlowCondensed(
+                  fontSize: termino ? 20 : 34,
+                  fontWeight: FontWeight.w700,
+                  height: 1,
+                  color: palette.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        WearEffortRow(effort: effort),
+        const SizedBox(height: 10),
+        if (termino)
+          WearButton(label: 'Marcar serie', onTap: onListo)
+        else
+          // Ocultar NO cancela: el temporizador sigue corriendo y vibra al
+          // vencer igual. Es para poder mirar las series sin perder la cuenta.
+          WearButton(
+            label: 'Ocultar',
+            onTap: onOcultar,
+            tint: palette.textMuted,
+          ),
+      ],
     );
   }
 }

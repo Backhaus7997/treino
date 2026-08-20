@@ -2,7 +2,13 @@ import 'dart:async';
 import 'dart:developer' as developer;
 
 import 'package:cloud_firestore/cloud_firestore.dart'
-    show CollectionReference, DocumentSnapshot, FirebaseFirestore, Timestamp;
+    show
+        CollectionReference,
+        DocumentSnapshot,
+        FieldValue,
+        FirebaseFirestore,
+        SetOptions,
+        Timestamp;
 
 import '../../../core/utils/argentina_time.dart';
 import '../../../core/utils/streak_calculator.dart';
@@ -660,6 +666,79 @@ class SessionRepository {
         .orderBy('setNumber', descending: false)
         .snapshots()
         .map((s) => s.docs.map(_setLogFromDoc).whereType<SetLog>().toList());
+  }
+
+  // ─── Temporizador del ejercicio por tiempo ──────────────────────────────
+
+  /// Campos del temporizador dentro del doc de sesión.
+  ///
+  /// Viven en la SESIÓN y no viajan como mensaje, y esa es la decisión de
+  /// fondo. Un mensaje se pierde si el otro aparato no está escuchando en ese
+  /// instante; el caso real es justamente el contrario — el atleta arranca el
+  /// ejercicio en el teléfono y mira el reloj un rato después. Con estado
+  /// persistido, el que llega tarde lo lee igual.
+  ///
+  /// Y va por Firestore y no por la Data Layer porque ésta exige que el reloj
+  /// esté emparejado con ESE teléfono: medido en hardware, con un teléfono sin
+  /// app companion el envío muere en «no hay nodos conectados» y no cruza nada.
+  /// Firestore ya es el canal por el que los dos aparatos se mantienen al día.
+  static const String fieldTimerStartedAt = 'timerStartedAtMs';
+  static const String fieldTimerSeconds = 'timerSeconds';
+
+  /// Deja anotado que arrancó un ejercicio por tiempo.
+  ///
+  /// [startedAtMs] es epoch en milisegundos: quien lo lea descuenta lo
+  /// transcurrido, así los dos aparatos muestran el mismo número en vez de
+  /// quedar corridos por la latencia.
+  Future<void> startExerciseTimer({
+    required String uid,
+    required String sessionId,
+    required int seconds,
+    required int startedAtMs,
+  }) async {
+    if (uid.isEmpty || sessionId.isEmpty || seconds <= 0) return;
+    await _sessions(uid).doc(sessionId).set(
+      {
+        fieldTimerSeconds: seconds,
+        fieldTimerStartedAt: startedAtMs,
+      },
+      SetOptions(merge: true),
+    );
+  }
+
+  /// Borra el temporizador. Se llama al cancelar y al completar la serie.
+  Future<void> clearExerciseTimer({
+    required String uid,
+    required String sessionId,
+  }) async {
+    if (uid.isEmpty || sessionId.isEmpty) return;
+    await _sessions(uid).doc(sessionId).set(
+      {
+        fieldTimerSeconds: FieldValue.delete(),
+        fieldTimerStartedAt: FieldValue.delete(),
+      },
+      SetOptions(merge: true),
+    );
+  }
+
+  /// El temporizador anotado en la sesión, o null si no hay ninguno.
+  ///
+  /// Emite el valor inicial apenas se suscribe, así el aparato que entra TARDE
+  /// —el caso que un mensaje no puede cubrir— encuentra el temporizador en
+  /// curso.
+  Stream<({int seconds, int startedAtMs})?> watchExerciseTimer({
+    required String uid,
+    required String sessionId,
+  }) {
+    if (uid.isEmpty || sessionId.isEmpty) return Stream.value(null);
+    return _sessions(uid).doc(sessionId).snapshots().map((snap) {
+      final data = snap.data();
+      if (data == null) return null;
+      final seconds = (data[fieldTimerSeconds] as num?)?.toInt();
+      final startedAt = (data[fieldTimerStartedAt] as num?)?.toInt();
+      if (seconds == null || startedAt == null || seconds <= 0) return null;
+      return (seconds: seconds, startedAtMs: startedAt);
+    });
   }
 
   // ─── watchSessionFinished ───────────────────────────────────────────────
