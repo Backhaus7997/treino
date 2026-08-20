@@ -59,16 +59,19 @@ class WearExerciseTimerScreen extends StatelessWidget {
     return hecho.clamp(0.0, 1.0);
   }
 
-  /// `m:ss`, o sólo los segundos cuando falta menos de un minuto.
+  /// `MM:SS`, igual que el temporizador del teléfono.
   ///
-  /// Se redondea hacia ARRIBA: mostrar "0" durante el último segundo haría
+  /// Mismo formato en los dos aparatos a propósito: el atleta mira uno y otro
+  /// durante la misma serie, y dos formatos distintos para el mismo número
+  /// obligan a traducir mentalmente.
+  ///
+  /// Se redondea hacia ARRIBA: mostrar 0 durante el último segundo haría
   /// pensar que terminó cuando todavía falta.
   String get _tiempo {
     final total = (timer.remainingMs / 1000).ceil().clamp(0, 359999);
     final min = total ~/ 60;
     final seg = total % 60;
-    if (min == 0) return '$seg';
-    return '$min:${seg.toString().padLeft(2, '0')}';
+    return '${min.toString().padLeft(2, '0')}:${seg.toString().padLeft(2, '0')}';
   }
 
   @override
@@ -76,22 +79,26 @@ class WearExerciseTimerScreen extends StatelessWidget {
     final palette = AppPalette.of(context);
     final termino = timer.finished;
 
-    // `centered` y no un `Center` propio: el andamio es el que aporta el
-    // `Scaffold` —o sea el `Material`— y el inset de la pantalla redonda. Sin
-    // él, Flutter dibuja los `Text` con el subrayado amarillo de "falta
-    // Material", el título se corta contra el borde de arriba y el botón se va
-    // de pantalla abajo. Se vio en la muñeca.
+    // `list` y no `centered`: el andamio centrado NO scrollea, así que cuando
+    // el contenido no entra lo RECORTA — se vio en la muñeca con el título
+    // cortado arriba y «Cancelar» pegado al borde de abajo. Con la lista, si no
+    // entra se scrollea con la corona, que además ya está enganchada acá.
+    //
+    // El andamio también aporta el `Scaffold` —o sea el `Material`— y el inset
+    // circular: sin él Flutter dibuja los textos con el subrayado amarillo de
+    // "falta Material".
+    // `centered` y no `list`: la lista impone ancho COMPLETO a sus hijos, así
+    // que el `SizedBox` del anillo se ignoraba, el `Stack` se estiraba y el
+    // indicador salía ELÍPTICO. Se vio en la muñeca. El andamio centrado
+    // aporta igual el `Scaffold` —o sea el `Material`— y el inset circular.
     return WearRoundScaffold.centered(
       children: [
-        // UNA línea: con dos, el título más el anillo más el esfuerzo más los
-        // botones pasaban los 206 dp de alto y el botón quedaba cortado contra
-        // el borde de abajo. Se vio en la muñeca.
         WearFittedText(
           exerciseName,
           maxLines: 1,
           maxSize: 13,
           minSize: 10,
-          widthFactor: 0.9,
+          widthFactor: 0.85,
           styleFor: (size) => GoogleFonts.barlowCondensed(
             fontSize: size,
             fontWeight: FontWeight.w700,
@@ -99,42 +106,44 @@ class WearExerciseTimerScreen extends StatelessWidget {
             color: palette.textMuted,
           ),
         ),
-        const SizedBox(height: 6),
-        SizedBox(
-          // Medido para que entren título, anillo, esfuerzo, botón y el enlace
-          // de cancelar dentro de los 206 dp del SM-L500.
-          width: 72,
-          height: 72,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              // El anillo se lee ANTES que el número cuando el reloj se mira de
-              // reojo: la posición dice cuánto falta sin leer.
-              SizedBox.expand(
-                child: CircularProgressIndicator(
-                  value: _progreso,
-                  strokeWidth: 5,
-                  backgroundColor: palette.bgCard,
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    termino ? palette.accent : palette.highlight,
+        const SizedBox(height: 8),
+        // El `Center` NO es decorativo: sin él, cualquier padre que imponga
+        // ancho completo vuelve a deformar el anillo.
+        Center(
+          child: SizedBox(
+            width: 96,
+            height: 96,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                SizedBox.expand(
+                  child: CircularProgressIndicator(
+                    value: _progreso,
+                    strokeWidth: 5,
+                    // Track visible: sobre el fondo negro del reloj, un track
+                    // oscuro no se distingue y el anillo parece descentrado.
+                    backgroundColor: palette.border,
+                    // VERDE, igual que el temporizador del teléfono cuando
+                    // corre. Es el color de "esto está en marcha" en toda la app.
+                    valueColor: AlwaysStoppedAnimation<Color>(palette.accent),
                   ),
                 ),
-              ),
-              Text(
-                termino ? 'LISTO' : _tiempo,
-                style: GoogleFonts.barlowCondensed(
-                  fontSize: termino ? 18 : 30,
-                  fontWeight: FontWeight.w700,
-                  height: 1,
-                  color: palette.textPrimary,
+                Text(
+                  _tiempo,
+                  style: GoogleFonts.barlowCondensed(
+                    fontSize: 30,
+                    fontWeight: FontWeight.w700,
+                    height: 1,
+                    color: termino ? palette.accent : palette.textPrimary,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-        const SizedBox(height: 6),
-        WearEffortRow(effort: effort),
         const SizedBox(height: 8),
+        WearEffortRow(effort: effort),
+        const SizedBox(height: 10),
         if (termino)
           WearButton(label: 'Marcar serie', onTap: onListo)
         else
@@ -145,19 +154,18 @@ class WearExerciseTimerScreen extends StatelessWidget {
             onTap: onOcultar,
             tint: palette.textMuted,
           ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 2),
         // Cancelar va como enlace y no como botón para que no compita con la
-        // acción principal: salir del ejercicio es la excepción, no lo que el
-        // atleta viene a hacer.
+        // acción principal: salir del ejercicio es la excepción.
         GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: onCancelar,
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+            padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 12),
             child: Text(
               'Cancelar',
               style: GoogleFonts.barlow(
-                fontSize: 12,
+                fontSize: 11,
                 fontWeight: FontWeight.w600,
                 color: palette.danger,
               ),

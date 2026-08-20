@@ -150,9 +150,16 @@ class WearWorkoutScreen extends ConsumerWidget {
             // historial diría que la hizo sin haberla hecho.
             final duracion = snapshot.durationSecondsOf(setNumber);
             if (duracion > 0) {
-              // Que deje de estar oculto: es un temporizador nuevo y el atleta
-              // acaba de pedirlo.
+              // Deja de estar oculto: el atleta quiere ver el temporizador.
               ref.read(wearTimerOcultadoProvider.notifier).state = null;
+
+              // Y si YA hay uno corriendo, sólo se muestra — NO se reinicia.
+              // Éste era el reinicio que se veía en la muñeca: después de
+              // ocultar, volver tocando la serie llamaba a arrancar de nuevo y
+              // pisaba el deadline. Cualquier camino de vuelta que pase por el
+              // círculo tenía el mismo efecto.
+              if (timer != null && !timer.finished) return;
+
               unawaited(ref.read(wearTimerSyncProvider).arrancar(duracion));
               return;
             }

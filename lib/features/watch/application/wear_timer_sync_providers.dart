@@ -54,6 +54,7 @@ class WearTimerSync {
   /// del servidor.
   Future<void> arrancar(int seconds) async {
     if (seconds <= 0) return cancelar();
+    debugPrint('[wear-timer] ARRANCA local ($seconds s)');
     await _service.startExerciseTimer(seconds);
     if (!_puedeSincronizar) return;
     unawaited(
@@ -110,6 +111,7 @@ final wearTimerInboxProvider = Provider<void>((ref) {
       .watchExerciseTimer(uid: uid, sessionId: sesion.session.sessionId)
       .listen(
     (remoto) async {
+      debugPrint('[wear-timer] la sesión dice: $remoto');
       if (remoto == null) {
         // Se canceló del otro lado, o nunca hubo. Cancelar de más es inocuo:
         // el nativo borra un deadline que ya no está y listo.
@@ -131,6 +133,7 @@ final wearTimerInboxProvider = Provider<void>((ref) {
       // construcción. Lo único que tiene que llegar de afuera es el arranque
       // —cuando acá no hay nada— y la cancelación, que se maneja arriba.
       final actual = await service.exerciseTimerState();
+      debugPrint('[wear-timer] local=$actual');
       if (actual != null && !actual.finished) return;
 
       final restante = wearRemainingSeconds(
