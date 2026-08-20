@@ -33,6 +33,7 @@ class WearExerciseTimerScreen extends StatelessWidget {
     required this.effort,
     required this.onOcultar,
     required this.onListo,
+    required this.onCancelar,
   });
 
   final String exerciseName;
@@ -44,6 +45,12 @@ class WearExerciseTimerScreen extends StatelessWidget {
 
   /// El tiempo terminó y el atleta lo da por hecho: marca la serie.
   final VoidCallback onListo;
+
+  /// Abandona el ejercicio por tiempo SIN marcar la serie.
+  ///
+  /// Distinto de ocultar, y hace falta: si el atleta no aguanta la plancha, no
+  /// tiene por qué esperar a que el reloj llegue a cero para poder salir.
+  final VoidCallback onCancelar;
 
   /// Fracción ya transcurrida, de 0 a 1.
   double get _progreso {
@@ -76,9 +83,12 @@ class WearExerciseTimerScreen extends StatelessWidget {
     // de pantalla abajo. Se vio en la muñeca.
     return WearRoundScaffold.centered(
       children: [
+        // UNA línea: con dos, el título más el anillo más el esfuerzo más los
+        // botones pasaban los 206 dp de alto y el botón quedaba cortado contra
+        // el borde de abajo. Se vio en la muñeca.
         WearFittedText(
           exerciseName,
-          maxLines: 2,
+          maxLines: 1,
           maxSize: 13,
           minSize: 10,
           widthFactor: 0.9,
@@ -89,12 +99,12 @@ class WearExerciseTimerScreen extends StatelessWidget {
             color: palette.textMuted,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         SizedBox(
-          // Medido para 206 dp de alto: con el título, el esfuerzo y el botón,
-          // un anillo más grande empuja el botón fuera de la pantalla.
-          width: 88,
-          height: 88,
+          // Medido para que entren título, anillo, esfuerzo, botón y el enlace
+          // de cancelar dentro de los 206 dp del SM-L500.
+          width: 72,
+          height: 72,
           child: Stack(
             alignment: Alignment.center,
             children: [
@@ -113,7 +123,7 @@ class WearExerciseTimerScreen extends StatelessWidget {
               Text(
                 termino ? 'LISTO' : _tiempo,
                 style: GoogleFonts.barlowCondensed(
-                  fontSize: termino ? 20 : 34,
+                  fontSize: termino ? 18 : 30,
                   fontWeight: FontWeight.w700,
                   height: 1,
                   color: palette.textPrimary,
@@ -122,9 +132,9 @@ class WearExerciseTimerScreen extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         WearEffortRow(effort: effort),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         if (termino)
           WearButton(label: 'Marcar serie', onTap: onListo)
         else
@@ -135,6 +145,25 @@ class WearExerciseTimerScreen extends StatelessWidget {
             onTap: onOcultar,
             tint: palette.textMuted,
           ),
+        const SizedBox(height: 4),
+        // Cancelar va como enlace y no como botón para que no compita con la
+        // acción principal: salir del ejercicio es la excepción, no lo que el
+        // atleta viene a hacer.
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onCancelar,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+            child: Text(
+              'Cancelar',
+              style: GoogleFonts.barlow(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: palette.danger,
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }

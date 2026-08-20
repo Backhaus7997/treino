@@ -92,6 +92,10 @@ class WearWorkoutScreen extends ConsumerWidget {
         effort: effort,
         onOcultar: () => ref.read(wearTimerOcultadoProvider.notifier).state =
             timer.endsAtElapsedMs,
+        onCancelar: () {
+          HapticFeedback.selectionClick();
+          unawaited(ref.read(wearTimerSyncProvider).cancelar());
+        },
         onListo: () {
           HapticFeedback.selectionClick();
           final n = snapshot.nextSetNumber;
@@ -108,7 +112,21 @@ class WearWorkoutScreen extends ConsumerWidget {
       firstItem: WearItemType.text,
       lastItem: WearItemType.text,
       children: [
-        _Header(snapshot: snapshot),
+        // Con un temporizador OCULTO, tocar el nombre del ejercicio vuelve a
+        // él. Es la contraparte de «Ocultar»: sin esto, esconder la pantalla
+        // era un viaje de ida y había que esperar a que venciera para volver a
+        // verla.
+        if (timer != null)
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {
+              HapticFeedback.selectionClick();
+              ref.read(wearTimerOcultadoProvider.notifier).state = null;
+            },
+            child: _Header(snapshot: snapshot),
+          )
+        else
+          _Header(snapshot: snapshot),
         const SizedBox(height: 8),
         WearEffortRow(effort: effort),
         if (rest != null) ...[

@@ -117,22 +117,28 @@ final wearTimerInboxProvider = Provider<void>((ref) {
         return;
       }
 
-      // Si acá ya corre el MISMO temporizador, no se reinicia. Sin esto, cada
-      // emisión del listener lo volvería a arrancar y el número saltaría hacia
-      // atrás una vez por escritura en la sesión.
+      // Si acá YA hay un temporizador corriendo, no se toca. Punto.
+      //
+      // Antes se comparaba el remanente y se reiniciaba ante cualquier
+      // diferencia mayor a dos segundos, y eso era un bug: cada reinicio pisa
+      // el deadline nativo, o sea que CAMBIA `endsAtElapsedMs`. Y como ocultar
+      // se recuerda por deadline, el temporizador oculto dejaba de coincidir y
+      // la pantalla reaparecía sola con el tiempo movido. El dueño lo vio como
+      // "si oculto y vuelvo a entrar, se reinicia".
+      //
+      // Un temporizador que ya corre no necesita corrección: los dos aparatos
+      // salieron del MISMO `startedAtMs`, así que van iguales por
+      // construcción. Lo único que tiene que llegar de afuera es el arranque
+      // —cuando acá no hay nada— y la cancelación, que se maneja arriba.
       final actual = await service.exerciseTimerState();
+      if (actual != null && !actual.finished) return;
+
       final restante = wearRemainingSeconds(
         seconds: remoto.seconds,
         startedAtEpochMs: remoto.startedAtMs,
         nowEpochMs: DateTime.now().millisecondsSinceEpoch,
       );
       if (restante <= 0) return;
-      if (actual != null && !actual.finished) {
-        final diferencia = (actual.remainingMs ~/ 1000 - restante).abs();
-        // Dos segundos de tolerancia: la latencia de Firestore y el redondeo no
-        // son motivo para reiniciar nada.
-        if (diferencia <= 2) return;
-      }
 
       debugPrint('[wear-timer] sincronizado desde la sesión ($restante s)');
       await service.startExerciseTimer(restante);
