@@ -75,8 +75,8 @@ final wearExerciseTimerProvider =
 
   Future<void> poll() async {
     try {
-      if (!controller.isClosed)
-        controller.add(await service.exerciseTimerState());
+      final estado = await service.exerciseTimerState();
+      if (!controller.isClosed) controller.add(estado);
     } on Object catch (e, st) {
       if (!controller.isClosed) controller.addError(e, st);
     }
@@ -144,3 +144,16 @@ final wearEffortProvider =
 
   return controller.stream;
 });
+
+/// El deadline del temporizador que el atleta escondió, o null.
+///
+/// ## Por qué se guarda el DEADLINE y no un bool
+///
+/// Un bool habría que acordarse de apagarlo, y el olvido tiene un costo caro:
+/// el temporizador siguiente arrancaría invisible. Guardando cuál se escondió,
+/// el reseteo es automático — un temporizador nuevo tiene otro deadline, así
+/// que no coincide y se muestra solo.
+///
+/// Es la misma idea que hace idempotente al resto del dominio del reloj: en vez
+/// de recordar qué pasó, comparar contra el estado absoluto.
+final wearTimerOcultadoProvider = StateProvider<int?>((ref) => null);

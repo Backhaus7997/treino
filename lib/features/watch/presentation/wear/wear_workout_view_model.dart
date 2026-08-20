@@ -58,6 +58,21 @@ class WearWorkoutSnapshot {
 
   bool isLogged(int setNumber) => loggedSetNumbers.contains(setNumber);
 
+  /// Segundos que dura la serie [setNumber], o 0 si no es por tiempo.
+  ///
+  /// Es lo que distingue una serie que se MARCA de una que se AGUANTA: la
+  /// segunda abre el temporizador en vez de anotarse de una.
+  int durationSecondsOf(int setNumber) {
+    if (setNumber < 1 || setNumber > sets.length) return 0;
+    return sets[setNumber - 1].durationSeconds ?? 0;
+  }
+
+  /// Si la próxima serie a marcar es por tiempo.
+  bool get nextSetIsTimed {
+    final n = nextSetNumber;
+    return n != null && durationSecondsOf(n) > 0;
+  }
+
   /// La ÚNICA serie que se puede marcar es la primera sin marcar.
   ///
   /// Regla copiada literal de watchOS, y la razón está documentada allá: sin

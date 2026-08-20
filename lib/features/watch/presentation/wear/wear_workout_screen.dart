@@ -14,6 +14,8 @@ import 'wear_strings.dart';
 import 'wear_widgets.dart';
 import 'wear_workout_view_model.dart';
 import 'wear_fitted_text.dart';
+import 'dart:async';
+import 'wear_exercise_timer_screen.dart';
 
 /// La pantalla de entrenamiento del companion de Wear OS.
 ///
@@ -70,13 +72,44 @@ class WearWorkoutScreen extends ConsumerWidget {
         const WatchEffortDisplay.nada();
     final service = ref.read(wearWorkoutServiceProvider);
 
+    // ── El ejercicio por tiempo se lleva la pantalla entera ──────────────────
+    //
+    // Mientras corre, el atleta no tiene nada que tocar: está aguantando. Lo
+    // único que necesita ver, de reojo y con la muñeca ocupada, es cuánto
+    // falta. La lista de series en ese momento no sirve para nada.
+    //
+    // El estado sale del DEADLINE persistido, no de un contador en memoria, así
+    // que volver acá después de apagar la pantalla —o de que se destruya la
+    // Activity— reencuentra el temporizador donde estaba. Eso es lo que hace
+    // que "persista al levantar la muñeca" salga gratis.
+    final timer = ref.watch(wearExerciseTimerProvider).valueOrNull;
+    final ocultado = ref.watch(wearTimerOcultadoProvider);
+    if (timer != null && ocultado != timer.endsAtElapsedMs) {
+      return WearExerciseTimerScreen(
+        exerciseName: snapshot.exerciseName,
+        timer: timer,
+        effort: effort,
+        onOcultar: () => ref.read(wearTimerOcultadoProvider.notifier).state =
+            timer.endsAtElapsedMs,
+        onListo: () {
+          HapticFeedback.selectionClick();
+          final n = snapshot.nextSetNumber;
+          if (n != null) onLogSet(snapshot.exerciseId, n);
+          unawaited(service.cancelExerciseTimer());
+          // El descanso arranca igual que en una serie normal: terminar de
+          // aguantar es terminar la serie.
+          service.startRest(snapshot.restSeconds);
+        },
+      );
+    }
+
     return WearRoundScaffold.list(
       firstItem: WearItemType.text,
       lastItem: WearItemType.text,
       children: [
         _Header(snapshot: snapshot),
         const SizedBox(height: 8),
-        _EffortRow(effort: effort),
+        WearEffortRow(effort: effort),
         if (rest != null) ...[
           const SizedBox(height: 8),
           _RestBar(
@@ -92,6 +125,19 @@ class WearWorkoutScreen extends ConsumerWidget {
             // En el reloj la confirmación táctil no es adorno: el atleta
             // marca sin mirar, con la mano ocupada.
             HapticFeedback.selectionClick();
+
+            // Una serie POR TIEMPO no se marca al tocarla: se arranca. La
+            // marca viene después, cuando el tiempo termina — si no, el
+            // historial diría que la hizo sin haberla hecho.
+            final duracion = snapshot.durationSecondsOf(setNumber);
+            if (duracion > 0) {
+              // Que deje de estar oculto: es un temporizador nuevo y el atleta
+              // acaba de pedirlo.
+              ref.read(wearTimerOcultadoProvider.notifier).state = null;
+              unawaited(service.startExerciseTimer(duracion));
+              return;
+            }
+
             onLogSet(snapshot.exerciseId, setNumber);
             // El descanso del ejercicio que se está DIBUJANDO. Se toma del
             // snapshot y no se busca al marcar porque la última serie arranca
@@ -162,110 +208,6 @@ class _Header extends StatelessWidget {
 /// **Si NINGUNO de los dos tiene dato no se dibuja fila, ni vacía**: el hueco
 /// también ocupa. Y si falta uno solo, se dibuja el otro nada más — nunca un
 /// guion ni un cero. Ver [WearEffort] para el porqué medido.
-class _EffortRow extends StatelessWidget {
-  const _EffortRow({required this.effort});
-
-  /// `WatchEffortDisplay` y no un tipo propio: es el MISMO modelo que usa el
-  /// teléfono para el reloj de Apple. Un solo tipo para las dos plataformas.
-  final WatchEffortDisplay effort;
-
-  @override
-  Widget build(BuildContext context) {
-    if (effort.isEmpty) return const SizedBox.shrink();
-
-    final palette = AppPalette.of(context);
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        if (effort.bpm != null)
-          _EffortStat(
-            icon: TreinoIcon.heartRate,
-            iconColor: palette.danger,
-            value: effort.bpm!,
-            unit: WearStrings.bpmUnit,
-          ),
-        if (effort.bpm != null && effort.kcal != null)
-          const SizedBox(width: 12),
-        if (effort.kcal != null)
-          _EffortStat(
-            icon: TreinoIcon.calories,
-            iconColor: palette.warning,
-            value: effort.kcal!,
-            unit: WearStrings.kcalUnit,
-          ),
-      ],
-    );
-  }
-}
-
-class _EffortStat extends StatelessWidget {
-  const _EffortStat({
-    required this.icon,
-    required this.iconColor,
-    required this.value,
-    required this.unit,
-  });
-
-  final IconData icon;
-  final Color iconColor;
-  final int value;
-  final String unit;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 12, color: iconColor),
-        const SizedBox(width: 8),
-        Text(
-          '$value',
-          style: GoogleFonts.barlow(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: palette.textPrimary,
-            fontFeatures: const [FontFeature.tabularFigures()],
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          unit,
-          style: GoogleFonts.barlow(fontSize: 10, color: palette.textMuted),
-        ),
-      ],
-    );
-  }
-}
-
-/// El descanso, como ANILLO.
-///
-/// ## Por qué se fue la píldora
-///
-/// La versión anterior era una píldora ancha: contador a la izquierda, `Spacer`,
-/// y "Saltar" a la derecha. El dueño lo dijo sin vueltas: *"el botón de
-/// temporizador está feo"*. Y tenía razón — es una toolbar de escritorio metida
-/// en una pantalla redonda de 206 dp. Ocupaba el 23% del alto, obligaba a un
-/// `Spacer` que dejaba un agujero sin área táctil en el medio, y no hablaba el
-/// idioma de la pantalla.
-///
-/// Un anillo dice lo mismo con menos: el arco ES el tiempo que queda, se lee de
-/// reojo sin procesar dígitos, y todo el círculo es tocable — sin `Spacer`, sin
-/// hack de área mínima.
-/// El descanso, como una barra sobre las series.
-///
-/// **Réplica de `restBanner` de `WorkoutView.swift`**: ícono, los segundos que
-/// quedan, y «Saltar». Antes era un anillo de 64 px centrado, que se comía la
-/// altura justo donde tienen que estar las series que el atleta va a marcar —
-/// en una pantalla de 206 dp eso es medio entreno fuera de vista.
-///
-/// El separador es FIJO y la fila va centrada, en vez de empujar «Saltar» al
-/// borde con un `Spacer` como hace el Swift. Es preferencia del dueño, y acá
-/// además ayuda: pegado al bisel, en una pantalla redonda, el objetivo de toque
-/// se recorta.
-///
-/// Vencido cambia de color en vez de desaparecer: el atleta mira el reloj de
-/// reojo, sin enfocar, y el color se lee antes que un número.
 class _RestBar extends StatelessWidget {
   const _RestBar({
     required this.remainingMs,
