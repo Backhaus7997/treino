@@ -30,6 +30,7 @@ export { notifyOnLinkChange } from "./notifications/notify-link-change";
 export { notifyOnFollow } from "./notifications/notify-friendship";
 export { notifyOnReaction } from "./notifications/notify-reaction";
 export { reassignFcmToken } from "./notifications/reassign-fcm-token";
+export { notifyWearOnWorkoutStarted } from "./notifications/notify-wear-workout";
 export { maintainFollowCounters } from "./social/maintain-follow-counters";
 export { maintainReactionCounters } from "./social/maintain-reaction-counters";
 export { notifyOnReview } from "./notifications/notify-review";

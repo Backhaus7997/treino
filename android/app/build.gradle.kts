@@ -195,6 +195,17 @@ dependencies {
     // compilar por un motivo invisible. Misma versión que él, para no forzar
     // una resolución de conflicto.
     implementation("com.google.android.gms:play-services-wearable:19.0.0")
+
+    // FCM nativo, SOLO para el reloj: es el segundo transporte del aviso de
+    // "arrancó un entreno", el que no necesita emparejamiento. Ver
+    // WearMessagingService.
+    //
+    // El BoM es el MISMO que fija firebase_core (gradle.properties del plugin,
+    // FirebaseSDKVersion). Clavar una versión suelta acá desalinearía el SDK
+    // nativo respecto del que usan los plugins de Flutter, y esos conflictos se
+    // manifiestan en runtime, no al compilar.
+    "wearImplementation"(platform("com.google.firebase:firebase-bom:33.16.0"))
+    "wearImplementation"("com.google.firebase:firebase-messaging")
 }
 
 flutter {

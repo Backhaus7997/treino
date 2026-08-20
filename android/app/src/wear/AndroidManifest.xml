@@ -99,6 +99,20 @@
             android:exported="false"
             android:foregroundServiceType="health" />
 
+        <!-- El otro transporte del mismo aviso: FCM.
+             A diferencia de la Data Layer no necesita emparejamiento — al reloj
+             le alcanza con internet, que ya tiene porque habla Firestore por
+             Wi-Fi. Se declara SOLO en el flavor wear: el APK del telefono no lo
+             lleva, asi que las notificaciones reales de alla no se tocan.
+             Ver WearMessagingService para el riesgo asumido. -->
+        <service
+            android:name="com.treino.app.workout.WearMessagingService"
+            android:exported="false">
+            <intent-filter android:priority="1">
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
         <!-- Abre el companion cuando el entreno arranca en el TELEFONO.
              Va en el manifest y no se registra desde Dart a proposito: el
              listener del plugin `watch_connectivity` solo vive mientras la app

@@ -53,6 +53,7 @@ import 'app/theme/app_theme.dart';
 import 'features/watch/application/wear_session_providers.dart';
 import 'features/auth/application/auth_providers.dart';
 import 'features/watch/application/wear_pairing_providers.dart';
+import 'features/watch/application/wear_push_providers.dart';
 import 'features/watch/application/wear_routine_list_providers.dart';
 import 'features/watch/application/wear_today_providers.dart';
 import 'features/watch/presentation/wear/wear_root.dart';
@@ -271,6 +272,12 @@ class _WearHomeState extends ConsumerState<_WearHome> {
 
   @override
   Widget build(BuildContext context) {
+    // EAGER, y sin usar el valor: es lo que deja al reloj alcanzable por push.
+    // Sin esta línea el registro del token es código muerto y el companion no
+    // se puede despertar con la app cerrada. Mismo patrón que el lifecycle de
+    // credencial del teléfono (ADR-PN-003).
+    ref.watch(wearPushLifecycleProvider);
+
     final pairing = ref.watch(wearPairingProvider);
 
     // HOY ya sale de Firestore, y con los cuatro estados distinguibles: sin
