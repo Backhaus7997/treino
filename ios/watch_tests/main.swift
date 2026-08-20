@@ -607,6 +607,85 @@ private func runPhoneTimerMirror() {
     )
 }
 
+// MARK: - Cambio de cuenta: el token NO se reusa entre atletas
+//
+// Al cambiar de cuenta en el telefono, el reloj se quedaba con el token de A y
+// el uid de B. Las reglas de Firestore son owner-only, asi que leer `users/B`
+// con ese par da 403 garantizado — y el error no limpiaba el entreno ya
+// cargado, asi que la pantalla le mostraba a B la rutina de A.
+//
+// La causa era que la decision de reusar solo miraba la EDAD: la firma de
+// `shouldRefresh` ni siquiera recibe un uid.
+
+private func runTokenIdentity() {
+    let t0 = Date(timeIntervalSince1970: 1_800_000_000)
+
+    check(
+        TokenFreshness.canReuse(
+            cacheDe: "atleta-A", credencialDe: "atleta-A",
+            emitidoEn: t0, ahora: t0.addingTimeInterval(10)
+        ),
+        "un token fresco del MISMO atleta se reusa"
+    )
+
+    check(
+        !TokenFreshness.canReuse(
+            cacheDe: "atleta-A", credencialDe: "atleta-B",
+            emitidoEn: t0, ahora: t0.addingTimeInterval(10)
+        ),
+        "un token FRESCO de OTRO atleta NO se reusa: un token es de una sola cuenta"
+    )
+
+    check(
+        !TokenFreshness.canReuse(
+            cacheDe: nil, credencialDe: "atleta-A",
+            emitidoEn: t0, ahora: t0.addingTimeInterval(10)
+        ),
+        "sin saber de quien es el cache, no se reusa"
+    )
+
+    check(
+        !TokenFreshness.canReuse(
+            cacheDe: "atleta-A", credencialDe: "atleta-A",
+            emitidoEn: t0, ahora: t0.addingTimeInterval(TokenFreshness.ttl)
+        ),
+        "el TTL sigue mandando para el mismo atleta"
+    )
+
+    check(
+        !TokenFreshness.canReuse(
+            cacheDe: "atleta-A", credencialDe: "atleta-B",
+            emitidoEn: t0, ahora: t0.addingTimeInterval(TokenFreshness.ttl + 1)
+        ),
+        "vencido y de otro atleta: doblemente no"
+    )
+}
+
+// MARK: - El aviso de cierre de sesion
+
+private func runSignedOutPayload() {
+    check(
+        WatchSignedOutPayload.esAviso(["kind": "watchSignedOut"]),
+        "el aviso de cierre de sesion se reconoce"
+    )
+    // Viaja por el MISMO slot que la credencial: confundirlos desloguearia a un
+    // atleta que no lo pidio, o al reves dejaria una sesion abierta que se cerro.
+    check(
+        !WatchSignedOutPayload.esAviso([
+            "kind": "watchCredential", "customToken": "abc", "uid": "atleta-A",
+        ]),
+        "una credencial NO es un aviso de cierre de sesion"
+    )
+    check(
+        !WatchSignedOutPayload.esAviso([:]),
+        "un contexto vacio no desloguea a nadie"
+    )
+    check(
+        !WatchSignedOutPayload.esAviso(["kind": "watchEffort", "bpm": 140]),
+        "un payload de esfuerzo tampoco"
+    )
+}
+
 // MARK: - Corrida
 
 runRequestedTypes()
@@ -628,6 +707,8 @@ runSupersetCursor()
 runTokenFreshness()
 runCountdown()
 runPhoneTimerMirror()
+runTokenIdentity()
+runSignedOutPayload()
 runStaleSessions()
 runCloseFeedback()
 

@@ -234,6 +234,22 @@ final watchCredentialLifecycleProvider = Provider<void>((ref) {
           ultimo = WatchCredentialOutcome.deliveryFailed;
         }
 
+        // Entregada: se le avisa al reloj que hay contexto nuevo esperando.
+        //
+        // El contexto solo NO alcanza: el sistema lo entrega cuando quiere, y
+        // con la app del reloj cerrada recién en el próximo lanzamiento. Ese es
+        // el "tarda mucho y hay que cerrar y reabrir" que se reportó.
+        //
+        // Es un atajo best-effort: si el reloj no está alcanzable, el aviso se
+        // pierde y queda el camino de siempre.
+        if (ultimo == WatchCredentialOutcome.delivered) {
+          unawaited(
+            ref.read(watchNudgeServiceProvider).nudge(
+                  reason: WatchNudgeService.reasonAccountChanged,
+                ),
+          );
+        }
+
         // El bucle es SOLO para la race de emparejamiento. Los otros fallos
         // transitorios ya tienen su reintento por resume, y machacarlos acá
         // sería pegarle a la CF tres veces seguidas por nada.
@@ -252,7 +268,14 @@ final watchCredentialLifecycleProvider = Provider<void>((ref) {
     authStateChangesProvider,
     (prev, next) {
       next.whenData((user) {
-        if (user == null) return;
+        if (user == null) {
+          // Cerró sesión. Acá no había NADA — un `return` pelado— y por eso el
+          // reloj se quedaba con la credencial del atleta anterior para
+          // siempre, pudiendo leer y escribir Firestore como él sin teléfono
+          // de por medio.
+          unawaited(ref.read(watchCredentialServiceProvider).clearCredential());
+          return;
+        }
         // Fire-and-forget: esto corre en el camino crítico del arranque, así
         // que no se lo hace esperar ni se le deja tirar. Quedarse sin
         // credencial de reloj es una degradación aceptable; tumbar la app por

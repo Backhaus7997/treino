@@ -18,6 +18,13 @@ enum WatchAuthState: Equatable {
     case exchanging
     /// El reloj tiene credencial propia y puede operar solo.
     case ready(uid: String)
+    /// El atleta CERRO SESION en el telefono.
+    ///
+    /// Es un estado propio y no un `waitingForPairing` a proposito: ese dice
+    /// "abri TREINO en el telefono para vincular el reloj", que para alguien
+    /// que acaba de desloguearse le echa la culpa al emparejamiento. El reloj
+    /// esta perfectamente vinculado; lo que falta es una sesion.
+    case signedOut
     /// Algo falló. `message` es para diagnóstico, no para mostrarle al usuario.
     case failed(message: String)
 }
@@ -111,8 +118,19 @@ final class CredentialCoordinator: NSObject, ObservableObject {
         handle(applicationContext: session.receivedApplicationContext)
     }
 
-    /// El idToken vigente y cuando se emitió. Ver `TokenFreshness`.
-    private var idTokenCacheado: (token: String, emitidoEn: Date)?
+    /// El idToken cacheado, CON el uid de quien es. Ver `TokenFreshness`.
+    ///
+    /// El uid no es decorativo: sin el, cambiar de cuenta dejaba al reloj con
+    /// el token de A y el uid de B. `freshIdToken()` devolvia el cacheado ANTES
+    /// de mirar la credencial, asi que la identidad ni entraba en la decision.
+    /// Con ese par, leer `users/B` da 403 garantizado —las reglas son
+    /// owner-only— y la pantalla se quedaba con el entreno del atleta anterior.
+    ///
+    /// Va acá y no como un `idTokenCacheado = nil` en `exchange()` a proposito:
+    /// eso arreglaria el camino de hoy y dejaria la trampa puesta para el
+    /// proximo que alguien agregue. Un cache que no puede devolver el token de
+    /// otro no se puede usar mal.
+    private var idTokenCacheado: (token: String, emitidoEn: Date, uid: String)?
 
     /// Devuelve un idToken para hablar con Firestore, reusando el vigente.
     ///
@@ -126,13 +144,20 @@ final class CredentialCoordinator: NSObject, ObservableObject {
     /// renovar vive en `TokenFreshness`, aparte y pura, porque acá no se puede
     /// medir.
     func freshIdToken() async throws -> String {
-        if let cache = idTokenCacheado,
-           !TokenFreshness.shouldRefresh(emitidoEn: cache.emitidoEn, ahora: Date()) {
-            return cache.token
-        }
-
+        // La credencial se lee PRIMERO. El cache solo sirve si es del mismo
+        // atleta: un token no es reusable entre cuentas, es de una sola.
         guard let credential = CredentialStore.load() else {
             throw FirebaseAuthREST.AuthError.malformedResponse
+        }
+
+        if let cache = idTokenCacheado,
+           TokenFreshness.canReuse(
+               cacheDe: cache.uid,
+               credencialDe: credential.uid,
+               emitidoEn: cache.emitidoEn,
+               ahora: Date()
+           ) {
+            return cache.token
         }
         let token = try await FirebaseAuthREST.refreshIdToken(
             refreshToken: credential.refreshToken,
@@ -140,8 +165,27 @@ final class CredentialCoordinator: NSObject, ObservableObject {
             host: credential.authEmulatorHost.map { "\($0)/securetoken.googleapis.com" }
                 ?? "https://securetoken.googleapis.com"
         )
-        idTokenCacheado = (token: token, emitidoEn: Date())
+        idTokenCacheado = (token: token, emitidoEn: Date(), uid: credential.uid)
         return token
+    }
+
+    /// Vuelve a mirar el contexto que ya tenga WatchConnectivity.
+    ///
+    /// Hace falta porque `start()` corre UNA vez por proceso, desde el `.task`
+    /// de la escena, y ese no reentra en un resume. El contexto, en cambio, se
+    /// entrega "on next launch" segun el SDK: con la app del reloj cerrada, la
+    /// credencial nueva espera ahi. Sin esta relectura el atleta tenia que
+    /// cerrar y reabrir la app —y el propio arranque tiene una carrera, porque
+    /// `activate()` es asincrono y `start()` lee las properties en la linea
+    /// siguiente.
+    ///
+    /// Es idempotente por construccion: `handle()` corta solo si el uid ya
+    /// coincide, asi que llamarlo de mas no re-canjea nada.
+    func revisarContextoPendiente() {
+        guard WCSession.isSupported() else { return }
+        let session = WCSession.default
+        guard session.activationState == .activated else { return }
+        handle(applicationContext: session.receivedApplicationContext)
     }
 
     /// Descarta el token cacheado.
@@ -157,6 +201,16 @@ final class CredentialCoordinator: NSObject, ObservableObject {
     /// Procesa un contexto entrante. Ignora en silencio lo que no sea un
     /// payload de credencial: por ese canal pueden viajar otras cosas.
     fileprivate func handle(applicationContext: [String: Any]) {
+        // El atleta cerro sesion en el telefono. Viaja por el MISMO slot que la
+        // credencial, y eso no es casualidad: el contexto de salida es uno solo
+        // y se pisa entero, asi que publicar esto BORRA la credencial del canal
+        // —que es exactamente la semantica que se quiere— y ademas persiste: se
+        // entrega en el proximo lanzamiento del reloj aunque este cerrado.
+        if WatchSignedOutPayload.esAviso(applicationContext) {
+            cerrarSesion()
+            return
+        }
+
         guard let payload = WatchCredentialPayload(applicationContext: applicationContext)
         else { return }
 
@@ -168,8 +222,50 @@ final class CredentialCoordinator: NSObject, ObservableObject {
             return
         }
 
+        // CAMBIO DE CUENTA. Todo lo del atleta anterior se va ANTES de canjear.
+        //
+        // Sin esto el reloj quedaba con el entreno de A en `todaysWorkout` y el
+        // uid de B en `state`, y como `ContentView` prefiere el entreno sobre el
+        // error, le mostraba a B la rutina de A —dia, nombre del plan, lista
+        // completa de ejercicios— como si estuviera bien.
+        olvidarAlAtletaAnterior()
+
         state = .exchanging
         Task { await exchange(payload) }
+    }
+
+    /// Borra todo rastro del atleta anterior, menos la credencial.
+    ///
+    /// La credencial NO se toca acá: en un cambio de cuenta la pisa `exchange()`
+    /// con la nueva, y borrarla antes dejaria al reloj sin poder hablar con
+    /// Firestore si el canje falla.
+    private func olvidarAlAtletaAnterior() {
+        idTokenCacheado = nil
+        todaysWorkout = nil
+        workoutLoaded = false
+        workoutError = nil
+        phoneTimerSignal = nil
+
+        // El entreno a medias del atleta ANTERIOR tambien se va, y con el sus
+        // series sin subir.
+        //
+        // Se pierden, y es la opcion menos mala: para subirlas hace falta la
+        // credencial de A, que en este mismo momento se esta reemplazando por la
+        // de B. La alternativa es peor — `sync()` pide el cliente con el uid
+        // NUEVO y escribiria las series de A bajo `users/B`. Perder datos de una
+        // cuenta es malo; mezclarlos entre cuentas es inaceptable.
+        WorkoutSessionStore.clear()
+    }
+
+    /// El atleta cerro sesion en el telefono.
+    ///
+    /// Toca SEIS cosas, no una. Si quedara `todaysWorkout`, la pantalla de
+    /// "inicia sesion" conviviria con el entreno del anterior en memoria.
+    func cerrarSesion() {
+        _ = CredentialStore.delete()
+        olvidarAlAtletaAnterior()
+        state = .signedOut
+        log.notice("Sesion cerrada desde el telefono: credencial borrada")
     }
 
     private func exchange(_ payload: WatchCredentialPayload) async {
@@ -220,26 +316,65 @@ final class CredentialCoordinator: NSObject, ObservableObject {
     /// que manejar la expiración a mano y equivocarse.
     func loadTodaysWorkout() async {
         guard let credential = CredentialStore.load() else { return }
+        // De QUIEN es esta carga. Se captura al empezar y se vuelve a mirar
+        // antes de publicar: entre medio pudo cambiar la cuenta, y una carga
+        // vieja que aterriza tarde pisaria el dato bueno del atleta nuevo — y
+        // encima le borraria el error, dejando el rastro en nada.
+        let deQuien = credential.uid
+
         do {
+            let workout = try await resolverEntreno(credential)
+            guard CredentialStore.load()?.uid == deQuien else {
+                log.notice("Carga descartada: cambio la cuenta mientras se resolvia")
+                return
+            }
+            todaysWorkout = workout
+            workoutError = nil
+            workoutLoaded = true
+        } catch {
+            guard CredentialStore.load()?.uid == deQuien else { return }
+            todaysWorkout = nil
+            workoutError = String(describing: error)
+            workoutLoaded = true
+            // `error` es privacy-sensitive por defecto en os_log y saldría como
+            // "<private>", que es exactamente el silencio que esto viene a
+            // romper. Va explícito: son mensajes de Firestore, no datos del
+            // atleta.
+            log.error("No se pudo cargar el entreno de hoy: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    /// Resuelve el entreno, y si Firestore rechaza por credencial lo reintenta
+    /// UNA vez con token nuevo.
+    ///
+    /// El reintento existe porque un token cacheado puede haber quedado del
+    /// atleta anterior o haber muerto antes de tiempo, y sin esto el reloj
+    /// rebotaba contra el 403 hasta que venciera el TTL —3000 segundos— o hasta
+    /// que alguien matara el proceso. Es la misma cura que ya aplica
+    /// `WorkoutCoordinator` ante un 401, que solo corria con un entreno abierto.
+    private func resolverEntreno(_ credential: WatchCredential) async throws -> TodaysWorkout? {
+        func intentar() async throws -> TodaysWorkout? {
             let idToken = try await freshIdToken()
             let client = FirestoreREST(
                 projectId: credential.projectId,
                 idToken: idToken,
                 emulatorHost: credential.firestoreEmulatorHost
             )
-            todaysWorkout = try await TodaysWorkoutResolver.resolve(
+            return try await TodaysWorkoutResolver.resolve(
                 client: client,
                 uid: credential.uid
             )
-            workoutError = nil
-            workoutLoaded = true
-        } catch {
-            workoutError = String(describing: error)
-            // `error` es privacy-sensitive por defecto en os_log y saldría como
-            // "<private>", que es exactamente el silencio que esto viene a
-            // romper. Va explícito: son mensajes de Firestore, no datos del
-            // atleta.
-            log.error("No se pudo cargar el entreno de hoy: \(String(describing: error), privacy: .public)")
+        }
+
+        do {
+            return try await intentar()
+        } catch let error as FirestoreREST.FirestoreError {
+            guard case .http(let status, _) = error, status == 401 || status == 403 else {
+                throw error
+            }
+            log.notice("Firestore rechazo por credencial (\(status, privacy: .public)): token nuevo y un reintento")
+            invalidateIdToken()
+            return try await intentar()
         }
     }
 }
@@ -253,8 +388,16 @@ extension CredentialCoordinator: WCSessionDelegate {
         activationDidCompleteWith activationState: WCSessionActivationState,
         error: Error?
     ) {
-        // No hay nada que hacer acá: el contexto se procesa en `start()` y en
-        // el callback de abajo. Se implementa porque el protocolo lo exige.
+        // Acá SI hay algo que hacer, y antes no se hacía.
+        //
+        // `start()` llama a `activate()` —asincrono— y lee
+        // `receivedApplicationContext` en la LINEA SIGUIENTE: esa lectura puede
+        // salir vacia. Este es el primer momento en que las properties de la
+        // sesion son validas de verdad.
+        guard activationState == .activated else { return }
+        Task { @MainActor in
+            self.revisarContextoPendiente()
+        }
     }
 
     nonisolated func session(
@@ -288,6 +431,19 @@ extension CredentialCoordinator: WCSessionDelegate {
         }
 
         guard message["kind"] as? String == "watchRefresh" else { return }
+
+        // CAMBIO DE CUENTA: no se relee Firestore, se va a mirar el contexto.
+        //
+        // Releer usaria la credencial VIGENTE, que si este aviso le gana la
+        // carrera al contexto es todavia la del atleta ANTERIOR: seria pedirle
+        // a Firestore los datos de A justo cuando el atleta ya es B.
+        if message["reason"] as? String == "accountChanged" {
+            Task { @MainActor in
+                self.revisarContextoPendiente()
+            }
+            return
+        }
+
         Task { @MainActor in
             self.refreshFromPhone()
         }

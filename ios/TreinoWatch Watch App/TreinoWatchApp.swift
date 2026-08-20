@@ -159,6 +159,17 @@ struct TreinoWatch_Watch_AppApp: App {
                     // no hay forma de que reaparezca una cuenta vencida.
                     workoutCoordinator.mostrarPhoneTimer()
 
+                    // Y se revisa si el telefono dejo credencial nueva —o el
+                    // aviso de cierre de sesion— esperando en el contexto.
+                    //
+                    // `start()` corre UNA sola vez por proceso, desde el `.task`
+                    // de la escena, y ese no reentra en un resume. El contexto
+                    // se entrega "on next launch", asi que sin esto el atleta
+                    // tenia que cerrar y reabrir la app del reloj para que un
+                    // cambio de cuenta se notara. Es idempotente: si el uid ya
+                    // coincide, no hace nada.
+                    coordinator.revisarContextoPendiente()
+
                     Task {
                         // Con un entreno abierto se reintenta la cola en vez de
                         // refrescar la rutina: cambiarle los ejercicios al

@@ -51,6 +51,18 @@ struct ContentView: View {
                 WatchHome()
             }
 
+        case .signedOut:
+            // El reloj esta perfectamente vinculado; lo que falta es una sesion.
+            //
+            // Por eso NO reusa el texto de `waitingForPairing` —"abrí TREINO
+            // para vincular el reloj"— que le echaria la culpa al
+            // emparejamiento y mandaria al atleta a desemparejar y volver a
+            // emparejar un reloj que esta bien.
+            StatusMessage(
+                icon: "person.crop.circle.badge.xmark",
+                text: "Iniciá sesión en TREINO para acceder a tus planes"
+            )
+
         case .failed:
             StatusMessage(
                 icon: "exclamationmark.triangle",
@@ -126,9 +138,11 @@ struct TodayPage: View {
 
     var body: some View {
         ScrollView {
-            if let workout = coordinator.todaysWorkout {
-                TodaysWorkoutView(workout: workout)
-            } else if coordinator.workoutError != nil {
+            // El error va PRIMERO. Al reves —como estaba— un `todaysWorkout`
+            // viejo en memoria dejaba la rama de error y el boton "Reintentar"
+            // inalcanzables: el atleta no veia un error, veia la rutina del
+            // anterior como si estuviera bien.
+            if coordinator.workoutError != nil {
                 // El ícono de recargar ERA decorativo: un `Image` sin `Button`
                 // ni gesto. Prometía una salida que no existía, y la única
                 // recarga real era salir de la página y volver. Ahora acciona.
@@ -140,6 +154,8 @@ struct TodayPage: View {
                 ) {
                     Task { await coordinator.loadTodaysWorkout() }
                 }
+            } else if let workout = coordinator.todaysWorkout {
+                TodaysWorkoutView(workout: workout)
             } else if coordinator.workoutLoaded {
                 // Cargó bien y no hay nada que mostrar. Antes este caso caía en
                 // el spinner de abajo —`todaysWorkout` y `workoutError` los dos

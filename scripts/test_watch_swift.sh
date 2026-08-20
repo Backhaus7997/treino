@@ -38,6 +38,7 @@ WATCH_SOURCES=(
   "${REPO_ROOT}/ios/TreinoWatch Watch App/SetLogIdentity.swift"
   "${REPO_ROOT}/ios/TreinoWatch Watch App/CountdownRules.swift"
   "${REPO_ROOT}/ios/TreinoWatch Watch App/PhoneTimerMirror.swift"
+  "${REPO_ROOT}/ios/TreinoWatch Watch App/WatchSignedOutPayload.swift"
   "${REPO_ROOT}/ios/TreinoWatch Watch App/TokenFreshness.swift"
   "${REPO_ROOT}/ios/TreinoWatch Watch App/SupersetOrder.swift"
   "${REPO_ROOT}/ios/TreinoWatch Watch App/ExerciseCursor.swift"

@@ -48,4 +48,33 @@ enum TokenFreshness {
         if edad < 0 { return true }
         return edad >= ttl
     }
+
+    /// Si un token cacheado se puede REUSAR para hablar como `credencialDe`.
+    ///
+    /// ── Por que la identidad entra en esta decision ─────────────────────
+    ///
+    /// `shouldRefresh` solo mira la EDAD. Su firma ni siquiera recibe un uid:
+    /// era estructuralmente incapaz de notar que el token cacheado fuera de
+    /// otro atleta. Y el cache tampoco lo guardaba.
+    ///
+    /// Consecuencia medida: al cambiar de cuenta en el telefono, el reloj se
+    /// quedaba con el token de A y el uid de B. Las reglas de Firestore son
+    /// owner-only, asi que leer `users/B` con ese par da 403 GARANTIZADO — y
+    /// como el error no limpiaba el entreno ya cargado, la pantalla le mostraba
+    /// a B la rutina de A.
+    ///
+    /// Un token no es reusable entre cuentas: es de una sola. Que eso viva acá
+    /// —y no en un `= nil` suelto en el camino de canje— es lo que lo vuelve
+    /// medible, y lo que hace que el proximo camino que alguien agregue no
+    /// pueda saltearselo.
+    static func canReuse(
+        cacheDe: String?,
+        credencialDe: String,
+        emitidoEn: Date?,
+        ahora: Date,
+        ttl: TimeInterval = TokenFreshness.ttl
+    ) -> Bool {
+        guard let cacheDe, cacheDe == credencialDe else { return false }
+        return !shouldRefresh(emitidoEn: emitidoEn, ahora: ahora, ttl: ttl)
+    }
 }
