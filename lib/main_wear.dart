@@ -54,6 +54,7 @@ import 'features/watch/application/wear_session_providers.dart';
 import 'features/auth/application/auth_providers.dart';
 import 'features/watch/application/wear_pairing_providers.dart';
 import 'features/watch/application/wear_push_providers.dart';
+import 'features/watch/application/wear_timer_sync_providers.dart';
 import 'features/watch/application/wear_routine_list_providers.dart';
 import 'features/watch/application/wear_today_providers.dart';
 import 'features/watch/presentation/wear/wear_root.dart';
@@ -277,6 +278,10 @@ class _WearHomeState extends ConsumerState<_WearHome> {
     // se puede despertar con la app cerrada. Mismo patrón que el lifecycle de
     // credencial del teléfono (ADR-PN-003).
     ref.watch(wearPushLifecycleProvider);
+
+    // Idem: sin esto nadie escucha lo que manda el teléfono sobre el
+    // temporizador y la sincronización es código muerto.
+    ref.watch(wearTimerInboxProvider);
 
     final pairing = ref.watch(wearPairingProvider);
 

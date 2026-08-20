@@ -35,6 +35,7 @@ import 'exercise_detail_screen.dart';
 import 'widgets/bounded_number_formatter.dart';
 import 'widgets/coach_note.dart';
 import 'widgets/set_entry_sheet.dart';
+import '../../watch/application/phone_timer_sync_providers.dart';
 
 // ── Helpers de formato ────────────────────────────────────────────────────────
 
@@ -2357,7 +2358,7 @@ class _RepsField extends StatelessWidget {
 /// Fila de un set basado en duración.
 /// Muestra el tiempo objetivo como MM:SS y un countdown timer.
 /// "Iniciar" arranca el contador; al llegar a 0 auto-marca done con vibración.
-class _DurationSetRow extends StatefulWidget {
+class _DurationSetRow extends ConsumerStatefulWidget {
   const _DurationSetRow({
     super.key,
     required this.setNumber,
@@ -2374,10 +2375,10 @@ class _DurationSetRow extends StatefulWidget {
   final VoidCallback? onDone;
 
   @override
-  State<_DurationSetRow> createState() => _DurationSetRowState();
+  ConsumerState<_DurationSetRow> createState() => _DurationSetRowState();
 }
 
-class _DurationSetRowState extends State<_DurationSetRow> {
+class _DurationSetRowState extends ConsumerState<_DurationSetRow> {
   Timer? _timer;
   int _remaining = 0;
   bool _running = false;
@@ -2388,6 +2389,31 @@ class _DurationSetRowState extends State<_DurationSetRow> {
     _remaining = widget.targetSeconds;
   }
 
+  /// Arranca sin volver a avisarle al reloj.
+  ///
+  /// El aviso se manda desde [_startTimer], que es el camino del atleta tocando
+  /// acá. Éste es el camino de vuelta —el reloj ya arrancó y avisó— y reenviar
+  /// sería un eco: el reloj recibiría su propio arranque y los dos se quedarían
+  /// rebotando el mismo temporizador.
+  void _arrancarDesdeElReloj(int seconds) {
+    if (widget.isDone) return;
+    _timer?.cancel();
+    setState(() {
+      _remaining = seconds;
+      _running = false;
+    });
+    _correr();
+  }
+
+  void _cancelarDesdeElReloj() {
+    _timer?.cancel();
+    if (!mounted) return;
+    setState(() {
+      _running = false;
+      _remaining = widget.targetSeconds;
+    });
+  }
+
   @override
   void dispose() {
     _timer?.cancel();
@@ -2395,6 +2421,14 @@ class _DurationSetRowState extends State<_DurationSetRow> {
   }
 
   void _startTimer() {
+    if (_running || widget.isDone) return;
+    // Avisa al reloj ANTES de arrancar: así el instante que viaja es el del
+    // arranque real y el descuento del otro lado da el mismo numero.
+    ref.read(phoneTimerSyncProvider).arranco(_remaining);
+    _correr();
+  }
+
+  void _correr() {
     if (_running || widget.isDone) return;
     setState(() => _running = true);
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
@@ -2419,6 +2453,21 @@ class _DurationSetRowState extends State<_DurationSetRow> {
 
   @override
   Widget build(BuildContext context) {
+    // Lo que arranque o cancele el RELOJ se refleja acá. Sólo la fila que está
+    // en juego reacciona: una serie ya hecha no vuelve a arrancar sola.
+    ref.listen<AsyncValue<WatchTimerCommand>>(
+      phoneTimerCommandsProvider,
+      (_, next) => next.whenData((cmd) {
+        if (widget.onDone == null || widget.isDone) return;
+        switch (cmd) {
+          case WatchTimerStart(:final seconds):
+            _arrancarDesdeElReloj(seconds);
+          case WatchTimerCancel():
+            _cancelarDesdeElReloj();
+        }
+      }),
+    );
+
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     final textColor = widget.isDone ? palette.textMuted : palette.textPrimary;

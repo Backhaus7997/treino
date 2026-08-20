@@ -16,6 +16,7 @@ import 'wear_workout_view_model.dart';
 import 'wear_fitted_text.dart';
 import 'dart:async';
 import 'wear_exercise_timer_screen.dart';
+import '../../application/wear_timer_sync_providers.dart';
 
 /// La pantalla de entrenamiento del companion de Wear OS.
 ///
@@ -95,7 +96,7 @@ class WearWorkoutScreen extends ConsumerWidget {
           HapticFeedback.selectionClick();
           final n = snapshot.nextSetNumber;
           if (n != null) onLogSet(snapshot.exerciseId, n);
-          unawaited(service.cancelExerciseTimer());
+          unawaited(ref.read(wearTimerSyncProvider).cancelar());
           // El descanso arranca igual que en una serie normal: terminar de
           // aguantar es terminar la serie.
           service.startRest(snapshot.restSeconds);
@@ -134,7 +135,7 @@ class WearWorkoutScreen extends ConsumerWidget {
               // Que deje de estar oculto: es un temporizador nuevo y el atleta
               // acaba de pedirlo.
               ref.read(wearTimerOcultadoProvider.notifier).state = null;
-              unawaited(service.startExerciseTimer(duracion));
+              unawaited(ref.read(wearTimerSyncProvider).arrancar(duracion));
               return;
             }
 

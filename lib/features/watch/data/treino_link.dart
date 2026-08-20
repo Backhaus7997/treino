@@ -48,6 +48,17 @@ class TreinoLink {
   /// El teléfono arrancó un entreno. Es lo que despierta al companion.
   static const String pathWorkoutStarted = '$pathPrefix/workout-started';
 
+  /// Arrancó un ejercicio POR TIEMPO, de cualquiera de los dos lados.
+  ///
+  /// El payload lleva `seconds` y `startedAtEpochMs`. Los dos, y no sólo la
+  /// duración, porque el mensaje tarda en cruzar: con el instante de arranque el
+  /// receptor descuenta lo que ya pasó y los dos temporizadores muestran el
+  /// mismo número en vez de quedar corridos por la latencia del canal.
+  static const String pathTimerStarted = '$pathPrefix/timer-started';
+
+  /// Se canceló el ejercicio por tiempo. Sin payload: cancelar es cancelar.
+  static const String pathTimerCancelled = '$pathPrefix/timer-cancelled';
+
   final MethodChannel _methods;
   final EventChannel _messages;
 
