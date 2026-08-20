@@ -82,9 +82,10 @@ class _PlantillasTabState extends ConsumerState<PlantillasTab>
               child: entriesAsync.when(
                 data: (entries) {
                   if (entries.isEmpty) {
+                    final l10n = AppL10n.of(context);
                     final msg = filter == null
-                        ? 'No hay plantillas todavía.'
-                        : 'No hay plantillas para este nivel.';
+                        ? l10n.workoutExploreEmptyAll
+                        : l10n.workoutExploreEmptyLevel;
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 20),
                       child: Text(
@@ -154,7 +155,7 @@ class _CatalogErrorState extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Hubo un error cargando las plantillas.',
+                AppL10n.of(context).workoutExploreLoadError,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: palette.textMuted,
                 ),

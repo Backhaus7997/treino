@@ -71,8 +71,24 @@
   "@homeEstaSemanaResumeCta": {"description": "Home 'Esta Semana' card resume-state CTA button navigating to routines."},
   "@@locale": "es_AR",
   "authSplashTagline": "ENTRENÁ. COMPARTÍ. CRECÉ.",
+  "authBrandHeadline1Light": "DEJÁ DE ",
+  "@authBrandHeadline1Light": {
+    "description": "Brand headline, line 1, LIGHT half (w500). Rendered by splash_screen and welcome_screen from the same keys so the two screens can't drift apart. The trailing space is load-bearing — the light and bold halves are adjacent TextSpans, not separate widgets."
+  },
+  "authBrandHeadline1Bold": "IMPROVISAR.",
+  "@authBrandHeadline1Bold": {
+    "description": "Brand headline, line 1, BOLD half (w900). This is the punchline of the line — keep the emphasis on the payoff word, not the setup."
+  },
+  "authBrandHeadline2Light": "EMPEZÁ A ",
+  "@authBrandHeadline2Light": {
+    "description": "Brand headline, line 2, LIGHT half (w500). Trailing space is load-bearing, same as line 1."
+  },
+  "authBrandHeadline2Bold": "PROGRESAR.",
+  "@authBrandHeadline2Bold": {
+    "description": "Brand headline, line 2, BOLD half (w900). Deliberately does NOT name a modality: the old copy said 'EL HIERRO', which read as gym-only and excluded the calisthenics catalogue the app actually ships."
+  },
   "authWelcomeEyebrow": "ENTRENAMIENTO · GYM · COACH",
-  "authWelcomeBody": "Cargá tu rutina, ejecutá los sets, seguí a tus pibes y encontrá un coach cerca tuyo.",
+  "authWelcomeBody": "Tu rutina, tus series y tus cargas en un solo lugar. Con un coach atrás si lo querés.",
   "authWelcomeCta": "EMPEZAR",
   "authWelcomeHaveAccount": "Ya tengo cuenta",
   "authWelcomeSignIn": "Iniciar sesión",
@@ -384,6 +400,26 @@
   "workoutSelfEditorPermissionDenied": "No tenés permisos para hacer esto. Recargá la app.",
   "workoutEditStubToast": "Pronto vas a poder editar el contenido. Por ahora podés archivar y crear de nuevo.",
   "workoutSelfEditorCapReached": "Llegaste al máximo de 10 rutinas activas.",
+  "workoutTabYours": "TU ENTRENO",
+  "@workoutTabYours": {
+    "description": "Left pill of the athlete Entrenar segmented control (page 0 — own routines + session history). Key is semantic, not a copy of the label, so a future copy change does not strand the identifier the way `plantillas*` did (#638)."
+  },
+  "workoutTabExplore": "EXPLORAR",
+  "@workoutTabExplore": {
+    "description": "Right pill of the athlete Entrenar segmented control (page 1 — trainer-built routine catalogue). A VERB on purpose: the left pill already owns the noun 'rutinas' via workoutMisRutinasSectionTitle, and two nouns in one toggle is what made the old 'PLANTILLAS' label test badly (#638). Keep it short — over ~12 chars the TabBar starts scrolling on small screens."
+  },
+  "workoutExploreEmptyAll": "No hay rutinas todavía.",
+  "@workoutExploreEmptyAll": {
+    "description": "Empty state of the EXPLORAR catalogue grid when no trainer has published anything yet and no level filter is active (#638)."
+  },
+  "workoutExploreEmptyLevel": "No hay rutinas para este nivel.",
+  "@workoutExploreEmptyLevel": {
+    "description": "Empty state of the EXPLORAR catalogue grid when a level filter pill is active and nothing matches it (#638)."
+  },
+  "workoutExploreLoadError": "Hubo un error cargando las rutinas.",
+  "@workoutExploreLoadError": {
+    "description": "Error state of the EXPLORAR catalogue grid. Paired with plantillasRetryLabel as the retry CTA (#638)."
+  },
   "workoutMisRutinasSectionTitle": "MIS RUTINAS",
   "workoutMisRutinasCta": "CREAR RUTINA",
   "workoutMisRutinasCtaDisabledTooltip": "Llegaste al máximo de 10 rutinas activas. Archivá una para crear otra.",
@@ -416,7 +452,7 @@
   "@templateRatingsTitle": {
     "description": "Section header of the community ratings block in the detail of a published trainer template. Workout-area redesign slice 3."
   },
-  "templateRatingsNoneYet": "Todavía nadie calificó esta plantilla. ¡Sé el primero!",
+  "templateRatingsNoneYet": "Todavía nadie calificó esta rutina. ¡Sé el primero!",
   "@templateRatingsNoneYet": {
     "description": "Shown instead of the average when a published template has zero ratings."
   },
@@ -451,7 +487,7 @@
   "@templateRatingsError": {
     "description": "Error state of the comment list in the published-template detail."
   },
-  "templateRatingSheetTitle": "Calificá esta plantilla",
+  "templateRatingSheetTitle": "Calificá esta rutina",
   "@templateRatingSheetTitle": {
     "description": "Title of the rating bottom sheet when creating a new rating."
   },
@@ -459,7 +495,7 @@
   "@templateRatingSheetTitleEdit": {
     "description": "Title of the rating bottom sheet when editing an existing rating."
   },
-  "templateRatingSheetCommentHint": "Contá cómo te fue con esta plantilla (opcional)",
+  "templateRatingSheetCommentHint": "Contá cómo te fue con esta rutina (opcional)",
   "@templateRatingSheetCommentHint": {
     "description": "Hint of the optional comment field in the template rating sheet, max 500 chars."
   },
@@ -479,7 +515,7 @@
   "@templateRatingSheetError": {
     "description": "SnackBar shown when saving a rating fails."
   },
-  "workoutSplitFallback": "Sin split",
+  "workoutSplitFallback": "Rutina libre",
   "workoutPickerMuscleFilter": "Músculos",
   "workoutPickerEquipmentFilter": "Equipamiento",
   "workoutPickerMuscleSheetTitle": "Grupo muscular",
@@ -1502,6 +1538,14 @@
   "@coachHubDashboardResumeLinkError": {
     "description": "Coach Hub web dashboard — snackbar when resume() fails."
   },
+  "coachHubDashboardResumePrecondition": "Este vínculo ya no está disponible.",
+  "@coachHubDashboardResumePrecondition": {
+    "description": "Coach Hub web dashboard — snackbar when resumeTrainerLink fails with a non-quota precondition (not-found/permission-denied/failed-precondition): the link is no longer valid, retrying won't help (paywall Fase 7, PR4, slice 3, design D-5)."
+  },
+  "coachHubDashboardResumeUnavailable": "Revisá tu conexión y probá de nuevo.",
+  "@coachHubDashboardResumeUnavailable": {
+    "description": "Coach Hub web dashboard — snackbar when resumeTrainerLink fails with a network/unknown error, safe to retry (paywall Fase 7, PR4, slice 3, design D-5)."
+  },
   "coachHubDashboardAcceptSuccess": "Vínculo aceptado.",
   "@coachHubDashboardAcceptSuccess": {
     "description": "Coach Hub web dashboard — snackbar after accepting a pending link request."
@@ -1509,6 +1553,14 @@
   "coachHubDashboardAcceptError": "No pudimos aceptar el vínculo.",
   "@coachHubDashboardAcceptError": {
     "description": "Coach Hub web dashboard — snackbar when accept() fails."
+  },
+  "coachHubDashboardAcceptPrecondition": "Esta solicitud ya no está disponible.",
+  "@coachHubDashboardAcceptPrecondition": {
+    "description": "Coach Hub web dashboard — snackbar when acceptTrainerLink fails with a non-quota precondition (not-found/permission-denied/failed-precondition): the request is no longer valid, retrying won't help (paywall Fase 7, PR4, design D-5)."
+  },
+  "coachHubDashboardAcceptUnavailable": "Revisá tu conexión y probá de nuevo.",
+  "@coachHubDashboardAcceptUnavailable": {
+    "description": "Coach Hub web dashboard — snackbar when acceptTrainerLink fails with a network/unknown error, safe to retry (paywall Fase 7, PR4, design D-5)."
   },
   "coachHubDashboardRejectSuccess": "Solicitud rechazada.",
   "@coachHubDashboardRejectSuccess": {
@@ -1623,6 +1675,18 @@
   "coachHubAlumnosStatusDebt": "Con deuda",
   "@coachHubAlumnosStatusDebt": {
     "description": "Coach Hub web alumnos section — status badge for athletes with outstanding payments."
+  },
+  "coachHubAlumnosStatusBlocked": "Bloqueado",
+  "@coachHubAlumnosStatusBlocked": {
+    "description": "Coach Hub alumnos — status badge for a link blocked by the trainer plan limit (paywall Fase 7 downgrade). NOT the athlete fault: the trainer subscription lapsed."
+  },
+  "coachHubAlumnosFilterBloqueados": "Bloqueados",
+  "@coachHubAlumnosFilterBloqueados": {
+    "description": "Coach Hub web alumnos section — filter chip for athletes blocked by the plan limit."
+  },
+  "coachHubAlumnosBlockedHint": "Superaste el límite de tu plan. Este alumno no cuenta y no podés trabajar con él hasta que regularices.",
+  "@coachHubAlumnosBlockedHint": {
+    "description": "Coach Hub alumnos — tooltip explaining why an athlete is blocked and that the trainer must fix their subscription."
   },
   "coachHubAlumnosStatusPaused": "Pausado",
   "@coachHubAlumnosStatusPaused": {
@@ -2942,5 +3006,9 @@
   "followListOpenFollowersA11y": "Ver seguidores",
   "@followListOpenFollowersA11y": {"description": "Semantics del contador de SEGUIDORES del perfil, que abre la lista."},
   "followListOpenFollowingA11y": "Ver seguidos",
-  "@followListOpenFollowingA11y": {"description": "Semantics del contador de SIGUIENDO del perfil, que abre la lista."}
+  "@followListOpenFollowingA11y": {"description": "Semantics del contador de SIGUIENDO del perfil, que abre la lista."},
+  "routineCardDaysPerWeek": "{days, plural, =1{1 día/sem} other{{days} días/sem}}",
+  "@routineCardDaysPerWeek": {"description": "Días por semana en la línea de metadata de la tarjeta de rutina.", "placeholders": {"days": {"type": "int"}}},
+  "routineCardMinutes": "{value} min",
+  "@routineCardMinutes": {"description": "Duración estimada por sesión en la tarjeta de rutina. El valor ya viene con el prefijo ~ cuando es calculado.", "placeholders": {"value": {"type": "String"}}}
 }

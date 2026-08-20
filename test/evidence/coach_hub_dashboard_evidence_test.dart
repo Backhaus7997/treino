@@ -508,12 +508,27 @@ Future<void> _pumpDashboard(
   // blanco sin que ningún test lo detecte (matchesGoldenFile solo compara
   // píxeles contra el propio "before", igualmente roto). Falla temprano acá
   // con un mensaje claro en vez de un mismatch de imagen silencioso.
-  expect(
-    find.textContaining('BUENAS,'),
-    findsOneWidget,
-    reason: 'saludo en español ausente — el locale del harness no está '
-        'resolviendo a es_AR (welcome card quedaría en blanco en el golden)',
-  );
+  //
+  // A menos de 900 px lógicos el CoachHubScaffold monta el MobileBanner
+  // (desktop-only, ADR-CHW-004) y el dashboard NO se renderiza — ahí el
+  // guard equivalente es el texto del banner, no el saludo (las capturas
+  // 420x900 siempre documentaron el banner; ver fase-2/after).
+  final logicalWidth = physicalSize.width / tester.view.devicePixelRatio;
+  if (logicalWidth >= 900) {
+    expect(
+      find.textContaining('BUENAS,'),
+      findsOneWidget,
+      reason: 'saludo en español ausente — el locale del harness no está '
+          'resolviendo a es_AR (welcome card quedaría en blanco en el golden)',
+    );
+  } else {
+    expect(
+      find.textContaining('Coach Hub en escritorio'),
+      findsOneWidget,
+      reason: 'a ancho móvil el scaffold debe mostrar el MobileBanner '
+          '(ADR-CHW-004) — si tampoco está, el harness quedó en blanco',
+    );
+  }
 }
 
 // Cuerpo de sección stub para las rutas del sidebar que no son /dashboard.

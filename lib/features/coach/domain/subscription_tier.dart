@@ -7,8 +7,10 @@ import 'package:json_annotation/json_annotation.dart';
 /// `functions/src/subscriptions/weighted-load.ts`): un alumno activo pesa 1.0
 /// y uno pausado 0.5 hacia el límite del tier.
 ///
-/// Fase 1 = solo estos 3 tiers FLAT. El tier usage-based (16+ alumnos,
-/// $1/alumno) es Fase 2 y NO está acá.
+/// Cuatro tiers flat. El diseño original preveía un tier usage-based para
+/// 16+; se optó por [SubscriptionTier.plan3] ilimitado plano por simplicidad,
+/// con la idea de revisarlo cuando haya datos de cómo se distribuyen los PF
+/// arriba de 15 alumnos.
 enum SubscriptionTier {
   @JsonValue('free')
   free,
@@ -16,6 +18,8 @@ enum SubscriptionTier {
   plan1,
   @JsonValue('plan2')
   plan2,
+  @JsonValue('plan3')
+  plan3,
 }
 
 /// Límite de peso ponderado por tier. Es la fuente de verdad client-side;
@@ -23,11 +27,17 @@ enum SubscriptionTier {
 /// `functions/src/subscriptions/tier-config.ts` (el servidor es la autoridad
 /// real — este mapa es para mostrar "N/límite" en la UI sin un round-trip).
 ///
-/// Free 2 · Plan 1 7 · Plan 2 15.
-const Map<SubscriptionTier, int> kTierWeightLimits = {
+/// Free 2 · Plan 1 7 · Plan 2 15 · Plan 3 SIN LÍMITE.
+///
+/// `null` = ilimitado. Se eligió null y no un número gigante ni `double
+/// .infinity` a propósito: con null, cualquier sitio que compare
+/// `carga <= límite` y se olvide del caso NO COMPILA. El tipo obliga a
+/// decidir en cada lugar.
+const Map<SubscriptionTier, int?> kTierWeightLimits = {
   SubscriptionTier.free: 2,
   SubscriptionTier.plan1: 7,
   SubscriptionTier.plan2: 15,
+  SubscriptionTier.plan3: null,
 };
 
 /// Precios en ARS por tier pago y ciclo. Fuente de verdad para la UI del
@@ -40,9 +50,11 @@ const Map<SubscriptionTier, int> kTierWeightLimits = {
 /// gratis, ~17% off). Definidos con estudio de mercado AR.
 ///   Plan 1: $12.000/mes · $120.000/año
 ///   Plan 2: $22.000/mes · $220.000/año
+///   Plan 3: $39.000/mes · $390.000/año (ilimitado)
 const Map<SubscriptionTier, ({int monthly, int annual})> kTierPricesArs = {
   SubscriptionTier.plan1: (monthly: 12000, annual: 120000),
   SubscriptionTier.plan2: (monthly: 22000, annual: 220000),
+  SubscriptionTier.plan3: (monthly: 39000, annual: 390000),
 };
 
 /// Estado de la suscripción del PF.
@@ -83,10 +95,15 @@ extension SubscriptionTierX on SubscriptionTier {
         SubscriptionTier.free => 'free',
         SubscriptionTier.plan1 => 'plan1',
         SubscriptionTier.plan2 => 'plan2',
+        SubscriptionTier.plan3 => 'plan3',
       };
 
   /// Límite de peso ponderado de este tier.
-  int get weightLimit => kTierWeightLimits[this]!;
+  /// `null` = sin límite (plan3). El tipo obliga a contemplarlo.
+  int? get weightLimit => kTierWeightLimits[this];
+
+  /// `true` si el tier no tiene tope de alumnos.
+  bool get isUnlimited => kTierWeightLimits[this] == null;
 
   /// El siguiente tier hacia arriba, para el upsell del paywall de bloqueo.
   /// Free → Plan 1 → Plan 2 → null (Plan 2 es el tope de la Fase 1; más
@@ -94,12 +111,14 @@ extension SubscriptionTierX on SubscriptionTier {
   SubscriptionTier? get nextTier => switch (this) {
         SubscriptionTier.free => SubscriptionTier.plan1,
         SubscriptionTier.plan1 => SubscriptionTier.plan2,
-        SubscriptionTier.plan2 => null,
+        SubscriptionTier.plan2 => SubscriptionTier.plan3,
+        SubscriptionTier.plan3 => null,
       };
 
   static SubscriptionTier fromJson(String? value) => switch (value) {
         'free' => SubscriptionTier.free,
         'plan1' => SubscriptionTier.plan1,
+        'plan3' => SubscriptionTier.plan3,
         'plan2' => SubscriptionTier.plan2,
         // Default defensivo: un doc sin/con-tier-desconocido decodifica como
         // Free (sin backfill — un PF sin suscripción es Free por definición).
