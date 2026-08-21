@@ -1,7 +1,7 @@
 name: treino
 description: "TREINO — fitness app multiplataforma."
 publish_to: 'none'
-version: 0.1.0+14
+version: 0.1.0+16
 
 environment:
   sdk: ^3.5.0
@@ -60,6 +60,16 @@ dependencies:
   shared_preferences: ^2.3.0
   fl_chart: ^1.2.0
   firebase_messaging: ^15.0.0
+  # Companion de Apple Watch (change watch-standalone-client). Su rol es
+  # ACOTADO: entregarle al reloj el refresh token UNA vez, en el pairing.
+  # No es el puente de datos — el reloj habla Firestore por su REST API y
+  # renueva credencial contra securetoken.googleapis.com, todo por HTTP y
+  # sin SDK de Firebase (Locked Decision #9). Firebase en watchOS es
+  # community-supported y Firestore ni figura entre sus productos.
+  # Android/Wear OS NO está soportado en v1: el paquete cubre ambos lados,
+  # pero exige que reloj y teléfono compartan clave de firma, y la firma de
+  # release de Android sigue en debug keys (android/app/build.gradle).
+  watch_connectivity: ^0.2.8
 
 dev_dependencies:
   flutter_test:

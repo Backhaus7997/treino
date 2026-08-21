@@ -1,0 +1,104 @@
+[
+  {
+    "name": "empty",
+    "links": [],
+    "expected": 0
+  },
+  {
+    "name": "single-active",
+    "links": [{ "athleteId": "a1", "status": "active" }],
+    "expected": 1
+  },
+  {
+    "name": "single-paused",
+    "links": [{ "athleteId": "a1", "status": "paused" }],
+    "expected": 0.5
+  },
+  {
+    "name": "single-pending",
+    "links": [{ "athleteId": "a1", "status": "pending" }],
+    "expected": 0
+  },
+  {
+    "name": "single-terminated",
+    "links": [{ "athleteId": "a1", "status": "terminated" }],
+    "expected": 0
+  },
+  {
+    "name": "dedupe-active-and-terminated-same-athlete",
+    "links": [
+      { "athleteId": "a1", "status": "terminated" },
+      { "athleteId": "a1", "status": "active" }
+    ],
+    "expected": 1
+  },
+  {
+    "name": "dedupe-active-and-paused-same-athlete",
+    "links": [
+      { "athleteId": "a1", "status": "paused" },
+      { "athleteId": "a1", "status": "active" }
+    ],
+    "expected": 1
+  },
+  {
+    "name": "blocked-active-excluded",
+    "links": [{ "athleteId": "a1", "status": "active", "entitlement": "blocked" }],
+    "expected": 0
+  },
+  {
+    "name": "h1-blocked-active-plus-entitled-paused-same-athlete",
+    "links": [
+      { "athleteId": "a1", "status": "active", "entitlement": "blocked" },
+      { "athleteId": "a1", "status": "paused", "entitlement": "entitled" }
+    ],
+    "expected": 0.5
+  },
+  {
+    "name": "six-active-plus-two-paused-equals-7.0",
+    "links": [
+      { "athleteId": "a1", "status": "active" },
+      { "athleteId": "a2", "status": "active" },
+      { "athleteId": "a3", "status": "active" },
+      { "athleteId": "a4", "status": "active" },
+      { "athleteId": "a5", "status": "active" },
+      { "athleteId": "a6", "status": "active" },
+      { "athleteId": "a7", "status": "paused" },
+      { "athleteId": "a8", "status": "paused" }
+    ],
+    "expected": 7.0
+  },
+  {
+    "name": "six-active-plus-one-paused-equals-6.5",
+    "links": [
+      { "athleteId": "a1", "status": "active" },
+      { "athleteId": "a2", "status": "active" },
+      { "athleteId": "a3", "status": "active" },
+      { "athleteId": "a4", "status": "active" },
+      { "athleteId": "a5", "status": "active" },
+      { "athleteId": "a6", "status": "active" },
+      { "athleteId": "a7", "status": "paused" }
+    ],
+    "expected": 6.5
+  },
+  {
+    "name": "fifteen-paused-equals-7.5",
+    "links": [
+      { "athleteId": "a1", "status": "paused" },
+      { "athleteId": "a2", "status": "paused" },
+      { "athleteId": "a3", "status": "paused" },
+      { "athleteId": "a4", "status": "paused" },
+      { "athleteId": "a5", "status": "paused" },
+      { "athleteId": "a6", "status": "paused" },
+      { "athleteId": "a7", "status": "paused" },
+      { "athleteId": "a8", "status": "paused" },
+      { "athleteId": "a9", "status": "paused" },
+      { "athleteId": "a10", "status": "paused" },
+      { "athleteId": "a11", "status": "paused" },
+      { "athleteId": "a12", "status": "paused" },
+      { "athleteId": "a13", "status": "paused" },
+      { "athleteId": "a14", "status": "paused" },
+      { "athleteId": "a15", "status": "paused" }
+    ],
+    "expected": 7.5
+  }
+]

@@ -11,8 +11,16 @@ import {
 } from "../subscriptions/tier-config";
 
 describe("TIER_WEIGHT_LIMITS", () => {
-  it("free=2, plan1=7, plan2=15", () => {
-    expect(TIER_WEIGHT_LIMITS).toEqual({ free: 2, plan1: 7, plan2: 15 });
+  it("free=2, plan1=7, plan2=15, plan3=sin limite", () => {
+    // plan3: null = ILIMITADO, no "falta el dato". La distincion importa: un
+    // `?? FREE_LIMIT` en el resolvedor convertia ese null en 2, y el plan mas
+    // caro daba MENOS alumnos que el mas barato — compilando perfecto.
+    expect(TIER_WEIGHT_LIMITS).toEqual({
+      free: 2,
+      plan1: 7,
+      plan2: 15,
+      plan3: null,
+    });
   });
 });
 

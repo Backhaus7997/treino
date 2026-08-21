@@ -52,6 +52,8 @@ app.*.map.json
 scripts/treino-dev-service-account*.json
 scripts/*.serviceAccount.json
 scripts/sa-key.json
+# Respaldos de backfill_dedupe_setlogs.js: llevan setLogs de usuarios reales.
+scripts/dedupe-setlogs-backup-*.json
 *-firebase-adminsdk-*.json
 scripts/node_modules/
 scripts/rules_test/node_modules/

@@ -42,3 +42,15 @@ double computeWeightedLoad(Iterable<TrainerLink> links) {
   }
   return roundToHalf(sum);
 }
+
+/// Formatea una carga ponderada para mostrarla: entero sin decimal (7),
+/// fraccionaria con uno (6.5).
+///
+/// La carga ES fraccionaria por diseño (un pausado pesa 0.5), así que "1.5"
+/// es un render legítimo y no un error de redondeo. Vive acá —y no en cada
+/// pantalla— porque el contador aparece en el medidor de cupo del roster
+/// móvil y en la card de plan de Facturación: si el formato divergiera, el
+/// PF creería que son dos números distintos.
+String formatWeightedLoad(double load) => load == load.roundToDouble()
+    ? load.toStringAsFixed(0)
+    : load.toStringAsFixed(1);

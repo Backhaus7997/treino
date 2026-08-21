@@ -1,9 +1,11 @@
-import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
+import 'package:cloud_firestore/cloud_firestore.dart'
+    show QueryDocumentSnapshot, Timestamp;
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/profile/data/user_public_profile_repository.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/data/session_repository.dart';
+import 'package:treino/features/workout/application/session_duration.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
 
@@ -198,11 +200,117 @@ void main() {
       () async {
     await createActiveSession();
 
-    final result = await repo.getActive(uid);
+    // `now` explicito: la sesion nace en testNow(), y sin pasarlo getActive
+    // usaria la fecha real — meses despues — y la daria por vencida.
+    final result = await repo.getActive(uid, now: testNow());
 
     expect(result, isNotNull);
     expect(result!.status, equals(SessionStatus.active));
     expect(result.uid, equals(uid));
+  });
+
+  test(
+      'getActive cierra las sesiones activas colgadas y deja solo la más nueva',
+      () async {
+    // Dos caminos crean sesiones activas —el teléfono y el reloj— y ninguno
+    // cerraba las que quedaban atrás. Como getActive siempre devolvió la más
+    // nueva, las viejas se volvían zombis invisibles que se acumulaban para
+    // siempre: la causa de fondo del "me marca el entreno como pendiente".
+    for (var d = 1; d <= 3; d++) {
+      await repo.create(
+        uid: uid,
+        routineId: routineId,
+        routineName: routineName,
+        startedAt: DateTime.utc(2026, 5, 10 + d, 9),
+      );
+    }
+
+    final activa = await repo.getActive(
+      uid,
+      now: DateTime.utc(2026, 5, 13, 10),
+    );
+
+    expect(
+      activa!.startedAt,
+      equals(DateTime.utc(2026, 5, 13, 9)),
+      reason: 'la que devuelve sigue siendo la más nueva, como siempre',
+    );
+
+    final todas = await repo.listByUid(uid);
+    final siguenActivas =
+        todas.where((s) => s.status == SessionStatus.active).toList();
+    expect(
+      siguenActivas,
+      hasLength(1),
+      reason: 'las viejas se acumulaban para siempre; el reloj podía '
+          'engancharse a una que para el atleta ya no existía',
+    );
+    expect(siguenActivas.single.id, equals(activa.id));
+
+    // Cerradas SIN contar como entreno hecho: no mueven el plan, ni la racha,
+    // ni los rankings.
+    final cerradas =
+        todas.where((s) => s.status == SessionStatus.finished).toList();
+    expect(cerradas, hasLength(2));
+    for (final c in cerradas) {
+      expect(c.wasFullyCompleted, isFalse);
+      expect(c.finishedAt, isNotNull);
+    }
+  });
+
+  test('getActive cierra tambien la ultima si ya vencio', () async {
+    // Barrer solo las repetidas dejaba viva una sesión de ayer, y el aviso de
+    // retomar seguía saliendo hoy. Peor: el modal muestra solo la hora, sin
+    // fecha, así que un entreno de hace días se lee como "desde 19:42".
+    //
+    // El corte es maxWorkoutDuration (8h), la MISMA constante que ya acota el
+    // cronómetro: si el contador considera que un entreno no puede durar más,
+    // una activa más vieja está muerta por definición.
+    final arranque = DateTime.utc(2026, 5, 18, 10);
+    await repo.create(
+      uid: uid,
+      routineId: routineId,
+      routineName: routineName,
+      startedAt: arranque,
+    );
+
+    // Justo adentro de la ventana: se sigue pudiendo retomar.
+    final aunViva = await repo.getActive(
+      uid,
+      now: arranque.add(maxWorkoutDuration - const Duration(minutes: 1)),
+    );
+    expect(aunViva, isNotNull, reason: 'dentro de las 8h todavía se retoma');
+
+    // Pasada la ventana: no se ofrece, y ademas queda cerrada.
+    final vencida = await repo.getActive(
+      uid,
+      now: arranque.add(maxWorkoutDuration + const Duration(minutes: 1)),
+    );
+    expect(
+      vencida,
+      isNull,
+      reason: 'una sesión de ayer no se ofrece para retomar',
+    );
+
+    final todas = await repo.listByUid(uid);
+    expect(
+      todas.single.status,
+      equals(SessionStatus.finished),
+      reason: 'y no queda colgada: si no, el reloj se le engancha igual',
+    );
+    expect(todas.single.wasFullyCompleted, isFalse);
+  });
+
+  test('getActive no escribe nada cuando hay una sola activa', () async {
+    await createActiveSession();
+
+    final antes = (await repo.listByUid(uid)).single;
+    await repo.getActive(uid, now: testNow());
+    final despues = (await repo.listByUid(uid)).single;
+
+    expect(despues.status, equals(SessionStatus.active));
+    expect(despues.finishedAt, isNull);
+    expect(despues.startedAt, equals(antes.startedAt));
   });
 
   test('SCENARIO-246: getActive returns null when no active session', () async {
@@ -269,6 +377,232 @@ void main() {
         .get();
 
     expect(snap.exists, isTrue);
+  });
+
+  // ─── addSetLog(): dedupe contra lo que escribió el RELOJ ──────────────────
+  //
+  // El reloj escribe las series con id determinístico (`{exerciseId}__{n}`) y el
+  // teléfono con uno autogenerado. Los dos espacios de ids son disjuntos, así que
+  // el que escribía segundo no tenía contra qué deduplicar y creaba un documento
+  // nuevo: DOS documentos para una sola serie, y volumen inflado en historial,
+  // insights, progresión y rankings. Medido contra el emulador el 2026-08-11:
+  // 5 de 7 sesiones con duplicados, la peor con 17 documentos para 10 series.
+  //
+  // Escribe el documento tal como lo deja el reloj vía la REST API.
+  Future<void> seedWatchSetLog({
+    required String sessionId,
+    required String exerciseId,
+    required int setNumber,
+    required int fieldSetNumber,
+  }) async {
+    final docId = '${exerciseId}__$setNumber';
+    await firestore
+        .collection('users')
+        .doc(uid)
+        .collection('sessions')
+        .doc(sessionId)
+        .collection('setLogs')
+        .doc(docId)
+        .set({
+      'id': docId,
+      'exerciseId': exerciseId,
+      'exerciseName': 'Bench Press',
+      // Se pasa aparte del id a propósito: la renumeración del teléfono deja
+      // documentos cuyo campo `setNumber` ya no coincide con su ruta.
+      'setNumber': fieldSetNumber,
+      'reps': 10,
+      'weightKg': 80.0,
+      'completedAt': Timestamp.fromDate(DateTime.utc(2026, 5, 18, 10, 4, 0)),
+    });
+  }
+
+  Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> setLogDocs(
+    String sessionId,
+  ) async {
+    final snap = await firestore
+        .collection('users')
+        .doc(uid)
+        .collection('sessions')
+        .doc(sessionId)
+        .collection('setLogs')
+        .get();
+    return snap.docs;
+  }
+
+  test(
+      'addSetLog escribe SOBRE el documento del reloj en vez de crear un '
+      'segundo documento de la misma serie', () async {
+    final sessionId = await createActiveSession();
+    await seedWatchSetLog(
+      sessionId: sessionId,
+      exerciseId: 'bench-press',
+      setNumber: 1,
+      fieldSetNumber: 1,
+    );
+
+    final persisted = await repo.addSetLog(
+      uid: uid,
+      sessionId: sessionId,
+      setLog: buildSetLog(
+        setNumber: 1,
+        completedAt: DateTime.utc(2026, 5, 18, 10, 5, 0),
+      ),
+    );
+
+    final docs = await setLogDocs(sessionId);
+    expect(
+      docs,
+      hasLength(1),
+      reason: 'Una serie lógica = un documento. Con dos, el volumen del '
+          'historial se cuenta doble y rankings —que es competitivo entre gente '
+          'del mismo gimnasio— lee un número inflado.',
+    );
+    expect(docs.first.id, equals('bench-press__1'));
+    expect(
+      persisted.id,
+      equals('bench-press__1'),
+      reason:
+          'El id que se devuelve tiene que ser el del documento que existe: '
+          'un updateSet/removeSet posterior apunta por id.',
+    );
+  });
+
+  test(
+      'addSetLog NO pisa un documento que la renumeración dejó en la ruta '
+      'determinística con otra serie', () async {
+    final sessionId = await createActiveSession();
+    // Estado real después de que el teléfono borre una serie: `removeSet`
+    // renumera las sobrevivientes con `updateSetLog`, que CONSERVA el id del
+    // documento y baja el campo `setNumber`. Así, `bench-press__3` termina
+    // conteniendo la serie 2.
+    await seedWatchSetLog(
+      sessionId: sessionId,
+      exerciseId: 'bench-press',
+      setNumber: 3,
+      fieldSetNumber: 2,
+    );
+
+    final persisted = await repo.addSetLog(
+      uid: uid,
+      sessionId: sessionId,
+      setLog: buildSetLog(
+        setNumber: 3,
+        completedAt: DateTime.utc(2026, 5, 18, 10, 5, 0),
+      ),
+    );
+
+    expect(
+      persisted.id,
+      isNot(equals('bench-press__3')),
+      reason: 'Confiar en la RUTA en vez de en los CAMPOS pisaría la serie 2, '
+          'que el atleta cargó. Perder un dato es peor que el duplicado que '
+          'este arreglo vino a cerrar.',
+    );
+
+    final docs = await setLogDocs(sessionId);
+    expect(docs, hasLength(2));
+    final renumbered = docs.firstWhere((d) => d.id == 'bench-press__3').data();
+    expect(
+      renumbered['setNumber'],
+      equals(2),
+      reason: 'La serie 2 sigue intacta en la ruta que quedó desalineada.',
+    );
+  });
+
+  test(
+      'addSetLog sigue creando su propio documento cuando el reloj no tocó '
+      'esa serie', () async {
+    final sessionId = await createActiveSession();
+    await seedWatchSetLog(
+      sessionId: sessionId,
+      exerciseId: 'bench-press',
+      setNumber: 1,
+      fieldSetNumber: 1,
+    );
+
+    final persisted = await repo.addSetLog(
+      uid: uid,
+      sessionId: sessionId,
+      setLog: buildSetLog(
+        setNumber: 2,
+        completedAt: DateTime.utc(2026, 5, 18, 10, 6, 0),
+      ),
+    );
+
+    // El teléfono NO pasa a usar ids determinísticos para sus propias series:
+    // eso obligaría a mover documentos al renumerar (HANDOFF §4.3). Solo ADOPTA
+    // el del reloj cuando el reloj llegó primero.
+    expect(persisted.id, isNot(equals('bench-press__2')));
+    expect(await setLogDocs(sessionId), hasLength(2));
+  });
+
+  // ─── listSetLogs(): una serie ilegible no se lleva puesta la lista ────────
+
+  test('una serie malformada se saltea en vez de tumbar listSetLogs entero',
+      () async {
+    final sessionId = await createActiveSession();
+
+    await repo.addSetLog(
+      uid: uid,
+      sessionId: sessionId,
+      setLog: buildSetLog(setNumber: 1, completedAt: testNow()),
+    );
+
+    // Un documento al que le falta un campo requerido del modelo. Puede venir
+    // de un cliente viejo, de una escritura a medias, o de un seed a mano.
+    await firestore
+        .collection('users')
+        .doc(uid)
+        .collection('sessions')
+        .doc(sessionId)
+        .collection('setLogs')
+        .doc('roto')
+        .set({
+      'exerciseId': 'bench-press',
+      'exerciseName': 'Bench Press',
+      'setNumber': 2,
+      // falta `reps`, que en SetLog es requerido y no nullable
+      'weightKg': 80.0,
+      'completedAt': Timestamp.fromDate(testNow()),
+    });
+
+    final logs = await repo.listSetLogs(uid: uid, sessionId: sessionId);
+
+    expect(
+      logs,
+      hasLength(1),
+      reason: 'sin el try/catch, SetLog.fromJson tiraba y se llevaba puesta la '
+          'lista entera: el entreno no abría, ni para retomar ni para ver el '
+          'historial. Una serie ilegible es una serie perdida; las demás no.',
+    );
+    expect(logs.single.setNumber, equals(1));
+  });
+
+  test('el id del setLog sale del PATH, no del cuerpo', () async {
+    final sessionId = await createActiveSession();
+
+    // Cuerpo con un id que NO coincide con la ruta: el path es el que manda
+    // (HANDOFF §4.2). Si ganara el cuerpo, un updateSetLog/deleteSetLog
+    // posterior apuntaría a un documento que no existe.
+    await firestore
+        .collection('users')
+        .doc(uid)
+        .collection('sessions')
+        .doc(sessionId)
+        .collection('setLogs')
+        .doc('el-id-real')
+        .set({
+      'id': 'un-id-que-no-es',
+      'exerciseId': 'bench-press',
+      'exerciseName': 'Bench Press',
+      'setNumber': 1,
+      'reps': 10,
+      'weightKg': 80.0,
+      'completedAt': Timestamp.fromDate(testNow()),
+    });
+
+    final logs = await repo.listSetLogs(uid: uid, sessionId: sessionId);
+    expect(logs.single.id, equals('el-id-real'));
   });
 
   // ─── deleteSetLog() (live-set-editing PR2, AD-2) ─────────────────────────

@@ -1,0 +1,101 @@
+{
+  "rule": "routine-selection",
+  "source_of_truth": "lib/features/workout/domain/routine_selection.dart",
+  "description": "Cual rutina es la activa del atleta. Contrato compartido entre la implementacion Dart (telefono) y la Swift (reloj). Si divergen, telefono y reloj le muestran rutinas DISTINTAS al mismo usuario.",
+  "inputs": {
+    "activeRoutineId": "Marcador explicito del perfil. null o vacio = sin marcador.",
+    "assignedIds": "Rutinas asignadas por un PF, ordenadas por createdAt descendente (mas nueva primero).",
+    "selfCreatedIds": "Rutinas creadas por el propio atleta, mismo orden."
+  },
+  "cases": [
+    {
+      "name": "sin rutinas de ningun tipo",
+      "given": { "activeRoutineId": null, "assignedIds": [], "selfCreatedIds": [] },
+      "expect": { "routineId": null }
+    },
+    {
+      "name": "el marcador explicito gana sobre una asignada mas nueva",
+      "why": "Tier 0. Si el atleta marco una rutina, esa manda aunque el PF le haya asignado otra despues.",
+      "given": {
+        "activeRoutineId": "r-vieja",
+        "assignedIds": ["r-nueva", "r-vieja"],
+        "selfCreatedIds": []
+      },
+      "expect": { "routineId": "r-vieja" }
+    },
+    {
+      "name": "el marcador tambien se busca entre las auto-creadas",
+      "why": "Tier 0 resuelve contra la lista UNIFICADA, no solo contra las del PF.",
+      "given": {
+        "activeRoutineId": "mia-2",
+        "assignedIds": ["del-pf"],
+        "selfCreatedIds": ["mia-1", "mia-2"]
+      },
+      "expect": { "routineId": "mia-2" }
+    },
+    {
+      "name": "marcador obsoleto: NO devuelve null, sigue la cadena",
+      "why": "Una rutina archivada o borrada deja el marcador apuntando a la nada. Devolver null ahi dejaria al atleta sin entreno teniendo un plan del PF perfectamente valido.",
+      "given": {
+        "activeRoutineId": "borrada",
+        "assignedIds": ["del-pf"],
+        "selfCreatedIds": []
+      },
+      "expect": { "routineId": "del-pf" }
+    },
+    {
+      "name": "sin marcador: gana el plan del PF",
+      "given": {
+        "activeRoutineId": null,
+        "assignedIds": ["del-pf"],
+        "selfCreatedIds": ["mia-1"]
+      },
+      "expect": { "routineId": "del-pf" }
+    },
+    {
+      "name": "varias asignadas sin marcador: gana la mas nueva",
+      "why": "El repositorio las entrega ordenadas por createdAt descendente, asi que es la primera.",
+      "given": {
+        "activeRoutineId": null,
+        "assignedIds": ["nueva", "media", "vieja"],
+        "selfCreatedIds": []
+      },
+      "expect": { "routineId": "nueva" }
+    },
+    {
+      "name": "marcador vacio se trata igual que ausente",
+      "given": {
+        "activeRoutineId": "",
+        "assignedIds": ["del-pf"],
+        "selfCreatedIds": []
+      },
+      "expect": { "routineId": "del-pf" }
+    },
+    {
+      "name": "una sola auto-creada se auto-activa",
+      "why": "Tier 2: no hace falta marcador cuando no hay nada que desambiguar.",
+      "given": { "activeRoutineId": null, "assignedIds": [], "selfCreatedIds": ["unica"] },
+      "expect": { "routineId": "unica" }
+    },
+    {
+      "name": "varias auto-creadas sin marcador: null, no se adivina",
+      "why": "Tier 3. Elegir una al azar seria peor que no elegir: el home cae al CTA vacio y le pide al atleta que marque una.",
+      "given": {
+        "activeRoutineId": null,
+        "assignedIds": [],
+        "selfCreatedIds": ["mia-1", "mia-2", "mia-3"]
+      },
+      "expect": { "routineId": null }
+    },
+    {
+      "name": "varias auto-creadas con marcador obsoleto: null",
+      "why": "Mismo caso que arriba — el marcador no resuelve, asi que no hay a que caer.",
+      "given": {
+        "activeRoutineId": "borrada",
+        "assignedIds": [],
+        "selfCreatedIds": ["mia-1", "mia-2"]
+      },
+      "expect": { "routineId": null }
+    }
+  ]
+}

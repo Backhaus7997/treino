@@ -1,0 +1,124 @@
+{
+  "rule": "plan-advance",
+  "source_of_truth": "lib/features/workout/domain/plan_advance.dart",
+  "description": "Dado el ultimo dia FINALIZADO de una rutina, que dia y que semana tocan ahora. Contrato compartido entre la implementacion Dart (telefono) y la Swift (reloj).",
+  "inputs": {
+    "lastFinished": "null = nunca se finalizo una sesion de esta rutina. Si no, {dayNumber 1-based, weekNumber 0-based}.",
+    "numDays": "Cantidad de dias de la rutina. Siempre >= 1: el llamador ya descarto las rutinas sin dias.",
+    "numWeeks": "Cantidad de semanas del plan. <= 0 se trata como 1 (docs de Firestore corruptos o legacy)."
+  },
+  "cases": [
+    {
+      "name": "primera sesion de la rutina",
+      "why": "Sin sesiones finalizadas se arranca de cero, no se infiere nada.",
+      "given": { "lastFinished": null, "numDays": 5, "numWeeks": 1 },
+      "expect": { "dayNumber": 1, "weekNumber": 0 }
+    },
+    {
+      "name": "avance normal a mitad del plan",
+      "given": {
+        "lastFinished": { "dayNumber": 2, "weekNumber": 0 },
+        "numDays": 5,
+        "numWeeks": 1
+      },
+      "expect": { "dayNumber": 3, "weekNumber": 0 }
+    },
+    {
+      "name": "dias salteados: es ultimo-completado + 1, no el dia perdido",
+      "why": "Si el atleta hizo Dia 1 y Dia 3 salteando el 2, el proximo es el 4. Mismo criterio que Hevy/Strong.",
+      "given": {
+        "lastFinished": { "dayNumber": 3, "weekNumber": 0 },
+        "numDays": 5,
+        "numWeeks": 1
+      },
+      "expect": { "dayNumber": 4, "weekNumber": 0 }
+    },
+    {
+      "name": "rotacion de dia en plan no periodizado",
+      "why": "Dia 5 de 5 vuelve al Dia 1. Con numWeeks 1 el modulo de semana es un no-op.",
+      "given": {
+        "lastFinished": { "dayNumber": 5, "weekNumber": 0 },
+        "numDays": 5,
+        "numWeeks": 1
+      },
+      "expect": { "dayNumber": 1, "weekNumber": 0 }
+    },
+    {
+      "name": "rutina de un solo dia siempre vuelve al dia 1",
+      "given": {
+        "lastFinished": { "dayNumber": 1, "weekNumber": 0 },
+        "numDays": 1,
+        "numWeeks": 1
+      },
+      "expect": { "dayNumber": 1, "weekNumber": 0 }
+    },
+    {
+      "name": "periodizado sin rotacion: la semana NO avanza",
+      "why": "La semana rota solo cuando el dia da la vuelta.",
+      "given": {
+        "lastFinished": { "dayNumber": 2, "weekNumber": 1 },
+        "numDays": 5,
+        "numWeeks": 4
+      },
+      "expect": { "dayNumber": 3, "weekNumber": 1 }
+    },
+    {
+      "name": "periodizado con rotacion: avanzan dia Y semana",
+      "given": {
+        "lastFinished": { "dayNumber": 5, "weekNumber": 1 },
+        "numDays": 5,
+        "numWeeks": 4
+      },
+      "expect": { "dayNumber": 1, "weekNumber": 2 }
+    },
+    {
+      "name": "periodizado en la ultima semana: la semana vuelve a 0",
+      "why": "Semana 3 de 4 (0-based) al rotar da (3+1) % 4 = 0.",
+      "given": {
+        "lastFinished": { "dayNumber": 5, "weekNumber": 3 },
+        "numDays": 5,
+        "numWeeks": 4
+      },
+      "expect": { "dayNumber": 1, "weekNumber": 0 }
+    },
+    {
+      "name": "numWeeks 0 con rotacion no explota",
+      "why": "Un doc con `numWeeks: 0` EXPLICITO esquiva el `?? 1` del fromJson generado, que solo cubre el campo ausente. Sin el guard, `% 0` tira IntegerDivisionByZeroException y mata el 'empezar en 1 tap'.",
+      "given": {
+        "lastFinished": { "dayNumber": 5, "weekNumber": 0 },
+        "numDays": 5,
+        "numWeeks": 0
+      },
+      "expect": { "dayNumber": 1, "weekNumber": 0 }
+    },
+    {
+      "name": "numWeeks 0 sin rotacion deja la semana intacta",
+      "given": {
+        "lastFinished": { "dayNumber": 2, "weekNumber": 0 },
+        "numDays": 5,
+        "numWeeks": 0
+      },
+      "expect": { "dayNumber": 3, "weekNumber": 0 }
+    },
+    {
+      "name": "numWeeks negativo se trata como 1",
+      "why": "Un valor negativo no tira excepcion pero daria una semana fuera de rango.",
+      "given": {
+        "lastFinished": { "dayNumber": 3, "weekNumber": 0 },
+        "numDays": 3,
+        "numWeeks": -2
+      },
+      "expect": { "dayNumber": 1, "weekNumber": 0 }
+    },
+    {
+      "name": "dayNumber corrupto mayor que numDays",
+      "why": "Un doc editado a mano puede tener dayNumber 7 en una rutina de 5 dias. (7 % 5) + 1 = 3, y 7 >= 5 cuenta como rotacion, asi que la semana avanza. Comportamiento raro pero DEFINIDO: se documenta para que Swift lo replique en vez de inventar el suyo.",
+      "given": {
+        "lastFinished": { "dayNumber": 7, "weekNumber": 0 },
+        "numDays": 5,
+        "numWeeks": 4
+      },
+      "expect": { "dayNumber": 3, "weekNumber": 1 }
+    }
+  ]
+}

@@ -1,162 +1,190 @@
-# Firebase Hosting Rewrites for Browser-Callable Cloud Functions
+# Making Callable v2 Cloud Functions Publicly Reachable
 
-This document captures the **browser-CORS gap** discovered during the smoke of the
-`coach-excel-polish` SDD (Fase 6 Etapa 5) and the recommended long-term solution
-for invoking Firebase callable v2 Cloud Functions from a browser-based client
-(Coach Hub web).
+How `treino-dev` exposes Firebase **callable v2** Cloud Functions, why the
+obvious answer (`allUsers` → `roles/run.invoker`) does **not** work here, and
+what to check when a freshly deployed callable returns **403**.
 
-It is **out-of-band setup documentation**, not a code prerequisite for any merged
-PR. The CFs themselves work; this file describes how to make them callable from
-browsers without relaxing the org policy.
-
----
-
-## Why this matters
-
-Firebase callable v2 Cloud Functions run on Cloud Run under the hood. When a
-**browser** invokes them via `httpsCallable('addAlias')`:
-
-1. The Flutter `cloud_functions` plugin issues an HTTPS POST to the public
-   Firebase Functions URL (`https://southamerica-east1-treino-dev.cloudfunctions.net/addAlias`).
-2. The browser issues a **CORS preflight OPTIONS** request first.
-3. Cloud Run rejects the OPTIONS preflight with **403** because the underlying
-   Cloud Run service does NOT have `allUsers` as `roles/run.invoker`.
-4. The 403 has **no `Access-Control-Allow-Origin` header**, so the browser
-   blocks the request entirely at the network layer.
-5. The Flutter callable swallows the underlying error as
-   `[firebase_functions/internal]` and the call silently fails.
-
-This affects **only browser clients**. Mobile clients (iOS/Android via the
-Firebase Functions native SDK) bypass CORS preflight and work without `allUsers`
-on the invoker — that is why `deleteAccount` works on iOS without any extra
-configuration.
-
-### The org policy that blocks `allUsers`
-
-`treino-dev` has the GCP org policy
-`constraints/iam.allowedPolicyMemberDomains` enforced (Domain Restricted
-Sharing). Adding `allUsers` as `roles/run.invoker` on any new Cloud Run service
-fails with:
-
-```
-IAM policy update failed
-The 'Domain Restricted Sharing' organization policy is enforced.
-Only principals in allowed domains can be added as principals in the policy.
-```
-
-This is **correct security posture** for the organization. The fix is NOT to
-relax the org policy — the fix is to make browser clients call CFs via a path
-that does not require `allUsers`.
+> **2026-08-14 — this document was rewritten.** The previous version diagnosed
+> this as a browser-only CORS problem and recommended Firebase Hosting rewrites.
+> That diagnosis was wrong. See [What the previous version got wrong](#what-the-previous-version-got-wrong).
 
 ---
 
-## The fix: Firebase Hosting rewrites
+## The symptom
 
-When the Coach Hub web is served from **Firebase Hosting**, you can configure
-rewrites in `firebase.json` that proxy requests on the same origin to a
-callable function. From the browser's perspective the function lives at
-`/api/addAlias` on the same origin as the web app — **no CORS preflight
-required**.
+A callable is listed by `firebase functions:list`, deploy reported success, and
+yet every invocation fails. The client sees `[firebase_functions/internal]`.
 
-### `firebase.json` snippet
-
-```json
-{
-  "hosting": {
-    "public": "build/web",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
-    "rewrites": [
-      {
-        "source": "/api/addAlias",
-        "function": "addAlias",
-        "region": "southamerica-east1"
-      }
-    ]
-  }
-}
-```
-
-Add one rewrite block per browser-callable CF. Future Coach Hub CFs that are
-invoked from the browser must each get their own rewrite.
-
-### Client-side change
-
-Instead of:
-
-```dart
-final fn = ref.read(cloudFunctionsProvider).httpsCallable('addAlias');
-await fn.call({'exerciseId': id, 'alias': raw});
-```
-
-Use:
-
-```dart
-final fn = ref.read(cloudFunctionsProvider)
-    .httpsCallableFromUrl(Uri.parse('/api/addAlias'));
-await fn.call({'exerciseId': id, 'alias': raw});
-```
-
-`httpsCallableFromUrl` calls a same-origin URL. The browser does NOT issue a
-CORS preflight because the request is same-origin from its perspective.
-
-### When this matters
-
-You need the rewrite for any callable CF that:
-
-- Is invoked from a Flutter web client (Coach Hub web)
-- Today: `addAlias` is the first such CF in this codebase
-- Tomorrow: any new CF that adds a side effect on user interaction inside Coach
-  Hub web (e.g., a future "submit feedback" CF, an "approve plan revision" CF, etc.)
-
-CFs that are invoked **only from mobile** OR **server-side** (Firestore
-triggers, Eventarc events, other CFs, schedulers) do **not** need this — they
-already work without `allUsers` on the invoker.
-
----
-
-## Local development
-
-The rewrite path also works in local dev with the Firebase Hosting emulator:
+Probe it directly — no browser, no SDK:
 
 ```bash
-firebase emulators:start --only hosting,functions
+curl -s -o /dev/null -w "%{http_code} %{content_type}\n" -X POST \
+  "https://southamerica-east1-treino-dev.cloudfunctions.net/<name>" \
+  -H "Content-Type: application/json" -d '{"data":{}}'
 ```
 
-Then point the Flutter web app at the Hosting emulator URL (typically
-`http://localhost:5000`) and the `/api/addAlias` rewrite resolves to the local
-Functions emulator. No CORS issues.
+| response | meaning |
+| --- | --- |
+| **403** `text/html` | Blocked at the front door. **The function never ran.** |
+| **401** `application/json` `UNAUTHENTICATED` | Reached the handler, which rejected the missing Auth token. **This is the healthy state.** |
+
+A 401 from an unauthenticated probe is the *correct* result. Do not read it as a
+failure.
 
 ---
 
-## Verification of the smoke gap
+## Why 403 happens
 
-The `addAlias` CF correctness is validated by:
+A callable v2 function is a **Cloud Run service** underneath. Two independent
+layers guard it:
 
-- **Jest emulator tests** (14/14 SCENARIO-735..743) — full handler logic
-  including auth, role gate, normalize, dedup, idempotency, accent parity with
-  Dart `normalize()`.
-- **Widget tests** (4/4 SCENARIO-744..747) — client wire, `cloudFunctionsProvider`
-  injection, fire-and-forget order (R2), silent failure swallow.
-- **Cloud Run deploy** — service deployed in `southamerica-east1`, Compute SA
-  has `roles/run.invoker`, callable from server-to-server contexts.
+```
+Internet → [Cloud Run front door: IAM invoker check] → [handler: App Check + Firebase Auth]
+```
 
-What we could **not** validate end-to-end at smoke time is the browser →
-cloudfunctions.net → Cloud Run path, because the org policy blocks the
-`allUsers` invoker that the browser CORS preflight needs. Once Hosting rewrites
-are in place (or when Coach Hub web is served from Firebase Hosting in
-production), the end-to-end smoke becomes possible.
+The front door knows nothing about your users — it only understands Google Cloud
+identities. A Firebase Auth ID token is not one, so it does not get you past it.
+Authentication of *users* happens inside the handler.
+
+There are two ways to open the front door:
+
+1. Bind `allUsers` to `roles/run.invoker`, **or**
+2. Disable the invoker IAM check on the service.
+
+**This project must use option 2.**
+
+### Option 1 is impossible in this project
+
+`treino-dev` enforces the org policy `constraints/iam.allowedPolicyMemberDomains`
+(Domain Restricted Sharing):
+
+```console
+$ gcloud resource-manager org-policies describe \
+    constraints/iam.allowedPolicyMemberDomains --project=treino-dev --effective
+constraint: constraints/iam.allowedPolicyMemberDomains
+listPolicy:
+  allowedValues:
+  - C03bxdsb7
+```
+
+Only principals inside the organization's customer ID are allowed. Adding
+`allUsers` fails with `The 'Domain Restricted Sharing' organization policy is
+enforced`. This is correct security posture — **do not ask an admin to relax it.**
+
+Consequently **no callable in `treino-dev` has an `allUsers` binding.** Every
+service returns an empty IAM policy:
+
+```console
+$ gcloud run services get-iam-policy deleteaccount \
+    --region=southamerica-east1 --project=treino-dev --format=json
+{ "etag": "ACAB" }
+```
+
+If you are debugging by looking for a missing `allUsers` binding, you are
+looking at the wrong thing.
+
+### Option 2 is the mechanism actually in use
+
+Cloud Run can skip the invoker IAM check entirely. That is what makes the
+working callables reachable:
+
+```console
+$ gcloud run services describe deleteaccount \
+    --region=southamerica-east1 --project=treino-dev --format=json \
+    | rg invoker
+      "run.googleapis.com/invoker-iam-disabled": "true",
+```
+
+A broken service simply lacks that annotation. That single annotation is the
+entire difference between 401 and 403.
 
 ---
 
-## Notes
+## The fix
 
-- This is a **standard Firebase pattern** for browser-callable functions.
-  Documented at:
-  <https://firebase.google.com/docs/hosting/functions>
-- Do **not** request the org admin to relax `Domain Restricted Sharing` — the
-  policy is the correct posture. Use the rewrite pattern instead.
-- The rewrite does NOT require any IAM changes. It works because the Hosting
-  CDN is the caller of the Cloud Run service, and the CDN is an internal GCP
-  principal that already has invoke permission.
+```bash
+gcloud run services update <service-name> \
+  --project=treino-dev \
+  --region=southamerica-east1 \
+  --no-invoker-iam-check
+```
 
-REQ-CXP-CF-007..017. ADR-CXP-005. Fase 6 Etapa 5.
+Reversible with `--invoker-iam-check`. Then re-probe: 403 must become 401.
+
+### Footgun: Cloud Run service names are lowercase
+
+The function is `addAlias`; the Cloud Run service is **`addalias`**. List the
+real names before querying:
+
+```bash
+gcloud run services list --project=treino-dev --region=southamerica-east1
+```
+
+`gcloud run services get-iam-policy addAlias` does **not** 404 — it returns an
+empty policy `{"etag":"ACAB"}`, which looks exactly like a real service with no
+bindings. That silent success will send you down the wrong path.
+
+### Where `gcloud` lives on this machine
+
+Installed via Homebrew cask but **not on the default `PATH`**:
+
+```
+/opt/homebrew/share/google-cloud-sdk/bin/gcloud
+```
+
+Workspace enforces periodic re-authentication for mutating commands. When
+`Reauthentication failed. cannot prompt during non-interactive execution`
+appears, run `gcloud auth login` in an interactive terminal — reads may keep
+working from a cached token for a while after writes start failing.
+
+---
+
+## Checklist for every new callable
+
+Deploy does not reliably set the annotation. After deploying a **new** callable
+that clients invoke directly:
+
+1. Probe it with the `curl` above.
+2. If 403 → apply `--no-invoker-iam-check` to the lowercase service name.
+3. Re-probe and confirm 401 JSON.
+
+Functions invoked only server-side (Firestore triggers, Eventarc, schedulers,
+other functions) never need this — they are not called through the front door.
+
+---
+
+## Security posture
+
+Disabling the invoker IAM check does **not** make the function unprotected. It
+moves authentication from the front door into the handler, where it already
+lives:
+
+- `enforceAppCheck: true` on the `onCall` declaration
+- Firebase Auth validation inside the handler
+
+This is the same posture `deleteAccount` has had since it shipped.
+
+---
+
+## What the previous version got wrong
+
+Recorded so the same detour is not repeated.
+
+1. **"This affects only browser clients. Mobile clients bypass CORS preflight
+   and work without `allUsers`."** False. The `curl` probe above sends no
+   `Origin` header and triggers no preflight, and still receives 403. The
+   invoker check runs before any function code, for every caller.
+2. **The recommended fix — Firebase Hosting rewrites plus
+   `httpsCallableFromUrl` — was never needed.** It addressed a CORS problem that
+   was not the cause. It was never implemented, and `firebase.json` carries no
+   such rewrite.
+3. **The org policy was correctly identified but the conclusion did not
+   follow.** `allUsers` is genuinely blocked; the document treated that as a
+   dead end instead of finding the mechanism the project's own working functions
+   already used.
+
+Cost of the error: `addAlias` returned 403 for its entire deployed life. The
+call site swallows failures by design (ADR-CXP-009), so nothing surfaced. Fixed
+2026-08-14 — verified 403 → 401.
+
+REQ-CXP-CF-007..017. ADR-CXP-005.
