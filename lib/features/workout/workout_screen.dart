@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../app/theme/app_motion.dart';
-import '../../app/theme/app_palette.dart';
 import '../../core/analytics/sub_tab_analytics.dart';
 import '../../core/widgets/motion/treino_fade_slide_in.dart';
+import '../../core/widgets/treino_segmented_pill.dart';
 import '../../l10n/app_l10n.dart';
 import '../profile/application/user_providers.dart';
 import '../profile/domain/user_role.dart';
@@ -79,65 +78,20 @@ class _AthleteWorkout extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
     final labels = <String>[l10n.workoutTabYours, l10n.workoutTabExplore];
-    final palette = AppPalette.of(context);
-    final theme = Theme.of(context);
-    final textScaler = MediaQuery.textScalerOf(context);
-    final labelStyle = theme.textTheme.labelLarge?.copyWith(
-      fontWeight: FontWeight.w700,
-      letterSpacing: 0.5,
-    );
-    final scaledLabelHeight = textScaler.scale(labelStyle?.fontSize ?? 14) *
-        (labelStyle?.height ?? 1.2);
-    final tabHeight =
-        scaledLabelHeight + 20 < 40 ? 40.0 : scaledLabelHeight + 20;
-    final scrollTabs = textScaler.scale(1) > 1.3;
 
     return DefaultTabController(
       length: labels.length,
       initialIndex: _resolveInitialIndex(initialTab),
       child: Column(
         children: [
-          // Segmented pill control — mirrors TrainerCoachView's sub-tab
-          // language (week tabs, bottom-bar pill).
-          Container(
-            margin: const EdgeInsets.fromLTRB(20, 10, 20, 0),
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: palette.bgCard,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: palette.textMuted.withValues(alpha: 0.12),
-              ),
-            ),
-            child: TabBar(
-              isScrollable: scrollTabs,
-              tabAlignment: scrollTabs ? TabAlignment.start : TabAlignment.fill,
-              dividerColor: Colors.transparent,
-              indicatorSize: TabBarIndicatorSize.tab,
-              indicator: BoxDecoration(
-                color: palette.accent,
-                borderRadius: BorderRadius.circular(AppRadius.lg),
-              ),
-              splashBorderRadius: BorderRadius.circular(AppRadius.lg),
-              labelColor: palette.bg,
-              unselectedLabelColor: palette.textMuted,
-              labelStyle: labelStyle,
-              tabs: [
-                for (final label in labels)
-                  Tab(
-                    height: tabHeight,
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      softWrap: false,
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-              ],
-            ),
+          // El alto y el modo scroll ahora los resuelve el componente — la
+          // lógica de textScaler que vivía acá se universalizó al kit (#646).
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+            child: TreinoSegmentedPill(labels: labels),
           ),
           const SizedBox(height: 8),
-          // TU ENTRENO y PLANTILLAS son las dos la ruta `/workout`: mismo
+          // TU ENTRENO y EXPLORAR son las dos la ruta `/workout`: mismo
           // punto ciego que Feed. Envuelve las PÁGINAS, no el pill.
           const Expanded(
             child: SubTabAnalytics(

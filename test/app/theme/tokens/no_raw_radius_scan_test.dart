@@ -65,11 +65,11 @@ void main() {
     /// Techo de archivos permitidos. Congelado en el estado de `main` al abrir
     /// la issue #665. NUNCA subir este número: cada fase que migra un archivo
     /// lo baja.
-    const allowlistCeiling = 88;
+    const allowlistCeiling = 86;
 
     /// Techo de ocurrencias totales de radio crudo en `lib/`. Mismo contrato
     /// que [allowlistCeiling]: sólo baja.
-    const rawRadiusDebtCeiling = 252;
+    const rawRadiusDebtCeiling = 250;
 
     /// Allowlist de rutas relativas a `lib/` que todavía contienen radios
     /// crudos. Es un REGISTRO DE DEUDA, no una licencia: estar acá significa
@@ -98,7 +98,6 @@ void main() {
       'features/coach/presentation/widgets/trainer_day_detail_sheet.dart',
       'features/coach/presentation/widgets/trainers_map_bottom_sheet.dart',
       'features/coach/presentation/widgets/trainers_map_view.dart',
-      'features/coach/trainer_coach_view.dart',
       'features/coach_hub/presentation/coach_hub_login_screen.dart',
       'features/coach_hub/presentation/coach_hub_plan_preview_screen.dart',
       'features/coach_hub/presentation/coach_hub_upload_plan_screen.dart',
@@ -162,7 +161,6 @@ void main() {
       'features/workout/presentation/widgets/set_entry_sheet.dart',
       'features/workout/presentation/widgets/template_rating_sheet.dart',
       'features/workout/trainer_workout_view.dart',
-      'features/workout/workout_screen.dart',
     };
 
     late List<String> offenders;
