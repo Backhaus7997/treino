@@ -125,4 +125,16 @@ class FakeAnalyticsService implements AnalyticsService {
       }
     ));
   }
+
+  @override
+  Future<void> logScreenViewed({required String route}) async {
+    events.add('screen_view');
+    calls.add((name: 'screen_view', params: {'route': route}));
+  }
+
+  /// Atajo para los tests de navegación: las rutas capturadas, en orden.
+  List<String> get screenRoutes => calls
+      .where((c) => c.name == 'screen_view')
+      .map((c) => c.params['route']! as String)
+      .toList();
 }

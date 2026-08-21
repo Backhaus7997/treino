@@ -1,4 +1,5 @@
 import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Servicio centralizado de eventos analytics.
@@ -12,7 +13,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// y assertear sobre `events` capturados.
 ///
 /// Eventos auto-trackeados por Firebase Analytics que NO disparamos acá:
-/// `session_start`, `screen_view`, `app_open`, `first_open`, etc.
+/// `session_start`, `app_open`, `first_open`, etc.
+///
+/// `screen_view` NO está en esa lista, aunque antes lo estuviera: el
+/// auto-tracking de Firebase cuenta pantallas NATIVAS, y toda una app Flutter
+/// es una sola. Lo emite `RouteAnalytics` (ver `route_analytics.dart`).
 abstract class AnalyticsService {
   /// Tap "EMPEZAR" en RoutineDetail — el atleta arrancó una rutina (intent).
   Future<void> logRoutineStarted({
@@ -55,6 +60,14 @@ abstract class AnalyticsService {
     required String trainerId,
     required String athleteId,
   });
+
+  /// Una ruta quedó visible. Lo dispara `RouteAnalytics` en cada navegación.
+  ///
+  /// [route] es el PATRÓN de go_router (`/coach/exercise/:id`), no la ruta
+  /// concreta (`/coach/exercise/abc123`). Mandar la concreta haría explotar la
+  /// cardinalidad del evento: un valor distinto por cada id, y ningún reporte
+  /// agregable.
+  Future<void> logScreenViewed({required String route});
 }
 
 /// Implementación real basada en Firebase Analytics.
@@ -152,12 +165,92 @@ class FirebaseAnalyticsService implements AnalyticsService {
           'athlete_id': athleteId,
         },
       );
+
+  /// Usa `logScreenView` y no `logEvent('screen_view')`: es el helper tipado
+  /// del SDK y el que alimenta los reportes de pantallas de la consola.
+  @override
+  Future<void> logScreenViewed({required String route}) =>
+      _analytics.logScreenView(screenName: route);
 }
+
+/// [AnalyticsService] que no hace nada.
+///
+/// Se usa cuando no hay una app de Firebase inicializada, que en la práctica
+/// significa `flutter test`. Ver [analyticsServiceProvider].
+class NoopAnalyticsService implements AnalyticsService {
+  const NoopAnalyticsService();
+
+  @override
+  Future<void> logRoutineStarted({
+    required String routineId,
+    String? routineName,
+  }) async {}
+
+  @override
+  Future<void> logRoutineFinished({
+    required String routineId,
+    required String sessionId,
+    required int durationSeconds,
+  }) async {}
+
+  @override
+  Future<void> logPlanAssigned({
+    required String routineId,
+    required String assignedBy,
+    required String assignedTo,
+  }) async {}
+
+  @override
+  Future<void> logLinkRequested({
+    required String trainerId,
+    required String athleteId,
+  }) async {}
+
+  @override
+  Future<void> logLinkAccepted({required String linkId}) async {}
+
+  @override
+  Future<void> logChatMessageSent({
+    required String chatId,
+    required String senderId,
+  }) async {}
+
+  @override
+  Future<void> logAppointmentCreated({
+    required String appointmentId,
+    required String trainerId,
+    required String athleteId,
+  }) async {}
+
+  @override
+  Future<void> logScreenViewed({required String route}) async {}
+}
+
+/// Instancia de Firebase Analytics.
+///
+/// Existe como provider propio para que los tests puedan overridearla sin
+/// tener que inicializar Firebase.
+final firebaseAnalyticsProvider = Provider<FirebaseAnalytics>((ref) {
+  return FirebaseAnalytics.instance;
+});
 
 /// Provider Riverpod — los call sites hacen
 /// `ref.read(analyticsServiceProvider).logFoo(...)`.
 ///
-/// Tests override con `FakeAnalyticsService`.
+/// Tests override con `FakeAnalyticsService` cuando quieren assertear sobre
+/// los eventos. Los que NO se ocupan de analytics no necesitan hacer nada:
+/// sin app de Firebase esto devuelve un [NoopAnalyticsService].
+///
+/// Ese fallback no es cosmético. `FirebaseAnalytics.instance` tira
+/// `[core/no-app]` si no hay app inicializada, y en `flutter test` nunca la
+/// hay. Antes daba igual, porque analytics sólo se tocaba desde acciones de
+/// negocio que los widget tests no disparan. Desde #666 hay widgets que
+/// loguean AL MONTARSE (`SubTabAnalytics`), así que sin esta guarda cualquier
+/// test que pumpee Feed o Entrenar reventaría — fueron 82 de una.
+///
+/// En producción `main.dart` hace `Firebase.initializeApp()` bastante antes de
+/// `runApp`, así que para cuando alguien lee este provider siempre hay app.
 final analyticsServiceProvider = Provider<AnalyticsService>((ref) {
-  return FirebaseAnalyticsService(FirebaseAnalytics.instance);
+  if (Firebase.apps.isEmpty) return const NoopAnalyticsService();
+  return FirebaseAnalyticsService(ref.watch(firebaseAnalyticsProvider));
 });
