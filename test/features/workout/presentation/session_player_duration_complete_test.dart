@@ -24,6 +24,8 @@ import 'package:treino/features/workout/application/session_init.dart';
 import 'package:treino/features/workout/application/session_notifier.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/application/session_state.dart';
+import 'package:treino/features/workout/application/workout_clock.dart';
+import 'package:treino/features/workout/domain/duration_timer.dart';
 import 'package:treino/features/workout/domain/routine_slot.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/presentation/session_player_screen.dart';
@@ -92,8 +94,22 @@ SessionState _durationOnlyState() => SessionState(
       elapsedSeconds: 0,
     );
 
+/// Reloj de pared controlable.
+///
+/// La cuenta de un ejercicio por tiempo se deriva del INSTANTE de fin, no de
+/// cuántos ticks corrieron (ver `DurationTimerRules`). `tester.pump(5s)` mueve
+/// el tiempo falso de los timers pero NO el reloj de pared, así que para llevar
+/// el countdown a cero hay que mover este.
+///
+/// El test verifica exactamente lo mismo que antes; lo único que cambió es cómo
+/// se hace pasar el tiempo.
+DateTime _ahora = DateTime.utc(2027, 1, 15, 10);
+
 Widget _wrap(SessionNotifier Function() create) => ProviderScope(
-      overrides: [sessionNotifierProvider.overrideWith(create)],
+      overrides: [
+        sessionNotifierProvider.overrideWith(create),
+        workoutClockProvider.overrideWithValue(() => _ahora),
+      ],
       child: MaterialApp(
         theme: AppTheme.dark(),
         localizationsDelegates: AppL10n.localizationsDelegates,
@@ -112,6 +128,10 @@ ElevatedButton _finishButton(WidgetTester tester) =>
 
 void main() {
   group('QA-WKT-001: completar un set de duración', () {
+    // El reloj arranca en el mismo punto en cada test: es estado global del
+    // archivo y sin esto el orden de ejecucion podria filtrarse de uno a otro.
+    setUp(() => _ahora = DateTime.utc(2027, 1, 15, 10));
+
     // Ancla GREEN ejecutable (SIN skip): precondición estable que se cumple
     // HOY y también DESPUÉS del fix. Un día de solo-duración, sin sets
     // logueados aún, arranca con "Iniciar" visible y TERMINAR deshabilitado.
@@ -158,12 +178,15 @@ void main() {
       expect(find.text('Iniciar'), findsOneWidget);
       expect(_finishButton(tester).onPressed, isNull);
 
-      // Arrancar el countdown y avanzarlo más allá de 0. Con targetSeconds = 3
-      // el `Timer.periodic(1s)` dispara `onDone` al 4º tick (~4 s), así que
-      // pumpear 5 s cubre el disparo con margen; el timer se auto-cancela.
+      // Arrancar el countdown y llevarlo más allá de 0. Con targetSeconds = 3
+      // basta con adelantar el reloj de pared 5 segundos: la cuenta se deriva
+      // del instante de fin, así que UN tick alcanza para verla terminada. Ya
+      // no importa cuántos ticks hayan corrido — que es todo el punto del
+      // cambio a reloj de pared.
       await tester.tap(find.text('Iniciar'));
       await tester.pump();
-      await tester.pump(const Duration(seconds: 5));
+      _ahora = _ahora.add(const Duration(seconds: 5));
+      await tester.pump(DurationTimerRules.tickInterval);
       await tester.pump();
 
       // 1) El set quedó logueado: SetLog creado para el ejercicio de duración.
@@ -180,6 +203,53 @@ void main() {
 
       // 3) TERMINAR SESIÓN habilitado (isFullyCompleted == true).
       expect(_finishButton(tester).onPressed, isNotNull);
+    });
+  });
+
+  group('la PANTALLA es la autoridad de completado', () {
+    setUp(() => _ahora = DateTime.utc(2027, 1, 15, 10));
+
+    testWidgets('marca la serie aunque la fila NUNCA se haya redibujado',
+        (tester) async {
+      // El punto del cambio: quien completa es la pantalla, que está montada
+      // todo el tiempo que el player está abierto. Antes completaba la fila, y
+      // la fila se desmonta al scrollear — con ella moría la cuenta y nadie
+      // marcaba nada.
+      //
+      // Acá se avanza el reloj de pared y se corre UN tick sin tocar la fila.
+      final notifier = _DurationLoggingNotifier(_durationOnlyState());
+      await tester.pumpWidget(_wrap(() => notifier));
+      await tester.pump();
+
+      await tester.tap(find.text('Iniciar'));
+      await tester.pump();
+
+      _ahora = _ahora.add(const Duration(seconds: 5));
+      await tester.pump(DurationTimerRules.tickInterval);
+      await tester.pump();
+
+      expect(notifier.loggedSets, hasLength(1));
+      expect(notifier.loggedSets.single.exerciseId, 'edur');
+      expect(notifier.loggedSets.single.setNumber, 1);
+    });
+
+    testWidgets('no marca dos veces si entran varios ticks', (tester) async {
+      // La cuenta se limpia al vencer, así que el tick siguiente no encuentra
+      // nada. Sin eso, cada tick posterior marcaría la serie de nuevo.
+      final notifier = _DurationLoggingNotifier(_durationOnlyState());
+      await tester.pumpWidget(_wrap(() => notifier));
+      await tester.pump();
+
+      await tester.tap(find.text('Iniciar'));
+      await tester.pump();
+
+      _ahora = _ahora.add(const Duration(seconds: 5));
+      for (var i = 0; i < 4; i++) {
+        await tester.pump(DurationTimerRules.tickInterval);
+      }
+      await tester.pump();
+
+      expect(notifier.loggedSets, hasLength(1));
     });
   });
 }

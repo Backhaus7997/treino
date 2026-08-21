@@ -417,7 +417,7 @@ El test `test/app/theme/tokens/no_raw_radius_scan_test.dart` falla si se agrega
 un `Radius.circular(<literal>)` fuera de la allowlist. Corre en CI.
 
 A diferencia del scanner de HEX, este arranca con una allowlist grande: al
-congelarse el guard había **668 literales en 149 archivos** contra ~71 usos de
+congelarse el guard había **677 literales en 150 archivos** contra ~71 usos de
 `AppRadius`. La allowlist es un **registro de deuda**, no una licencia — estar
 en la lista significa "pendiente de migrar", no "exento".
 

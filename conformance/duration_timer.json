@@ -1,0 +1,77 @@
+{
+  "rule": "duration-timer",
+  "source_of_truth": "lib/features/workout/domain/duration_timer.dart",
+  "description": "Cuánto falta de un ejercicio POR TIEMPO y si ya terminó. Se cuenta contra el RELOJ DE PARED —instante de fin menos ahora— y se redondea hacia ARRIBA. Contrato compartido entre la implementación Dart (teléfono) y la Swift del reloj (`CountdownRules`).",
+  "why_this_exists": "La misma regla estaba escrita DOS VECES y de dos maneras distintas, y ninguna sabía de la otra. El reloj contaba contra el reloj de pared: guardaba el instante de fin y restaba contra `Date()`. El teléfono contaba por TICKS: un `Timer.periodic` de un segundo que decrementaba un contador. Las dos daban el mismo número mientras nada las molestara, y por eso la divergencia era invisible. Un contador de ticks se ATRASA apenas el sistema estrangula la app —pantalla bloqueada, batería baja, otra app adelante— porque los ticks que no corren no se recuperan. Para un descanso eso se tolera; para un ejercicio por tiempo no: una plancha de 60 segundos que dura 70 no es la misma serie, y el atleta no tiene cómo notarlo. La regla del reloj es la buena, y este contrato la vuelve la única.",
+  "inputs": {
+    "endsAtMs": "Instante de fin de la serie, en milisegundos desde epoch UTC.",
+    "nowMs": "Instante actual, mismo formato.",
+    "note": "Los timestamps van ABSOLUTOS y no como offsets a propósito. Rondan 1,8e12 y NO entran en 32 bits, y en watchOS `Int` es de 32 bits (arm64_32): una implementación que los lea como `Int` se rompe en la muñeca aunque pase en el host. Es exactamente el crash que costó el commit 3a0840cc. Con offsets chicos el fixture no ejercería esa presión."
+  },
+  "not_covered": {
+    "display": "El TEXTO de la cuenta queda deliberadamente fuera del contrato y cada lado formatea el suyo. El reloj muestra `45` y `1:30` porque en una pantalla de 40mm cada carácter cuenta; el teléfono muestra `00:45` y `01:30`, alineado con el resto de su UI. Son decisiones de presentación con razones propias, no una divergencia de la regla. Lo que sí tiene que coincidir —y es lo que está acá— es el NÚMERO de segundos y si la serie terminó."
+  },
+  "cases": [
+    {
+      "name": "plancha de 60s recién arrancada: faltan 60",
+      "given": { "endsAtMs": 1800000060000, "nowMs": 1800000000000 },
+      "expect": { "remaining": 60, "finished": false }
+    },
+    {
+      "name": "a mitad de camino faltan 30",
+      "given": { "endsAtMs": 1800000060000, "nowMs": 1800000030000 },
+      "expect": { "remaining": 30, "finished": false }
+    },
+    {
+      "name": "en el instante de fin no falta nada",
+      "given": { "endsAtMs": 1800000060000, "nowMs": 1800000060000 },
+      "expect": { "remaining": 0, "finished": true }
+    },
+    {
+      "name": "pasado el fin nunca da negativo",
+      "why": "Un negativo se mostraría como texto roto, y si alguien lo usa para indexar o para dimensionar una barra de progreso, revienta. Cero es la respuesta correcta y además es la verdad: no falta nada.",
+      "given": { "endsAtMs": 1800000060000, "nowMs": 1800000180000 },
+      "expect": { "remaining": 0, "finished": true }
+    },
+    {
+      "name": "con 400ms restantes todavía falta 1, no 0",
+      "why": "El redondeo va hacia ARRIBA: mientras quede una fracción de segundo la serie NO terminó. Mostrar 0 con tiempo restante no solo miente, invita a cortar antes — y en un ejercicio por tiempo cortar antes es hacer otra serie.",
+      "given": { "endsAtMs": 1800000060000, "nowMs": 1800000059600 },
+      "expect": { "remaining": 1, "finished": false }
+    },
+    {
+      "name": "un milisegundo antes del fin sigue sin terminar",
+      "given": { "endsAtMs": 1800000060000, "nowMs": 1800000059999 },
+      "expect": { "remaining": 1, "finished": false }
+    },
+    {
+      "name": "la app estrangulada NO atrasa la cuenta",
+      "why": "Este es el caso que motiva el contrato entero. Pasaron 70 segundos de reloj de pared sobre una plancha de 60: la serie terminó hace 10 segundos. Un contador por ticks que perdió los últimos 10 tics diría que todavía faltan 10, y el atleta aguantaría 70 segundos creyendo que hizo 60. Contra el reloj de pared da lo mismo haber corrido 60 tics o ninguno.",
+      "given": { "endsAtMs": 1800000060000, "nowMs": 1800000070000 },
+      "expect": { "remaining": 0, "finished": true }
+    },
+    {
+      "name": "un salto de 59s de golpe da 1, no 59",
+      "why": "Misma propiedad que el caso anterior, del lado que todavía no terminó: lo que falta no depende de cuántos tics se ejecutaron.",
+      "given": { "endsAtMs": 1800000060000, "nowMs": 1800000059000 },
+      "expect": { "remaining": 1, "finished": false }
+    },
+    {
+      "name": "una serie larga con fracción redondea hacia arriba",
+      "why": "10 minutos menos 1,5 segundos son 598,5 restantes. Tiene que dar 599 y no 598: el redondeo hacia arriba no es un caso de borde del último segundo, es la regla en todo el rango.",
+      "given": { "endsAtMs": 1800000600000, "nowMs": 1800000001500 },
+      "expect": { "remaining": 599, "finished": false }
+    },
+    {
+      "name": "una serie de un segundo termina cuando pasa ese segundo",
+      "given": { "endsAtMs": 1800000001000, "nowMs": 1800000001000 },
+      "expect": { "remaining": 0, "finished": true }
+    },
+    {
+      "name": "un reloj del sistema corrido hacia atrás alarga la cuenta",
+      "why": "Consecuencia inevitable de contar contra el reloj de pared: si el sistema corrige la hora 5 segundos hacia atrás, faltan 5 segundos más. Está bajo contrato para que los dos lados hagan LO MISMO, que es lo que importa — el reloj y el teléfono derivan su cuenta del mismo instante de fin, así que se corren juntos y siguen mostrando el mismo número. Tolerable, y muy preferible a que cada implementación invente su propia corrección.",
+      "given": { "endsAtMs": 1800000060000, "nowMs": 1799999995000 },
+      "expect": { "remaining": 65, "finished": false }
+    }
+  ]
+}

@@ -20,6 +20,15 @@ class TreinoIcon {
   static const IconData tabProfile = PhosphorIconsRegular.user;
   static const IconData tabProfileFill = PhosphorIconsFill.user;
 
+  // Esfuerzo medido por el reloj (change watch-workout-session, F4).
+  //
+  // Van aparte de `reactionLike` / `reactionFire` aunque compartan glifo: esos
+  // son reacciones a un post del feed. Reusarlos acá ataría dos cosas que no
+  // tienen nada que ver, y el día que el feed cambie de icono se llevaría
+  // puesto el ritmo cardíaco.
+  static const IconData heartRate = PhosphorIconsFill.heart;
+  static const IconData calories = PhosphorIconsFill.flame;
+
   // Hero / acciones
   static const IconData streak = PhosphorIconsFill.flame;
   static const IconData play = PhosphorIconsFill.play;

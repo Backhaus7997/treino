@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +11,7 @@ import '../../../core/analytics/analytics_service.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../../core/utils/appointment_window.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../coach_hub/presentation/sections/facturacion_planes/plan_limit_paywall.dart';
 import '../../coach_hub/presentation/sections/pagos/widgets/thousands_input_formatter.dart';
 import '../../payments/application/pagos_por_cobrar_provider.dart';
 import '../../payments/application/payment_providers.dart';
@@ -24,6 +27,7 @@ import '../application/follow_up_entry_providers.dart';
 import '../application/recent_activity_provider.dart';
 import '../application/trained_today_provider.dart';
 import '../application/trainer_link_providers.dart';
+import '../data/trainer_link_promotion_service.dart';
 import '../domain/appointment.dart';
 import '../domain/follow_up_entry.dart' show FollowUpTag;
 import '../domain/wall_clock.dart';
@@ -420,14 +424,40 @@ class _PendingRequestCardState extends ConsumerState<_PendingRequestCard> {
   Future<void> _accept() async {
     if (_busy) return;
     setState(() => _busy = true);
+    final l10n = AppL10n.of(context);
     try {
-      await ref.read(trainerLinkRepositoryProvider).accept(widget.link.id);
+      await ref
+          .read(trainerLinkPromotionServiceProvider)
+          .accept(widget.link.id);
       ref
           .read(analyticsServiceProvider)
           .logLinkAccepted(linkId: widget.link.id);
-    } catch (_) {
+    } on LinkPromotionFailure$PlanLimitReached catch (failure) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      unawaited(
+        showPlanLimitPaywall(
+          context,
+          currentTier: failure.tier,
+          reason: failure.reason == 'subscription-inactive'
+              ? PlanLimitReason.subscriptionInactive
+              : PlanLimitReason.planLimit,
+        ),
+      );
+    } on LinkPromotionFailure$PromotionPrecondition {
       if (mounted) setState(() => _busy = false);
-      _showError('No pudimos aceptar la solicitud. Probá de nuevo.');
+      _showError(l10n.coachHubDashboardAcceptPrecondition);
+    } on LinkPromotionFailure catch (_) {
+      if (mounted) setState(() => _busy = false);
+      _showError(l10n.coachHubDashboardAcceptUnavailable);
+    } catch (_) {
+      // QA H5: el catch-all NO se puede angostar a LinkPromotionFailure. Lo
+      // que no sea de esa jerarquia (un bug del servicio, un error de
+      // plataforma) escaparia dejando _busy en true para siempre: boton
+      // muerto, sin feedback, y el PF creyendo que acepto cuando no paso
+      // nada. Es exactamente el bug que este metodo ya tuvo una vez.
+      if (mounted) setState(() => _busy = false);
+      _showError(l10n.coachHubDashboardAcceptUnavailable);
     }
   }
 
