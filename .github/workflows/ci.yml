@@ -138,6 +138,13 @@ jobs:
       - name: Build functions (tsc)
         run: npm --prefix functions run build
 
+      # Los scripts one-off de `functions/scripts/` NO entran en `tsconfig.json`
+      # —que incluye solo `src`— asi que el build de arriba pasaba en verde sin
+      # mirarlos. Uno llevaba semanas sin compilar: importaba un modulo borrado
+      # al desacoplar cobros, y nadie se entero porque nada lo compilaba.
+      - name: Typecheck functions scripts
+        run: npm --prefix functions run typecheck:scripts
+
   # Corre los tests de las Cloud Functions (jest) contra el Firebase Emulator
   # Suite. Era el agujero que faltaba: hasta ahora los tests de functions/ —
   # incluidos los de reglas de seguridad, que nunca se ejecutaron en CI (ver
