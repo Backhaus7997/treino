@@ -1,4 +1,5 @@
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 
 import '../domain/watch_credential_payload.dart';
 import 'watch_bridge.dart';
@@ -99,9 +100,28 @@ class WatchCredentialService {
         return WatchCredentialOutcome.mintFailed;
       }
       customToken = token;
-    } catch (_) {
-      // Incluye FirebaseFunctionsException (no autenticado, App Check, red).
-      // Quedarse sin credencial de reloj no debe tumbar nada del teléfono.
+    } catch (e) {
+      // Quedarse sin credencial de reloj no debe tumbar nada del teléfono: por
+      // eso se traga. Pero tragarlo SIN DEJAR RASTRO costó caro.
+      //
+      // Este catch es el que hizo irreconocible el problema de App Attest: la
+      // función devolvía 401 "Decoding App Check token failed", acá se comía el
+      // error entero, y el único síntoma visible era el reloj clavado en
+      // "vinculando" para siempre. La causa y el síntoma no se parecían en
+      // nada, y encontrarla costó llegar hasta los logs de la Cloud Function.
+      //
+      // Ahora el motivo queda escrito. Es lo que pide la condición de salida de
+      // la deuda de App Check (`functions/src/mint-watch-credential.ts`):
+      // instrumentar el cliente para saber POR QUÉ App Attest no emite token.
+      // Sin esto, volver a prender `enforceAppCheck` es a ciegas otra vez.
+      if (e is FirebaseFunctionsException) {
+        debugPrint(
+          '[watch] mintWatchCredential falló: code=${e.code} '
+          'message=${e.message} details=${e.details}',
+        );
+      } else {
+        debugPrint('[watch] mintWatchCredential falló: $e');
+      }
       return WatchCredentialOutcome.mintFailed;
     }
 
