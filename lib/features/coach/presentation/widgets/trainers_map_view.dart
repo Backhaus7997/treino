@@ -8,6 +8,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
@@ -305,7 +306,7 @@ class _TrainersMapViewState extends ConsumerState<TrainersMapView> {
               padding: const EdgeInsets.fromLTRB(4, 4, 10, 4),
               decoration: BoxDecoration(
                 color: pillColor,
-                borderRadius: BorderRadius.circular(9999),
+                borderRadius: BorderRadius.circular(AppRadius.full),
                 boxShadow: [
                   BoxShadow(
                     color: palette.bg.withValues(alpha: 0.6),

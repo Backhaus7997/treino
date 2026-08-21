@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
@@ -255,7 +256,7 @@ class _ListMapToggle extends StatelessWidget {
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(9999),
+        borderRadius: BorderRadius.circular(AppRadius.full),
         border: Border.all(color: palette.border, width: 1),
       ),
       child: Row(
@@ -328,7 +329,7 @@ class _TogglePill extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
               color: bg,
-              borderRadius: BorderRadius.circular(9999),
+              borderRadius: BorderRadius.circular(AppRadius.full),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -505,7 +506,7 @@ class _ModeTabBar extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(9999),
+        borderRadius: BorderRadius.circular(AppRadius.full),
         border: Border.all(color: palette.border),
       ),
       padding: const EdgeInsets.all(4),
@@ -514,9 +515,9 @@ class _ModeTabBar extends StatelessWidget {
         indicatorSize: TabBarIndicatorSize.tab,
         indicator: BoxDecoration(
           color: palette.accent,
-          borderRadius: BorderRadius.circular(9999),
+          borderRadius: BorderRadius.circular(AppRadius.full),
         ),
-        splashBorderRadius: BorderRadius.circular(9999),
+        splashBorderRadius: BorderRadius.circular(AppRadius.full),
         labelColor: palette.bg,
         unselectedLabelColor: palette.textMuted,
         labelStyle: GoogleFonts.barlowCondensed(

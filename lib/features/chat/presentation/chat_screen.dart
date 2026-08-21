@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/analytics/analytics_service.dart';
@@ -467,7 +468,7 @@ class _Composer extends StatelessWidget {
             child: Container(
               decoration: BoxDecoration(
                 color: palette.bgCard,
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(AppRadius.lg),
                 border: Border.all(color: palette.border),
               ),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
