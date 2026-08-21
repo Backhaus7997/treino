@@ -13,6 +13,9 @@ import 'package:cloud_firestore/cloud_firestore.dart'
 import '../../../core/utils/argentina_time.dart';
 import '../../../core/utils/streak_calculator.dart';
 import '../../profile/data/user_public_profile_repository.dart';
+import '../domain/duration_timer.dart';
+import '../domain/duration_timer_owner.dart';
+import '../domain/duration_timer_state.dart';
 import '../domain/session.dart';
 import '../domain/session_status.dart';
 import '../domain/set_log.dart';
@@ -682,25 +685,49 @@ class SessionRepository {
   /// esté emparejado con ESE teléfono: medido en hardware, con un teléfono sin
   /// app companion el envío muere en «no hay nodos conectados» y no cruza nada.
   /// Firestore ya es el canal por el que los dos aparatos se mantienen al día.
-  static const String fieldTimerStartedAt = 'timerStartedAtMs';
-  static const String fieldTimerSeconds = 'timerSeconds';
-
-  /// Deja anotado que arrancó un ejercicio por tiempo.
   ///
-  /// [startedAtMs] es epoch en milisegundos: quien lo lea descuenta lo
-  /// transcurrido, así los dos aparatos muestran el mismo número en vez de
-  /// quedar corridos por la latencia.
+  /// Lo que viaja es el shape de [DurationTimerState]: identidad, duración
+  /// total, INSTANTE DE FIN y DUEÑO. El instante de fin y no los segundos que
+  /// faltan, para que los dos lados deriven la cuenta con [DurationTimerRules]
+  /// —la misma aritmética que el reloj de Apple, bajo contrato en
+  /// `conformance/duration_timer.json`—. Y el dueño porque el documento es
+  /// COMPARTIDO: a diferencia de un mensaje, acá el canal no dice quién arrancó,
+  /// y sin eso los dos aparatos cargarían la misma serie al llegar a cero.
+  static const String fieldTimerExerciseId = 'timerExerciseId';
+  static const String fieldTimerSetNumber = 'timerSetNumber';
+  static const String fieldTimerTotalSeconds = 'timerTotalSeconds';
+  static const String fieldTimerEndsAt = 'timerEndsAtMs';
+  static const String fieldTimerOwner = 'timerOwner';
+
+  /// El dueño, escrito explícito y NO como `enum.name`.
+  ///
+  /// Renombrar el enum en Dart no puede cambiar en silencio lo que ya está
+  /// escrito en una sesión viva: si el valor guardado deja de reconocerse, el
+  /// espejo pasa a creerse dueño y carga la serie por segunda vez.
+  static const String ownerPhone = 'phone';
+  static const String ownerWatch = 'watch';
+
+  /// Deja anotado el cronómetro que está corriendo.
+  ///
+  /// [DurationTimerState.endsAt] se guarda en epoch UTC de milisegundos. Es
+  /// absoluto a propósito: ronda 1,8e12 y no entra en 32 bits, por lo mismo que
+  /// documenta `conformance/duration_timer.json`.
   Future<void> startExerciseTimer({
     required String uid,
     required String sessionId,
-    required int seconds,
-    required int startedAtMs,
+    required DurationTimerState timer,
   }) async {
-    if (uid.isEmpty || sessionId.isEmpty || seconds <= 0) return;
+    if (uid.isEmpty || sessionId.isEmpty) return;
+    if (timer.totalSeconds <= 0 || timer.exerciseId.isEmpty) return;
+    final owner = _ownerToDoc(timer.owner);
+    if (owner == null) return;
     await _sessions(uid).doc(sessionId).set(
       {
-        fieldTimerSeconds: seconds,
-        fieldTimerStartedAt: startedAtMs,
+        fieldTimerExerciseId: timer.exerciseId,
+        fieldTimerSetNumber: timer.setNumber,
+        fieldTimerTotalSeconds: timer.totalSeconds,
+        fieldTimerEndsAt: timer.endsAt.toUtc().millisecondsSinceEpoch,
+        fieldTimerOwner: owner,
       },
       SetOptions(merge: true),
     );
@@ -714,8 +741,11 @@ class SessionRepository {
     if (uid.isEmpty || sessionId.isEmpty) return;
     await _sessions(uid).doc(sessionId).set(
       {
-        fieldTimerSeconds: FieldValue.delete(),
-        fieldTimerStartedAt: FieldValue.delete(),
+        fieldTimerExerciseId: FieldValue.delete(),
+        fieldTimerSetNumber: FieldValue.delete(),
+        fieldTimerTotalSeconds: FieldValue.delete(),
+        fieldTimerEndsAt: FieldValue.delete(),
+        fieldTimerOwner: FieldValue.delete(),
       },
       SetOptions(merge: true),
     );
@@ -726,20 +756,56 @@ class SessionRepository {
   /// Emite el valor inicial apenas se suscribe, así el aparato que entra TARDE
   /// —el caso que un mensaje no puede cubrir— encuentra el temporizador en
   /// curso.
-  Stream<({int seconds, int startedAtMs})?> watchExerciseTimer({
+  ///
+  /// Un documento al que le falta cualquier campo se lee como "no hay
+  /// temporizador". Es deliberado: media cuenta no se puede ubicar en una fila
+  /// ni se le puede saber el dueño, y un espejo sin dueño se cree dueño.
+  Stream<DurationTimerState?> watchExerciseTimer({
     required String uid,
     required String sessionId,
   }) {
-    if (uid.isEmpty || sessionId.isEmpty) return Stream.value(null);
-    return _sessions(uid).doc(sessionId).snapshots().map((snap) {
-      final data = snap.data();
-      if (data == null) return null;
-      final seconds = (data[fieldTimerSeconds] as num?)?.toInt();
-      final startedAt = (data[fieldTimerStartedAt] as num?)?.toInt();
-      if (seconds == null || startedAt == null || seconds <= 0) return null;
-      return (seconds: seconds, startedAtMs: startedAt);
-    });
+    if (uid.isEmpty || sessionId.isEmpty) {
+      return Stream.value(null);
+    }
+    return _sessions(uid)
+        .doc(sessionId)
+        .snapshots()
+        .map((snap) => _timerFromDoc(snap.data()))
+        .distinct();
   }
+
+  static DurationTimerState? _timerFromDoc(Map<String, Object?>? data) {
+    if (data == null) return null;
+    final exerciseId = data[fieldTimerExerciseId];
+    final setNumber = (data[fieldTimerSetNumber] as num?)?.toInt();
+    final totalSeconds = (data[fieldTimerTotalSeconds] as num?)?.toInt();
+    final endsAtMs = (data[fieldTimerEndsAt] as num?)?.toInt();
+    final owner = _ownerFromDoc(data[fieldTimerOwner]);
+    if (exerciseId is! String || exerciseId.isEmpty) return null;
+    if (setNumber == null || setNumber <= 0) return null;
+    if (totalSeconds == null || totalSeconds <= 0) return null;
+    if (endsAtMs == null || owner == null) return null;
+    return DurationTimerState(
+      exerciseId: exerciseId,
+      setNumber: setNumber,
+      totalSeconds: totalSeconds,
+      endsAt: DateTime.fromMillisecondsSinceEpoch(endsAtMs, isUtc: true),
+      owner: owner,
+    );
+  }
+
+  static String? _ownerToDoc(DurationTimerOwner owner) => switch (owner) {
+        DurationTimerOwner.telefono => ownerPhone,
+        DurationTimerOwner.reloj => ownerWatch,
+        // Un cronómetro de nadie no es un cronómetro: no se escribe.
+        DurationTimerOwner.nadie => null,
+      };
+
+  static DurationTimerOwner? _ownerFromDoc(Object? raw) => switch (raw) {
+        ownerPhone => DurationTimerOwner.telefono,
+        ownerWatch => DurationTimerOwner.reloj,
+        _ => null,
+      };
 
   // ─── watchSessionFinished ───────────────────────────────────────────────
 

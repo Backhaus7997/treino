@@ -98,6 +98,17 @@ class WearWorkoutScreen extends ConsumerWidget {
         final t = next.valueOrNull;
         if (t == null || !t.finished) return;
 
+        // **Sólo el DUEÑO carga la serie.** Si esta cuenta la arrancó el
+        // teléfono, este reloj la está ESPEJANDO: la muestra y vibra al vencer,
+        // pero no la marca. Sin esta línea la marcarían los dos —cada uno con
+        // su propio id de documento, así que el que llega tarde no puede
+        // deduplicar— y el atleta la ve repetida en el historial.
+        //
+        // Se compara contra el DEADLINE y no contra el documento vivo a
+        // propósito: el dueño borra el documento al llegar a cero, y preguntarle
+        // justo ahí devolvería "no hay dueño" en plena carrera.
+        if (ref.read(wearTimerAjenoProvider) == t.endsAtElapsedMs) return;
+
         final n = snapshot.nextSetNumber;
         if (n != null) onLogSet(snapshot.exerciseId, n);
         unawaited(ref.read(wearTimerSyncProvider).cancelar());
@@ -110,10 +121,16 @@ class WearWorkoutScreen extends ConsumerWidget {
     final timer = ref.watch(wearExerciseTimerProvider).valueOrNull;
     final ocultado = ref.watch(wearTimerOcultadoProvider);
     if (timer != null && ocultado != timer.endsAtElapsedMs) {
+      // Una cuenta ajena se MUESTRA y no se toca, igual que la fila del teléfono
+      // cuando el cronómetro corre en el reloj. Ofrecer «Cancelar» acá sería
+      // mentir: borraría el espejo de esta muñeca, y el teléfono —que es el
+      // dueño— seguiría contando y marcaría la serie igual.
+      final ajena = ref.watch(wearTimerAjenoProvider) == timer.endsAtElapsedMs;
       return WearExerciseTimerScreen(
         exerciseName: snapshot.exerciseName,
         timer: timer,
         effort: effort,
+        puedeCancelar: !ajena,
         onOcultar: () => ref.read(wearTimerOcultadoProvider.notifier).state =
             timer.endsAtElapsedMs,
         onCancelar: () {
@@ -175,7 +192,16 @@ class WearWorkoutScreen extends ConsumerWidget {
               // círculo tenía el mismo efecto.
               if (timer != null && !timer.finished) return;
 
-              unawaited(ref.read(wearTimerSyncProvider).arrancar(duracion));
+              // Con IDENTIDAD: sin ella el teléfono no sabe en qué fila
+              // dibujar el espejo, y una cuenta dibujada en la fila equivocada
+              // es peor que ninguna.
+              unawaited(
+                ref.read(wearTimerSyncProvider).arrancar(
+                      exerciseId: snapshot.exerciseId,
+                      setNumber: setNumber,
+                      seconds: duracion,
+                    ),
+              );
               return;
             }
 

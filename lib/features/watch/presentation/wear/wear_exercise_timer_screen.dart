@@ -33,6 +33,7 @@ class WearExerciseTimerScreen extends StatelessWidget {
     required this.effort,
     required this.onOcultar,
     required this.onCancelar,
+    this.puedeCancelar = true,
   });
 
   final String exerciseName;
@@ -47,6 +48,17 @@ class WearExerciseTimerScreen extends StatelessWidget {
   /// Distinto de ocultar, y hace falta: si el atleta no aguanta la plancha, no
   /// tiene por qué esperar a que el reloj llegue a cero para poder salir.
   final VoidCallback onCancelar;
+
+  /// Si esta cuenta es de este reloj.
+  ///
+  /// Cuando la arrancó el TELÉFONO, acá no se cancela: este reloj la está
+  /// espejando, y el botón borraría el espejo mientras el dueño sigue contando
+  /// y termina marcando la serie igual. Es la misma decisión que toma la fila
+  /// del teléfono cuando la cuenta corre en el reloj — el dueño de la serie es
+  /// el lado que la arrancó, y es el único que la maneja.
+  ///
+  /// «Ocultar» sí queda: esconder el espejo no le hace nada a la cuenta.
+  final bool puedeCancelar;
 
   /// Fracción ya transcurrida, de 0 a 1.
   double get _progreso {
@@ -183,14 +195,16 @@ class WearExerciseTimerScreen extends StatelessWidget {
                 tint: palette.textMuted,
               ),
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: WearButton(
-                label: 'Cancelar',
-                onTap: onCancelar,
-                tint: palette.danger,
+            if (puedeCancelar) ...[
+              const SizedBox(width: 8),
+              Expanded(
+                child: WearButton(
+                  label: 'Cancelar',
+                  onTap: onCancelar,
+                  tint: palette.danger,
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ],

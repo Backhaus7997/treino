@@ -5,8 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../workout/application/session_providers.dart';
 import '../../workout/data/session_repository.dart';
+import '../../workout/domain/duration_timer_owner.dart';
+import '../../workout/domain/duration_timer_state.dart';
 import '../data/wear_workout_service.dart';
-import '../domain/wear_timer_sync.dart';
 import 'wear_rest_providers.dart';
 import 'wear_session_providers.dart';
 
@@ -24,9 +25,9 @@ import 'wear_session_providers.dart';
 ///    reloj un rato después. Para eso no alcanza un aviso, hace falta ESTADO —
 ///    y el estado va en la sesión, que es lo que los dos aparatos ya leen.
 ///
-/// El instante de arranque se guarda junto con la duración: quien lo lea
-/// descuenta lo transcurrido, así los dos muestran el mismo número en vez de
-/// quedar corridos por la latencia. Ver [wearRemainingSeconds].
+/// Lo que se anota es un [DurationTimerState] completo: con IDENTIDAD, para que
+/// el teléfono sepa en qué fila dibujar el espejo, y con DUEÑO, para que sólo
+/// uno de los dos cargue la serie al llegar a cero.
 class WearTimerSync {
   const WearTimerSync({
     required WearWorkoutService service,
@@ -46,13 +47,17 @@ class WearTimerSync {
   bool get _puedeSincronizar =>
       (_uid?.isNotEmpty ?? false) && (_sessionId?.isNotEmpty ?? false);
 
-  /// Arranca acá y lo anota en la sesión.
+  /// Arranca acá y lo anota en la sesión, con este reloj como DUEÑO.
   ///
   /// El temporizador local arranca SIEMPRE, aunque la escritura falle: sin red
   /// el atleta igual tiene que poder hacer su plancha. Y la escritura no se
   /// espera — es la lección del ciclo: nunca hacer que la UI dependa del ack
   /// del servidor.
-  Future<void> arrancar(int seconds) async {
+  Future<void> arrancar({
+    required String exerciseId,
+    required int setNumber,
+    required int seconds,
+  }) async {
     if (seconds <= 0) return cancelar();
     debugPrint('[wear-timer] ARRANCA local ($seconds s)');
     await _service.startExerciseTimer(seconds);
@@ -62,8 +67,13 @@ class WearTimerSync {
           .startExerciseTimer(
             uid: _uid!,
             sessionId: _sessionId!,
-            seconds: seconds,
-            startedAtMs: DateTime.now().millisecondsSinceEpoch,
+            timer: DurationTimerState.startedAt(
+              exerciseId: exerciseId,
+              setNumber: setNumber,
+              totalSeconds: seconds,
+              start: DateTime.now().toUtc(),
+              owner: DurationTimerOwner.reloj,
+            ),
           )
           .catchError(
             (Object e) => debugPrint('[wear-timer] no se pudo anotar — $e'),
@@ -92,61 +102,106 @@ final wearTimerSyncProvider = Provider<WearTimerSync>((ref) {
   );
 });
 
+/// Lo que la sesión dice del ejercicio por tiempo, visto desde el reloj.
+///
+/// Emite el valor inicial al suscribirse, así entrar al reloj DESPUÉS de haber
+/// arrancado el ejercicio en el teléfono encuentra el temporizador en curso —
+/// el caso que un mensaje no puede cubrir.
+final wearSessionTimerProvider = StreamProvider<DurationTimerState?>((ref) {
+  final sesion = ref.watch(wearSessionProvider);
+  if (sesion is! WearSessionRunning) return const Stream.empty();
+  final uid = ref.watch(currentUidProvider);
+  if (uid == null || uid.isEmpty) return const Stream.empty();
+
+  return ref.watch(sessionRepositoryProvider).watchExerciseTimer(
+        uid: uid,
+        sessionId: sesion.session.sessionId,
+      );
+});
+
+/// El deadline nativo de un temporizador que NO es de este reloj.
+///
+/// ## Por qué se guarda el DEADLINE y no un bool
+///
+/// Es lo mismo que hace [wearTimerOcultadoProvider], y por el mismo motivo: un
+/// bool habría que acordarse de apagarlo, y el olvido acá cuesta caro en las dos
+/// direcciones —o el reloj deja de cargar series propias para siempre, o carga
+/// una ajena—. Guardando CUÁL deadline es ajeno, un temporizador nuevo no
+/// coincide y el estado se resetea solo.
+///
+/// Y por eso tampoco se limpia al cancelar. Limpiarlo abriría una carrera real:
+/// el teléfono borra el documento al llegar a cero, y si eso llegara antes de
+/// que el reloj note su propio vencimiento, el reloj se creería dueño y
+/// cargaría la serie por segunda vez — que es exactamente el bug que esta regla
+/// existe para evitar. Un valor viejo es inofensivo: apunta a un deadline que
+/// ya no existe.
+final wearTimerAjenoProvider = StateProvider<int?>((ref) => null);
+
 /// Refleja en el reloj el temporizador anotado en la sesión.
 ///
-/// Se lee de forma EAGER en `main_wear.dart`. Emite el valor inicial al
-/// suscribirse, así entrar al reloj DESPUÉS de haber arrancado el ejercicio en
-/// el teléfono encuentra el temporizador en curso — el caso que un mensaje no
-/// puede cubrir.
+/// Se lee de forma EAGER en `main_wear.dart`: sin eso, nadie escucha lo que el
+/// teléfono anota y la sincronización es código muerto.
+///
+/// **Espeja siempre, sea de quien sea.** El dueño no decide qué se MUESTRA —el
+/// atleta quiere ver la cuenta y sentir la vibración en la muñeca aunque la haya
+/// arrancado en el teléfono—, decide quién CARGA la serie. Eso último se resuelve
+/// con [wearTimerAjenoProvider].
 final wearTimerInboxProvider = Provider<void>((ref) {
-  final sesion = ref.watch(wearSessionProvider);
-  if (sesion is! WearSessionRunning) return;
-  final uid = ref.watch(currentUidProvider);
-  if (uid == null || uid.isEmpty) return;
-
   final service = ref.watch(wearWorkoutServiceProvider);
 
-  final sub = ref
-      .watch(sessionRepositoryProvider)
-      .watchExerciseTimer(uid: uid, sessionId: sesion.session.sessionId)
-      .listen(
-    (remoto) async {
-      debugPrint('[wear-timer] la sesión dice: $remoto');
-      if (remoto == null) {
-        // Se canceló del otro lado, o nunca hubo. Cancelar de más es inocuo:
-        // el nativo borra un deadline que ya no está y listo.
-        await service.cancelExerciseTimer();
-        return;
-      }
-
-      // Si acá YA hay un temporizador corriendo, no se toca. Punto.
-      //
-      // Antes se comparaba el remanente y se reiniciaba ante cualquier
-      // diferencia mayor a dos segundos, y eso era un bug: cada reinicio pisa
-      // el deadline nativo, o sea que CAMBIA `endsAtElapsedMs`. Y como ocultar
-      // se recuerda por deadline, el temporizador oculto dejaba de coincidir y
-      // la pantalla reaparecía sola con el tiempo movido. El dueño lo vio como
-      // "si oculto y vuelvo a entrar, se reinicia".
-      //
-      // Un temporizador que ya corre no necesita corrección: los dos aparatos
-      // salieron del MISMO `startedAtMs`, así que van iguales por
-      // construcción. Lo único que tiene que llegar de afuera es el arranque
-      // —cuando acá no hay nada— y la cancelación, que se maneja arriba.
-      final actual = await service.exerciseTimerState();
-      debugPrint('[wear-timer] local=$actual');
-      if (actual != null && !actual.finished) return;
-
-      final restante = wearRemainingSeconds(
-        seconds: remoto.seconds,
-        startedAtEpochMs: remoto.startedAtMs,
-        nowEpochMs: DateTime.now().millisecondsSinceEpoch,
-      );
-      if (restante <= 0) return;
-
-      debugPrint('[wear-timer] sincronizado desde la sesión ($restante s)');
-      await service.startExerciseTimer(restante);
-    },
-    onError: (Object e) => debugPrint('[wear-timer] el canal se quejó — $e'),
+  ref.listen<AsyncValue<DurationTimerState?>>(
+    wearSessionTimerProvider,
+    (_, next) => next.whenData(
+      (remoto) => unawaited(_espejar(ref, service, remoto)),
+    ),
+    // Sin esto, un temporizador ya en curso al momento de suscribirse no se
+    // espejaría hasta el siguiente cambio del documento — que puede no llegar
+    // nunca, porque el instante de fin no cambia mientras corre.
+    fireImmediately: true,
   );
-  ref.onDispose(sub.cancel);
 });
+
+Future<void> _espejar(
+  Ref ref,
+  WearWorkoutService service,
+  DurationTimerState? remoto,
+) async {
+  debugPrint('[wear-timer] la sesión dice: $remoto');
+  if (remoto == null) {
+    // Se canceló del otro lado, o nunca hubo. Cancelar de más es inocuo: el
+    // nativo borra un deadline que ya no está y listo.
+    await service.cancelExerciseTimer();
+    return;
+  }
+
+  // Si acá YA hay un temporizador corriendo, no se toca. Punto.
+  //
+  // Antes se comparaba el remanente y se reiniciaba ante cualquier diferencia
+  // mayor a dos segundos, y eso era un bug: cada reinicio pisa el deadline
+  // nativo, o sea que CAMBIA `endsAtElapsedMs`. Y como ocultar se recuerda por
+  // deadline, el temporizador oculto dejaba de coincidir y la pantalla
+  // reaparecía sola con el tiempo movido. El dueño lo vio como "si oculto y
+  // vuelvo a entrar, se reinicia".
+  //
+  // Un temporizador que ya corre no necesita corrección: los dos aparatos
+  // cuentan contra el MISMO instante de fin, así que van iguales por
+  // construcción. Lo único que tiene que llegar de afuera es el arranque
+  // —cuando acá no hay nada— y la cancelación, que se maneja arriba.
+  final actual = await service.exerciseTimerState();
+  debugPrint('[wear-timer] local=$actual');
+  if (actual != null && !actual.finished) return;
+
+  final restante = remoto.remainingAt(DateTime.now().toUtc());
+  if (restante <= 0) return;
+
+  debugPrint('[wear-timer] sincronizado desde la sesión ($restante s)');
+  await service.startExerciseTimer(restante);
+
+  // Y se anota que este deadline es AJENO, si lo es. Se lee de vuelta el estado
+  // nativo porque el deadline lo pone el nativo —cuenta en `elapsedRealtime`,
+  // no en reloj de pared— y es la única forma de saber cuál quedó.
+  if (remoto.owner == DurationTimerOwner.reloj) return;
+  final espejado = await service.exerciseTimerState();
+  if (espejado == null) return;
+  ref.read(wearTimerAjenoProvider.notifier).state = espejado.endsAtElapsedMs;
+}
