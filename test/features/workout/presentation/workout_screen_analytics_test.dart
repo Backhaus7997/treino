@@ -55,7 +55,7 @@ Future<void> _pumpWorkout(
         assignedRoutinesProvider('test-uid').overrideWith((ref) async => []),
         userCreatedRoutinesProvider('test-uid')
             .overrideWith((ref) => Stream.value(const <Routine>[])),
-        // Sin esto PLANTILLAS queda en spinner y nada asienta.
+        // Sin esto EXPLORAR queda en spinner y nada asienta.
         routinesProvider.overrideWith((ref) async => <Routine>[]),
       ],
       child: MaterialApp(
@@ -98,7 +98,7 @@ void main() {
       expect(analytics.subTabsFor('workout'), ['tu-entreno']);
     });
 
-    testWidgets('entrar por ?tab=plantillas cuenta PLANTILLAS, no TU ENTRENO',
+    testWidgets('entrar por ?tab=plantillas cuenta esa página, no TU ENTRENO',
         (tester) async {
       await _pumpWorkout(tester, analytics, initialTab: 'plantillas');
 
@@ -109,7 +109,7 @@ void main() {
     testWidgets('cambiar de pill cuenta la página nueva', (tester) async {
       await _pumpWorkout(tester, analytics);
 
-      await tester.tap(find.text('PLANTILLAS'));
+      await tester.tap(find.text('EXPLORAR'));
       await _settleTabs(tester);
 
       expect(analytics.subTabsFor('workout'), ['tu-entreno', 'plantillas']);
@@ -129,8 +129,11 @@ void main() {
     testWidgets('el slug NO es el label visible', (tester) async {
       await _pumpWorkout(tester, analytics, initialTab: 'plantillas');
 
-      // "PLANTILLAS" está en discusión en #638. Si el evento mandara el label,
-      // renombrar el tab partiría la serie histórica en dos.
+      // Esto dejó de ser hipótesis: #638 renombró el tab a "EXPLORAR" mientras
+      // esta rama esperaba. El label visible cambió y el slug no se movió, que
+      // es exactamente para lo que se separaron. Si el evento mandara el label,
+      // la serie histórica ya estaría partida en dos.
+      expect(analytics.subTabsFor('workout'), isNot(contains('EXPLORAR')));
       expect(analytics.subTabsFor('workout'), isNot(contains('PLANTILLAS')));
       expect(analytics.subTabsFor('workout'), ['plantillas']);
     });
