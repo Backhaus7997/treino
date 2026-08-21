@@ -93,11 +93,64 @@ android {
         release {
             // Con key.properties presente firma con la upload key (único
             // artefacto que Play acepta). Sin el archivo cae a las debug keys
-            // para que `flutter run --release` siga funcionando localmente.
+            // para que `flutter run --release` siga funcionando localmente —
+            // pero ese fallback ya NO es silencioso: ver el guard de abajo.
             signingConfig = if (keystorePropertiesFile.exists()) {
                 signingConfigs.getByName("release")
             } else {
                 signingConfigs.getByName("debug")
+            }
+        }
+    }
+}
+
+// ── El fallback a debug NO puede ser silencioso ──────────────────────────────
+//
+// Sin `key.properties`, el release firmaba con debug keys y el build salía
+// VERDE: .aab generado, cero warnings, todo aparentemente perfecto. El error
+// aparecía recién al subir a Play —que rechaza cualquier cosa que no venga
+// firmada con la upload key registrada— después de esperar el build entero y
+// sin una sola pista de la causa.
+//
+// Es el mismo patrón que ya mordió tres veces en este proyecto: degradar en
+// silencio deja el síntoma lejísimos de la causa. Acá se corta.
+//
+// El guard va en `doFirst` de las tareas de RELEASE y no en el bloque de
+// configuración a propósito: Gradle evalúa `buildTypes` para cualquier tarea,
+// así que tirar ahí rompería también los builds de debug y profile, que son los
+// que se usan todo el día.
+//
+// Escape para quien no tiene el keystore:
+//     flutter build apk --release -PallowDebugSigning=true
+val exigirFirmaDeRelease = !project.hasProperty("allowDebugSigning")
+
+tasks.configureEach {
+    val esRelease = name.contains("Release") &&
+        (name.startsWith("assemble") || name.startsWith("bundle") || name.startsWith("package"))
+    if (esRelease && exigirFirmaDeRelease) {
+        doFirst {
+            if (!keystorePropertiesFile.exists()) {
+                throw GradleException(
+                    """
+                    No existe android/key.properties, asi que este release se
+                    firmaria con DEBUG KEYS y Play lo rechazaria al subirlo.
+
+                    Creá android/key.properties apuntando al upload keystore:
+
+                        storePassword=...
+                        keyPassword=...
+                        keyAlias=upload
+                        storeFile=/ruta/al/upload-keystore.jks
+
+                    Tiene que ser el MISMO keystore con el que ya publicaste:
+                    una clave nueva la rechaza Play igual.
+
+                    Si sabes lo que hacés y querés un release firmado con debug
+                    —para probar local, nunca para subir— repetí el comando con:
+
+                        -PallowDebugSigning=true
+                    """.trimIndent()
+                )
             }
         }
     }
