@@ -57,11 +57,22 @@ function dedupeByAthlete(links: WeightedLink[]): WeightedLink[] {
 /**
  * Weighted load of a trainer's links. Blocked links are excluded (parked
  * excess). Deduped by athlete. Returns a float, e.g. 6.0, 7.5.
+ *
+ * ORDER IS LOAD-BEARING (H1 fix): filter `blocked` BEFORE dedupe, not after.
+ * `weighted_load.dart` has always done it in this order; this file used to
+ * dedupe first and filter after, which sub-counts when the same athlete has
+ * a blocked-active link AND a live entitled link (e.g. blocked-active +
+ * entitled-paused): dedupe-first picks the "heaviest" row (active) as the
+ * athlete's representative, then drops it as blocked, losing the paused
+ * link's 0.5 entirely instead of correctly counting it. Filtering first
+ * removes the blocked row from consideration before dedupe ever runs, so
+ * the paused link is what remains and gets counted. Pinned by the shared
+ * `weighted-load-cases.json` fixture (case `h1-...`) and its Dart mirror.
  */
 export function computeWeightedLoad(links: WeightedLink[]): number {
+  const eligible = links.filter((link) => link.entitlement !== "blocked");
   let sum = 0;
-  for (const link of dedupeByAthlete(links)) {
-    if (link.entitlement === "blocked") continue; // parked — never counts
+  for (const link of dedupeByAthlete(eligible)) {
     sum += STATUS_WEIGHT[link.status];
   }
   return round2(sum);

@@ -30,6 +30,7 @@ _$RoutineImpl _$$RoutineImplFromJson(Map<String, dynamic> json) =>
       numWeeks: (json['numWeeks'] as num?)?.toInt() ?? 1,
       ratingAvg: (json['ratingAvg'] as num?)?.toDouble(),
       ratingsCount: (json['ratingsCount'] as num?)?.toInt(),
+      summary: json['summary'] as String?,
     );
 
 Map<String, dynamic> _$$RoutineImplToJson(_$RoutineImpl instance) =>

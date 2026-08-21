@@ -2,6 +2,7 @@
   {
     "id": "ppl-beginner",
     "name": "Push Pull Legs — Principiante",
+    "summary": "Empujar, tirar y piernas: cada día trabajás un tipo de movimiento distinto.",
     "split": "PPL",
     "level": "beginner",
     "estimatedMinutesPerDay": 60,
@@ -231,6 +232,7 @@
   {
     "id": "full-body-3day",
     "name": "Full Body Principiante",
+    "summary": "Trabajás todo el cuerpo en cada sesión, en vez de repartirlo por día.",
     "split": "Full Body",
     "level": "beginner",
     "estimatedMinutesPerDay": 55,
@@ -427,6 +429,7 @@
   {
     "id": "upper-lower-intermediate",
     "name": "Upper/Lower — Intermedio",
+    "summary": "Alternás días de tren superior —pecho, espalda y brazos— con días de piernas.",
     "split": "Upper/Lower",
     "level": "intermediate",
     "estimatedMinutesPerDay": 65,
@@ -729,6 +732,7 @@
   {
     "id": "bro-split-intermediate",
     "name": "Bro Split — Intermedio",
+    "summary": "Un grupo muscular por día: más días por semana, con sesiones más cortas y enfocadas.",
     "split": "Bro Split",
     "level": "intermediate",
     "estimatedMinutesPerDay": 55,
@@ -1082,6 +1086,7 @@
   {
     "id": "powerlifting-base",
     "name": "Powerlifting Base",
+    "summary": "Gira alrededor de tres ejercicios base —sentadilla, banca y peso muerto— buscando levantar más peso.",
     "split": "Powerlifting",
     "level": "advanced",
     "estimatedMinutesPerDay": 75,
@@ -1351,6 +1356,7 @@
   {
     "id": "calistenia-beginner",
     "name": "Calistenia Principiante",
+    "summary": "Sin pesas: usás el peso de tu propio cuerpo como resistencia.",
     "split": "Full Body",
     "level": "beginner",
     "estimatedMinutesPerDay": 45,
@@ -1558,6 +1564,7 @@
   {
     "id": "hipertrofia-intermedio",
     "name": "Hipertrofia — Intermedio",
+    "summary": "Apunta a aumentar el tamaño del músculo, con más repeticiones y menos peso que un plan de fuerza.",
     "split": "Push/Pull/Legs",
     "level": "intermediate",
     "estimatedMinutesPerDay": 65,

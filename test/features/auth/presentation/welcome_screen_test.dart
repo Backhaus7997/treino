@@ -63,10 +63,15 @@ void main() {
 
     const palette = AppPalette.mintMagenta;
 
-    // Headline uses RichText spans — check that MOVÉS and NOSOTROS appear
-    // in textPrimary color (not accent).
-    bool foundMoves = false;
-    bool foundNosotros = false;
+    // Headline uses RichText spans — check that both LIGHT halves render in
+    // textPrimary (not accent). Keyed off l10n instead of literal copy: this
+    // asserts a COLOR contract, so a copy change shouldn't break it.
+    final l10n = AppL10n.of(tester.element(find.byType(WelcomeScreen)));
+    final lightHalves = <String>[
+      l10n.authBrandHeadline1Light,
+      l10n.authBrandHeadline2Light,
+    ];
+    final foundInPrimary = <String>{};
     for (final rt in tester.allWidgets.whereType<RichText>()) {
       final span = rt.text;
       if (span is TextSpan && span.children != null) {
@@ -74,20 +79,19 @@ void main() {
           if (child is TextSpan) {
             final text = child.text ?? '';
             final color = child.style?.color;
-            if (text.contains('MOVÉS') && color == palette.textPrimary) {
-              foundMoves = true;
-            }
-            if (text.contains('NOSOTROS') && color == palette.textPrimary) {
-              foundNosotros = true;
+            for (final half in lightHalves) {
+              if (text.contains(half) && color == palette.textPrimary) {
+                foundInPrimary.add(half);
+              }
             }
           }
         }
       }
     }
-    expect(foundMoves, isTrue,
-        reason: 'MOVÉS must be textPrimary (white), not accent');
-    expect(foundNosotros, isTrue,
-        reason: 'NOSOTROS must be textPrimary (white), not accent');
+    for (final half in lightHalves) {
+      expect(foundInPrimary, contains(half),
+          reason: '"$half" must be textPrimary (white), not accent');
+    }
   });
 
   testWidgets('uses a left-border accent bar, no IntrinsicHeight (F2)',
@@ -137,7 +141,7 @@ void main() {
     await tester.pumpWidget(_buildApp());
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Cargá tu rutina'), findsOneWidget);
+    expect(find.textContaining('Tu rutina, tus series'), findsOneWidget);
   });
 
   // ---------------------------------------------------------------------------

@@ -36,13 +36,22 @@ const FREE_LIMIT = TIER_WEIGHT_LIMITS.free; // 2
  * - cancelled → paid tier until currentPeriodEnd, then Free. (`nowMs` lets the
  *   caller pass a deterministic clock; defaults to Date.now()).
  */
+/**
+ * Limite efectivo del PF. `null` = SIN LIMITE (plan3, ver tier-config).
+ * Todo consumidor tiene que contemplar ese caso — el tipo lo obliga.
+ */
 export function effectiveWeightLimit(
   sub: SubscriptionState | null | undefined,
   nowMs: number = Date.now(),
-): number {
+): number | null {
   if (!sub) return FREE_LIMIT;
 
-  const tierLimit = TIER_WEIGHT_LIMITS[sub.tier] ?? FREE_LIMIT;
+  // OJO con `??` aca: `null` es un VALOR LEGITIMO (plan3 = sin tope), no una
+  // ausencia. Con `TIER_WEIGHT_LIMITS[tier] ?? FREE_LIMIT` el plan mas caro
+  // devolvia 2 — menos alumnos que el mas barato — y compilaba perfecto.
+  // El `in` separa "el tier no existe" de "el tier no tiene tope".
+  const tierLimit =
+    sub.tier in TIER_WEIGHT_LIMITS ? TIER_WEIGHT_LIMITS[sub.tier] : FREE_LIMIT;
 
   switch (sub.status) {
     case "active":

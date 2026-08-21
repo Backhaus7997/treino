@@ -409,10 +409,14 @@ void main() {
     });
 
     // ── Split fallback ────────────────────────────────────────────────────
+    // Era "Sin split" hasta #648. Explicar la AUSENCIA de algo nombrando otra
+    // vez el término que el usuario no entiende no explica nada: 2 de 5
+    // participantes de usabilidad no sabían qué era un split. El fallback
+    // ahora describe la rutina en vez de nombrar el concepto ausente.
     testWidgets('workoutSplitFallback', (t) async {
       await t.pumpWidget(_harness());
       await t.pumpAndSettle();
-      expect(_l10n(t).workoutSplitFallback, 'Sin split');
+      expect(_l10n(t).workoutSplitFallback, 'Rutina libre');
     });
 
     // ── Exercise picker filter strings ────────────────────────────────────

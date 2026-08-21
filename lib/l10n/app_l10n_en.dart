@@ -113,10 +113,23 @@ class AppL10nEn extends AppL10n {
   String get authSplashTagline => '';
 
   @override
+  String get authBrandHeadline1Light => 'STOP ';
+
+  @override
+  String get authBrandHeadline1Bold => 'GUESSING.';
+
+  @override
+  String get authBrandHeadline2Light => 'START ';
+
+  @override
+  String get authBrandHeadline2Bold => 'PROGRESSING.';
+
+  @override
   String get authWelcomeEyebrow => '';
 
   @override
-  String get authWelcomeBody => '';
+  String get authWelcomeBody =>
+      'Your routine, your sets and your loads in one place. With a coach behind you if you want one.';
 
   @override
   String get authWelcomeCta => '';
@@ -784,6 +797,22 @@ class AppL10nEn extends AppL10n {
   String get workoutSelfEditorCapReached => '';
 
   @override
+  String get workoutTabYours => 'YOUR WORKOUT';
+
+  @override
+  String get workoutTabExplore => 'EXPLORE';
+
+  @override
+  String get workoutExploreEmptyAll => 'No routines yet.';
+
+  @override
+  String get workoutExploreEmptyLevel => 'No routines for this level.';
+
+  @override
+  String get workoutExploreLoadError =>
+      'Something went wrong loading the routines.';
+
+  @override
   String get workoutMisRutinasSectionTitle => '';
 
   @override
@@ -854,7 +883,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get templateRatingsNoneYet =>
-      'Nobody has rated this template yet. Be the first!';
+      'Nobody has rated this routine yet. Be the first!';
 
   @override
   String templateRatingsCount(int count) {
@@ -886,14 +915,14 @@ class AppL10nEn extends AppL10n {
   String get templateRatingsError => 'We couldn\'t load the comments.';
 
   @override
-  String get templateRatingSheetTitle => 'Rate this template';
+  String get templateRatingSheetTitle => 'Rate this routine';
 
   @override
   String get templateRatingSheetTitleEdit => 'Edit your rating';
 
   @override
   String get templateRatingSheetCommentHint =>
-      'Tell others how this template went (optional)';
+      'Tell others how this routine went (optional)';
 
   @override
   String get templateRatingSheetCancel => 'CANCEL';
@@ -908,7 +937,7 @@ class AppL10nEn extends AppL10n {
   String get templateRatingSheetError => 'We couldn\'t save your rating.';
 
   @override
-  String get workoutSplitFallback => '';
+  String get workoutSplitFallback => 'Free-form routine';
 
   @override
   String get workoutPickerMuscleFilter => '';
@@ -2172,10 +2201,26 @@ class AppL10nEn extends AppL10n {
       'We couldn\'t resume the link.';
 
   @override
+  String get coachHubDashboardResumePrecondition =>
+      'This link is no longer available.';
+
+  @override
+  String get coachHubDashboardResumeUnavailable =>
+      'Check your connection and try again.';
+
+  @override
   String get coachHubDashboardAcceptSuccess => 'Link accepted.';
 
   @override
   String get coachHubDashboardAcceptError => 'We couldn\'t accept the link.';
+
+  @override
+  String get coachHubDashboardAcceptPrecondition =>
+      'This request is no longer available.';
+
+  @override
+  String get coachHubDashboardAcceptUnavailable =>
+      'Check your connection and try again.';
 
   @override
   String get coachHubDashboardRejectSuccess => 'Request rejected.';
@@ -2260,6 +2305,16 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get coachHubAlumnosStatusDebt => 'Overdue';
+
+  @override
+  String get coachHubAlumnosStatusBlocked => 'Blocked';
+
+  @override
+  String get coachHubAlumnosFilterBloqueados => 'Blocked';
+
+  @override
+  String get coachHubAlumnosBlockedHint =>
+      'You are over your plan limit. This athlete does not count and you cannot work with them until you resolve it.';
 
   @override
   String get coachHubAlumnosStatusPaused => 'Paused';
@@ -2381,6 +2436,10 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get sessionDetailNoSets => 'This session has no logged sets.';
+
+  @override
+  String get sessionFinishedOnWatch =>
+      'You finished this workout on your watch.';
 
   @override
   String get sessionLogSetError =>
@@ -3398,4 +3457,20 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get followListOpenFollowingA11y => 'View following';
+
+  @override
+  String routineCardDaysPerWeek(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '$days days/week',
+      one: '1 day/week',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String routineCardMinutes(String value) {
+    return '$value min';
+  }
 }
