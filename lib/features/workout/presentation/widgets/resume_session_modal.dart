@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../domain/session.dart';
@@ -25,7 +26,8 @@ class ResumeSessionModal extends StatelessWidget {
 
     return AlertDialog(
       backgroundColor: palette.bgCard,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg)),
       title: Text(
         'Entrenamiento en curso',
         style: GoogleFonts.barlowCondensed(
@@ -50,7 +52,7 @@ class ResumeSessionModal extends StatelessWidget {
             side: BorderSide(color: palette.highlight, width: 1),
             foregroundColor: palette.highlight,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(AppRadius.lg),
             ),
           ),
           child: Text(
@@ -68,7 +70,7 @@ class ResumeSessionModal extends StatelessWidget {
             backgroundColor: palette.accent,
             foregroundColor: palette.bg,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(AppRadius.lg),
             ),
           ),
           child: Text(

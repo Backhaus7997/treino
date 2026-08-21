@@ -4,6 +4,7 @@
   "private": true,
   "description": "Treino workout catalog seed scripts.",
   "scripts": {
+    "test": "node --test \"test/*.test.js\"",
     "seed:exercises": "node seed_workout_catalog.js --exercises",
     "seed:routines": "node seed_workout_catalog.js --routines",
     "seed:all": "node seed_workout_catalog.js --all",

@@ -1,0 +1,33 @@
+change: watch-connectivity
+fase: "Sin asignar — feature nueva, fuera del roadmap actual"
+branch: feat/workout-watch-connectivity
+artifact_store: openspec
+execution_mode: manual (armado por Claude fuera de gentle-ai/sdd-new)
+delivery_strategy: chained-pr (2 PRs)
+tdd: strict
+
+phases:
+  explore: done
+  propose: done
+  spec: done
+  design: done
+  tasks: pending
+  apply: pending
+  verify: pending
+  archive: pending
+
+artifacts:
+  explore: openspec/changes/watch-connectivity/explore.md
+  proposal: openspec/changes/watch-connectivity/proposal.md
+  spec: openspec/changes/watch-connectivity/spec.md
+  design: openspec/changes/watch-connectivity/design.md
+
+nota: |
+  Este ciclo SDD fue armado a mano por Claude (Cowork) en una sesion
+  en la nube, sin acceso a gentle-ai/Engram local. Las decisiones
+  "locked" en proposal.md son un borrador razonado, no una decision
+  de equipo -- revisar antes de avanzar a tasks/apply. Si se retoma
+  con /sdd-new local, gentle-ai puede no reconocer este state.yaml
+  si su schema espera campos adicionales; es un mejor esfuerzo para
+  dejar el contexto legible, no una garantia de compatibilidad con
+  el CLI real.

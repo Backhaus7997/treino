@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/app/theme/tokens/components/treino_transparent_tokens.dart';
 import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/motion/treino_shimmer.dart';
@@ -377,7 +378,7 @@ class _ToggleCell extends StatelessWidget {
           decoration: BoxDecoration(
             color: value
                 ? palette.accent.withValues(alpha: 0.12)
-                : Colors.transparent,
+                : TreinoTransparentTokens.value,
             borderRadius: BorderRadius.circular(AppRadius.sm),
           ),
           child: Checkbox(

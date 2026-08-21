@@ -10,6 +10,7 @@ import 'package:treino/app/theme/tokens/components/treino_kpi_card_tokens.dart';
 import 'package:treino/app/theme/tokens/components/treino_list_row_tokens.dart';
 import 'package:treino/app/theme/tokens/components/treino_section_header_tokens.dart';
 import 'package:treino/app/theme/tokens/components/treino_table_tokens.dart';
+import 'package:treino/app/theme/tokens/components/treino_transparent_tokens.dart';
 
 /// Helper que inyecta [AppPalette] en el árbol (patrón de component_tokens_test.dart).
 /// Cada test usa UN solo pumpWidget — nunca dos en el mismo testWidgets.
@@ -521,6 +522,19 @@ void main() {
 
     test('ringWidth == 2.0', () {
       expect(TreinoFocusTokens.ringWidth, 2.0);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // TreinoTransparentTokens
+  // ---------------------------------------------------------------------------
+  group('TreinoTransparentTokens', () {
+    test('value == AppColorPrimitives.transparent (0x00000000)', () {
+      expect(TreinoTransparentTokens.value, const Color(0x00000000));
+    });
+
+    test('value tiene alpha 0 (invisible en cualquier tema)', () {
+      expect(TreinoTransparentTokens.value.a, 0.0);
     });
   });
 }

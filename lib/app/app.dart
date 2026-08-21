@@ -5,9 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/analytics/analytics_service.dart';
+import '../core/analytics/route_analytics.dart';
 import '../features/auth/application/auth_providers.dart';
 import '../features/notifications/application/notification_providers.dart';
 import '../features/notifications/application/notification_router.dart';
+import '../features/watch/application/watch_credential_providers.dart';
+import '../features/watch/application/watch_effort_notifier.dart';
+import '../features/watch/application/watch_timer_control_notifier.dart';
 import '../l10n/app_l10n.dart';
 import 'locale_resolver.dart';
 import 'root_scaffold_messenger.dart';
@@ -53,6 +58,9 @@ class TreinoApp extends ConsumerStatefulWidget {
 class _TreinoAppState extends ConsumerState<TreinoApp> {
   late final GoRouter _router;
 
+  /// Loguea `screen_view` en cada navegación. Se detacha en [dispose].
+  late final RouteAnalytics _routeAnalytics;
+
   /// Foreground message subscription — cancelled on dispose.
   StreamSubscription<RemoteMessage>? _fgSub;
 
@@ -65,10 +73,43 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
     final refresh = ref.read(routerRefreshNotifierProvider);
     _router = buildRouter(refreshListenable: refresh, read: ref.read);
 
+    // Analytics de navegación (#666). Sin esto la app no emite UN solo evento
+    // de qué pantalla se usa, y ese dato no es recuperable retroactivamente.
+    _routeAnalytics = RouteAnalytics(
+      router: _router,
+      analytics: ref.read(analyticsServiceProvider),
+    )..attach();
+
     // (c) Eagerly read fcmLifecycleProvider to register the auth-state listener
     //     for the app lifetime. Without this, all of PR#2a is dead code —
     //     no tokens are ever registered. ADR-PN-003, REQ-PN-CLIENT-004.
     ref.read(fcmLifecycleProvider);
+
+    // (c2) Igual que arriba, para el companion de Apple Watch: sin este read
+    //      el handoff de credencial es código muerto — el servicio existe pero
+    //      nadie lo llama y el reloj se queda esperando para siempre.
+    //      Corta solo si no hay reloj emparejado. Change watch-standalone-client.
+    ref.read(watchCredentialLifecycleProvider);
+
+    // (c3) Le avisa al reloj cuando cambia la rutina activa. El reloj habla
+    //      Firestore por REST y no tiene listeners, así que sin este aviso un
+    //      cambio hecho en el teléfono recién se veía al cambiar de página en
+    //      la muñeca. Best-effort: si el reloj no está alcanzable el aviso se
+    //      pierde y el reloj se pone al día solo, como antes.
+    ref.read(watchActiveRoutineNudgeProvider);
+    // El canal de escucha al reloj vive mientras vive la app, no solo mientras
+    // esté abierta la pantalla del player.
+    //
+    // Antes solo lo miraban dos filas DENTRO del player, así que el teléfono
+    // dejaba de escuchar al reloj apenas salías de ahí — y volvía a empezar de
+    // cero al entrar. Un cronómetro arrancado en la muñeca con el teléfono en
+    // Home no llegaba nunca.
+    ref.read(watchEffortNotifierProvider);
+
+    // Y el canal por el que el RELOJ pide cancelar el cronómetro del teléfono.
+    // Vive acá por lo mismo: si naciera al abrir el player, una cancelación
+    // hecha desde la muñeca con el teléfono en otra pantalla no llegaría nunca.
+    ref.read(watchTimerControlNotifierProvider);
 
     // (a) Attach foreground SnackBar listener. (ADR-PN-010, REQ-PN-HANDLER-001)
     final fcm = ref.read(fcmServiceProvider);
@@ -105,6 +146,7 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
 
   @override
   void dispose() {
+    _routeAnalytics.detach();
     _fgSub?.cancel();
     _bgSub?.cancel();
     super.dispose();

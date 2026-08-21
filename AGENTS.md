@@ -65,7 +65,9 @@ Si el usuario pide alguno → **frená y confirmá**.
 
 **Rankings SÍ está en scope** y ya está implementado: ranking por gym, opt-in
 explícito del atleta (rachas / volumen / main lifts). Vive en la 2da página
-swipeable del tab Entrenar (`/workout?tab=rankings`). No lo confundas con
+swipeable del tab **Feed** (`/feed?tab=rankings`). `/workout?tab=rankings` y
+`/profile/rankings` son hosts anteriores y redirigen ahí — no los borres, hay
+bookmarks y notificaciones vivas apuntándoles. No lo confundas con
 "Gamificación" de la lista de arriba. → Detalle en [docs/product.md](./docs/product.md).
 
 ### 5. Tab bar (5 tabs, Inicio al medio)
