@@ -146,11 +146,34 @@ service cloud.firestore {
       // que no habilita enumeración.
       // Sólo aplica a `get`: en un `list` (query) `resource` es cada doc
       // candidato y nunca es null, así que las queries no se ven afectadas.
+      // Verificado contra el emulador: con SÓLO este disyunto, el `list` de un
+      // tercero se DENIEGA correctamente.
+      //
+      // 🔒  NO reintroducir `!('visibility' in resource.data)` acá, ni ninguna
+      // otra prueba de EXISTENCIA de campo sobre `resource.data`.
+      // Esa línea vivió acá y abría un leak total: en un `list`, el motor de
+      // reglas NO evalúa `'x' in resource.data` por documento — trata el
+      // disyunto como posiblemente verdadero y PERMITE la query entera. Con
+      // ella puesta, cualquier autenticado corría
+      // `collection('routines').get()` y se llevaba TODAS las rutinas de la
+      // base, incluidas las privadas de otros alumnos, junto con el grafo
+      // assignedBy/assignedTo de toda la plataforma. El `get` seguía denegado,
+      // así que el agujero era invisible salvo que se probara el `list`.
+      // Aislado por bisección de los 8 disyuntos; lo pinea
+      // routines-list-leak-rules.test.ts.
+      //
+      // El caso legacy que aquella línea cubría —docs sin el campo— ahora lo
+      // resuelve `.get('visibility', 'private')`, que es total y no rompe la
+      // evaluación del `list`. Falla cerrado: un doc sin `visibility` queda
+      // privado. No se pierde nada legítimo: sus dueños lo siguen leyendo por
+      // las ramas assignedTo/assignedBy/createdBy de abajo, y el catálogo de la
+      // app ya filtra `where('visibility', isEqualTo: 'public')`
+      // (routine_repository.dart:36 y :52), así que Firestore YA descartaba los
+      // docs sin el campo.
       allow read: if request.auth != null
                   && (resource == null
-                      || !('visibility' in resource.data)
-                      || resource.data.visibility == 'public'
-                      || resource.data.visibility == 'shared'
+                      || resource.data.get('visibility', 'private') == 'public'
+                      || resource.data.get('visibility', 'private') == 'shared'
                       || request.auth.uid == resource.data.assignedTo
                       || request.auth.uid == resource.data.assignedBy
                       || request.auth.uid == resource.data.createdBy // REQ-USR-008, SCENARIO-605
