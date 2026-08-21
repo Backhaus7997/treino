@@ -42,6 +42,14 @@ export { syncSessionShareOnTrainerLink } from "./sync-session-share";
 // pagado"). Redeploying functions (`firebase deploy --only functions`) prunes
 // this function from the deployed set.
 export { notifyOverduePayments } from "./payments/notify-overdue-payments";
+// Email transaccional (Resend): consumer del outbox `mail_queue`. Los triggers
+// de dominio NUNCA llaman a Resend — escriben una fila de cola con ID
+// determinístico y esta función es la única que envía. Ver
+// functions/src/mail/enqueue-mail.ts para el contrato de idempotencia.
+// OJO en el deploy: necesita el secret RESEND_API_KEY
+// (`firebase functions:secrets:set RESEND_API_KEY`) y que el dominio del
+// remitente esté verificado por DNS en Resend, o cada envío devuelve 403.
+export { sendQueuedMail } from "./mail/send-queued-mail";
 export { syncSharedProfile } from "./profile/sync-shared-profile";
 // Paywall Fase 7, PR4 (ISSUE-1): keeps users/{trainerId}.weightedLoad
 // accurate for display after client-side pause/terminate/decline/cancel —
