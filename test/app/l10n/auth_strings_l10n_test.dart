@@ -52,7 +52,7 @@ void main() {
       final l10n = await _pumpAndGetL10n(tester);
       expect(
         l10n.authWelcomeBody,
-        'Cargá tu rutina, ejecutá los sets, seguí a tus pibes y encontrá un coach cerca tuyo.',
+        'Tu rutina, tus series y tus cargas en un solo lugar. Con un coach atrás si lo querés.',
       );
     });
 
@@ -120,7 +120,9 @@ void main() {
     testWidgets('authLoginTrainerCardSubtitle verbatim', (tester) async {
       final l10n = await _pumpAndGetL10n(tester);
       expect(
-          l10n.authLoginTrainerCardSubtitle, 'Pedí tu alta al equipo TREINO');
+        l10n.authLoginTrainerCardSubtitle,
+        'Pedí tu alta al equipo TREINO',
+      );
     });
 
     // --- Register ---
@@ -267,7 +269,9 @@ void main() {
     testWidgets('authValidationPasswordMismatch verbatim', (tester) async {
       final l10n = await _pumpAndGetL10n(tester);
       expect(
-          l10n.authValidationPasswordMismatch, 'Las contraseñas no coinciden');
+        l10n.authValidationPasswordMismatch,
+        'Las contraseñas no coinciden',
+      );
     });
 
     // --- Profile ---

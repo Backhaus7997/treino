@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/utils/network_timeouts.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../profile/application/user_providers.dart' show firestoreProvider;
 import '../../profile/domain/experience_level.dart';
@@ -123,13 +124,23 @@ final visibleRoutineByIdProvider =
 /// old non-autoDispose provider did. Taking the link BEFORE the first await
 /// also means an in-flight fetch is never disposed mid-air by a consumer that
 /// unmounted while waiting.
+/// ⚠️ El `keepAlive` se toma ANTES del await y solo se suelta si el fetch TIRA.
+/// Un fetch que no resuelve NI tira no es éxito ni fracaso: dejaba el elemento
+/// clavado en `AsyncLoading` por el resto de la vida del proceso, y cada lector
+/// posterior de `.future` esperaba para siempre. Ni el botón de reintento de la
+/// pantalla lo destrababa, porque nunca había un error del que volver.
+///
+/// Por eso el fetch va ACOTADO: un stall se convierte en `TimeoutException`, y
+/// con eso el `catch` de abajo corre, el link se cierra, el elemento se descarta
+/// y la próxima lectura arranca un fetch nuevo. Es la mitad estructural del
+/// spinner eterno al retomar — ver `core/utils/network_timeouts.dart`.
 Future<Routine?> _cacheOnlyOnSuccess(
   Ref<AsyncValue<Routine?>> ref,
   Future<Routine?> Function() fetch,
 ) async {
   final link = ref.keepAlive();
   try {
-    return await fetch();
+    return await fetch().timeout(ref.read(firestoreReadTimeoutProvider));
   } catch (_) {
     link.close();
     rethrow;

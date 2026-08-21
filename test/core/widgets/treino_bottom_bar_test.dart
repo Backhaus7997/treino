@@ -616,10 +616,10 @@ void main() {
     testWidgets('la barra queda centrada respecto de la pantalla', (
       tester,
     ) async {
-      // Esta SÍ falla sin el fix. El `SafeArea` de la barra tiene `top: false`
-      // pero aplicaba el inset izquierdo y el derecho tal como venían; el
-      // margen lateral que resuelve `resolveBarLayout` es simétrico pero se
-      // aplica DESPUÉS, adentro de una caja que el SafeArea ya dejó corrida.
+      // Esta SÍ falla sin el fix. La barra aplicaba el inset izquierdo y el
+      // derecho tal como venían; el margen lateral que resuelve
+      // `resolveBarLayout` es simétrico pero se aplica DESPUÉS, adentro de
+      // una caja que el inset del dispositivo ya dejó corrida.
       // A 320dp con inset izquierdo de 44, el centro de la barra caía en 182
       // en vez de 160: 22pt = medio inset.
       for (final width in widths) {
@@ -658,6 +658,37 @@ void main() {
             bar.right,
             lessThanOrEqualTo(width - entry.value.right + 0.01),
             reason: 'la barra invade el inset derecho — $ctx',
+          );
+        }
+      }
+    });
+
+    testWidgets('la barra nunca queda pegada al borde de abajo', (
+      tester,
+    ) async {
+      // El reporte de Android. El único aire de abajo era el safe area del
+      // dispositivo, y con navegación por gestos ese número es chico —o 0 en
+      // los equipos que dejan esconder la barra de gestos—, así que la barra
+      // terminaba apoyada contra el borde físico de la pantalla. Ahora el
+      // margen es propio de la barra y el safe area es apenas su piso.
+      const screenHeight = 900.0;
+      const minMargin = 16.0;
+
+      for (final width in widths) {
+        for (final entry in paddings.entries) {
+          await pumpBar(tester, width: width, padding: entry.value, index: 2);
+
+          final gap = screenHeight - barRect(tester).bottom;
+          final ctx = '${width}dp, ${entry.key}';
+          expect(
+            gap,
+            greaterThanOrEqualTo(minMargin - 0.01),
+            reason: 'la barra quedó pegada al borde inferior — $ctx',
+          );
+          expect(
+            gap,
+            greaterThanOrEqualTo(entry.value.bottom - 0.01),
+            reason: 'la barra se mete en el safe area inferior — $ctx',
           );
         }
       }

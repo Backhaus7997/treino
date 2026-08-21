@@ -15,6 +15,8 @@
 // Scaffold/SafeArea, AppPalette/AppL10n (ADR-CHW-005).
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/app/theme/app_palette.dart';
@@ -24,10 +26,12 @@ import 'package:treino/core/analytics/analytics_service.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
+import 'package:treino/features/coach/data/trainer_link_promotion_service.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
+import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_limit_paywall.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 /// Pendientes de HOY — solicitudes pendientes REAL. REQ-HOY-06.
@@ -211,9 +215,13 @@ class _PendingRequestTileState extends ConsumerState<_PendingRequestTile> {
     if (_busy) return;
     setState(() => _busy = true);
     final l10n = AppL10n.of(context);
-    final repo = ref.read(trainerLinkRepositoryProvider);
     try {
-      await repo.accept(widget.link.id);
+      // Server-authoritative: la callable aplica el gate de peso ponderado
+      // (paywall Fase 7, PR4). Antes esto escribia status:'active' directo a
+      // Firestore y el limite era inaplicable.
+      await ref
+          .read(trainerLinkPromotionServiceProvider)
+          .accept(widget.link.id);
       ref
           .read(analyticsServiceProvider)
           .logLinkAccepted(linkId: widget.link.id);
@@ -221,11 +229,35 @@ class _PendingRequestTileState extends ConsumerState<_PendingRequestTile> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.coachHubDashboardAcceptSuccess)),
       );
-    } catch (_) {
+    } on LinkPromotionFailure$PlanLimitReached catch (failure) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      unawaited(
+        showPlanLimitPaywall(
+          context,
+          currentTier: failure.tier,
+          reason: failure.reason == 'subscription-inactive'
+              ? PlanLimitReason.subscriptionInactive
+              : PlanLimitReason.planLimit,
+          // El Coach Hub SI tiene vista de facturacion; la app movil no, y
+          // por eso el default es null (ver showPlanLimitPaywall).
+          billingRoute: '/ajustes',
+        ),
+      );
+    } on LinkPromotionFailure$PromotionPrecondition {
       if (!mounted) return;
       setState(() => _busy = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.coachHubDashboardAcceptError)),
+        SnackBar(content: Text(l10n.coachHubDashboardAcceptPrecondition)),
+      );
+    } catch (_) {
+      // Catch-all a proposito, NO acotado a LinkPromotionFailure (QA H5): lo
+      // que quede afuera de la jerarquia sellada igual tiene que resetear
+      // _busy y avisar, o el boton queda muerto sin explicacion.
+      if (!mounted) return;
+      setState(() => _busy = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.coachHubDashboardAcceptUnavailable)),
       );
     }
   }

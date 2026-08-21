@@ -5,10 +5,11 @@ import '../../workout/application/assigned_routine_providers.dart';
 import '../../workout/application/session_providers.dart'
     show currentUidProvider, sessionsByUidProvider;
 import '../../workout/application/user_routines_providers.dart';
+import '../../workout/domain/plan_advance.dart';
 import '../../workout/domain/routine.dart';
 import '../../workout/domain/routine_day.dart';
+import '../../workout/domain/routine_selection.dart';
 import '../../workout/domain/session.dart';
-import 'active_routine_provider.dart';
 
 /// Resolved "what to train today" snapshot for the home `EmpezarEntrenamientoCard`.
 ///
@@ -73,46 +74,37 @@ final todaysRoutineProvider = FutureProvider.autoDispose<TodaysRoutine?>(
     );
 
     final assigned = await ref.watch(assignedRoutinesProvider(uid).future);
+    // La lista de auto-creadas se resuelve siempre porque `resolveActiveRoutineId`
+    // la necesita para el marcador explícito y para los tiers 2/3. El provider
+    // está cacheado, así que no es una lectura extra costosa.
+    final selfCreated =
+        await ref.watch(userCreatedRoutinesProvider(uid).future);
+
+    // La prioridad vive en `resolveActiveRoutineId`
+    // (workout/domain/routine_selection.dart) porque el cliente watchOS la
+    // reimplementa en Swift y los fixtures de
+    // `conformance/routine_selection.json` son el contrato entre ambas. Acá
+    // solo se resuelven las entradas y se traduce el id de vuelta a Routine.
+    final resolvedId = resolveActiveRoutineId(
+      activeRoutineId: activeId,
+      assignedIds: [for (final r in assigned) r.id],
+      selfCreatedIds: [for (final r in selfCreated) r.id],
+    );
+
     Routine? routine;
-    if (activeId != null && activeId.isNotEmpty) {
+    if (resolvedId != null) {
       for (final r in assigned) {
-        if (r.id == activeId) {
+        if (r.id == resolvedId) {
           routine = r;
           break;
         }
       }
-      if (routine == null) {
-        final selfCreated =
-            await ref.watch(userCreatedRoutinesProvider(uid).future);
+      routine ??= () {
         for (final r in selfCreated) {
-          if (r.id == activeId) {
-            routine = r;
-            break;
-          }
+          if (r.id == resolvedId) return r;
         }
-      }
-    }
-
-    // Legacy chain — activeRoutineId null (pre-slice-1 users) or stale.
-    if (routine == null) {
-      // Tier 1: trainer-assigned plan wins.
-      if (assigned.isNotEmpty) {
-        routine = assigned.first;
-      } else {
-        final selfCreated =
-            await ref.watch(userCreatedRoutinesProvider(uid).future);
-        if (selfCreated.length == 1) {
-          // Tier 2: single self-created routine auto-activates — no manual
-          // marker needed when there's nothing to disambiguate.
-          routine = selfCreated.first;
-        } else if (selfCreated.length > 1) {
-          // Tier 3: multi self-created → require an explicit active marker
-          // (PR#2). [activeRoutineProvider] already validates the id against
-          // the live user-created list; a stale pointer (routine archived/
-          // deleted) resolves to null and the home falls back to the empty CTA.
-          routine = ref.watch(activeRoutineProvider);
-        }
-      }
+        return null;
+      }();
     }
 
     if (routine == null || routine.days.isEmpty) return null;
@@ -128,30 +120,23 @@ final todaysRoutineProvider = FutureProvider.autoDispose<TodaysRoutine?>(
       }
     }
 
+    // La aritmética vive en `nextPlanPosition` (workout/domain/plan_advance.dart)
+    // porque el cliente watchOS la reimplementa en Swift y los fixtures
+    // compartidos de `conformance/plan_advance.json` son el contrato entre las
+    // dos implementaciones. Acá solo se resuelven las entradas.
     final numDays = routine.days.length;
-    final int nextDayNumber;
-    final int weekNumber;
-    if (lastFinished == null) {
-      // First session ever for this routine.
-      nextDayNumber = 1;
-      weekNumber = 0;
-    } else {
-      nextDayNumber = (lastFinished.dayNumber % numDays) + 1;
-      // Runtime guard: a corrupt/legacy Firestore doc with an EXPLICIT
-      // `numWeeks: 0` bypasses the `?? 1` in the generated fromJson (which
-      // only covers an ABSENT field), and `% 0` throws
-      // IntegerDivisionByZeroException — killing the card's "empezar en 1 tap".
-      // A negative value doesn't throw but yields an out-of-range week.
-      // Treat anything <= 0 as 1, same criterion as `derivePlanProgress`
-      // (plan_progress.dart) and `SessionNotifier._buildFresh`.
-      final numWeeks = routine.numWeeks > 0 ? routine.numWeeks : 1;
-      // Week rolls over only when day wraps. numWeeks is 1 for non-periodized
-      // plans, so the modulo is a no-op there.
-      final rolledOver = lastFinished.dayNumber >= numDays;
-      weekNumber = rolledOver
-          ? (lastFinished.weekNumber + 1) % numWeeks
-          : lastFinished.weekNumber;
-    }
+    final position = nextPlanPosition(
+      lastFinished: lastFinished == null
+          ? null
+          : (
+              dayNumber: lastFinished.dayNumber,
+              weekNumber: lastFinished.weekNumber,
+            ),
+      numDays: numDays,
+      numWeeks: routine.numWeeks,
+    );
+    final nextDayNumber = position.dayNumber;
+    final weekNumber = position.weekNumber;
 
     // Resolve the RoutineDay. Defensive against non-contiguous dayNumbers
     // (shouldn't happen, but a hand-edited Firestore doc could).

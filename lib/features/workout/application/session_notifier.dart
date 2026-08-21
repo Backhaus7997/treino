@@ -4,6 +4,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/analytics/analytics_service.dart';
+import '../../../core/utils/network_timeouts.dart';
+import '../../watch/application/watch_credential_providers.dart'
+    show watchLauncherServiceProvider, watchNudgeServiceProvider;
+import '../../watch/data/watch_launcher_service.dart';
+import '../../watch/data/watch_nudge_service.dart';
 import '../domain/routine_day.dart';
 import '../domain/routine_slot.dart';
 import '../domain/set_log.dart';
@@ -48,6 +53,26 @@ class SessionNotifier
   /// La UI llama esto al mostrar el feedback para no re-emitir el mismo error.
   void clearLogSetError() => _logSetError.value = null;
 
+  /// Suscripciones vivas a la sesión mientras el player está abierto.
+  ///
+  /// El RELOJ escribe en la MISMA sesión: series nuevas y el cierre del
+  /// entreno. Sin escuchar, el teléfono se quedaba con la foto que sacó al
+  /// abrir — el atleta marcaba en la muñeca y la pantalla del celular no se
+  /// movía.
+  StreamSubscription<List<SetLog>>? _setLogsSub;
+  StreamSubscription<bool>? _finishedSub;
+
+  /// Se dispara cuando el entreno se cerró DESDE OTRO LADO (el reloj).
+  ///
+  /// Canal aparte del estado por el mismo motivo que [_logSetError]: mutar el
+  /// AsyncValue tiraría abajo toda la pantalla. La UI lo escucha para salir del
+  /// player, que es lo correcto — la sesión ya está en el historial.
+  final ValueNotifier<bool> _finishedElsewhere = ValueNotifier<bool>(false);
+
+  /// La UI escucha esto para cerrar el player cuando el reloj terminó el
+  /// entreno.
+  ValueListenable<bool> get finishedElsewhere => _finishedElsewhere;
+
   @override
   Future<SessionState> build(SessionInit arg) async {
     final state = switch (arg) {
@@ -63,13 +88,95 @@ class SessionNotifier
     // El timer empieza DESPUÉS de armar el estado para que ambos paths
     // compartan el mismo punto de inicio. Diseño §7.
     _timer = Timer.periodic(const Duration(seconds: 1), _onTick);
+    _watchRemoteChanges(state.session.id);
     ref.onDispose(() {
       _timer?.cancel();
       _timer = null;
+      _setLogsSub?.cancel();
+      _finishedSub?.cancel();
       _logSetError.dispose();
+      _finishedElsewhere.dispose();
     });
 
     return state;
+  }
+
+  /// Engancha el estado a lo que pase con la sesión en Firestore.
+  ///
+  /// Es lo que vuelve al reloj un complemento de verdad: lo que se marca en la
+  /// muñeca aparece en el teléfono sin que el atleta toque nada, y terminar en
+  /// un lado termina en los dos.
+  void _watchRemoteChanges(String sessionId) {
+    final uid = ref.read(currentUidProvider);
+    if (uid == null || uid.isEmpty) return;
+    final repo = ref.read(sessionRepositoryProvider);
+
+    _setLogsSub = repo
+        .watchSetLogs(uid: uid, sessionId: sessionId)
+        .listen(_applyRemoteSetLogs, onError: (_) {
+      // Un stream caído no puede tumbar el entreno: se sigue con lo local,
+      // que es exactamente el comportamiento que había antes de esto.
+    });
+
+    _finishedSub = repo
+        .watchSessionFinished(uid: uid, sessionId: sessionId)
+        .listen((finished) {
+      if (!finished || _finalized) return;
+      // Lo cerró el reloj. Se marca finalizado ANTES de avisar para que un
+      // `finishSession`/`abandonSession` que llegue después sea no-op: escribir
+      // encima pisaría el volumen y la duración que ya calculó el reloj.
+      _finalized = true;
+      _timer?.cancel();
+      _timer = null;
+      _finishedElsewhere.value = true;
+      final currentUid = ref.read(currentUidProvider);
+      if (currentUid != null) ref.invalidate(sessionsByUidProvider(currentUid));
+    }, onError: (_) {});
+  }
+
+  /// Deja UNA sola serie por `exerciseId + setNumber`, quedándose con la
+  /// primera.
+  ///
+  /// Es un INVARIANTE, no un parche puntual. Dos series con la misma identidad
+  /// lógica no existen: el teléfono las contaba doble, inflaba el volumen, daba
+  /// un ejercicio por terminado antes de tiempo y bloqueaba la serie siguiente.
+  ///
+  /// Se aplica en el único punto donde el estado recibe una lista MEZCLADA —
+  /// local + lo que llega del stream— en vez de confiar en que cada camino
+  /// chequee. Perseguir camino por camino ya falló una vez: se arregló `logSet`
+  /// y el estado volvió a duplicar por otra ventana de carrera que no pude
+  /// aislar. Un invariante en un solo lugar no depende de haberlos encontrado
+  /// a todos.
+  ///
+  /// Devuelve la MISMA lista si no había nada que sacar, para no crear objetos
+  /// nuevos en el camino caliente.
+  static List<SetLog> _dedupedLogs(List<SetLog> logs) {
+    final seen = <String>{};
+    final out = <SetLog>[];
+    for (final l in logs) {
+      if (seen.add('${l.exerciseId}__${l.setNumber}')) out.add(l);
+    }
+    return out.length == logs.length ? logs : List<SetLog>.unmodifiable(out);
+  }
+
+  /// Reemplaza las series con lo que dice Firestore.
+  ///
+  /// Se pisa entero en vez de mezclar porque el remoto YA es la fuente de
+  /// verdad: `logSet`, `updateSetLog` y `deleteSetLog` escriben primero y
+  /// recién después tocan el estado, así que lo local nunca tiene nada que el
+  /// remoto no tenga. Mezclar solo agregaría la chance de resucitar una serie
+  /// borrada.
+  void _applyRemoteSetLogs(List<SetLog> remote) {
+    final current = state.valueOrNull;
+    if (current == null) return;
+    // Sin cambios reales no se emite: cada emisión reconstruye la pantalla del
+    // entreno, y Firestore repite el snapshot ante cualquier escritura de la
+    // sesión.
+    final clean = _dedupedLogs(remote);
+    if (listEquals(current.setLogs, clean)) return;
+    state = AsyncData(
+      current.copyWith(setLogs: List<SetLog>.unmodifiable(clean)),
+    );
   }
 
   // ── Path A — Sesión nueva ─────────────────────────────────────────────────
@@ -79,7 +186,11 @@ class SessionNotifier
     int dayNumber,
     int weekNumber,
   ) async {
-    final routine = await ref.read(routineByIdProvider(routineId).future);
+    // Misma cota que en `_buildResume`: empezar un entreno tampoco puede quedar
+    // colgado sin salida.
+    final routine = await ref
+        .read(routineByIdProvider(routineId).future)
+        .timeout(ref.read(firestoreReadTimeoutProvider));
     if (routine == null) {
       throw StateError('Rutina $routineId no encontrada');
     }
@@ -111,6 +222,12 @@ class SessionNotifier
       weekNumber: clampedWeek,
     );
     _resetElapsedBaseline(elapsedSeconds: 0, at: session.startedAt);
+    _nudgeWatch(WatchNudgeService.reasonWorkoutStarted);
+    // DESPUÉS de que `repo.create` resolvió, nunca antes: el reloj lee Firestore
+    // por REST y no tiene listeners. Si se abriera antes de que el documento con
+    // `status: active` exista, no encontraría sesión que adoptar y se quedaría
+    // en la pantalla equivocada, sin nada que lo corrija después.
+    _launchWatch();
 
     // REQ-WPRES-021 (ADR-WPRES-09): filter slots by presence BEFORE building
     // session state so buildBlocks, isFullyCompleted, _nextIncompleteIndex,
@@ -132,6 +249,43 @@ class SessionNotifier
     );
   }
 
+  /// Le avisa al reloj que el estado del entreno cambió.
+  ///
+  /// El reloj habla Firestore por REST y no tiene listeners, así que sin este
+  /// aviso solo se entera cuando el atleta lo mira. La idea es la contraria:
+  /// que si empezaste a entrenar en el celular la muñeca se ponga en modo
+  /// entreno sola.
+  ///
+  /// Fire-and-forget y sin `await`: corre en el camino de empezar y terminar un
+  /// entreno, que es lo más caliente de la app. Un reloj que no está a mano no
+  /// puede demorar ni romper eso — se pone al día cuando el atleta lo mire.
+  void _nudgeWatch(String reason) {
+    try {
+      unawaited(ref.read(watchNudgeServiceProvider).nudge(reason: reason));
+    } catch (_) {
+      // `ref.read` tira si el notifier ya se descartó (la ruta del player puede
+      // salir mientras la escritura está en vuelo — ver la nota de #497 más
+      // abajo). Un aviso perdido no justifica tumbar el cierre del entreno.
+    }
+  }
+
+  /// Abre la app del reloj, si hay uno emparejado.
+  ///
+  /// Hermano de [_nudgeWatch] pero NO el mismo camino: `nudge` exige
+  /// alcanzabilidad y se descarta cuando la app del reloj está cerrada, que es
+  /// justo el caso que esto resuelve. Ver [WatchLauncherService].
+  ///
+  /// Fire-and-forget con la misma disciplina: abrir el reloj es un agregado y
+  /// no puede demorar ni romper el arranque del entreno, que es lo más caliente
+  /// de la app.
+  void _launchWatch() {
+    try {
+      unawaited(ref.read(watchLauncherServiceProvider).launchWorkout());
+    } catch (_) {
+      // Idem [_nudgeWatch]: `ref.read` tira si el notifier ya se descartó.
+    }
+  }
+
   // ── Path B — Retomar sesión existente ────────────────────────────────────
 
   Future<SessionState> _buildResume(String sessionId) async {
@@ -141,8 +295,13 @@ class SessionNotifier
       throw StateError('Resume solicitado sin usuario autenticado');
     }
 
+    // Cada lectura va ACOTADA. Sin cota, un `get()` que no resuelve deja este
+    // build en `AsyncLoading` para siempre: spinner eterno sobre un entreno ya
+    // empezado, sin excepción ni salida. Ver `network_timeouts.dart`.
+    final timeout = ref.read(firestoreReadTimeoutProvider);
+
     // Adaptación al contrato real de Etapa 1: getActive + listSetLogs.
-    final session = await repo.getActive(uid);
+    final session = await repo.getActive(uid).timeout(timeout);
     if (session == null) {
       throw StateError(
         'Resume solicitado para $sessionId pero no hay sesión activa',
@@ -153,13 +312,20 @@ class SessionNotifier
         'Sesión activa ${session.id} no coincide con la solicitada $sessionId',
       );
     }
-    final recoveredLogs = await repo.listSetLogs(
-      uid: uid,
-      sessionId: session.id,
-    );
+    // Retomar también abre el reloj. Antes este camino no le avisaba NADA — ni
+    // siquiera el nudge—, así que un entreno retomado desde el teléfono dejaba
+    // la muñeca sin enterarse.
+    _launchWatch();
+    final recoveredLogs = await repo
+        .listSetLogs(
+          uid: uid,
+          sessionId: session.id,
+        )
+        .timeout(timeout);
 
-    final routine =
-        await ref.read(routineByIdProvider(session.routineId).future);
+    final routine = await ref
+        .read(routineByIdProvider(session.routineId).future)
+        .timeout(timeout);
     if (routine == null) {
       throw StateError('Rutina ${session.routineId} no encontrada');
     }
@@ -238,7 +404,25 @@ class SessionNotifier
 
       // Re-leemos el estado: pudo cambiar durante el await.
       final latest = state.value ?? current;
-      final newLogs = [...latest.setLogs, persisted];
+      // ⚠️ Y ahora puede cambiar por el STREAM, no solo por otra operación
+      // local. La escritura de arriba dispara su propio snapshot de Firestore,
+      // y si ese snapshot llega ANTES que este append, la serie entra dos veces
+      // en el estado local. Se veía como un ejercicio "4/4" con solo 3 series
+      // cargadas y el volumen inflado — Firestore estaba bien, el que contaba
+      // de más era el teléfono.
+      //
+      // Se compara TAMBIÉN por identidad lógica y no solo por id: si esa serie
+      // la escribió el reloj, su documento tiene otro id (determinístico) y por
+      // id no matchearía.
+      final alreadyInState = latest.setLogs.any(
+        (l) =>
+            l.id == persisted.id ||
+            (l.exerciseId == persisted.exerciseId &&
+                l.setNumber == persisted.setNumber),
+      );
+      final newLogs = _dedupedLogs(
+        alreadyInState ? latest.setLogs : [...latest.setLogs, persisted],
+      );
       final newIndex = _nextIncompleteIndex(
         latest.day,
         newLogs,
@@ -250,6 +434,11 @@ class SessionNotifier
         setLogs: newLogs,
         currentExerciseIndex: newIndex,
       ));
+      // El reloj no tiene listeners: hasta que no se entere de esta serie,
+      // marcarla en la muñeca escribiría un SEGUNDO documento de la misma
+      // serie (los dos clientes generan ids distintos) y el atleta la vería
+      // marcada dos veces.
+      _nudgeWatch(WatchNudgeService.reasonSetLogged);
     } catch (e) {
       // El write a Firestore falló (red caída, permisos, offline). NO mutamos
       // `state` a AsyncError: eso flipearía `when()` al branch `error:` y volaría
@@ -388,13 +577,39 @@ class SessionNotifier
       // el delete/renumber (p.ej. un logSet concurrente). Mismo patrón que
       // logSet/updateSet.
       final latest = state.value ?? current;
-      final renumberedIds = {for (final s in survivorsAbove) s.id};
-      final newLogs = latest.setLogs
-          .where((l) => target == null || l.id != target.id)
-          .map((l) => renumberedIds.contains(l.id)
-              ? l.copyWith(setNumber: l.setNumber - 1)
-              : l)
-          .toList(growable: false);
+
+      // El setNumber nuevo se aplica como valor ABSOLUTO, no como un `-1`.
+      //
+      // Un delta se aplica DOS VECES. `updateSetLog` de arriba dispara su propio
+      // snapshot de Firestore (compensación de latencia: llega antes de que el
+      // `await` resuelva), el listener de `watchSetLogs` lo mete en el estado ya
+      // renumerado, y este `map` volvía a restarle uno. Con 3 series y borrando
+      // la 2, la sobreviviente pasaba de 3 → 2 por el stream → 1 por el map, y
+      // el estado quedaba con DOS series en setNumber 1 y NINGUNA en 2.
+      //
+      // Se veía así: la fila 2 sin tildar aunque la serie existía en Firestore,
+      // y la fila 3 ofrecida para cargar. Reproducido en el simulador el
+      // 2026-08-12. Es la misma trampa del §4.5 del HANDOFF que ya había mordido
+      // a `logSet` — "la propia escritura dispara su snapshot"— y por eso la
+      // defensa correcta es la misma: que el camino sea idempotente, no que
+      // adivine si el stream ya pasó.
+      //
+      // El valor absoluto es EXACTAMENTE el que se escribió a Firestore arriba,
+      // así que aplicarlo sobre un estado ya renumerado es un no-op.
+      final renumbered = {
+        for (final s in survivorsAbove) s.id: s.setNumber - 1,
+      };
+      // Pasa por el invariante, igual que `logSet` y `_applyRemoteSetLogs`.
+      // `removeSet` era el ÚNICO camino de mutación que lo salteaba, y por eso
+      // las dos series con el mismo setNumber sobrevivían en el estado.
+      final newLogs = _dedupedLogs(
+        latest.setLogs
+            .where((l) => target == null || l.id != target.id)
+            .map((l) {
+          final nuevo = renumbered[l.id];
+          return nuevo == null ? l : l.copyWith(setNumber: nuevo);
+        }).toList(growable: false),
+      );
       final loggedCountAfterRemoval =
           newLogs.where((l) => l.exerciseId == exerciseId).length;
       final lowered = latest.plannedSetsFor(slot) - 1;
@@ -480,6 +695,7 @@ class SessionNotifier
     // (and the no-longer-active session clears) without an app restart.
     // Same audited post-dispose contract as finishSession (#497) — see there.
     ref.invalidate(sessionsByUidProvider(uid));
+    _nudgeWatch(WatchNudgeService.reasonWorkoutFinished);
     state = AsyncData(current.copyWith(
       session: current.session.copyWith(wasFullyCompleted: false),
     ));
@@ -536,6 +752,7 @@ class SessionNotifier
     // (todaysRoutineProvider, the Insights aggregators, historial) watches this
     // provider, so a single invalidate cascades.
     ref.invalidate(sessionsByUidProvider(uid));
+    _nudgeWatch(WatchNudgeService.reasonWorkoutFinished);
     // Solo en el path "finished fully completed" — los abandonos no cuentan
     // como "routine_finished" para producto. Si más adelante producto pide
     // ver abandons, se agrega `routine_abandoned` aparte.
@@ -590,7 +807,16 @@ class SessionNotifier
           : slot.effectiveSetsForWeek(weekNumber).length;
       if (count < planned) return i;
     }
-    return day.slots.length - 1;
+    // `length - 1` sobre una lista VACÍA da -1, y ese -1 termina en
+    // `SessionState.currentExerciseIndex`, o sea en un índice negativo sobre la
+    // lista de ejercicios.
+    //
+    // No es hipotético: los dos paths de build filtran los slots por
+    // `isPresentInWeek(weekNumber)` (REQ-WPRES-021), así que un día cuyos slots
+    // estén TODOS ausentes en esa semana —periodización legítima— deja la lista
+    // en cero. Devolver 0 mantiene el índice dentro del dominio; la pantalla ya
+    // sabe dibujar un día sin ejercicios, lo que no sabe es indexar en -1.
+    return day.slots.isEmpty ? 0 : day.slots.length - 1;
   }
 
   int _durationMin(int elapsedSeconds) {

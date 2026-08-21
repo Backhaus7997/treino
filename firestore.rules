@@ -491,11 +491,11 @@ service cloud.firestore {
                     && request.resource.data.trainerId is string
                     && request.resource.data.trainerId.size() > 0;
 
-      // Update: members del vínculo pueden actualizar (accept / decline /
-      // terminate). Fields `trainerId`, `athleteId`, `requestedAt` son
-      // inmutables. Business rules (transiciones de status válidas, who
-      // can accept vs terminate) se enforce client-side en el repository;
-      // las rules dan defensa estructural.
+      // Update: members del vínculo pueden actualizar (decline / cancel /
+      // terminate / pause). Fields `trainerId`, `athleteId`, `requestedAt` son
+      // inmutables. `accept` y `resume` YA NO son client-side: viven en sus
+      // callables (paywall Fase 7 PR4) porque son las dos transiciones que
+      // suben el peso ponderado y desde el cliente el límite era inaplicable.
       //
       // Privacy gate (REQ-COACH-LINK-012..014): el último OR clause restringe
       // la mutación de `sharedWithTrainer` exclusivamente al atleta. Si el
@@ -503,34 +503,42 @@ service cloud.firestore {
       // resource.data.sharedWithTrainer`), el auth.uid debe ser el atleta.
       // El PF nunca puede flippear el flag.
       //
-      // Paywall Fase 7 PR1 (design §5.2, entitlement half only): `entitlement`,
-      // `blockedAt`, `blockedReason` son CF-write-only — pinneados
-      // equal-to-existing via get(...,null) (mismo idioma que `payments`,
-      // firestore.rules ~1112-1134). Solo el downgrade CF y
-      // acceptTrainerLink/reactivation CF (Admin SDK, bypasea rules) los
-      // escriben. El lock CF-only de promoción status (reemplazar el accept()
-      // client-side por el acceptTrainerLink CF) queda para PR4 — hacerlo acá
-      // rompería el accept() actual antes de que su reemplazo exista. NOTA
-      // QA-SEC-002 (abajo): eso NO impide el gate más angosto que sí agregamos —
-      // impedir que el ATLETA promueva el link a active/paused — que preserva el
-      // accept() del trainer y no depende del CF.
+      // Paywall Fase 7 PR1 (design §5.2): `entitlement`, `blockedAt`,
+      // `blockedReason` son CF-write-only — pinneados equal-to-existing via
+      // get(...,null) (mismo idioma que `payments`, firestore.rules
+      // ~1112-1134). Solo el downgrade CF y las callables de promoción
+      // (Admin SDK, bypasean rules) los escriben.
       allow update: if request.auth != null
                     && (request.auth.uid == resource.data.trainerId
                         || request.auth.uid == resource.data.athleteId)
-                    // QA-SEC-002: only the trainer may promote a link INTO a
-                    // reviewable state (active/paused). The athlete creates the
-                    // pending request and may terminate it, but must never
-                    // self-promote — otherwise it forges an active/paused link
-                    // and fabricates reviews against any trainer (reviews create
-                    // gates on link.status in ['active','paused']). The trainer's
-                    // accept()/pause()/resume() still work; the acceptTrainerLink
-                    // CF (Admin SDK) bypasses rules. This is narrower than the
-                    // CF-only pending→active lock deferred to PR4: it preserves
-                    // the current client accept() (performed by the trainer), so
-                    // it does not break that flow ahead of the CF.
+                    // ── Lock de promoción (paywall Fase 7 PR4) ──────────────
+                    //
+                    // `active` es CF-ONLY. Es la única forma de que el límite
+                    // de alumnos sea real: mientras el cliente pudiera escribir
+                    // `status: 'active'`, el gate de peso ponderado era una
+                    // sugerencia. Las callables acceptTrainerLink y
+                    // resumeTrainerLink usan el Admin SDK y bypasean rules.
+                    //
+                    // `paused` sigue siendo client-side pero SOLO del trainer
+                    // (QA-SEC-002: si el atleta pudiera auto-promoverse a
+                    // active/paused, forjaría un vínculo y fabricaría reviews
+                    // contra cualquier PF — reviews gatea en
+                    // status in ['active','paused']). Pausar BAJA el peso, así
+                    // que no necesita gate.
+                    //
+                    // `terminated` lo puede escribir cualquier member
+                    // (decline / cancel / terminate). También baja el peso.
+                    //
+                    // Volver a `pending` queda DENEGADO para todos. Es un
+                    // endurecimiento nuevo, no un efecto colateral: la cláusula
+                    // vieja permitía `!(status in ['active','paused'])`, o sea
+                    // que cualquiera de los dos members podía reescribir un
+                    // vínculo VIVO de vuelta a `pending`. Un re-request legítimo
+                    // crea un doc nuevo, nunca revive el viejo.
                     && (request.resource.data.status == resource.data.status
-                        || !(request.resource.data.status in ['active', 'paused'])
-                        || request.auth.uid == resource.data.trainerId)
+                        || request.resource.data.status == 'terminated'
+                        || (request.resource.data.status == 'paused'
+                            && request.auth.uid == resource.data.trainerId))
                     && request.resource.data.trainerId == resource.data.trainerId
                     && request.resource.data.athleteId == resource.data.athleteId
                     && request.resource.data.requestedAt == resource.data.requestedAt

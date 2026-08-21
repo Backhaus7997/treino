@@ -102,6 +102,7 @@ Routine _makeRoutine({
   String? assignedBy,
   String? createdBy,
   int numWeeks = 1,
+  String? summary,
 }) =>
     Routine(
       id: id,
@@ -113,6 +114,7 @@ Routine _makeRoutine({
       assignedBy: assignedBy,
       createdBy: createdBy,
       numWeeks: numWeeks,
+      summary: summary,
     );
 
 void main() {
@@ -514,6 +516,62 @@ void main() {
         expect(find.text('EMPEZAR'), findsNothing);
       },
     );
+
+    // ── Resumen en criollo (#648) ─────────────────────────────────────────
+    //
+    // El hero abre con la jerga —"PPL · DÍA 1", "BRO SPLIT · DÍA 1"— y 2 de 5
+    // participantes de usabilidad no supieron qué significaba. El término no
+    // se esconde: se explica, justo donde se lee por primera vez.
+
+    testWidgets('#648: el resumen se muestra debajo del hero', (tester) async {
+      const summary = 'Empujar, tirar y piernas.';
+      await tester.pumpWidget(
+        _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
+          routineByIdStreamProvider('test-id').overrideWith(
+            (ref) => Stream.value(_makeRoutine(summary: summary)),
+          ),
+        ]),
+      );
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.text(summary, skipOffstage: false), findsOneWidget);
+    });
+
+    testWidgets(
+      '#648: sin resumen no se reserva hueco — la mayoría de las rutinas no '
+      'lo tienen',
+      (tester) async {
+        await tester.pumpWidget(
+          _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
+            routineByIdStreamProvider('test-id')
+                .overrideWith((ref) => Stream.value(_makeRoutine())),
+          ]),
+        );
+        await tester.pump(const Duration(milliseconds: 50));
+
+        // Sin resumen no aparece NADA de ese bloque. Se busca el mismo
+        // texto que el test anterior sí encuentra: prueba que el render
+        // depende del dato y no de un string hardcodeado en la pantalla.
+        expect(
+          find.text('Empujar, tirar y piernas.', skipOffstage: false),
+          findsNothing,
+        );
+      },
+    );
+
+    testWidgets('#648: un resumen en blanco se trata como ausente',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
+          routineByIdStreamProvider('test-id').overrideWith(
+            (ref) => Stream.value(_makeRoutine(summary: '   ')),
+          ),
+        ]),
+      );
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.text('   ', skipOffstage: false), findsNothing);
+    });
 
     testWidgets('SCENARIO-565: athlete role shows EMPEZAR', (tester) async {
       await tester.pumpWidget(

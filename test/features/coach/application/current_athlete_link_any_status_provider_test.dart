@@ -15,6 +15,7 @@
 // nuevo EXPONE pending/paused mientras el active-only sigue devolviendo null
 // para esos estados (no le cambiamos la semántica).
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -37,6 +38,16 @@ void main() {
     fakeFirestore = FakeFirebaseFirestore();
     seedRepo = TrainerLinkRepository(firestore: fakeFirestore);
   });
+
+  /// Deja un link en `active` escribiendo directo, que es lo que hace ahora la
+  /// CF `acceptTrainerLink` (Admin SDK). `TrainerLinkRepository.accept` ya no
+  /// existe: la promoción se movió detrás del gate de peso ponderado (paywall
+  /// Fase 7, PR4). Estos tests sólo SIEMBRAN estado, no ejercitan el accept.
+  Future<void> seedAccept(String linkId) =>
+      fakeFirestore.collection('trainer_links').doc(linkId).update({
+        'status': 'active',
+        'acceptedAt': Timestamp.fromDate(DateTime.utc(2026, 1, 2)),
+      });
 
   ProviderContainer makeContainer() {
     final container = ProviderContainer(
@@ -76,7 +87,7 @@ void main() {
     test('expone un link PAUSED (y el active-only devuelve null)', () async {
       final link =
           await seedRepo.request(trainerId: trainerId, athleteId: athleteId);
-      await seedRepo.accept(link.id);
+      await seedAccept(link.id);
       await seedRepo.pause(link.id);
       final container = makeContainer();
 
@@ -93,7 +104,7 @@ void main() {
     test('expone un link ACTIVE (ambos providers lo ven)', () async {
       final link =
           await seedRepo.request(trainerId: trainerId, athleteId: athleteId);
-      await seedRepo.accept(link.id);
+      await seedAccept(link.id);
       final container = makeContainer();
 
       final anyStatus =

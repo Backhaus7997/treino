@@ -72,7 +72,7 @@ Widget _wrapWorkout(
         currentUidProvider.overrideWithValue('test-uid'),
         sessionsByUidProvider.overrideWith((ref, uid) async => []),
         // RutinasSection: resolve the unified list to empty so tests that
-        // only care about PLANTILLAS / HISTORIAL don't need a full stack.
+        // only care about EXPLORAR / HISTORIAL don't need a full stack.
         authStateChangesProvider.overrideWith((ref) => const Stream.empty()),
         currentAthleteLinkProvider.overrideWith((ref) async => null),
         assignedRoutinesProvider('test-uid').overrideWith((ref) async => []),
@@ -227,7 +227,7 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.byType(TabBar), findsOneWidget);
       expect(find.text('TU ENTRENO').hitTestable(), findsOneWidget);
-      for (final label in ['TU ENTRENO', 'PLANTILLAS']) {
+      for (final label in ['TU ENTRENO', 'EXPLORAR']) {
         final text = tester.widget<Text>(find.text(label));
         expect(text.maxLines, 1);
         expect(text.softWrap, isFalse);
@@ -235,7 +235,7 @@ void main() {
     });
 
     testWidgets(
-        'default: pill tabs TU ENTRENO | PLANTILLAS y page 0 con '
+        'default: pill tabs TU ENTRENO | EXPLORAR y page 0 con '
         'RUTINAS → HISTORIAL (sin secciones de plantillas)', (tester) async {
       await tester.pumpWidget(
         _wrapWorkout(
@@ -251,10 +251,10 @@ void main() {
       // Segmented pill control with both labels.
       expect(find.byType(TabBar), findsOneWidget);
       expect(find.text('TU ENTRENO'), findsOneWidget);
-      expect(find.text('PLANTILLAS'), findsOneWidget);
+      expect(find.text('EXPLORAR'), findsOneWidget);
 
       // Page 0 body: unified routines + history, in that order. The template
-      // sections left this page — they live in the PLANTILLAS tab now.
+      // sections left this page — they live in the EXPLORAR tab now.
       expect(find.byType(RutinasSection), findsOneWidget);
       expect(find.text('HISTORIAL'), findsOneWidget);
       expect(find.byType(PlantillasTab), findsNothing);
@@ -349,8 +349,8 @@ void main() {
     });
   });
 
-  group('WorkoutScreen — tab PLANTILLAS (page 1)', () {
-    testWidgets('tapping the PLANTILLAS tab shows the unified template grid',
+  group('WorkoutScreen — tab EXPLORAR (page 1)', () {
+    testWidgets('tapping the EXPLORAR tab shows the unified template grid',
         (tester) async {
       final routines = [makeRoutine(id: 'r1'), makeRoutine(id: 'r2')];
 
@@ -365,7 +365,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
 
-      await tester.tap(find.text('PLANTILLAS'));
+      await tester.tap(find.text('EXPLORAR'));
       await tester.pumpAndSettle();
 
       expect(find.byType(PlantillasTab), findsOneWidget);
@@ -388,7 +388,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
 
       expect(find.byType(PlantillasTab), findsOneWidget);
-      expect(find.text('No hay plantillas todavía.'), findsOneWidget);
+      expect(find.text('No hay rutinas todavía.'), findsOneWidget);
       expect(find.byType(RutinasSection), findsNothing);
     });
 
@@ -458,7 +458,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
 
-      // Page 0 activa: PLANTILLAS nunca se visitó → la cadena del coach ni
+      // Page 0 activa: EXPLORAR nunca se visitó → la cadena del coach ni
       // siquiera se construyó.
       expect(
         container.exists(trainerTemplatesStreamProvider('trainer-1')),
@@ -476,7 +476,7 @@ void main() {
       );
 
       // Volver a TU ENTRENO: keep-alive → el stream NO se desmonta (sin
-      // churn de listener ni flicker del coach al volver a PLANTILLAS).
+      // churn de listener ni flicker del coach al volver a EXPLORAR).
       await tester.drag(find.byType(TabBarView), const Offset(600, 0));
       await tester.pumpAndSettle();
       expect(find.byType(RutinasSection), findsOneWidget);
@@ -524,10 +524,10 @@ void main() {
   // ─── Rankings relocation ──────────────────────────────────────────────────
   //
   // Rankings moved from the Entrenar tab to the FEED tab
-  // (`/feed?tab=rankings`) — the second page here is PLANTILLAS now, never
+  // (`/feed?tab=rankings`) — the second page here is EXPLORAR now, never
   // rankings. Rankings host coverage lives in feed_screen_test.dart.
   group('WorkoutScreen — no rankings page', () {
-    testWidgets('athlete tabs are TU ENTRENO | PLANTILLAS — no RANKINGS label',
+    testWidgets('athlete tabs are TU ENTRENO | EXPLORAR — no RANKINGS label',
         (tester) async {
       await tester.pumpWidget(
         _wrapWorkout(

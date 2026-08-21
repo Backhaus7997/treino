@@ -1,0 +1,42 @@
+{
+  "rule": "set-log-identity",
+  "source_of_truth": "lib/features/workout/domain/set_log_identity.dart",
+  "description": "Dada la identidad logica de una serie (exerciseId + setNumber), el id del documento con el que el RELOJ la escribe en `setLogs`. Contrato compartido entre la implementacion Dart (telefono) y la Swift (reloj).",
+  "why_this_exists": "Los dos clientes acunan ids distintos para la misma fila logica: el reloj uno deterministico y el telefono uno autogenerado. Eso dejaba DOS documentos por serie cuando la misma serie se marcaba en los dos lados, y el volumen del historial salia inflado — medido en el emulador el 2026-08-11: 5 de 7 sesiones con duplicados, una con 17 documentos para 10 series reales. El arreglo es que el telefono BUSQUE la serie en la ruta deterministica del reloj antes de crear la suya. Eso convierte la formula del id en un contrato cruzado: si las dos implementaciones divergen aunque sea en el separador, el telefono busca donde no esta, no encuentra nada, y vuelve a duplicar en silencio. Ninguno de los otros fixtures cubre esto: cubren DECISIONES sobre el plan, no como se nombra un documento.",
+  "inputs": {
+    "exerciseId": "Id del ejercicio. Los reales pueden traer guiones (`peso-muerto`) y guiones bajos (`press_banca`).",
+    "setNumber": "Numero de serie, 1-based, igual en los dos clientes."
+  },
+  "cases": [
+    {
+      "name": "serie 1 de un ejercicio simple",
+      "given": { "exerciseId": "sentadilla", "setNumber": 1 },
+      "expect": { "docId": "sentadilla__1" }
+    },
+    {
+      "name": "exerciseId con guion medio, que es la forma real del seed",
+      "given": { "exerciseId": "peso-muerto", "setNumber": 4 },
+      "expect": { "docId": "peso-muerto__4" }
+    },
+    {
+      "name": "exerciseId con guion bajo: el separador sigue siendo doble",
+      "given": { "exerciseId": "press_banca", "setNumber": 2 },
+      "expect": { "docId": "press_banca__2" }
+    },
+    {
+      "name": "serie de dos digitos: el numero va tal cual, sin padding",
+      "given": { "exerciseId": "dominadas", "setNumber": 10 },
+      "expect": { "docId": "dominadas__10" }
+    },
+    {
+      "name": "exerciseId de un caracter",
+      "given": { "exerciseId": "a", "setNumber": 3 },
+      "expect": { "docId": "a__3" }
+    },
+    {
+      "name": "serie 0 no deberia existir, pero el formato no la trata especial",
+      "given": { "exerciseId": "remo-barra", "setNumber": 0 },
+      "expect": { "docId": "remo-barra__0" }
+    }
+  ]
+}
