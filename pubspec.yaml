@@ -74,6 +74,12 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  # Driver de los tests de `integration_test/` (flujos end-to-end sobre un
+  # dispositivo o emulador real, vía `flutter test integration_test`). Faltaba
+  # declararlo, así que los 5 archivos de esa carpeta no resolvían el import y
+  # `flutter analyze` tiraba 15 issues sobre código que en realidad está bien.
+  integration_test:
+    sdk: flutter
   flutter_lints: ^4.0.0
   build_runner: ^2.4.13
   freezed: ^2.5.7

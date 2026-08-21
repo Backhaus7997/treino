@@ -76,7 +76,7 @@ describe("SCENARIO-637: new link status=pending → notify trainer", () => {
     const mock = makeMockMessaging();
     const afterData = { trainerId, athleteId, status: "pending" };
 
-    await notifyOnLinkChangeHandler(testApp, undefined, afterData, mock);
+    await notifyOnLinkChangeHandler(testApp, "link-test", undefined, afterData, mock);
 
     expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
@@ -106,7 +106,7 @@ describe("SCENARIO-638: pending→active → notify athlete", () => {
     const beforeData = { trainerId, athleteId, status: "pending" };
     const afterData = { trainerId, athleteId, status: "active" };
 
-    await notifyOnLinkChangeHandler(testApp, beforeData, afterData, mock);
+    await notifyOnLinkChangeHandler(testApp, "link-test", beforeData, afterData, mock);
 
     expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
@@ -140,7 +140,7 @@ describe("SCENARIO-639: active→terminated, no reason → notify BOTH parties",
       // no reason field
     };
 
-    await notifyOnLinkChangeHandler(testApp, beforeData, afterData, mock);
+    await notifyOnLinkChangeHandler(testApp, "link-test", beforeData, afterData, mock);
 
     expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
@@ -174,7 +174,7 @@ describe("SCENARIO-640: reason=account-deleted → sendFcm NOT called", () => {
       reason: "account-deleted",
     };
 
-    await notifyOnLinkChangeHandler(testApp, beforeData, afterData, mock);
+    await notifyOnLinkChangeHandler(testApp, "link-test", beforeData, afterData, mock);
 
     expect(mock.sendEachForMulticast as jest.Mock).not.toHaveBeenCalled();
   });
@@ -188,7 +188,7 @@ describe("SCENARIO-640: reason=account-deleted → sendFcm NOT called", () => {
       reason: "account-deleted",
     };
     await expect(
-      notifyOnLinkChangeHandler(testApp, undefined, afterData, mock),
+      notifyOnLinkChangeHandler(testApp, "link-test", undefined, afterData, mock),
     ).resolves.not.toThrow();
   });
 });
@@ -212,7 +212,7 @@ describe("SCENARIO-641: before.status === after.status → skip (no-op write)", 
     const beforeData = { trainerId, athleteId, status: "pending" };
     const afterData = { trainerId, athleteId, status: "pending" };
 
-    await notifyOnLinkChangeHandler(testApp, beforeData, afterData, mock);
+    await notifyOnLinkChangeHandler(testApp, "link-test", beforeData, afterData, mock);
 
     expect(mock.sendEachForMulticast as jest.Mock).not.toHaveBeenCalled();
   });
@@ -237,7 +237,7 @@ describe("SCENARIO-642: active→paused → notify athlete", () => {
     const beforeData = { trainerId, athleteId, status: "active" };
     const afterData = { trainerId, athleteId, status: "paused" };
 
-    await notifyOnLinkChangeHandler(testApp, beforeData, afterData, mock);
+    await notifyOnLinkChangeHandler(testApp, "link-test", beforeData, afterData, mock);
 
     expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
@@ -268,7 +268,7 @@ describe("SCENARIO-643: paused→active (resume) → notify athlete", () => {
     const beforeData = { trainerId, athleteId, status: "paused" };
     const afterData = { trainerId, athleteId, status: "active" };
 
-    await notifyOnLinkChangeHandler(testApp, beforeData, afterData, mock);
+    await notifyOnLinkChangeHandler(testApp, "link-test", beforeData, afterData, mock);
 
     expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
@@ -287,7 +287,7 @@ describe("no-op: after document missing (delete event)", () => {
   it("resolves cleanly without calling sendFcm", async () => {
     const mock = makeMockMessaging();
     await expect(
-      notifyOnLinkChangeHandler(testApp, undefined, undefined, mock),
+      notifyOnLinkChangeHandler(testApp, "link-test", undefined, undefined, mock),
     ).resolves.not.toThrow();
     expect(mock.sendEachForMulticast as jest.Mock).not.toHaveBeenCalled();
   });

@@ -2177,5 +2177,19 @@ service cloud.firestore {
 
       allow delete: if false;
     }
+
+    // ── mail_queue ──────────────────────────────────────────────────────────
+    //
+    // Outbox de email transaccional (Resend). Escrito SOLO por `enqueueMail`
+    // vía Admin SDK (que saltea estas reglas) y consumido SOLO por la Cloud
+    // Function `sendQueuedMail`.
+    //
+    // Cerrado en los cuatro verbos a propósito. Un cliente que pudiera crear
+    // filas acá mandaría mail arbitrario desde el dominio de TREINO — o sea,
+    // un relay de spam con nuestra reputación de remitente. Y uno que pudiera
+    // leerlas se llevaría las direcciones de email de otros usuarios.
+    match /mail_queue/{mailId} {
+      allow read, write: if false;
+    }
   }
 }

@@ -79,7 +79,7 @@ describe("SCENARIO-632: new appointment status=requested → notify trainer", ()
       scheduledAt: admin.firestore.Timestamp.now(),
     };
 
-    await notifyOnAppointmentHandler(testApp, undefined, afterData, mock);
+    await notifyOnAppointmentHandler(testApp, "appt-test", undefined, afterData, mock);
 
     expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
@@ -116,7 +116,7 @@ describe("SCENARIO-633: requested→confirmed → notify athlete", () => {
       scheduledAt: admin.firestore.Timestamp.now(),
     };
 
-    await notifyOnAppointmentHandler(testApp, beforeData, afterData, mock);
+    await notifyOnAppointmentHandler(testApp, "appt-test", beforeData, afterData, mock);
 
     expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
@@ -151,7 +151,7 @@ describe("SCENARIO-634: confirmed→cancelled, no cancelledBy → notify both pa
       // no cancelledBy field
     };
 
-    await notifyOnAppointmentHandler(testApp, beforeData, afterData, mock);
+    await notifyOnAppointmentHandler(testApp, "appt-test", beforeData, afterData, mock);
 
     expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
@@ -185,7 +185,7 @@ describe("SCENARIO-635: reason=athlete-account-deleted → sendFcm NOT called", 
       scheduledAt: admin.firestore.Timestamp.now(),
     };
 
-    await notifyOnAppointmentHandler(testApp, beforeData, afterData, mock);
+    await notifyOnAppointmentHandler(testApp, "appt-test", beforeData, afterData, mock);
 
     expect(mock.sendEachForMulticast as jest.Mock).not.toHaveBeenCalled();
   });
@@ -199,7 +199,7 @@ describe("SCENARIO-635: reason=athlete-account-deleted → sendFcm NOT called", 
       reason: "athlete-account-deleted",
     };
     await expect(
-      notifyOnAppointmentHandler(testApp, undefined, afterData, mock),
+      notifyOnAppointmentHandler(testApp, "appt-test", undefined, afterData, mock),
     ).resolves.not.toThrow();
   });
 });
@@ -228,7 +228,7 @@ describe("SCENARIO-636: before.status === after.status → skip (no-op write)", 
       scheduledAt: admin.firestore.Timestamp.now(),
     };
 
-    await notifyOnAppointmentHandler(testApp, beforeData, afterData, mock);
+    await notifyOnAppointmentHandler(testApp, "appt-test", beforeData, afterData, mock);
 
     expect(mock.sendEachForMulticast as jest.Mock).not.toHaveBeenCalled();
   });
@@ -241,7 +241,7 @@ describe("no-op: after document missing (delete event)", () => {
   it("resolves cleanly without calling sendFcm", async () => {
     const mock = makeMockMessaging();
     await expect(
-      notifyOnAppointmentHandler(testApp, undefined, undefined, mock),
+      notifyOnAppointmentHandler(testApp, "appt-test", undefined, undefined, mock),
     ).resolves.not.toThrow();
     expect(mock.sendEachForMulticast as jest.Mock).not.toHaveBeenCalled();
   });

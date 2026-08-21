@@ -30,6 +30,8 @@ import * as admin from "firebase-admin";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { logger } from "firebase-functions";
 import { sendFcm } from "../notifications/send-fcm";
+import { enqueueMail } from "../mail/enqueue-mail";
+import { artDateKey, formatArs, formatShortDateAR } from "../mail/format";
 
 // ---------------------------------------------------------------------------
 // Lazy app singleton (project convention — mirrors generate-due-payments.ts)
@@ -194,6 +196,25 @@ export async function notifyOverduePaymentsHandler(
         },
         messaging,
       );
+
+      // ── Queue the email counterpart ──────────────────────────────────────
+      // Dedupe scope carries the ART run date, not just the payment id: this
+      // reminder legitimately repeats every 7 days, so a payment-only key would
+      // suppress every reminder after the first one forever. Same-day retries
+      // of the scheduled run still collapse — which matters, because the
+      // lastOverdueNotifiedAt write below is NOT atomic with the push above.
+      await enqueueMail(app, {
+        toUid: athleteId,
+        kind: "payment-overdue",
+        scope: `${paymentDoc.id}_${artDateKey(now)}`,
+        params: {
+          trainerName,
+          amountLabel: formatArs(payment.amountArs as number | undefined),
+          dueLabel: formatShortDateAR(
+            payment.dueAt as admin.firestore.Timestamp,
+          ),
+        },
+      });
 
       // ── Write lastOverdueNotifiedAt via Admin SDK (bypasses Firestore rules) ─
       await paymentDoc.ref.update({
