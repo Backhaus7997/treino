@@ -8,6 +8,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/features/payments/domain/payment.dart';
 
 import 'payment_format.dart';
@@ -44,7 +45,7 @@ class PagosTable extends StatelessWidget {
       decoration: BoxDecoration(
         color: palette.bgCard,
         border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Column(
         children: [

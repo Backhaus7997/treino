@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/theme/app_motion.dart';
+import '../../core/analytics/sub_tab_analytics.dart';
 import '../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../core/widgets/treino_segmented_pill.dart';
+import '../../l10n/app_l10n.dart';
 import '../profile/application/user_providers.dart';
 import '../profile/domain/user_role.dart';
 import 'presentation/widgets/historial_section.dart';
@@ -14,7 +16,7 @@ import 'trainer_workout_view.dart';
 /// Role-aware workout screen.
 ///
 /// - Athlete → 2-page swipeable Entrenar tab (workout redesign slice 2):
-///   "Tu entreno" (page 0 — unified routines + history) + "Plantillas"
+///   "Tu entreno" (page 0 — unified routines + history) + "Explorar"
 ///   (page 1 — the full template grid, coach-shared + catalog). Same
 ///   segmented-pill pattern the tab had in the rankings era; rankings itself
 ///   now lives in the FEED tab (`/feed?tab=rankings`) — see [FeedScreen].
@@ -58,29 +60,48 @@ class _AthleteWorkout extends StatelessWidget {
 
   final String? initialTab;
 
-  static const _labels = <String>['TU ENTRENO', 'PLANTILLAS'];
+  /// Slugs de analytics — estables, en el orden del [TabBarView]. No son los
+  /// labels: esos cambian con el copy y con el idioma, y ya cambiaron —
+  /// "PLANTILLAS" pasó a "EXPLORAR" en #638 mientras esta rama esperaba.
+  /// El slug no se movió, que es exactamente para lo que se separó del texto:
+  /// una serie temporal de analytics que se corta cada vez que alguien edita
+  /// una etiqueta no sirve para nada.
+  static const _analyticsSurface = 'workout';
+  static const _analyticsTabs = <String>['tu-entreno', 'plantillas'];
 
+  /// Deep-link value stays `plantillas` on purpose — the copy changed, the
+  /// route did not (#638). Renaming it would break live bookmarks and
+  /// notifications for cosmetics.
   static int _resolveInitialIndex(String? tab) => tab == 'plantillas' ? 1 : 0;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
+    final labels = <String>[l10n.workoutTabYours, l10n.workoutTabExplore];
+
     return DefaultTabController(
-      length: _labels.length,
+      length: labels.length,
       initialIndex: _resolveInitialIndex(initialTab),
-      child: const Column(
+      child: Column(
         children: [
           // El alto y el modo scroll ahora los resuelve el componente — la
           // lógica de textScaler que vivía acá se universalizó al kit (#646).
           Padding(
-            padding: EdgeInsets.fromLTRB(20, 10, 20, 0),
-            child: TreinoSegmentedPill(labels: _labels),
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+            child: TreinoSegmentedPill(labels: labels),
           ),
-          SizedBox(height: 8),
-          Expanded(
-            child: TabBarView(
-              // Swipeable on purpose — same gesture language the tab had in
-              // the rankings era.
-              children: [_TuEntrenoPage(), PlantillasTab()],
+          const SizedBox(height: 8),
+          // TU ENTRENO y EXPLORAR son las dos la ruta `/workout`: mismo
+          // punto ciego que Feed. Envuelve las PÁGINAS, no el pill.
+          const Expanded(
+            child: SubTabAnalytics(
+              surface: _analyticsSurface,
+              tabs: _analyticsTabs,
+              child: TabBarView(
+                // Swipeable on purpose — same gesture language the tab had in
+                // the rankings era.
+                children: [_TuEntrenoPage(), PlantillasTab()],
+              ),
             ),
           ),
         ],
@@ -92,7 +113,7 @@ class _AthleteWorkout extends StatelessWidget {
 /// Page 0 — unified RUTINAS list (workout redesign slice 1: former "Mi plan"
 /// + "Mis rutinas" merged, coach plans pinned with their own chip) + session
 /// history. Wrapped with [AutomaticKeepAliveClientMixin] so its section
-/// providers are NOT rebuilt when swiping to PLANTILLAS and back.
+/// providers are NOT rebuilt when swiping to EXPLORAR and back.
 class _TuEntrenoPage extends StatefulWidget {
   const _TuEntrenoPage();
 

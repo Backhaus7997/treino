@@ -87,8 +87,11 @@ void main() {
         .widgetList<RichText>(find.byType(RichText))
         .map((rt) => rt.text.toPlainText())
         .join(' ');
-    expect(headlineText, contains('MOVÉS'));
-    expect(headlineText, contains('EL RESTO.'));
+    // Keyed off l10n, not literal copy: splash and welcome now read the brand
+    // headline from the same keys, so a copy change can't desync them.
+    final l10n = AppL10n.of(tester.element(find.byType(TreinoLogo)));
+    expect(headlineText, contains(l10n.authBrandHeadline1Light.trim()));
+    expect(headlineText, contains(l10n.authBrandHeadline2Bold));
 
     await tester.pumpAndSettle();
   });

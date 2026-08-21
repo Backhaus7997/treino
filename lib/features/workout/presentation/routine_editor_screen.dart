@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_motion.dart';
@@ -1658,7 +1659,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         return AlertDialog(
           backgroundColor: palette.bgCard,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(AppRadius.lg),
           ),
           title: Text(
             l10n.routineEditorDiscardTitle,
@@ -2081,7 +2082,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                       disabledBackgroundColor: palette.accent.withAlpha(80),
                       minimumSize: const Size.fromHeight(48),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(9999),
+                        borderRadius: BorderRadius.circular(AppRadius.full),
                       ),
                     ),
                     child: _submitting
@@ -2280,12 +2281,12 @@ class _WeekChip extends StatelessWidget {
       selected: selected,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(9999),
+        borderRadius: BorderRadius.circular(AppRadius.full),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
           decoration: BoxDecoration(
             color: selected ? palette.accent : palette.bgCard,
-            borderRadius: BorderRadius.circular(9999),
+            borderRadius: BorderRadius.circular(AppRadius.full),
             border: Border.all(
               color: selected ? palette.accent : palette.border,
             ),
@@ -2646,7 +2647,7 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
     return Container(
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         border: Border.all(
           color: hasDayError ? palette.danger.withAlpha(180) : palette.border,
           width: hasDayError ? 1.5 : 1.0,
@@ -2657,7 +2658,8 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
           // Header row
           InkWell(
             onTap: () => setState(() => _expanded = !_expanded),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(AppRadius.sm)),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               child: Row(
@@ -2871,7 +2873,7 @@ class _SupersetGroupCard extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
       decoration: BoxDecoration(
         color: palette.highlight.withAlpha(12),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         border: Border.all(color: palette.highlight.withAlpha(120)),
       ),
       child: Column(
@@ -3090,7 +3092,7 @@ class _SlotEditorState extends State<_SlotEditor> {
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         border: widget.hasSlotError
             ? Border(
                 left: BorderSide(

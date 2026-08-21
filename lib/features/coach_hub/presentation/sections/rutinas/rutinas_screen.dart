@@ -366,7 +366,7 @@ class _Chip extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected ? palette.accent : Colors.transparent,
           border: Border.all(color: selected ? palette.accent : palette.border),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
         ),
         child: Text(
           label,
@@ -411,15 +411,15 @@ class _SearchFieldState extends ConsumerState<_SearchField> {
         filled: true,
         fillColor: palette.bgCard,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           borderSide: BorderSide(color: palette.border),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           borderSide: BorderSide(color: palette.border),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           borderSide: BorderSide(color: palette.accent),
         ),
       ),
@@ -530,7 +530,7 @@ class _AthleteRowState extends State<_AthleteRow> {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
             color: palette.bgCard,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
             border: Border.all(
                 color: _hovered ? palette.borderHover : palette.border),
           ),
@@ -749,7 +749,7 @@ class _EstadoPill extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -792,7 +792,7 @@ class _RoutineCountBadge extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
           color: palette.textMuted.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
         ),
         child: Text(
           '…', // i18n
@@ -813,7 +813,7 @@ class _RoutineCountBadge extends StatelessWidget {
         color: hasRoutines
             ? color.withValues(alpha: 0.15)
             : palette.textMuted.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
       ),
       child: Text(
         label,

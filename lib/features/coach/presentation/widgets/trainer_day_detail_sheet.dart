@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/motion/treino_state_switcher.dart';
@@ -424,7 +425,8 @@ class _BookedSlotChipState extends ConsumerState<_BookedSlotChip> {
         isScrollControlled: true,
         backgroundColor: AppPalette.of(context).bgCard,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
         ),
         builder: (_) => SessionDetailSheet(
           appointment: widget.appointment,

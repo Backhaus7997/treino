@@ -14,7 +14,7 @@ Reglas de producto: naming, tab bar, roles, scope. Cosas que no son técnicas pe
 | # | Tab | Ícono | Ruta | Contiene |
 |---|---|---|---|---|
 | 1 | Entrenar | `TreinoIcon.tabWorkout` | `/workout` | Rutinas, Workout Player, Explore programas, Historial, Entreno IA |
-| 2 | Feed | `TreinoIcon.tabFeed` | `/feed` | Amigos · Comunidad · Público (3 segmentos), perfiles, friend requests. Sin PFs. |
+| 2 | Feed | `TreinoIcon.tabFeed` | `/feed` | Amigos · Comunidad · Público (3 segmentos), perfiles, friend requests. Sin PFs. 2da página swipeable: Rankings (`/feed?tab=rankings`), sólo para el rol atleta. |
 | 3 | **Inicio** | `TreinoIcon.tabHome` | `/home` | Mockup Mobile Home (streak, stats, card HOY con CTA, amigos entrenando) |
 | 4 | Coach | `TreinoIcon.tabCoach` | `/coach` | Discovery cercana, mis coaches, chat, agenda, planes asignados. Vista distinta según rol. |
 | 5 | Perfil | `TreinoIcon.tabProfile` | `/profile` | Datos, gym, apariencia (toggle paleta), ajustes, logout |
@@ -52,7 +52,7 @@ No hay toggle interno entre vistas — el rol es uno solo y se elige al crear la
 
 Aunque el repo viejo (`gymrankiOS` / `gymrank` Android) los tenía, en TREINO Flutter quedan **fuera**:
 
-- Ranking global, semanal y mensual (ranking por gym, opt-in, ya está implementado — ver `/workout?tab=rankings` (2da página swipeable del tab Entrenar; `/profile/rankings` redirige ahí): rachas/volumen/main lifts, scope per-gym, opt-in explícito del atleta)
+- Ranking global, semanal y mensual (ranking por gym, opt-in, ya está implementado — ver `/feed?tab=rankings` (2da página swipeable del tab Feed; `/workout?tab=rankings` y `/profile/rankings` redirigen ahí): rachas/volumen/main lifts, scope per-gym, opt-in explícito del atleta)
 - Retos / Challenges
 - Missions
 - Bets

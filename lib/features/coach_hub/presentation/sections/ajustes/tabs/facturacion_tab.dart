@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
@@ -74,12 +75,8 @@ String _tierLabel(SubscriptionTier tier) => switch (tier) {
       SubscriptionTier.free => 'Free', // i18n: Fase W3
       SubscriptionTier.plan1 => 'Plan 1', // i18n: Fase W3
       SubscriptionTier.plan2 => 'Plan 2', // i18n: Fase W3
+      SubscriptionTier.plan3 => 'Plan 3', // i18n: Fase W3
     };
-
-/// Formatea la carga ponderada: entero sin decimal (7), fracción con uno (6.5).
-String _formatLoad(double load) => load == load.roundToDouble()
-    ? load.toStringAsFixed(0)
-    : load.toStringAsFixed(1);
 
 class _CurrentPlanCard extends StatelessWidget {
   const _CurrentPlanCard({
@@ -91,14 +88,20 @@ class _CurrentPlanCard extends StatelessWidget {
 
   final SubscriptionTier tier;
   final double load;
-  final int limit;
+
+  /// `null` = sin límite (plan3).
+  final int? limit;
   final AppPalette palette;
 
   @override
   Widget build(BuildContext context) {
     // Fracción para la barra, tope en 1.0 aunque esté sobre el límite.
-    final fraction = limit == 0 ? 0.0 : (load / limit).clamp(0.0, 1.0);
-    final overLimit = load > limit;
+    // Sin límite: la barra queda vacía y nunca hay excedente. Mostrar una
+    // barra llena al 100% sugeriría que estás al tope, que es lo contrario.
+    final lim = limit;
+    final fraction =
+        lim == null || lim == 0 ? 0.0 : (load / lim).clamp(0.0, 1.0);
+    final overLimit = lim != null && load > lim;
 
     return Container(
       width: double.infinity,
@@ -149,7 +152,11 @@ class _CurrentPlanCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '${_formatLoad(load)} / $limit',
+                lim == null
+                    // Contador sin techo: "N / sin límite" en vez de un
+                    // simbolo. Mismo criterio que la pricing page.
+                    ? '${formatWeightedLoad(load)} / sin límite' // i18n: Fase W3
+                    : '${formatWeightedLoad(load)} / $lim',
                 style: GoogleFonts.barlowCondensed(
                   color: overLimit ? palette.highlight : palette.textPrimary,
                   fontSize: 26,
@@ -211,7 +218,7 @@ class _ChangePlanButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
             border: Border.all(color: palette.accent),
-            borderRadius: BorderRadius.circular(9999),
+            borderRadius: BorderRadius.circular(AppRadius.full),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,

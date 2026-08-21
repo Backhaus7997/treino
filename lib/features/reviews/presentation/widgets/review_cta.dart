@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../l10n/app_l10n.dart';
@@ -85,7 +86,7 @@ class ReviewCta extends ConsumerWidget {
           side: BorderSide(color: palette.accent),
           padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(9999),
+            borderRadius: BorderRadius.circular(AppRadius.full),
           ),
         ),
         child: Text(

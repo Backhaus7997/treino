@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
@@ -44,7 +45,8 @@ class _LocationRationaleSheet extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: palette.espresso,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius:
+            const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
       ),
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
       child: Column(

@@ -10,8 +10,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/motion/treino_shimmer.dart';
+import 'package:treino/features/coach_hub/presentation/sections/biblioteca/widgets/biblioteca_filter_chips.dart';
 import 'package:treino/features/coach_hub/presentation/sections/biblioteca/widgets/ejercicios_tab.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/workout/application/custom_exercise_providers.dart';
@@ -157,6 +160,32 @@ void main() {
       expect(find.byType(GridView), findsNothing);
       expect(find.byType(TreinoEmptyState), findsOneWidget);
       expect(find.textContaining('ejercicio'), findsWidgets);
+    });
+  });
+
+  group('EjerciciosTab — stagger de entrada (ADR-B7-03)', () {
+    testWidgets(
+        'BibliotecaFilterChips está envuelto en TreinoFadeSlideIn con delay '
+        'staggered (índice 1)', (tester) async {
+      tester.view.physicalSize = const Size(1280, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        _wrap(const EjerciciosTab(), catalog: const [_bench]),
+      );
+      await tester.pump();
+
+      final fadeSlideInAncestor = tester.widget<TreinoFadeSlideIn>(
+        find.ancestor(
+          of: find.byType(BibliotecaFilterChips),
+          matching: find.byType(TreinoFadeSlideIn),
+        ),
+      );
+
+      expect(fadeSlideInAncestor.delay, AppMotion.stagger(1));
+      expect(fadeSlideInAncestor.delay, isNot(Duration.zero));
     });
   });
 

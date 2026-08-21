@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/utils/kg_format.dart';
@@ -84,7 +85,8 @@ class _SetEntrySheetState extends State<SetEntrySheet> {
     return Container(
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius:
+            const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
       ),
       padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottomPad),
       // Sin TreinoFadeSlideIn de bloque: showModalBottomSheet ya anima la
@@ -233,7 +235,7 @@ class _SetEntrySheetState extends State<SetEntrySheet> {
                 backgroundColor: palette.accent,
                 minimumSize: const Size.fromHeight(56),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(9999),
+                  borderRadius: BorderRadius.circular(AppRadius.full),
                 ),
               ),
               child: Text(
@@ -315,7 +317,8 @@ class TechniqueSheet extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius:
+            const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
       ),
       padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottomPad),
       constraints: BoxConstraints(
@@ -368,7 +371,7 @@ class TechniqueSheet extends StatelessWidget {
               height: 120,
               decoration: BoxDecoration(
                 color: palette.bg,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
                 border: Border.all(color: palette.border),
               ),
               child: Center(

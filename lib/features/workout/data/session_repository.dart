@@ -9,6 +9,8 @@ import '../../profile/data/user_public_profile_repository.dart';
 import '../domain/session.dart';
 import '../domain/session_status.dart';
 import '../domain/set_log.dart';
+import '../application/session_duration.dart';
+import '../domain/set_log_identity.dart';
 
 class SessionRepository {
   SessionRepository({
@@ -37,6 +39,14 @@ class SessionRepository {
   /// or the server's recompute would disagree with what the app historically
   /// showed for `workoutsCount`/`racha` scoping.
   static const int counterRecomputeWindow = 365;
+
+  /// Cuántas sesiones `active` mira [getActive] para barrer las colgadas.
+  ///
+  /// No es 1 porque con `limit(1)` era imposible enterarse de que había otras;
+  /// y no es ilimitado porque la lectura no puede crecer con la basura
+  /// acumulada. 10 alcanza de sobra: el barrido corre en cada lectura, así que
+  /// una cola larga se drena en pocas visitas en vez de en una sola cara.
+  static const int _staleActiveSweep = 10;
 
   // ─── Private collection getters ─────────────────────────────────────────
 
@@ -161,6 +171,34 @@ class SessionRepository {
     return snap.docs.map(_sessionFromDoc).whereType<Session>().toList();
   }
 
+  // ─── watchRevision ──────────────────────────────────────────────────────
+
+  /// Emite un número distinto cada vez que cambia ALGO en las sesiones de
+  /// [uid]: se crea una, se termina, se le carga una serie.
+  ///
+  /// Existe porque el historial se lee con `listByUid` de una sola vez, y desde
+  /// que el RELOJ también escribe sesiones el teléfono no tiene forma de
+  /// enterarse: terminabas el entreno en la muñeca y la app seguía mostrando lo
+  /// de antes hasta que la cerrabas.
+  ///
+  /// Devuelve una REVISIÓN y no las sesiones a propósito. Convertir
+  /// `sessionsByUidProvider` en stream cambiaría su tipo, y de él cuelgan el
+  /// historial, Home, cuatro pantallas de Insights, el panel del PF y 30
+  /// archivos de test. Una señal barata que dispara el refetch da lo mismo
+  /// —datos frescos sin reiniciar— sin tocar nada de eso.
+  ///
+  /// El primer valor llega apenas se suscribe (Firestore entrega el snapshot
+  /// inicial), así que quien lo escuche no queda colgado esperando un cambio.
+  Stream<int> watchRevision(String uid, {int? limit}) {
+    if (uid.isEmpty) return Stream.value(0);
+    var query = _sessions(uid).orderBy('startedAt', descending: true);
+    if (limit != null) query = query.limit(limit);
+    // El contador vive por suscripción: cada listener arranca en 0 y sube con
+    // cada snapshot. No importa el valor, importa que CAMBIE.
+    var revision = 0;
+    return query.snapshots().map((_) => revision++);
+  }
+
   // ─── listRecentCompletedByUid ───────────────────────────────────────────
 
   /// Returns the athlete's most recently STARTED completed sessions, bounded
@@ -261,23 +299,182 @@ class SessionRepository {
 
   // ─── getActive ──────────────────────────────────────────────────────────
 
-  Future<Session?> getActive(String uid) async {
+  /// La sesión activa del atleta. **Y cierra las que quedaron colgadas.**
+  ///
+  /// No existía ningún invariante de "una sola sesión activa por atleta": hay
+  /// DOS caminos que crean sesiones `active` —`SessionNotifier._buildFresh` en
+  /// el teléfono y `HistorySync.adoptOrCreateSession` en el reloj— y NINGUNO
+  /// cerraba las que quedaban atrás. Como esta consulta siempre devolvió la más
+  /// nueva, las viejas se volvían zombis invisibles que se acumulaban para
+  /// siempre. Es la causa de fondo del "me marca el entreno como pendiente"
+  /// (HANDOFF §8.1).
+  ///
+  /// Cerrarlas NO cambia nada de lo que ve el atleta: esta consulta ya
+  /// devolvía solo la más nueva, así que las otras no se mostraban en ningún
+  /// lado. Lo que sí cambia es que dejan de acumularse, y que el reloj —cuyo
+  /// `findAnyActiveSession` mira las 10 más recientes sin terminar— deja de
+  /// poder engancharse a una que para el atleta ya no existe.
+  ///
+  /// Va acá y no en `create` a propósito: `create` es el camino del TELÉFONO, y
+  /// el reloj crea sus sesiones por REST sin pasar por Dart. Esta consulta es el
+  /// único punto donde convergen los zombis de los dos clientes.
+  ///
+  /// Se cierran con `wasFullyCompleted: false`, así que no cuentan como entreno
+  /// hecho: no mueven el avance del plan, ni la racha, ni los rankings.
+  /// `totalVolumeKg` y `durationMin` se dejan como están —una sesión activa nace
+  /// en 0 y nadie los toca hasta terminarla— porque inventarles un valor sería
+  /// peor que dejar el 0 honesto.
+  /// Además cierra la ÚLTIMA si ya venció.
+  ///
+  /// Barrer las repetidas dejaba viva una sesión de ayer, y el aviso de retomar
+  /// seguía saliendo hoy — con un agravante: el modal muestra solo la hora, sin
+  /// fecha, así que un entreno de hace cinco días se lee como "desde 19:42" y el
+  /// atleta no tiene forma de saber que está viejo.
+  ///
+  /// El corte es [maxWorkoutDuration], la MISMA constante que ya usa
+  /// `sanitizedActiveSessionElapsedSeconds` para acotar el cronómetro. No es un
+  /// número nuevo: si el propio contador de tiempo considera que un entreno no
+  /// puede durar más de eso, una sesión activa más vieja está muerta por
+  /// definición.
+  ///
+  /// [now] se inyecta para que el test sea determinístico, igual que en
+  /// [listFinishedToday].
+  Future<Session?> getActive(String uid, {DateTime? now}) async {
     final snap = await _sessions(uid)
         .where('status', isEqualTo: 'active')
         .orderBy('startedAt', descending: true)
-        .limit(1)
+        // Se piden VARIAS y no una: con `limit(1)` era imposible enterarse de
+        // que había colgadas. La cota existe igual para que la lectura no
+        // crezca con la basura acumulada.
+        .limit(_staleActiveSweep)
         .get();
     if (snap.docs.isEmpty) return null;
-    return _sessionFromDoc(snap.docs.first);
+
+    final ahora = (now ?? DateTime.now()).toUtc();
+    final masNueva = _sessionFromDoc(snap.docs.first);
+    // Una sesión que no se puede ni leer no se puede ofrecer para retomar, pero
+    // tampoco hay que dejarla colgada: entra en el barrido con las demás.
+    final vencio = masNueva == null ||
+        ahora.difference(masNueva.startedAt.toUtc()) > maxWorkoutDuration;
+
+    // Si venció, se cierran TODAS; si no, todas menos la que el atleta está
+    // haciendo.
+    final aCerrar = vencio ? snap.docs : snap.docs.skip(1).toList();
+
+    // Best-effort: si el barrido falla, se devuelve igual la sesión activa. El
+    // atleta tiene que poder seguir entrenando aunque la limpieza no entre.
+    if (aCerrar.isNotEmpty) {
+      try {
+        final cerradaEn = Timestamp.fromDate(ahora);
+        for (final vieja in aCerrar) {
+          await vieja.reference.update({
+            'status': SessionStatusX(SessionStatus.finished).toJson(),
+            'finishedAt': cerradaEn,
+            'wasFullyCompleted': false,
+          });
+        }
+      } catch (e, st) {
+        developer.log(
+          'SessionRepository: no se pudieron cerrar las sesiones colgadas '
+          'de $uid',
+          error: e,
+          stackTrace: st,
+        );
+      }
+    }
+
+    return vencio ? null : masNueva;
   }
 
   // ─── addSetLog ──────────────────────────────────────────────────────────
 
+  /// Persiste una serie. **Idempotente por identidad lógica contra lo que
+  /// escribió el RELOJ**, no solo contra el estado local del teléfono.
+  ///
+  /// Antes de crear su documento, mira la ruta determinística con la que el reloj
+  /// escribe esa misma serie (`{exerciseId}__{setNumber}`) y, si ya está, escribe
+  /// SOBRE ESE documento en vez de crear uno nuevo.
+  ///
+  /// Por qué la comprobación va acá y no alcanzaba con el guard de
+  /// `SessionNotifier.logSet`: ese guard pregunta por el estado LOCAL, y el
+  /// estado local es tan fresco como el último snapshot que llegó. Medido contra
+  /// el emulador el 2026-08-11, sobre una sesión de `seed-athlete-001`: el reloj
+  /// escribió la serie 1 a las 17:06:13 y el teléfono creó su propio documento de
+  /// la MISMA serie 37 segundos después, y cerró la sesión con
+  /// `totalVolumeKg = 1650` — sus 3 series propias, sin haber ingerido ninguno de
+  /// los 4 documentos del reloj en 55 segundos. Con 37 segundos de ventaja no hay
+  /// carrera que perder: lo que falla es depender de la frescura de una caché.
+  /// De 77 sesiones inspeccionadas, 13 tenían duplicados —24 documentos de más y
+  /// 11.450 kg fantasma acumulados—; la peor, 17 documentos para 10 series
+  /// reales. El volumen inflado lo leen historial, insights, progresión y
+  /// RANKINGS, que es competitivo entre gente del mismo gimnasio.
+  ///
+  /// Cuesta UNA lectura por serie cargada (~30 por entreno).
+  ///
+  /// ⚠️ ALCANCE EXACTO, para no prometer más de lo que hace: esto NO vuelve la
+  /// escritura atómica. La secuencia `get` → (el reloj escribe) → `set` sigue
+  /// siendo posible; lo que cambia es el TAMAÑO de la ventana, de "lo que tarde
+  /// en refrescarse la caché" —37 segundos medidos— a un round-trip de `get`.
+  /// Cerrarla del todo pediría una transacción, que reintenta si el documento
+  /// leído cambió antes del commit; no se agregó porque `fake_cloud_firestore`
+  /// resuelve `runTransaction` con un `_DummyTransaction` sin atomicidad ni
+  /// reintento, así que la garantía quedaría afirmada y no medida.
+  ///
+  /// En la práctica hay DOS defensas y la de la caché gana casi siempre: medido
+  /// en los simuladores emparejados el 2026-08-12, al escribir la serie con la
+  /// app en segundo plano y marcarla al volver, el listener llegó primero y el
+  /// guard de `logSet` cortó antes de esta lectura. Este camino es la red para
+  /// cuando ese listener NO llegó a tiempo — que es exactamente lo que pasó en la
+  /// sesión de 37 segundos de arriba.
+  ///
+  /// El teléfono NO pasa a usar ids determinísticos para sus propias series: al
+  /// borrar una serie renumera las siguientes, y eso obligaría a mover documentos
+  /// (HANDOFF §4.3). Solo ADOPTA el id del reloj cuando el reloj llegó primero.
   Future<SetLog> addSetLog({
     required String uid,
     required String sessionId,
     required SetLog setLog,
   }) async {
+    final watchDocId = setLogDeterministicDocId(
+      exerciseId: setLog.exerciseId,
+      setNumber: setLog.setNumber,
+    );
+    final watchRef = _setLogs(uid, sessionId).doc(watchDocId);
+    final watchSnap = await watchRef.get();
+    final watchData = watchSnap.data();
+
+    // La identidad se decide por los CAMPOS, nunca por el path. Un documento
+    // puede quedar en una ruta que ya no lo describe: `removeSet` renumera las
+    // sobrevivientes con `updateSetLog`, que conserva el id y baja el campo
+    // `setNumber`, así que `sentadilla__3` puede contener la serie 2. Escribir
+    // ahí confiando en la ruta perdería una serie que el atleta cargó — peor que
+    // el duplicado que estamos arreglando.
+    //
+    // No es hipotético: reproducido en los simuladores emparejados el
+    // 2026-08-12. El reloj escribió `peso-muerto__1/2/3`, se borró la serie 2
+    // desde el teléfono —la renumeración dejó `peso-muerto__3` conteniendo la
+    // serie 2— y al cargar una serie 3 nueva el teléfono creó su propio
+    // documento. Confiando en la ruta, esa serie 2 se habría destruido.
+    final holdsThisSet = watchSnap.exists &&
+        watchData != null &&
+        setLogDocHoldsSet(
+          docExerciseId: watchData['exerciseId'],
+          docSetNumber: watchData['setNumber'],
+          exerciseId: setLog.exerciseId,
+          setNumber: setLog.setNumber,
+        );
+
+    if (holdsThisSet) {
+      // Se pisa con los valores del teléfono a propósito: es la superficie
+      // interactiva —la única con edición de reps/peso— así que el documento
+      // queda coincidiendo con lo que el atleta está viendo. El id que se
+      // devuelve es el del reloj, para que un `updateSet`/`removeSet` posterior
+      // apunte al documento que existe y no a uno inventado.
+      final adopted = setLog.copyWith(id: watchDocId);
+      await watchRef.set(adopted.toJson());
+      return adopted;
+    }
+
     final ref = _setLogs(uid, sessionId).doc();
     final withId = setLog.copyWith(id: ref.id);
     await ref.set(withId.toJson());
@@ -324,6 +521,53 @@ class SessionRepository {
     return snap.docs.map(_setLogFromDoc).whereType<SetLog>().toList();
   }
 
+  // ─── watchSetLogs ───────────────────────────────────────────────────────
+
+  /// Stream vivo de las series de una sesión, ordenadas por `setNumber`.
+  ///
+  /// Existe porque el RELOJ escribe series en la misma sesión que el teléfono
+  /// tiene abierta, y `listSetLogs` es una lectura única: el atleta marcaba en
+  /// la muñeca y la pantalla del celular seguía mostrando la serie sin tildar.
+  ///
+  /// Ordenado igual que [listSetLogs] para que el estado no dé un salto de
+  /// orden cuando el stream reemplaza a la carga inicial.
+  Stream<List<SetLog>> watchSetLogs({
+    required String uid,
+    required String sessionId,
+  }) {
+    if (uid.isEmpty || sessionId.isEmpty) {
+      return Stream.value(const <SetLog>[]);
+    }
+    return _setLogs(uid, sessionId)
+        .orderBy('setNumber', descending: false)
+        .snapshots()
+        .map((s) => s.docs.map(_setLogFromDoc).whereType<SetLog>().toList());
+  }
+
+  // ─── watchSessionFinished ───────────────────────────────────────────────
+
+  /// Emite `true` cuando la sesión pasa a terminada, o deja de existir.
+  ///
+  /// El reloj puede cerrar el entreno mientras el teléfono lo tiene abierto.
+  /// Sin esto la app se quedaba con el player vivo sobre una sesión cerrada, y
+  /// lo que se marcara ahí se escribía sobre un entreno que ya estaba en el
+  /// historial.
+  Stream<bool> watchSessionFinished({
+    required String uid,
+    required String sessionId,
+  }) {
+    if (uid.isEmpty || sessionId.isEmpty) return Stream.value(false);
+    return _sessions(uid).doc(sessionId).snapshots().map((snap) {
+      if (!snap.exists) return true;
+      final data = snap.data();
+      // `finishedAt` viaja SIEMPRE como clave (json_serializable la incluye
+      // con null), así que preguntar por la presencia de la clave no alcanza:
+      // hay que mirar el valor. Es la misma trampa que rompió el lado del
+      // reloj — ver `FS.isEmpty` en FirestoreREST.swift.
+      return data != null && data['finishedAt'] != null;
+    });
+  }
+
   // ─── Private helpers ────────────────────────────────────────────────────
 
   Session? _sessionFromDoc(DocumentSnapshot<Map<String, Object?>> snap) {
@@ -348,6 +592,27 @@ class SessionRepository {
   SetLog? _setLogFromDoc(DocumentSnapshot<Map<String, Object?>> snap) {
     final data = snap.data();
     if (!snap.exists || data == null) return null;
-    return SetLog.fromJson(data);
+    try {
+      // El id sale del PATH, no del cuerpo (HANDOFF §4.2, la trampa que dejaba
+      // las rutinas reales con id vacío). Los dos clientes hoy lo escriben
+      // adentro y coincide, pero el path es el que manda: si alguna vez no
+      // coincidieran, un `updateSetLog`/`deleteSetLog` por el id del cuerpo
+      // apuntaría a un documento que no existe.
+      //
+      // Y va envuelto por la MISMA razón que `_sessionFromDoc`: una sola serie
+      // malformada no puede tumbar la lista entera. Sin esto, `SetLog.fromJson`
+      // tiraba y se llevaba puesto todo `listSetLogs` — o sea el entreno no
+      // abría, ni para retomar ni para ver el historial. Una serie que no se
+      // puede leer es una serie perdida; todas las demás no tienen por qué
+      // irse con ella.
+      return SetLog.fromJson({...data, 'id': snap.id});
+    } catch (e, st) {
+      developer.log(
+        'SessionRepository: skipped unparseable setLog ${snap.id}',
+        error: e,
+        stackTrace: st,
+      );
+      return null;
+    }
   }
 }
