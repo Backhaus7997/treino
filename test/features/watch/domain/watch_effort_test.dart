@@ -94,15 +94,62 @@ void main() {
       expect(effort!.kcal, 0);
     });
 
-    test('ida y vuelta', () {
-      const original = WatchEffort(bpm: 130, kcal: 42, measuredAt: null);
-      final conFecha = WatchEffort(
-        bpm: original.bpm,
-        kcal: original.kcal,
-        measuredAt: t0,
-      );
+    // El test de "ida y vuelta" que había acá se borró junto con `toContext()`.
+    //
+    // Serializaba con Dart y parseaba con Dart, o sea que confirmaba un
+    // contrato que no es el real: el que ESCRIBE este payload es Swift. Y
+    // pasaba por vacuidad — `toContext()` no incluía ninguno de los campos del
+    // cronómetro, así que el round-trip no los ejercía. La suite se veía verde
+    // sobre el contrato que después resultó estar roto.
+    //
+    // El contrato de verdad vive en `conformance/effort_payload.json` y lo
+    // corren los DOS lados.
 
-      expect(WatchEffort.tryParse(conFecha.toContext()), conFecha);
+    test('un cronómetro sin pulso ni calorías sobrevive el parseo', () {
+      // El caso normal de los primeros segundos de una serie por tiempo: el
+      // atleta arranca la plancha antes de que llegue la primera muestra de
+      // HealthKit. Si alguna guarda lo descartara por "vacío", el teléfono no
+      // se enteraría nunca del cronómetro — y es justo cuando más importa.
+      final effort = WatchEffort.tryParse({
+        'kind': WatchEffort.kind,
+        'measuredAtMs': t0.millisecondsSinceEpoch,
+        'timerExerciseId': 'plancha',
+        'timerSetNumber': 2,
+        'timerTotalSeconds': 60,
+        'timerEndsAtMs':
+            t0.add(const Duration(seconds: 60)).millisecondsSinceEpoch,
+      });
+
+      expect(effort, isNotNull);
+      expect(effort!.bpm, isNull);
+      expect(effort.kcal, isNull);
+      expect(effort.timerCorreEn(exerciseId: 'plancha', setNumber: 2), isTrue);
+      expect(
+        effort.timerCorreEn(exerciseId: 'plancha', setNumber: 3),
+        isFalse,
+        reason: 'otra serie del MISMO ejercicio no es la que corre',
+      );
+      expect(
+        effort.timerCorreEn(exerciseId: 'sentadilla', setNumber: 2),
+        isFalse,
+      );
+    });
+
+    test('sin número de serie no se puede ubicar la cuenta', () {
+      // Una cuenta dibujada en la fila equivocada es peor que ninguna: el
+      // atleta la ve correr sobre una serie que no está haciendo.
+      final effort = WatchEffort.tryParse({
+        'kind': WatchEffort.kind,
+        'measuredAtMs': t0.millisecondsSinceEpoch,
+        'timerExerciseId': 'plancha',
+        'timerTotalSeconds': 60,
+        'timerEndsAtMs':
+            t0.add(const Duration(seconds: 60)).millisecondsSinceEpoch,
+      });
+
+      expect(effort, isNotNull);
+      expect(effort!.timerSetNumber, isNull);
+      expect(effort.timerCorreEn(exerciseId: 'plancha', setNumber: 1), isFalse);
     });
   });
 
@@ -148,7 +195,8 @@ void main() {
       // que no existe. Se muestra nada, que es lo cierto.
       final display = WatchEffortRules.display(
         effort: WatchEffort(bpm: 138, kcal: 90, measuredAt: t0),
-        now: t0.add(WatchEffortRules.maxAntiguedad + const Duration(seconds: 1)),
+        now:
+            t0.add(WatchEffortRules.maxAntiguedad + const Duration(seconds: 1)),
       );
 
       expect(display, const WatchEffortDisplay.nada());
@@ -167,7 +215,8 @@ void main() {
       // Desfase mayor que el umbral, para que el test distinga esta regla de
       // una que use el valor absoluto de la diferencia.
       final display = WatchEffortRules.display(
-        effort: WatchEffort(bpm: 138, measuredAt: t0.add(const Duration(minutes: 5))),
+        effort: WatchEffort(
+            bpm: 138, measuredAt: t0.add(const Duration(minutes: 5))),
         now: t0,
       );
 

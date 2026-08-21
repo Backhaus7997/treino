@@ -28,7 +28,23 @@ struct WorkoutView: View {
     @State private var confirmandoAbandono = false
 
     var body: some View {
-        if let exercise = workout.currentExercise, let session = workout.session {
+        // El cronometro de un ejercicio POR TIEMPO gana sobre todo lo demas.
+        //
+        // Pedido del dueno: que tome prioridad en la pantalla y que hasta que no
+        // termine no se pueda marcar la serie. Con la pantalla tomada no hay
+        // ninguna fila que tocar, asi que la regla se cumple por construccion en
+        // vez de por un `disabled` que hay que acordarse de poner.
+        if let cuenta = workout.durationSet {
+            durationTimerScreen(cuenta)
+        } else if let espejo = workout.phoneTimer, !workout.phoneTimerOculto {
+            // El cronometro que arranco en el TELEFONO. Misma prioridad de
+            // pantalla por el mismo motivo: mientras dura la serie no hay nada
+            // que marcar.
+            //
+            // Si el atleta lo oculto, la cuenta SIGUE viva —vibra igual al
+            // terminar— y esta pantalla vuelve al tocar la fila del ejercicio.
+            phoneTimerScreen(espejo)
+        } else if let exercise = workout.currentExercise, let session = workout.session {
             ScrollView {
                 VStack(spacing: 6) {
                     header(exercise: exercise, session: session)
@@ -41,13 +57,20 @@ struct WorkoutView: View {
 
                     setsList(exercise: exercise, session: session)
 
-                    if !session.pendingSets.isEmpty {
-                        Label("\(session.pendingSets.count) sin subir",
-                              systemImage: "arrow.up.circle")
-                            .font(.caption2)
-                            .foregroundStyle(.orange)
-                            .padding(.top, 2)
-                    }
+                    // El cartel "N sin subir" se saco por pedido del dueno
+                    // (2026-08-19): aparecia en cada serie marcada y ensuciaba
+                    // la pantalla.
+                    //
+                    // No deja al atleta ciego: el caso PELIGROSO —abandonar un
+                    // entreno con series sin subir, que es un no-op silencioso—
+                    // tiene su propio banner explicito en `WorkoutCloseFeedback`
+                    // ("Falta subir N series. El entreno sigue abierto") con
+                    // boton de reintentar. Ese aviso llega cuando importa, en
+                    // vez de estar prendido todo el tiempo.
+                    //
+                    // Y la causa de fondo se ataco en el mismo commit: con el
+                    // idToken cacheado las series suben en menos viajes, asi que
+                    // la cola casi no existe.
 
                     // Terminar aparece SOLO con todas las series de todos los
                     // ejercicios cargadas. Pedido del dueño: tenerlo siempre a
@@ -72,18 +95,41 @@ struct WorkoutView: View {
                         // teléfono a mano, antes no había ningún gesto: la
                         // sesión quedaba abierta para siempre.
                         //
-                        // Deliberadamente POCO accesible, que es lo que pidió el
-                        // dueño: chico, gris, sin tinte destructivo y debajo del
-                        // texto. El botón de arriba se gana marcando series; a
-                        // este hay que buscarlo. Y no ejecuta nada por sí solo —
-                        // pide confirmación, igual que el teléfono.
+                        // VISIBILIDAD, revisada por el dueño el 2026-08-18 con
+                        // la app corriendo en la muñeca: "casi ni lo veo, lo vi
+                        // de pedo". La versión original era deliberadamente poco
+                        // accesible —texto plano de 10pt en gris, pegado debajo
+                        // de otra línea gris— y en pantalla resultó invisible,
+                        // no discreta.
+                        //
+                        // El criterio nuevo es que se ENCUENTRE sin que se TOQUE
+                        // sin querer, y son dos cosas distintas:
+                        //   - Se encuentra: forma de botón (`.bordered`), que lo
+                        //     despega del texto de arriba, y tamaño legible.
+                        //   - No se toca sin querer: sigue ABAJO de todo y
+                        //     separado, el destructivo de verdad ("Terminar")
+                        //     se gana marcando series, y sobre todo NO EJECUTA
+                        //     NADA por sí solo — abre un `confirmationDialog`.
+                        //     Esa confirmación es la defensa real contra el
+                        //     toque accidental; la invisibilidad nunca lo fue.
                         Button("Abandonar entreno") {
                             confirmandoAbandono = true
                         }
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                        .buttonStyle(.plain)
-                        .padding(.top, 6)
+                        .font(.caption2)
+                        .buttonStyle(.bordered)
+                        .tint(.secondary)
+                        .padding(.top, 12)
+                    }
+
+                    // Por que NO se cerro el entreno.
+                    //
+                    // Va afuera del if/else porque las dos salidas —TERMINAR y
+                    // ABANDONAR— llaman a `finish()` y las dos pueden fallar
+                    // igual. Antes no habia nada: el fallo por pendientes
+                    // cortaba en silencio y el del historial se guardaba en
+                    // `syncError`, que no lo renderizaba ninguna vista.
+                    if let motivo = workout.closeFailure {
+                        closeFailureBanner(motivo)
                     }
                 }
                 .padding(.horizontal, 2)
@@ -116,7 +162,128 @@ struct WorkoutView: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+
+            // Sin esto el atleta no tiene forma de saber que esta adentro de
+            // una superserie: la pantalla del reloj muestra UN ejercicio, y
+            // saltar de A a B entre series parece un error de la app en vez de
+            // el entrenamiento que pidio su plan.
+            if let cursor = workout.currentCursor,
+               let vuelta = cursor.round,
+               let total = cursor.totalRounds {
+                Text("SUPERSERIE · VUELTA \(vuelta)/\(total)")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.orange)
+                    .multilineTextAlignment(.center)
+            }
         }
+    }
+
+    /// La cuenta regresiva de un ejercicio por tiempo, a pantalla completa.
+    ///
+    /// No hay boton de "hecho": al llegar a cero la serie se marca SOLA y el
+    /// reloj vibra. Un ejercicio por tiempo no se completa por decision del
+    /// atleta, se completa cuando pasa el tiempo.
+    private func durationTimerScreen(_ cuenta: WorkoutCoordinator.DurationSet) -> some View {
+        VStack(spacing: 8) {
+            Text(nombreDe(cuenta.exerciseId))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .minimumScaleFactor(0.7)
+
+            Text(CountdownRules.display(remaining: workout.durationRemaining))
+                .font(.system(size: 46, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .minimumScaleFactor(0.5)
+                .foregroundStyle(.green)
+
+            Text("serie \(cuenta.setNumber) · \(cuenta.totalSeconds)s")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
+            // El pulso tambien acá: es el dato que el atleta mira mientras
+            // aguanta, y esta pantalla le tapa la otra. Sin esto, arrancar el
+            // cronometro le sacaba de la vista lo unico que estaba mirando.
+            effortRow()
+
+            // Salida sin cargar la serie. Sin esto, un toque equivocado deja al
+            // atleta mirando una cuenta que no pidio y sin forma de volver.
+            Button("Cancelar") { workout.cancelDurationSet() }
+                .font(.caption2)
+                .buttonStyle(.bordered)
+                .tint(.secondary)
+                .padding(.top, 6)
+        }
+        .padding()
+    }
+
+    /// La cuenta regresiva de una serie que arranco en el TELEFONO.
+    ///
+    /// Se ve igual que la propia salvo por dos cosas, y las dos importan:
+    ///
+    /// 1. Dice de donde viene. Sin eso el atleta no tiene como saber por que
+    ///    esta cuenta no responde al reloj.
+    /// 2. El boton OCULTA, no cancela. Cancelar de verdad la serie es del
+    ///    telefono, que es su dueno; desde aca solo se saca de la pantalla.
+    ///
+    /// Existe el boton igual —aunque el espejo se apague solo al llegar a
+    /// cero— porque el aviso de cancelacion viaja por `sendMessage` y ese exige
+    /// alcanzabilidad: si el atleta cancela en el telefono y el bluetooth se
+    /// cayo, sin salida la muneca queda tomada hasta que venza la cuenta.
+    private func phoneTimerScreen(_ espejo: PhoneTimer) -> some View {
+        VStack(spacing: 8) {
+            Text(nombreDe(espejo.exerciseId))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .minimumScaleFactor(0.7)
+
+            Text(CountdownRules.display(remaining: workout.phoneTimerRemaining))
+                .font(.system(size: 46, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .minimumScaleFactor(0.5)
+                .foregroundStyle(.green)
+
+            Text("serie \(espejo.setNumber) · en el telefono")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
+            effortRow()
+
+            if workout.phoneTimerCancelFallo {
+                // Cancelar en falso es peor que no ofrecerlo: el telefono
+                // seguiria contando y marcaria la serie mientras el atleta cree
+                // que la corto. Misma leccion que `WorkoutCloseFailure`.
+                Text("No se pudo cancelar. Usá el teléfono.")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+                    .multilineTextAlignment(.center)
+            }
+
+            HStack(spacing: 6) {
+                // OCULTAR no cancela: saca la cuenta de la pantalla y la deja
+                // corriendo. Vibra igual al terminar y la serie se marca igual;
+                // al tocar la fila del ejercicio se vuelve acá, sincronizado.
+                Button("Ocultar") { workout.ocultarPhoneTimer() }
+                    .tint(.secondary)
+
+                // CANCELAR corta de los dos lados. La orden viaja al telefono,
+                // que es el dueño de la serie.
+                Button("Cancelar") { workout.cancelarPhoneTimer() }
+                    .tint(.red)
+            }
+            .font(.caption2)
+            .buttonStyle(.bordered)
+            .padding(.top, 6)
+        }
+        .padding()
+    }
+
+    /// El nombre del ejercicio del cronometro. Se busca por id porque el cursor
+    /// puede haberse movido mientras corre la cuenta.
+    private func nombreDe(_ exerciseId: String) -> String {
+        workout.exercises.first { $0.exerciseId == exerciseId }?.exerciseName
+            ?? "Ejercicio"
     }
 
     /// Ritmo cardiaco y calorias, en una sola fila.
@@ -197,6 +364,36 @@ struct WorkoutView: View {
         .background(Color.green.opacity(0.15), in: Capsule())
     }
 
+    /// El aviso de que el entreno NO se cerró, con la salida.
+    ///
+    /// Naranja y no rojo a propósito: no se perdió nada, la sesión sigue viva y
+    /// lo hecho está guardado. Rojo diría "pasó algo grave", y lo que pasó es
+    /// que no hay señal.
+    ///
+    /// REINTENTAR llama a `finish()`, el mismo camino que falló. Es lo que hace
+    /// el teléfono en `_showFinishError` — un SnackBar con acción Reintentar—, y
+    /// es lo único accionable: cuando vuelva la conectividad, el mismo botón
+    /// cierra. Sin él, el atleta tiene el diagnóstico y ninguna salida.
+    private func closeFailureBanner(_ motivo: WorkoutCloseFailure) -> some View {
+        VStack(spacing: 4) {
+            Text(motivo.mensaje)
+                .font(.system(size: 11))
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.orange)
+
+            Button("Reintentar") {
+                Task { await workout.finish() }
+            }
+            .font(.caption2)
+            .buttonStyle(.plain)
+            .foregroundStyle(.orange)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 6)
+        .background(Color.orange.opacity(0.15), in: RoundedRectangle(cornerRadius: 8))
+        .padding(.top, 6)
+    }
+
     private func setsList(exercise: WatchExercise, session: WorkoutSession) -> some View {
         // La ÚNICA serie que se puede marcar es la primera sin marcar.
         //
@@ -219,9 +416,20 @@ struct WorkoutView: View {
             .max() ?? 0
         let filas = max(exercise.sets.count, ultimaCargada, 1)
 
-        let nextSet = (1...filas).first {
-            !session.isLogged(exerciseId: exercise.exerciseId, setNumber: $0)
-        }
+        // La serie ofrecida sale del CURSOR y no del primer hueco local.
+        //
+        // En el flujo normal dan lo mismo, pero divergen cuando el estado viene
+        // desordenado —el telefono cargo series salteadas, o el reloj adelanto
+        // un miembro de la superserie— y ahi el hueco local ofreceria una serie
+        // que la regla compartida no autoriza. El cursor es la unica autoridad.
+        let cursor = workout.currentCursor
+        let esElActual = cursor.map {
+            $0.exerciseIndex < workout.exercises.count
+                && workout.exercises[$0.exerciseIndex].exerciseId == exercise.exerciseId
+        } ?? false
+        let nextSet: Int? = esElActual
+            ? cursor?.setNumber
+            : nil
         // El setNumber es 1-based para que coincida con la identidad lógica que
         // usa el teléfono.
         return ForEach(1...filas, id: \.self) { setNumber in
@@ -237,19 +445,61 @@ struct WorkoutView: View {
             // Ni las hechas, ni las que están más adelante que la próxima, ni
             // una fila sin prescripción: el reloj no ofrece cargar una serie de
             // la que no sabe el objetivo. Agregar series es del teléfono.
-            let tappable = !done && setNumber == nextSet && spec != nil
+            // La gracia post-vencimiento: la cuenta del telefono llego a cero
+            // hace instantes y el reloj todavia no sincronizo la serie. Sin
+            // esto se ve sin tildar y tocarla arranca otra cuenta — el atleta
+            // hace la plancha dos veces.
+            let enGracia = workout.estaEnGracia(
+                exerciseId: exercise.exerciseId, setNumber: setNumber
+            )
+            let tappable = !done && !enGracia && setNumber == nextSet && spec != nil
+            // Un ejercicio POR TIEMPO no se marca: se cronometra.
+            //
+            // El toque arranca la cuenta en vez de cargar la serie, y la serie
+            // se carga sola al llegar a cero. Marcarla a mano permitiria darla
+            // por hecha sin haberla hecho, que es justo lo que el dueno pidio
+            // evitar.
+            let porTiempo = (spec?.durationSeconds ?? 0) > 0
             Button {
                 guard let spec else { return }
-                workout.logSet(
-                    exerciseId: exercise.exerciseId,
-                    setNumber: setNumber,
-                    spec: spec,
-                    restSeconds: exercise.restSeconds
-                )
+                if porTiempo {
+                    // Si YA hay una cuenta corriendo —la arranco el telefono y
+                    // el atleta oculto el espejo— tocar la fila REENTRA a ella
+                    // en vez de arrancar otra.
+                    //
+                    // El guard es amplio a proposito: "hay cuenta corriendo",
+                    // no "es la misma serie". Si el telefono cronometra la serie
+                    // 2 y por algun desorden el cursor apunta a otra, arrancar
+                    // una segunda cuenta dejaria dos cronometros vivos, y al
+                    // llegar a cero cada uno cargaria su serie.
+                    //
+                    // Por eso la fila se ve NORMAL mientras tanto: no hace falta
+                    // explicarle nada al atleta ni inventar un estado visual de
+                    // "bloqueada". El bloqueo vive acá.
+                    if workout.phoneTimer != nil {
+                        workout.mostrarPhoneTimer()
+                        return
+                    }
+                    workout.startDurationSet(
+                        exerciseId: exercise.exerciseId,
+                        setNumber: setNumber,
+                        spec: spec,
+                        restSeconds: exercise.restSeconds
+                    )
+                } else {
+                    workout.logSet(
+                        exerciseId: exercise.exerciseId,
+                        setNumber: setNumber,
+                        spec: spec,
+                        restSeconds: exercise.restSeconds
+                    )
+                }
             } label: {
                 HStack(spacing: 6) {
-                    Image(systemName: done ? "checkmark.circle.fill" : "circle")
-                        .foregroundStyle(done ? .green : .secondary)
+                    Image(systemName: done
+                            ? "checkmark.circle.fill"
+                            : (porTiempo && tappable ? "timer" : "circle"))
+                        .foregroundStyle(done ? .green : (porTiempo && tappable ? .green : .secondary))
                     Text("\(setNumber)")
                         .font(.caption2)
                         .foregroundStyle(.secondary)

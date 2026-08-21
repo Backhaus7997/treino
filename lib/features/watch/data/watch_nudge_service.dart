@@ -54,6 +54,19 @@ class WatchNudgeService {
   /// que llega tarde no puede deduplicar por id.
   static const String reasonSetLogged = 'setLogged';
 
+  /// CAMBIÓ EL ATLETA. Hay una credencial nueva esperando en el contexto.
+  ///
+  /// No le pide al reloj que relea Firestore —eso lo haría con la credencial
+  /// VIGENTE, que si este aviso le gana la carrera al contexto es todavía la
+  /// del atleta anterior— sino que vaya a MIRAR el contexto pendiente.
+  ///
+  /// Es un atajo, no el mecanismo: `updateApplicationContext` lo entrega el
+  /// sistema cuando quiere, y con la app del reloj cerrada, recién en el
+  /// próximo lanzamiento. Eso es lo que hacía que cambiar de cuenta tardara y
+  /// obligara a cerrar y reabrir la app. Con el reloj a la vista, esto lo
+  /// vuelve inmediato; sin él, todo sigue funcionando como antes.
+  static const String reasonAccountChanged = 'accountChanged';
+
   /// Manda el aviso. Nunca tira: devuelve si se pudo entregar.
   Future<bool> nudge({String reason = reasonActiveRoutine}) async {
     try {

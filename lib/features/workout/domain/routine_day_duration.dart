@@ -1,3 +1,4 @@
+import 'routine.dart';
 import 'routine_day.dart';
 
 /// Result of [estimateRoutineDayMinutes]. `null` minutes means nothing
@@ -38,4 +39,52 @@ RoutineDayDuration estimateRoutineDayMinutes(RoutineDay day, {int week = 0}) {
   }
   if (seconds <= 0) return (minutes: null, authored: false);
   return (minutes: (seconds / 60).round(), authored: false);
+}
+
+/// Estimated minutes of ONE session of [routine] — what a card shows to answer
+/// "how long is this going to take me today?" (#639).
+///
+/// Priority:
+///   1. Authored `routine.estimatedMinutesPerDay` → `authored: true`.
+///   2. Otherwise the AVERAGE of [estimateRoutineDayMinutes] over the days
+///      that yield a value. `authored` stays true only when every counted day
+///      was itself authored — one computed day makes the whole figure an
+///      estimate, and the UI must say so.
+///   3. `minutes: null` when no day yields anything measurable. Callers render
+///      NOTHING in that case — never "0 min" or a dash. Trainer- and
+///      community-published routines are not guaranteed to carry duration
+///      data, and inventing one for them is worse than staying quiet.
+///
+/// DECISION — average, not a range. Days of a routine can differ (an
+/// Upper/Lower with a 50' day and an 80' day), so a range would be more
+/// faithful for those. Average wins here because this feeds a two-line
+/// metadata caption on a grid card where a range costs a line, and because the
+/// question the card answers is "roughly how long", not "exactly which day".
+/// The detail screen already shows the exact per-day figure. Revisit if
+/// routines with wide day dispersion turn out to be common.
+///
+/// Pure function — same contract as [estimateRoutineDayMinutes]: no Flutter
+/// imports, no providers.
+RoutineDayDuration estimateRoutineSessionMinutes(
+  Routine routine, {
+  int week = 0,
+}) {
+  final authored = routine.estimatedMinutesPerDay;
+  if (authored != null && authored > 0) {
+    return (minutes: authored, authored: true);
+  }
+
+  var total = 0;
+  var counted = 0;
+  var everyDayAuthored = true;
+  for (final day in routine.days) {
+    final est = estimateRoutineDayMinutes(day, week: week);
+    final minutes = est.minutes;
+    if (minutes == null) continue;
+    total += minutes;
+    counted++;
+    if (!est.authored) everyDayAuthored = false;
+  }
+  if (counted == 0) return (minutes: null, authored: false);
+  return (minutes: (total / counted).round(), authored: everyDayAuthored);
 }

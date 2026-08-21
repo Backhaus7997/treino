@@ -497,6 +497,195 @@ private func runWorkoutDuration() {
     checkEqual(WorkoutDurationRules.maxMinutos, 8 * 60, "El techo son 8 horas, igual que en el telefono")
 }
 
+// MARK: - El cronometro que arranca en el TELEFONO, espejado en la muneca
+//
+// Llega por `sendMessage` porque el contexto de aplicacion de entrada esta
+// ocupado por la credencial del reloj, y es uno solo. El canal es COMPARTIDO
+// con el aviso de "relee", asi que el `kind` no es decorativo: sin el, un aviso
+// de recarga se leeria como un cronometro.
+//
+// La orden se ESPEJA y no se adopta: el dueno de la serie es el lado que la
+// arranco. Si el reloj la cargara al llegar a cero, y el telefono tambien,
+// quedarian dos documentos para la misma serie.
+
+private func runPhoneTimerMirror() {
+    // Milisegundos reales desde epoch: 1,8e12. NO entran en 32 bits, que es
+    // donde vive `Int` en watchOS. Con un numero chico este test no ejerceria
+    // ninguna presion sobre la trampa que crasheo el reloj (commit 3a0840cc).
+    let finMs: Int64 = 1_800_000_060_000
+    let fin = Date(timeIntervalSince1970: 1_800_000_060)
+
+    let ordenValida: [String: Any] = [
+        "kind": "watchTimer",
+        "action": "start",
+        "exerciseId": "plancha",
+        "setNumber": 2,
+        "totalSeconds": 60,
+        "endsAtMs": NSNumber(value: finMs),
+    ]
+
+    guard case .start(let timer)? = PhoneTimerMirror.parse(ordenValida) else {
+        check(false, "una orden de arranque bien formada se parsea")
+        return
+    }
+    checkEqual(timer.exerciseId, "plancha", "va el ejercicio")
+    checkEqual(timer.setNumber, 2, "va el numero de serie")
+    checkEqual(timer.totalSeconds, 60, "van los segundos totales")
+    checkEqual(
+        timer.endsAt.timeIntervalSince1970,
+        fin.timeIntervalSince1970,
+        "el instante de fin sobrevive el cruce entre lenguajes SIN truncarse"
+    )
+
+    checkEqual(
+        PhoneTimerMirror.parse([
+            "kind": "watchTimer", "action": "cancel",
+        ]),
+        .cancel,
+        "cancelar se parsea sin mas datos"
+    )
+
+    // El canal es compartido: el aviso de "relee" NO puede leerse como
+    // cronometro, ni al reves.
+    check(
+        PhoneTimerMirror.parse(["kind": "watchRefresh", "reason": "activeRoutine"]) == nil,
+        "un aviso de recarga NO es una orden de cronometro"
+    )
+    // Este es el que de verdad amarra el discriminador. El de arriba pasaba
+    // igual sin el guard de `kind` —un aviso de recarga no trae `action`, asi
+    // que caia en el default— y por eso no protegia nada: se comprobo mutando
+    // el guard y viendo que NINGUN chequeo se ponia rojo. Aca el payload ajeno
+    // trae todos los campos de un cronometro y lo unico que lo descarta es el
+    // `kind`.
+    var kindAjeno = ordenValida
+    kindAjeno["kind"] = "watchRefresh"
+    check(
+        PhoneTimerMirror.parse(kindAjeno) == nil,
+        "un payload ajeno con TODOS los campos de cronometro igual se descarta por el kind"
+    )
+    check(
+        PhoneTimerMirror.parse(["action": "start"]) == nil,
+        "sin kind no se lee nada"
+    )
+    check(
+        PhoneTimerMirror.parse(["kind": "watchTimer", "action": "loquesea"]) == nil,
+        "una accion desconocida se ignora en vez de adivinar"
+    )
+
+    // Defensivo: el payload cruza un puente entre lenguajes y un cambio del
+    // lado Dart no puede tirar la app del reloj.
+    var sinFin = ordenValida
+    sinFin["endsAtMs"] = nil
+    check(PhoneTimerMirror.parse(sinFin) == nil, "sin instante de fin no hay cuenta que mostrar")
+
+    var idVacio = ordenValida
+    idVacio["exerciseId"] = ""
+    check(PhoneTimerMirror.parse(idVacio) == nil, "un ejercicio vacio no se muestra")
+
+    var serieCero = ordenValida
+    serieCero["setNumber"] = 0
+    check(PhoneTimerMirror.parse(serieCero) == nil, "no existe la serie 0")
+
+    var duracionCero = ordenValida
+    duracionCero["totalSeconds"] = 0
+    check(PhoneTimerMirror.parse(duracionCero) == nil, "una serie de 0 segundos no es una serie")
+
+    // Una orden entregada al reconectar puede describir una serie que ya
+    // termino. Mostrar una cuenta vencida tomando la pantalla es peor que no
+    // mostrar nada: el atleta ya esta en otra.
+    check(
+        PhoneTimerMirror.shouldShow(timer, now: fin.addingTimeInterval(-1)),
+        "con un segundo por delante todavia se muestra"
+    )
+    check(
+        !PhoneTimerMirror.shouldShow(timer, now: fin),
+        "justo en el instante de fin ya no"
+    )
+    check(
+        !PhoneTimerMirror.shouldShow(timer, now: fin.addingTimeInterval(300)),
+        "una orden que llego cinco minutos tarde no toma la pantalla"
+    )
+}
+
+// MARK: - Cambio de cuenta: el token NO se reusa entre atletas
+//
+// Al cambiar de cuenta en el telefono, el reloj se quedaba con el token de A y
+// el uid de B. Las reglas de Firestore son owner-only, asi que leer `users/B`
+// con ese par da 403 garantizado — y el error no limpiaba el entreno ya
+// cargado, asi que la pantalla le mostraba a B la rutina de A.
+//
+// La causa era que la decision de reusar solo miraba la EDAD: la firma de
+// `shouldRefresh` ni siquiera recibe un uid.
+
+private func runTokenIdentity() {
+    let t0 = Date(timeIntervalSince1970: 1_800_000_000)
+
+    check(
+        TokenFreshness.canReuse(
+            cacheDe: "atleta-A", credencialDe: "atleta-A",
+            emitidoEn: t0, ahora: t0.addingTimeInterval(10)
+        ),
+        "un token fresco del MISMO atleta se reusa"
+    )
+
+    check(
+        !TokenFreshness.canReuse(
+            cacheDe: "atleta-A", credencialDe: "atleta-B",
+            emitidoEn: t0, ahora: t0.addingTimeInterval(10)
+        ),
+        "un token FRESCO de OTRO atleta NO se reusa: un token es de una sola cuenta"
+    )
+
+    check(
+        !TokenFreshness.canReuse(
+            cacheDe: nil, credencialDe: "atleta-A",
+            emitidoEn: t0, ahora: t0.addingTimeInterval(10)
+        ),
+        "sin saber de quien es el cache, no se reusa"
+    )
+
+    check(
+        !TokenFreshness.canReuse(
+            cacheDe: "atleta-A", credencialDe: "atleta-A",
+            emitidoEn: t0, ahora: t0.addingTimeInterval(TokenFreshness.ttl)
+        ),
+        "el TTL sigue mandando para el mismo atleta"
+    )
+
+    check(
+        !TokenFreshness.canReuse(
+            cacheDe: "atleta-A", credencialDe: "atleta-B",
+            emitidoEn: t0, ahora: t0.addingTimeInterval(TokenFreshness.ttl + 1)
+        ),
+        "vencido y de otro atleta: doblemente no"
+    )
+}
+
+// MARK: - El aviso de cierre de sesion
+
+private func runSignedOutPayload() {
+    check(
+        WatchSignedOutPayload.esAviso(["kind": "watchSignedOut"]),
+        "el aviso de cierre de sesion se reconoce"
+    )
+    // Viaja por el MISMO slot que la credencial: confundirlos desloguearia a un
+    // atleta que no lo pidio, o al reves dejaria una sesion abierta que se cerro.
+    check(
+        !WatchSignedOutPayload.esAviso([
+            "kind": "watchCredential", "customToken": "abc", "uid": "atleta-A",
+        ]),
+        "una credencial NO es un aviso de cierre de sesion"
+    )
+    check(
+        !WatchSignedOutPayload.esAviso([:]),
+        "un contexto vacio no desloguea a nadie"
+    )
+    check(
+        !WatchSignedOutPayload.esAviso(["kind": "watchEffort", "bpm": 140]),
+        "un payload de esfuerzo tampoco"
+    )
+}
+
 // MARK: - Corrida
 
 runRequestedTypes()
@@ -510,9 +699,18 @@ runHeartRateRounding()
 runActiveEnergyDisplay()
 runWorkoutDuration()
 runEffortBroadcast()
+runEffortTimerBroadcast()
 runSetLogWriteTarget()
 runSetLogDeletion()
 runExerciseCursor()
+runSupersetCursor()
+runTokenFreshness()
+runCountdown()
+runPhoneTimerMirror()
+runTokenIdentity()
+runSignedOutPayload()
+runStaleSessions()
+runCloseFeedback()
 
 if failures.isEmpty {
     print("OK: \(totalChecks) chequeos de la logica de permisos de Salud")
@@ -535,8 +733,116 @@ exit(1)
 // Estas reglas deciden CUANDO vale la pena mandar. Son puras y se testean en el
 // host; el envio en si vive en `EffortRelay.swift`.
 
+private func runEffortTimerBroadcast() {
+    let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+    let crono = EffortSnapshot.RunningTimer(
+        exerciseId: "plancha", setNumber: 2, totalSeconds: 60,
+        endsAt: t0.addingTimeInterval(60)
+    )
+
+    // Un cronometro corriendo YA es algo que mostrar, aunque no haya pulso.
+    let soloCrono = EffortSnapshot(bpm: nil, kcal: nil, timer: crono)
+    check(!soloCrono.isEmpty, "un cronometro sin pulso no es un payload vacio")
+    check(
+        EffortBroadcastRules.shouldSend(last: nil, actual: soloCrono, now: t0),
+        "arrancar el cronometro se manda aunque no haya llegado ningun pulso"
+    )
+
+    // Y APAGARLO tambien, aunque quede vacio: si no, el telefono sigue
+    // contando hasta cero algo que el atleta ya cancelo.
+    let vacio = EffortSnapshot(bpm: nil, kcal: nil, timer: nil)
+    check(
+        EffortBroadcastRules.shouldSend(
+            last: (payload: soloCrono, at: t0), actual: vacio, now: t0
+        ),
+        "cancelar el cronometro se avisa aunque el payload quede vacio"
+    )
+
+    // Pero un vacio que NO apaga nada sigue sin mandarse.
+    check(
+        !EffortBroadcastRules.shouldSend(
+            last: (payload: EffortSnapshot(bpm: 140, kcal: 10), at: t0),
+            actual: vacio, now: t0
+        ),
+        "un vacio sin cronometro previo no justifica un envio"
+    )
+
+    // ── El throttle NO puede atrasar un cronometro ──────────────────────────
+    //
+    // Los tres chequeos de arriba pasan `last: nil`, que cortocircuita el
+    // throttle en la primera linea de shouldSend. O sea que NINGUNO cruzaba
+    // throttle x cronometro, y por ahi se colaba el bug: con un pulso reciente
+    // —lo normal a mitad de entreno— arrancar la cuenta caia en el throttle y
+    // tardaba hasta 5 segundos en verse en el telefono.
+    let pulsoReciente = EffortSnapshot(bpm: 140, kcal: 10)
+    let pulsoMasCrono = EffortSnapshot(bpm: 140, kcal: 10, timer: crono)
+    check(
+        EffortBroadcastRules.shouldSend(
+            last: (payload: pulsoReciente, at: t0),
+            actual: pulsoMasCrono,
+            now: t0.addingTimeInterval(1)
+        ),
+        "ARRANCAR la cuenta un segundo despues de un pulso no espera al throttle"
+    )
+    check(
+        EffortBroadcastRules.shouldSend(
+            last: (payload: pulsoMasCrono, at: t0),
+            actual: pulsoReciente,
+            now: t0.addingTimeInterval(1)
+        ),
+        "CORTAR la cuenta tampoco espera al throttle, aunque el pulso siga igual"
+    )
+    // Y el throttle sigue haciendo su trabajo con lo que SI puede esperar.
+    check(
+        !EffortBroadcastRules.shouldSend(
+            last: (payload: pulsoReciente, at: t0),
+            actual: EffortSnapshot(bpm: 141, kcal: 10),
+            now: t0.addingTimeInterval(1)
+        ),
+        "un pulso nuevo un segundo despues del anterior SI espera: es lo que el throttle viene a evitar"
+    )
+
+    // El payload lleva el INSTANTE DE FIN, no lo que falta.
+    let payload = soloCrono.context(measuredAt: t0)
+    checkEqual(payload["timerExerciseId"] as? String, "plancha", "va el ejercicio")
+    checkEqual(payload["timerSetNumber"] as? Int, 2, "va la serie: sin esto el telefono no sabe cual de las tres corre")
+    checkEqual(payload["timerTotalSeconds"] as? Int, 60, "van los segundos totales")
+    check(
+        payload["timerEndsAtMs"] is Int64,
+        "el fin viaja como Int64: con Int trapea en arm64_32, igual que measuredAtMs"
+    )
+}
+
 private func runEffortBroadcast() {
     let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+
+    // ── El crash de los milisegundos ────────────────────────────────────────
+    //
+    // watchOS corre arm64_32 y ahi `Int` es de 32 bits. Los milisegundos desde
+    // 1970 (~1,79e12) exceden Int32 por ~832 veces, y `Int(Double)` TRAPEA
+    // cuando no entra: mata el proceso. El reloj crasheaba con EXC_BREAKPOINT
+    // en el primer dato de pulso de cada entreno.
+    //
+    // ESTE TEST NO PUEDE REPRODUCIR EL TRAP: corre en el host, donde `Int` es
+    // de 64 bits y la conversion es perfectamente valida. Lo unico observable
+    // desde aca es el TIPO — y alcanza, porque `Int64` es lo que hace que en el
+    // reloj tampoco trape. Si alguien vuelve a poner `Int`, este check se cae
+    // en el host antes de llegar a una muneca.
+    let payload = EffortSnapshot(bpm: 140, kcal: 50).context(measuredAt: t0)
+    check(
+        payload["measuredAtMs"] is Int64,
+        "measuredAtMs viaja como Int64: con Int trapea en arm64_32 (32 bits)"
+    )
+    checkEqual(
+        payload["measuredAtMs"] as? Int64,
+        1_700_000_000_000,
+        "measuredAtMs en milisegundos"
+    )
+    check(
+        1_700_000_000_000 > Int64(Int32.max),
+        "el valor real excede Int32: por eso el tipo importa y no es cosmetico"
+    )
+
     let a = EffortSnapshot(bpm: 140, kcal: 50)
     let b = EffortSnapshot(bpm: 145, kcal: 52)
 
@@ -913,4 +1219,303 @@ private func runExerciseCursor() {
         1,
         "Una lista de cargadas mas corta no rompe"
     )
+}
+
+// MARK: - Sesiones colgadas: que adoptar y que cerrar (HANDOFF §8.1)
+//
+// El barrido lo disparaba SOLO el telefono. El reloj adoptaba cualquier sesion
+// sin `finishedAt`, sin mirar la fecha: un atleta que usara solo la muñeca
+// podia caer en un entreno de hace dias creyendo que era el de hoy.
+//
+// Esto es caro de reproducir corriendo —hay que fabricar historial viejo— y
+// barato de medir acá.
+
+private func runStaleSessions() {
+    let ahora = Date(timeIntervalSince1970: 1_760_000_000)
+    func haceHoras(_ h: Double) -> Date { ahora.addingTimeInterval(-h * 3600) }
+    func candidata(_ id: String, _ cuandoEmpezo: Date) -> StaleSessionRules.Candidata {
+        StaleSessionRules.Candidata(id: id, startedAt: cuandoEmpezo)
+    }
+
+    // El techo es DERIVADO del del telefono, no una copia. Si alguien mueve uno,
+    // este chequeo cae con el otro en vez de dejarlos discrepar en silencio.
+    checkEqual(
+        StaleSessionRules.maxAntiguedad,
+        TimeInterval(WorkoutDurationRules.maxMinutos * 60),
+        "El corte de antiguedad sale del mismo techo que la duracion"
+    )
+    checkEqual(StaleSessionRules.maxAntiguedad, 8 * 3600, "El corte son 8 horas")
+
+    // Sin nada abierto no hay nada que hacer.
+    checkEqual(
+        StaleSessionRules.decidir(candidatas: [], ahora: ahora),
+        StaleSessionRules.Decision(adoptar: nil, aCerrar: []),
+        "Sin sesiones abiertas no se adopta ni se cierra nada"
+    )
+
+    // El caso normal: el atleta esta entrenando ahora.
+    checkEqual(
+        StaleSessionRules.decidir(
+            candidatas: [candidata("viva", haceHoras(0.5))], ahora: ahora
+        ),
+        StaleSessionRules.Decision(adoptar: "viva", aCerrar: []),
+        "Una sesion de hace media hora se adopta y no se cierra"
+    )
+
+    // ⚠️ EL BUG. Una sola sesion, de hace tres dias. Antes se adoptaba: el reloj
+    // abria la pantalla de entreno sobre un entreno de otro dia. Sin el corte
+    // por antiguedad este chequeo se pone rojo.
+    checkEqual(
+        StaleSessionRules.decidir(
+            candidatas: [candidata("de-hace-tres-dias", haceHoras(72))],
+            ahora: ahora
+        ),
+        StaleSessionRules.Decision(adoptar: nil, aCerrar: ["de-hace-tres-dias"]),
+        "Una sesion de hace tres dias NO se adopta: se cierra"
+    )
+
+    // El borde, exacto. `>` estricto, igual que el telefono: a las 8h clavadas
+    // todavia esta viva.
+    checkEqual(
+        StaleSessionRules.decidir(
+            candidatas: [candidata("justo", haceHoras(8))], ahora: ahora
+        ),
+        StaleSessionRules.Decision(adoptar: "justo", aCerrar: []),
+        "A las 8h clavadas la sesion sigue viva"
+    )
+    checkEqual(
+        StaleSessionRules.decidir(
+            candidatas: [candidata("pasada", ahora.addingTimeInterval(-8 * 3600 - 60))],
+            ahora: ahora
+        ),
+        StaleSessionRules.Decision(adoptar: nil, aCerrar: ["pasada"]),
+        "Un minuto despues de las 8h ya vencio"
+    )
+
+    // Varias abiertas y la mas nueva viva: esa es la que el atleta esta
+    // haciendo, las otras se barren. Barrer solo las repetidas y dejar viva una
+    // de ayer era el agujero del telefono; acá no se repite.
+    checkEqual(
+        StaleSessionRules.decidir(
+            candidatas: [
+                candidata("anteayer", haceHoras(50)),
+                candidata("ahora", haceHoras(0.2)),
+                candidata("ayer", haceHoras(26)),
+            ],
+            ahora: ahora
+        ),
+        StaleSessionRules.Decision(
+            adoptar: "ahora", aCerrar: ["ayer", "anteayer"]
+        ),
+        "Con la mas nueva viva se adopta esa y se cierran las demas"
+    )
+
+    // Todas vencidas: no se adopta ninguna y se barren TODAS, incluida la mas
+    // nueva. Es lo que hace `getActive` cuando la primera ya vencio.
+    checkEqual(
+        StaleSessionRules.decidir(
+            candidatas: [
+                candidata("vieja", haceHoras(30)),
+                candidata("menos-vieja", haceHoras(9)),
+            ],
+            ahora: ahora
+        ),
+        StaleSessionRules.Decision(
+            adoptar: nil, aCerrar: ["menos-vieja", "vieja"]
+        ),
+        "Si vencio la mas nueva, vencieron todas"
+    )
+
+    // La decision NO depende del orden de entrada. La query ordena, pero una
+    // regla que se apoya en eso se rompe muda el dia que alguien la toca.
+    checkEqual(
+        StaleSessionRules.decidir(
+            candidatas: [
+                candidata("b", haceHoras(1)),
+                candidata("a", haceHoras(0.1)),
+                candidata("c", haceHoras(2)),
+            ],
+            ahora: ahora
+        ),
+        StaleSessionRules.Decision(adoptar: "a", aCerrar: ["b", "c"]),
+        "El orden de entrada no cambia la decision"
+    )
+
+    // Reloj desfasado: una fecha en el FUTURO no vence. Cerrarla le sacaria al
+    // atleta el entreno que esta haciendo.
+    checkEqual(
+        StaleSessionRules.decidir(
+            candidatas: [candidata("futuro", ahora.addingTimeInterval(600))],
+            ahora: ahora
+        ),
+        StaleSessionRules.Decision(adoptar: "futuro", aCerrar: []),
+        "Una sesion con fecha futura no se da por vencida"
+    )
+}
+
+// MARK: - Cerrar el entreno puede fallar, y hay que DECIRLO (HANDOFF §8.3)
+//
+// Abandonar sin conectividad era un no-op silencioso: el dialogo se cerraba y
+// la sesion seguia abierta. El motivo es lo unico que el atleta necesita para
+// entender que paso y volver a intentar.
+
+private func runCloseFeedback() {
+    // Singular y plural. Un "1 series" en la muñeca se lee como un bug.
+    checkEqual(
+        WorkoutCloseFailure.seriesSinSubir(1).mensaje,
+        "Falta subir 1 serie. El entreno sigue abierto.",
+        "Con una sola serie pendiente el mensaje va en singular"
+    )
+    checkEqual(
+        WorkoutCloseFailure.seriesSinSubir(3).mensaje,
+        "Falta subir 3 series. El entreno sigue abierto.",
+        "Con varias series pendientes el mensaje va en plural"
+    )
+
+    // Las dos causas piden lo mismo del atleta —reintentar— pero NO dicen lo
+    // mismo. Colapsarlas esconde justo la que hay que diagnosticar.
+    check(
+        WorkoutCloseFailure.seriesSinSubir(2).mensaje
+            != WorkoutCloseFailure.historialNoRespondio.mensaje,
+        "Las dos causas de fallo no pueden decir lo mismo"
+    )
+
+    // El contrato con el atleta, el mismo que el dialogo de confirmacion: lo
+    // hecho NO se pierde. Si el mensaje no lo dice, el cartel naranja se lee
+    // como "perdiste el entreno".
+    check(
+        WorkoutCloseFailure.historialNoRespondio.mensaje.contains("guardado"),
+        "El fallo del historial tiene que decir que lo hecho esta guardado"
+    )
+    check(
+        WorkoutCloseFailure.seriesSinSubir(2).mensaje.contains("sigue abierto"),
+        "El fallo por pendientes tiene que decir que el entreno sigue abierto"
+    )
+}
+// MARK: - Cursor con superseries
+//
+// El reloj mostraba SOLO el primer ejercicio de la superserie y, tras marcar
+// 1a, lo unico marcable era 2a. Estos chequeos fijan el recorrido correcto,
+// que es el mismo contrato de `conformance/superset_order.json`.
+
+private func runSupersetCursor() {
+    func ej(_ id: String, _ planned: Int, _ logged: Int, _ grupo: Int?) -> CursorExercise {
+        CursorExercise(exerciseId: id, plannedSets: planned, loggedSets: logged, supersetGroup: grupo)
+    }
+
+    // A, B, C en la misma superserie, tres series cada uno.
+    let virgen = [ej("a", 3, 0, 1), ej("b", 3, 0, 1), ej("c", 3, 0, 1)]
+    checkEqual(cursorPosition(virgen).exerciseIndex, 0, "bloque virgen arranca en A")
+    checkEqual(cursorPosition(virgen).setNumber, 1, "y en la serie 1")
+    checkEqual(cursorPosition(virgen).round, 1, "vuelta 1")
+    checkEqual(cursorPosition(virgen).totalRounds, 3, "tres vueltas")
+
+    // EL BUG REPORTADO: hecha 1a, toca 1b y NO 2a.
+    let hecha1a = [ej("a", 3, 1, 1), ej("b", 3, 0, 1), ej("c", 3, 0, 1)]
+    checkEqual(cursorPosition(hecha1a).exerciseIndex, 1, "tras 1a toca B, no A otra vez")
+    checkEqual(cursorPosition(hecha1a).setNumber, 1, "y es la serie 1 de B")
+
+    // Cerrada la vuelta 1, vuelve a A con la serie 2.
+    let vuelta1 = [ej("a", 3, 1, 1), ej("b", 3, 1, 1), ej("c", 3, 1, 1)]
+    checkEqual(cursorPosition(vuelta1).exerciseIndex, 0, "cerrada la vuelta 1 vuelve a A")
+    checkEqual(cursorPosition(vuelta1).setNumber, 2, "con la serie 2")
+    checkEqual(cursorPosition(vuelta1).round, 2, "vuelta 2")
+
+    // Ejercicios SUELTOS: se sigue recorriendo ejercicio por ejercicio.
+    let sueltos = [ej("x", 3, 3, nil), ej("y", 3, 0, nil)]
+    checkEqual(cursorPosition(sueltos).exerciseIndex, 1, "sin superserie avanza al siguiente ejercicio")
+    checkEqual(cursorPosition(sueltos).setNumber, 1, "serie 1 del siguiente")
+    check(cursorPosition(sueltos).round == nil, "un ejercicio suelto no tiene vuelta")
+
+    // Un ejercicio tagueado SOLO degrada a suelto, igual que en Dart.
+    let taggeadoSolo = [ej("a", 2, 0, 7), ej("b", 2, 0, nil)]
+    checkEqual(supersetBlocks(taggeadoSolo).count, 2, "un miembro unico no forma bloque")
+
+    // Bloques CONSECUTIVOS: dos superseries distintas no se mezclan.
+    let dosBloques = [ej("a", 2, 2, 1), ej("b", 2, 2, 1), ej("c", 2, 0, 2), ej("d", 2, 0, 2)]
+    checkEqual(supersetBlocks(dosBloques).count, 2, "dos bloques separados")
+    checkEqual(cursorPosition(dosBloques).exerciseIndex, 2, "cerrado el primero pasa al segundo")
+
+    // Lista vacia: no puede reventar indexando.
+    checkEqual(cursorPosition([]).exerciseIndex, 0, "lista vacia devuelve 0 sin reventar")
+}
+// MARK: - Frescura del idToken
+//
+// El token se renovaba en CADA sincronizacion: un POST completo delante de cada
+// serie marcada. Estos chequeos fijan cuando corresponde renovar.
+
+private func runTokenFreshness() {
+    let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+
+    check(
+        TokenFreshness.shouldRefresh(emitidoEn: nil, ahora: t0),
+        "sin token cacheado siempre se renueva"
+    )
+    check(
+        !TokenFreshness.shouldRefresh(emitidoEn: t0, ahora: t0.addingTimeInterval(60)),
+        "un token de hace un minuto se reusa: ese era el viaje tirado en cada serie"
+    )
+    check(
+        !TokenFreshness.shouldRefresh(emitidoEn: t0, ahora: t0.addingTimeInterval(2999)),
+        "justo antes del TTL todavia sirve"
+    )
+    check(
+        TokenFreshness.shouldRefresh(emitidoEn: t0, ahora: t0.addingTimeInterval(3000)),
+        "cumplido el TTL se renueva"
+    )
+    check(
+        TokenFreshness.ttl < 3600,
+        "el TTL deja margen contra los 3600s reales: vencer en vuelo es peor que renovar de mas"
+    )
+    check(
+        TokenFreshness.shouldRefresh(emitidoEn: t0, ahora: t0.addingTimeInterval(-10)),
+        "hora corrida hacia atras: se renueva en vez de quedarse con un token eterno"
+    )
+}
+// MARK: - Cuenta regresiva
+//
+// Los ejercicios POR TIEMPO se cronometran y se marcan solos al llegar a cero.
+// La cuenta va contra el RELOJ DE PARED y no por ticks: si el sistema estrangula
+// la app, un contador de ticks se atrasa y una plancha de 60s dura 70.
+
+private func runCountdown() {
+    let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+    let fin = t0.addingTimeInterval(60)
+
+    checkEqual(CountdownRules.remaining(endsAt: fin, now: t0), 60, "recien arrancado faltan 60")
+    checkEqual(CountdownRules.remaining(endsAt: fin, now: t0.addingTimeInterval(30)), 30, "a mitad faltan 30")
+    checkEqual(CountdownRules.remaining(endsAt: fin, now: fin), 0, "en el instante de fin no falta nada")
+    checkEqual(
+        CountdownRules.remaining(endsAt: fin, now: fin.addingTimeInterval(120)),
+        0,
+        "pasado el fin nunca da negativo: un negativo indexaria o se mostraria como texto roto"
+    )
+
+    // El redondeo hacia ARRIBA es la regla: mientras quede una fraccion, la
+    // serie no termino. Mostrar 0 con tiempo restante invitaria a cortar antes.
+    checkEqual(
+        CountdownRules.remaining(endsAt: fin, now: fin.addingTimeInterval(-0.4)),
+        1,
+        "con menos de un segundo restante todavia falta 1, no 0"
+    )
+    check(
+        !CountdownRules.isFinished(endsAt: fin, now: fin.addingTimeInterval(-0.4)),
+        "y por lo tanto NO esta terminada"
+    )
+    check(
+        CountdownRules.isFinished(endsAt: fin, now: fin),
+        "terminada justo en el instante de fin"
+    )
+
+    // Saltar ticks no atrasa la cuenta: es la razon de ser del reloj de pared.
+    checkEqual(
+        CountdownRules.remaining(endsAt: fin, now: t0.addingTimeInterval(59)),
+        1,
+        "un salto de 59s de golpe da 1, no 59: la cuenta no depende de cuantos ticks corrieron"
+    )
+
+    checkEqual(CountdownRules.display(remaining: 45), "45", "bajo un minuto va sin cero a la izquierda")
+    checkEqual(CountdownRules.display(remaining: 60), "1:00", "un minuto justo")
+    checkEqual(CountdownRules.display(remaining: 90), "1:30", "minuto y medio")
+    checkEqual(CountdownRules.display(remaining: 0), "0", "cero")
 }

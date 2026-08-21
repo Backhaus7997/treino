@@ -172,7 +172,7 @@ void main() {
     // (unlike "aggregate missing but ratings exist", covered in
     // template_ratings_section_test.dart).
     expect(
-      find.text('Todavía nadie calificó esta plantilla. ¡Sé el primero!'),
+      find.text('Todavía nadie calificó esta rutina. ¡Sé el primero!'),
       findsOneWidget,
     );
     expect(find.text('Todavía no hay comentarios.'), findsOneWidget);

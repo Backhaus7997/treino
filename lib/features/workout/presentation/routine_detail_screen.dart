@@ -491,6 +491,21 @@ class _RoutineDetailContent extends ConsumerWidget {
                 ),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
+                    // Plain-language summary (#648). Sits directly under the
+                    // hero because the hero is where the jargon lands: its
+                    // badge reads "PPL · DÍA 1" or "BRO SPLIT · DÍA 1", and 2
+                    // of 5 usability participants could not tell what those
+                    // meant. The term is not hidden — it is explained, right
+                    // where it is first read.
+                    //
+                    // Absent on routines with no summary (every athlete- and
+                    // trainer-authored one today), and the layout collapses
+                    // with it rather than reserving an empty gap.
+                    if (routine.summary != null &&
+                        routine.summary!.trim().isNotEmpty) ...[
+                      const SizedBox(height: 20),
+                      _RoutineSummary(text: routine.summary!.trim()),
+                    ],
                     const SizedBox(height: 20),
                     _StatRow(
                       tiles: [
@@ -1264,6 +1279,32 @@ class _CompletedDayChip extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// One-sentence, jargon-free explanation of what the routine is (#648).
+///
+/// Body copy, not a heading: it is meant to be READ, so it uses the regular
+/// text face at full line height instead of the condensed uppercase the rest
+/// of this screen's chrome uses. Muted, because it explains the title rather
+/// than competing with it.
+class _RoutineSummary extends StatelessWidget {
+  const _RoutineSummary({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Text(
+      text,
+      style: GoogleFonts.barlow(
+        fontWeight: FontWeight.w400,
+        fontSize: 14,
+        height: 1.45,
+        color: palette.textMuted,
       ),
     );
   }

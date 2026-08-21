@@ -13,6 +13,14 @@ struct WatchExercise: Equatable {
     let exerciseName: String
     let sets: [SetSpec]
     let restSeconds: Int
+
+    /// El bloque de superserie al que pertenece, o nil si es un ejercicio
+    /// suelto.
+    ///
+    /// El reloj NO leia este campo: aplanaba el bloque y recorria ejercicio por
+    /// ejercicio, produciendo 1a, 2a, 3a, 1b... en vez de 1a, 1b, 1c, 2a...
+    /// Sin el dato aca, agrupar era imposible. Ver `SupersetOrder.swift`.
+    let supersetGroup: Int?
 }
 
 /// El entreno que le toca al atleta hoy, resuelto por el reloj.
@@ -179,7 +187,8 @@ enum TodaysWorkoutResolver {
                     exerciseId: FS.string(f["exerciseId"]) ?? "",
                     exerciseName: FS.string(f["exerciseName"]) ?? "Ejercicio",
                     sets: SetResolution.effectiveSets(prescription, week: week),
-                    restSeconds: FS.int(f["restSeconds"]) ?? 90
+                    restSeconds: FS.int(f["restSeconds"]) ?? 90,
+                    supersetGroup: FS.int(f["supersetGroup"])
                 )
             )
         }

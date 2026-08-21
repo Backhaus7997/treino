@@ -6,7 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../core/utils/network_timeouts.dart';
 import '../../watch/application/watch_credential_providers.dart'
-    show watchNudgeServiceProvider;
+    show watchLauncherServiceProvider, watchNudgeServiceProvider;
+import '../../watch/data/watch_launcher_service.dart';
 import '../../watch/data/watch_nudge_service.dart';
 import '../domain/routine_day.dart';
 import '../domain/routine_slot.dart';
@@ -224,6 +225,11 @@ class SessionNotifier
     );
     _resetElapsedBaseline(elapsedSeconds: 0, at: session.startedAt);
     _nudgeWatch(WatchNudgeService.reasonWorkoutStarted);
+    // DESPUÉS de que `repo.create` resolvió, nunca antes: el reloj lee Firestore
+    // por REST y no tiene listeners. Si se abriera antes de que el documento con
+    // `status: active` exista, no encontraría sesión que adoptar y se quedaría
+    // en la pantalla equivocada, sin nada que lo corrija después.
+    _launchWatch();
 
     // REQ-WPRES-021 (ADR-WPRES-09): filter slots by presence BEFORE building
     // session state so buildBlocks, isFullyCompleted, _nextIncompleteIndex,
@@ -277,6 +283,23 @@ class SessionNotifier
     }
   }
 
+  /// Abre la app del reloj, si hay uno emparejado.
+  ///
+  /// Hermano de [_nudgeWatch] pero NO el mismo camino: `nudge` exige
+  /// alcanzabilidad y se descarta cuando la app del reloj está cerrada, que es
+  /// justo el caso que esto resuelve. Ver [WatchLauncherService].
+  ///
+  /// Fire-and-forget con la misma disciplina: abrir el reloj es un agregado y
+  /// no puede demorar ni romper el arranque del entreno, que es lo más caliente
+  /// de la app.
+  void _launchWatch() {
+    try {
+      unawaited(ref.read(watchLauncherServiceProvider).launchWorkout());
+    } catch (_) {
+      // Idem [_nudgeWatch]: `ref.read` tira si el notifier ya se descartó.
+    }
+  }
+
   // ── Path B — Retomar sesión existente ────────────────────────────────────
 
   Future<SessionState> _buildResume(String sessionId) async {
@@ -303,6 +326,10 @@ class SessionNotifier
         'Sesión activa ${session.id} no coincide con la solicitada $sessionId',
       );
     }
+    // Retomar también abre el reloj. Antes este camino no le avisaba NADA — ni
+    // siquiera el nudge—, así que un entreno retomado desde el teléfono dejaba
+    // la muñeca sin enterarse.
+    _launchWatch();
     final recoveredLogs = await repo
         .listSetLogs(
           uid: uid,

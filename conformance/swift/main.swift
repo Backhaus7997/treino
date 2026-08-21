@@ -26,6 +26,36 @@ private func fail(_ message: String) {
     failures.append(message)
 }
 
+/// Lee un entero de 64 bits del fixture.
+///
+/// `as? Int` alcanzaría en este corredor, que compila en el host — y ese es
+/// justamente el problema. En watchOS `Int` es de 32 bits (arm64_32) y los
+/// milisegundos desde epoch rondan 1,8e12, así que ahí ese cast devolvería nil
+/// y la regla no correría nunca. Leerlos como `Int64` acá mantiene el corredor
+/// bajo la misma disciplina que el código del reloj.
+private func int64(_ any: Any?) -> Int64? {
+    // Se prueban los tipos NATIVOS primero, y despues NSNumber.
+    //
+    // No es cinturon y tiradores: este corredor corre en CI sobre **ubuntu**, y
+    // en swift-corelibs-foundation el bridging automatico entre los enteros de
+    // Swift y `NSNumber` no es el de Darwin. Un `as? NSNumber` sobre el `Int64`
+    // que produce `EffortSnapshot.context` puede devolver nil en Linux y dejar
+    // el job en rojo por una razon que en mac es invisible.
+    //
+    // Los valores llegan de dos lugares distintos: los del fixture salen de
+    // `JSONSerialization` (NSNumber en las dos plataformas) y los del payload
+    // los produce el codigo del reloj (Int / Int64 nativos).
+    if let v = any as? Int64 { return v }
+    if let v = any as? Int { return Int64(v) }
+    if let n = any as? NSNumber { return n.int64Value }
+    return nil
+}
+
+/// Un instante a partir de milisegundos desde epoch.
+private func fecha(desdeMs ms: Int64) -> Date {
+    Date(timeIntervalSince1970: TimeInterval(ms) / 1000)
+}
+
 // MARK: - plan_advance
 
 private func runPlanAdvance(fixtureURL: URL) {
@@ -340,6 +370,282 @@ private func runSetLogIdentity(fixtureURL: URL) {
     }
 }
 
+// MARK: - superset_order
+
+private func runSupersetOrder(fixtureURL: URL) {
+    guard let data = try? Data(contentsOf: fixtureURL) else {
+        fail("No se pudo leer \(fixtureURL.path). Los fixtures son el contrato "
+            + "con la implementación Dart: si el archivo no está, ese contrato "
+            + "no existe.")
+        return
+    }
+
+    guard
+        let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+        let rule = json["rule"] as? String,
+        let cases = json["cases"] as? [[String: Any]]
+    else {
+        fail("\(fixtureURL.lastPathComponent) no tiene la forma esperada.")
+        return
+    }
+
+    guard rule == "superset-order" else {
+        fail("Se esperaba rule 'superset-order' y vino '\(rule)'.")
+        return
+    }
+
+    guard !cases.isEmpty else {
+        fail("\(fixtureURL.lastPathComponent) no tiene casos.")
+        return
+    }
+
+    for testCase in cases {
+        totalCases += 1
+        let name = testCase["name"] as? String ?? "(sin nombre)"
+
+        guard
+            let given = testCase["given"] as? [String: Any],
+            let expected = testCase["expect"] as? [String: Any],
+            let rawMembers = given["members"] as? [[String: Any]],
+            let expectedRounds = expected["totalRounds"] as? Int
+        else {
+            fail("Caso '\(name)' mal formado.")
+            continue
+        }
+
+        let members: [SupersetMember] = rawMembers.compactMap {
+            guard
+                let id = $0["exerciseId"] as? String,
+                let planned = $0["plannedSets"] as? Int,
+                let logged = $0["loggedSets"] as? Int
+            else { return nil }
+            return SupersetMember(exerciseId: id, plannedSets: planned, loggedSets: logged)
+        }
+        guard members.count == rawMembers.count else {
+            fail("Caso '\(name)': algún miembro está mal formado.")
+            continue
+        }
+
+        let rounds = SupersetOrder.totalRounds(members)
+        if rounds != expectedRounds {
+            fail("Caso '\(name)': vueltas totales — se esperaba \(expectedRounds) y vino \(rounds).")
+            continue
+        }
+
+        let cell = SupersetOrder.nextCell(members)
+
+        // `exerciseId: null` en el fixture significa bloque completo.
+        if expected["exerciseId"] is NSNull || expected["exerciseId"] == nil {
+            if let cell {
+                fail("Caso '\(name)': se esperaba bloque completo y vino \(cell.exerciseId) serie \(cell.setNumber).")
+            }
+            continue
+        }
+
+        guard
+            let expectedId = expected["exerciseId"] as? String,
+            let expectedSet = expected["setNumber"] as? Int,
+            let expectedRound = expected["round"] as? Int
+        else {
+            fail("Caso '\(name)': expect mal formado.")
+            continue
+        }
+
+        guard let cell else {
+            fail("Caso '\(name)': se esperaba \(expectedId) serie \(expectedSet) y vino bloque completo.")
+            continue
+        }
+
+        if cell.exerciseId != expectedId || cell.setNumber != expectedSet || cell.round != expectedRound {
+            fail("Caso '\(name)': se esperaba \(expectedId)/serie \(expectedSet)/vuelta \(expectedRound) "
+                + "y vino \(cell.exerciseId)/serie \(cell.setNumber)/vuelta \(cell.round).")
+        }
+    }
+}
+
+// MARK: - duration_timer
+
+private func runDurationTimer(fixtureURL: URL) {
+    guard let data = try? Data(contentsOf: fixtureURL) else {
+        fail("No se pudo leer \(fixtureURL.path). Los fixtures son el contrato "
+            + "con la implementación Dart: si el archivo no está, ese contrato "
+            + "no existe.")
+        return
+    }
+
+    guard
+        let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+        let rule = json["rule"] as? String,
+        let cases = json["cases"] as? [[String: Any]]
+    else {
+        fail("\(fixtureURL.lastPathComponent) no tiene la forma esperada.")
+        return
+    }
+
+    guard rule == "duration-timer" else {
+        fail("Se esperaba rule 'duration-timer' y vino '\(rule)'.")
+        return
+    }
+
+    guard !cases.isEmpty else {
+        fail("\(fixtureURL.lastPathComponent) no tiene casos.")
+        return
+    }
+
+    for testCase in cases {
+        totalCases += 1
+        let name = testCase["name"] as? String ?? "(sin nombre)"
+
+        guard
+            let given = testCase["given"] as? [String: Any],
+            let expected = testCase["expect"] as? [String: Any],
+            let endsAtMs = int64(given["endsAtMs"]),
+            let nowMs = int64(given["nowMs"]),
+            let expectedRemaining = expected["remaining"] as? Int,
+            let expectedFinished = expected["finished"] as? Bool
+        else {
+            fail("Caso '\(name)' mal formado.")
+            continue
+        }
+
+        let endsAt = fecha(desdeMs: endsAtMs)
+        let now = fecha(desdeMs: nowMs)
+
+        let restante = CountdownRules.remaining(endsAt: endsAt, now: now)
+        if restante != expectedRemaining {
+            fail("Caso '\(name)': segundos restantes — se esperaba "
+                + "\(expectedRemaining) y vino \(restante).")
+        }
+
+        let termino = CountdownRules.isFinished(endsAt: endsAt, now: now)
+        if termino != expectedFinished {
+            fail("Caso '\(name)': terminada — se esperaba \(expectedFinished) "
+                + "y vino \(termino).")
+        }
+    }
+}
+
+// MARK: - effort_payload
+
+/// Este contrato es ASIMETRICO: Swift ESCRIBE el diccionario y Dart lo LEE. Acá
+/// se verifica la mitad de Swift — que `EffortSnapshot.context(measuredAt:)`
+/// produzca exactamente el diccionario del fixture, clave por clave.
+private func runEffortPayload(fixtureURL: URL) {
+    guard let data = try? Data(contentsOf: fixtureURL) else {
+        fail("No se pudo leer \(fixtureURL.path). Los fixtures son el contrato "
+            + "con la implementación Dart: si el archivo no está, ese contrato "
+            + "no existe.")
+        return
+    }
+
+    guard
+        let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+        let rule = json["rule"] as? String,
+        let cases = json["cases"] as? [[String: Any]]
+    else {
+        fail("\(fixtureURL.lastPathComponent) no tiene la forma esperada.")
+        return
+    }
+
+    guard rule == "effort-payload" else {
+        fail("Se esperaba rule 'effort-payload' y vino '\(rule)'.")
+        return
+    }
+
+    guard !cases.isEmpty else {
+        fail("\(fixtureURL.lastPathComponent) no tiene casos.")
+        return
+    }
+
+    for testCase in cases {
+        totalCases += 1
+        let name = testCase["name"] as? String ?? "(sin nombre)"
+
+        guard
+            let given = testCase["given"] as? [String: Any],
+            let esperado = testCase["expect"] as? [String: Any],
+            let measuredAtMs = int64(given["measuredAtMs"])
+        else {
+            fail("Caso '\(name)' mal formado.")
+            continue
+        }
+
+        // `NSNull` es como JSONSerialization representa un null explícito del
+        // fixture; hay que distinguirlo de "la clave no está".
+        let bpm = given["bpm"] as? Int
+        let kcal = given["kcal"] as? Int
+
+        var cronometro: EffortSnapshot.RunningTimer?
+        if let t = given["timer"] as? [String: Any] {
+            guard
+                let exerciseId = t["exerciseId"] as? String,
+                let setNumber = t["setNumber"] as? Int,
+                let totalSeconds = t["totalSeconds"] as? Int,
+                let endsAtMs = int64(t["endsAtMs"])
+            else {
+                fail("Caso '\(name)': el cronómetro del fixture está mal formado.")
+                continue
+            }
+            cronometro = EffortSnapshot.RunningTimer(
+                exerciseId: exerciseId,
+                setNumber: setNumber,
+                totalSeconds: totalSeconds,
+                endsAt: fecha(desdeMs: endsAtMs)
+            )
+        }
+
+        let snapshot = EffortSnapshot(bpm: bpm, kcal: kcal, timer: cronometro)
+        let payload = snapshot.context(measuredAt: fecha(desdeMs: measuredAtMs))
+
+        // Mismo conjunto de claves, ni una de más ni una de menos. Una clave de
+        // más es tan grave como una de menos: significa que un lado manda algo
+        // que el otro no sabe que existe.
+        let clavesEsperadas = Set(esperado.keys)
+        let clavesReales = Set(payload.keys)
+        if clavesEsperadas != clavesReales {
+            let sobran = clavesReales.subtracting(clavesEsperadas).sorted()
+            let faltan = clavesEsperadas.subtracting(clavesReales).sorted()
+            fail("Caso '\(name)': las claves no coinciden — sobran \(sobran), faltan \(faltan).")
+            continue
+        }
+
+        for (clave, valorEsperado) in esperado {
+            let valorReal = payload[clave]
+            let ok: Bool
+            if let esperadoTexto = valorEsperado as? String {
+                ok = (valorReal as? String) == esperadoTexto
+            } else if let esperadoEntero = int64(valorEsperado) {
+                // Los enteros viajan como Int o Int64 según la clave; comparar
+                // por valor de 64 bits cubre las dos sin perder precisión.
+                ok = int64(valorReal) == esperadoEntero
+            } else {
+                ok = false
+            }
+            if !ok {
+                fail("Caso '\(name)': clave '\(clave)' — se esperaba "
+                    + "\(valorEsperado) y vino \(valorReal.map { String(describing: $0) } ?? "nada").")
+            }
+        }
+
+        // TODA clave de milisegundos tiene que salir como `Int64`.
+        //
+        // Se recorre por nombre y no se chequea una sola a mano: la comparación
+        // de valores de arriba usa `int64(...)`, que en el host de 64 bits es
+        // CIEGA al tipo — un `Int64` cambiado a `Int` dejaría el corredor en
+        // verde y crashearía el reloj. Es lo único observable desde acá sobre la
+        // trampa de arm64_32.
+        for clave in esperado.keys where clave.hasSuffix("Ms") {
+            guard let valor = payload[clave] else { continue }
+            if !(valor is Int64) {
+                fail("Caso '\(name)': '\(clave)' tiene que ser Int64 y es \(type(of: valor)). "
+                    + "Con `Int` trapea en arm64_32 — ver commit 3a0840cc.")
+            }
+        }
+    }
+}
+
+// MARK: - main
+
 // MARK: - exercise_cursor
 
 private func runExerciseCursor(fixtureURL: URL) {
@@ -506,6 +812,9 @@ runSessionCounting(fixtureURL: conformanceDir.appendingPathComponent("session_co
 runSetLogIdentity(fixtureURL: conformanceDir.appendingPathComponent("set_log_identity.json"))
 runExerciseCursor(fixtureURL: conformanceDir.appendingPathComponent("exercise_cursor.json"))
 runSetLogWriteTarget(fixtureURL: conformanceDir.appendingPathComponent("set_log_write_target.json"))
+runSupersetOrder(fixtureURL: conformanceDir.appendingPathComponent("superset_order.json"))
+runDurationTimer(fixtureURL: conformanceDir.appendingPathComponent("duration_timer.json"))
+runEffortPayload(fixtureURL: conformanceDir.appendingPathComponent("effort_payload.json"))
 
 if failures.isEmpty {
     print("✓ conformidad Swift: \(totalCases) casos, todos en verde")

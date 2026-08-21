@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
+import '../../../app/theme/tokens/components/treino_button_tokens.dart';
 import '../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
@@ -211,11 +212,22 @@ class _RankingsBodyState extends ConsumerState<RankingsBody> {
 }
 
 /// Opted-out invitation state (design AD-6, spec `gym-rankings` — Opt-In
-/// Toggle Lives on the Rankings Surface). Renders a prominent `ACTIVAR
-/// RANKINGS` CTA that calls [RankingOptInControllerBase.enableRankingOptIn].
+/// Toggle Lives on the Rankings Surface). Renders a visible `ACTIVAR RANKINGS`
+/// CTA that calls [RankingOptInControllerBase.enableRankingOptIn].
 /// The success path needs no manual navigation: [_OptInGate] watches the
 /// same live provider this write targets, so the surface swaps to
 /// leaderboards the instant the write lands.
+///
+/// The CTA is deliberately NOT full-bleed (issue #642, spec change
+/// `rankings-placement-v3`). Rankings is opt-in, and this surface is what the
+/// athlete who declined still lands on: a 56pt edge-to-edge accent slab read
+/// as the app re-selling a feature they had already turned down. It is now a
+/// compact button — still unmistakably a control, no longer a pitch.
+///
+/// Shrinking it further (a text link, or dropping the CTA for a neutral state)
+/// was rejected: issue #646 found participants do not recognise these controls
+/// as tappable at all, so lowering the affordance would trade one reported
+/// defect for another.
 class _InvitationState extends ConsumerStatefulWidget {
   const _InvitationState({required this.myUid, required this.palette});
 
@@ -281,19 +293,28 @@ class _InvitationStateState extends ConsumerState<_InvitationState> {
               ),
             ),
             const SizedBox(height: 20),
+            // Intrinsic width, not `double.infinity`: see the class doc.
+            // 44 is the Apple HIG tap-target floor (the same one
+            // `_kFeedActionTapTarget` pins in feed_screen.dart), which is why
+            // it sits off the 8·12·14·18·20 spacing scale — a11y minimum wins
+            // over the scale, exactly as the 56 it replaces did.
             SizedBox(
-              width: double.infinity,
-              height: 56,
+              height: 44,
               child: ElevatedButton(
                 onPressed: _enabling ? null : _enable,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: palette.accent,
-                  foregroundColor: palette.bg,
+                  // NOT `palette.bg`. That token inverts between themes, so on
+                  // light it resolves to paper50 over mint accent — 1.57:1,
+                  // failing WCAG AA. `TreinoButtonTokens.foreground` returns
+                  // ink950 invariantly: 12.10:1 in both themes.
+                  foregroundColor: TreinoButtonTokens.foreground(context),
                   disabledBackgroundColor:
                       palette.accent.withValues(alpha: 0.5),
-                  disabledForegroundColor: palette.bg,
+                  disabledForegroundColor:
+                      TreinoButtonTokens.foreground(context),
                   shape: const StadiumBorder(),
-                  padding: EdgeInsets.zero,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
                 ),
                 child: _enabling
                     ? SizedBox(
@@ -302,7 +323,9 @@ class _InvitationStateState extends ConsumerState<_InvitationState> {
                         height: 22,
                         child: CircularProgressIndicator(
                           strokeWidth: 2.5,
-                          valueColor: AlwaysStoppedAnimation<Color>(palette.bg),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            TreinoButtonTokens.foreground(context),
+                          ),
                         ),
                       )
                     : Text(
@@ -311,7 +334,7 @@ class _InvitationStateState extends ConsumerState<_InvitationState> {
                           fontWeight: FontWeight.w700,
                           fontSize: 16,
                           letterSpacing: 1.0,
-                          color: palette.bg,
+                          color: TreinoButtonTokens.foreground(context),
                         ),
                       ),
               ),

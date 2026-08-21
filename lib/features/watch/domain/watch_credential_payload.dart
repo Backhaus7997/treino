@@ -112,3 +112,35 @@ class WatchCredentialPayload {
   int get hashCode => Object.hash(customToken, uid, apiKey, projectId,
       authEmulatorHost, firestoreEmulatorHost);
 }
+
+/// El aviso de que el atleta CERRÓ SESIÓN en el teléfono.
+///
+/// ── Por qué viaja por el MISMO slot que la credencial ────────────────────
+///
+/// El `applicationContext` de salida es UNO SOLO y se pisa entero. Para casi
+/// todo eso es una restricción; para esto es exactamente la semántica que se
+/// quiere: publicar este aviso **borra la credencial del canal**.
+///
+/// Y persiste. `sendMessage` exige que el reloj esté alcanzable AHORA, y "la
+/// app del reloj está cerrada" es justo el caso que hay que cubrir: cerrar
+/// sesión con el reloj guardado en un cajón tiene que desloguearlo igual. El
+/// contexto se entrega en el próximo lanzamiento del reloj.
+///
+/// ── Por qué un `kind` propio y no una credencial vacía ───────────────────
+///
+/// Mandar [WatchCredentialPayload] con el `customToken` en blanco NO sirve: el
+/// lado Swift valida con `nonEmpty`, el init falla entero, y el contexto se
+/// descarta en silencio. El teléfono creería que avisó.
+///
+/// Con un `kind` hermano, además, los builds VIEJOS del reloj lo ignoran solos
+/// —su guard de credencial no matchea— sin crashear.
+///
+/// Lo lee `WatchSignedOutPayload.esAviso` en
+/// `ios/TreinoWatch Watch App/WatchSignedOutPayload.swift`.
+class WatchSignedOutPayload {
+  const WatchSignedOutPayload();
+
+  static const String kind = 'watchSignedOut';
+
+  Map<String, dynamic> toJson() => {'kind': kind};
+}

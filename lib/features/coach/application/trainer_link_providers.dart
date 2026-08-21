@@ -1,15 +1,27 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../coach_hub/application/cf_providers.dart'
+    show cloudFunctionsProvider;
 import '../../profile/application/user_providers.dart' show firestoreProvider;
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../data/session_share_repository.dart';
+import '../data/trainer_link_promotion_service.dart';
 import '../data/trainer_link_repository.dart';
 import '../domain/trainer_link.dart';
 import '../domain/trainer_link_status.dart';
 
 final trainerLinkRepositoryProvider = Provider<TrainerLinkRepository>(
   (ref) => TrainerLinkRepository(firestore: ref.watch(firestoreProvider)),
+);
+
+/// Server-authoritative `accept` — replaces
+/// `trainerLinkRepositoryProvider.accept()` (Fase 7, PR4, slice 2).
+final trainerLinkPromotionServiceProvider =
+    Provider<TrainerLinkPromotionService>(
+  (ref) => TrainerLinkPromotionService(
+    functions: ref.watch(cloudFunctionsProvider),
+  ),
 );
 
 /// Lista de vínculos donde el usuario actuó como PF.

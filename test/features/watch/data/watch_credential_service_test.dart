@@ -217,4 +217,68 @@ void main() {
       );
     });
   });
+
+  group('clearCredential — cerrar sesión', () {
+    // Esto NO existía. El listener de auth era `if (user == null) return;` sin
+    // rama else, y `CredentialStore.delete()` del lado Swift tenía cero
+    // llamadores. O sea que cerrar sesión en el teléfono no hacía absolutamente
+    // nada en el reloj: seguía con un refresh token válido y podía leer y
+    // escribir Firestore como el atleta anterior, indefinidamente y sin
+    // teléfono de por medio.
+
+    setUp(() {
+      when(() => bridge.isSupported).thenAnswer((_) async => true);
+      when(() => bridge.isPaired).thenAnswer((_) async => true);
+    });
+
+    test('PISA la credencial en el contexto, que es lo que la borra', () async {
+      expect(await service.clearCredential(), isTrue);
+
+      final ctx = verify(() => bridge.updateApplicationContext(captureAny()))
+          .captured
+          .single as Map<String, dynamic>;
+      expect(ctx['kind'], 'watchSignedOut');
+      // El contexto de salida es UNO SOLO y se pisa entero: que no quede ni un
+      // campo de la credencial es lo que hace que el reloj no pueda releerla.
+      expect(ctx.containsKey('customToken'), isFalse);
+      expect(ctx.containsKey('refreshToken'), isFalse);
+      expect(ctx.containsKey('uid'), isFalse);
+      expect(ctx.keys, hasLength(1));
+    });
+
+    test('NO manda una credencial vacía', () async {
+      // Un `WatchCredentialPayload` con el customToken en blanco no serviría:
+      // el lado Swift valida con `nonEmpty`, el init falla entero y el contexto
+      // se descarta en silencio. El teléfono creería que avisó.
+      await service.clearCredential();
+
+      final ctx = verify(() => bridge.updateApplicationContext(captureAny()))
+          .captured
+          .single as Map<String, dynamic>;
+      expect(ctx['kind'], isNot(WatchCredentialPayload.kind));
+    });
+
+    test(
+        'va por CONTEXTO y no por mensaje: tiene que llegar con la app cerrada',
+        () async {
+      await service.clearCredential();
+      // `sendMessage` exige alcanzabilidad AHORA, y "el reloj está en un cajón"
+      // es justo el caso que hay que cubrir: cerrar sesión tiene que
+      // desloguearlo igual, aunque sea al próximo lanzamiento.
+      verifyNever(() => bridge.sendMessage(any()));
+    });
+
+    test('sin reloj emparejado no hace nada', () async {
+      when(() => bridge.isPaired).thenAnswer((_) async => false);
+      expect(await service.clearCredential(), isFalse);
+      verifyNever(() => bridge.updateApplicationContext(any()));
+    });
+
+    test('una falla del puente NO se propaga', () async {
+      // Corre en el camino de logout: no puede tumbar el cierre de sesión.
+      when(() => bridge.updateApplicationContext(any()))
+          .thenThrow(Exception('canal muerto'));
+      expect(await service.clearCredential(), isFalse);
+    });
+  });
 }

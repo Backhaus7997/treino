@@ -15,21 +15,23 @@
 // Scaffold/SafeArea, AppPalette/AppL10n (ADR-CHW-005).
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/app/theme/tokens/components/treino_card_tokens.dart';
 import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
+import 'package:treino/features/coach/data/trainer_link_promotion_service.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
-import 'package:treino/features/coach_hub/presentation/widgets/empty_state/empty_state.dart';
-import 'package:treino/features/coach_hub/presentation/widgets/list_row/list_row.dart';
-import 'package:treino/features/coach_hub/presentation/widgets/section_header/section_header.dart';
-import 'package:treino/features/feed/presentation/widgets/post_avatar.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
+import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_limit_paywall.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 /// Pendientes de HOY — solicitudes pendientes REAL. REQ-HOY-06.
@@ -46,19 +48,21 @@ class DashboardPendingSection extends ConsumerWidget {
         ?.where((l) => l.status == TrainerLinkStatus.pending)
         .toList();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        TreinoSectionHeader(
-          title: 'Pendientes de HOY',
-          count: pending?.length,
-        ),
-        const SizedBox(height: AppSpacing.s12),
-        TreinoStateSwitcher(
-          childKey: ValueKey(_stateKey(linksAsync, pending)),
-          child: _PendingContent(linksAsync: linksAsync, pending: pending),
-        ),
-      ],
+    return _SectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TreinoSectionHeader(
+            title: 'Pendientes de HOY',
+            count: pending?.length,
+          ),
+          const SizedBox(height: AppSpacing.s12),
+          TreinoStateSwitcher(
+            childKey: ValueKey(_stateKey(linksAsync, pending)),
+            child: _PendingContent(linksAsync: linksAsync, pending: pending),
+          ),
+        ],
+      ),
     );
   }
 
@@ -72,6 +76,33 @@ class DashboardPendingSection extends ConsumerWidget {
     if (pending == null) return 'loading';
     if (pending.isEmpty) return 'empty';
     return 'data';
+  }
+}
+
+// ─── Card wrapper (cards flotantes, revisión) ───────────────────────────────
+
+/// Card flotante compartida — mismo contrato visual que `_SectionCard` de
+/// `dashboard_right_column.dart` (TreinoCardTokens: bgCard + borde + radio
+/// md). Duplicada localmente en vez de extraída a un widget compartido, igual
+/// criterio que `_SectionError` en este mismo archivo (ver comentario arriba)
+/// — Pendientes antes no tenía superficie propia (header + filas pegados
+/// directo al fondo, "borde a borde"), quedaba visualmente desalineado de
+/// las 3 cards de la columna derecha.
+class _SectionCard extends StatelessWidget {
+  const _SectionCard({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.s18),
+      decoration: BoxDecoration(
+        color: TreinoCardTokens.background(context),
+        borderRadius: BorderRadius.circular(TreinoCardTokens.borderRadius),
+        border: Border.all(color: TreinoCardTokens.border(context)),
+      ),
+      child: child,
+    );
   }
 }
 
@@ -184,9 +215,13 @@ class _PendingRequestTileState extends ConsumerState<_PendingRequestTile> {
     if (_busy) return;
     setState(() => _busy = true);
     final l10n = AppL10n.of(context);
-    final repo = ref.read(trainerLinkRepositoryProvider);
     try {
-      await repo.accept(widget.link.id);
+      // Server-authoritative: la callable aplica el gate de peso ponderado
+      // (paywall Fase 7, PR4). Antes esto escribia status:'active' directo a
+      // Firestore y el limite era inaplicable.
+      await ref
+          .read(trainerLinkPromotionServiceProvider)
+          .accept(widget.link.id);
       ref
           .read(analyticsServiceProvider)
           .logLinkAccepted(linkId: widget.link.id);
@@ -194,11 +229,35 @@ class _PendingRequestTileState extends ConsumerState<_PendingRequestTile> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.coachHubDashboardAcceptSuccess)),
       );
-    } catch (_) {
+    } on LinkPromotionFailure$PlanLimitReached catch (failure) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      unawaited(
+        showPlanLimitPaywall(
+          context,
+          currentTier: failure.tier,
+          reason: failure.reason == 'subscription-inactive'
+              ? PlanLimitReason.subscriptionInactive
+              : PlanLimitReason.planLimit,
+          // El Coach Hub SI tiene vista de facturacion; la app movil no, y
+          // por eso el default es null (ver showPlanLimitPaywall).
+          billingRoute: '/ajustes',
+        ),
+      );
+    } on LinkPromotionFailure$PromotionPrecondition {
       if (!mounted) return;
       setState(() => _busy = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.coachHubDashboardAcceptError)),
+        SnackBar(content: Text(l10n.coachHubDashboardAcceptPrecondition)),
+      );
+    } catch (_) {
+      // Catch-all a proposito, NO acotado a LinkPromotionFailure (QA H5): lo
+      // que quede afuera de la jerarquia sellada igual tiene que resetear
+      // _busy y avisar, o el boton queda muerto sin explicacion.
+      if (!mounted) return;
+      setState(() => _busy = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.coachHubDashboardAcceptUnavailable)),
       );
     }
   }
@@ -239,8 +298,8 @@ class _PendingRequestTileState extends ConsumerState<_PendingRequestTile> {
         vertical: AppSpacing.s12,
       ),
       decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(AppRadius.md),
+        color: TreinoCardTokens.background(context),
+        borderRadius: BorderRadius.circular(TreinoCardTokens.borderRadius),
         border: Border.all(color: palette.highlight.withValues(alpha: 0.4)),
       ),
       child: Row(
@@ -248,10 +307,11 @@ class _PendingRequestTileState extends ConsumerState<_PendingRequestTile> {
           Semantics(
             image: true,
             label: l10n.a11yAvatarLabel(name),
-            child: PostAvatar(
-              authorDisplayName: name,
-              authorAvatarUrl: avatar,
-              size: 40,
+            child: TreinoAvatar(
+              displayName: name,
+              avatarUrl: avatar,
+              diameter: 40,
+              initialFontSize: 15,
             ),
           ),
           const SizedBox(width: AppSpacing.s12),

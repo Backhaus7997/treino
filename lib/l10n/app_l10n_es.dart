@@ -114,11 +114,23 @@ class AppL10nEs extends AppL10n {
   String get authSplashTagline => 'ENTRENÁ. COMPARTÍ. CRECÉ.';
 
   @override
+  String get authBrandHeadline1Light => 'DEJA DE ';
+
+  @override
+  String get authBrandHeadline1Bold => 'IMPROVISAR.';
+
+  @override
+  String get authBrandHeadline2Light => 'EMPIEZA A ';
+
+  @override
+  String get authBrandHeadline2Bold => 'PROGRESAR.';
+
+  @override
   String get authWelcomeEyebrow => 'ENTRENAMIENTO · GYM · COACH';
 
   @override
   String get authWelcomeBody =>
-      'Cargá tu rutina, ejecutá los sets, seguí a tus pibes y encontrá un coach cerca tuyo.';
+      'Tu rutina, tus series y tus cargas en un solo lugar. Con un coach atrás si lo quieres.';
 
   @override
   String get authWelcomeCta => 'EMPEZAR';
@@ -804,6 +816,21 @@ class AppL10nEs extends AppL10n {
       'Llegaste al máximo de 10 rutinas activas.';
 
   @override
+  String get workoutTabYours => 'TU ENTRENO';
+
+  @override
+  String get workoutTabExplore => 'EXPLORAR';
+
+  @override
+  String get workoutExploreEmptyAll => 'No hay rutinas todavía.';
+
+  @override
+  String get workoutExploreEmptyLevel => 'No hay rutinas para este nivel.';
+
+  @override
+  String get workoutExploreLoadError => 'Hubo un error cargando las rutinas.';
+
+  @override
   String get workoutMisRutinasSectionTitle => 'MIS RUTINAS';
 
   @override
@@ -881,7 +908,7 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get templateRatingsNoneYet =>
-      'Todavía nadie calificó esta plantilla. ¡Sé el primero!';
+      'Todavía nadie calificó esta rutina. ¡Sé el primero!';
 
   @override
   String templateRatingsCount(int count) {
@@ -913,14 +940,14 @@ class AppL10nEs extends AppL10n {
   String get templateRatingsError => 'No pudimos cargar los comentarios.';
 
   @override
-  String get templateRatingSheetTitle => 'Califica esta plantilla';
+  String get templateRatingSheetTitle => 'Califica esta rutina';
 
   @override
   String get templateRatingSheetTitleEdit => 'Edita tu calificación';
 
   @override
   String get templateRatingSheetCommentHint =>
-      'Cuenta cómo te fue con esta plantilla (opcional)';
+      'Cuenta cómo te fue con esta rutina (opcional)';
 
   @override
   String get templateRatingSheetCancel => 'CANCELAR';
@@ -935,7 +962,7 @@ class AppL10nEs extends AppL10n {
   String get templateRatingSheetError => 'No pudimos guardar tu calificación.';
 
   @override
-  String get workoutSplitFallback => 'Sin split';
+  String get workoutSplitFallback => 'Rutina libre';
 
   @override
   String get workoutPickerMuscleFilter => 'Músculos';
@@ -2223,10 +2250,26 @@ class AppL10nEs extends AppL10n {
       'No pudimos reanudar el vínculo.';
 
   @override
+  String get coachHubDashboardResumePrecondition =>
+      'Este vínculo ya no está disponible.';
+
+  @override
+  String get coachHubDashboardResumeUnavailable =>
+      'Revisá tu conexión y probá de nuevo.';
+
+  @override
   String get coachHubDashboardAcceptSuccess => 'Vínculo aceptado.';
 
   @override
   String get coachHubDashboardAcceptError => 'No pudimos aceptar el vínculo.';
+
+  @override
+  String get coachHubDashboardAcceptPrecondition =>
+      'Esta solicitud ya no está disponible.';
+
+  @override
+  String get coachHubDashboardAcceptUnavailable =>
+      'Revisá tu conexión y probá de nuevo.';
 
   @override
   String get coachHubDashboardRejectSuccess => 'Solicitud rechazada.';
@@ -2313,6 +2356,16 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get coachHubAlumnosStatusDebt => 'Con deuda';
+
+  @override
+  String get coachHubAlumnosStatusBlocked => 'Bloqueado';
+
+  @override
+  String get coachHubAlumnosFilterBloqueados => 'Bloqueados';
+
+  @override
+  String get coachHubAlumnosBlockedHint =>
+      'Superaste el límite de tu plan. Este alumno no cuenta y no puedes trabajar con él hasta que regularices.';
 
   @override
   String get coachHubAlumnosStatusPaused => 'Pausado';
@@ -3465,6 +3518,22 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get followListOpenFollowingA11y => 'Ver seguidos';
+
+  @override
+  String routineCardDaysPerWeek(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '$days días/sem',
+      one: '1 día/sem',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String routineCardMinutes(String value) {
+    return '$value min';
+  }
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -3577,11 +3646,23 @@ class AppL10nEsAr extends AppL10nEs {
   String get authSplashTagline => 'ENTRENÁ. COMPARTÍ. CRECÉ.';
 
   @override
+  String get authBrandHeadline1Light => 'DEJÁ DE ';
+
+  @override
+  String get authBrandHeadline1Bold => 'IMPROVISAR.';
+
+  @override
+  String get authBrandHeadline2Light => 'EMPEZÁ A ';
+
+  @override
+  String get authBrandHeadline2Bold => 'PROGRESAR.';
+
+  @override
   String get authWelcomeEyebrow => 'ENTRENAMIENTO · GYM · COACH';
 
   @override
   String get authWelcomeBody =>
-      'Cargá tu rutina, ejecutá los sets, seguí a tus pibes y encontrá un coach cerca tuyo.';
+      'Tu rutina, tus series y tus cargas en un solo lugar. Con un coach atrás si lo querés.';
 
   @override
   String get authWelcomeCta => 'EMPEZAR';
@@ -4267,6 +4348,21 @@ class AppL10nEsAr extends AppL10nEs {
       'Llegaste al máximo de 10 rutinas activas.';
 
   @override
+  String get workoutTabYours => 'TU ENTRENO';
+
+  @override
+  String get workoutTabExplore => 'EXPLORAR';
+
+  @override
+  String get workoutExploreEmptyAll => 'No hay rutinas todavía.';
+
+  @override
+  String get workoutExploreEmptyLevel => 'No hay rutinas para este nivel.';
+
+  @override
+  String get workoutExploreLoadError => 'Hubo un error cargando las rutinas.';
+
+  @override
   String get workoutMisRutinasSectionTitle => 'MIS RUTINAS';
 
   @override
@@ -4344,7 +4440,7 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get templateRatingsNoneYet =>
-      'Todavía nadie calificó esta plantilla. ¡Sé el primero!';
+      'Todavía nadie calificó esta rutina. ¡Sé el primero!';
 
   @override
   String templateRatingsCount(int count) {
@@ -4376,14 +4472,14 @@ class AppL10nEsAr extends AppL10nEs {
   String get templateRatingsError => 'No pudimos cargar los comentarios.';
 
   @override
-  String get templateRatingSheetTitle => 'Calificá esta plantilla';
+  String get templateRatingSheetTitle => 'Calificá esta rutina';
 
   @override
   String get templateRatingSheetTitleEdit => 'Editá tu calificación';
 
   @override
   String get templateRatingSheetCommentHint =>
-      'Contá cómo te fue con esta plantilla (opcional)';
+      'Contá cómo te fue con esta rutina (opcional)';
 
   @override
   String get templateRatingSheetCancel => 'CANCELAR';
@@ -4398,7 +4494,7 @@ class AppL10nEsAr extends AppL10nEs {
   String get templateRatingSheetError => 'No pudimos guardar tu calificación.';
 
   @override
-  String get workoutSplitFallback => 'Sin split';
+  String get workoutSplitFallback => 'Rutina libre';
 
   @override
   String get workoutPickerMuscleFilter => 'Músculos';
@@ -5687,10 +5783,26 @@ class AppL10nEsAr extends AppL10nEs {
       'No pudimos reanudar el vínculo.';
 
   @override
+  String get coachHubDashboardResumePrecondition =>
+      'Este vínculo ya no está disponible.';
+
+  @override
+  String get coachHubDashboardResumeUnavailable =>
+      'Revisá tu conexión y probá de nuevo.';
+
+  @override
   String get coachHubDashboardAcceptSuccess => 'Vínculo aceptado.';
 
   @override
   String get coachHubDashboardAcceptError => 'No pudimos aceptar el vínculo.';
+
+  @override
+  String get coachHubDashboardAcceptPrecondition =>
+      'Esta solicitud ya no está disponible.';
+
+  @override
+  String get coachHubDashboardAcceptUnavailable =>
+      'Revisá tu conexión y probá de nuevo.';
 
   @override
   String get coachHubDashboardRejectSuccess => 'Solicitud rechazada.';
@@ -5777,6 +5889,16 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get coachHubAlumnosStatusDebt => 'Con deuda';
+
+  @override
+  String get coachHubAlumnosStatusBlocked => 'Bloqueado';
+
+  @override
+  String get coachHubAlumnosFilterBloqueados => 'Bloqueados';
+
+  @override
+  String get coachHubAlumnosBlockedHint =>
+      'Superaste el límite de tu plan. Este alumno no cuenta y no podés trabajar con él hasta que regularices.';
 
   @override
   String get coachHubAlumnosStatusPaused => 'Pausado';
@@ -6925,4 +7047,20 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get followListOpenFollowingA11y => 'Ver seguidos';
+
+  @override
+  String routineCardDaysPerWeek(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '$days días/sem',
+      one: '1 día/sem',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String routineCardMinutes(String value) {
+    return '$value min';
+  }
 }

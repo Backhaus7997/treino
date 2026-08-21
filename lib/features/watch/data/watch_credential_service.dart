@@ -195,4 +195,35 @@ class WatchCredentialService {
     );
     return outcome;
   }
+
+  /// El atleta cerró sesión: el reloj tiene que dejar de ser suyo.
+  ///
+  /// ── Por qué esto no existía y por qué importa ──────────────────────────
+  ///
+  /// El listener de auth era `if (user == null) return;` sin rama `else`, y
+  /// `CredentialStore.delete()` del lado Swift tenía CERO llamadores — su
+  /// docstring decía "se usa al cerrar sesión" y era código muerto.
+  ///
+  /// O sea que cerrar sesión en el teléfono no hacía absolutamente nada en el
+  /// reloj: seguía con un refresh token válido y podía leer y escribir
+  /// Firestore como el atleta anterior, indefinidamente y sin teléfono.
+  /// Prestás el celular, la otra persona se loguea, y la muñeca sigue siendo
+  /// del dueño anterior.
+  ///
+  /// Publicar este aviso PISA la credencial en el contexto, que es la parte
+  /// que hace que funcione: no queda nada que un reloj pueda releer.
+  ///
+  /// Best-effort igual que el resto: no puede tirar en el camino de logout.
+  Future<bool> clearCredential() async {
+    try {
+      if (!await _bridge.isSupported) return false;
+      if (!await _bridge.isPaired) return false;
+      await _bridge.updateApplicationContext(
+        const WatchSignedOutPayload().toJson(),
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
 }

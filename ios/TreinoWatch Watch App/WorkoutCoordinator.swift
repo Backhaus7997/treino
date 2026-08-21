@@ -34,9 +34,99 @@ final class WorkoutCoordinator: ObservableObject {
     /// Segundos que faltan del descanso, o nil si no hay descanso corriendo.
     @Published private(set) var restRemaining: Int?
 
+    /// Un ejercicio POR TIEMPO en curso.
+    ///
+    /// Mientras esto no sea nil la pantalla la toma el cronometro: la serie no
+    /// se puede marcar a mano, y al llegar a cero se marca SOLA. Pedido del
+    /// dueno: un ejercicio por tiempo no se "completa" por decision del atleta,
+    /// se completa cuando pasa el tiempo.
+    struct DurationSet: Equatable {
+        let exerciseId: String
+        let setNumber: Int
+        let totalSeconds: Int
+        let spec: SetSpec
+        let restSeconds: Int
+        /// Instante de fin. Se guarda el FIN y no lo que falta: ver
+        /// `CountdownRules` para por que no se cuenta por ticks.
+        let endsAt: Date
+    }
+
+    @Published private(set) var durationSet: DurationSet?
+    @Published private(set) var durationRemaining: Int = 0
+    private var durationTimer: Timer?
+
+    /// El cronometro que corre en el TELEFONO, espejado en la muneca.
+    ///
+    /// Vive APARTE de `durationSet` a proposito, y la diferencia no es
+    /// cosmetica: esto no tiene camino a `logSet`. El dueno de la serie es el
+    /// lado que arranco el cronometro, y si los dos la cargaran al llegar a
+    /// cero quedarian dos documentos para la misma serie. Ver
+    /// `PhoneTimerMirror.swift`.
+    @Published private(set) var phoneTimer: PhoneTimer?
+    @Published private(set) var phoneTimerRemaining: Int = 0
+    private var phoneTimerTicker: Timer?
+
+    /// El espejo esta fuera de la pantalla, pero la cuenta SIGUE VIVA.
+    ///
+    /// Ocultar es una decision de PANTALLA, nunca de la serie. Antes el boton
+    /// "Ocultar" borraba el espejo entero, y eso destapaba la lista de series
+    /// con la serie sin marcar: el atleta la tocaba, el reloj arrancaba un
+    /// cronometro PROPIO sobre la misma serie, y al llegar a cero la cargaban
+    /// los dos. Dos documentos, ids distintos, ninguno puede deduplicar al
+    /// otro. La serie le quedaba repetida en el historial.
+    @Published private(set) var phoneTimerOculto = false
+
+    /// Le pide al TELEFONO que corte su cronometro. Lo inyecta `TreinoWatchApp`
+    /// para que este coordinador no tenga que importar WatchConnectivity.
+    ///
+    /// El callback se invoca SOLO si el pedido no llego. Importa: si no llego,
+    /// el telefono sigue contando y va a marcar la serie mientras el atleta
+    /// cree que la cancelo.
+    var onCancelarCronometroDelTelefono:
+        ((_ exerciseId: String, _ setNumber: Int, @escaping @MainActor () -> Void) -> Void)?
+
+    /// El ultimo pedido de cancelacion no llego al telefono.
+    ///
+    /// Se le muestra al atleta: cancelar en falso es peor que no ofrecerlo.
+    @Published var phoneTimerCancelFallo = false
+
+    /// La serie cuya cuenta espejada acaba de vencer, y cuando.
+    ///
+    /// El telefono la va a marcar —el la arranco— pero el reloj recien se entera
+    /// en el proximo `sync()`. En esa ventana la lista la muestra sin tildar, y
+    /// sin esto tocarla arrancaria una cuenta nueva: el atleta haria la plancha
+    /// dos veces.
+    ///
+    /// Es una ventana de GRACIA y no un bloqueo permanente a proposito: si el
+    /// telefono nunca llega a marcarla —se quedo sin señal, lo cerraron— la
+    /// serie tiene que volver a estar disponible. Preferimos que se pueda
+    /// rehacer a que quede trabada para siempre.
+    private var phoneTimerVencido: (exerciseId: String, setNumber: Int, cuando: Date)?
+
+    /// Cuanto dura esa gracia. Suficiente para que el telefono escriba y el
+    /// reloj sincronice, corto para no trabar una serie que hay que rehacer.
+    private static let graciaPostVencimiento: TimeInterval = 120
+
+    /// Si esa serie sigue bloqueada por haber vencido recien.
+    func estaEnGracia(exerciseId: String, setNumber: Int, now: Date = Date()) -> Bool {
+        guard let v = phoneTimerVencido else { return false }
+        guard v.exerciseId == exerciseId, v.setNumber == setNumber else { return false }
+        return now.timeIntervalSince(v.cuando) < Self.graciaPostVencimiento
+    }
+
     /// Ultima falla de sincronizacion, para diagnostico. La UI solo muestra que
     /// hay pendientes, no el detalle.
     @Published private(set) var syncError: String?
+
+    /// Por que no se pudo CERRAR el entreno, si es que no se pudo.
+    ///
+    /// Existe aparte de `syncError` porque son dos cosas distintas: `syncError`
+    /// es el detalle tecnico del ultimo error —un `String(describing:)`, que no
+    /// se le muestra a nadie— y esto es lo unico que el atleta necesita saber.
+    ///
+    /// Sin esto, ABANDONAR era un no-op SILENCIOSO sin conectividad: el dialogo
+    /// se cerraba y la sesion seguia abierta. Ver `WorkoutCloseFailure`.
+    @Published private(set) var closeFailure: WorkoutCloseFailure?
 
     private var restTimer: Timer?
 
@@ -64,6 +154,15 @@ final class WorkoutCoordinator: ObservableObject {
     /// Como conseguir un cliente de Firestore autenticado. Lo inyecta la app
     /// para no acoplar este coordinator al de credenciales.
     var makeClient: (() async throws -> (FirestoreREST, String))?
+
+    /// Se llama cuando Firestore rechaza por credencial. Lo cablea
+    /// `TreinoWatchApp` a `CredentialCoordinator.invalidateIdToken`.
+    ///
+    /// Desde que el idToken se cachea (`TokenFreshness`), un token que muere
+    /// antes de tiempo —credencial revocada, reloj con la hora corrida— dejaria
+    /// al reloj rebotando contra un 401 hasta que venza el TTL. Esto lo corta
+    /// en el primer rechazo.
+    var onAuthFailure: (() -> Void)?
 
     /// Cómo resolver el entreno de una rutina en una POSICIÓN dada del plan.
     ///
@@ -281,7 +380,14 @@ final class WorkoutCoordinator: ObservableObject {
         WorkoutSessionStore.save(current)
 
         startRest(seconds: restSeconds)
-        advanceIfExerciseDone(exerciseId: exerciseId)
+        // Se RECALCULA la posicion en vez de incrementar el indice.
+        //
+        // `advanceIfExerciseDone` solo avanzaba cuando el ejercicio actual
+        // quedaba COMPLETO, que en una superserie es exactamente lo que no hay
+        // que hacer: despues de 1a toca 1b, con A recien empezado. Recalcular
+        // cubre los dos casos con la misma regla, y ademas puede RETROCEDER si
+        // el telefono borro una serie.
+        currentExerciseIndex = firstUnfinishedIndex(in: exercises, session: current)
 
         Task { await sync() }
     }
@@ -309,13 +415,35 @@ final class WorkoutCoordinator: ObservableObject {
     /// estado local: si se borrara primero, una serie que nunca llego al
     /// historial se perderia sin dejar rastro.
     func finish() async {
+        // Se limpia al ENTRAR y no al salir: el intento anterior ya no describe
+        // nada, y dejar el cartel viejo mientras corre el nuevo sync le mentiria
+        // al atleta sobre que esta pasando ahora.
+        closeFailure = nil
+
+        // Los TRES cronometros, no solo el descanso.
+        //
+        // Antes solo se paraba el descanso, asi que abandonar con una cuenta por
+        // tiempo corriendo dejaba su ticker vivo: minutos despues la muñeca
+        // vibraba "serie completada" de un entreno que ya no existe. Y con el
+        // espejo del telefono sin limpiar, `startDurationSet` rechazaba TODA
+        // serie por tiempo del entreno siguiente.
         stopRest()
+        cancelDurationSet()
+        clearPhoneTimer()
         await sync()
 
         // Si quedan pendientes, el entreno NO se descarta: se conserva para
         // reintentar. Perder series que el atleta hizo es peor que dejarle la
         // pantalla abierta.
-        if let current = session, !current.pendingSets.isEmpty { return }
+        //
+        // ⚠️ Pero se AVISA. Esta rama cortaba en silencio: el atleta se
+        // lesionaba sin señal, tocaba ABANDONAR, confirmaba, el dialogo se
+        // cerraba y la sesion seguia abierta sin ninguna pista de por que. La
+        // decision de no descartar es correcta; lo que faltaba era decirlo.
+        if let current = session, !current.pendingSets.isEmpty {
+            closeFailure = .seriesSinSubir(current.pendingSets.count)
+            return
+        }
 
         // Marca la sesion FINALIZADA en el historial. Sin esto el reloj borraba
         // su estado local pero la sesion quedaba `active` en Firestore, y la app
@@ -336,6 +464,11 @@ final class WorkoutCoordinator: ObservableObject {
                 )
             } catch {
                 syncError = String(describing: error)
+                // El detalle queda en `syncError` para diagnostico; al atleta le
+                // llega el motivo y el boton de reintentar. Antes esta rama solo
+                // escribia `syncError`, que no lo renderizaba NINGUNA vista:
+                // el dialogo se cerraba sin aviso.
+                closeFailure = .historialNoRespondio
                 return
             }
         }
@@ -429,13 +562,19 @@ final class WorkoutCoordinator: ObservableObject {
                     }
                 }
 
+                // Igual que en `finish()`: los tres, no solo el descanso.
                 stopRest()
+                cancelDurationSet()
+                clearPhoneTimer()
                 session = nil
                 workout = nil
                 currentExerciseIndex = 0
                 WorkoutSessionStore.clear()
                 endWorkoutSession()
                 syncError = nil
+                // El entreno ya no existe: cualquier motivo de "no se pudo
+                // cerrar" que hubiera quedado en pantalla dejo de ser cierto.
+                closeFailure = nil
                 return
             }
 
@@ -632,8 +771,23 @@ final class WorkoutCoordinator: ObservableObject {
             }
 
             syncError = nil
+
+            // Si la cola se drenó, el cartel de "falta subir N series" dejó de
+            // ser cierto — y se cae solo, sin que el atleta tenga que tocar
+            // nada. Es el caso normal: volvió la señal, entró el sync de fondo.
+            //
+            // El de `.historialNoRespondio` NO se toca acá: ese lo levanta el
+            // cierre, no el sync, y solo se limpia volviendo a intentar cerrar.
+            if case .seriesSinSubir = closeFailure,
+               current.pendingSets.isEmpty {
+                closeFailure = nil
+            }
         } catch {
             syncError = String(describing: error)
+            if case FirestoreREST.FirestoreError.http(let status, _) = error,
+               status == 401 || status == 403 {
+                onAuthFailure?()
+            }
         }
     }
 
@@ -686,31 +840,42 @@ final class WorkoutCoordinator: ObservableObject {
 
     // MARK: - Internos
 
-    /// Avanza al siguiente ejercicio cuando el actual quedó completo.
-    ///
-    /// No avanza más allá del último: quedarse ahí deja al atleta ver que
-    /// terminó, en vez de mostrarle una pantalla vacía.
-    private func advanceIfExerciseDone(exerciseId: String) {
-        guard let session, let exercise = currentExercise,
-              exercise.exerciseId == exerciseId,
-              session.loggedCount(exerciseId: exerciseId) >= exercise.sets.count,
-              currentExerciseIndex + 1 < exercises.count
-        else { return }
-        currentExerciseIndex += 1
-    }
-
     /// Delega en la regla pura de `ExerciseCursor.swift`, que es donde esta
     /// medida en el host. Aca solo se traduce el estado a numeros.
     private func firstUnfinishedIndex(
         in exercises: [WatchExercise],
         session: WorkoutSession
     ) -> Int {
-        firstUnfinishedExerciseIndex(
-            seriesPlanificadas: exercises.map { $0.sets.count },
-            seriesCargadas: exercises.map {
-                session.loggedCount(exerciseId: $0.exerciseId)
+        cursor(in: exercises, session: session).exerciseIndex
+    }
+
+    /// La celda que toca AHORA, respetando superseries.
+    ///
+    /// Antes esto delegaba en `firstUnfinishedExerciseIndex`, que recorre
+    /// ejercicio por ejercicio: correcto para ejercicios sueltos y ERRADO para
+    /// una superserie, donde la vuelta va afuera. Ver `SupersetOrder.swift` y
+    /// el contrato en `conformance/superset_order.json`.
+    func cursor(
+        in exercises: [WatchExercise],
+        session: WorkoutSession
+    ) -> CursorPosition {
+        cursorPosition(
+            exercises.map {
+                CursorExercise(
+                    exerciseId: $0.exerciseId,
+                    plannedSets: $0.sets.count,
+                    loggedSets: session.loggedCount(exerciseId: $0.exerciseId),
+                    supersetGroup: $0.supersetGroup
+                )
             }
         )
+    }
+
+    /// La posicion actual, para que la vista sepa que serie ofrecer y si esta
+    /// adentro de una superserie.
+    var currentCursor: CursorPosition? {
+        guard let session else { return nil }
+        return cursor(in: exercises, session: session)
     }
 
     /// Descanso contado LOCALMENTE por el reloj.
@@ -718,6 +883,203 @@ final class WorkoutCoordinator: ObservableObject {
     /// El plan original lo descartaba porque mandar un tick por segundo desde
     /// el teléfono saturaba el canal. Acá no aplica: el reloj es autónomo y
     /// tiene el estado, así que contar no cuesta tráfico (Locked Decision #8).
+    /// Arranca el cronometro de un ejercicio por tiempo.
+    ///
+    /// NO se dispara solo al llegar al ejercicio: lo arranca el atleta. Empezar
+    /// a contar sin que este listo seria peor que no contar.
+    func startDurationSet(
+        exerciseId: String,
+        setNumber: Int,
+        spec: SetSpec,
+        restSeconds: Int
+    ) {
+        // `phoneTimer == nil` NO es defensa de mas: es lo que evita que existan
+        // dos cronometros sobre la misma serie.
+        //
+        // El telefono ya esta cronometrando y va a cargar la serie el. Si el
+        // reloj arrancara el suyo, al llegar a cero la cargarian los dos, con
+        // ids distintos, y el atleta la veria repetida. Cuando hay espejo, tocar
+        // la fila REENTRA a el (ver `WorkoutView`), no arranca nada.
+        guard let seconds = spec.durationSeconds, seconds > 0,
+              durationSet == nil, phoneTimer == nil else { return }
+        stopRest()
+        let fin = Date().addingTimeInterval(TimeInterval(seconds))
+        durationSet = DurationSet(
+            exerciseId: exerciseId,
+            setNumber: setNumber,
+            totalSeconds: seconds,
+            spec: spec,
+            restSeconds: restSeconds,
+            endsAt: fin
+        )
+        durationRemaining = seconds
+        durationTimer?.invalidate()
+        durationTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self, let actual = self.durationSet else { return }
+                // Se recalcula contra el reloj de pared en cada tick: si el
+                // sistema se salteo ticks, la cuenta sigue siendo correcta.
+                self.durationRemaining = CountdownRules.remaining(
+                    endsAt: actual.endsAt, now: Date()
+                )
+                if CountdownRules.isFinished(endsAt: actual.endsAt, now: Date()) {
+                    self.completeDurationSet()
+                }
+            }
+        }
+    }
+
+    /// Corta el cronometro SIN cargar la serie.
+    ///
+    /// Existe porque sin salida un toque equivocado dejaria al atleta mirando
+    /// una cuenta que no pidio, sin forma de volver.
+    func cancelDurationSet() {
+        durationTimer?.invalidate()
+        durationTimer = nil
+        durationSet = nil
+        durationRemaining = 0
+    }
+
+    // MARK: - Espejo del cronometro del telefono
+
+    /// Aplica una orden de cronometro que mando el telefono.
+    ///
+    /// `now` es inyectable para poder medir la regla en el host.
+    func apply(phoneTimerCommand comando: PhoneTimerMirror.Command, now: Date = Date()) {
+        switch comando {
+        case .cancel:
+            clearPhoneTimer()
+
+        case .start(let timer):
+            // El cronometro propio gana: es el que va a cargar la serie, y
+            // pisarlo con un espejo la perderia.
+            guard durationSet == nil else { return }
+            // Una orden que llega tarde —el reloj estaba fuera de alcance y se
+            // entrego al reconectar— describe una serie que ya termino.
+            guard PhoneTimerMirror.shouldShow(timer, now: now) else { return }
+
+            phoneTimer = timer
+            phoneTimerRemaining = CountdownRules.remaining(endsAt: timer.endsAt, now: now)
+            // Una orden NUEVA se muestra: si el atleta habia ocultado la
+            // anterior, eso valia para aquella cuenta, no para esta.
+            phoneTimerOculto = false
+            phoneTimerCancelFallo = false
+            phoneTimerTicker?.invalidate()
+            phoneTimerTicker = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+                Task { @MainActor in
+                    guard let self, let actual = self.phoneTimer else { return }
+                    let ahora = Date()
+                    self.phoneTimerRemaining = CountdownRules.remaining(
+                        endsAt: actual.endsAt, now: ahora
+                    )
+                    if CountdownRules.isFinished(endsAt: actual.endsAt, now: ahora) {
+                        // VIBRA, aunque el espejo este oculto.
+                        //
+                        // La serie la carga el TELEFONO —el la arranco, el es su
+                        // dueno— pero el aviso es la razon de ser de tener esto
+                        // en la muneca: el atleta esta aguantando una plancha,
+                        // no mirando una pantalla. Y tiene que sonar igual si
+                        // saco el espejo de la vista: ocultar es una decision de
+                        // pantalla, nunca de la serie.
+                        Haptics.durationSetCompleted()
+                        // La serie queda BLOQUEADA un rato mas.
+                        //
+                        // El telefono la va a marcar, pero el reloj recien se
+                        // entera en el proximo `sync()`. En esa ventana la
+                        // lista la muestra sin tildar y tocarla arrancaria una
+                        // cuenta nueva: el atleta haria la plancha DOS VECES.
+                        self.phoneTimerVencido = (actual.exerciseId, actual.setNumber, ahora)
+                        self.clearPhoneTimer()
+                    }
+                }
+            }
+        }
+    }
+
+    /// Saca el espejo de la VISTA. La cuenta sigue corriendo.
+    ///
+    /// Ocultar no cancela nada ni cambia lo que va a pasar con la serie: al
+    /// llegar a cero el reloj vibra igual y el telefono la marca igual. Lo unico
+    /// que cambia es que la muneca deja de estar tomada, y la fila vuelve a
+    /// verse normal — al tocarla se vuelve a entrar a la cuenta, sincronizada.
+    func ocultarPhoneTimer() {
+        phoneTimerOculto = true
+    }
+
+    /// Vuelve a poner el espejo en pantalla.
+    func mostrarPhoneTimer() {
+        phoneTimerOculto = false
+    }
+
+    /// Cancela de verdad: corta la cuenta ACA y le pide al telefono que corte
+    /// la suya.
+    ///
+    /// El espejo se saca SOLO si el telefono recibio el pedido. Si no llego, el
+    /// telefono sigue contando y va a marcar la serie: dejar la pantalla como
+    /// si se hubiera cancelado seria mentirle al atleta, que es exactamente el
+    /// no-op silencioso que costo `WorkoutCloseFailure`.
+    func cancelarPhoneTimer() {
+        guard let actual = phoneTimer else { return }
+        guard let pedir = onCancelarCronometroDelTelefono else {
+            // Sin canal no se puede prometer nada. Se avisa en vez de fingir.
+            phoneTimerCancelFallo = true
+            return
+        }
+
+        // La cuenta NO se borra todavia, y esto es lo importante.
+        //
+        // Mientras el pedido esta en vuelo el telefono SIGUE contando: es el
+        // dueño de la serie y todavia no se entero de nada. Borrar el espejo
+        // aca abriria el guard de `startDurationSet` y la reentrada de la lista
+        // durante esa ventana, y el atleta podria arrancar una SEGUNDA cuenta
+        // sobre la misma serie.
+        //
+        // Se saca de la VISTA —que es lo unico que el atleta pidio— y se deja
+        // el estado intacto. La confirmacion llega como un `watchTimer/cancel`
+        // de vuelta desde el telefono, que cae en `apply(.cancel)` y limpia. Ese
+        // ida y vuelta TERMINA: `.cancel` no manda nada de regreso.
+        phoneTimerCancelFallo = false
+        phoneTimerOculto = true
+
+        pedir(actual.exerciseId, actual.setNumber) { [weak self] in
+            guard let self else { return }
+            // No llego: el telefono sigue contando y va a marcar la serie. Se
+            // vuelve a mostrar la cuenta —que es la verdad— con el aviso.
+            //
+            // El cartel se dibuja DENTRO de la pantalla del espejo, asi que
+            // volver a mostrarla no es cosmetico: es lo que lo hace visible.
+            guard self.phoneTimer != nil else { return }
+            self.phoneTimerOculto = false
+            self.phoneTimerCancelFallo = true
+        }
+    }
+
+    /// Olvida el espejo por completo. La cuenta dejo de existir.
+    func clearPhoneTimer() {
+        phoneTimerTicker?.invalidate()
+        phoneTimerTicker = nil
+        phoneTimer = nil
+        phoneTimerRemaining = 0
+        phoneTimerOculto = false
+        phoneTimerCancelFallo = false
+    }
+
+    /// Llego a cero: vibra y carga la serie sola.
+    private func completeDurationSet() {
+        guard let actual = durationSet else { return }
+        durationTimer?.invalidate()
+        durationTimer = nil
+        durationSet = nil
+        durationRemaining = 0
+        Haptics.durationSetCompleted()
+        logSet(
+            exerciseId: actual.exerciseId,
+            setNumber: actual.setNumber,
+            spec: actual.spec,
+            restSeconds: actual.restSeconds
+        )
+    }
+
     private func startRest(seconds: Int) {
         stopRest()
         guard seconds > 0 else { return }
@@ -727,6 +1089,10 @@ final class WorkoutCoordinator: ObservableObject {
                 guard let self, let remaining = self.restRemaining else { return }
                 if remaining <= 1 {
                     self.stopRest()
+                    // Antes el descanso terminaba en SILENCIO: habia que mirar
+                    // la pantalla para enterarse, que es justo lo que un reloj
+                    // viene a evitar.
+                    Haptics.restFinished()
                 } else {
                     self.restRemaining = remaining - 1
                 }

@@ -11,6 +11,7 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject private var coordinator: CredentialCoordinator
     @EnvironmentObject private var workoutCoordinator: WorkoutCoordinator
+    @EnvironmentObject private var launchIntent: WatchLaunchIntent
 
     var body: some View {
         switch coordinator.state {
@@ -33,9 +34,34 @@ struct ContentView: View {
                 // páginas laterales, para no ofrecerle al atleta arrancar otra
                 // rutina mientras está a mitad de esta.
                 WorkoutView()
+            } else if launchIntent.pendingWorkout != nil {
+                // Nos lanzó el teléfono y la adopción todavía no terminó.
+                //
+                // Sin esta rama caeríamos en `WatchHome`, que dibuja HOY con el
+                // botón "Empezar" ACTIVO durante los cinco viajes de red que
+                // tarda la adopción. El atleta ve el reloj abrirse solo, toca lo
+                // único accionable que hay en pantalla, y crea una SEGUNDA
+                // sesión para el mismo entreno. Ver `WatchLaunchDelegate.swift`.
+                VStack(spacing: 8) {
+                    ProgressView()
+                    Text("Preparando tu entreno…").font(.footnote)
+                }
+                .padding()
             } else {
                 WatchHome()
             }
+
+        case .signedOut:
+            // El reloj esta perfectamente vinculado; lo que falta es una sesion.
+            //
+            // Por eso NO reusa el texto de `waitingForPairing` —"abrí TREINO
+            // para vincular el reloj"— que le echaria la culpa al
+            // emparejamiento y mandaria al atleta a desemparejar y volver a
+            // emparejar un reloj que esta bien.
+            StatusMessage(
+                icon: "person.crop.circle.badge.xmark",
+                text: "Iniciá sesión en TREINO para acceder a tus planes"
+            )
 
         case .failed:
             StatusMessage(
@@ -112,13 +138,33 @@ struct TodayPage: View {
 
     var body: some View {
         ScrollView {
-            if let workout = coordinator.todaysWorkout {
-                TodaysWorkoutView(workout: workout)
-            } else if coordinator.workoutError != nil {
+            // El error va PRIMERO. Al reves —como estaba— un `todaysWorkout`
+            // viejo en memoria dejaba la rama de error y el boton "Reintentar"
+            // inalcanzables: el atleta no veia un error, veia la rutina del
+            // anterior como si estuviera bien.
+            if coordinator.workoutError != nil {
+                // El ícono de recargar ERA decorativo: un `Image` sin `Button`
+                // ni gesto. Prometía una salida que no existía, y la única
+                // recarga real era salir de la página y volver. Ahora acciona.
                 StatusMessage(
                     icon: "arrow.clockwise",
                     text: "No se pudo cargar tu rutina",
-                    tint: .orange
+                    tint: .orange,
+                    actionTitle: "Reintentar"
+                ) {
+                    Task { await coordinator.loadTodaysWorkout() }
+                }
+            } else if let workout = coordinator.todaysWorkout {
+                TodaysWorkoutView(workout: workout)
+            } else if coordinator.workoutLoaded {
+                // Cargó bien y no hay nada que mostrar. Antes este caso caía en
+                // el spinner de abajo —`todaysWorkout` y `workoutError` los dos
+                // en nil— y giraba para siempre: un atleta sin rutina asignada
+                // no tenía forma de saber que la carga ya había terminado.
+                StatusMessage(
+                    icon: "calendar",
+                    text: "No tenés una rutina activa.\nActivá una desde el teléfono.",
+                    tint: .secondary
                 )
             } else {
                 VStack(spacing: 8) {
@@ -233,6 +279,11 @@ struct StatusMessage: View {
     let text: String
     var tint: Color = .primary
 
+    /// Título del botón. Nil deja el mensaje sin acción, que es lo correcto
+    /// cuando no hay nada que reintentar.
+    var actionTitle: String?
+    var action: (() -> Void)?
+
     var body: some View {
         VStack(spacing: 8) {
             Image(systemName: icon)
@@ -241,6 +292,14 @@ struct StatusMessage: View {
             Text(text)
                 .font(.footnote)
                 .multilineTextAlignment(.center)
+
+            if let actionTitle, let action {
+                Button(actionTitle, action: action)
+                    .font(.caption2)
+                    .buttonStyle(.bordered)
+                    .tint(tint)
+                    .padding(.top, 4)
+            }
         }
         .padding()
     }

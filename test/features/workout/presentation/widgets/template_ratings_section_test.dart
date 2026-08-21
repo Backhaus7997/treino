@@ -126,7 +126,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text('Todavía nadie calificó esta plantilla. ¡Sé el primero!'),
+        find.text('Todavía nadie calificó esta rutina. ¡Sé el primero!'),
         findsOneWidget,
       );
       expect(find.byKey(const Key('template_rating_average')), findsNothing);
@@ -158,7 +158,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text('Todavía nadie calificó esta plantilla. ¡Sé el primero!'),
+        find.text('Todavía nadie calificó esta rutina. ¡Sé el primero!'),
         findsNothing,
       );
       expect(find.text('4.0'), findsOneWidget);

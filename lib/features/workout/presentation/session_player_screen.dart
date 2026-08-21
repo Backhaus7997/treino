@@ -23,6 +23,7 @@ import '../application/session_notifier.dart';
 import '../application/session_providers.dart';
 import '../application/session_state.dart';
 import '../domain/routine.dart';
+import '../domain/superset_order.dart';
 import '../domain/routine_slot.dart';
 import '../domain/superset_blocks.dart';
 import '../domain/set_enums.dart';
@@ -34,17 +35,9 @@ import '../domain/set_spec.dart';
 import 'exercise_detail_screen.dart';
 import 'widgets/bounded_number_formatter.dart';
 import 'widgets/coach_note.dart';
+import 'widgets/duration_set_row.dart';
+import 'widgets/mmss.dart';
 import 'widgets/set_entry_sheet.dart';
-import '../../watch/application/phone_timer_sync_providers.dart';
-
-// ── Helpers de formato ────────────────────────────────────────────────────────
-
-/// Formatea segundos totales como MM:SS (máx 99:59). Diseño §9.4.
-String _formatMMSS(int totalSeconds) {
-  final m = (totalSeconds ~/ 60).clamp(0, 99).toString().padLeft(2, '0');
-  final s = (totalSeconds % 60).toString().padLeft(2, '0');
-  return '$m:$s';
-}
 
 // ── Block gating helpers (top-level, testable) ────────────────────────────────
 
@@ -167,7 +160,7 @@ String repsDisplayText(SetSpec? spec, ExerciseMode mode) {
   if (spec.type == SetType.failure) return 'Al fallo';
   if (mode == ExerciseMode.duration) {
     final secs = spec.durationSeconds ?? 0;
-    return _formatMMSS(secs);
+    return formatMMSS(secs);
   }
   if (spec.reps != null) return '${spec.reps} reps';
   final min = spec.repsMin;
@@ -874,13 +867,14 @@ class _SessionStatsCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    _formatMMSS(state.elapsedSeconds),
+                    formatMMSS(state.elapsedSeconds),
                     style: GoogleFonts.barlowCondensed(
                       fontWeight: FontWeight.w700,
                       fontSize: 40,
                       color: palette.accent,
                     ),
                   ),
+                  const _WatchTimerRow(),
                   const _WatchEffortRow(),
                 ],
               ),
@@ -1403,29 +1397,29 @@ class _SupersetSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
 
-    // Vueltas totales = el ejercicio más largo del bloque.
-    final maxRounds = entries.fold<int>(
-        0, (m, e) => plannedCountFor(e.slot) > m ? plannedCountFor(e.slot) : m);
+    // La regla del round-robin vive en `SupersetOrder`, no acá.
+    //
+    // Estaba escrita adentro de este `build()`, y por eso el reloj no podía
+    // portarla: reimplementaba el recorrido por su cuenta, ejercicio por
+    // ejercicio en vez de vuelta por vuelta, y producía 1a, 2a, 3a, 1b… El dato
+    // salía válido y el orden equivocado, que en una superserie es el
+    // entrenamiento entero. Ahora las dos implementaciones responden al mismo
+    // fixture: `conformance/superset_order.json`.
+    final miembros = [
+      for (final e in entries)
+        (
+          exerciseId: e.slot.exerciseId,
+          plannedSets: plannedCountFor(e.slot),
+          loggedSets: e.logs.length,
+        ),
+    ];
+    final maxRounds = SupersetOrder.totalRounds(miembros);
+    final celda = SupersetOrder.nextCell(miembros);
 
-    // Scan round-robin: la celda activa es el primer par (vuelta, ejercicio)
-    // que aún no fue logueado.
-    String? activeId;
-    int? activeSet;
-    var activeRound = 0;
-    outer:
-    for (var round = 1; round <= maxRounds; round++) {
-      for (final e in entries) {
-        if (round > plannedCountFor(e.slot)) continue;
-        if (e.logs.length < round) {
-          activeId = e.slot.exerciseId;
-          activeSet = round;
-          activeRound = round;
-          break outer;
-        }
-      }
-    }
-    final blockDone = activeId == null;
-    final displayRound = blockDone ? maxRounds : activeRound;
+    final String? activeId = celda?.exerciseId;
+    final int? activeSet = celda?.setNumber;
+    final blockDone = celda == null;
+    final displayRound = blockDone ? maxRounds : celda.round;
 
     final children = <Widget>[];
     for (var i = 0; i < entries.length; i++) {
@@ -1644,8 +1638,9 @@ class _ExerciseSectionState extends State<_ExerciseSection> {
           widget.onRemoveSet != null && (isRowDone || isAddedUnlogged);
 
       Widget innerRow = isDurationSet
-          ? _DurationSetRow(
+          ? DurationSetRow(
               key: ValueKey('dur-$setNumber-${logged?.id ?? "pending"}'),
+              exerciseId: widget.slot.exerciseId,
               setNumber: setNumber,
               targetSeconds: targetSeconds,
               isDone: isRowDone,
@@ -2353,232 +2348,6 @@ class _RepsField extends StatelessWidget {
   }
 }
 
-// ── _DurationSetRow ───────────────────────────────────────────────────────────
-
-/// Fila de un set basado en duración.
-/// Muestra el tiempo objetivo como MM:SS y un countdown timer.
-/// "Iniciar" arranca el contador; al llegar a 0 auto-marca done con vibración.
-class _DurationSetRow extends ConsumerStatefulWidget {
-  const _DurationSetRow({
-    super.key,
-    required this.setNumber,
-    required this.targetSeconds,
-    required this.isDone,
-    required this.onDone,
-  });
-
-  final int setNumber;
-  final int targetSeconds;
-  final bool isDone;
-
-  /// Called when the set is marked done. Null means not interactive.
-  final VoidCallback? onDone;
-
-  @override
-  ConsumerState<_DurationSetRow> createState() => _DurationSetRowState();
-}
-
-class _DurationSetRowState extends ConsumerState<_DurationSetRow> {
-  Timer? _timer;
-  int _remaining = 0;
-  bool _running = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _remaining = widget.targetSeconds;
-  }
-
-  /// Arranca sin volver a avisarle al reloj.
-  ///
-  /// El aviso se manda desde [_startTimer], que es el camino del atleta tocando
-  /// acá. Éste es el camino de vuelta —el reloj ya arrancó y avisó— y reenviar
-  /// sería un eco: el reloj recibiría su propio arranque y los dos se quedarían
-  /// rebotando el mismo temporizador.
-  void _arrancarDesdeElReloj(int seconds) {
-    if (widget.isDone) return;
-
-    // Si acá ya corre el MISMO temporizador, no se reinicia. Este listener
-    // también recibe la escritura que hizo ESTE aparato, así que sin el guard
-    // el número saltaría hacia atrás apenas Firestore devuelve el eco. Dos
-    // segundos de tolerancia: la latencia y el redondeo no son motivo para
-    // reiniciar nada.
-    if (_running && (_remaining - seconds).abs() <= 2) return;
-
-    _timer?.cancel();
-    setState(() {
-      _remaining = seconds;
-      _running = false;
-    });
-    _correr();
-  }
-
-  void _cancelarDesdeElReloj() {
-    _timer?.cancel();
-    if (!mounted) return;
-    setState(() {
-      _running = false;
-      _remaining = widget.targetSeconds;
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  void _startTimer() {
-    if (_running || widget.isDone) return;
-    // Avisa al reloj ANTES de arrancar: así el instante que viaja es el del
-    // arranque real y el descuento del otro lado da el mismo numero.
-    ref.read(phoneTimerSyncProvider).arranco(_remaining);
-    _correr();
-  }
-
-  void _correr() {
-    if (_running || widget.isDone) return;
-    setState(() => _running = true);
-    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (!mounted) {
-        t.cancel();
-        return;
-      }
-      setState(() {
-        if (_remaining > 0) {
-          _remaining--;
-        } else {
-          t.cancel();
-          _running = false;
-          // Buzz to alert the user that time is up.
-          HapticFeedback.heavyImpact();
-          // Auto-mark done when countdown reaches 0.
-          widget.onDone?.call();
-        }
-      });
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // Lo que arranque o cancele el RELOJ se refleja acá. Sólo la fila que está
-    // en juego reacciona: una serie ya hecha no vuelve a arrancar sola.
-    ref.listen<AsyncValue<WatchTimerCommand>>(
-      phoneTimerCommandsProvider,
-      (_, next) => next.whenData((cmd) {
-        if (widget.onDone == null || widget.isDone) return;
-        switch (cmd) {
-          case WatchTimerStart(:final seconds):
-            _arrancarDesdeElReloj(seconds);
-          case WatchTimerCancel():
-            _cancelarDesdeElReloj();
-        }
-      }),
-    );
-
-    final palette = AppPalette.of(context);
-    final l10n = AppL10n.of(context);
-    final textColor = widget.isDone ? palette.textMuted : palette.textPrimary;
-    final isInteractive = widget.onDone != null && !widget.isDone;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-      decoration: BoxDecoration(
-        // bgCard (no bg): misma delimitación por-fila que _RepsSetRow.
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 20,
-            child: Text(
-              '${widget.setNumber}',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
-                color: textColor,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          // Timer display.
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _running ||
-                          (!widget.isDone && _remaining < widget.targetSeconds)
-                      ? _formatMMSS(_remaining)
-                      : _formatMMSS(widget.targetSeconds),
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 22,
-                    color: _running ? palette.accent : textColor,
-                  ),
-                ),
-                if (!widget.isDone)
-                  Text(
-                    'objetivo: ${_formatMMSS(widget.targetSeconds)}',
-                    style: GoogleFonts.barlow(
-                      fontWeight: FontWeight.w400,
-                      fontSize: 11,
-                      color: palette.textMuted,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Action button.
-          if (widget.isDone)
-            Icon(TreinoIcon.checkCircleFill, color: palette.accent, size: 22)
-          else if (!_running)
-            Semantics(
-              button: true,
-              label: l10n.sessionPlayerTimerStartA11y,
-              // TREINO Motion PR3: TreinoTappable reemplaza al
-              // GestureDetector (absorbe su onTap). onTap null cuando no es
-              // interactivo → child pelado, mismo no-op que antes.
-              child: TreinoTappable(
-                onTap: isInteractive ? _startTimer : null,
-                child: Container(
-                  constraints:
-                      const BoxConstraints(minWidth: 44, minHeight: 44),
-                  alignment: Alignment.center,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: isInteractive
-                        ? palette.accent.withValues(alpha: 0.15)
-                        : palette.bg,
-                    borderRadius: BorderRadius.circular(9999),
-                    border: Border.all(
-                      color: isInteractive ? palette.accent : palette.border,
-                    ),
-                  ),
-                  child: Text(
-                    'Iniciar',
-                    style: GoogleFonts.barlowCondensed(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                      color: isInteractive ? palette.accent : palette.textMuted,
-                    ),
-                  ),
-                ),
-              ),
-            )
-          else
-            // Timer running — show countdown-only state, no manual completion.
-            Icon(TreinoIcon.timer, color: palette.accent, size: 22),
-        ],
-      ),
-    );
-  }
-}
-
 // ── _TerminarSessionButton ────────────────────────────────────────────────────
 
 class _TerminarSessionButton extends StatelessWidget {
@@ -2691,6 +2460,104 @@ class _AbandonConfirmDialog extends StatelessWidget {
 /// cada pocos segundos, y metiendolo inline haria rebuild de toda la cabecera
 /// del player —incluido el cronometro y la barra de progreso— por un dato
 /// secundario. Asi el rebuild queda acotado a esta fila.
+/// La cuenta regresiva de un ejercicio por tiempo que corre EN EL RELOJ.
+///
+/// El reloj manda el INSTANTE DE FIN, no los segundos restantes, así que acá se
+/// calcula la cuenta sola. Eso hace que no haga falta tráfico por segundo entre
+/// los dispositivos, y que un envío que llega tarde —el reloj throttlea a 5s—
+/// muestre igual el número correcto.
+///
+/// Es stateful porque hay que redibujar cada segundo: el notifier del esfuerzo
+/// solo emite cuando llega un payload nuevo, y entre payload y payload la
+/// cuenta tiene que seguir bajando.
+class _WatchTimerRow extends ConsumerStatefulWidget {
+  const _WatchTimerRow();
+
+  @override
+  ConsumerState<_WatchTimerRow> createState() => _WatchTimerRowState();
+}
+
+class _WatchTimerRowState extends ConsumerState<_WatchTimerRow> {
+  Timer? _tick;
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    super.dispose();
+  }
+
+  /// Arranca o corta el tick según haya o no cuenta viva.
+  ///
+  /// No se deja corriendo siempre: un timer por segundo en la pantalla más
+  /// caliente de la app, para no mostrar nada, es exactamente el tipo de
+  /// rebuild que este proyecto evita.
+  void _syncTick(bool debeCorrer) {
+    if (debeCorrer && _tick == null) {
+      _tick = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() {});
+      });
+    } else if (!debeCorrer && _tick != null) {
+      _tick!.cancel();
+      _tick = null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final notifier = ref.watch(watchEffortNotifierProvider);
+
+    return ValueListenableBuilder<WatchEffort?>(
+      valueListenable: notifier,
+      builder: (context, effort, _) {
+        final endsAt = effort?.timerEndsAt;
+        final restante = endsAt == null
+            ? 0
+            : endsAt.difference(DateTime.now().toUtc()).inSeconds;
+
+        // Vencido o inexistente: nada que mostrar. Que se apague solo al llegar
+        // a cero es la red contra un "se apagó" que no llegue.
+        final vivo = endsAt != null && restante > 0;
+        WidgetsBinding.instance.addPostFrameCallback((_) => _syncTick(vivo));
+        if (!vivo) return const SizedBox.shrink();
+
+        return Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(TreinoIcon.timer, size: 12, color: palette.accent),
+              const SizedBox(width: 4),
+              Text(
+                formatMMSS(restante),
+                style: GoogleFonts.barlow(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                  color: palette.accent,
+                ),
+              ),
+              const SizedBox(width: 4),
+              // De dónde viene. Sin esto es un MM:SS suelto pegado abajo del
+              // cronómetro de sesión de 40px, sin nada que diga qué cuenta es
+              // ni de qué ejercicio. La cuenta de la serie se ve en su propia
+              // fila; esto es el recordatorio para cuando el atleta scrolleó y
+              // esa fila no está en pantalla.
+              Text(
+                'en el reloj',
+                style: GoogleFonts.barlow(
+                  fontWeight: FontWeight.w400,
+                  fontSize: 11,
+                  color: palette.textMuted,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _WatchEffortRow extends ConsumerWidget {
   const _WatchEffortRow();
 

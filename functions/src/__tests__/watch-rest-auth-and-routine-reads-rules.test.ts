@@ -35,6 +35,23 @@
  * Requiere los emuladores de Firestore (8080) y Auth (9099).
  */
 
+// Este archivo es un MODULO, no un script.
+//
+// Sin un `import`/`export` de nivel superior, TypeScript lo trata como script y
+// mete sus `const` de arriba en el scope GLOBAL. Estos tests del reloj declaran
+// las mismas cuatro constantes de emulador —PROJECT_ID, AUTH_HOST,
+// FIRESTORE_HOST, DOCS— y una `interface EmulatorUser`, asi que chocaban entre
+// si: "Cannot redeclare block-scoped variable".
+//
+// Estuvo roto desde el 2026-08-04 y no lo vio nadie porque la rama del
+// companion nunca se pusheo: CI no corrio sobre ella ni una vez. Lo encontro el
+// primer PR.
+//
+// Todos los demas tests de `functions/src/__tests__/` son modulos por tener
+// imports propios; estos dos hacen los pedidos con `fetch` global y no
+// importaban nada.
+export {};
+
 const PROJECT_ID =
   process.env.GCLOUD_PROJECT ?? process.env.FIREBASE_PROJECT ?? "treino-dev";
 

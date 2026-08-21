@@ -77,12 +77,19 @@ class WatchBridge {
   /// Los contextos que la contraparte YA dejó escritos, se hayan recibido antes
   /// de abrir esta app o no.
   ///
-  /// Es lo que hace posible el arranque en frío, y no es un lujo: la credencial
-  /// se publica como DataItem desde el teléfono ANTES de que nadie abra la app
-  /// del reloj. Ese DataItem persiste, pero [contextStream] sólo reenvía
-  /// eventos `TYPE_CHANGED` recibidos con el plugin ya enganchado — o sea que
-  /// un reloj que sólo escuchara el stream esperaría PARA SIEMPRE una
-  /// credencial que ya estaba ahí.
+  /// Hace falta en LAS DOS direcciones, y las dos ramas llegaron a esto por
+  /// separado:
+  ///
+  /// - **Teléfono → reloj**: la credencial se publica como DataItem cuando el
+  ///   atleta inicia sesión, o sea mucho antes de que nadie abra la app del
+  ///   reloj. Sin sembrar con esto, el arranque en frío espera para siempre una
+  ///   credencial que ya estaba escrita.
+  /// - **Reloj → teléfono**: un estado publicado por el reloj antes de que el
+  ///   teléfono empezara a escuchar se perdería, y la pantalla quedaría vacía
+  ///   sin ningún error.
+  ///
+  /// La causa común es la misma: [contextStream] sólo emite lo NUEVO — reenvía
+  /// eventos recibidos con el plugin ya enganchado— y no reproduce el pasado.
   ///
   /// En Wear devuelve un mapa por cada nodo que haya publicado contexto; en
   /// watchOS, a lo sumo uno.
