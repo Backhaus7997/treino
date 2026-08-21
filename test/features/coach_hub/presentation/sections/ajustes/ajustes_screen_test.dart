@@ -153,7 +153,8 @@ void main() {
       await tester.pump();
       await tester.pump(); // deja emitir el StreamProvider de prefs
 
-      // Primer checkbox = pago_recibido × EMAIL (default on) → lo apago.
+      // Primer checkbox = nueva_solicitud × EMAIL (default on) → lo apago.
+      // `nueva_solicitud` es una de las dos filas de kEmailBackedTypes.
       await tester.tap(find.byType(Checkbox).first);
       await tester.pump();
 
@@ -161,8 +162,8 @@ void main() {
           .captured
           .single as Map<String, Object?>;
       final prefs = captured['notificationPrefs'] as Map<String, dynamic>;
-      expect((prefs['pago_recibido'] as Map)['email'], false);
-      expect((prefs['pago_recibido'] as Map)['push'], true);
+      expect((prefs['nueva_solicitud'] as Map)['email'], false);
+      expect((prefs['nueva_solicitud'] as Map)['push'], true);
     });
 
     testWidgets(
