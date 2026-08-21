@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/features/coach_hub/presentation/sections/biblioteca/widgets/template_format.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/workout/domain/routine.dart';
@@ -66,7 +67,7 @@ class _TemplateDetailDialog extends StatelessWidget {
     return AlertDialog(
       backgroundColor: palette.bgCard,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.all(Radius.circular(20)),
+        borderRadius: BorderRadius.all(Radius.circular(AppRadius.lg)),
       ),
       title: Text(
         routine.name,

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_palette.dart';
@@ -424,7 +425,7 @@ class _PhotoField extends StatelessWidget {
                     ),
                     decoration: BoxDecoration(
                       color: palette.bgCard,
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(AppRadius.lg),
                       border: Border.all(color: palette.border),
                     ),
                     child: Row(
@@ -474,7 +475,7 @@ class _PhotoField extends StatelessWidget {
       alignment: Alignment.topRight,
       children: [
         ClipRRect(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxHeight: 260),
             child: SizedBox(

@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../../app/theme/app_palette.dart';
 import '../../../../../core/widgets/motion/treino_state_switcher.dart';
@@ -1647,7 +1648,7 @@ class _RoutineEditorWebScreenState
                       backgroundColor: palette.accent,
                       foregroundColor: palette.bg,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(9999),
+                        borderRadius: BorderRadius.circular(AppRadius.full),
                       ),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 24,
@@ -1876,7 +1877,7 @@ class _StepButton extends StatelessWidget {
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: palette.bgCard,
-          borderRadius: BorderRadius.circular(9999),
+          borderRadius: BorderRadius.circular(AppRadius.full),
           border: Border.all(
             color: enabled
                 ? palette.border
@@ -1921,7 +1922,7 @@ class _LevelSelector extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
                 color: selected == level ? palette.accent : palette.bgCard,
-                borderRadius: BorderRadius.circular(9999),
+                borderRadius: BorderRadius.circular(AppRadius.full),
                 border: Border.all(
                   color: selected == level ? palette.accent : palette.border,
                 ),
@@ -2026,7 +2027,7 @@ class _DayCard extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         border: Border.all(
           color:
               hasError ? palette.danger.withValues(alpha: 0.6) : palette.border,
@@ -2724,7 +2725,7 @@ class _ModeChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
         decoration: BoxDecoration(
           color: selected ? palette.accent : palette.bgCard,
-          borderRadius: BorderRadius.circular(9999),
+          borderRadius: BorderRadius.circular(AppRadius.full),
           border: Border.all(color: selected ? palette.accent : palette.border),
         ),
         child: Text(
@@ -2855,7 +2856,7 @@ class _WeekChip extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
             decoration: BoxDecoration(
               color: selected ? palette.accent : palette.bgCard,
-              borderRadius: BorderRadius.circular(9999),
+              borderRadius: BorderRadius.circular(AppRadius.full),
               border: Border.all(
                 color: selected ? palette.accent : palette.border,
               ),
@@ -2921,7 +2922,7 @@ class _PresenceChip extends StatelessWidget {
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: present ? palette.accent : palette.bgCard,
-          borderRadius: BorderRadius.circular(9999),
+          borderRadius: BorderRadius.circular(AppRadius.full),
           border: Border.all(color: present ? palette.accent : palette.border),
         ),
         child: Text(

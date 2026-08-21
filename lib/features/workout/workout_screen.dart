@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../app/theme/app_motion.dart';
 import '../../app/theme/app_palette.dart';
@@ -105,9 +106,9 @@ class _AthleteWorkout extends StatelessWidget {
               indicatorSize: TabBarIndicatorSize.tab,
               indicator: BoxDecoration(
                 color: palette.accent,
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(AppRadius.lg),
               ),
-              splashBorderRadius: BorderRadius.circular(20),
+              splashBorderRadius: BorderRadius.circular(AppRadius.lg),
               labelColor: palette.bg,
               unselectedLabelColor: palette.textMuted,
               labelStyle: labelStyle,

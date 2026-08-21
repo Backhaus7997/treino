@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/core/utils/date_labels.dart';
@@ -460,9 +461,9 @@ class _Tabs extends StatelessWidget {
         indicatorSize: TabBarIndicatorSize.tab,
         indicator: BoxDecoration(
           color: palette.accent,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
         ),
-        splashBorderRadius: BorderRadius.circular(20),
+        splashBorderRadius: BorderRadius.circular(AppRadius.lg),
         labelColor: palette.bg,
         unselectedLabelColor: palette.textMuted,
         labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
@@ -926,7 +927,7 @@ class _MetricCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: palette.bgCard,
           border: Border.all(color: palette.border),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1068,7 +1069,7 @@ class _NoteCard extends ConsumerWidget {
               decoration: BoxDecoration(
                 color: palette.bgCard,
                 border: Border.all(color: palette.border),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
               ),
               child: note == null || note.note.trim().isEmpty
                   ? Text(
@@ -1189,7 +1190,7 @@ class _ProxSesionCard extends ConsumerWidget {
               decoration: BoxDecoration(
                 color: palette.bgCard,
                 border: Border.all(color: palette.border),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
               ),
               child: next == null
                   ? Text(
@@ -1274,7 +1275,7 @@ class _UltimaSessionCard extends ConsumerWidget {
               decoration: BoxDecoration(
                 color: palette.bgCard,
                 border: Border.all(color: palette.border),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
               ),
               child: child,
             ),
@@ -1491,7 +1492,7 @@ class _AdherenciaHeatmap extends StatelessWidget {
       decoration: BoxDecoration(
         color: palette.bgCard,
         border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2054,7 +2055,7 @@ class _RutinaCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: palette.bgCard,
         border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2149,7 +2150,7 @@ class _HistorialTable extends StatelessWidget {
       decoration: BoxDecoration(
         color: palette.bgCard,
         border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Column(
         children: [
@@ -2569,7 +2570,7 @@ class _NotasPrivadasTabState extends ConsumerState<_NotasPrivadasTab> {
                   // the ClipRRect ancestor.
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
                       border: Border.all(color: palette.border),
                     ),
                     child: ClipRRect(
@@ -2768,7 +2769,7 @@ class _SessionStatusPill extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(9999),
+        borderRadius: BorderRadius.circular(AppRadius.full),
         border: Border.all(color: color.withValues(alpha: 0.5), width: 1),
       ),
       child: Text(
@@ -5311,7 +5312,7 @@ class _TagChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(9999),
+        borderRadius: BorderRadius.circular(AppRadius.full),
         border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
       child: Text(
@@ -6124,7 +6125,7 @@ class _SelectionModeSelector extends StatelessWidget {
           color: active
               ? palette.accent.withValues(alpha: 0.18)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(9999),
+          borderRadius: BorderRadius.circular(AppRadius.full),
           border: Border.all(
             color: active ? palette.accent : palette.border,
           ),

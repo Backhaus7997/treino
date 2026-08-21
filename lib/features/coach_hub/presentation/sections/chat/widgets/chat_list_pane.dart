@@ -302,7 +302,8 @@ class _ChatRow extends ConsumerWidget {
                             padding: const EdgeInsets.symmetric(horizontal: 5),
                             decoration: BoxDecoration(
                               color: palette.accent,
-                              borderRadius: BorderRadius.circular(9999),
+                              borderRadius:
+                                  BorderRadius.circular(AppRadius.full),
                             ),
                             child: Icon(
                               Icons.circle,
