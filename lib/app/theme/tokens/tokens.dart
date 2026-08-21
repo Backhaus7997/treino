@@ -20,4 +20,5 @@ export 'components/treino_focus_tokens.dart';
 export 'components/treino_kpi_card_tokens.dart';
 export 'components/treino_list_row_tokens.dart';
 export 'components/treino_section_header_tokens.dart';
+export 'components/treino_segmented_pill_tokens.dart';
 export 'components/treino_table_tokens.dart';

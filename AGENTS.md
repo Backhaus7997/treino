@@ -40,7 +40,7 @@ Estas son las que más fácil se olvidan o más fácil rompen el producto. Si el
 - **Modo oscuro siempre**. No hay light theme.
 - **Headings**: Barlow Condensed 700 UPPERCASE.
 - **Body**: Barlow 400/600/700.
-- **Spacing**: sólo `8 · 12 · 14 · 18 · 20` px. No 4/16/24.
+- **Spacing**: sólo `8 · 12 · 14 · 18 · 20` px para separar elementos. No 16/24. El 4 existe **sólo** como `AppSpacing.hairline`, para separaciones ópticas sub-8 y gutters internos de un componente del kit — nunca como padding de layout. Ver su dartdoc.
 - **Nunca** HEX literal en widgets — usar `AppPalette.of(context).accent`.
 - **Nunca** PhosphorIcons directo — usar `TreinoIcon.X`.
 
