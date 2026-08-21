@@ -4,6 +4,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../app/theme/app_motion.dart';
 import '../../app/theme/app_palette.dart';
+import '../../core/analytics/sub_tab_analytics.dart';
 import '../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../l10n/app_l10n.dart';
 import '../profile/application/user_providers.dart';
@@ -59,6 +60,15 @@ class _AthleteWorkout extends StatelessWidget {
   const _AthleteWorkout({this.initialTab});
 
   final String? initialTab;
+
+  /// Slugs de analytics — estables, en el orden del [TabBarView]. No son los
+  /// labels: esos cambian con el copy y con el idioma, y ya cambiaron —
+  /// "PLANTILLAS" pasó a "EXPLORAR" en #638 mientras esta rama esperaba.
+  /// El slug no se movió, que es exactamente para lo que se separó del texto:
+  /// una serie temporal de analytics que se corta cada vez que alguien edita
+  /// una etiqueta no sirve para nada.
+  static const _analyticsSurface = 'workout';
+  static const _analyticsTabs = <String>['tu-entreno', 'plantillas'];
 
   /// Deep-link value stays `plantillas` on purpose — the copy changed, the
   /// route did not (#638). Renaming it would break live bookmarks and
@@ -127,11 +137,17 @@ class _AthleteWorkout extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
+          // TU ENTRENO y PLANTILLAS son las dos la ruta `/workout`: mismo
+          // punto ciego que Feed. Envuelve las PÁGINAS, no el pill.
           const Expanded(
-            child: TabBarView(
-              // Swipeable on purpose — same gesture language the tab had in
-              // the rankings era.
-              children: [_TuEntrenoPage(), PlantillasTab()],
+            child: SubTabAnalytics(
+              surface: _analyticsSurface,
+              tabs: _analyticsTabs,
+              child: TabBarView(
+                // Swipeable on purpose — same gesture language the tab had in
+                // the rankings era.
+                children: [_TuEntrenoPage(), PlantillasTab()],
+              ),
             ),
           ),
         ],

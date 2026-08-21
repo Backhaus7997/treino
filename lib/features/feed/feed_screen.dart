@@ -6,6 +6,8 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../app/theme/app_motion.dart';
 import '../../app/theme/app_palette.dart';
+import '../../core/analytics/analytics_service.dart';
+import '../../core/analytics/sub_tab_analytics.dart';
 import '../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../core/widgets/motion/treino_state_switcher.dart';
 import '../../core/widgets/motion/treino_tappable.dart';
@@ -94,6 +96,15 @@ class _AthleteFeed extends StatelessWidget {
 
   static const _labels = <String>['FEED', 'RANKINGS'];
 
+  /// Slugs de analytics — estables, en el orden del [TabBarView]. No son los
+  /// labels: esos cambian con el copy y con el idioma.
+  static const _analyticsSurface = 'feed';
+  static const _analyticsTabs = <String>['feed', 'rankings'];
+
+  static const _pages = TabBarView(
+    children: [_FeedPage(showTitle: false), _RankingsPage()],
+  );
+
   static int _resolveInitialIndex(String? tab) => tab == 'rankings' ? 1 : 0;
 
   @override
@@ -179,9 +190,17 @@ class _AthleteFeed extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
+          // FEED y RANKINGS son las dos la ruta `/feed`: el observer de rutas
+          // las ve como una sola pantalla, así que este wrapper es el único
+          // que puede distinguirlas. Envuelve las PÁGINAS y no el pill a
+          // propósito — el pill sigue siendo presentación pura, y así el
+          // evento tampoco depende de qué widget dibuje el control (#646 lo
+          // está reemplazando).
           const Expanded(
-            child: TabBarView(
-              children: [_FeedPage(showTitle: false), _RankingsPage()],
+            child: SubTabAnalytics(
+              surface: _analyticsSurface,
+              tabs: _analyticsTabs,
+              child: _pages,
             ),
           ),
         ],
@@ -213,9 +232,43 @@ class _FeedPageState extends ConsumerState<_FeedPage>
   @override
   bool get wantKeepAlive => true;
 
+  /// Slug estable por segmento. Se mapea a mano en vez de usar `.name` para
+  /// que renombrar el enum no renombre el evento y parta la serie histórica.
+  /// Además `FeedSegment.public` se reporta como `publico`, que es como se
+  /// llama el segmento en la UI.
+  static const _segmentSlugs = <FeedSegment, String>{
+    FeedSegment.amigos: 'amigos',
+    FeedSegment.gym: 'gym',
+    FeedSegment.public: 'publico',
+  };
+
+  void _logSegment(FeedSegment segment) {
+    ref.read(analyticsServiceProvider).logSubTabViewed(
+          surface: 'feed_segments',
+          tab: _segmentSlugs[segment]!,
+        );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // El segmento inicial también cuenta: sin esto `amigos` (el default)
+    // quedaría sistemáticamente subcontado contra `gym` y `publico`, que sólo
+    // se alcanzan tapeando.
+    _logSegment(ref.read(feedSegmentProvider));
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    // Los segmentos no son un TabController sino un StateProvider, así que
+    // acá se escucha el provider. Escuchar el estado y no el `onTap` de los
+    // pills mantiene el evento correcto si mañana el segmento se cambia desde
+    // otro lado (deep-link, restaurar preferencia).
+    ref.listen<FeedSegment>(feedSegmentProvider, (previous, next) {
+      if (previous == next) return;
+      _logSegment(next);
+    });
     final segment = ref.watch(feedSegmentProvider);
 
     return switch (segment) {
