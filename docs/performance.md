@@ -55,7 +55,7 @@ Antes de mergear cualquier PR que toque UI, probar en al menos:
 
 ### Modos y orientación
 
-- Modo oscuro siempre (la app es dark-only, no hay light theme).
+- **Los dos temas**: dark (`mintMagenta`) y light (`mintMagentaLight`). La app arranca en `ThemeMode.system`, así que el tema claro se sirve desde el primer arranque — probar sólo dark deja pasar regresiones a la mitad de los usuarios. Esta línea decía "dark-only, no hay light theme" y por eso #646 encontró dos fallas WCAG que sólo existían en claro.
 - Portrait por defecto. Landscape opcional excepto en **Workout Player** que sí debe soportarlo (útil para pantalla del gym apoyada en banco).
 
 ### Densidad de texto

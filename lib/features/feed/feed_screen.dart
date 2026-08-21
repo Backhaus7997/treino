@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../app/theme/app_motion.dart';
 import '../../app/theme/app_palette.dart';
@@ -11,6 +10,7 @@ import '../../core/analytics/sub_tab_analytics.dart';
 import '../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../core/widgets/motion/treino_state_switcher.dart';
 import '../../core/widgets/motion/treino_tappable.dart';
+import '../../core/widgets/treino_segmented_pill.dart';
 import '../../core/widgets/treino_bottom_bar.dart';
 import '../../core/widgets/treino_glass_surface.dart';
 import '../../core/widgets/treino_icon.dart';
@@ -109,9 +109,6 @@ class _AthleteFeed extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    final theme = Theme.of(context);
-
     return DefaultTabController(
       length: _labels.length,
       initialIndex: _resolveInitialIndex(initialTab),
@@ -136,44 +133,12 @@ class _AthleteFeed extends StatelessWidget {
                     Flexible(
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 176),
-                        child: Container(
-                          key: const ValueKey('feed-rankings-toggle'),
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: palette.bgCard,
-                            borderRadius: BorderRadius.circular(24),
-                            border: Border.all(
-                              color: palette.textMuted.withValues(alpha: 0.12),
-                            ),
-                          ),
-                          child: TabBar(
-                            dividerColor: Colors.transparent,
-                            indicatorSize: TabBarIndicatorSize.tab,
-                            indicator: BoxDecoration(
-                              color: palette.accent,
-                              borderRadius: BorderRadius.circular(AppRadius.lg),
-                            ),
-                            splashBorderRadius:
-                                BorderRadius.circular(AppRadius.lg),
-                            labelPadding:
-                                const EdgeInsets.symmetric(horizontal: 8),
-                            labelColor: palette.bg,
-                            unselectedLabelColor: palette.textMuted,
-                            labelStyle: theme.textTheme.labelLarge?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.5,
-                            ),
-                            tabs: [
-                              for (final label in _labels)
-                                Tab(
-                                  height: 40,
-                                  child: FittedBox(
-                                    fit: BoxFit.scaleDown,
-                                    child: Text(label),
-                                  ),
-                                ),
-                            ],
-                          ),
+                        // La key va en el componente: los tests de layout de
+                        // esta fila la usan para medir el centrado contra las
+                        // acciones.
+                        child: const TreinoSegmentedPill(
+                          key: ValueKey('feed-rankings-toggle'),
+                          labels: _labels,
                         ),
                       ),
                     ),
