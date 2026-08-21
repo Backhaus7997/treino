@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_motion.dart';
 import '../../../../app/theme/app_palette.dart';
@@ -117,7 +118,7 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
                   height: 4,
                   decoration: BoxDecoration(
                     color: palette.border,
-                    borderRadius: BorderRadius.circular(9999),
+                    borderRadius: BorderRadius.circular(AppRadius.full),
                   ),
                 ),
               ),
@@ -305,15 +306,15 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
                         filled: true,
                         fillColor: palette.bg,
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(AppRadius.sm),
                           borderSide: BorderSide(color: palette.border),
                         ),
                         enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(AppRadius.sm),
                           borderSide: BorderSide(color: palette.border),
                         ),
                         focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(AppRadius.sm),
                           borderSide: BorderSide(
                             color: palette.accent,
                             width: 1.5,
@@ -531,7 +532,8 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: palette.bgCard,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.lg)),
         title: Text(
           title,
           style: GoogleFonts.barlowCondensed(
@@ -1094,15 +1096,15 @@ class _DurationSectionState extends State<_DurationSection> {
             filled: true,
             fillColor: palette.bg,
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
               borderSide: BorderSide(color: palette.border),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
               borderSide: BorderSide(color: palette.border),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
               borderSide: BorderSide(color: palette.accent, width: 1.5),
             ),
             suffixText: 'min',
@@ -1168,7 +1170,7 @@ class _TappableField extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         decoration: BoxDecoration(
           color: palette.bg,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           border: Border.all(color: palette.border),
         ),
         child: Row(
@@ -1285,15 +1287,15 @@ class _AthleteDropdown extends ConsumerWidget {
         filled: true,
         fillColor: palette.bg,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           borderSide: BorderSide(color: palette.border),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           borderSide: BorderSide(color: palette.border),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           borderSide: BorderSide(color: palette.accent, width: 1.5),
         ),
       ),

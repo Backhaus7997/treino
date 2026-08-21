@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../l10n/app_l10n.dart';
@@ -353,7 +354,8 @@ class _DayTimelineState extends ConsumerState<DayTimeline> {
             isScrollControlled: true,
             backgroundColor: AppPalette.of(context).bgCard,
             shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              borderRadius:
+                  BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
             ),
             builder: (_) => SessionDetailSheet(
               appointment: appt,
@@ -492,7 +494,7 @@ class _DayTimelineState extends ConsumerState<DayTimeline> {
       isScrollControlled: true,
       backgroundColor: AppPalette.of(context).bgCard,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
       ),
       builder: (_) => NewSessionSheet(
         initialDate: widget.day,
@@ -606,7 +608,7 @@ class _TimelineErrorState extends StatelessWidget {
               style: OutlinedButton.styleFrom(
                 side: BorderSide(color: palette.accent),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(9999),
+                  borderRadius: BorderRadius.circular(AppRadius.full),
                 ),
               ),
               child: Text(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
@@ -126,7 +127,8 @@ class _PostSessionCheckInSheetState
         constraints: BoxConstraints(maxHeight: maxHeight),
         decoration: BoxDecoration(
           color: palette.bg,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius:
+              const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -379,7 +381,7 @@ class _FeelingOption extends StatelessWidget {
             color: selected
                 ? palette.accent.withValues(alpha: 0.15)
                 : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
             border: Border.all(
               color: selected ? palette.accent : palette.border,
               width: 1.5,
@@ -493,7 +495,7 @@ class _PainOption extends StatelessWidget {
             color: selected
                 ? palette.accent.withValues(alpha: 0.15)
                 : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
             border: Border.all(
               color: selected ? palette.accent : palette.border,
               width: 1.5,
@@ -545,7 +547,7 @@ class _PainAreaChips extends StatelessWidget {
                   color: selected.contains(group)
                       ? palette.accent.withValues(alpha: 0.15)
                       : Colors.transparent,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
                   border: Border.all(
                     color: selected.contains(group)
                         ? palette.accent

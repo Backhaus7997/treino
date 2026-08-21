@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
@@ -130,7 +131,7 @@ class _PendingRequestsBlock extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
             color: palette.bgCard,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppRadius.md),
             border: Border.all(color: palette.accent.withValues(alpha: 0.35)),
           ),
           child: Row(
@@ -183,7 +184,7 @@ class _NotificationItem extends ConsumerWidget {
             color: unread
                 ? palette.accent.withValues(alpha: 0.08)
                 : palette.bgCard,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppRadius.md),
             border: Border.all(
               color: unread
                   ? palette.accent.withValues(alpha: 0.3)

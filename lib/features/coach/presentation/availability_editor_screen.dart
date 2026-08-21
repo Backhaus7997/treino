@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
@@ -191,7 +192,7 @@ class _EditorBody extends ConsumerWidget {
       isScrollControlled: true,
       backgroundColor: AppPalette.of(context).bgCard,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
       ),
       builder: (_) => _RuleFormSheet(
         trainerId: trainerId,
@@ -234,7 +235,7 @@ class _EditorBody extends ConsumerWidget {
       isScrollControlled: true,
       backgroundColor: AppPalette.of(context).bgCard,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
       ),
       builder: (_) => _BlockOverrideFormSheet(trainerId: trainerId),
     );
@@ -294,7 +295,7 @@ class _RuleTile extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         border: Border.all(color: palette.border, width: 1),
       ),
       child: Row(
@@ -373,7 +374,7 @@ class _OverrideTile extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         border: Border.all(color: palette.border, width: 1),
       ),
       child: Row(
@@ -563,7 +564,7 @@ class _RuleFormSheetState extends ConsumerState<_RuleFormSheet> {
                   foregroundColor: palette.bg,
                   minimumSize: const Size.fromHeight(48),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(9999),
+                    borderRadius: BorderRadius.circular(AppRadius.full),
                   ),
                 ),
                 child: Text(
@@ -728,7 +729,7 @@ class _BlockOverrideFormSheetState
                   foregroundColor: palette.bg,
                   minimumSize: const Size.fromHeight(48),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(9999),
+                    borderRadius: BorderRadius.circular(AppRadius.full),
                   ),
                 ),
                 child: Text(
@@ -837,7 +838,7 @@ class _ErrorState extends StatelessWidget {
               style: OutlinedButton.styleFrom(
                 side: BorderSide(color: palette.accent),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(9999),
+                  borderRadius: BorderRadius.circular(AppRadius.full),
                 ),
               ),
               child: Text(
@@ -870,7 +871,7 @@ class _EmptyHint extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         border: Border.all(color: palette.border, width: 1),
       ),
       child: Text(
@@ -911,7 +912,7 @@ class _AddButton extends StatelessWidget {
           side: BorderSide(color: palette.accent),
           minimumSize: const Size.fromHeight(44),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(9999),
+            borderRadius: BorderRadius.circular(AppRadius.full),
           ),
         ),
       ),
@@ -1047,7 +1048,8 @@ class _ConfirmDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     return AlertDialog(
       backgroundColor: palette.bgCard,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg)),
       content: Text(
         body,
         style: GoogleFonts.barlow(fontSize: 14, color: palette.textPrimary),

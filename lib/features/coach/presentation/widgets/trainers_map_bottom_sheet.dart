@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../feed/presentation/widgets/post_avatar.dart';
@@ -72,8 +73,8 @@ class TrainersMapBottomSheet extends ConsumerWidget {
               decoration: BoxDecoration(
                 color: palette.bgCard,
                 borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(20),
-                  topRight: Radius.circular(20),
+                  topLeft: Radius.circular(AppRadius.lg),
+                  topRight: Radius.circular(AppRadius.lg),
                 ),
                 border: Border(top: BorderSide(color: palette.border)),
                 boxShadow: [
