@@ -1,0 +1,422 @@
+{
+  "rule": "set-resolution",
+  "source_of_truth": "lib/features/workout/domain/routine_slot.dart (effectiveSetsForWeek / isPresentInWeek)",
+  "description": "Que series le tocan al atleta en un ejercicio, para una semana dada. Es la logica mas sutil del dominio y la que mas riesgo de divergencia tiene: define lo que el atleta efectivamente levanta.",
+  "inputs": {
+    "week": "Semana 0-based del plan.",
+    "activeWeeks": "Mascara de PRESENCIA. Vacia = presente en TODAS las semanas (back-compat: los docs legacy no traen el campo).",
+    "weeklySets": "Prescripcion por semana. Outer vacio = legacy, resolver por la via plana. Una semana EN RANGO pero vacia es un deload AUTORADO y se devuelve tal cual, sin fallback.",
+    "sets": "Filas explicitas. Si hay, ganan sobre todo lo plano.",
+    "targetSets": "Cantidad de series del modelo plano. Se clampea a [1, 999]: siempre al menos una.",
+    "durationSeconds": "Si es > 0, las series son por tiempo y no por reps.",
+    "targetReps": "Reps por serie. Un solo valor = uniforme para targetSets filas. Varios = una fila por entrada, ignorando targetSets.",
+    "targetRepsMin/targetRepsMax/targetWeightKg": "Ultimo fallback, como rango. min/max son enteros NO nulos en el modelo; 0 significa 'no aplica' en los casos donde gana otra via."
+  },
+  "cases": [
+    {
+      "name": "legacy por rango: targetSets filas identicas",
+      "given": {
+        "week": 0,
+        "activeWeeks": [],
+        "weeklySets": [],
+        "sets": [],
+        "targetSets": 4,
+        "durationSeconds": null,
+        "targetReps": [],
+        "targetRepsMin": 5,
+        "targetRepsMax": 6,
+        "targetWeightKg": 100
+      },
+      "expect": {
+        "isActive": true,
+        "sets": [
+          {
+            "repsMin": 5,
+            "repsMax": 6,
+            "weightKg": 100
+          },
+          {
+            "repsMin": 5,
+            "repsMax": 6,
+            "weightKg": 100
+          },
+          {
+            "repsMin": 5,
+            "repsMax": 6,
+            "weightKg": 100
+          },
+          {
+            "repsMin": 5,
+            "repsMax": 6,
+            "weightKg": 100
+          }
+        ]
+      }
+    },
+    {
+      "name": "targetSets 0 igual produce una serie",
+      "why": "El clamp a [1,999] evita que un doc mal cargado deje al atleta sin nada que hacer.",
+      "given": {
+        "week": 0,
+        "activeWeeks": [],
+        "weeklySets": [],
+        "sets": [],
+        "targetSets": 0,
+        "durationSeconds": null,
+        "targetReps": [],
+        "targetRepsMin": 8,
+        "targetRepsMax": 12,
+        "targetWeightKg": null
+      },
+      "expect": {
+        "isActive": true,
+        "sets": [
+          {
+            "repsMin": 8,
+            "repsMax": 12,
+            "weightKg": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "duracion gana sobre reps",
+      "given": {
+        "week": 0,
+        "activeWeeks": [],
+        "weeklySets": [],
+        "sets": [],
+        "targetSets": 3,
+        "durationSeconds": 45,
+        "targetReps": [
+          10
+        ],
+        "targetRepsMin": 0,
+        "targetRepsMax": 0,
+        "targetWeightKg": null
+      },
+      "expect": {
+        "isActive": true,
+        "sets": [
+          {
+            "durationSeconds": 45
+          },
+          {
+            "durationSeconds": 45
+          },
+          {
+            "durationSeconds": 45
+          }
+        ]
+      }
+    },
+    {
+      "name": "un solo targetReps se repite targetSets veces",
+      "given": {
+        "week": 0,
+        "activeWeeks": [],
+        "weeklySets": [],
+        "sets": [],
+        "targetSets": 3,
+        "durationSeconds": null,
+        "targetReps": [
+          10
+        ],
+        "targetRepsMin": 0,
+        "targetRepsMax": 0,
+        "targetWeightKg": null
+      },
+      "expect": {
+        "isActive": true,
+        "sets": [
+          {
+            "reps": 10
+          },
+          {
+            "reps": 10
+          },
+          {
+            "reps": 10
+          }
+        ]
+      }
+    },
+    {
+      "name": "varios targetReps: una fila por entrada, targetSets se IGNORA",
+      "why": "Una secuencia explicita [6,8,10] describe 3 series aunque targetSets diga 5. El dato mas especifico manda.",
+      "given": {
+        "week": 0,
+        "activeWeeks": [],
+        "weeklySets": [],
+        "sets": [],
+        "targetSets": 5,
+        "durationSeconds": null,
+        "targetReps": [
+          6,
+          8,
+          10
+        ],
+        "targetRepsMin": 0,
+        "targetRepsMax": 0,
+        "targetWeightKg": null
+      },
+      "expect": {
+        "isActive": true,
+        "sets": [
+          {
+            "reps": 6
+          },
+          {
+            "reps": 8
+          },
+          {
+            "reps": 10
+          }
+        ]
+      }
+    },
+    {
+      "name": "filas explicitas ganan sobre todo lo plano",
+      "given": {
+        "week": 0,
+        "activeWeeks": [],
+        "weeklySets": [],
+        "sets": [
+          {
+            "reps": 3,
+            "weightKg": 140
+          }
+        ],
+        "targetSets": 9,
+        "durationSeconds": null,
+        "targetReps": [
+          10
+        ],
+        "targetRepsMin": 5,
+        "targetRepsMax": 6,
+        "targetWeightKg": 100
+      },
+      "expect": {
+        "isActive": true,
+        "sets": [
+          {
+            "reps": 3,
+            "weightKg": 140
+          }
+        ]
+      }
+    },
+    {
+      "name": "weeklySets en rango gana para esa semana",
+      "given": {
+        "week": 1,
+        "activeWeeks": [],
+        "weeklySets": [
+          [
+            {
+              "reps": 5
+            }
+          ],
+          [
+            {
+              "reps": 3
+            },
+            {
+              "reps": 3
+            }
+          ]
+        ],
+        "sets": [],
+        "targetSets": 4,
+        "durationSeconds": null,
+        "targetReps": [],
+        "targetRepsMin": 8,
+        "targetRepsMax": 10,
+        "targetWeightKg": 60
+      },
+      "expect": {
+        "isActive": true,
+        "sets": [
+          {
+            "reps": 3
+          },
+          {
+            "reps": 3
+          }
+        ]
+      }
+    },
+    {
+      "name": "semana EN RANGO pero vacia es un deload autorado: se devuelve vacia",
+      "why": "Sin este caso, un fallback bien intencionado le haria hacer al atleta el volumen completo en una semana de descarga. La lista vacia es una prescripcion, no un dato faltante.",
+      "given": {
+        "week": 1,
+        "activeWeeks": [],
+        "weeklySets": [
+          [
+            {
+              "reps": 5
+            }
+          ],
+          []
+        ],
+        "sets": [],
+        "targetSets": 4,
+        "durationSeconds": null,
+        "targetReps": [],
+        "targetRepsMin": 8,
+        "targetRepsMax": 10,
+        "targetWeightKg": 60
+      },
+      "expect": {
+        "isActive": true,
+        "sets": []
+      }
+    },
+    {
+      "name": "semana FUERA de rango cae a la via plana",
+      "given": {
+        "week": 5,
+        "activeWeeks": [],
+        "weeklySets": [
+          [
+            {
+              "reps": 5
+            }
+          ]
+        ],
+        "sets": [],
+        "targetSets": 2,
+        "durationSeconds": null,
+        "targetReps": [],
+        "targetRepsMin": 8,
+        "targetRepsMax": 10,
+        "targetWeightKg": 60
+      },
+      "expect": {
+        "isActive": true,
+        "sets": [
+          {
+            "repsMin": 8,
+            "repsMax": 10,
+            "weightKg": 60
+          },
+          {
+            "repsMin": 8,
+            "repsMax": 10,
+            "weightKg": 60
+          }
+        ]
+      }
+    },
+    {
+      "name": "mascara vacia: el ejercicio esta presente en cualquier semana",
+      "given": {
+        "week": 7,
+        "activeWeeks": [],
+        "weeklySets": [],
+        "sets": [],
+        "targetSets": 1,
+        "durationSeconds": null,
+        "targetReps": [
+          10
+        ],
+        "targetRepsMin": 0,
+        "targetRepsMax": 0,
+        "targetWeightKg": null
+      },
+      "expect": {
+        "isActive": true,
+        "sets": [
+          {
+            "reps": 10
+          }
+        ]
+      }
+    },
+    {
+      "name": "mascara no vacia: ausente en una semana que no lista",
+      "given": {
+        "week": 1,
+        "activeWeeks": [
+          0,
+          2
+        ],
+        "weeklySets": [],
+        "sets": [],
+        "targetSets": 1,
+        "durationSeconds": null,
+        "targetReps": [
+          10
+        ],
+        "targetRepsMin": 0,
+        "targetRepsMax": 0,
+        "targetWeightKg": null
+      },
+      "expect": {
+        "isActive": false,
+        "sets": [
+          {
+            "reps": 10
+          }
+        ]
+      }
+    },
+    {
+      "name": "mascara no vacia: presente en una semana listada",
+      "given": {
+        "week": 2,
+        "activeWeeks": [
+          0,
+          2
+        ],
+        "weeklySets": [],
+        "sets": [],
+        "targetSets": 1,
+        "durationSeconds": null,
+        "targetReps": [
+          10
+        ],
+        "targetRepsMin": 0,
+        "targetRepsMax": 0,
+        "targetWeightKg": null
+      },
+      "expect": {
+        "isActive": true,
+        "sets": [
+          {
+            "reps": 10
+          }
+        ]
+      }
+    },
+    {
+      "name": "semana negativa: ausente con mascara, presente sin ella",
+      "why": "Nunca tira excepcion, en ninguno de los dos casos.",
+      "given": {
+        "week": -1,
+        "activeWeeks": [
+          0
+        ],
+        "weeklySets": [],
+        "sets": [],
+        "targetSets": 1,
+        "durationSeconds": null,
+        "targetReps": [
+          10
+        ],
+        "targetRepsMin": 0,
+        "targetRepsMax": 0,
+        "targetWeightKg": null
+      },
+      "expect": {
+        "isActive": false,
+        "sets": [
+          {
+            "reps": 10
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -54,7 +54,26 @@ mixin _$Routine {
   double? get ratingAvg =>
       throw _privateConstructorUsedError; // ignore: invalid_annotation_target
   @JsonKey(includeToJson: false)
-  int? get ratingsCount => throw _privateConstructorUsedError;
+  int? get ratingsCount =>
+      throw _privateConstructorUsedError; // ── Plain-language summary (#648) ────────────────────────────────────────
+// One sentence explaining what the routine IS, in words someone who has
+// never set foot in a gym can parse. The catalogue leads with jargon —
+// "Bro Split", "PPL", "Upper/Lower" — and 2 of 5 usability participants
+// could not tell what those meant; the term is not hidden, it is explained.
+//
+// Seeded via scripts/seed_templates.js (Admin SDK, bypasses rules).
+// `includeToJson: false` for the same reason as the rating aggregates
+// above, and it is what keeps this field OUT of firestore.rules: the
+// client never puts it in a write payload, so no `hasOnly` list has to
+// learn about it and no athlete/trainer routine update can break on it
+// (the #563 failure mode). Routine writes use `update()`, never `set()`,
+// so an excluded field survives untouched.
+//
+// Trainer-authored summaries would need the editor AND the rules
+// allowlists — deliberately a separate slice.
+// ignore: invalid_annotation_target
+  @JsonKey(includeToJson: false)
+  String? get summary => throw _privateConstructorUsedError;
 
   /// Serializes this Routine to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -86,7 +105,8 @@ abstract class $RoutineCopyWith<$Res> {
       RoutineStatus status,
       int numWeeks,
       @JsonKey(includeToJson: false) double? ratingAvg,
-      @JsonKey(includeToJson: false) int? ratingsCount});
+      @JsonKey(includeToJson: false) int? ratingsCount,
+      @JsonKey(includeToJson: false) String? summary});
 }
 
 /// @nodoc
@@ -120,6 +140,7 @@ class _$RoutineCopyWithImpl<$Res, $Val extends Routine>
     Object? numWeeks = null,
     Object? ratingAvg = freezed,
     Object? ratingsCount = freezed,
+    Object? summary = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -186,6 +207,10 @@ class _$RoutineCopyWithImpl<$Res, $Val extends Routine>
           ? _value.ratingsCount
           : ratingsCount // ignore: cast_nullable_to_non_nullable
               as int?,
+      summary: freezed == summary
+          ? _value.summary
+          : summary // ignore: cast_nullable_to_non_nullable
+              as String?,
     ) as $Val);
   }
 }
@@ -213,7 +238,8 @@ abstract class _$$RoutineImplCopyWith<$Res> implements $RoutineCopyWith<$Res> {
       RoutineStatus status,
       int numWeeks,
       @JsonKey(includeToJson: false) double? ratingAvg,
-      @JsonKey(includeToJson: false) int? ratingsCount});
+      @JsonKey(includeToJson: false) int? ratingsCount,
+      @JsonKey(includeToJson: false) String? summary});
 }
 
 /// @nodoc
@@ -245,6 +271,7 @@ class __$$RoutineImplCopyWithImpl<$Res>
     Object? numWeeks = null,
     Object? ratingAvg = freezed,
     Object? ratingsCount = freezed,
+    Object? summary = freezed,
   }) {
     return _then(_$RoutineImpl(
       id: null == id
@@ -311,6 +338,10 @@ class __$$RoutineImplCopyWithImpl<$Res>
           ? _value.ratingsCount
           : ratingsCount // ignore: cast_nullable_to_non_nullable
               as int?,
+      summary: freezed == summary
+          ? _value.summary
+          : summary // ignore: cast_nullable_to_non_nullable
+              as String?,
     ));
   }
 }
@@ -334,7 +365,8 @@ class _$RoutineImpl implements _Routine {
       this.status = RoutineStatus.active,
       this.numWeeks = 1,
       @JsonKey(includeToJson: false) this.ratingAvg,
-      @JsonKey(includeToJson: false) this.ratingsCount})
+      @JsonKey(includeToJson: false) this.ratingsCount,
+      @JsonKey(includeToJson: false) this.summary})
       : _days = days;
 
   factory _$RoutineImpl.fromJson(Map<String, dynamic> json) =>
@@ -401,10 +433,30 @@ class _$RoutineImpl implements _Routine {
   @override
   @JsonKey(includeToJson: false)
   final int? ratingsCount;
+// ── Plain-language summary (#648) ────────────────────────────────────────
+// One sentence explaining what the routine IS, in words someone who has
+// never set foot in a gym can parse. The catalogue leads with jargon —
+// "Bro Split", "PPL", "Upper/Lower" — and 2 of 5 usability participants
+// could not tell what those meant; the term is not hidden, it is explained.
+//
+// Seeded via scripts/seed_templates.js (Admin SDK, bypasses rules).
+// `includeToJson: false` for the same reason as the rating aggregates
+// above, and it is what keeps this field OUT of firestore.rules: the
+// client never puts it in a write payload, so no `hasOnly` list has to
+// learn about it and no athlete/trainer routine update can break on it
+// (the #563 failure mode). Routine writes use `update()`, never `set()`,
+// so an excluded field survives untouched.
+//
+// Trainer-authored summaries would need the editor AND the rules
+// allowlists — deliberately a separate slice.
+// ignore: invalid_annotation_target
+  @override
+  @JsonKey(includeToJson: false)
+  final String? summary;
 
   @override
   String toString() {
-    return 'Routine(id: $id, name: $name, split: $split, level: $level, days: $days, estimatedMinutesPerDay: $estimatedMinutesPerDay, imageUrl: $imageUrl, source: $source, assignedBy: $assignedBy, assignedTo: $assignedTo, visibility: $visibility, createdBy: $createdBy, status: $status, numWeeks: $numWeeks, ratingAvg: $ratingAvg, ratingsCount: $ratingsCount)';
+    return 'Routine(id: $id, name: $name, split: $split, level: $level, days: $days, estimatedMinutesPerDay: $estimatedMinutesPerDay, imageUrl: $imageUrl, source: $source, assignedBy: $assignedBy, assignedTo: $assignedTo, visibility: $visibility, createdBy: $createdBy, status: $status, numWeeks: $numWeeks, ratingAvg: $ratingAvg, ratingsCount: $ratingsCount, summary: $summary)';
   }
 
   @override
@@ -436,7 +488,8 @@ class _$RoutineImpl implements _Routine {
             (identical(other.ratingAvg, ratingAvg) ||
                 other.ratingAvg == ratingAvg) &&
             (identical(other.ratingsCount, ratingsCount) ||
-                other.ratingsCount == ratingsCount));
+                other.ratingsCount == ratingsCount) &&
+            (identical(other.summary, summary) || other.summary == summary));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -458,7 +511,8 @@ class _$RoutineImpl implements _Routine {
       status,
       numWeeks,
       ratingAvg,
-      ratingsCount);
+      ratingsCount,
+      summary);
 
   /// Create a copy of Routine
   /// with the given fields replaced by the non-null parameter values.
@@ -493,7 +547,8 @@ abstract class _Routine implements Routine {
       final RoutineStatus status,
       final int numWeeks,
       @JsonKey(includeToJson: false) final double? ratingAvg,
-      @JsonKey(includeToJson: false) final int? ratingsCount}) = _$RoutineImpl;
+      @JsonKey(includeToJson: false) final int? ratingsCount,
+      @JsonKey(includeToJson: false) final String? summary}) = _$RoutineImpl;
 
   factory _Routine.fromJson(Map<String, dynamic> json) = _$RoutineImpl.fromJson;
 
@@ -540,7 +595,27 @@ abstract class _Routine implements Routine {
   double? get ratingAvg; // ignore: invalid_annotation_target
   @override
   @JsonKey(includeToJson: false)
-  int? get ratingsCount;
+  int?
+      get ratingsCount; // ── Plain-language summary (#648) ────────────────────────────────────────
+// One sentence explaining what the routine IS, in words someone who has
+// never set foot in a gym can parse. The catalogue leads with jargon —
+// "Bro Split", "PPL", "Upper/Lower" — and 2 of 5 usability participants
+// could not tell what those meant; the term is not hidden, it is explained.
+//
+// Seeded via scripts/seed_templates.js (Admin SDK, bypasses rules).
+// `includeToJson: false` for the same reason as the rating aggregates
+// above, and it is what keeps this field OUT of firestore.rules: the
+// client never puts it in a write payload, so no `hasOnly` list has to
+// learn about it and no athlete/trainer routine update can break on it
+// (the #563 failure mode). Routine writes use `update()`, never `set()`,
+// so an excluded field survives untouched.
+//
+// Trainer-authored summaries would need the editor AND the rules
+// allowlists — deliberately a separate slice.
+// ignore: invalid_annotation_target
+  @override
+  @JsonKey(includeToJson: false)
+  String? get summary;
 
   /// Create a copy of Routine
   /// with the given fields replaced by the non-null parameter values.

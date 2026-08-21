@@ -14,11 +14,34 @@ import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
 import 'package:treino/features/workout/data/session_repository.dart';
 import 'package:treino/features/workout/domain/routine.dart';
+import 'package:treino/features/workout/domain/set_log.dart';
 
 import '../../../helpers/fake_analytics_service.dart';
 import 'stub_factories.dart';
 
-class MockSessionRepository extends Mock implements SessionRepository {}
+class MockSessionRepository extends Mock implements SessionRepository {
+  // Los dos streams que SessionNotifier engancha al abrir el entreno para ver
+  // en vivo lo que escribe el RELOJ. Se implementan de verdad —vacios— en vez
+  // de stubearse: ningun test de este archivo mira esa sincronia, y un
+  // `when(...)` por cada sitio donde se crea el mock seria puro ruido. Un
+  // stream vacio nunca emite, asi que el comportamiento que estos tests
+  // ejercitan queda EXACTAMENTE igual que antes de que existieran.
+  //
+  // La sincronia con el reloj se cubre en session_remote_sync_test.dart.
+  @override
+  Stream<List<SetLog>> watchSetLogs({
+    required String uid,
+    required String sessionId,
+  }) =>
+      const Stream<List<SetLog>>.empty();
+
+  @override
+  Stream<bool> watchSessionFinished({
+    required String uid,
+    required String sessionId,
+  }) =>
+      const Stream<bool>.empty();
+}
 
 ProviderContainer _makeContainer({
   required MockSessionRepository repo,

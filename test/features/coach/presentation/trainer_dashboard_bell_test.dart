@@ -7,8 +7,8 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart'
-    show trainerLinkRepositoryProvider, trainerLinksStreamProvider;
-import 'package:treino/features/coach/data/trainer_link_repository.dart';
+    show trainerLinkPromotionServiceProvider, trainerLinksStreamProvider;
+import 'package:treino/features/coach/data/trainer_link_promotion_service.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach/presentation/trainer_dashboard_tab.dart';
@@ -34,7 +34,8 @@ Widget _wrap(Widget child) => MaterialApp(
       home: Scaffold(body: Center(child: child)),
     );
 
-class _MockLinkRepo extends Mock implements TrainerLinkRepository {}
+class _MockPromotionService extends Mock
+    implements TrainerLinkPromotionService {}
 
 TrainerLink _pending(String id, String athleteId) => TrainerLink(
       id: id,
@@ -139,8 +140,13 @@ void main() {
     // un fallo dejaba al PF creyendo que aceptó/rechazó cuando no pasó nada.
     testWidgets('ACEPTAR que falla muestra SnackBar y no traga el error',
         (tester) async {
-      final repo = _MockLinkRepo();
-      when(() => repo.accept(any())).thenThrow(Exception('permission-denied'));
+      final service = _MockPromotionService();
+      // A PROPOSITO una excepcion cruda, fuera de LinkPromotionFailure: pinea
+      // que el catch-all sigue existiendo. Angostarlo a la jerarquia sellada
+      // dejaria _busy en true para siempre ante cualquier fallo inesperado —
+      // el bug original de QA H5, de vuelta por la ventana.
+      when(() => service.accept(any()))
+          .thenThrow(Exception('permission-denied'));
 
       await tester.pumpWidget(ProviderScope(
         overrides: [
@@ -149,7 +155,7 @@ void main() {
           userPublicProfileProvider.overrideWith(
             (ref, uid) => Stream<UserPublicProfile?>.value(null),
           ),
-          trainerLinkRepositoryProvider.overrideWithValue(repo),
+          trainerLinkPromotionServiceProvider.overrideWithValue(service),
         ],
         child: _wrap(const PendingRequestsSheetTestHarness()),
       ));
@@ -158,8 +164,10 @@ void main() {
       await tester.tap(find.text('ACEPTAR'));
       await tester.pumpAndSettle();
 
+      // El copy pasó a l10n al migrar el accept a la callable (paywall PR4);
+      // lo que se pinea sigue siendo lo mismo: el fallo NO se traga.
       expect(
-        find.text('No pudimos aceptar la solicitud. Probá de nuevo.'),
+        find.text('Revisá tu conexión y probá de nuevo.'),
         findsOneWidget,
       );
     });

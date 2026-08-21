@@ -13,6 +13,7 @@ import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_source.dart';
 import 'package:treino/features/workout/domain/routine_visibility.dart';
 import 'package:treino/features/workout/presentation/widgets/plantillas_tab.dart';
+import 'package:treino/features/workout/presentation/widgets/level_filter_pills.dart';
 import 'package:treino/features/workout/presentation/widgets/routine_card.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
@@ -216,7 +217,15 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(RoutineCard), findsNWidgets(2));
 
-      await tester.tap(find.text('Avanzado'));
+      // Scoped to the filter pills on purpose: since #639 the card caption
+      // leads with the routine's level, so a bare find.text('Avanzado')
+      // matches the card too and the tap goes ambiguous.
+      await tester.tap(
+        find.descendant(
+          of: find.byType(LevelFilterPills),
+          matching: find.text('Avanzado'),
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('AVANZADA'), findsOneWidget);
@@ -261,8 +270,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('SOBREVIVIENTE'), findsOneWidget);
-      expect(
-          find.text('Hubo un error cargando las plantillas.'), findsOneWidget);
+      expect(find.text('Hubo un error cargando las rutinas.'), findsOneWidget);
     });
   });
 }
