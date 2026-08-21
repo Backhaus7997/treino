@@ -17,6 +17,7 @@ import '../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../../core/widgets/treino_icon.dart';
 import '../../../../coach/application/agenda_providers.dart';
 import '../../../../coach/domain/appointment.dart';
+import '../../../../coach/domain/wall_clock.dart';
 import '../../../../coach/presentation/agenda_formatters.dart';
 import '../../../../payments/application/billing_providers.dart'
     show athleteBillingProvider;
@@ -554,8 +555,9 @@ class AppointmentCard extends ConsumerWidget {
   }
 
   void _openDetail(BuildContext context, WidgetRef ref) {
-    final now = DateTime.now().toUtc();
-    final isPast = appointment.startsAt.isBefore(now);
+    // Wall-clock contra wall-clock (#671): con el instante UTC real un turno
+    // que empieza en menos de 3h se marcaba isPast y perdia el boton Cancelar.
+    final isPast = appointment.startsAt.isBefore(nowWall());
     showDialog<void>(
       context: context,
       builder: (_) => AppointmentDetailDialog(

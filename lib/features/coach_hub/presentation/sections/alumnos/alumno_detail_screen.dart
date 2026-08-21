@@ -20,6 +20,7 @@ import 'package:treino/features/coach/application/athlete_file_providers.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/application/athlete_note_providers.dart';
 import 'package:treino/features/coach/domain/appointment.dart';
+import 'package:treino/features/coach/domain/wall_clock.dart';
 import 'package:treino/features/coach/application/follow_up_entry_providers.dart';
 import 'package:treino/features/coach/application/nutrition_plan_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
@@ -1109,7 +1110,9 @@ class _ProxSesionCard extends ConsumerWidget {
     // day-truncada ESTABLE y filtramos el alumno en memoria: sin permission-denied
     // y sin índice nuevo.
     final trainerId = ref.watch(currentUidProvider) ?? '';
-    final now = DateTime.now().toUtc();
+    // Wall-clock ADR-7 (#671): con el instante UTC real, "Proxima sesion"
+    // descartaba los turnos de las proximas 3h.
+    final now = nowWall();
     final todayStart = DateTime.utc(now.year, now.month, now.day);
     final async = ref.watch(trainerAppointmentsStreamProvider(
       TrainerAppointmentsKey(
