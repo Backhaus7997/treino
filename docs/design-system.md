@@ -103,6 +103,9 @@ Padding(padding: EdgeInsets.all(16));
 | `AppRadius.lg` | `20.0` | Hero cards, bottom sheets |
 | `AppRadius.full` | `9999.0` | CTAs pill, avatares |
 
+La escala es **cerrada**: un radio nuevo se pide como excepción, no se inventa
+inline. Ver [Excepciones a la escala de radios](#excepciones-a-la-escala-de-radios).
+
 ### AppFonts
 
 | Token | Valor | Uso |
@@ -382,7 +385,7 @@ Container(color: palette.accent);
 
 Tokens disponibles: `accent`, `highlight`, `bg`, `bgCard`, `border`, `borderHover`, `textPrimary`, `textMuted`, `sage`, `espresso`, `danger`, `warning`, `onDanger`, `scrimDark`.
 
-El test `test/app/theme/tokens/no_hex_scan_test.dart` falla si se agrega un HEX fuera de la allowlist (primitives.dart + app_palette.dart). Este test corre en CI.
+El test `test/app/theme/tokens/no_hex_scan_test.dart` falla si se agrega un HEX fuera de la allowlist (hoy: sólo `primitives.dart` — `app_palette.dart` salió de la lista en WU-02). Este test corre en CI.
 
 ### 2. Nunca PhosphorIcons directo
 
@@ -399,6 +402,61 @@ Si falta un ícono, agregarlo a `lib/core/widgets/treino_icon.dart` con nombre s
 ### 3. Nunca hard-code de strings de UI
 
 Tab labels, feature names, mensajes — centralizar en constantes o en archivos de localización (`lib/l10n/`).
+
+### 4. Nunca radio crudo en widgets
+
+```dart
+// ❌ MAL
+BorderRadius.circular(16);
+
+// ✅ BIEN
+BorderRadius.circular(AppRadius.md);
+```
+
+El test `test/app/theme/tokens/no_raw_radius_scan_test.dart` falla si se agrega
+un `Radius.circular(<literal>)` fuera de la allowlist. Corre en CI.
+
+A diferencia del scanner de HEX, este arranca con una allowlist grande: al
+congelarse el guard había **677 literales en 150 archivos** contra ~71 usos de
+`AppRadius`. La allowlist es un **registro de deuda**, no una licencia — estar
+en la lista significa "pendiente de migrar", no "exento".
+
+El guard tiene cuatro reglas, y la tercera es la que le falta al de HEX:
+
+1. Ningún archivo fuera de la allowlist puede tener un radio crudo.
+2. La allowlist nunca crece.
+3. **La deuda total nunca crece** — sumar un radio crudo a un archivo que ya
+   está en la lista también rompe el build. Sin esta regla, un archivo listado
+   podía acumular literales sin que nadie lo viera, que es exactamente cómo se
+   llegó a esa cifra.
+4. Un archivo que ya no tiene radios crudos debe salir de la allowlist.
+
+Si tocás un archivo de la allowlist, migrá sus radios y sacalo de la lista. Es
+la única forma en que el número baja.
+
+#### Excepciones a la escala de radios
+
+Hay valores que no están en la escala y **no son un descuido**: la cola
+asimétrica de la burbuja de chat (`14/14/14/4`) viene del mockup aprobado en
+#339. Cambiarlos a `AppRadius` altera un diseño firmado.
+
+Cuando necesitás un radio que no está en la escala:
+
+1. **Verificá que no exista ya.** `AppRadius.sm` (12) y `AppRadius.md` (16)
+   cubren casi todo lo que se pide como "14".
+2. **Abrí un issue con la evidencia**: mockup o captura, el valor, y por qué
+   un token existente no sirve. No lo resuelvas en el PR de la feature.
+3. **Con el diseño aprobado, elegí una de dos** — y decidilo con el reviewer,
+   no por tu cuenta:
+   - **Ampliar la escala**: agregar el token a `AppRadius` en
+     `lib/app/theme/tokens/primitives.dart`, documentarlo en la tabla de arriba
+     y usarlo. Esta es la opción por defecto si el valor se repite.
+   - **Aceptar la excepción**: dejar el literal, sumar el archivo a la
+     allowlist del scanner y subir los dos techos. Requiere aprobación
+     explícita del reviewer en el PR, porque va contra el ratchet.
+
+Lo que **no** se hace: agregar el archivo a la allowlist en silencio, o subir
+un techo sin que nadie lo mire. Los techos son la memoria del sistema.
 
 ---
 
