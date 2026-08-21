@@ -7,22 +7,44 @@ import 'package:treino/features/watch/application/watch_effort_notifier.dart';
 import 'package:treino/features/watch/application/watch_timer_control_notifier.dart';
 import 'package:treino/features/watch/data/watch_bridge.dart';
 import 'package:treino/features/watch/domain/watch_effort.dart';
+import 'package:treino/features/workout/application/duration_timer_providers.dart';
 import 'package:treino/features/workout/application/workout_clock.dart';
 import 'package:treino/features/workout/domain/duration_timer.dart';
+import 'package:treino/features/workout/domain/duration_timer_owner.dart';
+import 'package:treino/features/workout/domain/duration_timer_state.dart';
 import 'package:treino/features/workout/presentation/widgets/duration_set_row.dart';
 
 import '../../../helpers/test_app_wrapper.dart';
 
 class _MockBridge extends Mock implements WatchBridge {}
 
+class _AnotadorFalso extends Mock implements DurationTimerRecorder {}
+
 void main() {
   late _MockBridge bridge;
+
+  /// Lo que esta fila deja anotado en la sesión, que es por donde lo lee un
+  /// reloj de Wear OS.
+  late _AnotadorFalso anotador;
+
+  setUpAll(() {
+    registerFallbackValue(
+      DurationTimerState(
+        exerciseId: 'x',
+        setNumber: 1,
+        totalSeconds: 1,
+        endsAt: DateTime.utc(2030),
+        owner: DurationTimerOwner.telefono,
+      ),
+    );
+  });
 
   /// Reloj de pared controlable. La fila lo lee en cada tick.
   late DateTime ahora;
 
   setUp(() {
     bridge = _MockBridge();
+    anotador = _AnotadorFalso();
     ahora = DateTime.utc(2027, 1, 15, 10);
     when(() => bridge.isSupported).thenAnswer((_) async => true);
     when(() => bridge.isPaired).thenAnswer((_) async => true);
@@ -60,6 +82,7 @@ void main() {
     required VoidCallback? onDone,
     int targetSeconds = 60,
     WatchEffort? enElReloj,
+    DurationTimerState? enLaSesion,
   }) async {
     relojNotifier = WatchEffortNotifier(
       contextStream: const Stream<Map<String, dynamic>>.empty(),
@@ -76,6 +99,13 @@ void main() {
           workoutClockProvider.overrideWithValue(() => ahora),
           watchEffortNotifierProvider.overrideWithValue(relojNotifier),
           watchTimerControlNotifierProvider.overrideWithValue(control),
+          // El otro camino hacia la muñeca: lo anotado en la sesión, que es
+          // por donde cruza un reloj de WEAR OS. Su Data Layer exige
+          // emparejamiento con ESE teléfono —medido en hardware— así que un
+          // mensaje no llega nunca.
+          sessionDurationTimerProvider
+              .overrideWith((ref) => Stream.value(enLaSesion)),
+          durationTimerRecorderProvider.overrideWithValue(anotador),
         ],
         child: TestAppWrapper(
           child: DurationSetRow(
@@ -88,6 +118,11 @@ void main() {
         ),
       ),
     );
+    // Un pump de más, y hace falta: lo anotado en la sesión llega por un stream
+    // y no está en el primer frame. Sin esto, los tests del espejo de Wear
+    // pasaban sin dibujar nada — verde por ausencia, que es la peor clase de
+    // verde.
+    await tester.pump();
   }
 
   Future<void> arrancar(WidgetTester tester) async {
@@ -466,5 +501,216 @@ void main() {
 
     expect(find.text('01:00'), findsOneWidget);
     verifyNever(() => bridge.sendMessage(any()));
+  });
+
+  group('lo que esta fila deja anotado en la SESIÓN', () {
+    // Es el único canal que cruza hacia un reloj de Wear OS: su Data Layer
+    // exige emparejamiento con ESE teléfono —medido en hardware, el envío muere
+    // en «no hay nodos conectados»— y encima un mensaje se pierde si el otro no
+    // está escuchando. El caso real es arrancar acá y mirar la muñeca un rato
+    // después, y para eso hace falta ESTADO, no un aviso.
+
+    DurationTimerState anotado() {
+      final capturado =
+          verify(() => anotador.anotar(captureAny())).captured.single;
+      return capturado as DurationTimerState;
+    }
+
+    testWidgets('arrancar lo anota con identidad, fin y dueño', (tester) async {
+      await montar(tester, onDone: () {}, targetSeconds: 60);
+
+      await arrancar(tester);
+
+      final t = anotado();
+      expect(t.exerciseId, 'plancha');
+      expect(t.setNumber, 2);
+      expect(t.totalSeconds, 60);
+      // El INSTANTE de fin, no lo que falta: así el reloj deriva la cuenta
+      // contra su propio reloj de pared y una lectura que llega tarde sigue
+      // dando el número correcto.
+      expect(t.endsAt, ahora.add(const Duration(seconds: 60)));
+      // Y el dueño, que es lo que evita que los dos carguen la misma serie.
+      expect(t.owner, DurationTimerOwner.telefono);
+    });
+
+    testWidgets('cancelar lo borra', (tester) async {
+      await montar(tester, onDone: () {});
+      await arrancar(tester);
+
+      await tester.tap(find.text('Cancelar'));
+      await tester.pump();
+
+      verify(anotador.borrar).called(1);
+    });
+
+    testWidgets('al vencer también lo borra', (tester) async {
+      // Es estado persistido, no un aviso: si queda ahí, el próximo aparato que
+      // lea la sesión encuentra un cronómetro fantasma.
+      await montar(tester, onDone: () {}, targetSeconds: 60);
+      await arrancar(tester);
+
+      ahora = ahora.add(const Duration(seconds: 61));
+      await tester.pump(DurationTimerRules.tickInterval);
+
+      verify(anotador.borrar).called(1);
+    });
+
+    testWidgets('desmontarse a mitad de cuenta lo borra', (tester) async {
+      // La fila murió con la cuenta corriendo —el atleta scrolleó— y nadie va a
+      // marcar la serie. Si la anotación queda, el espejo del reloj llega a
+      // cero, vibra "terminaste" por una serie que nadie cargó, y encima le
+      // bloquea arrancarla de nuevo desde la muñeca.
+      await montar(tester, onDone: () {});
+      await arrancar(tester);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+
+      verify(anotador.borrar).called(1);
+    });
+
+    testWidgets('sin Firebase inicializado, la fila arranca igual',
+        (tester) async {
+      // Sin los overrides: el anotador REAL, sobre una app donde Firebase no
+      // existe. Es el contexto de cualquier test de widget del player, y antes
+      // reventaba con `FirebaseException` apenas se tocaba el botón.
+      //
+      // Una sincronización que no sale degrada el espejo. Un botón que tira no
+      // deja entrenar.
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            watchBridgeProvider.overrideWithValue(bridge),
+            workoutClockProvider.overrideWithValue(() => ahora),
+            watchEffortNotifierProvider.overrideWithValue(
+              WatchEffortNotifier(
+                contextStream: const Stream<Map<String, dynamic>>.empty(),
+              ),
+            ),
+            watchTimerControlNotifierProvider.overrideWithValue(
+              WatchTimerControlNotifier(
+                messageStream: const Stream<Map<String, dynamic>>.empty(),
+              ),
+            ),
+          ],
+          child: TestAppWrapper(
+            child: DurationSetRow(
+              exerciseId: 'plancha',
+              setNumber: 2,
+              targetSeconds: 60,
+              isDone: false,
+              onDone: () {},
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      await arrancar(tester);
+
+      expect(find.text('00:60'), findsNothing);
+      expect(find.text('01:00'), findsOneWidget);
+      expect(find.text('Cancelar'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('la cuenta que arrancó en un reloj de WEAR OS', () {
+    // El de Apple publica su cronómetro dentro del payload de esfuerzo. El de
+    // Wear no puede: lo deja anotado en la sesión. Son dos entradas para UN
+    // concepto —"el reloj está cronometrando esta serie"— y la fila las resuelve
+    // a un solo shape antes de preguntarle a la regla de propiedad, para que la
+    // regla no tenga que enterarse de por dónde llegó el dato.
+
+    DurationTimerState enElRelojWear({
+      String exerciseId = 'plancha',
+      int setNumber = 2,
+      required Duration falta,
+    }) =>
+        DurationTimerState(
+          exerciseId: exerciseId,
+          setNumber: setNumber,
+          totalSeconds: 60,
+          endsAt: ahora.add(falta),
+          owner: DurationTimerOwner.reloj,
+        );
+
+    testWidgets('se ve en la fila, sin tocar nada', (tester) async {
+      await montar(
+        tester,
+        onDone: () {},
+        enLaSesion: enElRelojWear(falta: const Duration(seconds: 45)),
+      );
+
+      expect(find.text('00:45'), findsOneWidget);
+      expect(find.text('corriendo en el reloj'), findsOneWidget);
+      expect(
+        find.text('Iniciar'),
+        findsNothing,
+        reason: 'ofrecer arrancar una serie que ya se está cronometrando es lo '
+            'que produce dos cronómetros sobre la misma serie',
+      );
+    });
+
+    testWidgets('el teléfono NO marca la serie: el dueño es el reloj',
+        (tester) async {
+      var marcada = false;
+      await montar(
+        tester,
+        onDone: () => marcada = true,
+        enLaSesion: enElRelojWear(falta: const Duration(seconds: 45)),
+      );
+
+      ahora = ahora.add(const Duration(seconds: 90));
+      await tester.pump(DurationTimerRules.tickInterval);
+
+      expect(marcada, isFalse);
+    });
+
+    testWidgets('la anotación de ESTE teléfono no se toma por del reloj',
+        (tester) async {
+      // El documento es COMPARTIDO: lo que esta fila anota vuelve por el mismo
+      // canal. Sin mirar el dueño, la fila se vería a sí misma como un espejo
+      // ajeno y se quedaría sin poder cancelar su propia cuenta.
+      await montar(
+        tester,
+        onDone: () {},
+        enLaSesion: DurationTimerState(
+          exerciseId: 'plancha',
+          setNumber: 2,
+          totalSeconds: 60,
+          endsAt: ahora.add(const Duration(seconds: 45)),
+          owner: DurationTimerOwner.telefono,
+        ),
+      );
+
+      expect(find.text('corriendo en el reloj'), findsNothing);
+      expect(find.text('Iniciar'), findsOneWidget);
+    });
+
+    testWidgets('una cuenta sobre OTRA serie no se dibuja acá', (tester) async {
+      await montar(
+        tester,
+        onDone: () {},
+        enLaSesion: enElRelojWear(
+          setNumber: 3,
+          falta: const Duration(seconds: 45),
+        ),
+      );
+
+      expect(find.text('00:45'), findsNothing);
+      expect(find.text('Iniciar'), findsOneWidget);
+    });
+
+    testWidgets('una cuenta ya vencida no se dibuja', (tester) async {
+      await montar(
+        tester,
+        onDone: () {},
+        enLaSesion: enElRelojWear(falta: const Duration(seconds: -5)),
+      );
+
+      expect(find.text('corriendo en el reloj'), findsNothing);
+      expect(find.text('Iniciar'), findsOneWidget);
+    });
   });
 }

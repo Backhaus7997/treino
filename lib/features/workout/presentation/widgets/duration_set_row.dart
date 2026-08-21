@@ -15,9 +15,11 @@ import '../../../watch/application/watch_effort_notifier.dart';
 import '../../../watch/application/watch_timer_control_notifier.dart';
 import '../../../watch/data/watch_timer_service.dart';
 import '../../../watch/domain/watch_effort.dart';
+import '../../application/duration_timer_providers.dart';
 import '../../application/workout_clock.dart';
 import '../../domain/duration_timer.dart';
 import '../../domain/duration_timer_owner.dart';
+import '../../domain/duration_timer_state.dart';
 import 'mmss.dart';
 
 /// Fila de un set basado en duración.
@@ -43,6 +45,19 @@ import 'mmss.dart';
 /// Arrancar acá se lo avisa al reloj, que muestra la misma cuenta sin cargar la
 /// serie: el dueño de la serie es el lado que arrancó el cronómetro. El porqué
 /// completo está en [WatchTimerCommand].
+///
+/// El aviso sale por DOS canales, y no son alternativos sino complementarios:
+///
+/// - Al reloj de **Apple**, por `sendMessage` ([WatchTimerService]). Es
+///   inmediato y no toca el contexto persistido, que ahí lo ocupa la credencial.
+/// - Al de **Wear OS**, anotándolo en la sesión ([DurationTimerRecorder]). Su
+///   Data Layer exige emparejamiento con ESE teléfono —medido en hardware: sin
+///   app companion el envío muere en «no hay nodos conectados»—, y además un
+///   mensaje se pierde si el otro no está escuchando: el caso real es arrancar
+///   acá y mirar la muñeca un rato después.
+///
+/// Los dos mandan lo MISMO: identidad, duración e instante de fin. Un solo
+/// shape ([DurationTimerState]) y una sola aritmética ([DurationTimerRules]).
 class DurationSetRow extends ConsumerStatefulWidget {
   const DurationSetRow({
     super.key,
@@ -102,10 +117,14 @@ class _DurationSetRowState extends ConsumerState<DurationSetRow> {
   /// El servicio, cacheado: `ref.read` no se puede usar desde `dispose`.
   WatchTimerService? _servicioReloj;
 
+  /// Idem, para lo que se anota en la sesión.
+  DurationTimerRecorder? _anotador;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _servicioReloj = ref.read(watchTimerServiceProvider);
+    _anotador = ref.read(durationTimerRecorderProvider);
     final control = ref.read(watchTimerControlNotifierProvider);
     if (identical(control, _control)) return;
     _control?.removeListener(_cancelarPorPedidoDelReloj);
@@ -129,6 +148,11 @@ class _DurationSetRowState extends ConsumerState<DurationSetRow> {
     // ValueKey y este State se destruye, pero ahí `_completada` ya es true.
     if (_endsAt != null && !_completada) {
       unawaited(_servicioReloj?.cancel() ?? Future<bool>.value(false));
+      // Y hay que borrarlo de la sesión por lo mismo: el reloj de Wear espeja lo
+      // que está anotado ahí, no un mensaje. Sin esto su espejo llega a cero,
+      // vibra "terminaste" por una serie que nadie cargó, y encima le bloquea al
+      // atleta arrancarla de nuevo desde la muñeca.
+      _anotador?.borrar();
     }
     super.dispose();
   }
@@ -169,8 +193,11 @@ class _DurationSetRowState extends ConsumerState<DurationSetRow> {
       _endsAt = null;
       // Vibra para avisar que se acabó el tiempo.
       HapticFeedback.heavyImpact();
-      // Al reloj NO se le avisa: llega a cero solo, porque cuenta contra el
-      // mismo instante de fin.
+      // Al reloj NO se le avisa que TERMINÓ: llega a cero solo, porque cuenta
+      // contra el mismo instante de fin. Pero la anotación sí se limpia — es
+      // estado persistido, no un aviso, y si queda ahí el próximo aparato que
+      // lea la sesión encuentra un cronómetro fantasma.
+      _anotador?.borrar();
       widget.onDone?.call();
       setState(() {});
       return;
@@ -201,26 +228,59 @@ class _DurationSetRowState extends ConsumerState<DurationSetRow> {
     if (widget.isDone) {
       return (owner: DurationTimerOwner.nadie, endsAt: null);
     }
-    final effort = ref.read(watchEffortNotifierProvider).value;
+    final delReloj = _cronometroDelReloj();
     return DurationTimerOwnership.resolve(
       exerciseId: widget.exerciseId,
       setNumber: widget.setNumber,
       localEndsAt: _endsAt,
-      watchExerciseId: effort?.timerExerciseId,
-      watchSetNumber: effort?.timerSetNumber,
-      watchEndsAt: effort?.timerEndsAt,
+      watchExerciseId: delReloj?.exerciseId,
+      watchSetNumber: delReloj?.setNumber,
+      watchEndsAt: delReloj?.endsAt,
       now: ahora,
     );
   }
 
+  /// El cronómetro que corre en la muñeca, venga del reloj que venga.
+  ///
+  /// Dos plataformas, dos caminos de entrada, UN solo concepto: "el reloj está
+  /// cronometrando esta serie". Se resuelve a un [DurationTimerState] antes de
+  /// preguntarle a [DurationTimerOwnership] para que la regla de propiedad siga
+  /// siendo una sola y no tenga que enterarse de por dónde llegó el dato.
+  ///
+  /// - **Apple**: dentro del payload de esfuerzo, que el reloj publica solo.
+  /// - **Wear OS**: anotado en la sesión, y sólo si el dueño es el RELOJ. Un
+  ///   cronómetro que arrancó ESTE teléfono también está ahí —lo escribió él—, y
+  ///   tomarlo por ajeno le sacaría a la fila el botón de cancelar sobre una
+  ///   cuenta propia.
+  ///
+  /// No compiten: un teléfono está emparejado con uno u otro, no con los dos. El
+  /// orden desempata igual, porque depender de eso no es una garantía.
+  DurationTimerState? _cronometroDelReloj() {
+    final effort = ref.read(watchEffortNotifierProvider).value;
+    final apple = DurationTimerState.fromWatch(
+      exerciseId: effort?.timerExerciseId,
+      setNumber: effort?.timerSetNumber,
+      totalSeconds: effort?.timerTotalSeconds,
+      endsAt: effort?.timerEndsAt,
+    );
+    if (apple != null) return apple;
+
+    final enSesion = ref.read(sessionDurationTimerProvider).valueOrNull;
+    if (enSesion == null) return null;
+    return enSesion.owner == DurationTimerOwner.reloj ? enSesion : null;
+  }
+
   void _startTimer() {
     if (_endsAt != null || widget.isDone) return;
-    final fin = DurationTimerRules.endsAt(
-      start: _ahora(),
+    final arrancada = DurationTimerState.startedAt(
+      exerciseId: widget.exerciseId,
+      setNumber: widget.setNumber,
       totalSeconds: widget.targetSeconds,
+      start: _ahora(),
+      owner: DurationTimerOwner.telefono,
     );
     setState(() {
-      _endsAt = fin;
+      _endsAt = arrancada.endsAt;
       _completada = false;
     });
 
@@ -228,12 +288,16 @@ class _DurationSetRowState extends ConsumerState<DurationSetRow> {
     // hay tráfico por segundo y las dos pantallas no se pueden desfasar.
     unawaited(
       ref.read(watchTimerServiceProvider).start(
-            exerciseId: widget.exerciseId,
-            setNumber: widget.setNumber,
-            totalSeconds: widget.targetSeconds,
-            endsAt: fin,
+            exerciseId: arrancada.exerciseId,
+            setNumber: arrancada.setNumber,
+            totalSeconds: arrancada.totalSeconds,
+            endsAt: arrancada.endsAt,
           ),
     );
+    // Y queda anotado en la sesión, que es por donde lo lee el reloj de Wear.
+    // No se espera: el cronómetro de esta fila ya arrancó, y atarlo al ack del
+    // servidor lo rompe en un gimnasio sin señal.
+    ref.read(durationTimerRecorderProvider).anotar(arrancada);
   }
 
   /// Corta la cuenta SIN cargar la serie.
@@ -250,6 +314,7 @@ class _DurationSetRowState extends ConsumerState<DurationSetRow> {
     // Cancelar SÍ se avisa: adelanta un final que el instante de fin no
     // anticipa. Sin esto el reloj seguiría contando algo que ya no existe.
     unawaited(ref.read(watchTimerServiceProvider).cancel());
+    ref.read(durationTimerRecorderProvider).borrar();
   }
 
   /// El reloj pidió cortar la cuenta que corre acá.
@@ -283,6 +348,14 @@ class _DurationSetRowState extends ConsumerState<DurationSetRow> {
     // seguía ofreciendo "Iniciar" sobre una serie que ya se estaba cronometrando
     // en la muñeca.
     final notifier = ref.watch(watchEffortNotifierProvider);
+
+    // La cuenta también puede estar corriendo en un reloj de WEAR OS, y ése no
+    // publica un contexto: lo deja anotado en la sesión. Se mira acá —y no sólo
+    // en `_resolver`— para que la fila se redibuje cuando el documento cambia;
+    // sin el `watch`, el espejo aparecería recién en el siguiente tick de otra
+    // cosa, o nunca.
+    ref.watch(sessionDurationTimerProvider);
+
     return ValueListenableBuilder<WatchEffort?>(
       valueListenable: notifier,
       builder: (context, effort, _) => _fila(context, effort),
