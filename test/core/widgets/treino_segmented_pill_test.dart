@@ -10,6 +10,7 @@ Widget _wrap(
   Widget child, {
   ThemeData? theme,
   TextScaler textScaler = TextScaler.noScaling,
+  int? length,
 }) =>
     MaterialApp(
       theme: theme ?? AppTheme.dark(),
@@ -19,13 +20,29 @@ Widget _wrap(
       ),
       home: Scaffold(
         body: DefaultTabController(
-          length: _labels.length,
+          length: length ?? _labels.length,
           child: child,
         ),
       ),
     );
 
 const _labels = ['TU ENTRENO', 'PLANTILLAS'];
+
+/// Las once pestañas de la ficha de alumno del Coach Hub — el caso que motivó
+/// el parámetro `scrollable` (#667).
+const _elevenLabels = [
+  'RESUMEN',
+  'ENTRENAMIENTOS',
+  'NUTRICIÓN',
+  'MEDICIONES',
+  'HÁBITOS',
+  'CHAT',
+  'PAGOS',
+  'ARCHIVOS',
+  'NOTAS',
+  'CUESTIONARIO',
+  'ACTIVIDAD',
+];
 
 void main() {
   group('TreinoSegmentedPill', () {
@@ -197,6 +214,97 @@ void main() {
         lessThanOrEqualTo(segment.width),
         reason: 'la etiqueta desborda su celda a escala 3.2',
       );
+    });
+
+    group('scrollable', () {
+      testWidgets('con el flag scrollea a escala de texto normal',
+          (tester) async {
+        tester.view.physicalSize = const Size(1440, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+
+        await tester.pumpWidget(
+          _wrap(
+            const TreinoSegmentedPill(labels: _elevenLabels, scrollable: true),
+            length: _elevenLabels.length,
+          ),
+        );
+
+        final bar = tester.widget<TabBar>(find.byType(TabBar));
+        expect(bar.isScrollable, isTrue);
+        expect(bar.tabAlignment, TabAlignment.start);
+      });
+
+      testWidgets('sin el flag, las MISMAS once celdas reparten el ancho',
+          (tester) async {
+        // El contraste que justifica el parámetro. Si esto también scrolleara,
+        // el flag no haría nada y sería deuda.
+        tester.view.physicalSize = const Size(1440, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+
+        await tester.pumpWidget(
+          _wrap(
+            const TreinoSegmentedPill(labels: _elevenLabels),
+            length: _elevenLabels.length,
+          ),
+        );
+
+        final bar = tester.widget<TabBar>(find.byType(TabBar));
+        expect(bar.isScrollable, isFalse);
+        expect(bar.tabAlignment, TabAlignment.fill);
+      });
+
+      testWidgets('el flag NO puede apagar el scroll que pide el dynamic type',
+          (tester) async {
+        // Es un OR, no un override: `scrollable: false` es el default y aun
+        // así la escala grande manda. Apagarlo sería cambiar una decisión de
+        // accesibilidad por una de layout.
+        tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+        tester.view.devicePixelRatio = 3;
+        addTearDown(tester.view.reset);
+
+        await tester.pumpWidget(
+          _wrap(
+            const TreinoSegmentedPill(labels: _labels),
+            textScaler: const TextScaler.linear(3.2),
+          ),
+        );
+        await tester.pump();
+
+        expect(tester.widget<TabBar>(find.byType(TabBar)).isScrollable, isTrue);
+      });
+
+      testWidgets('con once celdas la etiqueta entra en su celda',
+          (tester) async {
+        tester.view.physicalSize = const Size(1440, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+
+        await tester.pumpWidget(
+          _wrap(
+            const TreinoSegmentedPill(labels: _elevenLabels, scrollable: true),
+            length: _elevenLabels.length,
+          ),
+        );
+        await tester.pump();
+
+        expect(tester.takeException(), isNull);
+        expect(find.text(_elevenLabels.first).hitTestable(), findsOneWidget);
+
+        final segment = tester.getSize(find.byType(Tab).first);
+        final label = tester.getSize(find.text(_elevenLabels.first));
+        expect(
+          label.width,
+          lessThanOrEqualTo(segment.width),
+          reason: 'la etiqueta desborda su celda con once pestañas',
+        );
+        // El área tapeable mínima no se negocia por tener más celdas.
+        expect(
+          segment.height,
+          greaterThanOrEqualTo(TreinoSegmentedPillTokens.minSegmentHeight),
+        );
+      });
     });
 
     testWidgets('el tap mueve el índice del controller ambiente',

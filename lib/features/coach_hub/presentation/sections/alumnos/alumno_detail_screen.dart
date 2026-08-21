@@ -75,6 +75,7 @@ import '../pagos/widgets/pagos_table.dart';
 import '../pagos/widgets/payment_format.dart';
 import 'alumnos_screen.dart' show AlumnoEstado, AlumnoEstadoX, estadoForLink;
 import 'resumen_metrics.dart';
+import 'package:treino/core/widgets/treino_segmented_pill.dart';
 
 /// Detalle del alumno (`/alumnos/:id`, Fase W2 PR2).
 ///
@@ -163,7 +164,7 @@ class AlumnoDetailScreen extends ConsumerWidget {
                   palette: palette,
                 ),
                 const SizedBox(height: 14),
-                _Tabs(palette: palette, labels: _tabs),
+                const TreinoSegmentedPill(labels: _tabs, scrollable: true),
               ],
             ),
           ),
@@ -435,40 +436,6 @@ class _MetricChip extends StatelessWidget {
                   fontSize: 18,
                   fontWeight: FontWeight.w700)),
         ],
-      ),
-    );
-  }
-}
-
-class _Tabs extends StatelessWidget {
-  const _Tabs({required this.palette, required this.labels});
-  final AppPalette palette;
-  final List<String> labels;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: palette.border),
-      ),
-      child: TabBar(
-        isScrollable: true,
-        tabAlignment: TabAlignment.start,
-        dividerColor: Colors.transparent,
-        indicatorSize: TabBarIndicatorSize.tab,
-        indicator: BoxDecoration(
-          color: palette.accent,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-        ),
-        splashBorderRadius: BorderRadius.circular(AppRadius.lg),
-        labelColor: palette.bg,
-        unselectedLabelColor: palette.textMuted,
-        labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-        unselectedLabelStyle: const TextStyle(fontSize: 13),
-        tabs: [for (final l in labels) Tab(text: l, height: 38)],
       ),
     );
   }

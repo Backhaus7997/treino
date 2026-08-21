@@ -46,7 +46,12 @@ import '../../app/theme/tokens/tokens.dart';
 ///  - **No modela `disabled`.** `TabBar` no tiene estado deshabilitado por
 ///    pestaña y ningún call site lo necesita.
 class TreinoSegmentedPill extends StatefulWidget {
-  const TreinoSegmentedPill({super.key, required this.labels, this.onTap});
+  const TreinoSegmentedPill({
+    super.key,
+    required this.labels,
+    this.onTap,
+    this.scrollable = false,
+  });
 
   /// Las etiquetas, en orden. La cantidad tiene que coincidir con el `length`
   /// del [DefaultTabController] ancestro.
@@ -63,6 +68,23 @@ class TreinoSegmentedPill extends StatefulWidget {
   /// cambios programáticos de índice ni al swipear el `TabBarView`. La vista de
   /// Coach lo usa para cerrar el sheet del día abierto.
   final ValueChanged<int>? onTap;
+
+  /// Fuerza el modo scrolleable, sin esperar a que la escala de texto lo pida.
+  ///
+  /// El default (`false`) alcanza para dos o tres celdas: ahí repartir el ancho
+  /// se ve bien y sólo hace falta scrollear con dynamic type grande, que es lo
+  /// que ya decide la heurística de abajo.
+  ///
+  /// Con MUCHAS celdas eso no aplica: la ficha de alumno del Coach Hub tiene
+  /// **once** pestañas, y repartir el ancho entre once las deja ilegibles a
+  /// escala de texto 1.0 — antes de que la heurística se active. Este flag
+  /// existe para ese caso.
+  ///
+  /// Es un OR, no un override: con `scrollable: true` el control scrollea
+  /// siempre, y con `false` la heurística de escala de texto sigue mandando.
+  /// Nunca puede APAGAR el scroll que el dynamic type necesita, que sería
+  /// cambiar una decisión de accesibilidad por una de layout.
+  final bool scrollable;
 
   @override
   State<TreinoSegmentedPill> createState() => _TreinoSegmentedPillState();
@@ -115,9 +137,11 @@ class _TreinoSegmentedPillState extends State<TreinoSegmentedPill> {
     );
 
     // Por encima del umbral, repartir el ancho deja las etiquetas ilegibles;
-    // scrollear nunca desborda, así que es el fallback seguro.
-    final isScrollable = textScaler.scale(1) >
-        TreinoSegmentedPillTokens.scrollTextScaleThreshold;
+    // scrollear nunca desborda, así que es el fallback seguro. El call site
+    // puede pedirlo de entrada cuando ya sabe que tiene demasiadas celdas.
+    final isScrollable = widget.scrollable ||
+        textScaler.scale(1) >
+            TreinoSegmentedPillTokens.scrollTextScaleThreshold;
 
     return Focus(
       // No participa de la navegación: sólo observa. `hasFocus` de un nodo
