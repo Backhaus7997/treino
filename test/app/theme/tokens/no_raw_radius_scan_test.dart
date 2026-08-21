@@ -7,10 +7,23 @@ import 'package:flutter_test/flutter_test.dart';
 /// Contraparte de `no_hex_scan_test.dart` para la escala de radios.
 /// `AppRadius` define cuatro valores (`sm` 12, `md` 16, `lg` 20, `full` 9999) y
 /// `docs/design-system.md` los documenta como escala CERRADA. La adopción era
-/// ~10%: al congelarse este guard, 668 literales `Radius.circular(N)` repartidos
-/// en 149 archivos de `lib/`, contra ~71 usos de `AppRadius.*`. (La issue #665
+/// ~10%: al congelarse este guard, 677 literales `Radius.circular(N)` repartidos
+/// en 150 archivos de `lib/`, contra ~71 usos de `AppRadius.*`. (La issue #665
 /// midió 678 sobre `40445dc5`; #546 se llevó 10 en el medio. Los techos de abajo
 /// son la cifra que vale: se miden contra el `main` del que sale esta rama.)
+///
+/// RE-CONGELADO contra `main` del 2026-08-21. La rama se abrió el 14/08 con
+/// techos 668/149; en los 167 commits que main avanzó desde entonces el paywall
+/// móvil sumó 8 radios crudos (`plan_limit_paywall` 4→9, `pricing_screen` 6→9),
+/// el reloj trajo `duration_set_row.dart` con 3 más, y `session_player_screen`
+/// devolvió 2. Neto +9 ocurrencias y +1 archivo.
+///
+/// Re-tomar el snapshot NO es subir el techo: el techo se congela en el estado
+/// del `main` al que este guard entra, y a partir de ahí sólo baja. Lo que la
+/// regla prohíbe es subirlo DESPUÉS de mergeado, que es exactamente lo que este
+/// test pasa a impedir. Las 3 ocurrencias de `duration_set_row.dart` entran a la
+/// allowlist como deuda registrada — dos son `9999`, o sea `AppRadius.full`
+/// escrito a mano, y son candidatas al mismo tratamiento que #676.
 ///
 /// A diferencia del scanner de hex, acá NO se puede exigir cero de entrada.
 /// Parte de esos literales son decisiones de diseño aprobadas que todavía no
@@ -52,11 +65,11 @@ void main() {
     /// Techo de archivos permitidos. Congelado en el estado de `main` al abrir
     /// la issue #665. NUNCA subir este número: cada fase que migra un archivo
     /// lo baja.
-    const allowlistCeiling = 149;
+    const allowlistCeiling = 150;
 
     /// Techo de ocurrencias totales de radio crudo en `lib/`. Mismo contrato
     /// que [allowlistCeiling]: sólo baja.
-    const rawRadiusDebtCeiling = 668;
+    const rawRadiusDebtCeiling = 677;
 
     /// Allowlist de rutas relativas a `lib/` que todavía contienen radios
     /// crudos. Es un REGISTRO DE DEUDA, no una licencia: estar acá significa
@@ -195,6 +208,7 @@ void main() {
       'features/workout/presentation/share_workout_composer_screen.dart',
       'features/workout/presentation/widgets/coach_chip.dart',
       'features/workout/presentation/widgets/coach_note.dart',
+      'features/workout/presentation/widgets/duration_set_row.dart',
       'features/workout/presentation/widgets/exercise_progression_chart.dart',
       'features/workout/presentation/widgets/exercise_progression_section.dart',
       'features/workout/presentation/widgets/exercise_slot_row.dart',
