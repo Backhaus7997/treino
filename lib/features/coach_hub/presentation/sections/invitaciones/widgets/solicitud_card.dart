@@ -29,6 +29,7 @@ import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/treino_interactive_state.dart';
 import 'package:treino/features/feed/presentation/widgets/post_avatar.dart';
 import 'package:treino/l10n/app_l10n.dart';
+import 'package:treino/core/utils/argentina_time.dart';
 
 class SolicitudCard extends StatelessWidget {
   const SolicitudCard({
@@ -293,7 +294,12 @@ String _relativeTime(DateTime createdAt) {
   if (delta.inHours < 1) return 'hace ${delta.inMinutes}m';
   if (delta.inDays < 1) return 'hace ${delta.inHours}h';
   if (delta.inDays < 7) return 'hace ${delta.inDays}d';
-  final d = createdAt.day.toString().padLeft(2, '0');
-  final m = createdAt.month.toString().padLeft(2, '0');
+  // El delta de arriba está bien: `difference` compara instantes reales, sin
+  // importar el flag UTC. Lo que estaba mal es esto: leer los campos crudos de
+  // un instante UTC muestra el día UTC, y una solicitud de las 22:30 ART cae
+  // en el día siguiente (#671). El día CALENDARIO se deriva en ART.
+  final art = toArgentina(createdAt.toUtc());
+  final d = art.day.toString().padLeft(2, '0');
+  final m = art.month.toString().padLeft(2, '0');
   return '$d/$m';
 }
