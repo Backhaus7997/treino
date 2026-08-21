@@ -13,6 +13,10 @@
  * **El alumno NO pierde nada en ningun caso**: conserva rutinas, historial y
  * chat. La presion va sobre quien paga.
  *
+ * DATOS DEGRADADOS: si `subscription` no se pudo leer bien, este barrido NO
+ * bloquea a nadie — solo devuelve. Ver la valvula mas abajo y la POLITICA en
+ * subscription-state.ts.
+ *
  * Transaccional por el mismo motivo que `syncTrainerLoad`: lee
  * `users/{trainerId}` (necesita `subscription`) y escribe `weightedLoad` ahi
  * mismo, asi que ese par read-write serializa contra las promociones
@@ -21,8 +25,10 @@
  */
 
 import * as admin from "firebase-admin";
+import { logger } from "firebase-functions";
 
-import { effectiveWeightLimit, SubscriptionState } from "./effective-limit";
+import { effectiveWeightLimit } from "./effective-limit";
+import { toSubscriptionState } from "./subscription-state";
 import { computeWeightedLoad, WeightedLink } from "./weighted-load";
 import { reconcileEntitlements, BlockableLink } from "./select-blocked-links";
 
@@ -30,29 +36,13 @@ export interface SyncEntitlementsResult {
   trainerId: string;
   /** `null` = sin limite (plan3). */
   limit: number | null;
+  /**
+   * ids efectivamente bloqueados. Vacio cuando la `subscription` venia
+   * degradada, aunque `limit` diga que sobran vinculos: ver la valvula.
+   */
   blocked: string[];
   unblocked: string[];
   weightedLoad: number;
-}
-
-function toSubscriptionState(
-  data: admin.firestore.DocumentData | undefined,
-): SubscriptionState | null {
-  const sub = data?.subscription as
-    | {
-        tier: SubscriptionState["tier"];
-        status: SubscriptionState["status"];
-        currentPeriodEnd?: admin.firestore.Timestamp | null;
-      }
-    | undefined;
-  if (!sub) return null;
-  return {
-    tier: sub.tier,
-    status: sub.status,
-    currentPeriodEndMs: sub.currentPeriodEnd
-      ? sub.currentPeriodEnd.toMillis()
-      : null,
-  };
 }
 
 /**
@@ -77,7 +67,7 @@ export async function syncTrainerEntitlements(
       tx.get(db.collection("trainer_links").where("trainerId", "==", trainerId)),
     ]);
 
-    const sub = toSubscriptionState(trainerSnap.data());
+    const { state: sub, degraded } = toSubscriptionState(trainerSnap.data(), trainerId);
     const limit = effectiveWeightLimit(sub, clock);
 
     const links: BlockableLink[] = linksSnap.docs.map((doc) => {
@@ -94,13 +84,42 @@ export async function syncTrainerEntitlements(
 
     const { block, unblock } = reconcileEntitlements(links, limit);
 
+    // ── VALVULA DE DEGRADACION ────────────────────────────────────────────
+    //
+    // POLITICA (definida en subscription-state.ts): la degradacion de datos
+    // frena TRABAJO NUEVO (friccion sobre el entrenador) pero NUNCA revoca
+    // relaciones existentes (friccion sobre el alumno).
+    //
+    // El barrido es el lado "no revoca". Si el mapa `subscription` no se
+    // entendio, el `limit` que llego aca no sale de lo que el PF pago: sale del
+    // fallback conservador. Bloquear con ese numero significa cortarle el
+    // servicio a los alumnos de un PF que capaz pago plan3, por un typo
+    // NUESTRO. `unblock` SI corre — devolver nunca puede empeorar la situacion
+    // de un alumno, y un PF con datos rotos no tiene por que quedarse ademas
+    // con vinculos bloqueados de un downgrade anterior.
+    //
+    // Asimetrico contra el gate de promote-link.ts, que con el mismo flag sigue
+    // denegando. Es la asimetria del enunciado, no una inconsistencia.
+    const blockNow = degraded ? [] : block;
+    if (degraded && block.length > 0) {
+      // error y no warn: es accionable y hay UN documento que arreglar a mano.
+      // Va con el uid y con los ids salteados porque sin eso no hay como saber
+      // a quien se le esta perdonando el limite ni por cuanto tiempo.
+      logger.error(
+        "sync-entitlements: subscription degradada — se SALTEA el bloqueo",
+        { trainerId, limit, skippedBlock: block, skippedCount: block.length },
+      );
+    }
+
     // Carga resultante: se recalcula sobre el estado YA reconciliado, no sobre
     // el previo. Si se usara el previo, `weightedLoad` mostraria la carga vieja
-    // hasta el proximo trigger.
+    // hasta el proximo trigger. Con la valvula abierta esto refleja la carga
+    // REAL (nadie fue bloqueado), que es justamente lo que hace visible el
+    // documento roto: un weightedLoad por arriba del limite.
     const after: WeightedLink[] = links.map((l) => ({
       athleteId: l.athleteId,
       status: l.status,
-      entitlement: block.includes(l.id)
+      entitlement: blockNow.includes(l.id)
         ? "blocked"
         : unblock.includes(l.id)
           ? "entitled"
@@ -109,7 +128,7 @@ export async function syncTrainerEntitlements(
     const weightedLoad = computeWeightedLoad(after);
 
     // ── frontera: writes ──────────────────────────────────────────────────
-    for (const id of block) {
+    for (const id of blockNow) {
       tx.update(db.collection("trainer_links").doc(id), {
         entitlement: "blocked",
         blockedAt: admin.firestore.Timestamp.fromMillis(clock),
@@ -129,6 +148,6 @@ export async function syncTrainerEntitlements(
       { merge: true },
     );
 
-    return { trainerId, limit, blocked: block, unblocked: unblock, weightedLoad };
+    return { trainerId, limit, blocked: blockNow, unblocked: unblock, weightedLoad };
   });
 }
