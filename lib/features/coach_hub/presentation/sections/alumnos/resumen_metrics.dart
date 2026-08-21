@@ -1,6 +1,7 @@
 import 'package:treino/features/measurements/domain/measurement.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
+import 'package:treino/core/utils/argentina_time.dart';
 
 /// ¿La sesión cuenta como entrenamiento real?
 ///
@@ -173,13 +174,14 @@ double? _weightDelta30d(List<Measurement> measurements,
 /// de la grilla (presencia/adherencia, no volumen).
 List<List<int>> _buildHeatmap(List<Session> completed,
     {required DateTime now}) {
-  // `now` puede llegar en hora LOCAL (DateTime.now() en producción) mientras
-  // que `finishedAt` siempre es UTC. Normalizamos ambos a fecha-UTC: si no, en
-  // es-AR (UTC-3) una sesión de la tarde cae al día UTC siguiente y se correría
-  // de columna (o se descartaría en el borde de la grilla). Trabajar siempre en
-  // UTC hace el bucketing independiente del huso, para cualquier caller.
-  final nowUtc = now.toUtc();
-  final today = DateTime.utc(nowUtc.year, nowUtc.month, nowUtc.day);
+  // Bucketing en ART, NO en UTC (#671). `core/utils/argentina_time.dart` lo
+  // dice textual: los day buckets se derivan en ART. El comentario anterior
+  // afirmaba lo contrario, y por eso una sesión terminada a las 22:00 ART caía
+  // en la columna del día siguiente — el heatmap pintaba hoy vacío y un día
+  // futuro lleno. `now` puede llegar local o UTC; `toArgentina` normaliza los
+  // dos, así el bucketing sigue siendo independiente del huso del caller.
+  final nowArt = toArgentina(now.toUtc());
+  final today = DateTime.utc(nowArt.year, nowArt.month, nowArt.day);
   final mondayThisWeek = today.subtract(Duration(days: today.weekday - 1));
   final gridStart = mondayThisWeek.subtract(const Duration(days: 7 * 11));
   final gridEnd = mondayThisWeek.add(const Duration(days: 7)); // exclusivo
@@ -188,7 +190,9 @@ List<List<int>> _buildHeatmap(List<Session> completed,
   for (final s in completed) {
     final d = s.finishedAt;
     if (d == null) continue;
-    final day = DateTime.utc(d.year, d.month, d.day);
+    // `finishedAt` es un instante real: su día CALENDARIO es el argentino.
+    final dArt = toArgentina(d.toUtc());
+    final day = DateTime.utc(dArt.year, dArt.month, dArt.day);
     if (day.isBefore(gridStart) || !day.isBefore(gridEnd)) continue;
     final diff = day.difference(gridStart).inDays;
     final week = diff ~/ 7;

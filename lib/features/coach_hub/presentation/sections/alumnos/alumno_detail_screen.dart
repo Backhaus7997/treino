@@ -264,7 +264,9 @@ class _Header extends StatelessWidget {
     // .toUtc() para compartir reloj con el pipeline de billing (monthKey/weekKey
     // de pagosPorCobrarProvider y las escrituras usan UTC); evita un desfase de
     // 1 día en el borde del período en AR (UTC-3).
-    final proxCobro = b == null ? null : nextDueDate(b, DateTime.now().toUtc());
+    // Bucket de MES en ART (#671): con UTC, "Prox. cobro" mostraba el mes
+    // siguiente al correcto.
+    final proxCobro = b == null ? null : nextDueDate(b, argentinaNow());
     // Mismo criterio determinístico que el chat (avatar_color.dart) y el
     // roster (alumnos_screen.dart): sin foto de red, círculo de color estable
     // seedeado por uid + inicial en blanco — evita que todos los alumnos sin

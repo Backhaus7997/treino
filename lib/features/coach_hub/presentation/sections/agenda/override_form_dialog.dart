@@ -15,6 +15,7 @@ import '../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../coach/application/agenda_providers.dart';
 import '../../../../coach/domain/availability_override.dart';
 import '../../../../coach/presentation/agenda_formatters.dart';
+import 'package:treino/core/utils/argentina_time.dart';
 
 // ─── BlockOverrideFormDialog ──────────────────────────────────────────────────
 
@@ -36,7 +37,9 @@ class BlockOverrideFormDialog extends ConsumerStatefulWidget {
 
 class _BlockOverrideFormDialogState
     extends ConsumerState<BlockOverrideFormDialog> {
-  DateTime _date = DateTime.now().toUtc().add(const Duration(days: 1));
+  // Default "manana" en ART (#671): con el instante UTC real el default
+  // saltaba DOS dias pasadas las 21:00.
+  DateTime _date = argentinaNow().add(const Duration(days: 1));
   bool _saving = false;
 
   @override
@@ -143,7 +146,8 @@ class ExtraOverrideFormDialog extends ConsumerStatefulWidget {
 
 class _ExtraOverrideFormDialogState
     extends ConsumerState<ExtraOverrideFormDialog> {
-  DateTime _date = DateTime.now().toUtc().add(const Duration(days: 1));
+  // Mismo default en ART que el dialogo de arriba (#671).
+  DateTime _date = argentinaNow().add(const Duration(days: 1));
   int _startHour = 7;
   int _startMinute = 0;
   int _endHour = 9;
@@ -386,12 +390,16 @@ class _DateField extends StatelessWidget {
   }
 
   Future<void> _pick(BuildContext context) async {
-    final now = DateTime.now();
+    // `date` se guarda como DateTime.utc(y, m, d) — wall-clock, no instante.
+    // Un .toLocal() acá le resta 3h y el picker reabría resaltando el día
+    // ANTERIOR al elegido (#671). Se leen los campos crudos.
+    final nowArt = argentinaNow();
+    final today = DateTime(nowArt.year, nowArt.month, nowArt.day);
     final picked = await showDatePicker(
       context: context,
-      initialDate: date.toLocal(),
-      firstDate: now,
-      lastDate: now.add(const Duration(days: 365)),
+      initialDate: DateTime(date.year, date.month, date.day),
+      firstDate: today,
+      lastDate: today.add(const Duration(days: 365)),
     );
     if (picked != null) {
       onChanged(DateTime.utc(picked.year, picked.month, picked.day));

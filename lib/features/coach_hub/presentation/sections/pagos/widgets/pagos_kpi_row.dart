@@ -19,6 +19,7 @@ import 'package:treino/features/payments/application/pagos_por_cobrar_provider.d
 import '../../../widgets/coach_hub_widgets.dart' show KpiCard;
 import 'pagos_buckets_provider.dart';
 import 'payment_format.dart';
+import 'package:treino/core/utils/argentina_time.dart';
 
 // ── PagosKpiRow ───────────────────────────────────────────────────────────────
 
@@ -46,7 +47,9 @@ class PagosKpiRow extends ConsumerWidget {
     final bucketsAsync = ref.watch(pagosBucketsProvider);
     final cobrosAsync = ref.watch(pagosPorCobrarProvider);
 
-    final now = DateTime.now().toUtc();
+    // Bucket de MES en ART (#671): con UTC los cobros de las ultimas 3h
+    // del mes se imputaban al mes siguiente.
+    final now = argentinaNow();
     final monthStart = DateTime.utc(now.year, now.month, 1);
 
     // Ingreso del mes: paid && (paidAt ?? createdAt) >= firstDayOfMonth UTC.

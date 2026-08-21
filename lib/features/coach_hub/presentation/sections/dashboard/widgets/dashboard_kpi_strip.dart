@@ -18,6 +18,7 @@ import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pa
     show fmtArs;
 import 'package:treino/features/coach_hub/presentation/widgets/kpi_card/kpi_card.dart';
 import 'package:treino/l10n/app_l10n.dart';
+import 'package:treino/core/utils/argentina_time.dart';
 
 /// 4-tile KPI strip: Alumnos activos / Ingreso del mes / Adherencia
 /// promedio / Por cobrar. REQ-HOY-05.
@@ -64,7 +65,9 @@ class DashboardKpiStrip extends ConsumerWidget {
     int porCobrarTotal = 0;
     int vencidosCount = 0;
     bucketsAsync.whenData((buckets) {
-      final now = DateTime.now().toUtc();
+      // Bucket de MES en ART (#671): con el instante UTC real, "Ingreso
+      // del mes" caia a \$0 las ultimas 3h del mes.
+      final now = argentinaNow();
       final monthStart = DateTime.utc(now.year, now.month, 1);
       for (final p in buckets.pagados) {
         final paidRef = (p.paidAt ?? p.createdAt).toUtc();

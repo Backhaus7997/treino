@@ -2,12 +2,19 @@
 // `now` se inyecta para que adherencia/volumen/peso/heatmap sean deterministas.
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/core/utils/argentina_time.dart';
 import 'package:treino/features/coach_hub/presentation/sections/alumnos/resumen_metrics.dart';
 import 'package:treino/features/measurements/domain/measurement.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
 
-final _now = DateTime.utc(2026, 6, 17); // miércoles
+final _now = DateTime.utc(2026, 6, 17); // miércoles UTC
+
+/// El heatmap bucketea en ART, no en UTC (#671). `_now` es medianoche UTC, que
+/// en Argentina es el **16 a las 21:00** — o sea, un día calendario antes. La
+/// columna esperada sale del día ARGENTINO, no del UTC; usar `_now.weekday`
+/// acá es justamente el error que este frame corrige.
+final _nowArt = toArgentina(_now);
 
 Session _sess({
   required DateTime finishedAt,
@@ -236,7 +243,7 @@ void main() {
 
     test('una sesión hoy → celda de la semana actual en nivel máximo (4)', () {
       final m = _compute(sessions: [_sess(finishedAt: _now, volume: 1000)]);
-      final dow = _now.weekday - 1; // 0 = lunes
+      final dow = _nowArt.weekday - 1; // 0 = lunes, en ART
       expect(m.heatmap[11][dow], 4);
       // El resto queda en 0.
       var nonZero = 0;
@@ -283,7 +290,7 @@ void main() {
     test('una sesión sin carga (0 kg) igual pinta el día (presencia)', () {
       // Regresión: el heatmap es adherencia, no volumen — 0 kg debe contar.
       final m = _compute(sessions: [_sess(finishedAt: _now, volume: 0)]);
-      final dow = _now.weekday - 1;
+      final dow = _nowArt.weekday - 1;
       expect(m.heatmap[11][dow], 4);
     });
 
@@ -301,6 +308,31 @@ void main() {
             if (v > 0) v
       ]..sort();
       expect(nonZero, [2, 4]);
+    });
+
+    test(
+        'una sesión de las 22:00 ART cae en HOY, no en el día siguiente (#671)',
+        () {
+      // El caso que reportaba la issue: entre las 21:00 y la medianoche
+      // argentina el día UTC ya rotó. Bucketeando en UTC, la sesión se pintaba
+      // en la columna del día SIGUIENTE y la de hoy quedaba vacía.
+      //
+      // 2026-06-17 01:00 UTC == 2026-06-16 22:00 ART (miércoles UTC, martes ART).
+      final nowUtc = DateTime.utc(2026, 6, 17, 1);
+      final m = ResumenMetrics.compute(
+        sessions: [_sess(finishedAt: nowUtc)],
+        measurements: const [],
+        weeklyTarget: 0,
+        now: nowUtc,
+      );
+
+      final art = toArgentina(nowUtc);
+      expect(art.day, 16, reason: 'el día ART del instante es el 16');
+      expect(art.weekday, DateTime.tuesday);
+
+      // Pinta el martes (la columna de HOY en ART), no el miércoles.
+      expect(m.heatmap[11][DateTime.tuesday - 1], 4);
+      expect(m.heatmap[11][DateTime.wednesday - 1], 0);
     });
 
     test('heatmap invariante al huso de `now` (local vs UTC, mismo instante)',
