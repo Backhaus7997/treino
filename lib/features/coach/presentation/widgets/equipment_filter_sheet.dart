@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/motion/treino_tappable.dart';
@@ -72,7 +73,8 @@ class _EquipmentFilterSheetContentState
           decoration: BoxDecoration(
             // Matches the parent exercise picker bg (was espresso).
             color: palette.bg,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
           ),
           // Sin TreinoFadeSlideIn de bloque: la ruta modal (DraggableScrollableSheet)
           // ya anima la entrada — un fade+slide interno quedaba enmascarado y
@@ -152,7 +154,7 @@ class _EquipmentFilterSheetContentState
                       foregroundColor: palette.bg,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
                       ),
                     ),
                     onPressed: () => Navigator.of(context).pop(_selected),
@@ -201,7 +203,7 @@ class _EquipmentRow extends StatelessWidget {
           color: selected
               ? palette.accent.withValues(alpha: 0.15)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           border: Border.all(
             color: selected ? palette.accent : Colors.transparent,
             width: 1.5,

@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
-import '../../../app/theme/tokens/components/treino_button_tokens.dart';
 import '../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
@@ -91,7 +91,8 @@ class _RankingsBodyState extends ConsumerState<RankingsBody> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: palette.bgCard,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.lg)),
         title: Text(
           'DESACTIVAR RANKINGS',
           style: GoogleFonts.barlowCondensed(
@@ -482,7 +483,7 @@ class _LiftTabBar extends StatelessWidget {
                   color: tab == selected
                       ? palette.accent.withValues(alpha: 0.15)
                       : palette.bgCard,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
                   border: Border.all(
                     color: tab == selected
                         ? palette.accent.withValues(alpha: 0.5)

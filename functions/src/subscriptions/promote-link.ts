@@ -39,6 +39,7 @@ import { HttpsError } from "firebase-functions/v2/https";
 
 import { computeWeightedLoad, WeightedLink } from "./weighted-load";
 import { effectiveWeightLimit, SubscriptionState } from "./effective-limit";
+import { toSubscriptionState } from "./subscription-state";
 import { SubscriptionTier, TIER_WEIGHT_LIMITS } from "./tier-config";
 
 export interface PromotionIntent {
@@ -93,32 +94,6 @@ export function promotionDenialReason(
   // limite EFECTIVO es finito, o sea que la suscripcion no esta al dia.
   if (nominalLimit === null) return "subscription-inactive";
   return limit < nominalLimit ? "subscription-inactive" : "plan-limit";
-}
-
-/**
- * Maps the Firestore `users/{uid}.subscription` map onto the pure
- * `SubscriptionState` shape `effectiveWeightLimit` consumes. The Firestore
- * field is `currentPeriodEnd` (Timestamp); `effectiveWeightLimit` wants
- * `currentPeriodEndMs` (number) so it stays Firestore-independent and
- * unit-testable with a plain clock. `subscription` absent ⇒ null (Free,
- * no backfill — same contract `TrainerSubscription?` uses client-side).
- */
-function toSubscriptionState(
-  data: admin.firestore.DocumentData | undefined,
-): SubscriptionState | null {
-  const sub = data?.subscription as
-    | {
-        tier: SubscriptionState["tier"];
-        status: SubscriptionState["status"];
-        currentPeriodEnd?: admin.firestore.Timestamp | null;
-      }
-    | undefined;
-  if (!sub) return null;
-  return {
-    tier: sub.tier,
-    status: sub.status,
-    currentPeriodEndMs: sub.currentPeriodEnd ? sub.currentPeriodEnd.toMillis() : null,
-  };
 }
 
 type LinkDoc = WeightedLink & { id: string; status: string };
@@ -184,7 +159,14 @@ export async function syncTrainerLoad(
       throw new HttpsError("not-found", "Trainer profile not found.");
     }
 
-    const sub = toSubscriptionState(trainerSnap.data());
+    // `degraded` se IGNORA aca a proposito — ver la POLITICA en
+    // subscription-state.ts: la degradacion de datos frena TRABAJO NUEVO
+    // (friccion sobre el entrenador) pero NUNCA revoca relaciones existentes
+    // (friccion sobre el alumno). Este es el lado del trabajo nuevo: con la
+    // suscripcion en un estado que no entendemos, el gate sigue midiendo contra
+    // el limite degradado y sigue denegando. Fail-closed. El que decide
+    // distinto es el barrido (sync-entitlements.ts).
+    const { state: sub } = toSubscriptionState(trainerSnap.data(), trainerId);
     const limit = effectiveWeightLimit(sub, nowMs);
 
     const currentLinks: LinkDoc[] = linksSnap.docs.map((doc) => {

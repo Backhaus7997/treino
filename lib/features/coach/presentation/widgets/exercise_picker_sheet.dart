@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/exercise_asset_image.dart';
@@ -756,7 +757,7 @@ class _StickyAddBar extends StatelessWidget {
             foregroundColor: palette.bg,
             disabledBackgroundColor: palette.accent.withAlpha(80),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(9999),
+              borderRadius: BorderRadius.circular(AppRadius.full),
             ),
           ),
           child: Text(
@@ -805,7 +806,7 @@ class _FilterButton extends StatelessWidget {
       height: 44,
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         border: Border.all(
           color: active ? palette.accent : palette.border,
           width: active ? 1.5 : 1,

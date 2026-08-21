@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart' as intl;
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../../app/theme/app_motion.dart';
@@ -425,7 +426,7 @@ class _ProgressionChartBlock extends StatelessWidget {
           height: 220,
           decoration: BoxDecoration(
             color: palette.bgCard,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppRadius.md),
           ),
         ),
       ),
@@ -530,7 +531,7 @@ class _HistoryList extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: palette.border),
       ),
       child: Column(
@@ -1033,7 +1034,7 @@ class _VideoHeroStripState extends State<_VideoHeroStrip> {
                               horizontal: 12, vertical: 4),
                           decoration: BoxDecoration(
                             color: palette.scrimDark.withValues(alpha: 0.55),
-                            borderRadius: BorderRadius.circular(9999),
+                            borderRadius: BorderRadius.circular(AppRadius.full),
                           ),
                           child: Text(
                             'No pudimos reproducir el video.',
@@ -1086,7 +1087,7 @@ class _Breadcrumb extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
         color: palette.accent.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(9999),
+        borderRadius: BorderRadius.circular(AppRadius.full),
       ),
       child: Text(
         text,
@@ -1134,7 +1135,7 @@ class _StatsCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: palette.bgCard,
         border: Border.all(color: palette.accent.withValues(alpha: 0.35)),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
       ),
       child: Row(
         children: tiles.map<Widget>((t) => Expanded(child: t)).toList(),
@@ -1156,7 +1157,7 @@ class _TecnicaCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: palette.bgCard,
         border: Border.all(color: palette.accent.withValues(alpha: 0.35)),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1314,7 +1315,7 @@ class _ExerciseLoadingSkeleton extends StatelessWidget {
                     height: 80,
                     decoration: BoxDecoration(
                       color: palette.bgCard,
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(AppRadius.lg),
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -1324,7 +1325,7 @@ class _ExerciseLoadingSkeleton extends StatelessWidget {
                     height: 160,
                     decoration: BoxDecoration(
                       color: palette.bgCard,
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(AppRadius.lg),
                     ),
                   ),
                 ],

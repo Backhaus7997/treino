@@ -6,6 +6,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../../app/theme/app_motion.dart';
 import '../../../../../app/theme/app_palette.dart';
@@ -70,7 +71,8 @@ class _RuleFormDialogState extends ConsumerState<RuleFormDialog> {
 
     return AlertDialog(
       backgroundColor: palette.bgCard,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg)),
       title: Text(
         isEdit ? 'Editar horario' : 'Agregar horario', // i18n
         style: GoogleFonts.barlowCondensed(
