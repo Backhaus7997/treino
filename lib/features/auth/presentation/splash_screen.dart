@@ -134,7 +134,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                     text: TextSpan(
                       children: [
                         TextSpan(
-                          text: 'MOVÉS ',
+                          text: l10n.authBrandHeadline1Light,
                           style: GoogleFonts.spaceGrotesk(
                             fontSize: 24,
                             fontWeight: FontWeight.w500,
@@ -144,7 +144,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                           ),
                         ),
                         TextSpan(
-                          text: 'EL HIERRO.\n',
+                          text: '${l10n.authBrandHeadline1Bold}\n',
                           style: GoogleFonts.spaceGrotesk(
                             fontSize: 24,
                             fontWeight: FontWeight.w900,
@@ -154,7 +154,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                           ),
                         ),
                         TextSpan(
-                          text: 'NOSOTROS ',
+                          text: l10n.authBrandHeadline2Light,
                           style: GoogleFonts.spaceGrotesk(
                             fontSize: 24,
                             fontWeight: FontWeight.w500,
@@ -164,7 +164,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                           ),
                         ),
                         TextSpan(
-                          text: 'EL RESTO.',
+                          text: l10n.authBrandHeadline2Bold,
                           style: GoogleFonts.spaceGrotesk(
                             fontSize: 24,
                             fontWeight: FontWeight.w900,

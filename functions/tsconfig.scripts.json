@@ -1,0 +1,18 @@
+{
+  // Los scripts one-off de `scripts/` NO los compila nadie.
+  //
+  // `tsconfig.json` incluye solo `src`, asi que `npm run build` —y con el, el
+  // job "Functions Build" de CI— pasaba en verde sobre codigo que ni se miraba.
+  // Se descubrio con uno que llevaba semanas roto: importaba un modulo borrado
+  // (`src/payments/generate-due-payments`, eliminado al desacoplar cobros) y
+  // nadie se entero porque nada lo compilaba.
+  //
+  // Este tsconfig existe aparte y con `noEmit` porque estos scripts se corren
+  // con `ts-node` a mano: no van a `lib/` ni se despliegan con las funciones.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": ["scripts"],
+  "exclude": []
+}

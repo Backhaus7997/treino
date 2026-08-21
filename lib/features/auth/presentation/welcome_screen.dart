@@ -144,13 +144,13 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                                   children: [
                                     _headlineLine(
                                       palette,
-                                      light: 'MOVÉS ',
-                                      bold: 'EL HIERRO.',
+                                      light: l10n.authBrandHeadline1Light,
+                                      bold: l10n.authBrandHeadline1Bold,
                                     ),
                                     _headlineLine(
                                       palette,
-                                      light: 'NOSOTROS ',
-                                      bold: 'EL RESTO.',
+                                      light: l10n.authBrandHeadline2Light,
+                                      bold: l10n.authBrandHeadline2Bold,
                                     ),
                                   ],
                                 ),
