@@ -69,7 +69,7 @@ void main() {
 
     /// Techo de ocurrencias totales de radio crudo en `lib/`. Mismo contrato
     /// que [allowlistCeiling]: sólo baja.
-    const rawRadiusDebtCeiling = 247;
+    const rawRadiusDebtCeiling = 246;
 
     /// Allowlist de rutas relativas a `lib/` que todavía contienen radios
     /// crudos. Es un REGISTRO DE DEUDA, no una licencia: estar acá significa
