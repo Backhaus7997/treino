@@ -73,7 +73,9 @@ void main() {
     test('un payload roto no mata el stream: llega vacío', () async {
       final link = TreinoLink(
         methods: const MethodChannel('treino/link'),
-        messages: _CanalFalso({'path': '/treino/x', 'payload': '{no es json'}),
+        messages: const _CanalFalso(
+          {'path': '/treino/x', 'payload': '{no es json'},
+        ),
       );
 
       final msg = await link.messages.first;
@@ -85,7 +87,7 @@ void main() {
     test('un payload bueno se parsea', () async {
       final link = TreinoLink(
         methods: const MethodChannel('treino/link'),
-        messages: _CanalFalso({
+        messages: const _CanalFalso({
           'path': '/treino/workout-started',
           'payload': '{"sessionId":"s1"}',
         }),
