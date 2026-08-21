@@ -21,6 +21,7 @@ import '../../../../../core/widgets/treino_icon.dart';
 import '../../../../coach/application/agenda_providers.dart';
 import '../../../../coach/domain/agenda_exceptions.dart';
 import '../../../../coach/domain/appointment.dart';
+import '../../../../coach/domain/wall_clock.dart';
 import '../../../../coach/presentation/agenda_formatters.dart';
 import '../../../../payments/application/billing_providers.dart'
     show athleteBillingProvider;
@@ -570,8 +571,10 @@ class _AppointmentDetailDialogState
         : rawName; // i18n
 
     final canCancel = !widget.isPast &&
-        appt.startsAt.difference(DateTime.now().toUtc()) >
-            const Duration(hours: 24);
+        // Wall-clock: contra el instante UTC real la ventana de 24h se
+        // volvia de 27h, y la web negaba cancelaciones que mobile permitia
+        // (#671).
+        appt.startsAt.difference(nowWall()) > const Duration(hours: 24);
     final isWithin24h = !widget.isPast && !canCancel;
     final isRecurring = appt.recurringId != null;
 

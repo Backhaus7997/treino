@@ -32,6 +32,7 @@ import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/domain/appointment.dart';
+import 'package:treino/features/coach/domain/wall_clock.dart';
 import 'package:treino/features/coach_hub/application/inactivos_provider.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pagos_buckets_provider.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
@@ -156,7 +157,10 @@ class _ProximasSesiones extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppL10n.of(context);
     final uid = ref.watch(currentUidProvider) ?? '';
-    final now = DateTime.now().toUtc();
+    // `startsAt` es wall-clock ADR-7, no un instante real: compararlo contra
+    // DateTime.now().toUtc() lo corre 3h y se come los turnos de las proximas
+    // 3 horas (#403, #671). El equivalente mobile ya usa este mismo reloj.
+    final now = nowWall();
     // La key de un provider .family DEBE ser estable entre builds. Usar
     // DateTime.now() con precisión de microsegundos genera una key distinta
     // en cada build → nueva instancia del family → loop infinito (mismo
@@ -270,17 +274,21 @@ class _SesionRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    final local = appointment.startsAt.toLocal();
-    final hh = local.hour.toString().padLeft(2, '0');
-    final mm = local.minute.toString().padLeft(2, '0');
+    // Campos crudos: `startsAt` YA representa la hora argentina (wall-clock
+    // ADR-7). Un .toLocal() aca resta 3h y muestra el turno de las 18:00 como
+    // las 15:00 (#671).
+    final startsAt = appointment.startsAt;
+    final hh = startsAt.hour.toString().padLeft(2, '0');
+    final mm = startsAt.minute.toString().padLeft(2, '0');
     final time = '$hh:$mm';
 
     // La lista de próximas sesiones abarca hasta 30 días. Cuando la sesión
     // no es hoy, prefijamos el día ("mañana · 09:00" / "14/7 · 09:00") para
     // que el orden no se lea salteado.
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final sessionDay = DateTime(local.year, local.month, local.day);
+    final now = nowWall();
+    final today = DateTime.utc(now.year, now.month, now.day);
+    final sessionDay =
+        DateTime.utc(startsAt.year, startsAt.month, startsAt.day);
     final daysAhead = sessionDay.difference(today).inDays;
     final String label;
     if (daysAhead <= 0) {
@@ -288,7 +296,7 @@ class _SesionRow extends StatelessWidget {
     } else if (daysAhead == 1) {
       label = '${l10n.dashboardProximaSesionManana} · $time';
     } else {
-      label = '${local.day}/${local.month} · $time';
+      label = '${startsAt.day}/${startsAt.month} · $time';
     }
 
     return TreinoListRow(
