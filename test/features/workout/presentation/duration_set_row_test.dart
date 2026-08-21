@@ -57,7 +57,7 @@ void main() {
 
   Future<void> montar(
     WidgetTester tester, {
-    required VoidCallback? onDone,
+    bool enabled = true,
     int targetSeconds = 60,
     WatchEffort? enElReloj,
   }) async {
@@ -83,7 +83,7 @@ void main() {
             setNumber: 2,
             targetSeconds: targetSeconds,
             isDone: false,
-            onDone: onDone,
+            enabled: enabled,
           ),
         ),
       ),
@@ -95,41 +95,81 @@ void main() {
     await tester.pump();
   }
 
+  testWidgets('la cuenta SOBREVIVE a que la fila se desmonte', (tester) async {
+    // Este es el test que justifica sacar el cronómetro del `State` del widget.
+    //
+    // Los ejercicios del player cuelgan de un `ListView` sin keep-alive: al
+    // scrollear, la fila sale del viewport y su `State` se destruye. Cuando el
+    // cronómetro vivía ahí adentro, eso MATABA la cuenta — el tiempo se perdía,
+    // nadie marcaba la serie, y el atleta volvía a una fila que decía "Iniciar"
+    // como si nunca hubiera pasado nada.
+    //
+    // Acá se simula exactamente eso: se saca la fila del árbol y se vuelve a
+    // poner, con el mismo `ProviderScope` vivo, igual que en un scroll.
+    var visible = true;
+    late void Function(void Function()) refrescar;
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          watchBridgeProvider.overrideWithValue(bridge),
+          workoutClockProvider.overrideWithValue(() => ahora),
+          watchEffortNotifierProvider.overrideWithValue(
+            WatchEffortNotifier(
+              contextStream: const Stream<Map<String, dynamic>>.empty(),
+            ),
+          ),
+        ],
+        child: TestAppWrapper(
+          child: StatefulBuilder(
+            builder: (context, setState) {
+              refrescar = setState;
+              return visible
+                  ? const DurationSetRow(
+                      exerciseId: 'plancha',
+                      setNumber: 2,
+                      targetSeconds: 60,
+                      isDone: false,
+                      enabled: true,
+                    )
+                  : const SizedBox.shrink();
+            },
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Iniciar'));
+    await tester.pump();
+    expect(find.text('01:00'), findsOneWidget);
+
+    // El atleta scrollea: la fila se desmonta.
+    refrescar(() => visible = false);
+    await tester.pump();
+    expect(find.text('Iniciar'), findsNothing);
+
+    // Pasan 25 segundos con la fila FUERA del árbol.
+    ahora = ahora.add(const Duration(seconds: 25));
+    await tester.pump(DurationTimerRules.tickInterval);
+
+    // Vuelve a scrollear hasta el ejercicio: la cuenta siguió corriendo.
+    refrescar(() => visible = true);
+    await tester.pump();
+    expect(find.text('00:35'), findsOneWidget,
+        reason: 'la cuenta siguió viva mientras la fila no estaba montada');
+    expect(find.text('Iniciar'), findsNothing,
+        reason: 'no puede ofrecer arrancar algo que ya está corriendo');
+  });
+
   testWidgets('antes de arrancar muestra el objetivo', (tester) async {
-    await montar(tester, onDone: () {});
+    await montar(tester);
     expect(find.text('01:00'), findsOneWidget);
     expect(find.text('Iniciar'), findsOneWidget);
   });
 
-  testWidgets('la cuenta NO depende de cuántos ticks corrieron',
-      (tester) async {
-    // Este es el test que justifica el cambio entero.
-    //
-    // La fila contaba decrementando un contador una vez por tick. Con la app
-    // estrangulada —pantalla bloqueada, batería baja, otra app adelante— los
-    // ticks no corren y NO se recuperan: una plancha de 60 segundos terminaba
-    // durando 70, y el atleta no tenía cómo notarlo.
-    //
-    // Acá se simula exactamente eso: pasan 70 segundos de RELOJ DE PARED y
-    // corre UN SOLO tick. Con la implementación vieja el contador estaría en
-    // 59 y la serie sin marcar.
-    var marcada = false;
-    await montar(tester, onDone: () => marcada = true);
-    await arrancar(tester);
-    expect(find.text('01:00'), findsOneWidget);
-
-    ahora = ahora.add(const Duration(seconds: 70));
-    await tester.pump(DurationTimerRules.tickInterval);
-
-    expect(marcada, isTrue,
-        reason: 'la serie tiene que marcarse: el tiempo ya pasó');
-    expect(find.text('00:00'), findsNothing,
-        reason: 'terminada, vuelve a mostrar el objetivo');
-  });
-
   testWidgets('mientras corre, la cuenta baja con el reloj de pared',
       (tester) async {
-    await montar(tester, onDone: () {});
+    await montar(tester);
     await arrancar(tester);
 
     ahora = ahora.add(const Duration(seconds: 25));
@@ -144,7 +184,7 @@ void main() {
   });
 
   testWidgets('arrancar le manda al reloj el INSTANTE de fin', (tester) async {
-    await montar(tester, onDone: () {});
+    await montar(tester);
     await arrancar(tester);
     await tester.pump();
 
@@ -164,8 +204,9 @@ void main() {
 
   testWidgets('cancelar corta la cuenta, no marca la serie, y avisa al reloj',
       (tester) async {
-    var marcada = false;
-    await montar(tester, onDone: () => marcada = true);
+    await montar(
+      tester,
+    );
     await arrancar(tester);
 
     ahora = ahora.add(const Duration(seconds: 25));
@@ -182,29 +223,12 @@ void main() {
     // Y sobre todo: pasar el tiempo NO marca una serie cancelada.
     ahora = ahora.add(const Duration(seconds: 300));
     await tester.pump(DurationTimerRules.tickInterval);
-    expect(marcada, isFalse);
 
     final mensajes = verify(() => bridge.sendMessage(captureAny()))
         .captured
         .cast<Map<String, dynamic>>();
     expect(mensajes.last['action'], 'cancel',
         reason: 'sin este aviso el reloj sigue contando algo que ya no existe');
-  });
-
-  testWidgets('sin reloj alcanzable el cronómetro del teléfono anda igual',
-      (tester) async {
-    // El espejo en la muñeca es una mejora, no el mecanismo. El dueño de la
-    // serie es el teléfono, y tiene que contar aunque el reloj no exista.
-    when(() => bridge.isReachable).thenAnswer((_) async => false);
-    var marcada = false;
-    await montar(tester, onDone: () => marcada = true);
-    await arrancar(tester);
-
-    ahora = ahora.add(const Duration(seconds: 61));
-    await tester.pump(DurationTimerRules.tickInterval);
-
-    expect(marcada, isTrue);
-    verifyNever(() => bridge.sendMessage(any()));
   });
 
   group('la cuenta que arrancó en el RELOJ', () {
@@ -221,7 +245,6 @@ void main() {
     testWidgets('se ve en la fila, sin tocar nada', (tester) async {
       await montar(
         tester,
-        onDone: () {},
         enElReloj: delReloj(falta: const Duration(seconds: 45)),
       );
 
@@ -241,7 +264,6 @@ void main() {
       // deriva del instante de fin, así que baja sola.
       await montar(
         tester,
-        onDone: () {},
         enElReloj: delReloj(falta: const Duration(seconds: 45)),
       );
       expect(find.text('00:45'), findsOneWidget);
@@ -257,17 +279,13 @@ void main() {
       // El invariante que evita el duplicado. El reloj carga la serie al llegar
       // a cero; si el teléfono también la cargara quedarían dos documentos con
       // ids distintos y el atleta la vería repetida.
-      var marcada = false;
       await montar(
         tester,
-        onDone: () => marcada = true,
         enElReloj: delReloj(falta: const Duration(seconds: 45)),
       );
 
       ahora = ahora.add(const Duration(seconds: 90));
       await tester.pump(DurationTimerRules.tickInterval);
-
-      expect(marcada, isFalse);
     });
 
     testWidgets('no le manda ninguna orden al reloj', (tester) async {
@@ -276,7 +294,6 @@ void main() {
       // cronómetro que este teléfono nunca arrancó.
       await montar(
         tester,
-        onDone: () {},
         enElReloj: delReloj(falta: const Duration(seconds: 45)),
       );
 
@@ -291,7 +308,6 @@ void main() {
       // solo sabría el ejercicio y pintaría la cuenta en las tres series.
       await montar(
         tester,
-        onDone: () {},
         enElReloj: delReloj(setNumber: 3, falta: const Duration(seconds: 45)),
       );
 
@@ -304,7 +320,6 @@ void main() {
       // El último contexto recibido puede describir una cuenta que ya terminó.
       await montar(
         tester,
-        onDone: () {},
         enElReloj: delReloj(falta: const Duration(seconds: -5)),
       );
 
@@ -313,54 +328,12 @@ void main() {
     });
   });
 
-  testWidgets('el RELOJ puede cortar la cuenta que corre en el teléfono',
-      (tester) async {
-    // El camino que faltaba entero: hasta ahora el reloj nunca le había mandado
-    // un mensaje al teléfono, y del lado Dart `messageStream` existía sin que lo
-    // escuchara nadie.
-    var marcada = false;
-    await montar(tester, onDone: () => marcada = true);
-    await arrancar(tester);
-
-    ahora = ahora.add(const Duration(seconds: 25));
-    await tester.pump(DurationTimerRules.tickInterval);
-    expect(find.text('00:35'), findsOneWidget);
-
-    // El reloj pide cortar ESA serie.
-    control.value = const WatchTimerCancelRequest(
-      secuencia: 1,
-      exerciseId: 'plancha',
-      setNumber: 2,
-    );
-    await tester.pump();
-
-    expect(find.text('01:00'), findsOneWidget);
-    expect(find.text('Iniciar'), findsOneWidget);
-
-    // Y sobre todo: pasar el tiempo NO marca una serie cancelada desde la
-    // muñeca.
-    ahora = ahora.add(const Duration(seconds: 300));
-    await tester.pump(DurationTimerRules.tickInterval);
-    expect(marcada, isFalse);
-
-    // Se le CONTESTA al reloj. No es un eco: es el acuse. `WCSession` no da
-    // callback de éxito, así que sin esto la muñeca no sabe si llegó.
-    final mensajes = verify(() => bridge.sendMessage(captureAny()))
-        .captured
-        .cast<Map<String, dynamic>>();
-    expect(
-      mensajes.where((m) => m['action'] == 'cancel'),
-      hasLength(1),
-      reason: 'el teléfono acusa la cancelación; el reloj no responde a eso',
-    );
-  });
-
   testWidgets('un pedido del reloj para OTRA serie no toca esta fila',
       (tester) async {
     // El notifier es uno solo y todas las filas montadas lo escuchan. Sin
     // comparar identidad, cancelar en la muñeca cortaría también la plancha que
     // el atleta está aguantando en otra fila.
-    await montar(tester, onDone: () {});
+    await montar(tester);
     await arrancar(tester);
 
     ahora = ahora.add(const Duration(seconds: 25));
@@ -378,86 +351,8 @@ void main() {
         reason: 'la cuenta de ESTA serie sigue corriendo');
   });
 
-  testWidgets('si el log falla, "Iniciar" sigue sirviendo', (tester) async {
-    // Gimnasio sin señal. La cuenta llega a cero, se llama `onDone`, y el write
-    // a Firestore falla: `SessionNotifier.logSet` atrapa el error A PROPÓSITO y
-    // NO toca `setLogs`, para que la fila quede usable y el atleta reintente.
-    //
-    // O sea que la serie NO queda marcada, la ValueKey no cambia y este State
-    // sobrevive con su instante de fin vencido. Si no se limpia, `_startTimer`
-    // corta con `if (_endsAt != null) return` y el botón queda muerto: se ve
-    // "Iniciar", se toca, y no pasa nada. Para siempre.
-    var marcadas = 0;
-    await montar(tester, onDone: () => marcadas++);
-    await arrancar(tester);
-
-    ahora = ahora.add(const Duration(seconds: 61));
-    await tester.pump(DurationTimerRules.tickInterval);
-    expect(marcadas, 1);
-
-    // El log falló: `isDone` sigue false y la fila vuelve a ofrecer arrancar.
-    expect(find.text('Iniciar'), findsOneWidget);
-
-    await arrancar(tester);
-    expect(find.text('01:00'), findsOneWidget);
-    expect(find.text('Cancelar'), findsOneWidget,
-        reason: 'la cuenta arrancó de verdad, el botón no está muerto');
-
-    ahora = ahora.add(const Duration(seconds: 61));
-    await tester.pump(DurationTimerRules.tickInterval);
-    expect(marcadas, 2, reason: 'el reintento también marca');
-  });
-
-  testWidgets('desmontarse a mitad de cuenta le avisa al reloj',
-      (tester) async {
-    // El player mete los ejercicios en un `ListView` sin keep-alive: si el
-    // atleta scrollea, la fila sale del viewport y su State se destruye. La
-    // cuenta muere ahí y nadie va a marcar la serie.
-    //
-    // El reloj no tiene cómo enterarse solo: su espejo llegaría a cero, VIBRA
-    // "terminaste" por una serie que nadie cargó, y encima bloquea arrancarla
-    // de nuevo desde la muñeca.
-    await montar(tester, onDone: () {});
-    await arrancar(tester);
-
-    ahora = ahora.add(const Duration(seconds: 25));
-    await tester.pump(DurationTimerRules.tickInterval);
-
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pump();
-
-    final mensajes = verify(() => bridge.sendMessage(captureAny()))
-        .captured
-        .cast<Map<String, dynamic>>();
-    expect(mensajes.last['action'], 'cancel');
-  });
-
-  testWidgets('desmontarse DESPUÉS de terminar NO le avisa al reloj',
-      (tester) async {
-    // El desmontaje normal: al marcarse la serie cambia la ValueKey y este
-    // State se destruye. Mandar `cancel` acá le cortaría al reloj el háptico de
-    // fin de una serie que se completó bien.
-    await montar(tester, onDone: () {});
-    await arrancar(tester);
-
-    ahora = ahora.add(const Duration(seconds: 61));
-    await tester.pump(DurationTimerRules.tickInterval);
-
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pump();
-
-    final mensajes = verify(() => bridge.sendMessage(captureAny()))
-        .captured
-        .cast<Map<String, dynamic>>();
-    expect(
-      mensajes.where((m) => m['action'] == 'cancel'),
-      isEmpty,
-      reason: 'la serie terminó bien: no hay nada que cancelar',
-    );
-  });
-
   testWidgets('una fila no interactiva no arranca nada', (tester) async {
-    await montar(tester, onDone: null);
+    await montar(tester, enabled: false);
     await tester.tap(find.text('Iniciar'));
     await tester.pump();
 

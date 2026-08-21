@@ -21,7 +21,10 @@ import '../application/routine_providers.dart';
 import '../application/session_init.dart';
 import '../application/session_notifier.dart';
 import '../application/session_providers.dart';
+import '../application/phone_duration_timer.dart';
 import '../application/session_state.dart';
+import '../application/workout_clock.dart';
+import '../domain/duration_timer.dart';
 import '../domain/routine.dart';
 import '../domain/superset_order.dart';
 import '../domain/routine_slot.dart';
@@ -29,6 +32,7 @@ import '../domain/set_enums.dart';
 import '../domain/set_limits.dart';
 import '../domain/set_log.dart';
 import '../../watch/application/watch_effort_notifier.dart';
+import '../../watch/application/watch_timer_control_notifier.dart';
 import '../../watch/domain/watch_effort.dart';
 import '../domain/set_spec.dart';
 import 'exercise_detail_screen.dart';
@@ -215,6 +219,19 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
   // hacer removeListener con el mismo objeto en dispose.
   SessionNotifier? _notifier;
 
+  /// El cronómetro por tiempo que corre en este teléfono.
+  ///
+  /// La PANTALLA es la autoridad de completado, no la fila. La fila se desmonta
+  /// al scrollear —el `ListView` de ejercicios no tiene keep-alive— y con ella
+  /// moría la cuenta: el tiempo se perdía y nadie marcaba la serie. Esta
+  /// pantalla, en cambio, está montada todo el tiempo que el player está
+  /// abierto, y además es la que tiene los slots para armar el `SetLog`.
+  PhoneDurationTimerNotifier? _cronometro;
+  Timer? _cronometroTick;
+
+  /// El canal por el que el RELOJ pide cortar la cuenta del teléfono.
+  WatchTimerControlNotifier? _controlDelReloj;
+
   @override
   void initState() {
     super.initState();
@@ -226,13 +243,96 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
       _notifier = ref.read(sessionNotifierProvider(widget.init).notifier);
       _notifier!.logSetError.addListener(_onLogSetError);
       _notifier!.finishedElsewhere.addListener(_onFinishedElsewhere);
+
+      final cronometro = ref.read(phoneDurationTimerProvider);
+      cronometro.addListener(_onCronometroCambio);
+      _cronometro = cronometro;
+
+      final control = ref.read(watchTimerControlNotifierProvider);
+      control.addListener(_onElRelojPideCancelar);
+      _controlDelReloj = control;
+      _onCronometroCambio();
     });
+  }
+
+  /// Arranca o corta el tick que vigila el vencimiento de la cuenta.
+  ///
+  /// Es UNO por pantalla, no uno por fila: la cuenta es una sola.
+  void _onCronometroCambio() {
+    final hay = _cronometro?.value != null;
+    if (hay && _cronometroTick == null) {
+      _cronometroTick = Timer.periodic(
+        DurationTimerRules.tickInterval,
+        (_) => _revisarCronometro(),
+      );
+    } else if (!hay && _cronometroTick != null) {
+      _cronometroTick!.cancel();
+      _cronometroTick = null;
+    }
+  }
+
+  /// La cuenta llegó a cero: vibra y marca la serie.
+  ///
+  /// Corre acá y no en la fila para que el scroll no pueda impedirlo. Al reloj
+  /// NO se le avisa: llega a cero solo, porque cuenta contra el mismo instante
+  /// de fin.
+  void _revisarCronometro() {
+    final cuenta = _cronometro?.value;
+    if (cuenta == null) return;
+    final ahora = ref.read(workoutClockProvider)().toUtc();
+    if (!DurationTimerRules.isFinished(endsAt: cuenta.endsAt, now: ahora)) {
+      return;
+    }
+
+    // Se limpia ANTES de marcar: `logSet` puede fallar y dejar la fila
+    // interactiva a propósito, y con la cuenta vencida todavía puesta el botón
+    // "Iniciar" quedaría muerto.
+    _cronometro!.clear();
+    HapticFeedback.heavyImpact();
+
+    final slot = _slotDe(cuenta.exerciseId);
+    if (slot == null) return;
+    _logSet(slot, cuenta.setNumber, 0, 0.0);
+  }
+
+  /// El reloj pidió cortar la cuenta que corre acá.
+  ///
+  /// Se compara la IDENTIDAD: el pedido nombra la serie, y cancelar la
+  /// equivocada le mataría al atleta una plancha que está aguantando.
+  ///
+  /// Se le contesta al reloj —`cancel()` avisa— y eso no es un eco: es el
+  /// acuse. `WCSession` no da callback de éxito, así que sin esto la muñeca no
+  /// sabe si el pedido llegó. El ida y vuelta termina ahí.
+  void _onElRelojPideCancelar() {
+    final pedido = _controlDelReloj?.value;
+    final cuenta = _cronometro?.value;
+    if (pedido == null || cuenta == null) return;
+    if (!pedido.aplicaA(
+      exerciseId: cuenta.exerciseId,
+      setNumber: cuenta.setNumber,
+    )) {
+      return;
+    }
+    unawaited(_cronometro!.cancel());
+  }
+
+  /// El slot de un ejercicio del día, o null si ya no está.
+  RoutineSlot? _slotDe(String exerciseId) {
+    final day = ref.read(sessionNotifierProvider(widget.init)).value?.day;
+    if (day == null) return null;
+    for (final slot in day.slots) {
+      if (slot.exerciseId == exerciseId) return slot;
+    }
+    return null;
   }
 
   @override
   void dispose() {
     _notifier?.logSetError.removeListener(_onLogSetError);
     _notifier?.finishedElsewhere.removeListener(_onFinishedElsewhere);
+    _cronometro?.removeListener(_onCronometroCambio);
+    _controlDelReloj?.removeListener(_onElRelojPideCancelar);
+    _cronometroTick?.cancel();
     super.dispose();
   }
 
@@ -1651,8 +1751,9 @@ class _ExerciseSectionState extends State<_ExerciseSection> {
               setNumber: setNumber,
               targetSeconds: targetSeconds,
               isDone: isRowDone,
-              onDone:
-                  isCurrent ? () => widget.onSetCheck(setNumber, 0, 0.0) : null,
+              // Sin callback de marcado: la serie la marca la pantalla cuando
+              // la cuenta llega a cero, esté esta fila montada o no.
+              enabled: isCurrent,
             )
           : _RepsSetRow(
               key: ValueKey('set-$setNumber-${logged?.id ?? "pending"}'),

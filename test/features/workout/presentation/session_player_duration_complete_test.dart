@@ -205,4 +205,51 @@ void main() {
       expect(_finishButton(tester).onPressed, isNotNull);
     });
   });
+
+  group('la PANTALLA es la autoridad de completado', () {
+    setUp(() => _ahora = DateTime.utc(2027, 1, 15, 10));
+
+    testWidgets('marca la serie aunque la fila NUNCA se haya redibujado',
+        (tester) async {
+      // El punto del cambio: quien completa es la pantalla, que está montada
+      // todo el tiempo que el player está abierto. Antes completaba la fila, y
+      // la fila se desmonta al scrollear — con ella moría la cuenta y nadie
+      // marcaba nada.
+      //
+      // Acá se avanza el reloj de pared y se corre UN tick sin tocar la fila.
+      final notifier = _DurationLoggingNotifier(_durationOnlyState());
+      await tester.pumpWidget(_wrap(() => notifier));
+      await tester.pump();
+
+      await tester.tap(find.text('Iniciar'));
+      await tester.pump();
+
+      _ahora = _ahora.add(const Duration(seconds: 5));
+      await tester.pump(DurationTimerRules.tickInterval);
+      await tester.pump();
+
+      expect(notifier.loggedSets, hasLength(1));
+      expect(notifier.loggedSets.single.exerciseId, 'edur');
+      expect(notifier.loggedSets.single.setNumber, 1);
+    });
+
+    testWidgets('no marca dos veces si entran varios ticks', (tester) async {
+      // La cuenta se limpia al vencer, así que el tick siguiente no encuentra
+      // nada. Sin eso, cada tick posterior marcaría la serie de nuevo.
+      final notifier = _DurationLoggingNotifier(_durationOnlyState());
+      await tester.pumpWidget(_wrap(() => notifier));
+      await tester.pump();
+
+      await tester.tap(find.text('Iniciar'));
+      await tester.pump();
+
+      _ahora = _ahora.add(const Duration(seconds: 5));
+      for (var i = 0; i < 4; i++) {
+        await tester.pump(DurationTimerRules.tickInterval);
+      }
+      await tester.pump();
+
+      expect(notifier.loggedSets, hasLength(1));
+    });
+  });
 }
