@@ -25,7 +25,11 @@ class TrainerSubscription with _$TrainerSubscription {
     // Límite de peso ponderado cacheado (denormalizado) — el CF lo escribe
     // junto con `tier` para que UI/rules lean sin lookup. Nunca confiar en
     // un valor client-provisto (rules lo pinnea CF-write-only).
-    required int weightLimit,
+    //
+    // `null` = SIN LÍMITE (plan3). Ojo: null acá es un valor legítimo, no
+    // una ausencia — no lo colapses con `?? algo` o el plan más caro pasa a
+    // valer menos que el más barato.
+    int? weightLimit,
     @TimestampConverter() DateTime? currentPeriodEnd,
     @TimestampConverter() DateTime? graceUntil,
     String? mpPreapprovalId,

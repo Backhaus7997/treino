@@ -1,0 +1,296 @@
+//
+//  TreinoWatchApp.swift
+//  TreinoWatch Watch App
+//
+//  Change `watch-standalone-client`, fase F1.
+//
+
+import Combine
+import SwiftUI
+
+@main
+struct TreinoWatch_Watch_AppApp: App {
+    /// Recibe el lanzamiento que dispara el telefono con `startWatchApp(with:)`.
+    /// Ver `WatchLaunchDelegate.swift` para por que hace falta.
+    @WKApplicationDelegateAdaptor(WatchLaunchDelegate.self)
+    private var launchDelegate
+
+    @StateObject private var launchIntent = WatchLaunchIntent.shared
+    @StateObject private var coordinator = CredentialCoordinator()
+    @StateObject private var workoutCoordinator = WorkoutCoordinator()
+
+    /// La sesion de entrenamiento de watchOS. Vive acá y no adentro del
+    /// coordinator para que ese siga sin importar HealthKit — `HKWorkoutSession`
+    /// es watchOS-only y lo dejaria sin poder compilarse en el host, que es la
+    /// unica forma barata de testearlo.
+    @StateObject private var workoutSession = WorkoutSessionController()
+
+    /// Le manda al telefono lo que el reloj mide, para que el dato tambien este
+    /// ahi si el atleta agarra el celular (F4). Es un agregado: si falla, el
+    /// reloj sigue mostrando todo igual.
+    @State private var effortRelay = EffortRelay()
+
+    /// Le pide al telefono que corte el cronometro que arranco alla. Va por
+    /// mensaje y NO por contexto: es una orden puntual, no estado.
+    @State private var phoneTimerRelay = PhoneTimerRelay()
+    @Environment(\.scenePhase) private var scenePhase
+
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+                .environmentObject(coordinator)
+                .environmentObject(workoutCoordinator)
+                .environmentObject(workoutSession)
+                .environmentObject(launchIntent)
+                // Activa WatchConnectivity y recupera la credencial guardada.
+                // Va acá y no en el init del coordinator para que el trabajo
+                // arranque con la escena viva, no durante la construcción.
+                .task {
+                    // La sesion de entrenamiento se inyecta ANTES de restore():
+                    // ese camino ya entra en modo entreno, y si llegara sin la
+                    // dependencia puesta, un entreno recuperado se quedaria sin
+                    // segundo plano justo despues de reabrir la app.
+                    workoutCoordinator.workoutSession = workoutSession
+
+                    // El coordinator del entreno pide su cliente al de
+                    // credenciales, en vez de que uno conozca al otro.
+                    workoutCoordinator.makeClient = {
+                        try await coordinator.firestoreClient()
+                    }
+                    // Un 401 tira el token cacheado en vez de dejar al reloj
+                    // rebotando hasta que venza el TTL. Ver `TokenFreshness`.
+                    workoutCoordinator.onAuthFailure = {
+                        coordinator.invalidateIdToken()
+                    }
+                    // El coordinador pide la cancelacion sin conocer
+                    // WatchConnectivity, igual que pide su cliente de Firestore.
+                    workoutCoordinator.onCancelarCronometroDelTelefono = { ejercicio, serie, fallo in
+                        phoneTimerRelay.cancelar(
+                            exerciseId: ejercicio,
+                            setNumber: serie,
+                            fallo: fallo
+                        )
+                    }
+                    workoutCoordinator.makeWorkout = { routineId, day, week in
+                        let (client, uid) = try await coordinator.firestoreClient()
+                        // Posición EXPLÍCITA: la sesión ya existe y su día lo
+                        // manda el historial. Recalcularlo hacía que el reloj
+                        // mostrara los ejercicios de otro día.
+                        return try await TodaysWorkoutResolver.resolve(
+                            client: client,
+                            uid: uid,
+                            routineId: routineId,
+                            dayNumber: day,
+                            weekNumber: week
+                        )
+                    }
+                    // Si nos lanzo el telefono, la sesion de HealthKit se
+                    // abre YA, antes de cualquier viaje de red. Es la razon por
+                    // la que watchOS nos desperto, y `begin()` es sincrono e
+                    // idempotente: la llamada posterior de
+                    // `WorkoutCoordinator.adoptRemoteSessionIfAny` es no-op.
+                    if launchIntent.pendingWorkout != nil {
+                        workoutSession.begin()
+                    }
+
+                    coordinator.start()
+                    // Recupera un entreno a medias. Ya no espera a que se
+                    // resuelva la rutina ACTIVA: la sesión guardada sabe de qué
+                    // rutina es y se re-resuelve sola, así que un entreno
+                    // arrancado desde una plantilla también sobrevive.
+                    await workoutCoordinator.restore()
+
+                    // La adopcion TERMINO, con o sin sesion encontrada. Se
+                    // limpia la intencion para que "Preparando tu entreno..." no
+                    // quede colgado si no habia nada que adoptar.
+                    launchIntent.clear()
+                }
+                // Relee la rutina al volver a primer plano. Sin esto el reloj
+                // solo la leia al arrancar la app: si el atleta cambiaba su
+                // rutina activa desde el telefono, el reloj seguia mostrando la
+                // anterior hasta que alguien lo relanzaba.
+                //
+                // No se refresca durante un entreno en curso: cambiar los
+                // ejercicios abajo del atleta a mitad de serie seria peor que
+                // mostrar un dato viejo.
+                // La intencion de lanzamiento se apaga apenas deja de tener
+                // sentido, y NO solo al final del `.task`.
+                //
+                // Bug reportado: al ABANDONAR el entreno desde el reloj, la
+                // pantalla quedaba en "Preparando tu entreno..." para siempre.
+                // La sesion pasaba a nil, `.task` no vuelve a correr en un
+                // resume, y la intencion vieja seguia puesta: `ContentView`
+                // caia en esa rama y no salia nunca mas.
+                //
+                // Se limpia cuando aparece una sesion (ya aterrizamos, la
+                // intencion cumplio) y cuando desaparece (se termino o se
+                // abandono, no hay nada que preparar).
+                .onChange(of: workoutCoordinator.session == nil) { _, sinSesion in
+                    launchIntent.clear()
+
+                    // Al TERMINAR o abandonar, se relee la rutina.
+                    //
+                    // Reportado por el dueno: despues de terminar habia que
+                    // salir y volver a entrar a la app —o bajar y levantar la
+                    // muneca— para que apareciera el dia siguiente. El dia lo
+                    // resuelve `loadTodaysWorkout` contra el historial, y eso
+                    // solo corria al arrancar la app o al volver a primer
+                    // plano. Terminar un entreno CAMBIA el historial, asi que
+                    // es exactamente el momento de releer.
+                    if sinSesion {
+                        Task { await coordinator.loadTodaysWorkout() }
+                    }
+                }
+                .onChange(of: scenePhase) { _, phase in
+                    guard phase == .active else { return }
+
+                    // La pantalla se apago y volvio: si hay una cuenta por
+                    // tiempo corriendo, se muestra sola.
+                    //
+                    // Es el caso de uso, no un extra. El atleta esta aguantando
+                    // una plancha; el unico motivo por el que levanta la muñeca
+                    // es ver cuanto falta, y tener que buscar la pantalla en ese
+                    // momento seria absurdo.
+                    //
+                    // Se dispara en la transicion a `.active` —o sea cuando la
+                    // pantalla realmente se apago y volvio— y no en cada
+                    // redibujo: si el atleta acaba de ocultarla, no le salta
+                    // encima. Y como el espejo se apaga solo al llegar a cero,
+                    // no hay forma de que reaparezca una cuenta vencida.
+                    workoutCoordinator.mostrarPhoneTimer()
+
+                    // Y se revisa si el telefono dejo credencial nueva —o el
+                    // aviso de cierre de sesion— esperando en el contexto.
+                    //
+                    // `start()` corre UNA sola vez por proceso, desde el `.task`
+                    // de la escena, y ese no reentra en un resume. El contexto
+                    // se entrega "on next launch", asi que sin esto el atleta
+                    // tenia que cerrar y reabrir la app del reloj para que un
+                    // cambio de cuenta se notara. Es idempotente: si el uid ya
+                    // coincide, no hace nada.
+                    coordinator.revisarContextoPendiente()
+
+                    Task {
+                        // Con un entreno abierto se reintenta la cola en vez de
+                        // refrescar la rutina: cambiarle los ejercicios al
+                        // atleta a mitad de serie seria peor.
+                        if workoutCoordinator.session != nil {
+                            // Con entreno abierto se sincroniza en AMBAS
+                            // direcciones —sube lo pendiente y baja lo que se
+                            // cargo desde el celular— pero NO se re-resuelve la
+                            // rutina: cambiarle los ejercicios al atleta a
+                            // mitad de serie seria peor que un dato viejo.
+                            await workoutCoordinator.sync()
+                        } else {
+                            // Sin entreno local, puede haber uno abierto que
+                            // arranco el telefono. Se busca ANTES de recargar
+                            // la rutina: si lo hay, el reloj tiene que entrar
+                            // en modo entreno, no mostrar "Empezar".
+                            await workoutCoordinator.adoptRemoteSessionIfAny()
+                            // El intento TERMINO, haya encontrado o no. En un
+                            // resume el `.task` no corre, asi que si no se
+                            // limpia aca la intencion queda colgada.
+                            launchIntent.clear()
+                            if workoutCoordinator.session == nil {
+                                await coordinator.loadTodaysWorkout()
+                            }
+                        }
+                    }
+                }
+                // El telefono aviso que algo cambio. Es el camino RAPIDO: sin
+                // esto el reloj se entera recien cuando el atleta lo mira, y la
+                // idea es que si empezaste a entrenar en el celular la muñeca
+                // se ponga en modo entreno sola.
+                // El esfuerzo se publica al telefono cuando cambia, con el
+                // throttle de `EffortBroadcastRules`. Se escuchan los DOS
+                // datos porque llegan por separado: el ritmo cardiaco cada
+                // ~5s y las calorias cuando el builder las acumula.
+                .onChange(of: workoutSession.heartRate) { _, _ in
+                    publicarEsfuerzo()
+                }
+                .onChange(of: workoutSession.activeEnergy) { _, _ in
+                    publicarEsfuerzo()
+                }
+                // Arrancar o cortar el cronometro tambien publica: si no, el
+                // telefono se enteraria recien con el proximo dato de pulso, y
+                // al TERMINAR no se enteraria nunca de que dejo de correr.
+                .onChange(of: workoutCoordinator.durationSet) { _, _ in
+                    publicarEsfuerzo()
+                }
+                // Al cerrarse el entreno se olvida lo ultimo enviado, para que
+                // el proximo no se coma el primer envio por parecerse.
+                .onChange(of: workoutSession.phase) { _, phase in
+                    if phase == .idle { effortRelay.reset() }
+                }
+                // El cronometro que arranco en el telefono. Se enruta aca —y no
+                // dentro de `CredentialCoordinator`— porque ese coordinador no
+                // conoce el estado del entreno: publica la senal y la vista la
+                // aplica, igual que con `externalRefresh`.
+                .onChange(of: coordinator.phoneTimerSignal) { _, signal in
+                    guard let signal else { return }
+                    workoutCoordinator.apply(phoneTimerCommand: signal.command)
+                }
+                .onChange(of: coordinator.externalRefresh) { _, _ in
+                    Task {
+                        if workoutCoordinator.session != nil {
+                            await workoutCoordinator.sync()
+                        } else {
+                            await workoutCoordinator.adoptRemoteSessionIfAny()
+                        }
+                    }
+                }
+        }
+    }
+
+    /// Manda el ultimo esfuerzo conocido, fechado con la medicion MAS RECIENTE
+    /// de las dos.
+    ///
+    /// Se usa la mas reciente y no `Date()` porque la regla de antiguedad del
+    /// telefono se apoya en ese timestamp: fecharlo al enviarlo lo haria pasar
+    /// por mas fresco de lo que es.
+    private func publicarEsfuerzo() {
+        let hr = workoutSession.heartRate
+        let energia = workoutSession.activeEnergy
+        let fechas = [hr?.takenAt, energia?.takenAt].compactMap { $0 }
+
+        let cronometro = workoutCoordinator.durationSet.map {
+            EffortSnapshot.RunningTimer(
+                exerciseId: $0.exerciseId,
+                setNumber: $0.setNumber,
+                totalSeconds: $0.totalSeconds,
+                endsAt: $0.endsAt
+            )
+        }
+
+        // Acá había un `guard !fechas.isEmpty || cronometro != nil else { return }`
+        // y se sacó, porque APAGABA el aviso de apagado.
+        //
+        // `HeartRateReading.bpm` y `ActiveEnergyReading.kcal` son `Int` no
+        // opcionales, asi que ese guard era la negacion EXACTA de
+        // `EffortSnapshot.isEmpty`. O sea que el snapshot vacio no llegaba nunca
+        // a `shouldSend`, y su primera rama —escrita palabra por palabra para
+        // "el atleta CANCELA el cronometro antes de que llegue el primer
+        // pulso"— era codigo muerto en produccion. Su test la ejercitaba en
+        // aislamiento y estaba en verde.
+        //
+        // Con el permiso de Salud NEGADO (degradacion firmada en D2: bpm y kcal
+        // en nil TODO el entreno) el sintoma era: arrancar la cuenta en el reloj
+        // llegaba, cancelarla no llegaba nunca, y el telefono se quedaba
+        // mostrando una cuenta fantasma hasta que vencia sola.
+        //
+        // Quien decide es `shouldSend`, que ya cubre los dos lados: deja pasar
+        // el vacio que APAGA algo y descarta el vacio que no apaga nada.
+
+        // Con mediciones se fecha con la MAS RECIENTE, porque la regla de
+        // antiguedad del telefono se apoya en ese timestamp. Sin mediciones se
+        // fecha ahora: el dato que viaja es el cronometro, y ese es actual.
+        let medido = fechas.max() ?? Date()
+
+        effortRelay.publish(
+            bpm: hr?.bpm,
+            kcal: energia?.kcal,
+            measuredAt: medido,
+            timer: cronometro
+        )
+    }
+}

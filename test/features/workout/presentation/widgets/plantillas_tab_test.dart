@@ -107,7 +107,7 @@ void main() {
       expect(find.byType(RoutineCard), findsNothing);
     });
 
-    testWidgets('AsyncData([]) + filter null → "No hay plantillas todavía."',
+    testWidgets('AsyncData([]) + filter null → "No hay rutinas todavía."',
         (tester) async {
       await tester.pumpWidget(
         _wrap(
@@ -120,11 +120,11 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
 
-      expect(find.text('No hay plantillas todavía.'), findsOneWidget);
+      expect(find.text('No hay rutinas todavía.'), findsOneWidget);
     });
 
     testWidgets(
-        'AsyncData([]) + filter beginner → "No hay plantillas para este nivel."',
+        'AsyncData([]) + filter beginner → "No hay rutinas para este nivel."',
         (tester) async {
       final container = ProviderContainer(
         overrides: [
@@ -141,6 +141,9 @@ void main() {
           container: container,
           child: MaterialApp(
             theme: AppTheme.dark(),
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('es', 'AR'),
             home: const Scaffold(
               body: SizedBox(
                 height: 800,
@@ -154,7 +157,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
 
       expect(
-        find.text('No hay plantillas para este nivel.'),
+        find.text('No hay rutinas para este nivel.'),
         findsOneWidget,
       );
     });
@@ -177,7 +180,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
 
       expect(
-        find.text('Hubo un error cargando las plantillas.'),
+        find.text('Hubo un error cargando las rutinas.'),
         findsOneWidget,
       );
       expect(find.text('Reintentar'), findsOneWidget);
@@ -441,7 +444,7 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.text('Hubo un error cargando las plantillas.'),
+        find.text('Hubo un error cargando las rutinas.'),
         findsOneWidget,
       );
       expect(find.text('Reintentar'), findsOneWidget);

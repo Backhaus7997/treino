@@ -132,7 +132,11 @@ describe("trainer_links update — QA-SEC-002 self-promotion", () => {
     await assertFails(ref.update({ status: "paused", pausedAt: 3 }));
   });
 
-  it("allows the trainer to accept (pending -> active) — legit flow preserved", async () => {
+  // FLIPPED in PR4 (was assertSucceeds). This suite pins the anti-forgery
+  // gate; the accept flow itself moved to the acceptTrainerLink callable, so
+  // `active` is now unreachable from ANY client — trainer included. The
+  // anti-forgery property this file exists for gets STRONGER, not weaker.
+  it("the trainer can no longer accept (pending -> active) from the client", async () => {
     await seedLink(LINK, {
       trainerId: TRAINER,
       athleteId: ATHLETE,
@@ -140,10 +144,10 @@ describe("trainer_links update — QA-SEC-002 self-promotion", () => {
       requestedAt: 1,
     });
     const ref = ctxDb(TRAINER).collection(COL_LINKS).doc(LINK);
-    await assertSucceeds(ref.update({ status: "active", acceptedAt: 2 }));
+    await assertFails(ref.update({ status: "active", acceptedAt: 2 }));
   });
 
-  it("allows the trainer to pause (active -> paused) and resume (paused -> active)", async () => {
+  it("allows the trainer to pause (active -> paused) but NOT to resume", async () => {
     await seedLink(LINK, {
       trainerId: TRAINER,
       athleteId: ATHLETE,
@@ -151,11 +155,13 @@ describe("trainer_links update — QA-SEC-002 self-promotion", () => {
       requestedAt: 1,
       acceptedAt: 2,
     });
+    // pause LOWERS weighted load → no gate needed, stays client-side.
     const pauseRef = ctxDb(TRAINER).collection(COL_LINKS).doc(LINK);
     await assertSucceeds(pauseRef.update({ status: "paused", pausedAt: 3 }));
 
+    // resume RAISES it (0.5 -> 1.0) → CF-only from PR4 on.
     const resumeRef = ctxDb(TRAINER).collection(COL_LINKS).doc(LINK);
-    await assertSucceeds(resumeRef.update({ status: "active" }));
+    await assertFails(resumeRef.update({ status: "active" }));
   });
 
   it("allows the athlete to terminate (active -> terminated) — not a reviewable state", async () => {

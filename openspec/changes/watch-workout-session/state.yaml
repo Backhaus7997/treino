@@ -1,0 +1,691 @@
+change: watch-workout-session
+fase: "Sin asignar — capability nueva, fuera del roadmap actual"
+branch_sugerida: feat/watch-workout-session
+artifact_store: openspec
+tdd: strict
+
+depende_de:
+  change: watch-standalone-client
+  motivo: |
+    El companion watchOS ya existe y funciona: lee la rutina por REST, carga
+    series, sincroniza con el telefono en las dos direcciones y termina el
+    entreno. Este ciclo NO lo reemplaza — le agrega la capa que le falta para
+    que watchOS lo trate como app de entrenamiento.
+
+fases_de_implementacion:
+  F0_terreno_y_permisos:
+    estado: HECHA — verificada corriendo en el simulador emparejado
+    rama: feat/watch-workout-session (sale de feat/workout-watch-connectivity)
+    entregado:
+      - Entitlement de HealthKit en el target del reloj, enganchado a las TRES
+        configuraciones (Debug, Release, Profile).
+      - Los dos textos de permiso, VISTOS en pantalla en el pliego del reloj.
+      - La solicitud, disparada en los tres caminos que abren un entreno.
+      - scripts/test_watch_capabilities.sh — guard contra la perdida silenciosa
+        de la capability. Probado con 4 mutaciones.
+      - scripts/test_watch_swift.sh — 20 chequeos de la logica de permisos.
+        Probado con 8 mutaciones.
+      - scripts/typecheck_watch.sh — typecheck con los flags del target.
+      - Job watch-capabilities en CI, en runner ubuntu.
+    cierre_verificado_corriendo: |
+      El criterio era: compila con HealthKit, pide permiso, y el entreno sigue
+      funcionando igual con permiso CONCEDIDO y DENEGADO. Los tres, vistos:
+
+        - BUILD SUCCEEDED contra el simulador del reloj.
+        - El pliego de Salud aparecio en la muñeca, con los dos textos en
+          castellano y pidiendo exactamente los tres tipos declarados
+          (Active Energy y Workouts para escribir, Heart Rate para leer).
+        - DENEGADO: se marco una serie, arranco el descanso (207s) y avanzo a
+          la serie siguiente. Estado interno: resolved(canWriteWorkouts: false).
+        - CONCEDIDO: se marco otra serie, arranco el descanso (205s) y avanzo.
+          Estado interno: resolved(canWriteWorkouts: true).
+    lo_que_NO_se_verifico: |
+      Nada en hardware. Todo esto es simulador, y F0 no lo necesitaba. Lo que
+      queda pendiente de una muñeca real esta anotado en Q1 (provisioning) y en
+      lo_que_NO_esta_verificado de Q3.
+  F1_la_sesion_de_entrenamiento:
+    estado: HECHA — verificada corriendo, con control negativo
+    cierre_verificado_corriendo: |
+      El criterio era: el descanso sobrevive a bajar la muñeca. Medido:
+
+        banner en T0 ............ 145s
+        segundos reales T0->T1 ... 72
+        banner al volver ........  73s
+        conto ................... 72s
+        PERDIO ..................  0s
+
+      Y vuelve a romperse al sacar el arreglo: comentando UNA linea —la
+      inyeccion de `workoutSession`— y dejando el background mode puesto, la
+      perdida vuelve a 50s en 56. Entre verde y rojo hay una sola linea.
+
+      Ciclo completo visto en el log: una abierta, transicion a running, una
+      cerrada al terminar. Y por los tres caminos de entrada se abre
+      EXACTAMENTE UNA.
+    medicion_1_abrir_la_sesion_NO_ALCANZA: |
+      RESULTADO NEGATIVO, medido en el par propio (F0-Watch 0F83477D).
+
+      Con la HKWorkoutSession ABIERTA Y CORRIENDO —el log muestra "Sesion de
+      entrenamiento abierta" y el delegate confirmando la transicion 1 -> 2
+      (running), y watchOS dibujando el borde verde de entrenamiento en curso—
+      el descanso SIGUIO PERDIENDO TIEMPO:
+
+        banner en T0 ............ 164s
+        segundos reales T0->T1 ... 62
+        banner al volver ........ 155s
+        conto ................... 9s
+        PERDIO .................. 53s
+
+      Comparar con la medicion sin sesion de la otra tanda: 57s perdidos en 84
+      reales. O sea que abrir la sesion NO movio la aguja.
+
+      El log del sistema confirma la suspension: SPApplicationDelegate
+      _updateAppState al volver al frente.
+
+      CONCLUSION: la premisa del explore —"abrir un HKWorkoutSession le dice al
+      sistema que esto es una app de entrenamiento, y a cambio da ejecucion en
+      segundo plano"— es INCOMPLETA. La sesion sola no alcanza.
+
+      Siguiente hipotesis a medir: falta declarar WKBackgroundModes con
+      `workout-processing`. No tiene equivalente INFOPLIST_KEY_ —se busco en las
+      specs de Xcode y no esta— asi que hay que darle un Info.plist propio al
+      target, con INFOPLIST_FILE apuntandolo y GENERATE_INFOPLIST_FILE siguiendo
+      en YES para que Xcode fusione.
+    medicion_2_LAS_CUATRO_COMBINACIONES: |
+      Se aislo el mecanismo midiendo las cuatro combinaciones. Este es el
+      resultado que corrige la premisa del ciclo:
+
+        ni sesion ni background mode ......... perdio 57s en 84 reales
+        sesion abierta, SIN background mode ... perdio 53s en 62
+        background mode, SIN sesion ........... perdio 50s en 56
+        SESION + BACKGROUND MODE .............. perdio  1s en 58
+
+      LOS DOS SON NECESARIOS Y NINGUNO ALCANZA SOLO.
+
+      El explore decia: "en watchOS todo esto sale de UNA cosa: abrir un
+      HKWorkoutSession mientras dura el entreno. Eso le dice al sistema que esto
+      es una app de entrenamiento, y a cambio: ejecucion en segundo plano...".
+
+      Es falso como estaba escrito. La sesion abre, llega a `running`, watchOS
+      dibuja el borde verde de entrenamiento en curso — y la app se suspende
+      igual. La declaracion en el Info.plist no es un tramite: es la mitad del
+      mecanismo.
+
+      El ultimo segundo perdido es latencia de captura, no del timer.
+    como_se_hizo_la_mutacion: |
+      Comentando UNA linea —la inyeccion de `workoutSession` en
+      TreinoWatchApp.swift— y dejando todo lo demas igual, incluido el
+      background mode. Es un control limpio: entre verde y rojo hay una sola
+      linea de diferencia.
+
+      Se confirmo en el log que con esa linea comentada NO se abre ninguna
+      sesion, y que con ella se abre exactamente UNA.
+    trampa_del_Info_plist: |
+      El primer intento fallo el build con "Multiple commands produce
+      .../Info.plist". La carpeta `TreinoWatch Watch App/` es un
+      PBXFileSystemSynchronizedRootGroup: todo lo que cae adentro se agrega al
+      target, y un Info.plist ahi se COPIA como recurso ADEMAS de procesarse
+      como Info.plist.
+
+      Por eso vive en `ios/TreinoWatch-Info.plist`, fuera de esa carpeta. El
+      `.entitlements` de F0 no tuvo el problema —ese tipo de archivo no se
+      copia como recurso— asi que no se puede generalizar de uno al otro.
+    trampa_de_medicion: |
+      Una medicion salio mal por instalar el .app ANTES de que terminara el
+      build: el binario era el anterior y el log mostraba una sesion abierta
+      donde no debia haberla. Se detecto comparando el timestamp de
+      `simctl get_app_container` contra el del .app en DerivedData.
+
+      Verificar el timestamp del binario instalado antes de creerle a una
+      medicion, siempre.
+  F2_ritmo_cardiaco_en_vivo:
+    estado: HECHA — verificada corriendo en simulador, incluido el numero
+    verificado_corriendo: |
+      El ritmo cardiaco se vio EN PANTALLA, actualizandose:
+      64 -> 61 -> 59 -> 56 -> 62 lpm. Ver la correccion en
+      `riesgo_que_define_el_ciclo`: el simulador SI genera pulsaciones.
+    la_regla_que_mas_importa: |
+      Cuando no hay dato no se dibuja NADA. Ni un guion, ni un cero, ni "sin
+      permiso".
+
+      No es minimalismo. Una lectura negada por el atleta es indistinguible de
+      "todavia no hay datos" (medido en F0: las dos dan query exitosa con cero
+      muestras). La app no puede saber cual de las dos es, asi que no puede
+      afirmar ninguna.
+
+      Y una lectura VIEJA tampoco se muestra: el sensor se corta seguido en un
+      entreno real, y dejar el ultimo numero conocido seria mentirle al atleta
+      sobre su esfuerzo justo cuando mas lo mira. Corte: 15s, tres muestras al
+      ritmo de ~5s del reloj.
+    dos_detalles_no_cosmeticos: |
+      - Se lee la estadistica MAS RECIENTE, no el promedio.
+      - El timestamp sale de LA MUESTRA, no de `Date()`. Fecharla al recibirla
+        la haria pasar por mas fresca de lo que es y la regla de antiguedad
+        dejaria de servir.
+  F4_el_esfuerzo_tambien_en_el_telefono:
+    estado: HECHA — verificada corriendo de punta a punta
+    que_es: |
+      Un AGREGADO, pedido por el dueño: si el atleta agarra el celular a mitad
+      de entreno, sus pulsaciones y calorias tambien estan ahi, al lado del
+      tiempo. Sin reloj conectado la pantalla queda exactamente como estaba.
+    NO_VIOLA_D1: |
+      D1 dice que el ritmo cardiaco vive en pantalla y en Salud, y que el ciclo
+      NO TOCA FIRESTORE. No lo toca: el dato viaja del reloj al telefono por
+      WatchConnectivity, se muestra en vivo y muere cuando termina el entreno.
+
+      Y para Apple tampoco es "collect" —transmitir datos FUERA del dispositivo
+      de forma que el desarrollador pueda accederlos—: nunca sale de los
+      dispositivos del atleta hacia un servidor nuestro. CERO declaraciones de
+      privacidad nuevas.
+
+      Si algun dia esto se guarda en Firestore, las dos cosas dejan de ser
+      ciertas en el acto. Eso es otro ciclo y arranca por una decision de
+      privacidad, no por codigo.
+    verificado_corriendo: |
+      reloj:    "Esfuerzo publicado al telefono: bpm 62, kcal 0" — 71 envios
+      telefono: 00:50 con ♥63, y un minuto despues 01:53 con ♥64
+
+      El dato viaja, se muestra al lado del tiempo y se actualiza en vivo. El
+      throttle tambien se ve: 71 envios espaciados, no uno por muestra.
+    la_caducidad_es_distinta_a_la_del_reloj: |
+      45 segundos en el telefono contra 15 en el reloj, y a proposito.
+
+      En el reloj las calorias NO caducan: son acumuladas y siguen siendo
+      verdad. En el telefono el dato viene RELAYADO, asi que su antiguedad mide
+      otra cosa — si hace 45s que no llega nada, lo mas probable es que el
+      vinculo este muerto. Mostrar calorias congeladas ahi sugiere una conexion
+      viva que no existe.
+
+      Los 45s salen de la latencia medida de WatchConnectivity: entre 2,0s y
+      24,4s segun la carga. Un umbral apretado descartaria datos buenos porque
+      el telefono estaba ocupado.
+    por_que_updateApplicationContext: |
+      `sendMessage` exige alcanzabilidad AHORA y sirve para un aviso puntual que
+      se puede perder. El contexto es estado "actual": el sistema lo COLAPSA
+      quedandose con el ultimo valor, que es exactamente lo que se quiere para
+      "a cuanto esta el pulso ahora".
+
+      Es la misma distincion que ya documentaba `watch_nudge_service.dart` para
+      el sentido inverso.
+
+  F3_duracion_y_escritura_en_salud:
+    estado: HECHA — verificada corriendo en simulador
+    verificado_corriendo: |
+      Duracion 2 min, origen medida
+      Entreno escrito en Salud, duracion 128.703213s
+      durationMin persistido en Firestore: 2
+    por_que_hizo_falta_loguear_el_ORIGEN: |
+      Medicion y reloj de pared COINCIDEN en el caso normal, asi que el numero
+      solo no distingue si la medicion se uso o si se cayo al respaldo en
+      silencio. Sin ese log D4 es inverificable corriendo.
+
+      No es teorico: la primera lectura de esta fase parecia mostrar que habia
+      caido al respaldo (durationMin=16 contra 352s medidos), hasta que se vio
+      que la sesion inspeccionada era la ANTERIOR, hecha con el build de F1 sin
+      F3. Verificar SIEMPRE que el dato que se mira sea del build que se probo.
+    techo_de_8_horas: |
+      Va un paso mas alla de D4, deliberado: sin el, el MISMO entreno persistia
+      una duracion distinta segun que dispositivo lo terminara.
+
+      El telefono ademas RECUPERA la duracion real desde los timestamps de las
+      series cuando se pasa del techo (session_duration.dart). Eso NO esta
+      portado — el reloj solo acota. Asimetria conocida, no un olvido.
+
+phases:
+  explore: done
+  propose: done
+  spec: pending
+  design: pending
+  tasks: pending
+  apply: pending
+  verify: pending
+  archive: pending
+
+decisiones_firmadas:
+  D1:
+    que: Donde vive el ritmo cardiaco
+    opciones: [solo en pantalla y en Salud, tambien resumen en Firestore, solo en pantalla]
+    recomendada: solo en pantalla y en Salud
+    por_que: |
+      La opcion de Firestore arrastra esquema, Security Rules, UI en el
+      telefono y una decision de privacidad sobre si el PF ve la frecuencia
+      cardiaca de sus atletas. Eso ultimo merece su propio ciclo, no ir de
+      arrastre.
+    estado: FIRMADA — el dueño aprobo el proposal tal como estaba, o sea la opcion recomendada
+  D2:
+    que: Que pasa si el atleta niega el permiso de HealthKit
+    recomendada: el entreno funciona igual, sin pulsaciones
+    a_verificar_en_F0: |
+      Si la sesion de entrenamiento —y con ella la ejecucion en segundo
+      plano— se puede abrir SIN permiso de lectura de ritmo cardiaco. Si no
+      se puede, hay que decidir si se insiste con el permiso o se acepta que
+      ese usuario pierde el descanso en segundo plano.
+    estado: FIRMADA — el dueño aprobo el proposal tal como estaba, o sea la opcion recomendada
+  D3:
+    que: Si el entreno se escribe en la app Salud
+    recomendada: si
+    por_que: |
+      Es lo que espera un usuario de Apple Watch. Sin eso, el entreno de
+      TREINO no cuenta para sus anillos ni su historial.
+    estado: FIRMADA — el dueño aprobo el proposal tal como estaba, o sea la opcion recomendada
+  D4:
+    que: De donde sale la duracion
+    recomendada: |
+      La sesion de entrenamiento pasa a ser la fuente de verdad cuando existe;
+      el calculo actual queda como respaldo. `durationMin` no cambia de forma
+      en Firestore, cambia de donde sale el numero.
+    estado: FIRMADA — el dueño aprobo el proposal tal como estaba, o sea la opcion recomendada
+
+hallazgos_medidos:
+  descanso_muere_en_segundo_plano: |
+    `restTimer` es un Timer.scheduledTimer comun
+    (WorkoutCoordinator.swift:444) y el target del reloj NO declara ningun
+    background mode — el pbxproj solo tiene WKCompanionAppBundleIdentifier
+    (lineas 560, 607, 651). watchOS suspende la app al bajar la muñeca, que en
+    el gimnasio es el caso NORMAL. Es el bug mas grave que queda del ciclo
+    anterior, y no se arregla con mas codigo Swift.
+  duracion_es_estimacion: |
+    Los dos lados restan timestamps: el reloj con
+    `Date().timeIntervalSince(start)` (WorkoutCoordinator.swift:396) y el
+    telefono con `_durationMin(elapsedSeconds)` acotado por
+    `maxWorkoutDuration` (session_notifier.dart:747). Ese clamp existe porque
+    sesiones dejadas abiertas toda la noche persistian duraciones absurdas —
+    sintoma de que nadie mide de verdad.
+  cero_healthkit: |
+    Ni una referencia en lib/ ni en el target del reloj. Entitlements actuales:
+    solo aps-environment y applesignin. El proposal del ciclo anterior lo dejo
+    explicitamente fuera de alcance (watch-standalone-client/proposal.md:38).
+
+riesgo_que_define_el_ciclo: |
+  ❌ ESTE RIESGO ERA FALSO. Se midio en F2 y no existe.
+
+  Decia: "EL SIMULADOR NO GENERA RITMO CARDIACO. Todo el ciclo anterior se
+  verifico en simulador y funciono; aca eso se termina, hace falta un Apple
+  Watch REAL en la muñeca."
+
+  MEDIDO: el simulador de watchOS 26.2 SI genera ritmo cardiaco sintetico
+  durante una HKWorkoutSession. Se vio actualizandose en la pantalla de
+  entreno: 64 -> 61 -> 59 -> 56 -> 62 lpm.
+
+  Las tres fases resultaron verificables en simulador, incluida F2. No queda
+  NADA del ciclo esperando hardware.
+
+  Por que se creyo lo contrario: la sonda de F0 leyo `builder.statistics` a los
+  pocos segundos de `beginCollection` y encontro un HKStatistics vacio. La
+  conclusion "no hay datos" era prematura — los datos llegan despues, por el
+  delegate. Un objeto vacio leido temprano no prueba que no vaya a haber nada.
+
+  Lo que el ordenamiento por verificabilidad SI acerto: F1 entrego el arreglo
+  grande temprano. Pero la razon que se dio para ordenarlo asi no era cierta.
+
+  ⚠️ Ojo con el alcance de esta correccion: el simulador prueba la CAÑERIA
+  —sesion, builder, delegate, pantalla— con datos sinteticos. No prueba que un
+  sensor real enganche en una muñeca real. El smoke en hardware sigue teniendo
+  sentido; lo que ya no tiene es BLOQUEAR nada esperandolo.
+
+preguntas_abiertas_para_F0: RESPONDIDAS — ver respuestas_de_F0
+
+respuestas_de_F0:
+  Q1_provisioning_profile:
+    pregunta: Si el entitlement de HealthKit exige regenerar el provisioning profile.
+    respuesta: |
+      SI, y hay algo peor: hoy NO EXISTE ningun perfil para el reloj.
+
+      Medido decodificando los 5 perfiles instalados en
+      ~/Library/Developer/Xcode/UserData/Provisioning Profiles:
+
+        J66AQRRM96.com.treino.app          -> 0 claves healthkit
+        J66AQRRM96.com.backhaus.treino     -> 0 claves healthkit
+        J66AQRRM96.com.backhaus.treino     -> 0 (Store)
+        J66AQRRM96.com.treino.ar           -> 0 claves healthkit
+        J66AQRRM96.com.backhaus.treino-    -> 0 claves healthkit
+
+      Ninguno tiene HealthKit, y NINGUNO cubre
+      com.backhaus.treino.watchkitapp: el companion nunca se firmo para un
+      dispositivo real, todo el ciclo anterior fue simulador.
+
+      Confirmado por el lado del build: el .xcent de DISPOSITIVO del reloj sale
+      vacio ({}), mientras que el -Simulated.xcent si trae
+      com.apple.developer.healthkit = true. O sea, en simulador el entitlement
+      esta; para dispositivo todavia no hay de donde sacarlo.
+    quien_lo_destraba: |
+      La firma es automatica (CODE_SIGN_STYLE = Automatic, DEVELOPMENT_TEAM =
+      J66AQRRM96), asi que Xcode genera el perfil solo — PERO antes tiene que
+      habilitar la capability HealthKit en el App ID del portal.
+
+      CORRECCION: se habia anotado que eso pedia rol Admin o App Manager. La
+      cuenta del dueño es INDIVIDUAL (visto en Xcode > Signing & Capabilities,
+      Team "Martin Backhaus (Individual)"), asi que es el titular y no necesita
+      permiso de nadie. El tramite es solo suyo, no de un tercero.
+    RESUELTO_2026_08_12: |
+      El dueño creo el App ID y tildo HealthKit. Verificado con
+      `scripts/verify_watch_provisioning.sh`:
+
+        perfil:  iOS Team Provisioning Profile: com.backhaus.treino.watchkitapp
+        app id:  J66AQRRM96.com.backhaus.treino.watchkitapp
+        vence:   2027-08-12
+        declara: com.apple.developer.healthkit ✓
+
+      El app id coincide exacto con el DEVELOPMENT_TEAM commiteado, asi que
+      Xcode lo resuelve solo.
+
+      Y se verifico con la MISMA vara con la que se diagnostico el problema:
+      un build contra `generic/platform=watchOS` con -allowProvisioningUpdates.
+
+      Antes el .xcent de DISPOSITIVO salia vacio ({}). Ahora:
+
+        "application-identifier" => "J66AQRRM96.com.backhaus.treino.watchkitapp"
+        "com.apple.developer.healthkit" => true
+        "com.apple.developer.team-identifier" => "J66AQRRM96"
+
+      O sea que no es solo que el perfil exista: Xcode lo resuelve y el
+      entitlement llega al binario firmado. BUILD SUCCEEDED.
+
+      Ya no queda NADA del ciclo bloqueado. El smoke en hardware es posible.
+
+  Q2_hkworkoutsession_en_simulador:
+    pregunta: Si HKWorkoutSession corre en el simulador, aunque sea sin datos de HR.
+    respuesta: |
+      SI, CORRE. Medido con una sonda descartable en el Apple Watch Series 11
+      42mm (EF0E3E46), watchOS 26.2:
+
+        isHealthDataAvailable = true
+        HKWorkoutSession CREADA, state = 1 (notStarted)
+        startActivity -> a los 3s, state = 2 (running)
+        session.end() -> state = 3 (ended)
+
+      Y con el permiso concedido tambien recolecta:
+
+        beginCollection OK — el builder recolecta
+        el builder tiene stats de HR: HKStatistics on HKQuantityTypeIdentifierHeartRate
+
+      El objeto HKStatistics viene VACIO (rango de tiempo de ancho cero, sources
+      null): el simulador no genera pulsaciones, como estaba previsto. Pero la
+      cañeria entera —sesion, builder, data source, statistics— funciona.
+    consecuencia_para_el_plan: |
+      F1 ES VERIFICABLE EN SIMULADOR. Abrir y cerrar la sesion junto con el
+      entreno se puede probar sin hardware.
+
+      CORRECCION (aporte de la sesion paralela del companion): tambien el
+      EFECTO es medible en simulador, no solo la mecanica. Yo habia escrito acá
+      que hacia falta la muñeca; estaba de mas. Mandar la app al fondo con la
+      Digital Crown la suspende igual, y eso alcanza para medir la perdida.
+
+      Medido por esa sesion, sin HKWorkoutSession abierta, en el mismo par de
+      simuladores:
+
+        banner en T0 ............ 148s
+        segundos reales T0->T1 ... 84
+        banner al volver ........ 121s
+        conto ................... 27s
+        PERDIO .................. 57s   (~47s en background + arranque)
+
+      Lo que convierte eso en prueba y no en indicio: el banner SEGUIA PRESENTE
+      al volver. Si la app se hubiera reiniciado, `restRemaining` seria nil y no
+      habria banner, porque no se persiste. O sea que no se reinicio: se
+      suspendio y retomo donde estaba.
+
+      F1 tiene entonces un test rojo/verde sin hardware: repetir ese
+      procedimiento con la sesion de entrenamiento abierta y ver si deja de
+      perder segundos.
+
+      Lo que el simulador sigue sin poder dar: pulsaciones reales (F2).
+
+  Q3_sesion_sin_permiso_de_lectura:
+    pregunta: Si la sesion se puede abrir SIN permiso de lectura de HR (ver D2).
+    respuesta: |
+      SI SE PUEDE. Es el hallazgo mas importante de F0.
+
+      Medido con el permiso NEGADO POR COMPLETO (authStatus(workoutType) =
+      sharingDenied, todos los toggles en off):
+
+        HKWorkoutSession CREADA, state = 1
+        startActivity -> a los 3s, state = 2 (RUNNING)
+        beginCollection FALLO: Not authorized
+
+      O sea: la SESION abre y corre sin permiso ninguno. Lo unico que falla es
+      la RECOLECCION de datos del HKLiveWorkoutBuilder.
+
+      Como la ejecucion en segundo plano cuelga de que la SESION este viva —no
+      de que el builder recolecte— el atleta que niega el permiso NO pierde el
+      descanso en segundo plano. Pierde las pulsaciones y la escritura en Salud,
+      nada mas.
+    consecuencia_para_D2: |
+      D2 SE SOSTIENE COMO SE FIRMO. No hay que volver al dueño: la disyuntiva
+      que el proposal dejaba abierta —"insistir con el permiso o aceptar que ese
+      usuario pierde el descanso"— no existe. No se pierde.
+    lo_que_NO_esta_verificado: |
+      Que la sesion viva efectivamente MANTENGA corriendo el Timer del descanso
+      con la muñeca abajo. Lo medido es que la sesion abre y llega a `running`.
+      El efecto en segundo plano es justamente lo que F1 tiene que demostrar, y
+      el simulador no baja la muñeca. No darlo por hecho.
+
+  hallazgo_extra_sobre_la_lectura:
+    que: Como se comporta HealthKit cuando el atleta niega la LECTURA.
+    medido: |
+      Tres estados distintos, con la misma query de ritmo cardiaco:
+
+        sin contestar aun -> ERROR: "Authorization not determined"
+        NEGADO            -> OK, 0 muestras     <-- sin error
+        CONCEDIDO         -> OK, 1 muestras
+
+      Confirmado ademas que `authorizationStatus(for:)` habla SOLO de escritura:
+      con el permiso concedido, el status de heartRate seguia dando
+      sharingDenied, porque heartRate esta en la lista de LECTURA y nunca se
+      pidio escribirlo.
+    por_que_importa_en_F2: |
+      Una lectura negada es INDISTINGUIBLE de "no hay datos": las dos dan una
+      query exitosa con cero muestras. La pantalla de F2 no puede mostrar un
+      error cuando no llegan pulsaciones, porque no sabe —ni puede saber— si el
+      atleta las nego o si todavia no midio ninguna. Tiene que tratar el
+      silencio como silencio.
+
+      Por eso `HealthAccessState` modela solo la escritura. No es una
+      simplificacion: es lo unico que HealthKit dice de verdad.
+
+  Q4_declaraciones_de_privacidad:
+    pregunta: Que declaraciones de privacidad pide Apple en la review por HealthKit.
+    respuesta: |
+      Lo que aplica, con numero de seccion de las App Review Guidelines:
+
+        5.1.1(i)  politica de privacidad que diga que datos se recogen y para que
+        5.1.2(vi) los datos de HealthKit NO pueden usarse para marketing,
+                  publicidad ni mineria de datos, ni propios ni de terceros
+        5.1.3(i)  no divulgarlos a terceros para esos mismos fines
+        5.1.3(ii) no escribir datos falsos o inexactos en HealthKit, y
+                  NO guardar informacion de salud en iCloud
+    el_hallazgo_que_sale_de_D1: |
+      Apple define "collect" como TRANSMITIR datos fuera del dispositivo de
+      forma que queden accesibles mas alla de atender el pedido en tiempo real,
+      y dice explicitamente que los datos procesados SOLO en el dispositivo no
+      se consideran recogidos y no hay que declararlos.
+
+      Como D1 dejo el ritmo cardiaco en pantalla y en la app Salud, SIN TOCAR
+      FIRESTORE, TREINO no "recoge" datos de salud. Consecuencia concreta: este
+      ciclo NO agrega declaraciones de Health/Fitness en App Privacy ni entradas
+      al privacy manifest. El repo no tiene PrivacyInfo.xcprivacy y no le hace
+      falta para F0.
+
+      Si algun dia se firma D1(b) —resumen en Firestore— eso deja de ser cierto
+      EN EL ACTO: pasa a ser recoleccion, con declaracion en App Privacy,
+      entrada en el privacy manifest, y 5.1.3(ii) sobre iCloud pasando a
+      importar. Es un costo de D1(b) que el proposal no habia contabilizado.
+
+hallazgos_laterales_de_F0:
+  el_typecheck_rapido_dejaba_pasar_errores: |
+    El comando corto del HANDOFF (swiftc -typecheck -sdk ... -target ...) NO
+    reproduce los flags del target y deja pasar errores que aparecen recien en
+    el build largo.
+
+    Medido: HealthStore.swift usaba @Published sin `import Combine`. El
+    typecheck corto lo daba LIMPIO; el build fallo con
+    "initializer 'init(wrappedValue:)' is not available due to missing import
+    of defining module 'Combine' [#MemberImportVisibility]".
+
+    Causa: el target activa SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY.
+    Sin ese flag, el import de OTRO archivo del mismo lote alcanzaba para que
+    resolviera. Costo un build de ~20 min.
+
+    Arreglado en scripts/typecheck_watch.sh, que fija los flags del target.
+    Usar ESE y no el comando suelto.
+
+  la_premisa_del_pbxproj_estaba_imprecisa: |
+    El HANDOFF (§8.8) dice que "Flutter reescribe project.pbxproj en cada
+    build". Medido contra el historial del propio repo (commit 29bf0f90):
+    Flutter reescribe UNA sola clave, `objectVersion` (70 -> 54), y eso ya
+    quedo neutralizado commiteando el 54. Ni `pod install` ni `xcodebuild` lo
+    tocan por ese lado.
+
+    El riesgo real es OTRO y esta documentado en docs/setup/watchos-target.md:
+    CocoaPods reescribe el archivo ENTERO en cada `pod install`, y una version
+    de Xcodeproj que no entienda una clave puede descartarla al escribir, sin
+    error. Ya casi se come el enganche del target del reloj.
+
+    Verificado en esta fase: `pod install` con CocoaPods 1.17.0 respeto las 9
+    lineas agregadas.
+
+  DOS_CAMINOS_ENTRAN_EN_MODO_ENTRENO_A_LA_VEZ: |
+    ⚠️ ESTO ES PARA F1, Y ES UN RIESGO REAL.
+
+    Con la sonda puesta se vio que `requestHealthAccess()` corrio DOS VECES en
+    un mismo arranque: el log muestra dos sondas completas en paralelo, una
+    llegando a state = 2 y la otra a state = 3.
+
+    La causa es de la app, no de F0: `TreinoWatchApp` llama a
+    `workoutCoordinator.restore()` en el `.task`, y ademas
+    `adoptRemoteSessionIfAny()` en el `.onChange(of: scenePhase)` cuando la
+    escena se pone activa. Las dos corren al arrancar, las dos ven
+    `session == nil`, y las dos adoptan.
+
+    En F0 es inofensivo: pedir permiso dos veces es idempotente.
+
+    EN F1 NO LO ES. Dos caminos concurrentes abriendo cada uno su
+    HKWorkoutSession son dos sesiones de entrenamiento en watchOS para un solo
+    entreno. F1 tiene que garantizar UNA sola, y el `guard session == nil` de
+    hoy NO alcanza porque la carrera pasa antes de que ninguno asigne.
+
+  el_permiso_faltaba_en_dos_de_los_tres_caminos: |
+    El reloj entra en modo entreno por TRES caminos —empezarlo ahi, adoptar el
+    que abrio el telefono, y recuperar uno a medias—. Pedir el permiso solo en
+    `start` dejaba sin preguntar justo al caso mas comun de un companion: el
+    atleta que arranca en el celular. Corregido: los tres piden.
+
+  cocoapods_necesita_locale_UTF8: |
+    `pod install` aborta con "Unicode Normalization not appropriate for
+    ASCII-8BIT" si el entorno no tiene locale UTF-8. Va
+    `LANG=en_US.UTF-8 pod install`. Ya estaba documentado en
+    docs/setup/watchos-target.md; se re-tropezo igual.
+
+el_HOY_viejo_NO_lo_agrava_F1: |
+  La sesion paralela aviso que el "HOY" del reloj se queda viejo en silencio, y
+  afirmo que con HKWorkoutSession manteniendo la app viva esa ventana se hace
+  MAS LARGA "porque la app deja de reiniciarse".
+
+  VERIFICADO CONTRA EL CODIGO: la afirmacion NO se sostiene, aunque la
+  conclusion practica —hace falta un refresh explicito— si.
+
+  Las dos ventanas son DISJUNTAS por construccion:
+    - La HKWorkoutSession dura exactamente lo que dura el entreno.
+    - La ventana de dato viejo ABRE cuando esa sesion CIERRA: el HOY se calcula
+      desde la ultima sesion con status=finished y wasFullyCompleted=true
+      (TodaysWorkout.swift:283-287), y lo unico que escribe esos campos desde el
+      reloj es finish() (WorkoutCoordinator.swift:253-263).
+
+  O sea: mientras la app esta viva por HealthKit, el HOY todavia no esta viejo;
+  cuando el HOY se pone viejo, la sesion ya esta cerrada. F1 no alarga nada.
+
+  Y el HOY no es una fecha: PlanAdvance.swift:42-61 no toca Date ni Calendar.
+  Es una rotacion desde la ultima sesion completada. Medianoche no lo invalida
+  — lo invalida finish(), que escribe esos campos y despues no recarga nada.
+
+  DURANTE el entreno el dato viejo no le llega al atleta: ContentView rutea a
+  WorkoutView apenas hay sesion, y WorkoutView lee `workout` del coordinator, no
+  `todaysWorkout`.
+
+  LO QUE SI ES CIERTO, y es anterior a este ciclo: la ventana DESPUES de
+  terminar ya es infinita hoy. finish() limpia el estado local sin recalcular el
+  HOY, y no hay red de contencion. Arreglarlo es barato y toca las mismas lineas
+  que F1 ya modifico —los dos puntos donde se llama endWorkoutSession()— pero es
+  un bug propio, no algo que F1 introduzca.
+
+  CORRECCION A UN AGENTE: se reporto que "F1 hace que un entreno olvidado
+  sobreviva horas en vez de morir con el proceso". Es falso. La sesion se
+  persiste en disco con su `startedAt` y se restaura, asi que ya sobrevive a que
+  el proceso muera. La duracion del reloj no tiene techo
+  (WorkoutCoordinator.swift:455-457) mientras el telefono clampea a 8 h
+  (session_duration.dart:4) — asimetria REAL pero PREEXISTENTE.
+
+  Lo que F1 si agrega de verdad: un entreno olvidado deja la app viva y el
+  reloj gastando bateria, con el indicador de entrenamiento de watchOS
+  encendido. Eso es nuevo, y es bateria, no duracion.
+
+candidato_para_F1_restEndsAt: |
+  Propuesta de la sesion paralela del companion. NO implementada — queda a
+  decision del dueño, y la autoria es de ellos.
+
+  `HKWorkoutSession` NO arregla que el descanso sea un contador de ticks: hace
+  que casi siempre alcance a tickear. Sigue siendo fragil ante cualquier
+  suspension que se cuele.
+
+  Guardar `restEndsAt: Date` y derivar los segundos de `Date()` —en vez de
+  restar de a uno— deja el descanso correcto AUNQUE la app se suspenda, sin
+  depender de ningun permiso. Es ortogonal a HealthKit y son pocas lineas.
+
+  Lo que suma F0 al argumento: como la sesion abre incluso con el permiso
+  NEGADO (ver Q3), ese atleta ya conserva el segundo plano. Con `restEndsAt`
+  encima, el camino de permiso denegado deja de estar degradado EN ABSOLUTO
+  para el descanso, no "casi". La fila de la tabla de riesgos del proposal
+  —"el atleta niega el permiso / sin background el descanso vuelve a morir"—
+  pasaria de riesgo aceptado a no puede pasar.
+
+  Por eso conviene hacerlo JUNTO con F1 y no despues.
+
+trampas_de_entorno_medidas_por_la_sesion_paralela: |
+  - La rutina de prueba "hhhh" (7Qiyue62lEiYsJmGzwOm) tiene `restSeconds = 0`
+    en los 5 dias. Con esa rutina el banner de descanso NO PUEDE aparecer
+    nunca, y es correcto (`guard seconds > 0`). Probar descanso ahi da un
+    falso negativo. Usar `seed-routine-001`: dia 1 tiene 180/150/120, dia 2
+    180/150/90, dia 3 210/150/150.
+
+  - La latencia de WatchConnectivity en simulador varia muchisimo con la carga
+    de la maquina: el mismo mensaje medido en 2,0 s y en 24,4 s, con load
+    average de 493. Con varios simuladores booteados y builds en paralelo, una
+    captura sacada a los 10 s da un falso "no llego el aviso". Mirar `uptime`
+    antes de medir tiempos de entrega, y rastrear el messageID en los dos lados
+    con `xcrun simctl spawn <udid> log show`.
+
+  - No lanzar builds ni instalar sobre el par emparejado sin coordinar: ademas
+    de la contencion de DerivedData, instalar cambia el binario abajo de quien
+    este probando. Paso en este ciclo — ver nota_de_coordinacion.
+
+nota_de_coordinacion: |
+  El 2026-08-11 14:23:30 esta fase dejo instalado su build de F0 en el Apple
+  Watch EF0E3E46, que es el par que usa el dueño para probar. Ese bundle trae
+  las claves de HealthKit, o sea que no es `feat/workout-watch-connectivity`.
+
+  Ademas quedaron cambiados en ese simulador:
+    - el permiso de HealthKit de TreinoWatch, CONCEDIDO (Turn On All). Persiste;
+      desinstalar la app no lo resetea.
+    - setLogs escritos en el emulador para seed-athlete-001: 3 series de Peso
+      Muerto Rumano en una sesion abierta de Upper B — Tiron.
+
+  No se revirtio a proposito: revertir eran mas builds e instalaciones sobre el
+  mismo par, que es justo lo que habia que dejar de hacer.
+
+
+artifacts:
+  explore: openspec/changes/watch-workout-session/explore.md
+  proposal: openspec/changes/watch-workout-session/proposal.md
+
+blocked_on: |
+  Nada. Las cuatro decisiones quedaron firmadas con la opcion recomendada al
+  aprobar el dueño el proposal tal como estaba.
+
+  CONSECUENCIA DE D1: este ciclo NO TOCA FIRESTORE. El ritmo cardiaco vive en
+  pantalla y en la app Salud. Si en algun momento se quiere que el PF vea la
+  frecuencia cardiaca de sus atletas, eso es otro ciclo y arranca por una
+  decision de privacidad, no por codigo.
+
+nota_de_metodo: |
+  El ciclo anterior dejo una leccion que aplica directo: cada vez que se
+  declaro algo listo sin verlo correr, estaba mal. Y aca el simulador deja de
+  alcanzar, asi que la disciplina tiene que ser mas estricta, no menos.
