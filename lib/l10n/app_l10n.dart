@@ -7039,6 +7039,36 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'No pudimos guardar tu reporte. Probá de nuevo.'**
   String get exerciseFeedbackError;
+
+  /// Tag del reporte cuando es un comentario común. Espejo de 'DEL COACH' en la otra dirección.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DEL ALUMNO'**
+  String get exerciseFeedbackNoteTagComment;
+
+  /// Tag del reporte cuando el alumno marcó dolor o molestia. Se ve distinto de un comentario a propósito.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MOLESTIA'**
+  String get exerciseFeedbackNoteTagDiscomfort;
+
+  /// Serie a la que quedó anclado el reporte, al lado del tag.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SERIE {setNumber}'**
+  String exerciseFeedbackNoteSetTag(int setNumber);
+
+  /// Error al cargar el feedback por ejercicio en las superficies del PF.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar los reportes del alumno.'**
+  String get coachSessionFeedbackLoadError;
+
+  /// Mismo fallo que coachSessionFeedbackLoadError pero en la superficie del PROPIO alumno: ahi los reportes son suyos, no 'del alumno'.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar tus reportes.'**
+  String get sessionFeedbackLoadError;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

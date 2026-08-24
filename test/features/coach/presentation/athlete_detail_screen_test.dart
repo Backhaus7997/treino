@@ -15,6 +15,7 @@ import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
+import 'package:treino/features/workout/application/exercise_feedback_providers.dart';
 import 'package:treino/features/workout/application/exercise_providers.dart';
 import 'package:treino/features/workout/application/routine_providers.dart'
     show routineByIdStreamProvider;
@@ -25,6 +26,7 @@ import 'package:treino/features/workout/application/session_providers.dart'
         coachSessionSetLogsProvider,
         sessionRepositoryProvider;
 import 'package:treino/features/workout/data/session_repository.dart';
+import 'package:treino/features/workout/domain/exercise_feedback.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_day.dart';
 import 'package:treino/features/workout/domain/routine_source.dart';
@@ -78,6 +80,26 @@ SetLog _makeSetLog({
       reps: reps,
       weightKg: weightKg,
       completedAt: DateTime(2024, 1, 10, 9),
+    );
+
+/// Un reporte del alumno (#628). `exerciseId` por defecto NO es el de
+/// [_makeSetLog]: el caso que importa es justamente el ejercicio sin series.
+ExerciseFeedback _makeFeedback({
+  String id = 'fb-1',
+  String exerciseId = 'ex-9',
+  String exerciseName = 'Remo en polea',
+  int? setNumber,
+  ExerciseFeedbackKind kind = ExerciseFeedbackKind.discomfort,
+  String text = 'Me tira el hombro',
+}) =>
+    ExerciseFeedback(
+      id: id,
+      exerciseId: exerciseId,
+      exerciseName: exerciseName,
+      setNumber: setNumber,
+      kind: kind,
+      text: text,
+      createdAt: DateTime(2024, 1, 10, 9, 30),
     );
 
 UserPublicProfile _makeProfile(String uid, String name) => UserPublicProfile(
@@ -626,6 +648,147 @@ void main() {
       await tester.tap(find.text('Plan Test'));
       await tester.pumpAndSettle();
 
+      expect(
+          find.text('Esta sesión no tiene sets registrados.'), findsOneWidget);
+    });
+
+    testWidgets(
+        '#628: un reporte sobre un ejercicio SIN series igual se renderiza',
+        (tester) async {
+      // El alumno reportó sobre un miembro de superset que nunca fue la celda
+      // activa: cero SetLogs de ese exerciseId. Derivando los bloques sólo de
+      // los logs, ese reporte no tenía dónde caer y el PF no lo veía nunca.
+      final finished = _makeSession(id: 'ses-1', wasFullyCompleted: true);
+
+      await _pumpScreen(
+        tester,
+        athleteId: 'athlete-1',
+        overrides: [
+          ...base(),
+          sessionsByUidProvider('athlete-1').overrideWith(
+            (ref) async => [finished],
+          ),
+          coachSessionSetLogsProvider(
+                  (athleteUid: 'athlete-1', sessionId: 'ses-1'))
+              .overrideWith((ref) async => [_makeSetLog(id: 'log-1')]),
+          coachSessionExerciseFeedbackProvider(
+                  (athleteUid: 'athlete-1', sessionId: 'ses-1'))
+              .overrideWith((ref) async => [_makeFeedback()]),
+        ],
+      );
+
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Plan Test'));
+      await tester.pumpAndSettle();
+
+      // El ejercicio con series sigue igual…
+      expect(find.text('Sentadilla'), findsOneWidget);
+      // …y el reportado sin series aparece con su nombre denormalizado.
+      expect(find.text('Remo en polea'), findsOneWidget);
+      expect(find.text('Me tira el hombro'), findsOneWidget);
+    });
+
+    testWidgets(
+        '#628: sesión con reportes y CERO series no muestra sólo el placeholder',
+        (tester) async {
+      // Sin series pero con algo reportado, cortar por `logs.isEmpty` era
+      // decirle al PF "esta sesión no tiene sets" y tragarse la molestia.
+      final finished = _makeSession(id: 'ses-1', wasFullyCompleted: true);
+
+      await _pumpScreen(
+        tester,
+        athleteId: 'athlete-1',
+        overrides: [
+          ...base(),
+          sessionsByUidProvider('athlete-1').overrideWith(
+            (ref) async => [finished],
+          ),
+          coachSessionSetLogsProvider(
+                  (athleteUid: 'athlete-1', sessionId: 'ses-1'))
+              .overrideWith((ref) async => <SetLog>[]),
+          coachSessionExerciseFeedbackProvider(
+                  (athleteUid: 'athlete-1', sessionId: 'ses-1'))
+              .overrideWith((ref) async => [_makeFeedback(setNumber: 2)]),
+        ],
+      );
+
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Plan Test'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Esta sesión no tiene sets registrados.'), findsNothing);
+      expect(find.text('Remo en polea'), findsOneWidget);
+      expect(find.text('Me tira el hombro'), findsOneWidget);
+    });
+
+    testWidgets(
+        '#628: si FALLA la lectura de reportes se avisa Y las series siguen',
+        (tester) async {
+      // El modo de falla que este aviso existe para tapar: degradado a lista
+      // vacía y sin decirlo, el PF ve el historial completo y normal, y
+      // concluye que el alumno no reportó ninguna molestia. "No se pudo leer"
+      // y "no reportó nada" NO pueden verse igual.
+      final finished = _makeSession(id: 'ses-1', wasFullyCompleted: true);
+
+      await _pumpScreen(
+        tester,
+        athleteId: 'athlete-1',
+        overrides: [
+          ...base(),
+          sessionsByUidProvider('athlete-1').overrideWith(
+            (ref) async => [finished],
+          ),
+          coachSessionSetLogsProvider(
+                  (athleteUid: 'athlete-1', sessionId: 'ses-1'))
+              .overrideWith((ref) async => [_makeSetLog(id: 'log-1')]),
+          coachSessionExerciseFeedbackProvider(
+                  (athleteUid: 'athlete-1', sessionId: 'ses-1'))
+              .overrideWith((ref) async => throw Exception('boom')),
+        ],
+      );
+
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Plan Test'));
+      await tester.pumpAndSettle();
+
+      // El aviso sale…
+      expect(find.text('No pudimos cargar los reportes del alumno.'),
+          findsOneWidget);
+      // …y NO se lleva puesta la sesión: las series se siguen viendo.
+      expect(find.text('Sentadilla'), findsOneWidget);
+      expect(find.text('Esta sesión no tiene sets registrados.'), findsNothing);
+    });
+
+    testWidgets(
+        '#628: el aviso de reportes convive con el placeholder de sesión vacía',
+        (tester) async {
+      // Sin series Y con la lectura de reportes rota son DOS hechos: el
+      // placeholder no puede tragarse el aviso ni al revés.
+      final finished = _makeSession(id: 'ses-1', wasFullyCompleted: true);
+
+      await _pumpScreen(
+        tester,
+        athleteId: 'athlete-1',
+        overrides: [
+          ...base(),
+          sessionsByUidProvider('athlete-1').overrideWith(
+            (ref) async => [finished],
+          ),
+          coachSessionSetLogsProvider(
+                  (athleteUid: 'athlete-1', sessionId: 'ses-1'))
+              .overrideWith((ref) async => <SetLog>[]),
+          coachSessionExerciseFeedbackProvider(
+                  (athleteUid: 'athlete-1', sessionId: 'ses-1'))
+              .overrideWith((ref) async => throw Exception('boom')),
+        ],
+      );
+
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Plan Test'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No pudimos cargar los reportes del alumno.'),
+          findsOneWidget);
       expect(
           find.text('Esta sesión no tiene sets registrados.'), findsOneWidget);
     });

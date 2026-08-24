@@ -3457,5 +3457,15 @@
   "exerciseFeedbackSuccess": "Listo. Tu PF lo va a ver junto a la serie.",
   "@exerciseFeedbackSuccess": {"description": "Confirmación después de guardar el reporte."},
   "exerciseFeedbackError": "No pudimos guardar tu reporte. Probá de nuevo.",
-  "@exerciseFeedbackError": {"description": "Error al guardar el reporte."}
+  "@exerciseFeedbackError": {"description": "Error al guardar el reporte."},
+  "exerciseFeedbackNoteTagComment": "DEL ALUMNO",
+  "@exerciseFeedbackNoteTagComment": {"description": "Tag del reporte cuando es un comentario común. Espejo de 'DEL COACH' en la otra dirección."},
+  "exerciseFeedbackNoteTagDiscomfort": "MOLESTIA",
+  "@exerciseFeedbackNoteTagDiscomfort": {"description": "Tag del reporte cuando el alumno marcó dolor o molestia. Se ve distinto de un comentario a propósito."},
+  "exerciseFeedbackNoteSetTag": "SERIE {setNumber}",
+  "@exerciseFeedbackNoteSetTag": {"description": "Serie a la que quedó anclado el reporte, al lado del tag.", "placeholders": {"setNumber": {"type": "int"}}},
+  "coachSessionFeedbackLoadError": "No pudimos cargar los reportes del alumno.",
+  "@coachSessionFeedbackLoadError": {"description": "Error al cargar el feedback por ejercicio en las superficies del PF."},
+  "sessionFeedbackLoadError": "No pudimos cargar tus reportes.",
+  "@sessionFeedbackLoadError": {"description": "Mismo fallo que coachSessionFeedbackLoadError pero en la superficie del PROPIO alumno: ahi los reportes son suyos, no 'del alumno'."}
 }

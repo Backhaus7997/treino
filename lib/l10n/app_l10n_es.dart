@@ -3983,6 +3983,24 @@ class AppL10nEs extends AppL10n {
   @override
   String get exerciseFeedbackError =>
       'No pudimos guardar tu reporte. Probá de nuevo.';
+
+  @override
+  String get exerciseFeedbackNoteTagComment => 'DEL ALUMNO';
+
+  @override
+  String get exerciseFeedbackNoteTagDiscomfort => 'MOLESTIA';
+
+  @override
+  String exerciseFeedbackNoteSetTag(int setNumber) {
+    return 'SERIE $setNumber';
+  }
+
+  @override
+  String get coachSessionFeedbackLoadError =>
+      'No pudimos cargar los reportes del alumno.';
+
+  @override
+  String get sessionFeedbackLoadError => 'No pudimos cargar tus reportes.';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -7961,4 +7979,22 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get exerciseFeedbackError =>
       'No pudimos guardar tu reporte. Probá de nuevo.';
+
+  @override
+  String get exerciseFeedbackNoteTagComment => 'DEL ALUMNO';
+
+  @override
+  String get exerciseFeedbackNoteTagDiscomfort => 'MOLESTIA';
+
+  @override
+  String exerciseFeedbackNoteSetTag(int setNumber) {
+    return 'SERIE $setNumber';
+  }
+
+  @override
+  String get coachSessionFeedbackLoadError =>
+      'No pudimos cargar los reportes del alumno.';
+
+  @override
+  String get sessionFeedbackLoadError => 'No pudimos cargar tus reportes.';
 }
