@@ -12,8 +12,7 @@ Documentación viva del proyecto. **Cualquier cambio acá entra por PR como cual
 | [performance.md](./performance.md) | State management, rebuilds, batería, multi-device matrix, profiling |
 | [workflow.md](./workflow.md) | Setup nueva máquina, equipo, commits, branching, PRs, SDD, calidad gates |
 | [roadmap.md](./roadmap.md) | Fases 0-6, Fase 1 desglosada en 7 etapas con owner y branch sugeridos |
-| [security.md](./security.md) | Matriz de cobertura de reglas (Firestore + Storage): qué colección × operación tiene test negativo y cuál no. **Se actualiza en el mismo PR que toque las reglas.** |
-| [privacy-data-inventory.md](./privacy-data-inventory.md) | Inventario de datos personales: qué PII se guarda y dónde, contrastado contra el cascade de `deleteAccount` y contra la Política de Privacidad. **Se actualiza en el mismo PR que agregue o mueva un dato personal.** |
+| [security.md](./security.md) | Superficie de seguridad. §1: matriz de cobertura de reglas (Firestore + Storage) — qué colección × operación tiene test negativo y cuál no. §2: inventario de datos personales, contrastado contra el cascade de `deleteAccount` y contra la Política de Privacidad. **Se actualiza en el mismo PR que toque las reglas o que agregue o mueva un dato personal.** |
 
 ## Cómo encontrar info
 
