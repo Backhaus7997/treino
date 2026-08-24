@@ -1,11 +1,19 @@
 # docs/security.md
 
-Estado de la superficie de seguridad de TREINO. Hoy contiene **tres secciones**:
-la matriz de cobertura de reglas (Slice A de #680), el inventario de datos
-personales contrastado contra el cascade de borrado y contra la Política de
-Privacidad, y la decisión escrita sobre las lecturas amplias de Storage
-(Slice E). El threat model por actor y el registro `QA-SEC-xxx` van a vivir acá
-también, en secciones aparte.
+Estado de la superficie de seguridad de TREINO. Hoy contiene **cuatro
+secciones**: la matriz de cobertura de reglas (Slice A de #680), el inventario
+de datos personales contrastado contra el cascade de borrado y contra la
+Política de Privacidad, la decisión escrita sobre las lecturas amplias de
+Storage, y el threat model por actor con el registro `QA-SEC-xxx` (Slice E).
+
+Las cuatro responden preguntas distintas y se leen en ese orden:
+
+| Sección | Pregunta que responde |
+|---|---|
+| [§1](#1-matriz-de-cobertura-de-reglas) | ¿Qué colección × operación no tiene un test que compruebe que el denegado se deniega? |
+| [§2](#2-inventario-de-datos-personales) | ¿Qué dato personal guardamos, dónde, y qué pasa con él cuando el usuario se va? |
+| [§3](#3-lecturas-amplias-en-storage--decisión-path-por-path) | Los tres `read` amplios de Storage, ¿son deliberados o son un agujero? |
+| [§4](#4-threat-model-por-actor) | Para cada actor del producto: qué puede leer, qué puede escribir, y qué **no debería** poder. |
 
 ---
 
@@ -168,7 +176,7 @@ números de arriba son call sites reales, no líneas.
 Esto es lo primero que hay que saber antes de tocar una regla:
 
 | Suite | Archivos | Job de CI | Cómo se corre a mano |
-|---|---|---|---|
+|---|---|---|---|---|
 | `functions/src/__tests__/*-rules.test.ts` | 24 | *Functions Test* | `npm --prefix functions run test:rules:emulator` |
 | `scripts/rules_test/*.test.js` | 8 | *Rules Test* | `bash scripts/test_rules.sh` |
 
@@ -208,7 +216,7 @@ Se priorizó lo que toca **datos de terceros**: información que una persona
 escribe sobre otra, que la segunda no puede ver o no puede modificar.
 
 | Path | Antes | Ahora | Archivo |
-|---|---|---|---|
+|---|---|---|---|---|
 | `athlete_files` | 0 celdas | 5/5 | `coach-private-collections-rules.test.ts` |
 | `follow_up_entries` | 0 celdas | 5/5 | `coach-private-collections-rules.test.ts` |
 | `nutrition_plans` | 0 celdas | 5/5 | `coach-private-collections-rules.test.ts` |
@@ -276,10 +284,16 @@ Ordenados por lo que me preocuparía primero:
    decididas (§3.7).
 2. **`storage:temp/uploads` y el catch-all `{allPaths=**}`**: cero tests.
    `temp/uploads` es `read: if false` + write por dueño, y ahí van los Excel
-   que sube el PF. Barato de cerrar; quedó afuera por tiempo.
+   que sube el PF. Barato de cerrar; quedó afuera por tiempo. El threat model
+   además midió que ese `write` **no tiene allowlist de content-type ni cap de
+   tamaño** —el único del archivo que no los tiene— y le abrió ticket propio:
+   **QA-SEC-015** (§4.9).
 3. **`users/{uid}` get/list**: la regla es owner-only y no hay ni un negativo
    que compruebe que un tercero no lee el doc de otro. Cubierto de refilón por
-   los tests de subcolecciones, nunca de frente.
+   los tests de subcolecciones, nunca de frente. El threat model **lo midió**
+   (§4.3: get y list de un tercero, los dos DENY) pero la celda sigue en `—`
+   a propósito: medir con una sonda no es lo mismo que dejar una aserción que
+   se ponga roja sola. Sigue pendiente y sigue siendo barato.
 4. **`chats` delete y `chats/{id}/messages` update+delete** son `if false`
    (mensajes inmutables en MVP). Cero tests. Barato.
 5. **`trainer_links` create y `reviews` update/delete**: `reviews` delete es
@@ -288,7 +302,9 @@ Ordenados por lo que me preocuparía primero:
    `users/{uid}/customExercises`**: cero. `mail_queue` es `read, write: if
    false` y su comentario dice por qué importa (relay de spam con nuestra
    reputación de remitente + emails de otros usuarios) — es el más barato de
-   todos de cerrar.
+   todos de cerrar. `coach_availability_*` dejó de ser sólo un hueco de
+   cobertura: el threat model midió que su `create` no tiene gate de rol ni
+   allowlist de campos, en una colección mundo-legible → **QA-SEC-013** (§4.9).
 7. ~~**Las 8 colecciones que dependen sólo de la suite manual**~~ — **CERRADO**
    por #680 Slice B: `scripts/test_rules.sh` es el job *Rules Test* de CI
    (§1.4). Queda pendiente, como deuda de consolidación y no
@@ -433,12 +449,12 @@ Leyenda de la columna **De quién**:
 | 19 | `users/{uid}/sessions/{id}/setLogs/{id}` | Series: peso, reps, RPE | 👤 | Ídem |
 | 20 | `users/{uid}/checkIns/{date}` | Asistencia diaria | 👤 | Dueño |
 | 21 | `users/{uid}/customExercises/{id}` | Ejercicios propios + URL de video | 👤 | Dueño |
-| 22 | `coach_availability_rules/{id}` | Agenda semanal del PF | 👤 (PF) | PF |
-| 23 | `coach_availability_overrides/{id}` | Excepciones de agenda del PF | 👤 (PF) | PF |
+| 22 | `coach_availability_rules/{id}` | Agenda semanal del PF | 👤 (PF) | **Cualquier autenticado** (get y list) — deliberado, `firestore.rules:1810`; corregido en §4.11 |
+| 23 | `coach_availability_overrides/{id}` | Excepciones de agenda del PF | 👤 (PF) | **Cualquier autenticado** (get y list) — ídem |
 | 24 | `appointments/{id}` | `athleteId`, **`athleteDisplayName` (nombre denormalizado)**, `startsAt`, `noteBefore`, `noteAfter` (notas de coaching), `paymentId` | 🫱 + 🔗 | Alumno + PF |
 | 25 | `measurements/{id}` | **Antropometría completa**: `weightKg`, `fatPercentage`, `muscleMassKg` y 18 circunferencias (hombros, pecho, cintura, cadera, glúteos, bíceps L/R y flexionados, antebrazos, muslos alto/medio L/R, gemelos L/R), `notes` | 👤 o 🫱 (`recordedBy`) | Alumno + PF vinculado |
 | 26 | `performance_tests/{id}` | `cmjCm`, `squatJumpCm`, `abalakovCm`, `broadJumpCm`, sprints 10/20/30/40 m, 1RM de sentadilla/banco/peso muerto/press/dominadas, `vo2maxMlKgMin`, course navette, Cooper | 👤 o 🫱 | Alumno + PF vinculado |
-| 27 | `athlete_billing/{id}` | `trainerId`, `athleteId`, `amountArs`, `cadence` | 🫱 | Sólo el PF |
+| 27 | `athlete_billing/{id}` | `trainerId`, `athleteId`, `amountArs`, `cadence` | 🫱 | **PF + el alumno del par** (`firestore.rules:2119`); corregido en §4.11 |
 | 28 | `athlete_notes/{id}` | `note` (texto libre del PF **sobre** el alumno) | 🫱 | Sólo el PF |
 | 29 | `athlete_files/{id}` | `fileName`, `contentType`, `sizeBytes`, `storagePath`, `downloadUrl` de archivos privados del PF sobre el alumno (PDF/imágenes) | 🫱 | Sólo el PF |
 | 30 | `follow_up_entries/{id}` | `text` (≤5000 chars), `tag`, `recordedAt` — bitácora privada del PF | 🫱 | Sólo el PF |
@@ -496,7 +512,7 @@ uno en su `try/catch`, y borra el usuario de Auth al final. Esto es lo que cada
 #### 2.2.1 Cobertura, ítem por ítem
 
 | # | Store | Estado | Paso del cascade / motivo |
-|---|---|---|---|
+|---|---|---|---|---|
 | 1 | `users/{uid}` | ✅ | `deleteUserDocs` → `recursiveDelete` |
 | 2 | `users/{uid}/notifications` | 🟡 **parcial** | El inbox propio se va con el `recursiveDelete`. **Las copias en el inbox de terceros quedan** → QA-CMP-008 |
 | 3 | `exercises` | n/a | Sin PII |
@@ -1320,3 +1336,865 @@ documento**.
 export PATH="/opt/homebrew/opt/openjdk@21/bin:$PATH"   # Java 21, macOS
 npm --prefix functions run test:rules:emulator          # incluye los 3 de Storage
 ```
+
+---
+
+## 4. Threat model por actor
+
+### 4.0 Por qué existe y cómo se midió
+
+§1 dice qué operación no está testeada. §2 dice qué dato guardamos. §3 decide
+tres bloques de Storage. Ninguna de las tres responde la pregunta que un
+atacante se hace primero: **"soy X, ¿hasta dónde llego?"**.
+
+Esta sección es esa respuesta, actor por actor. Los actores **no salen de un
+template genérico** — salen del código: son las siete formas distintas en que
+`firestore.rules` y `storage.rules` pueden ver a quien llama. Cada uno tiene su
+apartado con tres columnas fijas: **qué puede leer**, **qué puede escribir**, y
+**qué NO debería poder**.
+
+**El valor de la sección no es el documento — es el cruce.** Escribir "el PF no
+vinculado no ve nada del alumno" no vale nada si nadie lo probó. Lo que sigue
+está medido.
+
+**Cómo se midió.** Una sonda temporal —mismo método que §3.0— que ejecuta cada
+combinación `(actor × operación × path)` contra el emulador de Firestore y de
+Storage y **reporta ALLOW/DENY en vez de afirmar**, de modo que una sola corrida
+imprime la matriz entera. **166 pruebas en tres corridas**: 110 de Firestore, 33
+de Firestore + Storage, y 23 de re-verificación de los siete hallazgos y de los
+pisos de control. Siete contextos de auth distintos. Todo lo que sigue está
+medido contra `firestore.rules` y `storage.rules` en **`6149c6a6`** (2026-08-24).
+La sonda no quedó en el repo; lo que queda es esta sección y los siete tickets
+de §4.9.
+
+> Requiere Java 21. Si `java -version` dice menos, exportá uno que sirva antes
+> de correr nada: `export PATH="/opt/homebrew/opt/openjdk@21/bin:$PATH"`.
+
+Una aclaración de alcance, porque cambia cómo se leen las tablas: **las reglas
+no son la única puerta.** §3.1 midió que la URL de descarga que emite
+`getDownloadURL()` es una **credencial al portador** que no evalúa
+`storage.rules`. Todo lo que esta sección dice sobre Storage vale para el acceso
+*por referencia* (`ref()`, `list()`, `getMetadata()`); el que ya tiene una URL
+con token la sigue pudiendo bajar aunque acá diga DENY.
+
+### 4.1 Los siete actores
+
+| # | Actor | Cómo lo ve la regla | Cómo se consigue |
+|---|---|---|---|---|
+| A1 | **Atleta** (dueño del dato) | `request.auth.uid == <el uid del dato>` | Signup público. Siempre nace `role: 'athlete'` (AGENTS.md regla 3, pineado por `firestore.rules:97`) |
+| A2 | **Atleta ajeno / sin vínculo** | `request.auth != null` y ningún predicado de pertenencia da true | Cualquier signup. Es A1 mirando datos que no son suyos |
+| A3 | **PF vinculado** | `resource.data.trainerId == uid`, o `session_shares/{aid}.trainerId == uid`, o `profile_shares/{aid}.trainerId == uid` | `role: 'trainer'` (sólo Admin SDK) **+** un `trainer_links` activo **+** el grant que corresponda |
+| A4 | **PF NO vinculado** | `get(users/{uid}).data.role == 'trainer'` y nada más | `role: 'trainer'`. **El rol solo, sin vínculo, ya es un actor con permisos propios** — ver §4.5 |
+| A5 | **Autenticado cualquiera** | literalmente `if request.auth != null` | Cualquier signup. **No es una persona: es el predicado.** Es el actor que encontró los leaks de §3 |
+| A6 | **Anónimo / sin auth** | `request.auth == null` | Nada. Un cliente HTTP |
+| A7 | **Cloud Function (Admin SDK)** | **no la ve** — bypassea las reglas por diseño (ADR-ACCDEL-013) | Deploy. Es la TCB del sistema |
+
+A2 y A5 se parecen pero **no son el mismo actor y conviene no fusionarlos**. A2
+es una persona concreta que intenta llegar al dato de otra persona concreta; A5
+es la audiencia que una regla se dio a sí misma cuando escribió
+`if request.auth != null`. Cada `ALLOW` de A5 es una decisión de publicar algo a
+toda la base de usuarios, la haya tomado alguien o no. Las tres de §3.6 no las
+tomó nadie.
+
+Dos actores del enunciado clásico faltan a propósito:
+
+- **"Cuenta comprometida"** no es un actor separado: es A1 con otra persona
+  atrás. Su alcance es exactamente el de §4.2, y por eso ese apartado importa
+  aunque suene trivial.
+- **"Atleta de otro gym"** no es un actor separado tampoco: el `gymId` **no es
+  un límite de autorización** en ninguna regla salvo una — el branch
+  `privacy == 'gym'` de `posts` (`firestore.rules:745`). Para todo lo demás, un
+  atleta de otro gym es exactamente A2. Que el gym parezca una frontera y no lo
+  sea es precisamente lo que hay que tener escrito.
+
+---
+
+### 4.2 A1 — Atleta (dueño del dato)
+
+**Qué puede leer.** Todo lo suyo: `users/{uid}` y sus cuatro subcolecciones
+(`sessions`, `setLogs`, `checkIns`, `customExercises`, `notifications`), sus
+`measurements` y `performance_tests`, sus `payments`, sus `appointments`, sus
+`chats` y `messages`, sus grants (`session_shares` / `profile_shares`), sus
+`follows` y sus `posts`.
+
+**Qué NO puede leer, aunque sea sobre él.** Éste es el punto que más se olvida:
+las cuatro colecciones que el PF escribe **sobre** el alumno le están vedadas al
+alumno. Medido:
+
+| Path | A1 sobre su propio dato | Regla |
+|---|---|---|
+| `athlete_notes/{tid}_{uid}` | **DENY** | `firestore.rules:2182` — `trainerId` only |
+| `athlete_files/{id}` | **DENY** | `:2220` |
+| `nutrition_plans/{tid}_{uid}` | **DENY** | `:2273` |
+| `follow_up_entries/{tid}_{uid}` | **DENY** | `:2245` |
+| `athlete_billing/{tid}_{uid}` | **ALLOW** | `:2119` — el alumno **sí** lo lee |
+
+Las cuatro primeras están alineadas con el comentario de `storage.rules`
+(*"El alumno NUNCA lee estos archivos"*) y con §2.1.1. La quinta **no**: §2.1.1
+fila 27 dice *"Quién lo lee: Sólo el PF"* y la regla dice otra cosa. Corregido
+en §4.11.
+
+Esto tiene una consecuencia legal que §2.3.2 ya había marcado por otro camino:
+el alumno no puede ejercer el derecho de acceso sobre la mitad de lo que el
+sistema guarda sobre él, y encima la política no le avisa que esos documentos
+existen.
+
+**Qué puede escribir.** Su propio doc (con `uid`, `role`, `email`, `createdAt`,
+`subscription`, `weightedLoad` y `blockedAthleteIds` pineados), su historial, sus
+posts, sus grants, sus reacciones, sus reviews sobre un PF con el que tuvo
+vínculo activo, y sus rutinas `user-created`.
+
+**Qué NO debería poder — y no puede.** Medido, todo DENY:
+
+| Intento | Resultado | Guard |
+|---|---|---|
+| `users/{self}.role` → `'trainer'` | DENY | QA-SEC-001, `:119` |
+| `users/{self}.subscription` → `plan3` | DENY | pin de paywall, `:125` |
+| `userPublicProfiles.lifetimeVolumeKg` forjado | DENY | CF-write-only, `:1021` |
+| `userPublicProfiles.gymId` sin tocar `users` | DENY | `getAfter()`, `:1005` |
+| `measurements` sobre un tercero (siendo `role: athlete`) | DENY | gate de rol, Slice C |
+| `payments` contra un tercero (siendo `role: athlete`) | DENY | gate de rol, Slice C |
+| `session_shares` / `profile_shares` de otro | DENY | `uid == athleteId`, `:1713` / `:1734` |
+| abrir `chats` con alguien sin follow ni link | DENY | `chatCreateOk`, `:1522` |
+| borrar un `follows` del que no es miembro | DENY | `:1386` |
+
+**Qué NO debería poder, y sí puede.** Nada nuevo en este actor. El piso del
+dueño está bien puesto.
+
+---
+
+### 4.3 A2 — Atleta ajeno / sin vínculo
+
+Es el actor que no debería ver nada tuyo. Medido, **no ve casi nada** — y lo
+poco que ve es lo que hay que mirar.
+
+**Qué NO puede leer.** Todo DENY:
+
+`users/{ajeno}` (get y list), `sessions`, `setLogs`, `checkIns`,
+`notifications`, `measurements`, `performance_tests`, `payments`,
+`athlete_billing`, `athlete_notes`, `athlete_files`, `nutrition_plans`,
+`follow_up_entries`, `session_shares`, `profile_shares`, `chats` ajenos y sus
+`messages`, `appointments` ajenos, `mail_queue`, `audit_log`, los `posts` con
+`privacy: 'friends'` y las `routines` privadas.
+
+**Y no puede saltar la jerarquía.** Los `collectionGroup` sobre las
+subcolecciones **fallan por default-deny**, que es la propiedad que hace que el
+modelo cierre: ninguna de ellas tiene un `match /{path=**}/…`, así que la query
+ni siquiera encuentra una cláusula que la habilite. Medido, los seis:
+
+```
+collectionGroup(setLogs)        -> No matching allow statements
+collectionGroup(sessions)       -> No matching allow statements
+collectionGroup(messages)       -> No matching allow statements
+collectionGroup(ratings)        -> No matching allow statements
+collectionGroup(notifications)  -> No matching allow statements
+collectionGroup(customExercises)-> No matching allow statements
+```
+
+Vale la pena que esté escrito: es una propiedad **frágil**. El día que alguien
+agregue un `match /{path=**}/setLogs/{id}` para una pantalla nueva, las seis
+tablas de arriba cambian de golpe y ningún test de los que existen hoy se pone
+rojo.
+
+**Qué SÍ puede leer.** Lo mundo-legible, que es más de lo que suena:
+
+| Path | Contenido | ¿Decidido? |
+|---|---|---|
+| `userPublicProfiles/{uid}` (get **y list**) | nombre, avatar, gym, racha, workouts, seguidores, volumen de por vida, PRs de sentadilla/banco/peso muerto | Sí — habilita `searchByDisplayName` (`firestore.rules:894`) |
+| `trainerPublicProfiles/{uid}` (get y list) | perfil comercial del PF | Sí |
+| `gyms/{id}` (get y list) | nombre y coordenadas | Sí (`:1160`) |
+| `exercises/{id}` | catálogo | Sí |
+| `reviews/{id}` (get y **list**) | `athleteId` + `comment` de texto libre | Sí — §2.1.1 fila 33 |
+| `routines/*/ratings/{userId}` | uid del que puntúa + `comment` de 500 chars | Sí (`:581`) |
+| `users/{ajeno}/customExercises/{id}` (get y list) | ejercicios propios + URL de video | Sí — §3.3 lo apoya en `:1804` |
+| `posts` con `privacy: 'public'` | el post entero | Sí |
+| `routines` con `visibility: 'public'` | la rutina entera | Sí |
+| `follows` con `status: 'accepted'` (get y **list**) | el grafo social entero de la plataforma | **A medias** — ver abajo |
+| `coach_availability_rules` / `_overrides` (get y list) | agenda semanal de **cualquier** PF | Sí, comentado en `:1810` |
+| `routines` con `visibility: 'shared'` (get y **list**) | plan del PF + `assignedBy` + `assignedTo` | **NO** → QA-SEC-012 |
+
+Dos filas necesitan letra chica:
+
+- **`follows` accepted es enumerable en bloque.** Medido: `follows` sin filtro
+  falla (`Property members is undefined on object`), pero
+  `where('status', '==', 'accepted')` devuelve **ALLOW** — o sea, el grafo
+  dirigido completo de quién sigue a quién, para toda la base. Es coherente con
+  el producto (las listas de seguidores son públicas, estilo Instagram) y el
+  comentario de `:1275` piensa el `resource == null` a propósito. Lo que **no**
+  está pensado es que eso también publica la lista de seguidores de una cuenta
+  marcada como privada — ver QA-SEC-011.
+- **`coach_availability_*` es mundo-legible a propósito** (*"athletes and
+  trainers can read any rule (needed to compute free slots client-side)"*). El
+  permiso de lectura está decidido y comentado. Lo que no está decidido es quién
+  **escribe** ahí — ver QA-SEC-013.
+
+**Qué puede escribir sobre un tercero.** Casi nada, y lo que puede es un
+hallazgo:
+
+| Intento | Resultado |
+|---|---|
+| cualquier doc de las colecciones privadas del alumno | DENY |
+| `measurements` / `payments` sobre un tercero (rol athlete) | DENY |
+| `coach_availability_rules` **propia**, con 50 KB de payload arbitrario | **ALLOW** → QA-SEC-013 |
+| `trainerPublicProfiles` **propio**, sin ser trainer | **ALLOW** → QA-SEC-013 |
+| `gyms/{id}` `google-places` nuevo, con campos arbitrarios | **ALLOW** → §4.10 |
+| `appointments` en la agenda de **cualquier** PF, con 30 KB de texto libre | **ALLOW** → QA-SEC-014 |
+| `temp/uploads/{self}/payload.exe`, sin límite de tamaño | **ALLOW** → QA-SEC-015 |
+
+---
+
+### 4.4 A3 — PF vinculado
+
+Es el actor con más alcance sobre datos de terceros del producto, y el que mejor
+está delimitado. El modelo tiene **tres llaves separadas** y la sonda confirma
+que son separadas:
+
+| Llave | Qué abre |
+|---|---|
+| `trainer_links` activo | el vínculo comercial: `payments`, `athlete_billing`, `appointments` |
+| `session_shares/{aid}.trainerId == uid` | `users/{aid}/sessions/**` y `setLogs/**` |
+| `profile_shares/{aid}.trainerId == uid` | el snapshot denormalizado de perfil, y **junto con** `session_shares`, las `measurements` auto-registradas |
+
+**Qué puede leer.** Medido ALLOW: `sessions`, `setLogs`, las `measurements` con
+`recordedBy == athleteId` (que exigen **los dos** grants a la vez,
+`firestore.rules:1995`), lo que él mismo escribió (`athlete_notes`,
+`athlete_files`, `follow_up_entries`, `nutrition_plans`, `athlete_billing`), los
+`payments` del par y los `appointments` del par.
+
+**Qué NO puede leer, y no puede.** Medido DENY:
+
+| Path | Resultado |
+|---|---|
+| `users/{alumno}` — el doc privado con teléfono, email, `fcmTokens` | **DENY** |
+| `users/{alumno}/checkIns` — asistencia diaria | **DENY** |
+| `users/{alumno}/notifications` — el inbox | **DENY** |
+| `chats/{alumno}_{tercero}` — conversaciones con otra gente | **DENY** |
+| `athlete_files` de **otro** PF sobre el mismo alumno | **DENY** |
+
+Esto vale la pena escribirlo porque es contraintuitivo y es correcto: el PF ve
+el **entrenamiento**, no la **persona**. Lo personal viaja por el snapshot de
+`profile_shares`, que el alumno controla, no por `users`.
+
+**Qué NO puede escribir.** Medido DENY: no escribe `sessions` del alumno
+(`:1747` es owner-only), y **no borra ni edita una `measurement` auto-registrada
+por el alumno** (`:2024` / `:2029` pinean `recordedBy`). La asimetría es
+deliberada y está testeada (`measurements-self-log.test.js` S19, #439): leer no
+es escribir.
+
+**Qué NO debería poder.** Nada nuevo salió acá. Es el actor mejor cubierto de la
+matriz de §1 —`session_shares` y `profile_shares` pasaron de 0 a 5/5 celdas en
+§1.5— y se nota.
+
+---
+
+### 4.5 A4 — PF NO vinculado
+
+Es el caso de #763, y el actor donde el rol **por sí solo** ya es un permiso.
+
+**Qué puede leer del alumno: nada.** Medido, todo DENY: `sessions`, las
+`measurements` auto-registradas, `profile_shares`, `session_shares`, y los
+`athlete_files` de otro PF. El gate de lectura es siempre el vínculo o el grant,
+nunca el rol. **Esa mitad está bien.**
+
+**Qué puede escribir SOBRE un alumno con el que no tiene ninguna relación.**
+Acá está el alcance real, y **está decidido**: es el residuo aceptado de
+`rules-hardening` Slice C (AD-1 opción b, obs #413), escrito en el encabezado de
+`scripts/rules_test/coach-collections-role.test.js:13-18`. El gate es
+**role-check only, NO role + active-link**, y el argumento es que el forjador
+queda **atribuible** — su propio uid va en `recordedBy` / `trainerId`.
+
+Medido, sobre un uid con el que no comparte ni un documento:
+
+| Escritura | Resultado | Quién lo ve después |
+|---|---|---|
+| `measurements` (peso, circunferencias, `notes`) | **ALLOW** | el alumno, en su historial |
+| `performance_tests` (VO2max, 1RM, Cooper) | **ALLOW** | el alumno |
+| `payments` (deuda con monto y concepto) | **ALLOW** | el alumno, y le llega el aviso de vencida |
+| `athlete_notes` (texto libre sobre él) | **ALLOW** | nadie salvo el forjador |
+| `athlete_billing` | **ALLOW** | el alumno |
+
+**Lo que la decisión no contempló, y la sonda sí midió:** la víctima **no tiene
+remedio**. Sobre la medida antropométrica que un desconocido escribió sobre
+ella:
+
+```
+ATLETA lee la medida forjada sobre si mismo   -> ALLOW  (exists=true)
+ATLETA borra la medida forjada sobre si mismo -> DENY
+ATLETA edita la medida forjada sobre si mismo -> DENY
+```
+
+`measurements` update y delete piden `resource.data.recordedBy == request.auth.uid`
+(`:2024`, `:2029`), y `recordedBy` es el forjador. O sea: **un dato de salud que
+otro escribió sobre vos, en tu propio historial, indeleble desde la app.** Lo
+mismo con la deuda inventada — el alumno la lee y no la puede borrar.
+
+"Atribuible" resuelve el problema del auditor; no resuelve el del titular del
+dato. Bajo Ley 25.326 esto es el derecho de rectificación (art. 16) sobre un dato
+sensible, y se suma a la brecha que §2.3.2 ya había medido por el lado del
+derecho de acceso. **No es un permiso sin decidir** —la escritura está decidida—
+así que no lleva ticket de reglas: la remediación de la víctima es una decisión
+de producto, y va junto con QA-CMP-011 y con la §7 de la política.
+
+---
+
+### 4.6 A5 — Autenticado cualquiera, el que enumera
+
+No es una persona: es el predicado `if request.auth != null`. Es el actor que
+encontró QA-SEC-007 y QA-SEC-008 en §3, y el que encontró los siete de §4.9.
+
+Su pregunta no es *"¿puedo leer el documento de Fulano?"* sino **"¿qué me
+devuelve el sistema si pregunto por todos?"**. Y las dos superficies que
+contesta son distintas:
+
+**1. Enumeración por `list`.** Medido:
+
+| Superficie | `list` | Qué devuelve |
+|---|---|---|
+| `userPublicProfiles` | **ALLOW** | el padrón de uids de la plataforma, con nombre y gym |
+| `trainerPublicProfiles` | **ALLOW** | el padrón de PFs |
+| `reviews` | **ALLOW** | `athleteId` + comentario de texto libre |
+| `gyms`, `exercises` | **ALLOW** | catálogos |
+| `follows where status == 'accepted'` | **ALLOW** | el grafo social completo |
+| `routines where visibility == 'shared'` | **ALLOW** | el grafo PF↔alumno → QA-SEC-012 |
+| `coach_availability_rules` / `_overrides` | **ALLOW** | todas las agendas |
+| `users`, `routines` sin filtro, `appointments` | DENY (error de evaluación) | — |
+| `storage:avatars/`, `storage:customExerciseVideos/` | **ALLOW** | §3.6 — QA-SEC-007 y QA-SEC-008 |
+| `storage:postPhotos/`, `chatMedia/`, `temp/uploads/` | DENY | §3.5 |
+
+Que `userPublicProfiles` sea enumerable **es una decisión tomada** (`:894`,
+habilita la búsqueda por prefijo). Pero es la decisión que arma el arsenal de
+todo lo demás: cualquier ataque que necesite "una lista de uids reales" ya la
+tiene. El comentario de `chatMedia` en `storage.rules:43` lo dice con todas las
+letras — *"uids are enumerable (userPublicProfiles is world-readable)"*— y por
+eso ese bloque cerró el `get` con gate de membresía. **La misma premisa no se
+aplicó del lado de Firestore.** De ahí sale QA-SEC-010.
+
+**2. Enumeración por oráculo de existencia.** Es la superficie que nadie estaba
+mirando, y la que más rindió. El patrón:
+
+> una regla de `read` que arranca con `resource == null ||` **más** un doc id
+> **determinístico** = cualquiera puede preguntar "¿existe este documento?" y
+> obtener la respuesta, aunque no pueda leer ni un campo.
+
+El mecanismo es que las dos respuestas se distinguen: si el doc **no existe**,
+`resource == null` da true y la lectura devuelve un snapshot vacío; si **existe**
+y no sos el dueño, la evaluación da false y devuelve `PERMISSION_DENIED`. El
+`PERMISSION_DENIED` **es** la respuesta.
+
+Medido, sobre las seis reglas del archivo que usan el idiom:
+
+| Bloque | Doc id | Doc EXISTE | Doc NO existe | ¿Oráculo? |
+|---|---|---|---|---|
+| `chats` (`:1564`) | `sorted(a,b).join('_')` | DENY | **ALLOW** `exists=false` | **SÍ** |
+| `friendships` (`:1252`) | par ordenado | DENY | **ALLOW** `exists=false` | **SÍ** |
+| `athlete_notes` (`:2181`) | `{trainerId}_{athleteId}` | DENY | **ALLOW** `exists=false` | **SÍ** |
+| `follows` (`:1315`) | `{follower}_{followee}` | DENY (si `pending`) | **ALLOW** | **SÍ**, sólo para `pending` |
+| `routines` (`:256`) | auto-id de 20 chars | DENY | ALLOW | No — no enumerable |
+| `trainer_links` (`:606`) | auto-id de 20 chars | DENY | ALLOW | No — no enumerable |
+
+Los controles confirman que el idiom es la causa y no otra cosa: `session_shares`,
+`profile_shares`, `athlete_files`, `payments`, `appointments` y `measurements`
+—que **no** tienen el disyunto— dan **DENY en los dos estados**, así que no
+distinguen nada.
+
+Lo que hace que esto sea un hallazgo y no una observación de estilo es que
+`routines:217` **razonó el caso y acertó**:
+
+> *"El único dato que expone es 'este id no existe' vs 'existe pero es privado'
+> — los auto-ids de Firestore son de 20 chars aleatorios, así que **no habilita
+> enumeración**."*
+
+Es correcto, y es correcto **porque el id es aleatorio**. En los cuatro bloques
+con id determinístico la conclusión se invierte, y en dos de ellos hay un
+comentario escrito que afirma lo contrario. El de `athlete_notes:2175`:
+
+> *"El docId encodea `{trainerId}_{athleteId}` así que un attacker no puede
+> fishearse leyendo docs de otro PF: **solo llegaría al doc si armara el par
+> exacto** — y si existe, el segundo check bloquea el acceso."*
+
+Las dos mitades miden falso. Armar el par exacto **es trivial**: los uids de PF
+salen de `trainerPublicProfiles` y los de alumno de `userPublicProfiles`, las dos
+enumerables (medido arriba). Y "el segundo check bloquea el acceso" bloquea el
+**contenido**, no la **pregunta** — al atacante nunca le interesó el texto de la
+nota. El de `friendships:1247` comete el mismo error más corto: *"returns empty
+snapshot **without leaking data**"*.
+
+Es el mismo tipo de defecto que §3.1: una premisa escrita en un comentario, que
+nadie volvió a medir, sosteniendo un permiso. → **QA-SEC-010**.
+
+---
+
+### 4.7 A6 — Anónimo / sin auth
+
+**El piso está bien puesto, y es la única fila de toda esta sección sin un solo
+matiz.** Medido, DENY en las ocho pruebas de Firestore
+(`exercises`, `userPublicProfiles`, `posts` público, `gyms`, `reviews`,
+`routines` pública, `coach_availability_rules`, y el create de su propio
+`users/{uid}`) y, en Storage, **DENY en todas las celdas de todos los paths**
+(§3.5).
+
+No hay ni un `allow` en `firestore.rules` ni en `storage.rules` que no empiece
+por `request.auth != null`. Eso lo hace verificable de una: cualquier bloque
+nuevo que no arranque así es, por construcción, un agujero — y es la única
+invariante de este documento que se puede chequear con `rg`.
+
+```bash
+# Debe devolver 0 líneas. Cualquier resultado es un bloque sin piso.
+rg -n 'allow [a-z, ]+:\s*if\s+' firestore.rules storage.rules \
+  | rg -v 'if false' | rg -v 'if request\.auth'
+```
+
+Verificado el 2026-08-24: 0 líneas.
+
+La contracara —y por eso este actor no es la buena noticia que parece— es que
+**A6 no es el actor que importa**. Registrarse en TREINO es gratis y no requiere
+verificación: convertirse en A5 cuesta un email. Todo lo que esta sección
+encontró está del otro lado de esa línea.
+
+---
+
+### 4.8 A7 — Cloud Function (Admin SDK)
+
+**Bypassea las reglas por diseño** (ADR-ACCDEL-013). No hay matriz que medir: el
+Admin SDK no evalúa `firestore.rules` ni `storage.rules`, así que para este actor
+las secciones §1 a §4.7 no dicen nada. Es la TCB del sistema, y todo lo que lo
+protege es el código de las propias funciones.
+
+Es el actor correcto para varias cosas del producto, y conviene tener escrito
+cuáles, porque son el motivo por el que ciertos permisos de cliente están
+cerrados:
+
+| Lo que sólo A7 puede hacer | Por qué el cliente no |
+|---|---|
+| aprovisionar `role: 'trainer'` | QA-SEC-001 — `users` create pinea `'athlete'` |
+| escribir `subscription`, `weightedLoad`, `blockedAthleteIds` | pines de paywall (`:125`, `:126`, `:146`) |
+| escribir los agregados (`ratingAvg`, `averageRating`, `athleteCount`, métricas de ranking) | forjaría su propia reputación |
+| borrar una cuenta (`deleteAccount`) | `users` delete es `if false` |
+| escribir `users/*/notifications` y `mail_queue` | create/write `if false` |
+| pasar un `trainer_links` a `'active'` | ninguna cláusula de cliente lo permite (medido: el update sólo deja `terminated` / `paused`) |
+| barrer Storage en el cascade | `bucket.getFiles({prefix})` ignora `storage.rules` (§3.6) |
+
+**Su superficie expuesta al cliente son 5 callables desplegados**, y los cinco
+exigen `request.auth`:
+
+| Callable | App Check | Estado |
+|---|---|---|
+| `deleteAccount` | `true` | cubierto por el scanner QA-SEC-006 |
+| `addAlias` | `true` | cubierto por el scanner |
+| `acceptTrainerLink` | **off** | exención **decidida** y comentada (`accept-trainer-link.ts:82`) — el Coach Hub web no activa App Check |
+| `resumeTrainerLink` | **off** | exención decidida y comentada (`resume-trainer-link.ts:77`) |
+| `mintWatchCredential` | **off** | **deuda**, no decisión — el propio archivo lo dice (`mint-watch-credential.ts:115`) |
+
+**El hallazgo acá no es una exención: es que el guard dejó de guardar.**
+`functions/src/__tests__/appcheck-enforcement.test.ts` se presenta como *"every
+DEPLOYED callable must enforce App Check… fails loudly if a callable ships — or
+is edited back — without attestation"*, pero su lista `DEPLOYED_CALLABLES` está
+**escrita a mano y tiene dos entradas**. Los otros tres callables se desplegaron
+después y la lista nunca creció: el scanner está verde y **cubre 2 de 5**. Un
+sexto callable sin atestación entraría en silencio.
+
+Es exactamente el defecto que §1.4 midió para `rules.test.js` —un guard que no
+distingue "cambió porque quisimos" de "se rompió"— con el agravante de que acá el
+inventario es manual y el drift es la operación normal. → **QA-SEC-016**.
+
+Contexto que baja la severidad y hay que dejar escrito: según la verificación del
+2026-08-18 que cita `mint-watch-credential.ts:118`, el enforcement de App Check
+está **UNENFORCED a nivel de proyecto** (`firestore.googleapis.com` e
+`identitytoolkit.googleapis.com`), así que hoy el flag no cierra ninguna puerta
+en ningún lado. El ticket es sobre el guard, no sobre una exposición viva.
+
+---
+
+### 4.9 Lo que el cruce encontró — siete permisos que nadie decidió
+
+Ninguno se arregla en este PR, por el mismo motivo que §3.6: **tocar una regla
+de producción merece su propio change, su propio test y su propia verificación.**
+Los siete salieron con ticket propio, igual que QA-SEC-007/008/009.
+
+Ordenados por lo que me preocuparía primero.
+
+| ID | Qué | Dónde | Severidad | Ticket |
+|---|---|---|---|---|
+| **QA-SEC-010** | `resource == null` + doc id determinístico = oráculo de existencia en 4 bloques | `firestore.rules:1564`, `:1252`, `:2181`, `:1315` | **Media-alta** | [#777](https://github.com/Backhaus7997/treino/issues/777) |
+| **QA-SEC-011** | `isProfilePublic` no existe en las reglas: "Perfil privado" se aplica sólo en el cliente | `:894`, `:738`, `:256` | **Media-alta** | [#778](https://github.com/Backhaus7997/treino/issues/778) |
+| **QA-SEC-012** | `visibility: 'shared'` concede lectura y enumeración mundial a una feature que el dominio declara reservada | `:259` | Media | [#779](https://github.com/Backhaus7997/treino/issues/779) |
+| **QA-SEC-013** | El gate de rol de Slice C no llegó a las 3 colecciones que publican al PF | `:1111`, `:1816`, `:1826` | Media | [#780](https://github.com/Backhaus7997/treino/issues/780) |
+| **QA-SEC-014** | `appointments` create sin allowlist de campos ni cap de tamaño: un desconocido escribe en la agenda de cualquier PF | `:1858` | Media | [#781](https://github.com/Backhaus7997/treino/issues/781) |
+| **QA-SEC-015** | `temp/uploads` es el único write de Storage sin allowlist de content-type ni cap de tamaño | `storage.rules:19` | Baja | [#782](https://github.com/Backhaus7997/treino/issues/782) |
+| **QA-SEC-016** | El scanner de App Check cubre 2 de los 5 callables desplegados | `appcheck-enforcement.test.ts:18` | Baja | [#783](https://github.com/Backhaus7997/treino/issues/783) |
+
+---
+
+**QA-SEC-010 — Oráculo de existencia por doc id determinístico.**
+Desarrollado en §4.6. Cuatro bloques, un solo idiom, y un comentario en dos de
+ellos que afirma explícitamente que no hay leak. Lo que cada uno entrega a
+cualquier autenticado, medido:
+
+- `chats` → **¿estas dos personas se escriben?** Un bit por par, y un par
+  concreto es una sola llamada. Es el más sensible de los cuatro.
+- `athlete_notes` → **¿este PF tiene notas sobre este alumno?** Cruzando los dos
+  padrones enumerables, reconstruye la **cartera de clientes de cada PF**.
+- `friendships` → lo mismo sobre la colección legacy, que sigue intacta a
+  propósito (ADR-FOLLOW-012, y ver QA-CMP-007).
+- `follows` → **¿A le mandó solicitud a B y B todavía no aceptó?** Sólo aplica a
+  las `pending`, o sea exactamente a las cuentas privadas.
+
+*Arreglo propuesto:* el disyunto existe por UX (que "no hay nada" resuelva en
+vez de tirar error). Se puede conservar **acotándolo a quien tiene derecho a
+preguntar** — p. ej. en `athlete_notes`,
+`(resource == null && docId.split('_')[0] == request.auth.uid)`, mismo idiom que
+`storage.rules:athleteFiles`; en `chats`, `request.auth.uid in chatId.split('_')`.
+Ojo con el `split('_')`: §1.7 ya advierte que sólo es seguro mientras los uid de
+Firebase Auth no traigan guión bajo. Alternativa sin acoplamiento al id: sacar el
+disyunto y que el cliente trate el `permission-denied` como "no hay".
+
+---
+
+**QA-SEC-011 — `isProfilePublic` no existe en las reglas.**
+`UserPublicProfile.isProfilePublic` es el toggle de PRIVACIDAD del perfil. La app
+promete, en el propio widget del toggle
+(`profile_privacy_toggle_tile.dart:15-16`): *"Private: only the identity header
+stays visible to non-followers; **detailed content is gated** until you accept
+their request"*, y le muestra al visitante un candado con *"Seguí a esta persona
+para ver su actividad y sus rutinas públicas"*
+(`public_profile_screen.dart:206-228`).
+
+El gate existe **sólo en el cliente**: `public_profile_screen.dart:86` calcula
+`gated` y esconde `PublicProfileStatsRow` y `_ProfileTabBody`. Medido contra un
+perfil con `isProfilePublic: false`, desde un desconocido:
+
+| Lectura | Resultado | Qué entrega |
+|---|---|---|
+| `userPublicProfiles/{privado}` | **ALLOW** | racha, workouts, seguidores, `lifetimeVolumeKg`, `bestSquatKg`/`Bench`/`Deadlift` |
+| `list userPublicProfiles` | **ALLOW** | ídem, para toda la base |
+| `posts` `privacy: 'public'` del perfil privado | **ALLOW** | el post entero |
+| `routines` `visibility: 'public'` del perfil privado | **ALLOW** | la rutina entera |
+| `follows where status == 'accepted'` | **ALLOW** | su lista de seguidores y seguidos |
+| `posts` `privacy: 'friends'` | DENY | (esto sí lo gobierna la regla) |
+
+O sea: **todo lo que el candado esconde se sirve igual por debajo.** Y no es que
+las reglas no puedan ver el flag — `follows` create ya lo consulta
+(`firestore.rules:1350`) para decidir el auto-accept. La regla conoce el dato y no
+lo usa para leer.
+
+*Arreglo propuesto:* decidir primero **qué promete el producto**. Si "privado"
+significa lo que dice el widget, `userPublicProfiles` read tiene que partirse en
+"identity header para cualquiera" vs "métricas sólo para seguidores aceptados", y
+`posts`/`routines` públicas de un autor privado tienen que caer al branch de
+seguidor. Si "privado" sólo significa "aprobación manual de seguidores" —que es
+lo que el modelo hace hoy— entonces hay que **corregir el copy**, que es más
+barato y más honesto. Lo que no puede quedar es la brecha entre las dos cosas.
+
+---
+
+**QA-SEC-012 — `visibility: 'shared'` publica al mundo una feature que no existe.**
+El dominio declara el valor **reservado y sin uso**
+(`routine_visibility.dart:6`): *"`shared`: extensión futura (planes compartidos
+entre múltiples atletas). Reservado para iteración futura — no se usa en Etapa 1"*.
+
+Las reglas ya le dieron significado, y no el que dice esa frase. El lado de
+escritura lo pensó (`:277`: *"visibility debe ser 'private' o 'shared' (no
+'public')"*, `:353`: *"'shared' is trainer-assigned only"*); el lado de lectura
+lo mete en el mismo disyunto que `'public'` — **sin una sola línea de comentario,
+en una regla donde cada otro disyunto tiene párrafos**:
+
+```
+|| resource.data.get('visibility', 'private') == 'public'
+|| resource.data.get('visibility', 'private') == 'shared'    // firestore.rules:259
+```
+
+Medido, y alcanzable hoy: un PF crea una `trainer-assigned` con
+`visibility: 'shared'` (**ALLOW**), y desde un desconocido:
+
+```
+get routines/{shared de un par ajeno}          -> ALLOW  (assignedTo=athleteA…)
+list routines where visibility == 'shared'     -> ALLOW  (devuelve todas)
+```
+
+O sea que el día que se implemente "planes compartidos entre múltiples atletas",
+**cada plan compartido nace mundo-legible y mundo-enumerable, con el par
+`assignedBy`/`assignedTo` adentro** — el grafo PF↔alumno de toda la plataforma.
+Y va a parecer que funciona, porque el cliente filtra.
+
+*Arreglo propuesto:* sacar el disyunto de la regla de lectura hasta que la
+feature se diseñe, y que el diseño elija a quién abre. Un valor reservado no
+debería llegar a producción con un permiso ya concedido. Riesgo de sacarlo: nulo
+medible — el cliente sólo escribe `'public'`/`'private'`
+(`routine_repository.dart:36`), así que no debería haber docs `shared` en la base;
+**hay que confirmarlo con un conteo en producción antes de tocar la regla.**
+
+---
+
+**QA-SEC-013 — El gate de rol de trainer no llegó a las 3 colecciones que publican al PF.**
+`rules-hardening` Slice C agregó `get(users/{uid}).data.role == 'trainer'` a
+**cinco** colecciones —`payments`, `athlete_billing`, `measurements`,
+`performance_tests`, `appointments`— para cerrar el vector *"un usuario con rol
+athlete forja un documento nombrándose a sí mismo trainer"*. Quedaron afuera las
+tres que publican la **identidad y la agenda** del PF, y en las tres el rol se
+puede saltear. Medido, con una cuenta `role: 'athlete'`:
+
+| Escritura | Resultado |
+|---|---|
+| `trainerPublicProfiles/{self}` con `displayNameLowercase`, especialidad y `trainerOffersOnline` | **ALLOW** |
+| `coach_availability_rules/{propia}` con 50 KB de payload arbitrario | **ALLOW** |
+| `coach_availability_overrides/{propia}` con 50 KB de payload arbitrario | **ALLOW** |
+
+Y aparece en el descubrimiento: la sonda corrió la misma query que
+`TrainerPublicProfileRepository.listAll()`
+(`orderBy('displayNameLowercase').limit(50)`) y el doc forjado **volvió primero**,
+porque el atacante elige el string por el que se ordena. Como yapa, `trainer_links`
+create sólo pide `trainerId is string` — medido: un atleta puede pedir vínculo
+contra otro atleta.
+
+Dos matices que acotan el daño, y conviene tenerlos escritos para no
+sobredimensionar el ticket:
+
+- Los campos del perfil comercial son **self-attested a propósito** (AD-3,
+  `firestore.rules:1098`), y los agregados que sí son trust boundary
+  (`averageRating`, `reviewCount`, `athleteCount`) están pineados CF-write-only.
+  El ticket es sobre **quién puede existir en el directorio**, no sobre qué dice.
+- El chat de consulta no se abre contra un PF falso: `chatCreateOk` verifica
+  `get(users/{other}).data.role == 'trainer'` (`:1535`).
+
+Lo de `coach_availability_*` es un problema distinto en el mismo bloque: además
+de no tener gate de rol, **no tienen `keys().hasOnly()` ni cap de tamaño**, y la
+colección es mundo-legible y mundo-enumerable por decisión escrita (§4.3). Es
+decir: cualquier autenticado publica documentos arbitrarios de hasta 1 MB que
+todos los usuarios pueden listar. El comentario de la regla dice
+*"Create/update/delete restricted to the owning trainer"* — es dueño, sí, pero de
+un documento que se acuña solo.
+
+*Arreglo propuesto:* el mismo disyunto de rol que las otras cinco, más una
+allowlist de campos y un cap de longitud en `coach_availability_*`. Cuidado con
+el orden de despliegue: hoy hay perfiles de PF creados antes del gate y la regla
+de `update` también los tocaría.
+
+---
+
+**QA-SEC-014 — `appointments` create: un desconocido escribe en la agenda de cualquier PF.**
+Slice C razonó **el disyunto del trainer** y dejó el del atleta explícitamente
+intacto (`firestore.rules:1854`: *"the legacy athlete self-book disjunct
+(`athleteId == auth.uid`) is UNCHANGED, preserving that live path"*). El
+auto-booking está decidido. Lo que nadie miró es **qué se puede meter adentro del
+documento**: el bloque no tiene `keys().hasOnly()`, no valida un solo campo, no
+tiene cap de longitud en ninguno, y no verifica que `trainerId` sea un trainer ni
+que haya vínculo.
+
+Medido, desde una cuenta sin ninguna relación con el PF:
+
+```
+create appointments/{id} con trainerId = <cualquier PF>,
+  athleteDisplayName = 30 KB de texto arbitrario,
+  noteBefore         = 30 KB de texto arbitrario,
+  status             = 'confirmed'                      -> ALLOW
+el PF lee ese turno                                     -> ALLOW
+```
+
+Cae en la agenda del PF —que es una superficie con UI, la que §2.4/QA-CMP-009
+señala como *"el residuo más visible de todos"*— con `status: 'confirmed'` y con
+el texto que el atacante eligió. Y `allow delete: if false` (`:1898`): el PF
+**no lo puede borrar**, sólo cancelarlo.
+
+Peor: `startsAt` tampoco se valida, y la cancelación exige más de 24 h de
+anticipación (`:1870`, `startsAt - 86400000 > request.time`). Leyendo la regla —no
+lo medí— un turno forjado con `startsAt` dentro de las próximas 24 h, o en el
+pasado, **no lo puede cancelar nadie y no lo puede borrar nadie**: queda fijo en
+la agenda hasta que alguien entre con el Admin SDK.
+
+La evidencia de que es un olvido y no una decisión es la comparación dentro del
+mismo archivo: `athlete_notes` limita `note` a 5000 caracteres,
+`follow_up_entries` su `text` a 5000, `nutrition_plans` el `title` a 200,
+`payments` el `concept` a 200 y `measurements` las `notes` a 2000.
+`appointments` es el único documento escribible por un tercero **sin un solo
+límite**.
+
+*Arreglo propuesto:* `keys().hasOnly()` + `optStrMaxLen()` sobre
+`athleteDisplayName` / `noteBefore` / `noteAfter` —los guards compartidos del
+tope de `firestore.rules` (QA #508) ya existen y son exactamente para esto—, un
+rango sobre `startsAt`, y decidir aparte si el auto-booking debería exigir
+`trainer_links` activo. Eso último es cambio de producto, no de regla.
+
+---
+
+**QA-SEC-015 — `temp/uploads` es el único write de Storage sin allowlist ni cap.**
+
+```
+match /temp/uploads/{userId}/{file=**} {
+  allow read: if false;
+  allow write: if request.auth != null && request.auth.uid == userId;
+}
+```
+
+Los otros cinco bloques del archivo declaran content-type y tamaño. Éste no
+declara ninguno de los dos. Medido, con el mismo payload:
+
+| Path | `.exe` de 4 bytes | 8 MB |
+|---|---|---|
+| `temp/uploads/{self}/` | **ALLOW** | **ALLOW** |
+| `avatars/{self}.exe` | DENY | (cap 5 MB) |
+| `postPhotos/{self}/` | DENY | (cap 15 MB) |
+| `customExerciseVideos/{self}/` | DENY | (cap 100 MB) |
+
+El piso sí está: anónimo DENY, subir a la carpeta de otro uid DENY, `list` DENY,
+y el `read: if false` aguanta — medido, `getDownloadURL()` sobre lo que uno mismo
+subió **también da DENY**, porque mintear el token exige leer la metadata. **No es
+un file host público**, y eso es lo que baja la severidad a Baja.
+
+Lo que queda es: cualquier autenticado —incluido un rol `athlete`, que no tiene
+nada que hacer ahí, porque el path es para los Excel que importa el PF— puede
+escribir bytes arbitrarios, en cantidad arbitraria, en nuestro bucket. Sin ciclo
+de vida: el prefijo se llama `temp/` pero no hay TTL ni job de limpieza; lo único
+que barre `temp/uploads/{uid}/` es el cascade de borrado de cuenta
+(`cascade/storage.ts:67`), o sea que los bytes viven mientras viva la cuenta.
+
+*Arreglo propuesto:* content-type allowlist (los MIME de Excel) + cap de tamaño,
+espejo del guard del cliente, y una regla de ciclo de vida en el bucket. Ojo con
+uno solo de los dos: sin TTL, el cap sólo hace la acumulación más lenta.
+
+---
+
+**QA-SEC-016 — El scanner de App Check cubre 2 de los 5 callables desplegados.**
+Desarrollado en §4.8. Los tres callables fuera de la lista tienen su exención
+razonada **en su propio archivo**, así que el permiso está decidido; lo que no
+está decidido es que el guard afirme una propiedad que no verifica. Y una de las
+tres exenciones (`mintWatchCredential`) se declara a sí misma *"deuda, no decisión
+de diseño"*, con un TODO de restauración que nada vigila.
+
+*Arreglo propuesto:* derivar la lista de `index.ts` en vez de escribirla a mano
+—los callables desplegados son exactamente los símbolos `onCall` exportados
+ahí— y convertir las exenciones en entradas explícitas con motivo, de modo que
+agregar un callable sin atestación **y sin exención declarada** ponga el test en
+rojo. Es el mismo patrón que `rules-read-isolation.test.ts` (§1.4) ya usa para
+congelar cláusulas de `firestore.rules`.
+
+---
+
+### 4.10 Observaciones que no llegan a ticket
+
+No son permisos sin decidir, pero salieron del cruce y conviene que estén
+escritas. Mismo criterio que §1.7.
+
+- **`gyms` `google-places` no tiene `keys().hasOnly()`.** El permiso amplio de
+  update **sí está decidido y comentado** (`firestore.rules:1134-1158`: el
+  resolve pasó a ser client-side porque la CF no se puede desplegar, y dos
+  clientes pueden reescribir el mismo placeId a la vez), y los campos de
+  identidad **sí están pineados** por QA-SEC-003. Lo que quedó abierto es todo lo
+  demás: medido, cualquier autenticado agrega campos arbitrarios a un `gyms`
+  ajeno (20 KB en la prueba) y setea `createdBy` a su propio uid, en una
+  colección mundo-legible y mundo-enumerable. Nada lee `createdBy` en
+  `google-places` hoy, así que no escala a nada; es inyección de contenido en un
+  catálogo, no un leak. Si se toca `appointments` por QA-SEC-014, la allowlist
+  acá cuesta lo mismo y puede ir en el mismo change.
+- **Varias denegaciones de `routines` llegan por error de evaluación, no por
+  permiso.** Los disyuntos del `read` dereferencian `resource.data.assignedTo`,
+  `assignedBy` y `createdBy` **crudo**, sin el `.get(campo, default)` que el
+  mismo bloque sí usa para `visibility`. Medido: el `get` de una
+  `trainer-assigned` sin `createdBy` —que es la forma normal, el modelo no lo
+  emite— devuelve *"Property createdBy is undefined on object"*, y el `list` sin
+  filtro devuelve *"Property assignedTo is undefined"*. **Deniegan, que es el
+  resultado correcto**, pero por el motivo equivocado, y §1.8 avisa que un
+  denegado por el motivo equivocado es más frágil que uno por permiso: alcanza
+  con que un doc adquiera el campo para que la evaluación deje de fallar y pase
+  a decidir el disyunto. No es un agujero hoy; es una fila del `read` más
+  apoyada en la forma de los datos que en la regla.
+- **`addAlias` exige App Check y se llama desde el Coach Hub web, donde App
+  Check nunca se activa.** O sea que falla siempre, y el error va a un
+  `debugPrint`. No lo encontré yo: está escrito en
+  `accept-trainer-link.ts:87-89` (*"Falla siempre y nadie se entero"*). Lo dejo
+  anotado acá porque es el mismo patrón que §3.2.1 (`catch (_) {}` que se come
+  una denegación y le miente al usuario) y porque, cuando se active App Check en
+  web, es lo primero que hay que retestear.
+- **La jerarquía aguanta por default-deny, no por una regla.** Los seis
+  `collectionGroup` de §4.3 fallan porque no existe un `match /{path=**}/…`. Es
+  correcto y es gratis, pero es una propiedad que se pierde con un `match` nuevo
+  y ningún test la custodia. Es candidata a un scanner estático del estilo de
+  `rules-read-isolation.test.ts`.
+
+---
+
+### 4.11 Correcciones al inventario de §2 que salieron del cruce
+
+Medir §2.1.1 contra el emulador encontró dos filas donde la columna *"Quién lo
+lee"* no coincide con la regla. Las dos van corregidas en este mismo PR, y las
+dos van en la dirección de **más lectores de los declarados**:
+
+| Fila | Decía | Mide | Nota |
+|---|---|---|---|---|
+| 22-23 `coach_availability_rules` / `_overrides` | "PF" | **cualquier autenticado** | Deliberado y comentado en `firestore.rules:1810`: los alumnos lo necesitan para calcular slots libres client-side |
+| 27 `athlete_billing` | "Sólo el PF" | **PF + el alumno del par** | `:2119` incluye `athleteId`. Sin comentario que lo explique, pero es coherente con que el alumno vea el precio acordado |
+
+Ninguna de las dos es un agujero. Las dos son exactamente el motivo por el que
+§2.6 pide que el PR que cambia el dato actualice el documento: se escribieron
+leyendo el modelo, no la regla.
+
+---
+
+### 4.12 Cómo mantener esta sección
+
+Mismo contrato que §1.8, §2.6 y §3.8: **el PR que cambia la regla actualiza el
+documento.**
+
+1. **Bloque `match` nuevo** → antes de mergear, contestar las tres columnas para
+   los siete actores de §4.1. Si la respuesta para A5 (*autenticado cualquiera*)
+   es "puede leer", eso es una decisión de publicar a toda la base: se escribe
+   acá con su porqué, o no se mergea.
+2. **`resource == null` en una regla de `read`** → sólo con doc id **aleatorio**.
+   Con id determinístico es un oráculo de existencia (§4.6), y hay que acotar el
+   disyunto a quien tiene derecho a preguntar. Es la lección de QA-SEC-010 y vale
+   para cualquier bloque futuro.
+3. **Flag de privacidad nuevo en un modelo** → si la UI lo usa para esconder
+   algo, la regla tiene que aplicarlo también, o el copy tiene que dejar de
+   prometerlo. Lección de QA-SEC-011.
+4. **Valor de enum reservado "para más adelante"** → no darle permiso hasta que
+   la feature se diseñe. Lección de QA-SEC-012.
+5. **Documento que escribe un tercero** → `keys().hasOnly()` y cap de longitud en
+   todo campo de texto libre, siempre. Lección de QA-SEC-014 y del contraste con
+   las otras cinco colecciones que sí los tienen.
+6. **Si se cierra un `QA-SEC-0xx` de §4.9** → tacharlo ahí con la referencia al
+   PR, no borrarlo (misma regla que §2.4 y §3.8), y actualizar la fila que
+   corresponda de §1.1 o §1.2.
+7. **La medición no se hereda.** Los ALLOW/DENY de esta sección valen para el
+   `firestore.rules` del día que se escribieron. Si tocás un bloque, volvé a
+   correr la sonda.
+
+```bash
+export PATH="/opt/homebrew/opt/openjdk@21/bin:$PATH"   # Java 21, macOS
+npm --prefix functions run test:rules:emulator
+npm --prefix scripts/rules_test ci && bash scripts/test_rules.sh
+```
+
+---
+
+### 4.13 Registro `QA-SEC-xxx`
+
+#680 pide formalizar la convención porque *"hoy los IDs existen desperdigados en
+comentarios y nadie sabe cuál es el próximo libre"*. Éste es el registro.
+
+**Convención.** `QA-SEC-xxx` numera un **hallazgo de seguridad** con su
+disposición. La serie `1xx` está reservada para hallazgos de **plataforma**
+(manifiestos, entitlements, configuración de build) para no mezclarlos con los de
+autorización. El id se cita en el comentario de la regla o del test que lo cierra,
+y se tacha acá con la referencia al PR — nunca se borra. Los hallazgos de
+**borrado / cumplimiento** usan la serie paralela `QA-CMP-xxx` (§2.4).
+
+| ID | Qué | Estado |
+|---|---|---|
+| QA-SEC-001 | `users` create dejaba auto-asignarse `role: 'trainer'` (privilege escalation, permanente por el pin de update) | ~~Cerrado~~ — `firestore.rules:97`, `users-role-create-rules.test.ts` |
+| QA-SEC-002 | Forja de `trainer_links` | ~~Cerrado~~ — `trainer-links-forge-rules.test.ts` |
+| QA-SEC-003 | `gyms`: coordenadas sin validar + campos de identidad sin pinear en el update | ~~Cerrado~~ — `firestore.rules:1203`, `rules.test.js` |
+| QA-SEC-004 | — | **nunca asignado** |
+| QA-SEC-005 | — | **nunca asignado** |
+| QA-SEC-006 | App Check obligatorio en los callables desplegados | ~~Cerrado~~ — `appcheck-enforcement.test.ts`. **Su cobertura quedó desactualizada** → QA-SEC-016 |
+| QA-SEC-007 | `storage:avatars/` — `list` enumera el padrón de uids con avatar | Abierto — [#764](https://github.com/Backhaus7997/treino/issues/764), §3.6 |
+| QA-SEC-008 | `storage:customExerciseVideos/` — `list` exfiltra la videoteca entera de un PF | Abierto — [#763](https://github.com/Backhaus7997/treino/issues/763), §3.6 |
+| QA-SEC-009 | `storage:avatars/` — `delete` denegado hasta para el dueño por null deref | Abierto — [#765](https://github.com/Backhaus7997/treino/issues/765), §3.6 |
+| QA-SEC-010 | Oráculo de existencia por `resource == null` + doc id determinístico | Abierto — [#777](https://github.com/Backhaus7997/treino/issues/777), §4.9 |
+| QA-SEC-011 | `isProfilePublic` no se aplica en las reglas | Abierto — [#778](https://github.com/Backhaus7997/treino/issues/778), §4.9 |
+| QA-SEC-012 | `visibility: 'shared'` concede lectura mundial a una feature reservada | Abierto — [#779](https://github.com/Backhaus7997/treino/issues/779), §4.9 |
+| QA-SEC-013 | El gate de rol de trainer no llegó a 3 colecciones | Abierto — [#780](https://github.com/Backhaus7997/treino/issues/780), §4.9 |
+| QA-SEC-014 | `appointments` create sin allowlist ni cap de tamaño | Abierto — [#781](https://github.com/Backhaus7997/treino/issues/781), §4.9 |
+| QA-SEC-015 | `temp/uploads` sin allowlist de content-type ni cap | Abierto — [#782](https://github.com/Backhaus7997/treino/issues/782), §4.9 |
+| QA-SEC-016 | El scanner de App Check cubre 2 de 5 callables | Abierto — [#783](https://github.com/Backhaus7997/treino/issues/783), §4.9 |
+| QA-SEC-100 | Android: `allowBackup` | ~~Cerrado~~ — `test/security/android_manifest_backup_test.dart` |
+
+**Próximo id libre: QA-SEC-017** (y `QA-SEC-1xx`: 101).
