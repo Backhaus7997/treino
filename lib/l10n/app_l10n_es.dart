@@ -1875,6 +1875,17 @@ class AppL10nEs extends AppL10n {
   String get routineEditorNotesHint => 'Técnica, tempo, RIR…';
 
   @override
+  String get routineEditorSummaryLabel => 'RESUMEN';
+
+  @override
+  String get routineEditorSummaryHelp =>
+      'Una frase que explique qué es la rutina, para alguien que nunca pisó un gimnasio.';
+
+  @override
+  String get routineEditorSummaryHint =>
+      'Ej: Empujar, tirar y piernas: cada día trabaja un tipo de movimiento distinto.';
+
+  @override
   String get exerciseNoteFromCoachTag => 'DEL COACH';
 
   @override
@@ -5420,6 +5431,17 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get routineEditorNotesHint => 'Técnica, tempo, RIR…';
+
+  @override
+  String get routineEditorSummaryLabel => 'RESUMEN';
+
+  @override
+  String get routineEditorSummaryHelp =>
+      'Una frase que explique qué es la rutina, para alguien que nunca pisó un gimnasio.';
+
+  @override
+  String get routineEditorSummaryHint =>
+      'Ej: Empujar, tirar y piernas: cada día trabajás un tipo de movimiento distinto.';
 
   @override
   String get exerciseNoteFromCoachTag => 'DEL COACH';

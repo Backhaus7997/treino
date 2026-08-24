@@ -142,6 +142,7 @@ List<Override> _overrides({
 /// Adds "Press de Banca" to the first day via the exercise picker.
 Future<void> _addBenchPress(WidgetTester tester) async {
   await tester.ensureVisible(find.text('Agregar ejercicio'));
+  await tester.pumpAndSettle();
   await tester.tap(find.text('Agregar ejercicio'));
   await tester.pumpAndSettle();
   await tester.tap(find.text('Press de Banca').first);
@@ -1156,6 +1157,7 @@ void main() {
 
     // Add an exercise — scope dialog must appear
     await tester.ensureVisible(find.text('Agregar ejercicio'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Agregar ejercicio'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Press de Banca').first);
@@ -1196,6 +1198,7 @@ void main() {
 
     // Add exercise, choose "solo en esta semana"
     await tester.ensureVisible(find.text('Agregar ejercicio'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Agregar ejercicio'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Press de Banca').first);
@@ -1249,6 +1252,7 @@ void main() {
 
     // Add exercise, choose "todas las semanas"
     await tester.ensureVisible(find.text('Agregar ejercicio'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Agregar ejercicio'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Press de Banca').first);

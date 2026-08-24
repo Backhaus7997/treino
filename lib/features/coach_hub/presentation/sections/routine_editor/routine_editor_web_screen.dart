@@ -4,6 +4,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -167,6 +168,14 @@ class _EditorDay {
 const _kMaxDays = 7; // mirrors mobile's _kMaxDays
 const _kMaxWeeks = 16; // mirrors mobile's _kMaxWeeks
 
+/// Client-side cap of the resumen field (#648) — mirrors mobile's own
+/// `_kSummaryMaxLength` and, above both, the `optStrMaxLen(..., 280)` guard on
+/// the two trainer UPDATE paths of firestore.rules. The rule is the real
+/// enforcement (a patched client would ignore this one); this is the
+/// affordance that keeps an honest PF from ever meeting it as a
+/// permission-denied. The 7 seeded system resúmenes measure 61–100 characters.
+const _kSummaryMaxLength = 280;
+
 /// Scope choice when deleting an exercise from a multi-week plan (REQ-WPRES-010,
 /// mirrors mobile's `_DeleteScope`).
 enum _DeleteScope { thisWeek, allWeeks }
@@ -175,6 +184,11 @@ class _RoutineEditorWebScreenState
     extends ConsumerState<RoutineEditorWebScreen> {
   final _nameCtrl = TextEditingController();
   final _splitCtrl = TextEditingController();
+
+  /// Plain-language resumen of the routine (#648). Both modes of this screen
+  /// are PF modes, so unlike mobile there is nothing to gate here: the athlete
+  /// never reaches Coach Hub web.
+  final _summaryCtrl = TextEditingController();
   ExperienceLevel _level = ExperienceLevel.beginner;
   int _numWeeks = 1;
 
@@ -202,6 +216,17 @@ class _RoutineEditorWebScreenState
 
   /// Noun for user-facing messages ("No pudimos guardar la …").
   String get _noun => widget.isTemplate ? 'plantilla' : 'rutina'; // i18n
+
+  /// The resumen to persist, or `null` when the PF left it blank (#648).
+  ///
+  /// The field is OPTIONAL: an empty (or whitespace-only) box saves as `null`,
+  /// not as `''`. An empty string would make `routine.summary != null` true on
+  /// the detail screen and render an empty paragraph where the layout is
+  /// supposed to collapse.
+  String? get _summaryOrNull {
+    final trimmed = _summaryCtrl.text.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
 
   /// The routine being edited (its identity fields are preserved on save).
   Routine? _loadedRoutine;
@@ -252,6 +277,7 @@ class _RoutineEditorWebScreenState
   void _populate(Routine routine) {
     _nameCtrl.text = routine.name;
     _splitCtrl.text = routine.split ?? '';
+    _summaryCtrl.text = routine.summary ?? '';
     _level = routine.level;
     _numWeeks = routine.numWeeks.clamp(1, _kMaxWeeks);
     _days
@@ -321,6 +347,7 @@ class _RoutineEditorWebScreenState
   void dispose() {
     _nameCtrl.dispose();
     _splitCtrl.dispose();
+    _summaryCtrl.dispose();
     super.dispose();
   }
 
@@ -1225,18 +1252,17 @@ class _RoutineEditorWebScreenState
     try {
       if (_isEditing) {
         // Preserve the loaded routine's identity (id, assignedBy/To, source,
-        // createdAt, …). updateAssigned only writes name/split/level/days/
-        // numWeeks — `days` is rebuilt from a form that models 100% of
-        // RoutineSlot's schema, so nothing is lost on re-save (Fase 4c).
-        // updateTemplate/updateAssigned each write only name/split/level/days/
-        // numWeeks — `days` is rebuilt from a form that models 100% of
-        // RoutineSlot's schema, so nothing is lost on re-save.
+        // createdAt, …). updateTemplate/updateAssigned each write only
+        // name/split/level/days/numWeeks/summary — `days` is rebuilt from a
+        // form that models 100% of RoutineSlot's schema, so nothing is lost on
+        // re-save (Fase 4c).
         final draft = _loadedRoutine!.copyWith(
           name: _nameCtrl.text.trim(),
           split: _splitCtrl.text.trim(),
           level: _level,
           days: days,
           numWeeks: _numWeeks,
+          summary: _summaryOrNull,
         );
         if (widget.isTemplate) {
           await repo.updateTemplate(uid: trainerUid, draft: draft);
@@ -1254,6 +1280,7 @@ class _RoutineEditorWebScreenState
           level: _level,
           days: days,
           numWeeks: _numWeeks,
+          summary: _summaryOrNull,
           source: RoutineSource.trainerTemplate,
           assignedBy: trainerUid,
           visibility: RoutineVisibility.private,
@@ -1267,6 +1294,7 @@ class _RoutineEditorWebScreenState
           level: _level,
           days: days,
           numWeeks: _numWeeks,
+          summary: _summaryOrNull,
           source: RoutineSource.trainerAssigned,
           assignedBy: trainerUid,
           assignedTo: widget.athleteId,
@@ -1464,6 +1492,70 @@ class _RoutineEditorWebScreenState
                                     decoration: _inputDecoration(
                                       palette,
                                       'Ej: Push/Pull/Legs',
+                                    ), // i18n
+                                  ),
+                                  const SizedBox(height: 16),
+                                  // ── Resumen en criollo (#648) ──────────
+                                  //
+                                  // Sits right under SPLIT because SPLIT is
+                                  // the jargon it exists to translate: the
+                                  // routine detail badge opens with
+                                  // "PPL · DÍA 1" and 2 of 5 usability
+                                  // participants could not say what that
+                                  // meant. Asking for the plain sentence next
+                                  // to the term that needs it is what makes
+                                  // the field self-explanatory.
+                                  _FieldLabel('RESUMEN', palette), // i18n
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    // i18n
+                                    'Una frase que explique qué es la rutina, '
+                                    'para alguien que nunca pisó un gimnasio.',
+                                    style: GoogleFonts.barlow(
+                                      color: palette.textMuted,
+                                      fontSize: 12,
+                                      height: 1.35,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  TextField(
+                                    key: const Key(
+                                      'routine_editor_summary_field',
+                                    ),
+                                    controller: _summaryCtrl,
+                                    onChanged: (_) {
+                                      _markDirty();
+                                      // Unlike NOMBRE/SPLIT this DOES rebuild:
+                                      // the character counter under the field
+                                      // is the only thing on this screen that
+                                      // has to track a controller live.
+                                      setState(() {});
+                                    },
+                                    // 2–3 lines: the 7 seeded resúmenes measure
+                                    // 61–100 characters. A taller box would
+                                    // invite the essay the cap exists to stop.
+                                    minLines: 2,
+                                    maxLines: 3,
+                                    maxLength: _kSummaryMaxLength,
+                                    maxLengthEnforcement:
+                                        MaxLengthEnforcement.enforced,
+                                    textCapitalization:
+                                        TextCapitalization.sentences,
+                                    style: GoogleFonts.barlow(
+                                      color: palette.textPrimary,
+                                    ),
+                                    decoration: _inputDecoration(
+                                      palette,
+                                      'Ej: Empujar, tirar y piernas: cada día '
+                                      'trabajás un tipo de movimiento distinto.',
+                                    ).copyWith(
+                                      // The counter STAYS visible: the cap is
+                                      // an editorial constraint the PF writes
+                                      // against, not a defensive ceiling.
+                                      counterStyle: GoogleFonts.barlow(
+                                        fontSize: 11,
+                                        color: palette.textMuted,
+                                      ),
                                     ), // i18n
                                   ),
                                   const SizedBox(height: 16),

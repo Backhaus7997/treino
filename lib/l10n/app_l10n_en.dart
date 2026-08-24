@@ -1826,6 +1826,17 @@ class AppL10nEn extends AppL10n {
   String get routineEditorNotesHint => 'Technique, tempo, RIR…';
 
   @override
+  String get routineEditorSummaryLabel => 'SUMMARY';
+
+  @override
+  String get routineEditorSummaryHelp =>
+      'One sentence explaining what the routine is, for someone who has never set foot in a gym.';
+
+  @override
+  String get routineEditorSummaryHint =>
+      'E.g. Push, pull and legs: each day trains a different kind of movement.';
+
+  @override
   String get exerciseNoteFromCoachTag => 'FROM COACH';
 
   @override
