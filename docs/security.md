@@ -462,7 +462,7 @@ de terceros: `posts.authorDisplayName`/`authorAvatarUrl` (se van con el post),
 
 ### 2.2 Contraste contra el cascade de borrado
 
-`runDeleteAccount` (`functions/src/delete-account.ts`) ejecuta ocho pasos, cada
+`runDeleteAccount` (`functions/src/delete-account.ts`) ejecuta nueve pasos, cada
 uno en su `try/catch`, y borra el usuario de Auth al final. Esto es lo que cada
 ítem del inventario recibe.
 
@@ -473,7 +473,7 @@ uno en su `try/catch`, y borra el usuario de Auth al final. Esto es lo que cada
 | 1 | `users/{uid}` | ✅ | `deleteUserDocs` → `recursiveDelete` |
 | 2 | `users/{uid}/notifications` | 🟡 **parcial** | El inbox propio se va con el `recursiveDelete`. **Las copias en el inbox de terceros quedan** → QA-CMP-008 |
 | 3 | `exercises` | n/a | Sin PII |
-| 4 | `routines` | ❌ **hueco** | **No hay paso de cascade** → QA-CMP-004 |
+| 4 | `routines` | ✅ | `deleteAthleteRoutines` (PR #753) — `assignedTo == uid` + `createdBy == uid`, con `recursiveDelete`. `assignedBy` queda afuera a propósito, ver QA-CMP-004 |
 | 5 | `routines/*/ratings/{userId}` | ❌ **hueco** | Sin paso; `allow delete: if false` (`firestore.rules:494`) → QA-CMP-006 |
 | 6 | `trainer_links` | 🟡 parcial | `terminateTrainerLinks` marca `status:'terminated'`, `reason:'account-deleted'`. Los uids quedan. Deliberado. |
 | 7 | `posts` | ✅ | `deletePosts` (borrado real desde la decisión de producto 2026-07-16). El doc se va; **su subcolección `reactions` no** → QA-CMP-005b |
@@ -516,21 +516,27 @@ sobre el borrado de una cuenta **athlete**:
 
 | Estado | Ítems | Cuáles |
 |---|---|---|
-| ✅ Cubierto | **23** | 1, 7, 9, 10, 13, 16-21, 25-31 + S1-S5 |
+| ✅ Cubierto | **24** | 1, 4, 7, 9, 10, 13, 16-21, 25-31 + S1-S5 |
 | 🟡 Parcial (queda PII recuperable) | **3** | 2, 6, 24 |
 | ⚪ Retenido a propósito, con decisión escrita en el código | **5** | 14, 15, 32, 33, 35 |
-| ❌ Hueco sin decisión escrita | **6** | 4, 5, 8, 12, 34 + S6 |
+| ❌ Hueco sin decisión escrita | **5** | 5, 8, 12, 34 + S6 |
 | n/a para una cuenta athlete (PII de un PF) | **3** | 11, 22, 23 |
 
-**Titular: 8 de 40 ítems dejan datos personales recuperables sin que exista
-ninguna decisión escrita que lo justifique** (los 6 huecos + los 2 parciales que
-dejan nombre o texto identificable: `appointments` y `notifications`).
+**Titular: 7 de 40 ítems dejan datos personales recuperables sin que exista
+ninguna decisión escrita que lo justifique** (los 5 huecos + los 2 parciales que
+dejan nombre o texto identificable: `appointments` y `notifications`). Eran 8
+hasta que el PR #753 cerró `routines`.
 
-`delete-account.smoke.test.ts` afirma que `deletedCollections` trae las 8
+`delete-account.smoke.test.ts` afirma que `deletedCollections` trae las
 entradas esperadas, pero **ninguna aserción comprueba la ausencia de residuo en
 las colecciones que el cascade no toca** — que es exactamente donde están los
-ocho ítems de arriba. El test verifica lo que el cascade dice que hizo, no lo
+siete ítems de arriba. El test verifica lo que el cascade dice que hizo, no lo
 que quedó en la base.
+
+La única excepción, y el patrón a copiar para los que quedan, es
+`__tests__/cascade/routines.test.ts` (PR #753): afirma sobre `exists === false`
+del documento y sobre la desaparición de su subcolección, no sobre el string
+`"routines"` en `deletedCollections`.
 
 #### 2.2.3 Inconsistencia interna que conviene mirar
 
@@ -653,35 +659,57 @@ como ticket.
 
 Se numeran siguiendo la convención `QA-CMP-xxx` que ya usan
 `cascade/storage.ts` (QA-CMP-002) y `cascade/athlete-data.ts` (QA-CMP-003).
+Los que se cierren después quedan **tachados acá con la referencia al PR que
+los cerró**, no borrados — la §2.6 regla 3 lo pide así, y el historial de qué
+se decidió y por qué es la mitad del valor de esta lista.
 
 ---
 
-**QA-CMP-004 — `routines` no se borra, y hay un guard que asume que sí.**
-`runDeleteAccount` no tiene ningún paso sobre `routines`. Sobreviven las rutinas
-con `createdBy == uid` y —peor— las privadas con `assignedTo == uid`, que son
-los planes que el PF le armó a ese alumno.
+~~**QA-CMP-004 — `routines` no se borra, y hay un guard que asume que sí.**~~
+**CERRADO — PR #753.**
 
-Lo que lo convierte en un hueco de contrato y no en un olvido: el trigger
-`cleanupAssignedPlansOnUnlink` **se saltea explícitamente** el caso, delegándolo
-en un paso que no existe:
+~~`runDeleteAccount` no tiene ningún paso sobre `routines`. Sobreviven las
+rutinas con `createdBy == uid` y —peor— las privadas con `assignedTo == uid`,
+que son los planes que el PF le armó a ese alumno.~~
 
-```ts
-// functions/src/cleanup-assigned-plans.ts:110-113
-// Guard: account-deletion cascade owns its own cleanup — don't interfere.
-if (reason === "account-deleted") {
-  logger.info("cleanupAssignedPlans: skipping cascade reason=account-deleted");
-  return { count: 0 };
-}
-```
-
-Y `"account-deleted"` es exactamente el `reason` que escribe
+~~Lo que lo convierte en un hueco de contrato y no en un olvido: el trigger
+`cleanupAssignedPlansOnUnlink` **se saltea explícitamente** el caso,
+delegándolo en un paso que no existe (`cleanup-assigned-plans.ts:110-113`), y
+`"account-deleted"` es exactamente el `reason` que escribe
 `terminateTrainerLinks`. O sea: el único mecanismo que habría barrido esos
-planes se apaga justo cuando hace falta.
+planes se apagaba justo cuando hacía falta.~~
 
-*Reparación sugerida (no aplicada):* un paso de cascade que borre
-`routines where assignedTo == uid`, y que decida qué hacer con
-`createdBy == uid` según `visibility` (una plantilla pública que otros usan no
-es lo mismo que una rutina privada).
+El paso existe: `cascade/routines.ts` → `deleteAthleteRoutines`, step 8d del
+cascade. La disposición quedó escrita en la cabecera del módulo, con las tres
+decisiones separadas:
+
+- `assignedTo == uid` → **borra**. Son los planes que el PF armó para ese
+  alumno; es literalmente lo que el guard de `cleanupAssignedPlansOnUnlink`
+  venía delegando.
+- `createdBy == uid` → **borra**. El caso que la reparación sugerida marcaba
+  como dudoso —"una plantilla pública que otros usan"— resultó no ser
+  alcanzable por este predicado: las plantillas se llavean por `assignedBy`,
+  no por `createdBy`, y un PF ni siquiera entra al cascade (guard de rol). Una
+  rutina `user-created` con `visibility: 'public'` sí es legible por cualquier
+  autenticado que tenga el id, pero la única superficie que las lista es
+  `publicRoutinesByUserProvider`, la solapa RUTINAS PÚBLICAS del perfil
+  público **de ese mismo usuario**, y `userPublicProfiles/{uid}` se borra en el
+  mismo cascade. El catálogo tampoco las ve: `listSystemTemplates` filtra
+  `source == 'system'` y `listPublishedTemplates` filtra
+  `source == 'trainer-template'`.
+- `assignedBy == uid` → **no se toca, a propósito**. El guard de rol lee
+  `users/{uid}`; en un re-run idempotente posterior a un fallo parcial ese doc
+  ya no existe y el guard **no puede dispararse**. Un barrido por `assignedBy`
+  borraría entonces la biblioteca entera del PF y todos los planes de todos
+  sus alumnos. El residuo que esto deja —una `trainer-template` forjada por un
+  atleta, privada e impublicable— no justifica ese radio de daño. Hay un test
+  que fija la no-eliminación para que nadie ensanche el predicado sin darse
+  cuenta.
+
+Usa `recursiveDelete`, no `batch.delete`, así que se lleva la subcolección
+`ratings` del documento borrado. La otra mitad de QA-CMP-006 —las
+puntuaciones que el usuario borrado dejó en plantillas **ajenas**— sigue
+abierta: necesita un barrido `collectionGroup`, no estas dos queries.
 
 ---
 

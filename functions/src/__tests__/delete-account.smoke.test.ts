@@ -362,6 +362,8 @@ describe("SCENARIO-551 (full): deletedCollections includes all cascade collectio
       "storage",
       "storage-athlete",
       "athlete-data",
+      // QA-CMP-004 — the routines cascade step.
+      "routines",
       "users",
       "userPublicProfiles",
       "users-auth",
