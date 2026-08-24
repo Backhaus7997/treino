@@ -230,12 +230,12 @@ void main() {
       //
       // El nombre de la rutina NO contiene el split a propósito: si lo
       // contuviera, el finder daría un falso negativo contra el título.
-      final routine = Routine(
+      const routine = Routine(
         id: 'r-jerga',
         name: 'Mi Rutina',
         split: 'Bro Split',
         level: ExperienceLevel.beginner,
-        days: const [],
+        days: [],
         source: RoutineSource.userCreated,
         visibility: RoutineVisibility.private,
         createdBy: 'athlete-1',
