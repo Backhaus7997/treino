@@ -1,0 +1,21 @@
+{
+  // TSConfig que usa SOLO ESLint (`parserOptions.project` en `.eslintrc.js`).
+  //
+  // `tsconfig.json` excluye `src/__tests__` a proposito: `npm run build` no
+  // debe compilar los tests al bundle que se deploya a Functions. Pero el lint
+  // es typed (`@typescript-eslint` con type information), asi que cada archivo
+  // que ESLint mira tiene que estar en algun `project` — y los tests no lo
+  // estaban. Resultado: `npm run lint` moria con un parsing error por test y
+  // nadie lo veia, porque CI corre build/typecheck/test pero no lint.
+  //
+  // Este tsconfig incluye TODO `src` (tests incluidos) y tiene `noEmit` porque
+  // solo existe para darle tipos al parser: no emite nada a `lib/`.
+  //
+  // Si agregas otro directorio que ESLint deba mirar, agregalo tambien aca.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": ["src/**/*"],
+  "exclude": []
+}
