@@ -104,6 +104,11 @@ void main() {
     expect(find.textContaining('0 kg'), findsWidgets);
 
     // Tap the check circle to log the set.
+    // La ranura del ajuste de tiempo (#645) corre la fila hacia abajo:
+    // el check sigue en el arbol pero puede quedar fuera del viewport del
+    // test, y un tap sin scroll aterriza en otra cosa.
+    await tester.ensureVisible(find.byIcon(TreinoIcon.checkCircleEmpty));
+    await tester.pump();
     await tester.tap(find.byIcon(TreinoIcon.checkCircleEmpty));
     await tester.pump();
 
@@ -143,6 +148,11 @@ void main() {
     await tester.pump();
     expect(find.text('600'), findsNothing);
 
+    // La ranura del ajuste de tiempo (#645) corre la fila hacia abajo:
+    // el check sigue en el arbol pero puede quedar fuera del viewport del
+    // test, y un tap sin scroll aterriza en otra cosa.
+    await tester.ensureVisible(find.byIcon(TreinoIcon.checkCircleEmpty));
+    await tester.pump();
     await tester.tap(find.byIcon(TreinoIcon.checkCircleEmpty));
     await tester.pump();
 
