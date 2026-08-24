@@ -174,6 +174,40 @@ service cloud.firestore {
     }
 
     match /routines/{routineId} {
+      // ── Allowlist de campos de una rutina `user-created` ─────────────────
+      // Fuente ÚNICA de verdad, consumida por el `create` del atleta
+      // (CREATE branch 2) y por su `update` (UPDATE path 2).
+      //
+      // Vivía como literal duplicable en el update, y el create NO tenía
+      // allowlist ninguno. Esa asimetría es un brick silencioso: el create
+      // aceptaba CUALQUIER clave extra y el update la rechazaba después, así
+      // que una rutina creada con un campo desconocido no se podía editar
+      // NUNCA — y el permission-denied aparecía recién en la primera edición,
+      // lejos de la escritura que lo causó. Es el modo de falla de #563.
+      //
+      // Lo que lo vuelve alcanzable es #647 ("usar como base"): hasta ahora
+      // TODO payload de rutina de atleta se armaba desde un literal fijo en
+      // `_submit`; copiar una plantilla es el primer flujo donde el contenido
+      // sale de OTRO documento. Con el guard, un campo ajeno falla en el
+      // create — fuerte y en el acto — en vez de bloquear la edición meses
+      // después.
+      //
+      // `ratingAvg`/`ratingsCount` figuran acá por el update (un doc que
+      // alguna vez recibió agregados de la CF tiene que seguir siendo
+      // editable). En el create los rechaza aparte su propio guard de
+      // ausencia, que es más estricto y manda.
+      //
+      // ⚠️  COUPLING WARNING: esta lista tiene que contener TODO campo que
+      // guarde una rutina `user-created`. Si agregás uno al modelo Routine, a
+      // `createUserOwned` o a `updateUserOwned`, agregalo acá también —
+      // si no, se rompen create Y update a la vez.
+      function userCreatedRoutineFields() {
+        return ['name', 'level', 'days',
+                'source', 'createdBy', 'visibility', 'createdAt', 'status',
+                'split', 'estimatedMinutesPerDay', 'imageUrl', 'numWeeks',
+                'ratingAvg', 'ratingsCount', 'summary'];
+      }
+
       // Read: público para autenticados si la rutina es `visibility: 'public'`
       // (default histórico — todas las plantillas seedeadas sin el campo
       // explícito caen en este branch). Si la rutina es privada
@@ -288,7 +322,13 @@ service cloud.firestore {
                     // absence guard as branch 1.
                     && !('ratingAvg' in request.resource.data)
                     && !('ratingsCount' in request.resource.data)
-                    && request.resource.data.createdAt is timestamp;
+                    && request.resource.data.createdAt is timestamp
+                    // Ningún campo fuera del set conocido (#647). Simétrico
+                    // con el `hasOnly` de UPDATE path 2 y con la MISMA lista:
+                    // lo que se puede crear es exactamente lo que después se
+                    // puede editar. Ver `userCreatedRoutineFields()`.
+                    && request.resource.data.keys()
+                         .hasOnly(userCreatedRoutineFields());
 
       // UPDATE path 1 (narrow): owner flips only `status` — archive / restore.
       // REQ-USR-013, SCENARIO-607, SCENARIO-608.
@@ -337,23 +377,16 @@ service cloud.firestore {
                     && !('assignedBy' in request.resource.data)
                     && !('assignedTo' in request.resource.data)
                     // Only content fields may appear in the written document.
-                    // ratingAvg/ratingsCount: defensively listed (same as the
-                    // trainer-template path) so a doc that ever gained CF
-                    // aggregates cannot brick its owner's edits; the
-                    // affectedKeys allowlist below still excludes them.
-                    && request.resource.data.keys().hasOnly(
-                         // + numWeeks (periodization, Model B) — mirror RoutineRepository.
-                         ['name', 'level', 'days',
-                         'source', 'createdBy', 'visibility', 'createdAt', 'status',
-                         'split', 'estimatedMinutesPerDay', 'imageUrl', 'numWeeks',
-                         'ratingAvg', 'ratingsCount',
-                         // summary (#648): defensivo, mismo criterio que los
-                         // agregados de rating de arriba. Desde que el campo se
-                         // serializa, el cliente lo manda en TODA rutina que lo
-                         // tenga; sin esta entrada, un atleta cuya rutina tiene
-                         // summary no podria volver a editarla. NO esta en el
-                         // affectedKeys de abajo: puede convivir con el, no cambiarlo.
-                         'summary'])
+                    // La lista vive en `userCreatedRoutineFields()`, arriba —
+                    // compartida con el create para que las dos no puedan
+                    // divergir. Ahí está el detalle de por qué figuran
+                    // `ratingAvg`/`ratingsCount` (agregados de la CF) y
+                    // `summary` (#648): son defensivos, para que un doc que
+                    // los tenga siga siendo editable por su dueño. Ninguno
+                    // de los tres está en el `affectedKeys` de abajo — el
+                    // atleta convive con ellos, no los cambia.
+                    && request.resource.data.keys()
+                         .hasOnly(userCreatedRoutineFields())
                     // The diff must touch ONLY content fields (name/level/days/
                     // numWeeks/visibility).
                     && request.resource.data.diff(resource.data).affectedKeys()

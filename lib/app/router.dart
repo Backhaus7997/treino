@@ -391,6 +391,22 @@ GoRouter buildRouter({
           mode: SelfCreating(existingRoutineId: state.extra as String?),
         ),
       ),
+      GoRoute(
+        // "Usar como base" (#647): open the editor pre-loaded with an existing
+        // routine and save the result as a NEW routine owned by the athlete.
+        //
+        // The source id travels as a PATH param, not as `extra`: unlike
+        // `my-routine-editor` (where a null extra legitimately means "create
+        // from blank"), this route is meaningless without a source, and a path
+        // param makes that non-optional at the type level AND survives a deep
+        // link / process death, which `extra` does not.
+        path: '/workout/customize-routine/:routineId',
+        builder: (context, state) => RoutineEditorScreen(
+          mode: SelfCustomizing(
+            sourceRoutineId: state.pathParameters['routineId']!,
+          ),
+        ),
+      ),
 
       // ─── Full-screen sub-screens moved OUT of the ShellRoute ──────────────
       // These were shell sub-routes that showed the bottom nav bar; they read

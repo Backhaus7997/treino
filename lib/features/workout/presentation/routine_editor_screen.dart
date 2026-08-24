@@ -457,10 +457,16 @@ class RoutineEditorScreen extends ConsumerStatefulWidget {
       _RoutineEditorScreenState();
 }
 
-/// Extracts the existing doc id from any mode that supports editing.
-/// Returns null for create modes.
+/// Extracts the doc id the editor must HYDRATE FROM.
+/// Returns null for the create-from-blank modes.
+///
+/// [SelfCustomizing] is the one variant where this id is a SOURCE, not a
+/// destination: the editor loads it and then saves a brand-new doc (#647).
+/// Everything that keeps the copy from becoming the trainer's routine follows
+/// from that split — see [_submit].
 String? _existingIdFor(RoutineEditorMode mode) => switch (mode) {
       SelfCreating(:final existingRoutineId) => existingRoutineId,
+      SelfCustomizing(:final sourceRoutineId) => sourceRoutineId,
       TrainerAssigning(:final existingPlanId) => existingPlanId,
       TrainerTemplating(:final existingTemplateId) => existingTemplateId,
     };
@@ -472,6 +478,7 @@ String _titleFor(RoutineEditorMode mode, AppL10n l10n) => switch (mode) {
       TrainerTemplating() => l10n.coachEditorEditTitle,
       SelfCreating(existingRoutineId: null) => l10n.workoutSelfEditorTitle,
       SelfCreating() => l10n.workoutSelfEditorEditTitle,
+      SelfCustomizing() => l10n.workoutRoutineCustomizeTitle,
     };
 
 String _submitLabelFor(RoutineEditorMode mode, AppL10n l10n) => switch (mode) {
@@ -482,6 +489,7 @@ String _submitLabelFor(RoutineEditorMode mode, AppL10n l10n) => switch (mode) {
       SelfCreating(existingRoutineId: null) =>
         l10n.workoutSelfEditorSubmitLabel,
       SelfCreating() => l10n.workoutSelfEditorUpdateLabel,
+      SelfCustomizing() => l10n.workoutRoutineCustomizeSubmitLabel,
     };
 
 class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
@@ -653,28 +661,49 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       // Guard against the controller listeners marking a freshly-loaded
       // routine dirty while we assign their text below.
       _hydrating = true;
-      _nameController.text = routine.name;
+      final l10n = AppL10n.of(context);
+      // A copy must not land in MIS RUTINAS wearing the template's exact name
+      // — five identical "Push Pull Legs — Principiante" are unusable (#647).
+      // The suffix is a STARTING POINT, not a lock: the name field is the
+      // first thing on screen and the athlete can rewrite it before saving.
+      _nameController.text = _isCustomizing
+          ? l10n.workoutRoutineCopyName(routine.name)
+          : routine.name;
       _level = routine.level;
       // Defensive clamp — a hand-edited doc can't exceed the editor cap nor
       // drop below one week (REQ-PERIOD-011/018).
       _numWeeks = routine.numWeeks.clamp(1, _kMaxWeeks);
       // Restore the athlete's routine-visibility toggle. Only meaningful in
       // SelfCreating mode; trainer flows ignore this state.
-      _sharedOnProfile = routine.visibility == RoutineVisibility.public;
+      //
+      // NOT inherited when customizing: every copyable source is `public`
+      // (that is what makes it readable in the first place), so hydrating the
+      // toggle from it would publish a copy of the catalogue on the athlete's
+      // public profile the moment they tap save — a share they never asked
+      // for. A copy starts private, exactly like a from-scratch routine, and
+      // the athlete opts in from the same toggle if they want to.
+      _sharedOnProfile =
+          !_isCustomizing && routine.visibility == RoutineVisibility.public;
       // split is shown in trainer modes — restore it so the field is populated.
       if (routine.split != null) {
         _splitController.text = routine.split!;
       }
-      // Resumen (#648). Hydrated UNCONDITIONALLY, like the coaching note: the
-      // field only RENDERS in trainer modes, but a routine that carries a
+      // Resumen (#648). Hydrated for every mode that EDITS the doc it loaded:
+      // the field only RENDERS in trainer modes, but a routine that carries a
       // resumen must round-trip it whatever mode reopens it. An athlete
       // editing a plan is never asked about it and never writes it (the
       // athlete branches of _submit omit `summary` entirely), so hydrating
       // here costs nothing and losing it would be silent data destruction.
-      if (routine.summary != null) {
+      //
+      // Excepto al COPIAR (#647): ahí el destino es un doc NUEVO que no lleva
+      // resumen. Los branches de atleta de _submit ya omiten `summary`, así
+      // que hidratarlo sería inerte — pero dejaría el controller cargado con
+      // prosa del PF que la copia no va a tener, y el día que el editor del
+      // atleta gane un campo de resumen empezaría a copiarla en silencio. Que
+      // el estado coincida con el resultado.
+      if (!_isCustomizing && routine.summary != null) {
         _summaryController.text = routine.summary!;
       }
-      final l10n = AppL10n.of(context);
       _days = routine.days.map((day) {
         final editableDay = _EditableDay(
           dayNumber: day.dayNumber,
@@ -831,10 +860,17 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   }
 
   /// Whether the editor is in a trainer-creating mode (assigning or
-  /// templating). Athlete (SelfCreating) mode hides trainer-only fields.
+  /// templating). Athlete (SelfCreating / SelfCustomizing) modes hide
+  /// trainer-only fields.
   /// REQ-RER-012, REQ-RER-013, ADR-RER-04.
   bool get _isTrainerMode =>
       widget.mode is TrainerAssigning || widget.mode is TrainerTemplating;
+
+  /// Whether the editor is copying an existing routine into a new one (#647).
+  /// Drives the three places where hydration must NOT be faithful: the name
+  /// (gets a copy suffix), the share-on-profile toggle (never inherited) and
+  /// the resumen (the copy does not carry the PF's).
+  bool get _isCustomizing => widget.mode is SelfCustomizing;
 
   /// The resumen to persist, or `null` when the PF left it blank (#648).
   ///
@@ -1571,7 +1607,16 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           );
           context.pop();
 
-        case SelfCreating(existingRoutineId: null):
+        // Both athlete CREATE paths share one exit, and that is the whole
+        // safety argument of #647: "usar como base" produces a routine
+        // through the SAME literal a from-scratch one goes through. The
+        // template's `assignedBy`, `assignedTo`, `summary`, `imageUrl`,
+        // `estimatedMinutesPerDay`, `split` and rating aggregates cannot leak
+        // into the write because the editor never held them — the only thing
+        // hydration carried over is content (days, slots, sets, weeks) plus
+        // the suffixed name. The copy is the athlete's routine by
+        // construction, not by a field-stripping step someone can forget.
+        case SelfCreating(existingRoutineId: null) || SelfCustomizing():
           // Client-side cap check (ADR-USR-02).
           final userRoutines =
               ref.read(userCreatedRoutinesProvider(uid)).valueOrNull ?? [];
@@ -1663,9 +1708,11 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       final errorText = switch (widget.mode) {
         TrainerAssigning() => l10n.coachCreatePlanError,
         TrainerTemplating() => l10n.coachCreatePlanError,
-        SelfCreating() => e.toString().contains('permission-denied')
-            ? l10n.workoutSelfEditorPermissionDenied
-            : l10n.workoutSelfEditorError,
+        SelfCreating() ||
+        SelfCustomizing() =>
+          e.toString().contains('permission-denied')
+              ? l10n.workoutSelfEditorPermissionDenied
+              : l10n.workoutSelfEditorError,
       };
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(errorText)),
@@ -1684,7 +1731,10 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     if (context.canPop()) {
       context.pop();
     } else {
-      context.go(widget.mode is SelfCreating ? '/workout' : '/coach');
+      // Deep-link / state-restoration fallback: the athlete modes belong to
+      // the Entrenar tab, the trainer ones to Coach.
+      final athleteMode = widget.mode is SelfCreating || _isCustomizing;
+      context.go(athleteMode ? '/workout' : '/coach');
     }
   }
 

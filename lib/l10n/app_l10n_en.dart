@@ -825,6 +825,20 @@ class AppL10nEn extends AppL10n {
   String get workoutSelfEditorCapReached => '';
 
   @override
+  String get workoutRoutineUseAsBase => 'Use as a base';
+
+  @override
+  String get workoutRoutineCustomizeTitle => 'Customise routine';
+
+  @override
+  String get workoutRoutineCustomizeSubmitLabel => 'SAVE AS MINE';
+
+  @override
+  String workoutRoutineCopyName(String name) {
+    return '$name (my version)';
+  }
+
+  @override
   String get workoutTabYours => 'YOUR WORKOUT';
 
   @override

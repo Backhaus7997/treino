@@ -698,4 +698,189 @@ void main() {
     expect(capC.sets[1].repsMin, equals(6));
     expect(capC.sets[1].repsMax, equals(10));
   });
+
+  // ── SelfCustomizing — "usar como base" (#647) ────────────────────────────
+  //
+  // El cuarto modo: el editor abre CARGADO con una rutina existente y guarda
+  // una rutina NUEVA del atleta. Es el punto medio entre usar la plantilla tal
+  // cual y arrancar de una pantalla en blanco.
+  //
+  // La línea que estos tests cuidan es qué viaja y qué no. Viaja el CONTENIDO
+  // (días, slots, sets por semana, superserie, notas, máscara de presencia,
+  // numWeeks). No viaja nada que haga que la plantilla sea del PF o del
+  // sistema: assignedBy/assignedTo, summary, imageUrl, estimatedMinutesPerDay,
+  // split, ni los agregados de reputación.
+  //
+  // El caso con nombre propio es `visibility`: TODA plantilla copiable es
+  // `public` —es lo que la vuelve legible—, así que heredar el toggle de
+  // "compartir en mi perfil" publicaría una copia del catálogo en el perfil
+  // del atleta sin que la haya pedido.
+
+  const sourceId = 'ppl-principiante';
+  const sourceTemplate = Routine(
+    id: sourceId,
+    name: 'Push Pull Legs — Principiante',
+    split: 'PPL',
+    level: ExperienceLevel.intermediate,
+    days: [
+      RoutineDay(
+        dayNumber: 1,
+        name: 'Empuje',
+        slots: [
+          RoutineSlot(
+            exerciseId: 'bench-press',
+            exerciseName: 'Press de Banca',
+            muscleGroup: 'chest',
+            targetSets: 3,
+            targetRepsMin: 8,
+            targetRepsMax: 8,
+            restSeconds: 90,
+            supersetGroup: 1,
+            notes: 'RIR 2 · pausa abajo',
+            activeWeeks: [0, 1],
+            weeklySets: [
+              [SetSpec(reps: 8), SetSpec(reps: 8), SetSpec(reps: 8)],
+              [SetSpec(reps: 10), SetSpec(reps: 10), SetSpec(reps: 10)],
+            ],
+          ),
+          RoutineSlot(
+            exerciseId: 'overhead-press',
+            exerciseName: 'Press Militar',
+            muscleGroup: 'shoulders',
+            targetSets: 2,
+            targetRepsMin: 12,
+            targetRepsMax: 12,
+            restSeconds: 60,
+            supersetGroup: 1,
+            weeklySets: [
+              [SetSpec(reps: 12), SetSpec(reps: 12)],
+              [SetSpec(reps: 12), SetSpec(reps: 12)],
+            ],
+          ),
+        ],
+      ),
+    ],
+    estimatedMinutesPerDay: 55,
+    imageUrl: 'assets/routines/ppl-principiante.png',
+    source: RoutineSource.system,
+    visibility: RoutineVisibility.public,
+    numWeeks: 2,
+    ratingAvg: 4.7,
+    ratingsCount: 42,
+    summary: 'Empujar, tirar y piernas: un tipo de movimiento por día.',
+  );
+
+  _MockRoutineRepository repoWithTemplate() {
+    final repo = _MockRoutineRepository();
+    when(() => repo.getById(sourceId)).thenAnswer((_) async => sourceTemplate);
+    return repo;
+  }
+
+  testWidgets(
+      'SelfCustomizing abre cargado, con nombre distinguible y CTA propio',
+      (tester) async {
+    final repo = repoWithTemplate();
+    await _pumpEditor(
+      tester,
+      mode: const SelfCustomizing(sourceRoutineId: sourceId),
+      overrides: _overrides(repo: repo),
+    );
+
+    verify(() => repo.getById(sourceId)).called(1);
+
+    // El sufijo evita cinco "Push Pull Legs — Principiante" indistinguibles en
+    // MIS RUTINAS. Es un punto de partida: el campo es editable antes de
+    // guardar.
+    final nameField = tester.widget<TextField>(
+      find.byKey(const Key('editor_name_field')),
+    );
+    expect(nameField.controller?.text,
+        equals('Push Pull Legs — Principiante (mi versión)'));
+
+    // Título y CTA propios: el atleta tiene que entender que sale con una
+    // rutina SUYA, no que está editando la plantilla.
+    expect(find.text('Personalizar rutina'), findsOneWidget);
+    expect(find.text('GUARDAR COMO MÍA'), findsOneWidget);
+    // Abre CARGADO — el punto entero del issue es que no sea una pantalla en
+    // blanco.
+    expect(find.text('Empuje'), findsOneWidget);
+    // Y sigue siendo un modo de atleta: la plantilla trae split 'PPL', pero el
+    // campo es trainer-only (ADR-RER-04).
+    expect(find.byKey(const Key('editor_split_field')), findsNothing);
+  });
+
+  testWidgets(
+      'SelfCustomizing guarda una rutina DEL ATLETA: copia el contenido, '
+      'no la identidad de la plantilla', (tester) async {
+    final repo = repoWithTemplate();
+    Routine? draft;
+    when(() => repo.createUserOwned(
+          uid: any(named: 'uid'),
+          draft: any(named: 'draft'),
+        )).thenAnswer((inv) async {
+      draft = inv.namedArguments[const Symbol('draft')] as Routine;
+      return draft!.copyWith(id: 'copia-1');
+    });
+
+    await _pumpEditor(
+      tester,
+      mode: const SelfCustomizing(sourceRoutineId: sourceId),
+      overrides: _overrides(repo: repo),
+    );
+    await tester.tap(find.text('GUARDAR COMO MÍA'));
+    await tester.pumpAndSettle();
+
+    verify(() => repo.createUserOwned(
+          uid: 'athlete-1',
+          draft: any(named: 'draft'),
+        )).called(1);
+    final copy = draft!;
+
+    // ── Identidad: la copia es del atleta, no del PF ni del sistema ────────
+    expect(copy.source, equals(RoutineSource.userCreated));
+    expect(copy.assignedBy, isNull,
+        reason: 'un campo de assignment del PF no puede viajar a la copia');
+    expect(copy.assignedTo, isNull);
+    expect(copy.visibility, equals(RoutineVisibility.private),
+        reason: 'la plantilla es public; heredarlo publicaría la copia en el '
+            'perfil del atleta sin que la haya pedido');
+    expect(copy.summary, isNull,
+        reason: 'prosa del PF que el atleta no puede editar después');
+    expect(copy.imageUrl, isNull, reason: 'portada del catálogo');
+    expect(copy.estimatedMinutesPerDay, isNull);
+    expect(copy.split, isNull, reason: 'ADR-RER-04');
+    expect(copy.level, equals(ExperienceLevel.beginner), reason: 'ADR-RER-04');
+    expect(copy.ratingAvg, isNull,
+        reason: 'la copia no hereda la reputación del original');
+    expect(copy.ratingsCount, isNull);
+
+    // ── Contenido: fiel, semana por semana ────────────────────────────────
+    expect(copy.numWeeks, equals(2),
+        reason: 'copiar mal la periodización corrompe el plan en silencio');
+    expect(copy.days, hasLength(1));
+    expect(copy.days.single.name, equals('Empuje'));
+    final press = copy.days.single.slots[0];
+    expect(press.exerciseId, equals('bench-press'));
+    expect(press.exerciseName, equals('Press de Banca'));
+    expect(press.muscleGroup, equals('chest'));
+    expect(press.restSeconds, equals(90));
+    expect(press.notes, equals('RIR 2 · pausa abajo'));
+    expect(press.supersetGroup, equals(1),
+        reason: 'la superserie tiene que sobrevivir a la copia');
+    expect(copy.days.single.slots[1].supersetGroup, equals(1));
+    expect(press.activeWeeks, equals([0, 1]),
+        reason: 'la presencia por semana viaja igual que la prescripción');
+    expect(press.weeklySets, hasLength(2));
+    expect(press.weeklySets[0].map((s) => s.reps).toList(), equals([8, 8, 8]));
+    expect(
+        press.weeklySets[1].map((s) => s.reps).toList(), equals([10, 10, 10]));
+
+    // ── Y la plantilla original queda intacta ─────────────────────────────
+    verifyNever(() => repo.updateUserOwned(
+        uid: any(named: 'uid'), draft: any(named: 'draft')));
+    verifyNever(() => repo.updateTemplate(
+        uid: any(named: 'uid'), draft: any(named: 'draft')));
+    verifyNever(() => repo.updateAssigned(
+        uid: any(named: 'uid'), draft: any(named: 'draft')));
+  });
 }

@@ -845,6 +845,20 @@ class AppL10nEs extends AppL10n {
       'Llegaste al máximo de 10 rutinas activas.';
 
   @override
+  String get workoutRoutineUseAsBase => 'Usar como base';
+
+  @override
+  String get workoutRoutineCustomizeTitle => 'Personalizar rutina';
+
+  @override
+  String get workoutRoutineCustomizeSubmitLabel => 'GUARDAR COMO MÍA';
+
+  @override
+  String workoutRoutineCopyName(String name) {
+    return '$name (mi versión)';
+  }
+
+  @override
   String get workoutTabYours => 'TU ENTRENO';
 
   @override
@@ -4415,6 +4429,20 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get workoutSelfEditorCapReached =>
       'Llegaste al máximo de 10 rutinas activas.';
+
+  @override
+  String get workoutRoutineUseAsBase => 'Usar como base';
+
+  @override
+  String get workoutRoutineCustomizeTitle => 'Personalizar rutina';
+
+  @override
+  String get workoutRoutineCustomizeSubmitLabel => 'GUARDAR COMO MÍA';
+
+  @override
+  String workoutRoutineCopyName(String name) {
+    return '$name (mi versión)';
+  }
 
   @override
   String get workoutTabYours => 'TU ENTRENO';
