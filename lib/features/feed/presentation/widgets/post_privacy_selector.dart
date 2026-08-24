@@ -131,7 +131,9 @@ class _PrivacyPill extends StatelessWidget {
                   style: GoogleFonts.barlowCondensed(
                     fontWeight: FontWeight.w700,
                     fontSize: 13,
-                    color: _isActive ? palette.bg : palette.textPrimary,
+                    color: _isActive
+                        ? TreinoButtonTokens.foreground(context)
+                        : palette.textPrimary,
                   ),
                 ),
               ),

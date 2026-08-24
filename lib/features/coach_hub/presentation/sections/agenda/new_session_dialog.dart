@@ -295,7 +295,7 @@ class _NewSessionDialogState extends ConsumerState<NewSessionDialog> {
             onPressed: () => Navigator.of(ctx).pop(true),
             style: ElevatedButton.styleFrom(
               backgroundColor: palette.accent,
-              foregroundColor: palette.bg,
+              foregroundColor: TreinoButtonTokens.foreground(context),
             ),
             child: Text(
               'Cargar igual', // i18n
@@ -471,7 +471,7 @@ class _NewSessionDialogState extends ConsumerState<NewSessionDialog> {
           onPressed: (_saving || !hasActiveLinks) ? null : _submit,
           style: ElevatedButton.styleFrom(
             backgroundColor: palette.accent,
-            foregroundColor: palette.bg,
+            foregroundColor: TreinoButtonTokens.foreground(context),
             shape: const StadiumBorder(),
             disabledBackgroundColor: palette.accent.withValues(alpha: 0.3),
           ),
@@ -481,7 +481,7 @@ class _NewSessionDialogState extends ConsumerState<NewSessionDialog> {
                   height: 16,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: palette.bg,
+                    color: TreinoButtonTokens.foreground(context),
                   ),
                 )
               : Text(

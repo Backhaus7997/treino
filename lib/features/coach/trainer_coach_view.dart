@@ -453,7 +453,7 @@ class _ActiveAlumnoCard extends ConsumerWidget {
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: palette.accent,
-                        foregroundColor: palette.bg,
+                        foregroundColor: TreinoButtonTokens.foreground(context),
                         minimumSize: const Size.fromHeight(40),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(AppRadius.full),

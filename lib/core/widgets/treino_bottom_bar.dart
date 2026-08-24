@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../app/theme/app_motion.dart';
 import '../../app/theme/app_palette.dart';
+import '../../app/theme/tokens/components/treino_button_tokens.dart';
 import 'treino_glass_surface.dart';
 import 'treino_icon.dart';
 
@@ -609,7 +610,7 @@ class _TabContent extends StatelessWidget {
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
                           height: 1.2,
-                          color: palette.bg,
+                          color: TreinoButtonTokens.foreground(context),
                         ),
                       ),
                     ),

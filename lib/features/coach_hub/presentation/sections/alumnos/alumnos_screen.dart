@@ -27,6 +27,7 @@ import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_limit_paywall.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
 import '../../../../../l10n/app_l10n.dart';
+import '../../../../../app/theme/tokens/components/treino_button_tokens.dart';
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart';
 import 'package:treino/features/payments/domain/payment.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
@@ -1222,12 +1223,17 @@ class _ViewModeToggle extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(icon,
-                  size: 15, color: selected ? palette.bg : palette.textMuted),
+                  size: 15,
+                  color: selected
+                      ? TreinoButtonTokens.foreground(context)
+                      : palette.textMuted),
               const SizedBox(width: 6),
               Text(
                 label,
                 style: TextStyle(
-                  color: selected ? palette.bg : palette.textMuted,
+                  color: selected
+                      ? TreinoButtonTokens.foreground(context)
+                      : palette.textMuted,
                   fontSize: 13,
                   fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
                 ),

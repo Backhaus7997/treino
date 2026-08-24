@@ -33,6 +33,7 @@ import 'package:treino/features/coach/presentation/widgets/trainer_specialty_chi
     show SpecialtyLabels;
 import 'package:treino/features/feed/presentation/widgets/post_avatar.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
+import '../../../../../../app/theme/tokens/components/treino_button_tokens.dart';
 
 const double _bannerHeight = 56;
 const double _avatarSize = 64;
@@ -245,7 +246,8 @@ class CoachDiscoveryPreviewCard extends ConsumerWidget {
                             backgroundColor: palette.accent,
                             disabledBackgroundColor:
                                 palette.accent.withValues(alpha: 0.4),
-                            foregroundColor: palette.bg,
+                            foregroundColor:
+                                TreinoButtonTokens.foreground(context),
                             // WARNING-1 (verify fase-11): palette.bg casi
                             // invisible sobre el disabledBackgroundColor
                             // (accent tintado) — ratio ≈1.13:1 en light.

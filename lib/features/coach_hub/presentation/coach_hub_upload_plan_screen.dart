@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../app/theme/tokens/components/treino_button_tokens.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../application/plan_import_providers.dart';
 import '../data/plan_import_repository.dart';
@@ -149,7 +150,7 @@ class _CoachHubUploadPlanScreenState
                         : _processFile,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: palette.accent,
-                      foregroundColor: palette.bg,
+                      foregroundColor: TreinoButtonTokens.foreground(context),
                       minimumSize: const Size.fromHeight(48),
                       shape: const StadiumBorder(),
                       disabledBackgroundColor:
@@ -161,7 +162,7 @@ class _CoachHubUploadPlanScreenState
                             height: 18,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: palette.bg,
+                              color: TreinoButtonTokens.foreground(context),
                             ),
                           )
                         : Text(

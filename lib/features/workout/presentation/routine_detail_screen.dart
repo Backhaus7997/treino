@@ -1205,7 +1205,7 @@ class _StartActionButton extends StatelessWidget {
             fontWeight: FontWeight.w700,
             fontSize: 16,
             letterSpacing: 1.0,
-            color: palette.bg,
+            color: TreinoButtonTokens.foreground(context),
           ),
         ),
       ),

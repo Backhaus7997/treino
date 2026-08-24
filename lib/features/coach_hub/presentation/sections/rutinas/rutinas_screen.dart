@@ -21,6 +21,7 @@ import 'package:treino/features/profile/application/user_public_profile_provider
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
 import 'package:treino/features/workout/domain/routine_status.dart';
+import '../../../../../app/theme/tokens/components/treino_button_tokens.dart';
 
 /// Sección «Rutinas» del Coach Hub web.
 ///
@@ -371,7 +372,9 @@ class _Chip extends StatelessWidget {
         child: Text(
           label,
           style: TextStyle(
-            color: selected ? palette.bg : palette.textMuted,
+            color: selected
+                ? TreinoButtonTokens.foreground(context)
+                : palette.textMuted,
             fontSize: 12,
             fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
             letterSpacing: 0.4,
@@ -449,12 +452,17 @@ class _ViewModeToggle extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(icon,
-                  size: 15, color: selected ? palette.bg : palette.textMuted),
+                  size: 15,
+                  color: selected
+                      ? TreinoButtonTokens.foreground(context)
+                      : palette.textMuted),
               const SizedBox(width: 6),
               Text(
                 label,
                 style: TextStyle(
-                  color: selected ? palette.bg : palette.textMuted,
+                  color: selected
+                      ? TreinoButtonTokens.foreground(context)
+                      : palette.textMuted,
                   fontSize: 13,
                   fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
                 ),

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../app/theme/tokens/components/treino_button_tokens.dart';
 import '../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
@@ -168,7 +169,7 @@ class _ProfileGymScreenState extends ConsumerState<ProfileGymScreen> {
                     saveEnabled ? () => _save(myUid, _pendingGymId) : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: palette.accent,
-                  foregroundColor: palette.bg,
+                  foregroundColor: TreinoButtonTokens.foreground(context),
                   disabledBackgroundColor: palette.border,
                   disabledForegroundColor: palette.textMuted,
                   padding: const EdgeInsets.symmetric(vertical: 14),
@@ -182,7 +183,7 @@ class _ProfileGymScreenState extends ConsumerState<ProfileGymScreen> {
                         width: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: palette.bg,
+                          color: TreinoButtonTokens.foreground(context),
                         ),
                       )
                     : Text(

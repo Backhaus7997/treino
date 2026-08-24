@@ -15,6 +15,7 @@ import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/ava
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
+import '../../../../../../app/theme/tokens/components/treino_button_tokens.dart';
 
 /// Tab «Cuenta» de Configuración (Fase W3.1 / W3.1b).
 ///
@@ -239,7 +240,7 @@ class _CuentaFormState extends ConsumerState<_CuentaForm> {
             onPressed: (_canSave && !_saving) ? _save : null,
             style: ElevatedButton.styleFrom(
               backgroundColor: palette.accent,
-              foregroundColor: palette.bg,
+              foregroundColor: TreinoButtonTokens.foreground(context),
               disabledBackgroundColor: palette.bgCard,
               disabledForegroundColor: palette.textMuted,
               padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
@@ -250,7 +251,7 @@ class _CuentaFormState extends ConsumerState<_CuentaForm> {
                     height: 16,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: palette.bg,
+                      color: TreinoButtonTokens.foreground(context),
                     ),
                   )
                 : const Text('GUARDAR CAMBIOS'), // i18n: Fase W3

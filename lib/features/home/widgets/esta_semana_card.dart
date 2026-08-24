@@ -355,7 +355,7 @@ class _InsightsCtaState extends State<_InsightsCta> {
                 fontWeight: FontWeight.w700,
                 fontSize: 13,
                 letterSpacing: 0.8,
-                color: palette.bg,
+                color: TreinoButtonTokens.foreground(context),
               ),
             ),
           ),

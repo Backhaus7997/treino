@@ -33,6 +33,7 @@ import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_limit_paywall.dart';
 import 'package:treino/l10n/app_l10n.dart';
+import '../../../../../../app/theme/tokens/components/treino_button_tokens.dart';
 
 /// Pendientes de HOY — solicitudes pendientes REAL. REQ-HOY-06.
 ///
@@ -371,7 +372,7 @@ class _PendingRequestTileState extends ConsumerState<_PendingRequestTile> {
               onPressed: _accept,
               style: ElevatedButton.styleFrom(
                 backgroundColor: palette.accent,
-                foregroundColor: palette.bg,
+                foregroundColor: TreinoButtonTokens.foreground(context),
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s14),
                 shape: const StadiumBorder(),
               ),

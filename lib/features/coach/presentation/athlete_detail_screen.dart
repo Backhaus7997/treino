@@ -276,7 +276,7 @@ class _AthleteDetailBody extends ConsumerWidget {
                       context.push('/workout/routine-editor/$athleteId'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: palette.accent,
-                    foregroundColor: palette.bg,
+                    foregroundColor: TreinoButtonTokens.foreground(context),
                     minimumSize: const Size.fromHeight(48),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(AppRadius.full),
@@ -1399,7 +1399,7 @@ class _CobroConfigSheetState extends ConsumerState<_CobroConfigSheet> {
             onPressed: _saving ? null : _save,
             style: ElevatedButton.styleFrom(
               backgroundColor: palette.accent,
-              foregroundColor: palette.bg,
+              foregroundColor: TreinoButtonTokens.foreground(context),
               minimumSize: const Size.fromHeight(48),
               shape: const StadiumBorder(),
               disabledBackgroundColor: palette.accent.withValues(alpha: 0.3),
@@ -1410,7 +1410,7 @@ class _CobroConfigSheetState extends ConsumerState<_CobroConfigSheet> {
                     height: 18,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: palette.bg,
+                      color: TreinoButtonTokens.foreground(context),
                     ),
                   )
                 : Text(
@@ -1900,7 +1900,7 @@ class _NotaEditor extends StatelessWidget {
               onPressed: saving ? null : onSave,
               style: FilledButton.styleFrom(
                 backgroundColor: palette.accent,
-                foregroundColor: palette.bg,
+                foregroundColor: TreinoButtonTokens.foreground(context),
                 minimumSize: const Size(0, 40),
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 shape: const StadiumBorder(),
@@ -1910,7 +1910,8 @@ class _NotaEditor extends StatelessWidget {
                       width: 16,
                       height: 16,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: palette.bg),
+                          strokeWidth: 2,
+                          color: TreinoButtonTokens.foreground(context)),
                     )
                   : Text(
                       'Guardar',

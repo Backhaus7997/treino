@@ -549,7 +549,7 @@ class _PrimaryCta extends StatelessWidget {
           child: Text(
             'REGULARIZAR', // i18n: Fase W3
             style: GoogleFonts.barlowCondensed(
-              color: palette.bg,
+              color: TreinoButtonTokens.foreground(context),
               fontSize: 14,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.6,
@@ -585,7 +585,7 @@ class _PrimaryCta extends StatelessWidget {
         child: Text(
           hasNext ? 'VER PLANES' : 'CONTACTANOS', // i18n: Fase W3
           style: GoogleFonts.barlowCondensed(
-            color: palette.bg,
+            color: TreinoButtonTokens.foreground(context),
             fontSize: 14,
             fontWeight: FontWeight.w700,
             letterSpacing: 0.6,

@@ -43,7 +43,7 @@ class AuthPillButton extends StatelessWidget {
         onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
           backgroundColor: palette.accent,
-          foregroundColor: palette.bg,
+          foregroundColor: TreinoButtonTokens.foreground(context),
           disabledBackgroundColor: palette.accent.withValues(alpha: 0.5),
           shape: const StadiumBorder(),
           padding: EdgeInsets.zero,
@@ -54,7 +54,8 @@ class AuthPillButton extends StatelessWidget {
                 width: 22,
                 child: CircularProgressIndicator(
                   strokeWidth: 2.5,
-                  valueColor: AlwaysStoppedAnimation<Color>(palette.bg),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                      TreinoButtonTokens.foreground(context)),
                 ),
               )
             : Row(

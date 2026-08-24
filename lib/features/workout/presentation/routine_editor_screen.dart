@@ -2194,7 +2194,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                     onPressed: !_submitting ? () => _submit() : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: palette.accent,
-                      foregroundColor: palette.bg,
+                      foregroundColor: TreinoButtonTokens.foreground(context),
                       disabledBackgroundColor: palette.accent.withAlpha(80),
                       minimumSize: const Size.fromHeight(48),
                       shape: RoundedRectangleBorder(
@@ -2207,7 +2207,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                             width: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: palette.bg,
+                              color: TreinoButtonTokens.foreground(context),
                             ),
                           )
                         : Text(
@@ -2416,7 +2416,9 @@ class _WeekChip extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                   fontSize: 13,
                   letterSpacing: 0.5,
-                  color: selected ? palette.bg : palette.textMuted,
+                  color: selected
+                      ? TreinoButtonTokens.foreground(context)
+                      : palette.textMuted,
                 ),
               ),
               if (warning) ...[

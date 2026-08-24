@@ -26,6 +26,7 @@ import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
 import 'package:treino/l10n/app_l10n.dart';
+import '../../../../../../app/theme/tokens/components/treino_button_tokens.dart';
 
 // ── Alert banner (REAL — composes vencidos + solicitudes + inactivos) ────────
 
@@ -166,7 +167,7 @@ class _AlertBannerCta extends StatelessWidget {
             fontWeight: FontWeight.w700,
             fontSize: 12,
             letterSpacing: 0.6,
-            color: palette.bg,
+            color: TreinoButtonTokens.foreground(context),
           ),
         ),
       ),
@@ -402,13 +403,13 @@ class _PrimaryQuickAction extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 15, color: palette.bg),
+            Icon(icon, size: 15, color: TreinoButtonTokens.foreground(context)),
             const SizedBox(width: AppSpacing.s8),
             Text(
               label,
               style: TextStyle(
                 fontFamily: AppFonts.barlowCondensed,
-                color: palette.bg,
+                color: TreinoButtonTokens.foreground(context),
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 1.1,

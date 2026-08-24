@@ -443,7 +443,7 @@ class _PerfilPublicoCard extends StatelessWidget {
                   onPressed: () => context.push('/profile/edit-trainer'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: palette.accent,
-                    foregroundColor: palette.bg,
+                    foregroundColor: TreinoButtonTokens.foreground(context),
                     minimumSize: const Size.fromHeight(44),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(AppRadius.full),
@@ -541,7 +541,7 @@ class _MenuRow extends StatelessWidget {
                     style: GoogleFonts.barlowCondensed(
                       fontWeight: FontWeight.w700,
                       fontSize: 11,
-                      color: palette.bg,
+                      color: TreinoButtonTokens.foreground(context),
                     ),
                   ),
                 ),

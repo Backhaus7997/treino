@@ -492,13 +492,14 @@ class _ActionRow extends ConsumerWidget {
                   onPressed: () => _onMessage(context, ref),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: palette.accent,
-                    foregroundColor: palette.bg,
+                    foregroundColor: TreinoButtonTokens.foreground(context),
                     minimumSize: const Size.fromHeight(48),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(AppRadius.full),
                     ),
                   ),
-                  icon: Icon(TreinoIcon.chat, size: 18, color: palette.bg),
+                  icon: Icon(TreinoIcon.chat,
+                      size: 18, color: TreinoButtonTokens.foreground(context)),
                   label: Text(
                     'MENSAJE',
                     style: GoogleFonts.barlowCondensed(

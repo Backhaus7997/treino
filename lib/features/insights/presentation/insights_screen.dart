@@ -523,7 +523,7 @@ class _DayChip extends StatelessWidget {
         alignment: Alignment.center,
         child: Icon(
           TreinoIcon.checkCircleFill,
-          color: palette.bg,
+          color: TreinoButtonTokens.foreground(context),
           size: 18,
         ),
       );

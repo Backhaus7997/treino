@@ -31,6 +31,7 @@ import 'package:treino/features/coach/presentation/widgets/trainer_specialty_chi
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
+import '../../../../../../app/theme/tokens/components/treino_button_tokens.dart';
 
 /// Card «ESPECIALIDAD» + «PRECIO MENSUAL» — columna izquierda de
 /// `PerfilPublicoScreen` (WU-04).
@@ -227,7 +228,7 @@ class _EspecialidadPrecioCardState
                 onPressed: _canSave ? _save : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: palette.accent,
-                  foregroundColor: palette.bg,
+                  foregroundColor: TreinoButtonTokens.foreground(context),
                   disabledBackgroundColor: palette.bgCard,
                   disabledForegroundColor: palette.textMuted,
                   padding: const EdgeInsets.symmetric(
@@ -241,7 +242,7 @@ class _EspecialidadPrecioCardState
                         height: 16,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: palette.bg,
+                          color: TreinoButtonTokens.foreground(context),
                         ),
                       )
                     : const Text('GUARDAR'), // i18n: Fase 11

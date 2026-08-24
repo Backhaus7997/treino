@@ -430,7 +430,9 @@ class _ProfilePill extends StatelessWidget {
               fontWeight: FontWeight.w700,
               fontSize: 12,
               letterSpacing: 1.0,
-              color: isActive ? palette.bg : palette.textPrimary,
+              color: isActive
+                  ? TreinoButtonTokens.foreground(context)
+                  : palette.textPrimary,
             ),
           ),
         ),

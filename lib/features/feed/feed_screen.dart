@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../app/theme/app_motion.dart';
 import '../../app/theme/app_palette.dart';
+import '../../app/theme/tokens/components/treino_button_tokens.dart';
 import '../../core/analytics/analytics_service.dart';
 import '../../core/analytics/sub_tab_analytics.dart';
 import '../../core/widgets/motion/treino_fade_slide_in.dart';
@@ -403,7 +404,7 @@ class _FeedActions extends ConsumerWidget {
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
                               height: 1.2,
-                              color: palette.bg,
+                              color: TreinoButtonTokens.foreground(context),
                             ),
                           ),
                         ),
@@ -453,7 +454,7 @@ class _FeedActions extends ConsumerWidget {
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
                               height: 1.2,
-                              color: palette.bg,
+                              color: TreinoButtonTokens.foreground(context),
                             ),
                           ),
                         ),
@@ -500,7 +501,8 @@ class _FeedActions extends ConsumerWidget {
                     color: palette.accent,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(TreinoIcon.plus, size: 20, color: palette.bg),
+                  child: Icon(TreinoIcon.plus,
+                      size: 20, color: TreinoButtonTokens.foreground(context)),
                 ),
               ),
             ),

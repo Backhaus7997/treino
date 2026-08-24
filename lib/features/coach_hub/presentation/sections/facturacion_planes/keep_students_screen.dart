@@ -242,7 +242,7 @@ class _ConfirmButton extends StatelessWidget {
           child: Text(
             'CONFIRMAR SELECCIÓN', // i18n: Fase W3
             style: GoogleFonts.barlowCondensed(
-              color: palette.bg,
+              color: TreinoButtonTokens.foreground(context),
               fontSize: 14,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.6,

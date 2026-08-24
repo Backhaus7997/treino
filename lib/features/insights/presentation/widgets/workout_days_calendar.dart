@@ -241,7 +241,9 @@ class _DayCell extends StatelessWidget {
           style: GoogleFonts.barlow(
             fontSize: 13,
             fontWeight: trained ? FontWeight.w700 : FontWeight.w500,
-            color: trained ? palette.bg : palette.textPrimary,
+            color: trained
+                ? TreinoButtonTokens.foreground(context)
+                : palette.textPrimary,
           ),
         ),
       ),

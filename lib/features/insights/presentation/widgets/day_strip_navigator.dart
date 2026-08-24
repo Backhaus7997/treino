@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../app/theme/tokens/components/treino_button_tokens.dart';
 import '../../../../core/utils/argentina_time.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../domain/day_insights.dart';
@@ -116,7 +117,7 @@ class _DayTile extends StatelessWidget {
       child: trained
           ? Icon(
               TreinoIcon.checkCircleFill,
-              color: palette.bg,
+              color: TreinoButtonTokens.foreground(context),
               size: 16,
             )
           : Text(

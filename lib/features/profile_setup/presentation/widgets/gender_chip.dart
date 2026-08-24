@@ -44,7 +44,9 @@ class GenderChip extends StatelessWidget {
           child: Text(
             label,
             style: GoogleFonts.barlowCondensed(
-              color: selected ? palette.bg : palette.textMuted,
+              color: selected
+                  ? TreinoButtonTokens.foreground(context)
+                  : palette.textMuted,
               fontSize: 13,
               fontWeight: FontWeight.w700,
               letterSpacing: 1.0,

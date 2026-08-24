@@ -844,7 +844,7 @@ class _AvatarEditor extends StatelessWidget {
                   ),
                   child: Icon(
                     TreinoIcon.edit,
-                    color: palette.bg,
+                    color: TreinoButtonTokens.foreground(context),
                     size: 12,
                   ),
                 ),
@@ -916,7 +916,9 @@ class _GenderSelector extends StatelessWidget {
             child: Text(
               choice.label,
               style: GoogleFonts.barlowCondensed(
-                color: isSelected ? palette.bg : palette.textMuted,
+                color: isSelected
+                    ? TreinoButtonTokens.foreground(context)
+                    : palette.textMuted,
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 1.0,
@@ -1050,7 +1052,7 @@ class _FilledPill extends StatelessWidget {
         child: Text(
           label,
           style: GoogleFonts.barlowCondensed(
-            color: palette.bg,
+            color: TreinoButtonTokens.foreground(context),
             fontSize: 13,
             fontWeight: FontWeight.w700,
             letterSpacing: 1.0,
@@ -1224,7 +1226,7 @@ class _ProfileLoadError extends StatelessWidget {
                 child: Text(
                   retryLabel,
                   style: GoogleFonts.barlowCondensed(
-                    color: palette.bg,
+                    color: TreinoButtonTokens.foreground(context),
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 1.0,

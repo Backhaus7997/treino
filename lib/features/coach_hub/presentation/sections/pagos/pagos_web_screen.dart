@@ -38,6 +38,7 @@ import 'widgets/pagos_buckets_provider.dart';
 import 'widgets/pagos_filtro_provider.dart';
 import 'widgets/pagos_kpi_row.dart';
 import 'widgets/pagos_web_table.dart';
+import '../../../../../app/theme/tokens/components/treino_button_tokens.dart';
 
 /// Etiquetas (es-AR) de cada [PagosFiltro], en el orden en que se muestran
 /// los chips.
@@ -375,7 +376,8 @@ class _RegistrarPagoButton extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(TreinoIcon.plus, size: 16, color: palette.bg),
+              Icon(TreinoIcon.plus,
+                  size: 16, color: TreinoButtonTokens.foreground(context)),
               const SizedBox(width: AppSpacing.hairline),
               Text(
                 'Registrar pago', // i18n

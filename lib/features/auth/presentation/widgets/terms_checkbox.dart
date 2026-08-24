@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../app/theme/tokens/components/treino_button_tokens.dart';
 import '../legal/legal_content.dart';
 import '../legal/legal_document_screen.dart';
 
@@ -75,7 +76,7 @@ class _TermsCheckboxState extends State<TermsCheckbox> {
           value: widget.value,
           onChanged: (v) => widget.onChanged(v ?? false),
           activeColor: palette.accent,
-          checkColor: palette.bg,
+          checkColor: TreinoButtonTokens.foreground(context),
           side: BorderSide(color: palette.border),
         ),
         Expanded(

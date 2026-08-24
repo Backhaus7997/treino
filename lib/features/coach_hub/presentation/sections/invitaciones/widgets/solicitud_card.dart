@@ -30,6 +30,7 @@ import 'package:treino/features/coach_hub/presentation/widgets/treino_interactiv
 import 'package:treino/features/feed/presentation/widgets/post_avatar.dart';
 import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/core/utils/argentina_time.dart';
+import '../../../../../../app/theme/tokens/components/treino_button_tokens.dart';
 
 class SolicitudCard extends StatelessWidget {
   const SolicitudCard({
@@ -157,7 +158,7 @@ class SolicitudCard extends StatelessWidget {
                   actionKey: Key('accept_$id'),
                   label: l10n.coachHubActionAccept,
                   color: palette.accent,
-                  foregroundColor: palette.bg,
+                  foregroundColor: TreinoButtonTokens.foreground(context),
                   filled: true,
                   onTap: onAccept,
                 ),

@@ -68,7 +68,7 @@ class ResumeSessionModal extends StatelessWidget {
           onPressed: onContinue,
           style: ElevatedButton.styleFrom(
             backgroundColor: palette.accent,
-            foregroundColor: palette.bg,
+            foregroundColor: TreinoButtonTokens.foreground(context),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppRadius.lg),
             ),
