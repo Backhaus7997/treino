@@ -88,8 +88,13 @@ jobs:
   # se lea de un vistazo desde el PR sin abrir los logs.
   #
   # `--audit-level=high` filtra el ruido de low/moderate: lo que queremos ver es
-  # high y critical. `continue-on-error` en el step, no en el job, para que el
-  # summary igual se escriba.
+  # high y critical.
+  #
+  # El "no bloquea" NO se hace con `continue-on-error` (eso marca el job con un
+  # tilde amarillo y se lee como "algo falló y lo ignoramos"). Se hace con
+  # `|| true` sobre cada npm audit y SIN `set -e`: el step termina 0 de verdad,
+  # el job sale verde limpio, y la información vive en el Job Summary.
+  # Para volverlo bloqueante alcanza con sacar los `|| true` y poner `set -e`.
   npm-audit:
     name: npm audit (reporta, no bloquea)
     runs-on: ubuntu-latest
