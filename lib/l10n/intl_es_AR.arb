@@ -312,6 +312,14 @@
   "workoutSnackShareSuccess": "¡Post compartido!",
   "workoutSnackShareError": "No pudimos compartir tu post. Intentá de nuevo.",
   "workoutPostAutoCompleteText": "¡Terminé mi entreno! 💪",
+  "wellbeingDailyTitle": "¿CÓMO TE SENTÍS HOY?",
+  "@wellbeingDailyTitle": {
+    "description": "Title of the daily wellbeing card on Home, and of the sheet it opens. Present tense on purpose: the daily check-in does not assume a workout happened. Concrete, never abstract — the segment that asked for this feature is the one that tolerates abstraction worst."
+  },
+  "wellbeingDailyPrompt": "Anotá cómo amanecés, entrenes o no.",
+  "@wellbeingDailyPrompt": {
+    "description": "Subtitle of the daily wellbeing card on Home. Says plainly what the card is for. Must NOT promise any interpretation, advice or diagnosis derived from the answer."
+  },
   "wellbeingCheckInTitle": "¿CÓMO TE SENTISTE?",
   "@wellbeingCheckInTitle": {
     "description": "Title of the skippable post-session check-in step, and of the sheet it opens. Asks how the athlete felt — subjective, never a performance metric."

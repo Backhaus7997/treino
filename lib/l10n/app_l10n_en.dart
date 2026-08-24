@@ -638,6 +638,12 @@ class AppL10nEn extends AppL10n {
   String get workoutPostAutoCompleteText => '';
 
   @override
+  String get wellbeingDailyTitle => 'HOW ARE YOU FEELING TODAY?';
+
+  @override
+  String get wellbeingDailyPrompt => 'Log how you woke up, workout or not.';
+
+  @override
   String get wellbeingCheckInTitle => 'HOW DID YOU FEEL?';
 
   @override

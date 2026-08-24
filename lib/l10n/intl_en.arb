@@ -269,6 +269,8 @@
   "workoutSnackShareSuccess": "",
   "workoutSnackShareError": "",
   "workoutPostAutoCompleteText": "",
+  "wellbeingDailyTitle": "HOW ARE YOU FEELING TODAY?",
+  "wellbeingDailyPrompt": "Log how you woke up, workout or not.",
   "wellbeingCheckInTitle": "HOW DID YOU FEEL?",
   "wellbeingCheckInOptional": "Optional. You can skip it.",
   "wellbeingFeelingVeryBad": "Very bad",

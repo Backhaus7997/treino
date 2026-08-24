@@ -1274,6 +1274,18 @@ abstract class AppL10n {
   /// **'¡Terminé mi entreno! 💪'**
   String get workoutPostAutoCompleteText;
 
+  /// Title of the daily wellbeing card on Home, and of the sheet it opens. Present tense on purpose: the daily check-in does not assume a workout happened. Concrete, never abstract — the segment that asked for this feature is the one that tolerates abstraction worst.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿CÓMO TE SENTÍS HOY?'**
+  String get wellbeingDailyTitle;
+
+  /// Subtitle of the daily wellbeing card on Home. Says plainly what the card is for. Must NOT promise any interpretation, advice or diagnosis derived from the answer.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Anotá cómo amanecés, entrenes o no.'**
+  String get wellbeingDailyPrompt;
+
   /// Title of the skippable post-session check-in step, and of the sheet it opens. Asks how the athlete felt — subjective, never a performance metric.
   ///
   /// In es_AR, this message translates to:

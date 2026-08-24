@@ -653,6 +653,12 @@ class AppL10nEs extends AppL10n {
   String get workoutPostAutoCompleteText => '¡Terminé mi entreno! 💪';
 
   @override
+  String get wellbeingDailyTitle => '¿CÓMO TE SIENTES HOY?';
+
+  @override
+  String get wellbeingDailyPrompt => 'Anota cómo amaneces, entrenes o no.';
+
+  @override
   String get wellbeingCheckInTitle => '¿CÓMO TE SENTISTE?';
 
   @override
@@ -4237,6 +4243,12 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get workoutPostAutoCompleteText => '¡Terminé mi entreno! 💪';
+
+  @override
+  String get wellbeingDailyTitle => '¿CÓMO TE SENTÍS HOY?';
+
+  @override
+  String get wellbeingDailyPrompt => 'Anotá cómo amanecés, entrenes o no.';
 
   @override
   String get wellbeingCheckInTitle => '¿CÓMO TE SENTISTE?';
