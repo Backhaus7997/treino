@@ -1404,6 +1404,88 @@ service cloud.firestore {
       //
       // Efecto lateral bueno: el peor caso de `chats/create` baja de ≤6 a 4,
       // porque ya no se evalúan las dos ramas en cadena.
+      //
+      // ── TERCERA RAMA: chat de PRE-CONSULTA (#637) ────────────────────────
+      //
+      // Problema: la única forma de dirigirle la palabra a un PF era pedirle un
+      // vínculo formal, y `TrainerContactCtaStub` bloquea ese pedido si el
+      // atleta ya tiene UN vínculo pending/active con CUALQUIER PF. O sea que
+      // el producto obligaba a elegir antes de poder preguntar: pedirle vínculo
+      // al primer coach dejaba a los otros dos inalcanzables.
+      //
+      // La rama social NO sirve para este caso y no es cuestión de reusarla:
+      // es direccional a propósito (REQ-FOLLOW-012 / ADR-FOLLOW-005) y la
+      // dirección que habilita es la contraria — exigiría que el PF siga al
+      // atleta ANTES de que el atleta pueda preguntarle. Nadie hace eso.
+      //
+      // Por eso una rama propia, y —igual que las otras dos— EXCLUYENTE: es un
+      // ternario anidado, no un `|| esConsulta` al final. Un `||` reabriría
+      // exactamente el agujero que documenta el bloque de arriba: un payload
+      // con `kind: 'inquiry'` haría true la disyunción y el `linkId` del mismo
+      // payload no se validaría nunca.
+      //
+      // Qué habilita la rama, y por qué esa condición:
+      //
+      //   1. `users/{otro}.role == 'trainer'` — el destinatario es un PF DE
+      //      VERDAD. Es el ÚNICO hecho no auto-declarable del sistema: el rol
+      //      es intrínseco (AGENTS.md regla 3), el signup público fuerza
+      //      'athlete' y el update lo pinea inmutable (QA-SEC-001), así que
+      //      sólo el Admin SDK acuña un trainer.
+      //
+      //   2. `exists(trainerPublicProfiles/{otro})` — ese PF PUBLICÓ su perfil
+      //      de discovery, o sea que está en el mapa y en la búsqueda. Es la
+      //      señal de consentimiento: un PF que nunca se publicó no aparece en
+      //      ninguna superficie desde donde se pueda consultar, y no queremos
+      //      que sea alcanzable igual por doc id.
+      //
+      //   ⚠ El punto 2 NO alcanza solo, y por eso están los dos: el `create` de
+      //   `trainerPublicProfiles` (arriba, ~línea 995) valida dueño y forma
+      //   pero NO chequea rol — cualquier autenticado puede crearse el suyo.
+      //   Gatear sólo por ese doc sería confiar en un PF auto-declarado, que es
+      //   justo lo que el issue pide no hacer.
+      //
+      //   El `exists()` del punto 2 es REDUNDANTE y está a propósito: la
+      //   verificación por mutación lo confirma (sacarlo no pone rojo ningún
+      //   test, porque el `get()` de abajo sobre un doc inexistente devuelve
+      //   null y `.data` revienta → deny). Se queda por la misma razón que en
+      //   la rama Coach: que la condición se lea, y no dependa de un error de
+      //   evaluación. Cuesta 1 llamada y el peor caso sigue siendo la rama
+      //   Coach, así que no se paga nada.
+      //
+      //   3. `acceptsInquiries != false` — kill switch del lado del PF. Esta
+      //      rama abre una superficie de spam NUEVA (hoy nadie le escribe a un
+      //      PF sin que el PF haya aceptado un vínculo), así que el PF tiene
+      //      que poder cerrarla. Default `true` porque los perfiles existentes
+      //      no tienen el campo y la feature existe para que sean contactables.
+      //      El `update` de `trainerPublicProfiles` es owner-only sin
+      //      allowlist, así que el PF ya puede escribirlo sin regla nueva.
+      //
+      // DIRECCIONALIDAD GRATIS: la rama mira al OTRO, nunca a quien escribe.
+      // Un PF no puede usarla para escribirle en frío a un atleta — ahí `other`
+      // es el atleta, `role != 'trainer'`, denegado. La vía nueva es
+      // atleta→PF (o PF→PF), nunca PF→atleta.
+      //
+      // ANTI-SPAM que ESTA regla sí garantiza:
+      //   · UN chat de consulta por par, estructural: el doc id es
+      //     `sortedUids.join('_')`, así que el par no puede tener dos.
+      //   · Radio de impacto acotado a PFs publicados que no se cerraron.
+      //   El tope de mensajes sin respuesta NO está acá a propósito: todo lo
+      //   que las rules podrían mirar (`lastMessageSenderId`, un contador en el
+      //   doc padre) lo escribe el mismo cliente que se quiere limitar, y en
+      //   un batch las rules leen el estado COMMITEADO, no el pendiente — un
+      //   cliente modificado saltea el límite mandando el mensaje sin tocar el
+      //   padre. Un tope real necesita estado del servidor (contador desde una
+      //   CF `onDocumentCreated`); meter acá uno esquivable sería un gate
+      //   decorativo, que es exactamente lo que este bloque prohíbe.
+      //
+      // MARCA INMUTABLE: `kind` queda pineado en el `update` de abajo, igual
+      // que `linkId`. Sin eso, (a) un chat social se convertiría en consulta
+      // con un update de una línea, saltándose el gate de follow, y (b) una
+      // consulta podría escalar a chat de Coach agregándose un `linkId`.
+      //
+      // PRESUPUESTO DE LLAMADAS: la rama nueva cuesta 3 (1 exists + 2 get) y
+      // sólo se evalúa ella, así que el peor caso de `chats/create` sigue
+      // siendo la rama Coach con 4, sobre el techo de 10. Sin cambios.
       function chatCreateOk(members, data) {
         let me = request.auth.uid;
         let other = members[0] == me ? members[1] : members[0];
@@ -1415,6 +1497,10 @@ service cloud.firestore {
           && get(/databases/$(database)/documents/trainer_links/$(data.linkId)).data.status in ['active', 'paused']
           && get(/databases/$(database)/documents/trainer_links/$(data.linkId)).data.trainerId in members
           && get(/databases/$(database)/documents/trainer_links/$(data.linkId)).data.athleteId in members
+        ) : (data.get('kind', '') == 'inquiry') ? (
+          exists(/databases/$(database)/documents/trainerPublicProfiles/$(other))
+          && get(/databases/$(database)/documents/users/$(other)).data.role == 'trainer'
+          && get(/databases/$(database)/documents/trainerPublicProfiles/$(other)).data.get('acceptsInquiries', true) == true
         ) : followAccepted(other, me);
       }
 
@@ -1426,11 +1512,19 @@ service cloud.firestore {
       //
       // Costo: 0 llamadas en un chat de Coach, 2 en uno social, y sólo cuando el
       // update toca algo más que `lastRead`.
+      //
+      // #637: `kind == 'inquiry'` escapa por la MISMA vía y por el mismo
+      // motivo. Acá el `||` es legítimo —a diferencia del `create`— porque los
+      // dos primeros términos ya no son payload sin validar: son hechos que
+      // `chatCreateOk` verificó al crear el doc y que el `update` de abajo
+      // tiene pineados. Es una disyunción de hechos confiables, no una
+      // validación. Costo de un chat de consulta: 0 llamadas, igual que Coach.
       function chatWriterOk(uid) {
         let other = resource.data.members[0] == uid
           ? resource.data.members[1]
           : resource.data.members[0];
         return 'linkId' in resource.data
+            || resource.data.get('kind', '') == 'inquiry'
             || followAccepted(other, uid);
       }
 
@@ -1466,6 +1560,18 @@ service cloud.firestore {
                     && request.resource.data.createdAt == resource.data.createdAt
                     && request.resource.data.get('linkId', null)
                        == resource.data.get('linkId', null)
+                    // ⚠ `kind` PINEADO — segunda mitad de la invariante de la
+                    // rama de consulta (#637), por el mismo motivo que
+                    // `linkId`. Sin el pin, esta regla (que no tiene allowlist
+                    // de claves) dejaría convertir un chat social en consulta
+                    // con un update de una línea, saltándose el gate de follow
+                    // y auto-otorgándose escritura permanente que sobrevive al
+                    // unfollow. Y en la otra dirección impide BORRAR la marca
+                    // para que una consulta se haga pasar por chat social.
+                    // La escalada consulta→Coach ya la corta el pin de
+                    // `linkId`: a un chat existente no se le puede agregar.
+                    && request.resource.data.get('kind', null)
+                       == resource.data.get('kind', null)
                     && (
                          !request.resource.data.keys().hasAny(['lastRead'])
                          || request.resource.data.get('lastRead', {})
@@ -1516,12 +1622,20 @@ service cloud.firestore {
         // que hoy) y quede exactamente como está —membresía, sin re-verificar
         // que el link siga activo—, porque apretar el Coach no es parte de este
         // change. Un chat social paga 3 sobre el techo de 10.
+        //
+        // #637: la marca de consulta escapa igual que `linkId` y por el mismo
+        // motivo — `chatCreateOk` ya verificó al crear que el destinatario es
+        // un PF publicado, y el pin del `update` no deja plantarla después. Un
+        // chat de consulta paga 1 llamada, igual que uno de Coach. Los DOS
+        // miembros pueden postear: el atleta pregunta y el PF contesta, que es
+        // el punto entero de la feature.
         function senderMayPost(uid) {
           let chat = get(/databases/$(database)/documents/chats/$(chatId)).data;
           let other = chat.members[0] == uid ? chat.members[1] : chat.members[0];
           return uid in chat.members
               && (
                    'linkId' in chat
+                   || chat.get('kind', '') == 'inquiry'
                    || followAccepted(other, uid)
                  );
         }
