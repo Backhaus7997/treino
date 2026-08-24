@@ -329,17 +329,25 @@ describe("propagacion de un dato degradado — el gate (promote-link)", () => {
  * alumno). Es la MISMA senal que el gate, con la decision opuesta.
  */
 describe("propagacion de un dato degradado — el barrido (sync-entitlements)", () => {
-  /** 4 activos, del mas viejo al mas nuevo; L4 viene bloqueado de antes. */
+  /**
+   * 4 activos, del mas viejo al mas nuevo; L1 viene bloqueado de antes.
+   *
+   * El pre-bloqueado es el MAS VIEJO a proposito: el criterio de seleccion
+   * conserva los mas antiguos (select-blocked-links.ts), asi que L1 es el que
+   * tiene que volver. Si el pre-bloqueado fuera el mas nuevo no habria ninguna
+   * devolucion que observar y estos tests dejarian de probar la mitad
+   * asimetrica de la valvula.
+   */
   const cuatroLinks = () => ({
-    L1: link("a1", "active", { acceptedAt: ts(1000) }),
-    L2: link("a2", "active", { acceptedAt: ts(2000) }),
-    L3: link("a3", "active", { acceptedAt: ts(3000) }),
-    L4: link("a4", "active", {
-      acceptedAt: ts(4000),
+    L1: link("a1", "active", {
+      acceptedAt: ts(1000),
       entitlement: "blocked",
       blockedAt: ts(1),
       blockedReason: "over-limit",
     }),
+    L2: link("a2", "active", { acceptedAt: ts(2000) }),
+    L3: link("a3", "active", { acceptedAt: ts(3000) }),
+    L4: link("a4", "active", { acceptedAt: ts(4000) }),
   });
 
   it("VALVULA: con datos degradados devuelve, pero NO bloquea a nadie", async () => {
@@ -356,9 +364,10 @@ describe("propagacion de un dato degradado — el barrido (sync-entitlements)", 
     expect(res.limit).toBe(2);
     expect(res.blocked).toEqual([]);
     // Asimetrico a proposito: devolver NUNCA empeora la situacion de un alumno.
-    expect(res.unblocked).toEqual(["L4"]);
+    expect(res.unblocked).toEqual(["L1"]);
     expect(state.trainer_links.L1.entitlement).toBe("entitled");
     expect(state.trainer_links.L2.entitlement).toBe("entitled");
+    expect(state.trainer_links.L3.entitlement).toBe("entitled");
     expect(state.trainer_links.L4.entitlement).toBe("entitled");
     // weightedLoad refleja la carga REAL (4 > limite 2). Ese desfasaje es lo
     // que hace visible el documento roto en vez de esconderlo.
@@ -379,7 +388,7 @@ describe("propagacion de un dato degradado — el barrido (sync-entitlements)", 
       expect.objectContaining({
         trainerId: "t1",
         limit: 2,
-        skippedBlock: expect.arrayContaining(["L1", "L2"]),
+        skippedBlock: expect.arrayContaining(["L3", "L4"]),
       }),
     );
   });
@@ -395,9 +404,9 @@ describe("propagacion de un dato degradado — el barrido (sync-entitlements)", 
     const res = await syncTrainerEntitlements(app, "t1", 9000);
 
     expect(res.limit).toBe(2);
-    expect(res.blocked.sort()).toEqual(["L1", "L2"]);
-    expect(res.unblocked).toEqual(["L4"]);
-    expect(state.trainer_links.L1.entitlement).toBe("blocked");
+    expect(res.blocked.sort()).toEqual(["L3", "L4"]);
+    expect(res.unblocked).toEqual(["L1"]);
+    expect(state.trainer_links.L3.entitlement).toBe("blocked");
     expect(res.weightedLoad).toBe(2);
     expect(errorSpy).not.toHaveBeenCalled();
   });
