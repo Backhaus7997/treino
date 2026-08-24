@@ -3539,4 +3539,34 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get sessionTrimUndo => 'UNDO';
+
+  @override
+  String get sessionTimeFitPromptTitle => 'HOW MUCH TIME DO YOU HAVE TODAY?';
+
+  @override
+  String sessionTimeFitCurrent(String value) {
+    return 'This session runs $value min';
+  }
+
+  @override
+  String sessionTimeFitAlreadyFits(String value) {
+    return '$value min is enough. Nothing needs to come out.';
+  }
+
+  @override
+  String sessionTimeFitTrimHeadline(String value) {
+    return 'Drop these and the session runs $value min:';
+  }
+
+  @override
+  String sessionTimeFitCannotFit(String value) {
+    return 'We can\'t get there. The shortest possible is $value min:';
+  }
+
+  @override
+  String get sessionTimeFitNothingToTrim =>
+      'There\'s nothing to drop without emptying the session.';
+
+  @override
+  String get sessionTimeFitApply => 'TRIM TODAY';
 }

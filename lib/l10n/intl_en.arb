@@ -1364,5 +1364,19 @@
   "sessionTrimDroppedList": "Out for today: {names}",
   "@sessionTrimDroppedList": {"description": "Exercises the athlete left out of today's session so it would fit their time (#645). The routine itself is untouched.", "placeholders": {"names": {"type": "String"}}},
   "sessionTrimUndo": "UNDO",
-  "@sessionTrimUndo": {"description": "Action that puts everything trimmed back into the session (#645)."}
+  "@sessionTrimUndo": {"description": "Action that puts everything trimmed back into the session (#645)."},
+  "sessionTimeFitPromptTitle": "HOW MUCH TIME DO YOU HAVE TODAY?",
+  "@sessionTimeFitPromptTitle": {"description": "Entry point to the time adjustment in the player, and the title of its sheet (#645)."},
+  "sessionTimeFitCurrent": "This session runs {value} min",
+  "@sessionTimeFitCurrent": {"description": "Estimated length of today's session before trimming (#645). The value already carries the ~ prefix because it is always computed.", "placeholders": {"value": {"type": "String"}}},
+  "sessionTimeFitAlreadyFits": "{value} min is enough. Nothing needs to come out.",
+  "@sessionTimeFitAlreadyFits": {"description": "Shown when the full session already fits the declared time (#645).", "placeholders": {"value": {"type": "String"}}},
+  "sessionTimeFitTrimHeadline": "Drop these and the session runs {value} min:",
+  "@sessionTimeFitTrimHeadline": {"description": "Header of the trim proposal, followed by the exercise names (#645). The app suggests; the athlete decides.", "placeholders": {"value": {"type": "String"}}},
+  "sessionTimeFitCannotFit": "We can't get there. The shortest possible is {value} min:",
+  "@sessionTimeFitCannotFit": {"description": "Shown when even the deepest trim does not fit the declared time (#645).", "placeholders": {"value": {"type": "String"}}},
+  "sessionTimeFitNothingToTrim": "There's nothing to drop without emptying the session.",
+  "@sessionTimeFitNothingToTrim": {"description": "Shown when no exercise can be trimmed (#645)."},
+  "sessionTimeFitApply": "TRIM TODAY",
+  "@sessionTimeFitApply": {"description": "Confirms the proposed trim. Affects today's session only; the routine is untouched (#645)."}
 }

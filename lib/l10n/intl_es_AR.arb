@@ -3072,5 +3072,19 @@
   "sessionTrimDroppedList": "Fuera de hoy: {names}",
   "@sessionTrimDroppedList": {"description": "Ejercicios que el atleta dejó fuera de la sesión de hoy para que entrara en su tiempo (#645). La rutina no se modifica.", "placeholders": {"names": {"type": "String"}}},
   "sessionTrimUndo": "DESHACER",
-  "@sessionTrimUndo": {"description": "Acción que devuelve a la sesión todo lo que se había recortado (#645)."}
+  "@sessionTrimUndo": {"description": "Acción que devuelve a la sesión todo lo que se había recortado (#645)."},
+  "sessionTimeFitPromptTitle": "¿CUÁNTO TIEMPO TENÉS HOY?",
+  "@sessionTimeFitPromptTitle": {"description": "Entrada al ajuste de tiempo en el player y título de su hoja (#645)."},
+  "sessionTimeFitCurrent": "Esta sesión son {value} min",
+  "@sessionTimeFitCurrent": {"description": "Duración estimada de la sesión de hoy antes de recortar (#645). El valor ya viene con el prefijo ~ porque siempre es calculado.", "placeholders": {"value": {"type": "String"}}},
+  "sessionTimeFitAlreadyFits": "Con {value} min ya entrás. No hace falta sacar nada.",
+  "@sessionTimeFitAlreadyFits": {"description": "Respuesta cuando la sesión completa ya cabe en el tiempo declarado (#645).", "placeholders": {"value": {"type": "String"}}},
+  "sessionTimeFitTrimHeadline": "Si sacás esto, la sesión queda en {value} min:",
+  "@sessionTimeFitTrimHeadline": {"description": "Encabezado de la propuesta de recorte, seguido de los nombres de los ejercicios (#645). La app sugiere; el atleta decide.", "placeholders": {"value": {"type": "String"}}},
+  "sessionTimeFitCannotFit": "No llegamos a ese tiempo. Lo más corto posible son {value} min:",
+  "@sessionTimeFitCannotFit": {"description": "Respuesta cuando ni el recorte más profundo entra en el tiempo declarado (#645).", "placeholders": {"value": {"type": "String"}}},
+  "sessionTimeFitNothingToTrim": "No hay nada que sacar sin dejar la sesión vacía.",
+  "@sessionTimeFitNothingToTrim": {"description": "Respuesta cuando no queda ningún ejercicio recortable (#645)."},
+  "sessionTimeFitApply": "AJUSTAR HOY",
+  "@sessionTimeFitApply": {"description": "Confirma el recorte propuesto. Sólo afecta la sesión de hoy; la rutina no se modifica (#645)."}
 }

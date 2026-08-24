@@ -924,5 +924,16 @@
   "@sessionTrimAdjustedTo": {"placeholders": {"value": {"type": "String"}}},
   "sessionTrimDroppedList": "Fuera de hoy: {names}",
   "@sessionTrimDroppedList": {"placeholders": {"names": {"type": "String"}}},
-  "sessionTrimUndo": "DESHACER"
+  "sessionTrimUndo": "DESHACER",
+  "sessionTimeFitPromptTitle": "¿CUÁNTO TIEMPO TIENES HOY?",
+  "sessionTimeFitCurrent": "Esta sesión son {value} min",
+  "@sessionTimeFitCurrent": {"placeholders": {"value": {"type": "String"}}},
+  "sessionTimeFitAlreadyFits": "Con {value} min ya entras. No hace falta quitar nada.",
+  "@sessionTimeFitAlreadyFits": {"placeholders": {"value": {"type": "String"}}},
+  "sessionTimeFitTrimHeadline": "Si quitas esto, la sesión queda en {value} min:",
+  "@sessionTimeFitTrimHeadline": {"placeholders": {"value": {"type": "String"}}},
+  "sessionTimeFitCannotFit": "No llegamos a ese tiempo. Lo más corto posible son {value} min:",
+  "@sessionTimeFitCannotFit": {"placeholders": {"value": {"type": "String"}}},
+  "sessionTimeFitNothingToTrim": "No hay nada que quitar sin dejar la sesión vacía.",
+  "sessionTimeFitApply": "AJUSTAR HOY"
 }
