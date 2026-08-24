@@ -1,13 +1,17 @@
-// Tests del paso de check-in post-sesión (#643 slice 1).
+// Tests del paso de check-in post-sesión (#643).
 //
-// Dos contratos se testean acá porque son los que hacen o rompen el feature:
+// Tres contratos se testean acá porque son los que hacen o rompen el feature:
 //   1. SALTABLE DE VERDAD — salir sin guardar no escribe nada y no cuesta nada.
 //   2. REGISTRAR, NO INTERPRETAR — el aviso de dolor es neutro y no condiciona
 //      ningún comportamiento de la app.
+//   3. NO DESTRUCTIVO — un segundo entreno el mismo día suma un registro; no
+//      pisa el del primero. Era el defecto de la slice 1, cuando el id del
+//      documento era la fecha.
 // El resto (qué se persiste y con qué vocabulario) se verifica contra un
-// Firestore falso, no contra un mock de repositorio: así el id del documento
-// (la fecha local) queda cubierto de punta a punta.
+// Firestore falso, no contra un mock de repositorio: así el path y el id del
+// documento quedan cubiertos de punta a punta.
 
+import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -34,6 +38,7 @@ Widget _host({
   required void Function(bool?) onClosed,
   CheckIn? existing,
   String? uid = _uid,
+  String sessionId = 's1',
 }) {
   return ProviderScope(
     overrides: [
@@ -52,7 +57,7 @@ Widget _host({
               onPressed: () async {
                 onClosed(await showPostSessionCheckInSheet(
                   context,
-                  sessionId: 's1',
+                  sessionId: sessionId,
                   existing: existing,
                 ));
               },
@@ -70,16 +75,33 @@ Future<void> _openSheet(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
-Future<Map<String, Object?>?> _storedCheckIn(
+/// Todos los check-ins persistidos, con su id bajo `__id`.
+///
+/// Lee la subcolección REAL. Si alguien vuelve a apuntar el repositorio a
+/// `users/{uid}/checkIns` —el path reservado para el check-in de presencia en
+/// el gym— esto se queda vacío y toda la suite se cae.
+Future<List<Map<String, Object?>>> _storedCheckIns(
   FakeFirebaseFirestore firestore,
 ) async {
   final snap = await firestore
       .collection('users')
       .doc(_uid)
-      .collection('checkIns')
+      .collection('wellbeingCheckIns')
       .get();
-  if (snap.docs.isEmpty) return null;
-  return {...snap.docs.single.data(), '__id': snap.docs.single.id};
+  return [
+    for (final d in snap.docs) {...d.data(), '__id': d.id},
+  ];
+}
+
+/// El único check-in persistido, o `null` si no hay ninguno. Falla si hay más
+/// de uno: los tests que la usan afirman sobre un registro solo.
+Future<Map<String, Object?>?> _storedCheckIn(
+  FakeFirebaseFirestore firestore,
+) async {
+  final all = await _storedCheckIns(firestore);
+  if (all.isEmpty) return null;
+  expect(all, hasLength(1));
+  return all.single;
 }
 
 void main() {
@@ -103,7 +125,8 @@ void main() {
     );
   });
 
-  testWidgets('elegir un nivel habilita GUARDAR y persiste el día como doc id',
+  testWidgets(
+      'elegir un nivel habilita GUARDAR y persiste con id {fecha}_{millis}',
       (tester) async {
     final firestore = FakeFirebaseFirestore();
     bool? result;
@@ -123,10 +146,14 @@ void main() {
     await tester.tap(find.text('GUARDAR'));
     await tester.pumpAndSettle();
 
+    final today = checkInDateKey(DateTime.now());
     final stored = await _storedCheckIn(firestore);
     expect(stored, isNotNull);
-    expect(stored!['__id'], checkInDateKey(DateTime.now()));
-    expect(stored['date'], checkInDateKey(DateTime.now()));
+    // El id ARRANCA con la fecha pero no ES la fecha: el sufijo de
+    // milisegundos es lo que impide que el próximo registro del día lo pise.
+    expect(stored!['__id'], startsWith('${today}_'));
+    expect(stored['__id'], isNot(today));
+    expect(stored['date'], today);
     expect(stored['feeling'], 'great');
     expect(stored['hasPain'], isFalse);
     expect(stored['painAreas'], isEmpty);
@@ -318,7 +345,8 @@ void main() {
       firestore: firestore,
       onClosed: (_) {},
       existing: CheckIn(
-        date: checkInDateKey(DateTime.now()),
+        id: '2026-05-18_1779000000000',
+        date: '2026-05-18',
         feeling: CheckInFeeling.mal,
         hasPain: true,
         painAreas: const [MuscleGroup.gluteos],
@@ -338,5 +366,59 @@ void main() {
     expect(stored!['feeling'], 'bad');
     expect(stored['painAreas'], ['glutes']);
     expect(stored['note'], 'Vengo con la cadera');
+    // Editar reescribe SU documento y conserva SU fecha: corregir un registro
+    // no lo re-imputa al día en que se corrigió.
+    expect(stored['__id'], '2026-05-18_1779000000000');
+    expect(stored['date'], '2026-05-18');
+  });
+
+  // ── No destructivo ───────────────────────────────────────────────────────
+
+  testWidgets(
+      'un segundo entreno el mismo día SUMA un registro, no pisa el anterior',
+      (tester) async {
+    final firestore = FakeFirebaseFirestore();
+    final today = checkInDateKey(DateTime.now());
+
+    // El registro que dejó el entreno de la mañana, con su propia sesión.
+    await firestore
+        .collection('users')
+        .doc(_uid)
+        .collection('wellbeingCheckIns')
+        .doc('${today}_1700000000000')
+        .set({
+      'date': today,
+      'feeling': 'bad',
+      'hasPain': true,
+      'painAreas': ['back'],
+      'recordedAt': Timestamp.fromDate(DateTime.now().toUtc()),
+      'sessionId': 's-manana',
+    });
+
+    // El de la tarde es OTRA sesión: abre sin `existing`, que es exactamente
+    // lo que resuelve checkInForSession en el resumen post-entreno.
+    await tester.pumpWidget(_host(
+      firestore: firestore,
+      onClosed: (_) {},
+      sessionId: 's-tarde',
+    ));
+    await _openSheet(tester);
+
+    await tester.tap(find.text('Muy bien'));
+    await tester.pump();
+    await tester.tap(find.text('GUARDAR'));
+    await tester.pumpAndSettle();
+
+    final all = await _storedCheckIns(firestore);
+    // Dos documentos, no uno. Con la fecha como id, acá quedaba uno solo y el
+    // dolor de la mañana desaparecía sin que nadie se enterara.
+    expect(all, hasLength(2));
+    expect(
+      all.map((c) => c['sessionId']),
+      containsAll(<String>['s-manana', 's-tarde']),
+    );
+    final morning = all.firstWhere((c) => c['sessionId'] == 's-manana');
+    expect(morning['feeling'], 'bad');
+    expect(morning['painAreas'], ['back']);
   });
 }

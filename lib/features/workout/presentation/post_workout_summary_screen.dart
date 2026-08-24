@@ -391,9 +391,16 @@ class _CheckInSlot extends ConsumerWidget {
     // Fecha LOCAL: el que entrena a las 22:00 en Córdoba espera que cuente
     // para HOY, no para el día de UTC.
     final date = checkInDateKey(DateTime.now());
-    final existing = uid.isEmpty
-        ? null
-        : ref.watch(checkInByDateProvider((uid: uid, date: date))).valueOrNull;
+    // Sólo el check-in de ESTA sesión cuenta como "ya registrado". El de otro
+    // entreno del mismo día es otro registro y no se pisa: desde #643 el id del
+    // documento dejó de ser la fecha justamente para que convivan.
+    final dayCheckIns = uid.isEmpty
+        ? const <CheckIn>[]
+        : ref
+                .watch(checkInsForDateProvider((uid: uid, date: date)))
+                .valueOrNull ??
+            const <CheckIn>[];
+    final existing = checkInForSession(dayCheckIns, sessionId);
 
     Future<void> open(CheckInFeeling? feeling) => showPostSessionCheckInSheet(
           context,
@@ -451,11 +458,8 @@ class _CheckInSlot extends ConsumerWidget {
   }
 }
 
-/// Estado "ya registrado": el día tiene check-in y el sheet abre precargado.
-///
-/// El id del documento es la fecha, así que un segundo registro del mismo día
-/// PISA al anterior. Mostrarlo en vez de sobrescribir a ciegas es la
-/// diferencia entre un dedup y una pérdida de dato silenciosa.
+/// Estado "ya registrado": esta sesión ya tiene check-in y el sheet abre
+/// precargado para editarlo, sobre el MISMO documento.
 class _CheckInRecorded extends StatelessWidget {
   const _CheckInRecorded({required this.checkIn, required this.onEdit});
 
