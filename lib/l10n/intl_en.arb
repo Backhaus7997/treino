@@ -1338,5 +1338,11 @@
   "routineCardDaysPerWeek": "{days, plural, =1{1 day/week} other{{days} days/week}}",
   "@routineCardDaysPerWeek": {"placeholders": {"days": {"type": "int"}}},
   "routineCardMinutes": "{value} min",
-  "@routineCardMinutes": {"placeholders": {"value": {"type": "String"}}}
+  "@routineCardMinutes": {"placeholders": {"value": {"type": "String"}}},
+  "sessionTrimAdjustedTo": "Trimmed to {value} min",
+  "@sessionTrimAdjustedTo": {"description": "Title of the trimmed-session notice in the player (#645). The value already carries the ~ prefix when computed.", "placeholders": {"value": {"type": "String"}}},
+  "sessionTrimDroppedList": "Out for today: {names}",
+  "@sessionTrimDroppedList": {"description": "Exercises the athlete left out of today's session so it would fit their time (#645). The routine itself is untouched.", "placeholders": {"names": {"type": "String"}}},
+  "sessionTrimUndo": "UNDO",
+  "@sessionTrimUndo": {"description": "Action that puts everything trimmed back into the session (#645)."}
 }

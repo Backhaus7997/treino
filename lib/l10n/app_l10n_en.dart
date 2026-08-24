@@ -3501,4 +3501,17 @@ class AppL10nEn extends AppL10n {
   String routineCardMinutes(String value) {
     return '$value min';
   }
+
+  @override
+  String sessionTrimAdjustedTo(String value) {
+    return 'Trimmed to $value min';
+  }
+
+  @override
+  String sessionTrimDroppedList(String names) {
+    return 'Out for today: $names';
+  }
+
+  @override
+  String get sessionTrimUndo => 'UNDO';
 }

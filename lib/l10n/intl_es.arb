@@ -916,5 +916,10 @@
   "@routineCardDaysPerWeek": {"placeholders": {"days": {"type": "int"}}},
   "routineCardMinutes": "{value} min",
   "@routineCardMinutes": {"placeholders": {"value": {"type": "String"}}},
-  "workoutSplitFallback": "Rutina libre"
+  "workoutSplitFallback": "Rutina libre",
+  "sessionTrimAdjustedTo": "Ajustado a {value} min",
+  "@sessionTrimAdjustedTo": {"placeholders": {"value": {"type": "String"}}},
+  "sessionTrimDroppedList": "Fuera de hoy: {names}",
+  "@sessionTrimDroppedList": {"placeholders": {"names": {"type": "String"}}},
+  "sessionTrimUndo": "DESHACER"
 }
