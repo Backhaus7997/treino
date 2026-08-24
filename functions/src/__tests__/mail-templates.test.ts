@@ -21,6 +21,8 @@ import {
 } from "../mail/format";
 
 const ALL_KINDS: MailKind[] = [
+  "password-reset",
+  "email-verification",
   "appointment-confirmed",
   "appointment-series-created",
   "appointment-cancelled",
@@ -89,6 +91,56 @@ describe("renderMail: every MailKind produces a complete message", () => {
   it("carries the brand accent so the mail is recognisably TREINO", () => {
     const out = renderMail("appointment-confirmed", { trainerName: "Jose" });
     expect(out.html).toContain("#2CE5A2");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Mails de auth — el link es la razón de ser del mail
+// ---------------------------------------------------------------------------
+describe("plantillas de auth: el action link llega entero", () => {
+  const LINK =
+    "https://treino-dev.firebaseapp.com/__/auth/action" +
+    "?mode=resetPassword&oobCode=ABC123&apiKey=XYZ";
+
+  it.each(["password-reset", "email-verification"] as MailKind[])(
+    "%s pone el link en el href del CTA",
+    (kind) => {
+      const out = renderMail(kind, { actionLink: LINK });
+      expect(out.html).toContain("oobCode=ABC123");
+      expect(out.html).not.toContain("treino.app/coach");
+    },
+  );
+
+  // Un mail de recuperación cuyo único link vive dentro de un <a> es inútil
+  // para quien lee en texto plano — y en el camino de vuelta a una cuenta
+  // bloqueada, inútil es lo mismo que roto.
+  it.each(["password-reset", "email-verification"] as MailKind[])(
+    "%s repite la URL cruda en la parte de texto plano",
+    (kind) => {
+      const out = renderMail(kind, { actionLink: LINK });
+      expect(out.text).toContain(LINK);
+    },
+  );
+
+  // REQ-AUTH-011 alcanza también al copy: si el mail de una cuenta existente
+  // dijera algo distinto, el texto sería el oráculo que el endpoint evita ser.
+  it("el copy de reseteo no nombra al usuario ni afirma que la cuenta existe", () => {
+    const out = renderMail("password-reset", { actionLink: LINK });
+    const plano = out.text.toLowerCase();
+
+    expect(plano).not.toContain("@");
+    expect(plano).toContain("si no lo pediste");
+  });
+
+  it("no explota cuando falta el actionLink", () => {
+    expect(() => renderMail("password-reset", {})).not.toThrow();
+  });
+
+  it("escapa el link en vez de inyectarlo crudo en el atributo", () => {
+    const out = renderMail("password-reset", {
+      actionLink: 'https://x.test/?a="><script>alert(1)</script>',
+    });
+    expect(out.html).not.toContain("<script>");
   });
 });
 
