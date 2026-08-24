@@ -123,6 +123,16 @@ describe("postPhotos/{userId}/{fileName} — storage rules", () => {
     await assertFails(listAll(ref(storageAs(AUTHOR), `postPhotos/${AUTHOR}`)));
   });
 
+  it("DENIES listing the postPhotos/ root — no uid enumeration", async () => {
+    // El nivel de arriba no lo cubre `allow list: if false` (ese match pide
+    // dos segmentos): lo cierra el catch-all `{allPaths=**}`. Sin este caso,
+    // un `match /postPhotos/{p=**}` agregado sin cuidado abriría la
+    // enumeración de qué uids tienen fotos y ningún test se pondría rojo.
+    // Ver `docs/security.md` §3.4.
+    await assertFails(listAll(ref(storageAs(OTHER), "postPhotos")));
+    await assertFails(listAll(ref(storageAs(AUTHOR), "postPhotos")));
+  });
+
   it("allows the owner to delete their photo", async () => {
     await assertSucceeds(deleteObject(ref(storageAs(AUTHOR), PHOTO_PATH)));
   });
