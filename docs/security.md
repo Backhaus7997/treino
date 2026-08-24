@@ -27,9 +27,14 @@ aserción que, si la regla se aflojara, se pondría roja.
 
 | Marca | Significado |
 |---|---|
-| ✅ | Hay test negativo **y corre en CI** (`functions/src/__tests__/*-rules.test.ts`) |
-| 🟡 | Hay test negativo, pero **sólo en la suite manual** `scripts/rules_test/` — nada lo ejecuta automáticamente (ver §1.4) |
+| ✅ | Hay test negativo en `functions/src/__tests__/*-rules.test.ts` (job *Functions Test*) |
+| 🟡 | Hay test negativo en la otra suite, `scripts/rules_test/*.test.js` (job *Rules Test*) |
 | — | No hay ningún test negativo |
+
+**Las dos marcas bloquean el merge.** El 🟡 nació distinguiendo "hay test pero
+nada lo corre"; desde #680 Slice B las dos suites son gates de CI y lo único
+que separa las marcas es en qué archivo vive la cobertura — dato útil para
+saber dónde tocar, no un nivel de confianza menor. Ver §1.4.
 
 Las operaciones son las cinco de Firestore (`read` se abre en `get` + `list`
 porque son permisos distintos: `get` protege un documento, `list` protege la
@@ -127,22 +132,38 @@ llamadas — la línea del `import { assertFails, assertSucceeds }` suma uno de
 cada, y hay comentarios en prosa que nombran `assertSucceeds` sin llamarlo. Los
 números de arriba son call sites reales, no líneas.
 
-### 1.4 Hay dos suites de reglas, y una no corre en CI
+### 1.4 Hay dos suites de reglas, y las dos corren en CI
 
-Esto es lo primero que hay que saber antes de confiar en un ✅:
+Esto es lo primero que hay que saber antes de tocar una regla:
 
-| Suite | Archivos | Corre en CI | Cómo se corre |
+| Suite | Archivos | Job de CI | Cómo se corre a mano |
 |---|---|---|---|
-| `functions/src/__tests__/*-rules.test.ts` | 24 | **Sí** — `.github/workflows/ci.yml` job *Functions Test* | `npm --prefix functions run test:rules:emulator` |
-| `scripts/rules_test/*.test.js` | 8 | **No** | `bash scripts/test_rules.sh` (a mano) |
+| `functions/src/__tests__/*-rules.test.ts` | 24 | *Functions Test* | `npm --prefix functions run test:rules:emulator` |
+| `scripts/rules_test/*.test.js` | 8 | *Rules Test* | `bash scripts/test_rules.sh` |
 
-`scripts/test_rules.sh` lo dice en su propio header: *"NOT part of CI — this is
-a manual PR checklist item (reconsider at Fase 6)"*. Por eso las 🟡 de la
-matriz están marcadas distinto: el test existe y pasa, pero **nada garantiza
-que alguien lo corra antes de mergear**. Ocho colecciones dependen hoy
-exclusivamente de esa suite para alguna de sus celdas: `users/{uid}/checkIns`,
+La segunda entró en CI con **#680 Slice B**. Hasta ahí era un ítem de checklist
+de PR — `scripts/test_rules.sh` lo decía en su propio header — y ocho
+colecciones dependían de que alguien se acordara: `users/{uid}/checkIns`,
 `gyms`, `appointments`, `measurements` (delete), `athlete_billing`,
 `athlete_notes`, `payments` (create) y `storage:chatMedia`.
+
+**Lo que costó ese hueco, medido:** al meter la suite en CI estaba **roja**.
+Cuatro aserciones de `rules.test.js` habían quedado obsoletas contra cambios
+deliberados de las reglas, sin que nadie se enterara:
+
+| Escenario | Qué cambió en la regla | Desde |
+|---|---|---|
+| SCENARIO-608a | `routines` UPDATE path 2 — el dueño puede editar `name`/`level`/`days` (REQ-USR-018) | 2026-06-09 |
+| SCENARIO-270 inv. | `userPublicProfiles` create pinea `gymId` con `getAfter(users/{uid})` — el test no seedeaba el doc privado | 2026-07-06 |
+| SCENARIO-602 | `routines` CREATE branch 2 acepta `visibility: 'public'` (#297) | 2026-07-07 |
+| SCENARIO-132 inv. | `friendships` congelada, `update: if false` (ADR-FOLLOW-012) | 2026-08-07 |
+
+Ninguna era un agujero: en los cuatro casos la regla se movió a propósito y el
+test se quedó atrás. Pero eso **es** el problema. Una suite que nadie corre no
+distingue "la regla cambió porque quisimos" de "la regla se rompió" — las dos
+se ven igual, que es como se ven las cuatro de arriba. Y tres de ellas ya
+estaban rojas el 2026-07-21, la última vez que alguien editó ese archivo: ni
+siquiera quien lo tocaba lo estaba corriendo.
 
 Existe además `functions/src/__tests__/rules-read-isolation.test.ts`, que no es
 un test de emulador sino un **scanner estático** sobre el texto de
@@ -231,9 +252,15 @@ Ordenados por lo que me preocuparía primero:
    false` y su comentario dice por qué importa (relay de spam con nuestra
    reputación de remitente + emails de otros usuarios) — es el más barato de
    todos de cerrar.
-7. **Las 8 colecciones que dependen sólo de la suite manual** (§1.4). El
-   arreglo no es escribir más tests: es meter `scripts/test_rules.sh` en CI, o
-   migrar esos archivos a `functions/src/__tests__/`. Es trabajo de Slice B.
+7. ~~**Las 8 colecciones que dependen sólo de la suite manual**~~ — **CERRADO**
+   por #680 Slice B: `scripts/test_rules.sh` es el job *Rules Test* de CI y
+   bloquea el merge (§1.4). Queda pendiente, como deuda de consolidación y no
+   como hueco de cobertura, **unificar las dos suites**: hoy son dos árboles de
+   dependencias (`@firebase/rules-unit-testing` ^3 en `scripts/rules_test/`
+   contra ^5 en `functions/`), dos lockfiles y dos jobs para el mismo tipo de
+   test. Portar los 8 `.js` a TS bajo `functions/src/__tests__/` los dejaría
+   bajo un solo runner, pero es un diff grande y mecánico que no aporta
+   cobertura — vale la pena hacerlo solo, no colgado de otro cambio.
 8. **`test/firestore/payments_rules_test.dart`** sigue en el repo con los dos
    cuerpos vacíos. Los escenarios que describe (SCENARIO-VENC-14 y -15) ahora
    están cubiertos de verdad en `payments-update-rules.test.ts`; el stub
@@ -267,16 +294,23 @@ sección en el mismo PR.** Concretamente:
 
 1. Si agregás un `match` nuevo → fila nueva en la tabla que corresponda, con
    todas las celdas en `—` salvo las que traigas testeadas.
-2. Si agregás un test negativo → la celda pasa a ✅ (o 🟡 si lo pusiste en
-   `scripts/rules_test/`, cosa que conviene evitar mientras esa suite no corra
-   en CI).
+2. Si agregás un test negativo → la celda pasa a ✅, o a 🟡 si lo pusiste en
+   `scripts/rules_test/`. Para tests nuevos preferí `functions/src/__tests__/`:
+   no porque el otro job valga menos (los dos bloquean el merge), sino porque
+   ahí está TypeScript y es donde las dos suites van a converger algún día
+   (§1.6, punto 7).
 3. Recalculá los totales de §1.1 y §1.2. Son conteos, no impresiones.
 4. Los tests de reglas se corren con:
 
    ```bash
    npm --prefix functions run test:rules:emulator   # requiere Java 21+
-   bash scripts/test_rules.sh                       # la suite manual
+   npm --prefix scripts/rules_test ci               # una vez
+   bash scripts/test_rules.sh                       # la otra suite
    ```
+
+   Los dos levantan y bajan su propio emulador. Si `java -version` dice menos
+   de 21, exportá uno que sirva antes de correrlos
+   (`export PATH="/opt/homebrew/opt/openjdk@21/bin:$PATH"` en macOS).
 
 Un test negativo que pasa por el motivo equivocado es peor que no tenerlo:
 antes de dar por cerrada una celda, aflojá la regla y comprobá que el test se
