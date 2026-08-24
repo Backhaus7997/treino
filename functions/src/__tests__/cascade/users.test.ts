@@ -5,6 +5,7 @@
  * SCENARIOS covered:
  *   SCENARIO-536 — Main profile docs deleted on success (REQ-ACCDEL-CF-004)
  *   SCENARIO-537 — trainerPublicProfiles deletion is no-op when absent (REQ-ACCDEL-CF-004)
+ *   SCENARIO-643 — wellbeingCheckIns leaves no residue (#643, docs/security.md §2.2)
  */
 
 import * as admin from "firebase-admin";
@@ -36,6 +37,15 @@ async function seed(uid: string): Promise<void> {
   for (let i = 0; i < 3; i++) {
     batch.set(db().collection("users").doc(uid).collection("sessions").doc(`session-${i}`), { i });
   }
+  // Seed the wellbeing check-in sub-collection (#643). Self-reported health is
+  // the most sensitive data the app stores, so it gets its own assertion rather
+  // than riding along untested on the sessions one.
+  for (const id of ["2026-08-24_1787529600000", "2026-08-24_1787540400000"]) {
+    batch.set(
+      db().collection("users").doc(uid).collection("wellbeingCheckIns").doc(id),
+      { date: "2026-08-24", feeling: "bad", hasPain: true, painAreas: ["back"] }
+    );
+  }
   await batch.commit();
 }
 
@@ -66,6 +76,24 @@ describe("SCENARIO-536: main profile docs deleted on success", () => {
       .doc("session-0")
       .get();
     expect(sessionSnap.exists).toBe(false);
+  });
+
+  // #643 — a NEW sub-collection under users/{uid} is only covered because
+  // deleteUserDocs uses recursiveDelete on the parent document. That is a
+  // property of the Admin SDK call, not of the sub-collection, and nothing
+  // else in the suite would notice if someone narrowed the cascade to an
+  // explicit list of paths. docs/security.md §2.2.2 is explicit that the
+  // pattern to copy asserts the ABSENCE of the residue, not the presence of a
+  // collection name in `deletedCollections` — so that is what this does.
+  it("SCENARIO-643: wellbeingCheckIns leaves no residue behind", async () => {
+    await deleteUserDocs(testApp, uid);
+
+    const remaining = await db()
+      .collection("users")
+      .doc(uid)
+      .collection("wellbeingCheckIns")
+      .get();
+    expect(remaining.empty).toBe(true);
   });
 
   it("SCENARIO-536: userPublicProfiles/{uid} is deleted", async () => {
