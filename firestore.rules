@@ -256,7 +256,38 @@ service cloud.firestore {
       allow read: if request.auth != null
                   && (resource == null
                       || resource.data.get('visibility', 'private') == 'public'
-                      || resource.data.get('visibility', 'private') == 'shared'
+                      //
+                      // 🔒  `'shared'` NO va acá (QA-SEC-012, #779). Estuvo,
+                      // sin una sola línea de comentario, en una regla donde
+                      // cada otro disyunto tiene párrafos de justificación.
+                      //
+                      // El dominio declara ese valor RESERVADO y sin uso
+                      // (`routine_visibility.dart:6`: "extensión futura —
+                      // reservado para iteración futura, no se usa en Etapa
+                      // 1"), y aun así la lectura lo trataba IGUAL que
+                      // 'public': get y list para cualquier autenticado. Es
+                      // un permiso mundial ya concedido a una feature que
+                      // todavía no se diseñó.
+                      //
+                      // Lo que más pesaba era el `list`: medido contra el
+                      // emulador, un tercero corría
+                      // `where('visibility', '==', 'shared')` y se llevaba
+                      // `assignedBy` + `assignedTo` de cada doc — el grafo
+                      // PF↔alumno de toda la plataforma.
+                      //
+                      // La escritura, además, lo pensó con el modelo mental
+                      // OPUESTO: CREATE branch 1 acepta 'shared' sólo en
+                      // planes trainer-assigned ("'shared' is trainer-assigned
+                      // only", ver el update de abajo), o sea MÁS restringido
+                      // que 'public'. La lectura era la mitad incoherente.
+                      //
+                      // El `create` sigue aceptando 'shared' A PROPÓSITO: sin
+                      // este disyunto un doc 'shared' queda legible sólo por
+                      // assignedTo / assignedBy / createdBy, que es fallar
+                      // CERRADO. El día que se diseñe "planes compartidos
+                      // entre múltiples atletas", esa feature decide a quién
+                      // abre — no una línea escrita años antes. Lo pinea
+                      // routines-list-leak-rules.test.ts.
                       || request.auth.uid == resource.data.assignedTo
                       || request.auth.uid == resource.data.assignedBy
                       || request.auth.uid == resource.data.createdBy // REQ-USR-008, SCENARIO-605
