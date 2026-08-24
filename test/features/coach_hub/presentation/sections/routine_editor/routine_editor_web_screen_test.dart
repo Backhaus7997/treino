@@ -64,7 +64,10 @@ Future<void> _pumpEditor(
   String? routineId,
 }) async {
   // Desktop viewport — Coach Hub web dialogs (exercise picker) assume it.
-  tester.view.physicalSize = const Size(1400, 900);
+  // Raised 900 → 1100 when the RESUMEN field (#648) landed above DÍAS: the
+  // form is a SingleChildScrollView, so a short viewport leaves the day and
+  // set controls in the tree but under the pinned footer, where tap() misses.
+  tester.view.physicalSize = const Size(1400, 1100);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
@@ -2365,7 +2368,7 @@ void main() {
       RoutineRepository? repo,
       String? templateId,
     }) async {
-      tester.view.physicalSize = const Size(1400, 900);
+      tester.view.physicalSize = const Size(1400, 1100);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
@@ -2479,6 +2482,168 @@ void main() {
           draft: any(named: 'draft'),
         ),
       );
+    });
+  });
+
+  // ── Resumen en criollo (#648) ────────────────────────────────────────────
+  //
+  // Both modes of this screen are PF modes, so unlike mobile there is no
+  // "the athlete must not see it" case to assert here — that gate lives in
+  // test/features/workout/presentation/routine_editor_summary_test.dart,
+  // against RoutineEditorScreen.
+  group('RoutineEditorWebScreen — resumen (#648)', () {
+    const resumen =
+        'Empujar, tirar y piernas: cada día trabajás un tipo de movimiento '
+        'distinto.';
+    final summaryField = find.byKey(const Key('routine_editor_summary_field'));
+
+    testWidgets('renders with a label and a plain-language explanation',
+        (tester) async {
+      await _pumpEditor(tester);
+
+      expect(summaryField, findsOneWidget);
+      expect(find.text('RESUMEN'), findsOneWidget);
+      expect(
+        find.text(
+          'Una frase que explique qué es la rutina, para alguien que nunca '
+          'pisó un gimnasio.',
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('caps input at 280 characters and shows a live counter',
+        (tester) async {
+      await _pumpEditor(tester);
+
+      expect(find.text('0/280'), findsOneWidget);
+
+      await tester.enterText(summaryField, 'A' * 400);
+      await tester.pumpAndSettle();
+
+      final field = tester.widget<TextField>(summaryField);
+      expect(field.maxLength, 280);
+      expect(field.controller!.text.length, 280);
+      expect(find.text('280/280'), findsOneWidget);
+    });
+
+    testWidgets('saves the trimmed resumen on a new assigned routine',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.createAssigned(any())).thenAnswer(
+        (i) async => (i.positionalArguments.first as Routine).copyWith(id: 'x'),
+      );
+      await _pumpEditor(tester, repo: repo);
+
+      await _fillMinimalValidForm(tester);
+      await tester.enterText(summaryField, '  $resumen  ');
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      final saved = verify(() => repo.createAssigned(captureAny()))
+          .captured
+          .single as Routine;
+      expect(saved.summary, resumen);
+    });
+
+    testWidgets(
+        'is OPTIONAL — a routine saved with the field blank persists '
+        'summary: null, not an empty string', (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.createAssigned(any())).thenAnswer(
+        (i) async => (i.positionalArguments.first as Routine).copyWith(id: 'x'),
+      );
+      await _pumpEditor(tester, repo: repo);
+
+      // Resumen deliberately left untouched — the save must still go through.
+      await _fillMinimalValidForm(tester);
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      final saved = verify(() => repo.createAssigned(captureAny()))
+          .captured
+          .single as Routine;
+      expect(saved.summary, isNull);
+      expect(saved.name, 'Fuerza 4x semana');
+    });
+
+    testWidgets('whitespace-only input saves as null', (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.createAssigned(any())).thenAnswer(
+        (i) async => (i.positionalArguments.first as Routine).copyWith(id: 'x'),
+      );
+      await _pumpEditor(tester, repo: repo);
+
+      await _fillMinimalValidForm(tester);
+      await tester.enterText(summaryField, '   ');
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      final saved = verify(() => repo.createAssigned(captureAny()))
+          .captured
+          .single as Routine;
+      expect(saved.summary, isNull);
+    });
+
+    testWidgets('hydrates an existing resumen and round-trips it on save',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById('r1')).thenAnswer(
+        (_) async => _simpleRoutine().copyWith(summary: resumen),
+      );
+      when(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: any(named: 'draft'),
+        ),
+      ).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+
+      await _pumpEditor(tester, repo: repo, routineId: 'r1');
+
+      final field = tester.widget<TextField>(summaryField);
+      expect(field.controller!.text, resumen);
+
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      final draft = verify(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: captureAny(named: 'draft'),
+        ),
+      ).captured.single as Routine;
+      expect(draft.summary, resumen);
+    });
+
+    testWidgets('an emptied field clears the resumen on an existing routine',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById('r1')).thenAnswer(
+        (_) async => _simpleRoutine().copyWith(summary: resumen),
+      );
+      when(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: any(named: 'draft'),
+        ),
+      ).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+
+      await _pumpEditor(tester, repo: repo, routineId: 'r1');
+
+      await tester.enterText(summaryField, '');
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      final draft = verify(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: captureAny(named: 'draft'),
+        ),
+      ).captured.single as Routine;
+      expect(draft.summary, isNull);
     });
   });
 }

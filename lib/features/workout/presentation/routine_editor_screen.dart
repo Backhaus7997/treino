@@ -487,6 +487,13 @@ String _submitLabelFor(RoutineEditorMode mode, AppL10n l10n) => switch (mode) {
 class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _splitController = TextEditingController();
+
+  /// Plain-language resumen of the routine (#648). Written only in the trainer
+  /// modes: firestore.rules lists `summary` in the athlete UPDATE path's
+  /// `keys()` but NOT in its `affectedKeys()`, so an athlete literally cannot
+  /// change it. Showing them a field whose every save is a permission-denied
+  /// is worse than not showing it.
+  final TextEditingController _summaryController = TextEditingController();
   ExperienceLevel _level = ExperienceLevel.beginner;
 
   /// ScrollController for the main ListView so we can programmatically
@@ -545,6 +552,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     // `_hydrating` so loading an existing routine doesn't trip the flag.
     _nameController.addListener(_markDirty);
     _splitController.addListener(_markDirty);
+    _summaryController.addListener(_markDirty);
     // Hydrate editor when editing an existing routine/plan/template.
     // Works for all three modes: SelfCreating, TrainerAssigning, TrainerTemplating.
     final existingId = _existingIdFor(widget.mode);
@@ -657,6 +665,15 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       if (routine.split != null) {
         _splitController.text = routine.split!;
       }
+      // Resumen (#648). Hydrated UNCONDITIONALLY, like the coaching note: the
+      // field only RENDERS in trainer modes, but a routine that carries a
+      // resumen must round-trip it whatever mode reopens it. An athlete
+      // editing a plan is never asked about it and never writes it (the
+      // athlete branches of _submit omit `summary` entirely), so hydrating
+      // here costs nothing and losing it would be silent data destruction.
+      if (routine.summary != null) {
+        _summaryController.text = routine.summary!;
+      }
       final l10n = AppL10n.of(context);
       _days = routine.days.map((day) {
         final editableDay = _EditableDay(
@@ -735,8 +752,10 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   void dispose() {
     _nameController.removeListener(_markDirty);
     _splitController.removeListener(_markDirty);
+    _summaryController.removeListener(_markDirty);
     _nameController.dispose();
     _splitController.dispose();
+    _summaryController.dispose();
     _listScrollController.dispose();
     super.dispose();
   }
@@ -817,6 +836,17 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   bool get _isTrainerMode =>
       widget.mode is TrainerAssigning || widget.mode is TrainerTemplating;
 
+  /// The resumen to persist, or `null` when the PF left it blank (#648).
+  ///
+  /// The field is OPTIONAL: an empty (or whitespace-only) box must save as
+  /// `null`, not as `''`. `optStrMaxLen` accepts both, but an empty string
+  /// would make `routine.summary != null` true on the detail screen and
+  /// render an empty paragraph where the layout is supposed to collapse.
+  String? get _summaryOrNull {
+    final trimmed = _summaryController.text.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+
   /// Per-week validation across ALL weeks — maps each invalid week (0-based)
   /// to the first day number that fails on it. Empty when every week is
   /// valid. Drives both the save gate and the per-tab warning affordance
@@ -885,6 +915,20 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   /// Hard cap on plan length (REQ-PERIOD-011) — also bounds Firestore doc
   /// size since weeklySets duplicates per-week set data.
   static const int _kMaxWeeks = 16;
+
+  /// Client-side cap of the resumen field (#648). MUST stay equal to the
+  /// `optStrMaxLen(..., 280)` guard on the two trainer UPDATE paths of
+  /// firestore.rules — the rule is the real enforcement (a patched client
+  /// would ignore this one), and this is the affordance that keeps an honest
+  /// PF from ever meeting it as a permission-denied.
+  ///
+  /// The 7 seeded system summaries measure 61–100 characters; 280 leaves room
+  /// without inviting an essay into a card subtitle.
+  ///
+  /// The web editor (`routine_editor_web_screen.dart`) carries its own copy of
+  /// this number, the same way `_kMaxWeeks` is duplicated there: the two
+  /// editors share no presentation code. Both are mirrors of the rule.
+  static const int _kSummaryMaxLength = 280;
 
   /// Appends an EMPTY week (one placeholder set per slot) and jumps to it.
   /// Empty by design — "Duplicar semana" is the explicit copy affordance
@@ -1448,6 +1492,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             assignedTo: athleteId,
             visibility: RoutineVisibility.private,
             numWeeks: _numWeeks,
+            summary: _summaryOrNull,
           );
           await repo.updateAssigned(uid: uid, draft: draft);
           if (!mounted) return;
@@ -1469,6 +1514,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             assignedTo: athleteId,
             visibility: RoutineVisibility.private,
             numWeeks: _numWeeks,
+            summary: _summaryOrNull,
           );
           final created = await repo.createAssigned(routine);
           ref.read(analyticsServiceProvider).logPlanAssigned(
@@ -1494,6 +1540,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             assignedBy: uid,
             visibility: RoutineVisibility.private,
             numWeeks: _numWeeks,
+            summary: _summaryOrNull,
           );
           await repo.updateTemplate(uid: uid, draft: draft);
           if (!mounted) return;
@@ -1515,6 +1562,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             assignedBy: uid,
             visibility: RoutineVisibility.private,
             numWeeks: _numWeeks,
+            summary: _summaryOrNull,
           );
           await repo.createTemplate(routine);
           if (!mounted) return;
@@ -1585,6 +1633,12 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
 
         case SelfCreating(existingRoutineId: final existingId?):
           // Full edit path (REQ-USR-018) — update content in Firestore.
+          //
+          // `summary` is deliberately absent from this draft AND from
+          // updateUserOwned's payload (#648): the athlete UPDATE path lists
+          // it in keys() but not in affectedKeys(). A resumen written by a PF
+          // on a routine the athlete later edits therefore survives untouched
+          // instead of bricking the edit with permission-denied.
           final draft = Routine(
             id: existingId,
             name: _nameController.text.trim(),
@@ -1907,6 +1961,68 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                         ],
                       ],
                     ),
+
+                    // ── Resumen en criollo — trainer modes only (#648) ──
+                    //
+                    // Sits right under SPLIT because SPLIT is the jargon it
+                    // exists to translate: the detail screen's badge opens
+                    // with "PPL · DÍA 1" and 2 of 5 usability participants
+                    // could not say what that meant. Asking for the plain
+                    // sentence next to the term that needs it is what makes
+                    // the field self-explanatory.
+                    //
+                    // Absent in SelfCreating: firestore.rules keeps `summary`
+                    // out of the athlete UPDATE path's affectedKeys(), so the
+                    // athlete cannot change it. A field whose every save is a
+                    // permission-denied is worse than no field.
+                    if (_isTrainerMode) ...[
+                      const SizedBox(height: 12),
+                      _SectionLabel(
+                        label: l10n.routineEditorSummaryLabel,
+                        palette: palette,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        l10n.routineEditorSummaryHelp,
+                        style: GoogleFonts.barlow(
+                          fontWeight: FontWeight.w400,
+                          fontSize: 12,
+                          height: 1.35,
+                          color: palette.textMuted,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        key: const Key('editor_summary_field'),
+                        controller: _summaryController,
+                        // 2–3 lines: the 7 seeded resúmenes measure 61–100
+                        // characters. A taller box would invite the essay the
+                        // 280-char cap exists to prevent.
+                        minLines: 2,
+                        maxLines: 3,
+                        maxLength: _kSummaryMaxLength,
+                        maxLengthEnforcement: MaxLengthEnforcement.enforced,
+                        textCapitalization: TextCapitalization.sentences,
+                        style: GoogleFonts.barlow(
+                          color: palette.textPrimary,
+                          fontSize: 13,
+                        ),
+                        decoration: _inputDecoration(
+                          palette,
+                          hint: l10n.routineEditorSummaryHint,
+                        ).copyWith(
+                          // The counter STAYS (the coaching-note field hides
+                          // its own with counterText: ''): here the cap is a
+                          // real editorial constraint the PF writes against,
+                          // not a defensive ceiling they should never reach.
+                          counterStyle: GoogleFonts.barlow(
+                            fontSize: 11,
+                            color: palette.textMuted,
+                          ),
+                        ),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ],
 
                     // ── Row: Share on public profile — SelfCreating only
                     //

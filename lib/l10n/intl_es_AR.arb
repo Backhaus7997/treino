@@ -1068,6 +1068,18 @@
   "@routineEditorNotesLabel": {},
   "routineEditorNotesHint": "Técnica, tempo, RIR…",
   "@routineEditorNotesHint": {},
+  "routineEditorSummaryLabel": "RESUMEN",
+  "@routineEditorSummaryLabel": {
+    "description": "Section label of the plain-language routine summary field (#648). Trainer modes only — the athlete editor never shows it, and firestore.rules does not let an athlete write the field."
+  },
+  "routineEditorSummaryHelp": "Una frase que explique qué es la rutina, para alguien que nunca pisó un gimnasio.",
+  "@routineEditorSummaryHelp": {
+    "description": "Help line under the RESUMEN label explaining what the field is for. The catalogue leads with jargon (PPL, Bro Split) and 2 of 5 usability participants could not tell what those meant."
+  },
+  "routineEditorSummaryHint": "Ej: Empujar, tirar y piernas: cada día trabajás un tipo de movimiento distinto.",
+  "@routineEditorSummaryHint": {
+    "description": "Hint of the routine summary field. Verbatim one of the 7 seeded system-template summaries, so its length (78 chars) calibrates the expected answer."
+  },
   "exerciseNoteFromCoachTag": "DEL COACH",
   "@exerciseNoteFromCoachTag": {},
   "routineEditorIncompleteSetsFeedback": "Completá los sets de \"{exerciseName}\" antes de guardar.",

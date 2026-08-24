@@ -3464,6 +3464,24 @@ abstract class AppL10n {
   /// **'Técnica, tempo, RIR…'**
   String get routineEditorNotesHint;
 
+  /// Section label of the plain-language routine summary field (#648). Trainer modes only — the athlete editor never shows it, and firestore.rules does not let an athlete write the field.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'RESUMEN'**
+  String get routineEditorSummaryLabel;
+
+  /// Help line under the RESUMEN label explaining what the field is for. The catalogue leads with jargon (PPL, Bro Split) and 2 of 5 usability participants could not tell what those meant.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Una frase que explique qué es la rutina, para alguien que nunca pisó un gimnasio.'**
+  String get routineEditorSummaryHelp;
+
+  /// Hint of the routine summary field. Verbatim one of the 7 seeded system-template summaries, so its length (78 chars) calibrates the expected answer.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ej: Empujar, tirar y piernas: cada día trabajás un tipo de movimiento distinto.'**
+  String get routineEditorSummaryHint;
+
   /// No description provided for @exerciseNoteFromCoachTag.
   ///
   /// In es_AR, this message translates to:

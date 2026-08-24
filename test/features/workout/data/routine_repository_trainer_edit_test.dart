@@ -13,6 +13,9 @@
 //   SCENARIO-TRN-REPO-008: updateTemplate rejects empty draft.id.
 //   SCENARIO-PERIOD-050: updateAssigned / updateTemplate persist numWeeks in
 //                        the written doc (REQ-PERIOD-054).
+//   summary (#648):      updateAssigned / updateTemplate persist the resumen
+//                        (and clear it when emptied), while updateUserOwned
+//                        deliberately never sends it.
 
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -332,6 +335,134 @@ void main() {
       final data =
           (await firestore.collection('routines').doc(id).get()).data()!;
       expect(data['numWeeks'], equals(4));
+    });
+  });
+
+  // ── summary (#648) ────────────────────────────────────────────────────────
+  //
+  // Both update payloads are hand-built maps, so `summary` coming back into
+  // Routine.toJson() (PR #751) does NOT reach Firestore on its own. Without
+  // the explicit key the PF's resumen is dropped on the floor with no error —
+  // the exact silent-drop the COUPLING WARNING on each method warns about.
+
+  group('summary (#648)', () {
+    test('updateAssigned writes the resumen the PF authored', () async {
+      final id = await seedAssignedPlan();
+
+      await repo.updateAssigned(
+        uid: 'trainer-a',
+        draft: Routine(
+          id: id,
+          name: 'Plan Original',
+          split: 'PPL',
+          level: ExperienceLevel.beginner,
+          days: const [],
+          source: RoutineSource.trainerAssigned,
+          assignedBy: 'trainer-a',
+          assignedTo: 'athlete-b',
+          visibility: RoutineVisibility.private,
+          summary: 'Empujar, tirar y piernas: cada día trabajás un tipo de '
+              'movimiento distinto.',
+        ),
+      );
+
+      final data =
+          (await firestore.collection('routines').doc(id).get()).data()!;
+      expect(
+        data['summary'],
+        equals('Empujar, tirar y piernas: cada día trabajás un tipo de '
+            'movimiento distinto.'),
+      );
+    });
+
+    test('updateAssigned clears the resumen when the PF empties the field',
+        () async {
+      final id = await seedAssignedPlan();
+      await firestore
+          .collection('routines')
+          .doc(id)
+          .update({'summary': 'Un resumen viejo.'});
+
+      await repo.updateAssigned(
+        uid: 'trainer-a',
+        draft: Routine(
+          id: id,
+          name: 'Plan Original',
+          split: 'PPL',
+          level: ExperienceLevel.beginner,
+          days: const [],
+          source: RoutineSource.trainerAssigned,
+          assignedBy: 'trainer-a',
+          assignedTo: 'athlete-b',
+          visibility: RoutineVisibility.private,
+        ),
+      );
+
+      final data =
+          (await firestore.collection('routines').doc(id).get()).data()!;
+      expect(data['summary'], isNull);
+    });
+
+    test('updateTemplate writes the resumen the PF authored', () async {
+      final id = await seedTemplate();
+
+      await repo.updateTemplate(
+        uid: 'trainer-a',
+        draft: Routine(
+          id: id,
+          name: 'Plantilla Original',
+          split: 'Full Body',
+          level: ExperienceLevel.beginner,
+          days: const [],
+          source: RoutineSource.trainerTemplate,
+          assignedBy: 'trainer-a',
+          visibility: RoutineVisibility.private,
+          summary: 'Trabajás todo el cuerpo en cada sesión, en vez de '
+              'repartirlo por día.',
+        ),
+      );
+
+      final data =
+          (await firestore.collection('routines').doc(id).get()).data()!;
+      expect(
+        data['summary'],
+        equals('Trabajás todo el cuerpo en cada sesión, en vez de repartirlo '
+            'por día.'),
+      );
+    });
+
+    test(
+        'updateUserOwned does NOT send summary — the athlete UPDATE path lists '
+        'it in keys() but not in affectedKeys(), so a PF resumen must survive '
+        'the athlete re-saving their own routine', () async {
+      final ref = await firestore.collection('routines').add({
+        'name': 'Mi rutina',
+        'level': 'beginner',
+        'days': <dynamic>[],
+        'source': 'user-created',
+        'createdBy': 'athlete-b',
+        'visibility': 'private',
+        'status': 'active',
+        'createdAt': DateTime.now(),
+        'summary': 'Un resumen que escribió el PF.',
+      });
+
+      await repo.updateUserOwned(
+        uid: 'athlete-b',
+        draft: Routine(
+          id: ref.id,
+          name: 'Mi rutina editada',
+          level: ExperienceLevel.beginner,
+          days: const [],
+          source: RoutineSource.userCreated,
+          createdBy: 'athlete-b',
+          visibility: RoutineVisibility.private,
+        ),
+      );
+
+      final data = (await ref.get()).data()!;
+      expect(data['name'], equals('Mi rutina editada'));
+      expect(data['summary'], equals('Un resumen que escribió el PF.'));
     });
   });
 }
