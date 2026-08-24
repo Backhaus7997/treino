@@ -1,15 +1,21 @@
 /**
  * Storage rules tests for the `customExerciseVideos/{userId}/{file=**}` block
- * (#680 Slice E).
+ * (#680 Slice E; `list` cerrado por QA-SEC-008 / #763).
  *
  * ⚠️  COBERTURA DELIBERADAMENTE PARCIAL — leer `docs/security.md` §3.3 antes de
- * agregar casos acá. `list` queda SIN test a propósito: hoy
- * `allow read: if request.auth != null` deja que cualquier autenticado enumere
- * tanto `customExerciseVideos/` (devuelve el uid de cada PF que subió videos)
- * como `customExerciseVideos/{uid}/` (devuelve la videoteca entera de ese PF,
- * incluidos los prefijos anidados). Es el leak QA-SEC-008 y sale en su propio
- * PR; testearlo ahora congelaría el status quo (§1.6 regla 1). Cuando cierre,
- * acá van los dos `assertFails` del `listAll`.
+ * agregar casos acá.
+ *
+ * `list` está cerrado incondicionalmente y se pinea en los dos niveles: la
+ * raíz `customExerciseVideos/` (que devolvía el uid de cada PF con videos) y
+ * la carpeta `customExerciseVideos/{uid}/` (que devolvía la videoteca entera,
+ * recursivamente). Los dos casos van también para el DUEÑO: la regla es
+ * `if false`, no owner-only, y si alguien la aflojara a `request.auth.uid ==
+ * userId` el caso ajeno seguiría rojo y nadie se enteraría.
+ *
+ * `get` amplio queda SIN pinear a propósito: es un permiso deliberado (§3.3),
+ * pero un `assertSucceeds` ahí congelaría el status quo — si mañana se decide
+ * apretarlo a owner-only, el test tendría que borrarse en vez de guiar. Sí se
+ * pinea el piso anónimo.
  *
  * Lo que sí se pinea acá: escritura owner-only limitada a video, y borrado
  * owner-only. A diferencia de `avatars`, este bloque SÍ declara un
@@ -166,14 +172,39 @@ describe("customExerciseVideos/{userId}/{file=**} — storage rules", () => {
     await assertFails(deleteObject(ref(storageAs(OTHER), NESTED_PATH)));
   });
 
-  // --- lectura: sólo se pinea el piso (anónimo), NO el caso cruzado ---------
+  // --- get: sólo se pinea el piso (anónimo), NO el caso cruzado ------------
 
   it("DENIES an unauthenticated get", async () => {
     await assertFails(getBytes(ref(storageAs(null), VIDEO_PATH)));
   });
 
+  // --- list: cerrado incondicionalmente (QA-SEC-008) ------------------------
+
+  it("DENIES listing a trainer's video folder — even the owner's own", async () => {
+    // Este era el leak caro: `allow read` cubría `list`, y con `{file=**}` la
+    // enumeración era recursiva, así que un atleta con cuenta gratis se
+    // llevaba la videoteca completa de cualquier PF. Ver `docs/security.md`
+    // §3.3. La regla es `if false`, no owner-only: por eso el dueño también
+    // tiene que dar rojo.
+    await assertFails(
+      listAll(ref(storageAs(OTHER), `customExerciseVideos/${TRAINER}`))
+    );
+    await assertFails(
+      listAll(ref(storageAs(TRAINER), `customExerciseVideos/${TRAINER}`))
+    );
+  });
+
+  it("DENIES listing the customExerciseVideos/ root — no uid enumeration", async () => {
+    // La raíz devolvía `prefixes=[customExerciseVideos/{uid}]`: un directorio
+    // de qué PFs tienen contenido propio, que no existe en ninguna otra parte
+    // del producto. A diferencia de `postPhotos/` (donde la raíz la cierra el
+    // catch-all porque ese match pide dos segmentos), acá el `{file=**}` la
+    // hace caer dentro de ESTE bloque — por eso la cierra el `allow list`.
+    await assertFails(listAll(ref(storageAs(OTHER), "customExerciseVideos")));
+    await assertFails(listAll(ref(storageAs(TRAINER), "customExerciseVideos")));
+  });
+
   it("DENIES an unauthenticated list at both levels", async () => {
-    // Los casos AUTENTICADOS están abiertos y son QA-SEC-008 — no van acá.
     await assertFails(listAll(ref(storageAs(null), "customExerciseVideos")));
     await assertFails(
       listAll(ref(storageAs(null), `customExerciseVideos/${TRAINER}`))
