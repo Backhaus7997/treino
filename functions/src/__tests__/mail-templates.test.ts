@@ -60,6 +60,28 @@ describe("renderMail: escapes user-controlled values", () => {
     expect(out.html).toContain("Ruiz &amp; Co");
     expect(out.html).not.toContain("&amp;amp;");
   });
+
+  // La parte de texto se construye desde los MISMOS segmentos que el HTML, no
+  // quitándole los tags al HTML ya escapado (CodeQL:
+  // js/incomplete-multi-character-sanitization). Efecto lateral bueno: en
+  // text/plain las entidades no tienen sentido, y ahora no aparecen.
+  it("la parte de texto plano no lleva entidades HTML", () => {
+    const out = renderMail("link-accepted", { trainerName: "Ruiz & Co" });
+
+    expect(out.text).toContain("Ruiz & Co");
+    expect(out.text).not.toContain("&amp;");
+  });
+
+  // El regex de stripping podía CREAR un tag: `<<a>script>` -> `<script>`.
+  // Con segmentos no hay stripping, así que un nombre hostil sale escapado en
+  // el HTML y literal en el texto, sin pasar por ninguna pasada destructiva.
+  it("un nombre que construye un tag al quitar tags ya no puede hacerlo", () => {
+    const out = renderMail("link-accepted", { trainerName: "<<a>script>" });
+
+    expect(out.html).not.toContain("<script>");
+    expect(out.html).toContain("&lt;&lt;a&gt;script&gt;");
+    expect(out.text).toContain("<<a>script>");
+  });
 });
 
 // ---------------------------------------------------------------------------
