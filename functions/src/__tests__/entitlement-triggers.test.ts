@@ -86,9 +86,9 @@ describe("sweepEntitlementsHandler", () => {
   it("recorre todos los PF y cuenta los que cambiaron", async () => {
     installUsers(["t1", "t2", "t3"]);
     mockSync
-      .mockResolvedValueOnce({ trainerId: "t1", limit: 2, blocked: ["L1"], unblocked: [], weightedLoad: 2 })
-      .mockResolvedValueOnce({ trainerId: "t2", limit: 7, blocked: [], unblocked: [], weightedLoad: 3 })
-      .mockResolvedValueOnce({ trainerId: "t3", limit: 2, blocked: [], unblocked: ["L9"], weightedLoad: 2 });
+      .mockResolvedValueOnce({ trainerId: "t1", limit: 2, blocked: ["L1"], unblocked: [], weightedLoad: 2, blockedAthleteIds: ["a1"] })
+      .mockResolvedValueOnce({ trainerId: "t2", limit: 7, blocked: [], unblocked: [], weightedLoad: 3, blockedAthleteIds: [] })
+      .mockResolvedValueOnce({ trainerId: "t3", limit: 2, blocked: [], unblocked: ["L9"], weightedLoad: 2, blockedAthleteIds: [] });
 
     const r = await sweepEntitlementsHandler({} as admin.app.App, 1000);
 
@@ -100,7 +100,7 @@ describe("sweepEntitlementsHandler", () => {
     installUsers(["roto", "sano"]);
     mockSync
       .mockRejectedValueOnce(new Error("doc corrupto"))
-      .mockResolvedValueOnce({ trainerId: "sano", limit: 2, blocked: ["L1"], unblocked: [], weightedLoad: 2 });
+      .mockResolvedValueOnce({ trainerId: "sano", limit: 2, blocked: ["L1"], unblocked: [], weightedLoad: 2, blockedAthleteIds: ["a1"] });
 
     const r = await sweepEntitlementsHandler({} as admin.app.App, 1000);
 
