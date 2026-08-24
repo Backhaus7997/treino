@@ -90,7 +90,7 @@ SessionTimeFitPlan planSessionTimeFit({
   // Base calculada para los DOS números. Ver el dartdoc de arriba.
   final basis = day.copyWith(estimatedMinutes: null);
   final slots = basis.slots;
-  final current = estimateRoutineDayMinutes(basis, week: week).minutes;
+  final current = estimateSessionMinutes(basis, week: week);
 
   if (current == null) {
     return (
@@ -132,7 +132,7 @@ SessionTimeFitPlan planSessionTimeFit({
     if (_cutSplitsSuperset(slots, keep)) continue;
 
     final trimmed = basis.copyWith(slots: slots.sublist(0, keep));
-    final projected = estimateRoutineDayMinutes(trimmed, week: week).minutes;
+    final projected = estimateSessionMinutes(trimmed, week: week);
     // Lo que queda ya no es una sesión. Nos quedamos con el último recorte
     // válido y cortamos el recorrido.
     if (projected == null) break;
@@ -156,6 +156,33 @@ SessionTimeFitPlan planSessionTimeFit({
     projectedMinutes: deepestMinutes,
     dropExerciseIds: deepestDrops,
   );
+}
+
+/// Minutos estimados de lo que la sesión de HOY tiene por delante, con
+/// [droppedExerciseIds] ya sacado (#645).
+///
+/// Es la MISMA base que usa [planSessionTimeFit] —`estimatedMinutes` en null,
+/// todo calculado desde los slots— y por eso es la única forma correcta de
+/// pedir el número de una sesión recortada. Pedirlo por
+/// [estimateRoutineDayMinutes] sobre el día crudo devolvería el valor autorado
+/// del plan, que ya no describe lo que se va a hacer hoy.
+///
+/// `null` cuando no queda nada medible.
+int? estimateSessionMinutes(
+  RoutineDay day, {
+  int week = 0,
+  Set<String> droppedExerciseIds = const {},
+}) {
+  final slots = droppedExerciseIds.isEmpty
+      ? day.slots
+      : [
+          for (final s in day.slots)
+            if (!droppedExerciseIds.contains(s.exerciseId)) s
+        ];
+  return estimateRoutineDayMinutes(
+    day.copyWith(slots: slots, estimatedMinutes: null),
+    week: week,
+  ).minutes;
 }
 
 /// `true` cuando cortar dejando `slots[0..keep-1]` partiría una superserie al

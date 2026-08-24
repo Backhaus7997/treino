@@ -6368,6 +6368,24 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'{value} min'**
   String routineCardMinutes(String value);
+
+  /// Título del aviso de sesión recortada en el player (#645). El valor ya viene con el prefijo ~ cuando es calculado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ajustado a {value} min'**
+  String sessionTrimAdjustedTo(String value);
+
+  /// Ejercicios que el atleta dejó fuera de la sesión de hoy para que entrara en su tiempo (#645). La rutina no se modifica.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Fuera de hoy: {names}'**
+  String sessionTrimDroppedList(String names);
+
+  /// Acción que devuelve a la sesión todo lo que se había recortado (#645).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DESHACER'**
+  String get sessionTrimUndo;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

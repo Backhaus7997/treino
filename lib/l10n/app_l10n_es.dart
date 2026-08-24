@@ -3588,6 +3588,19 @@ class AppL10nEs extends AppL10n {
   String routineCardMinutes(String value) {
     return '$value min';
   }
+
+  @override
+  String sessionTrimAdjustedTo(String value) {
+    return 'Ajustado a $value min';
+  }
+
+  @override
+  String sessionTrimDroppedList(String names) {
+    return 'Fuera de hoy: $names';
+  }
+
+  @override
+  String get sessionTrimUndo => 'DESHACER';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -7171,4 +7184,17 @@ class AppL10nEsAr extends AppL10nEs {
   String routineCardMinutes(String value) {
     return '$value min';
   }
+
+  @override
+  String sessionTrimAdjustedTo(String value) {
+    return 'Ajustado a $value min';
+  }
+
+  @override
+  String sessionTrimDroppedList(String names) {
+    return 'Fuera de hoy: $names';
+  }
+
+  @override
+  String get sessionTrimUndo => 'DESHACER';
 }
