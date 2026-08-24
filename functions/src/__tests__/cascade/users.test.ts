@@ -104,6 +104,94 @@ describe("SCENARIO-536: main profile docs deleted on success", () => {
   });
 });
 
+// #628 — el feedback por ejercicio vive DOS niveles abajo de users/{uid}:
+// `users/{uid}/sessions/{sid}/exerciseFeedback/{id}`, y es dato de salud
+// (`kind: 'discomfort'` + la URL de la foto de la lesión).
+//
+// Este test existe porque la pregunta "¿hace falta un paso de cascade propio
+// para la subcolección nueva?" NO se contesta leyendo el código: se contesta
+// midiendo. `deleteUserDocs` hace `recursiveDelete(users/{uid})` con el Admin
+// SDK, que SÍ desciende el árbol entero — subcolecciones de subcolecciones
+// incluidas. Con esto verificado, la parte de Firestore de #628 no necesita
+// paso nuevo. La de STORAGE sí, y es otra historia: el bucket no tiene
+// cascade, así que `sessionFeedback/{uid}/` se barre explícitamente en
+// `cascade/storage.ts` (ver `cascade/storage.test.ts`).
+//
+// Si algún día `deleteUserDocs` cambia a un borrado por colección enumerada,
+// este test cae y avisa que el feedback quedó huérfano.
+describe("#628: exerciseFeedback under sessions goes with the recursive delete", () => {
+  const uid = "users-cascade-628";
+  const sessionId = "session-628";
+
+  beforeEach(async () => {
+    await seed(uid);
+    await db()
+      .collection("users")
+      .doc(uid)
+      .collection("sessions")
+      .doc(sessionId)
+      .set({ id: sessionId });
+    await db()
+      .collection("users")
+      .doc(uid)
+      .collection("sessions")
+      .doc(sessionId)
+      .collection("exerciseFeedback")
+      .doc("fb-1")
+      .set({
+        exerciseId: "ex-1",
+        exerciseName: "Press de banca",
+        setNumber: 3,
+        kind: "discomfort",
+        text: "Me tira el hombro derecho",
+        photoUrl: "https://firebasestorage.googleapis.com/v0/b/x/o/y?alt=media&token=z",
+        photoPath: `sessionFeedback/${uid}/${sessionId}/fb-1.jpg`,
+        createdAt: new Date(),
+      });
+  });
+
+  afterEach(() => cleanup(uid));
+
+  it("users/{uid}/sessions/{sid}/exerciseFeedback/{id} no longer exists", async () => {
+    // Precondición: el documento existe ANTES. Sin esto el test pasaría
+    // igual con un seed roto — verde por el motivo equivocado (security.md §1.8).
+    const before = await db()
+      .collection("users")
+      .doc(uid)
+      .collection("sessions")
+      .doc(sessionId)
+      .collection("exerciseFeedback")
+      .doc("fb-1")
+      .get();
+    expect(before.exists).toBe(true);
+
+    await deleteUserDocs(testApp, uid);
+
+    const after = await db()
+      .collection("users")
+      .doc(uid)
+      .collection("sessions")
+      .doc(sessionId)
+      .collection("exerciseFeedback")
+      .doc("fb-1")
+      .get();
+    expect(after.exists).toBe(false);
+  });
+
+  it("leaves nothing at all in the exerciseFeedback sub-collection", async () => {
+    await deleteUserDocs(testApp, uid);
+
+    const left = await db()
+      .collection("users")
+      .doc(uid)
+      .collection("sessions")
+      .doc(sessionId)
+      .collection("exerciseFeedback")
+      .get();
+    expect(left.empty).toBe(true);
+  });
+});
+
 describe("SCENARIO-537: trainerPublicProfiles deletion is no-op when absent", () => {
   const uid = "users-cascade-537";
 
