@@ -262,8 +262,8 @@ Ordenados por lo que me preocuparía primero:
    reputación de remitente + emails de otros usuarios) — es el más barato de
    todos de cerrar.
 7. ~~**Las 8 colecciones que dependen sólo de la suite manual**~~ — **CERRADO**
-   por #680 Slice B: `scripts/test_rules.sh` es el job *Rules Test* de CI y
-   bloquea el merge (§1.4). Queda pendiente, como deuda de consolidación y no
+   por #680 Slice B: `scripts/test_rules.sh` es el job *Rules Test* de CI
+   (§1.4). Queda pendiente, como deuda de consolidación y no
    como hueco de cobertura, **unificar las dos suites**: hoy son dos árboles de
    dependencias (`@firebase/rules-unit-testing` ^3 en `scripts/rules_test/`
    contra ^5 en `functions/`), dos lockfiles y dos jobs para el mismo tipo de
@@ -305,9 +305,9 @@ sección en el mismo PR.** Concretamente:
    todas las celdas en `—` salvo las que traigas testeadas.
 2. Si agregás un test negativo → la celda pasa a ✅, o a 🟡 si lo pusiste en
    `scripts/rules_test/`. Para tests nuevos preferí `functions/src/__tests__/`:
-   no porque el otro job valga menos (los dos bloquean el merge), sino porque
-   ahí está TypeScript y es donde las dos suites van a converger algún día
-   (§1.6, punto 7).
+   no porque el otro job valga menos (los dos corren igual en cada PR), sino
+   porque ahí está TypeScript y es donde las dos suites van a converger algún
+   día (§1.6, punto 7).
 3. Recalculá los totales de §1.1 y §1.2. Son conteos, no impresiones.
 4. Los tests de reglas se corren con:
 
