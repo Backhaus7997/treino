@@ -3928,6 +3928,61 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get templatesOnboardingBack => 'VOLVER';
+  String get exerciseFeedbackAction => 'COMENTAR / REPORTAR';
+
+  @override
+  String exerciseFeedbackActionA11y(String exerciseName) {
+    return 'Comentar o reportar una molestia en $exerciseName';
+  }
+
+  @override
+  String get exerciseFeedbackSheetTitle => 'CONTALE A TU PF';
+
+  @override
+  String exerciseFeedbackSheetAnchorSet(String exerciseName, int setNumber) {
+    return '$exerciseName · serie $setNumber';
+  }
+
+  @override
+  String get exerciseFeedbackKindComment => 'Comentario';
+
+  @override
+  String get exerciseFeedbackKindDiscomfort => 'Molestia / dolor';
+
+  @override
+  String get exerciseFeedbackDiscomfortNotice =>
+      'Tu PF recibe un aviso al toque.';
+
+  @override
+  String get exerciseFeedbackTextHint =>
+      '¿Qué le querés contar? Ej: en la 3ª me tiró el hombro derecho.';
+
+  @override
+  String get exerciseFeedbackPhotoCamera => 'Cámara';
+
+  @override
+  String get exerciseFeedbackPhotoGallery => 'Galería';
+
+  @override
+  String get exerciseFeedbackPhotoRemove => 'Quitar foto';
+
+  @override
+  String get exerciseFeedbackPhotoError =>
+      'No pudimos abrir la foto. Probá de nuevo.';
+
+  @override
+  String get exerciseFeedbackCancel => 'CANCELAR';
+
+  @override
+  String get exerciseFeedbackSubmit => 'ENVIAR';
+
+  @override
+  String get exerciseFeedbackSuccess =>
+      'Listo. Tu PF lo va a ver junto a la serie.';
+
+  @override
+  String get exerciseFeedbackError =>
+      'No pudimos guardar tu reporte. Probá de nuevo.';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -7851,4 +7906,59 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get templatesOnboardingBack => 'VOLVER';
+  String get exerciseFeedbackAction => 'COMENTAR / REPORTAR';
+
+  @override
+  String exerciseFeedbackActionA11y(String exerciseName) {
+    return 'Comentar o reportar una molestia en $exerciseName';
+  }
+
+  @override
+  String get exerciseFeedbackSheetTitle => 'CONTALE A TU PF';
+
+  @override
+  String exerciseFeedbackSheetAnchorSet(String exerciseName, int setNumber) {
+    return '$exerciseName · serie $setNumber';
+  }
+
+  @override
+  String get exerciseFeedbackKindComment => 'Comentario';
+
+  @override
+  String get exerciseFeedbackKindDiscomfort => 'Molestia / dolor';
+
+  @override
+  String get exerciseFeedbackDiscomfortNotice =>
+      'Tu PF recibe un aviso al toque.';
+
+  @override
+  String get exerciseFeedbackTextHint =>
+      '¿Qué le querés contar? Ej: en la 3ª me tiró el hombro derecho.';
+
+  @override
+  String get exerciseFeedbackPhotoCamera => 'Cámara';
+
+  @override
+  String get exerciseFeedbackPhotoGallery => 'Galería';
+
+  @override
+  String get exerciseFeedbackPhotoRemove => 'Quitar foto';
+
+  @override
+  String get exerciseFeedbackPhotoError =>
+      'No pudimos abrir la foto. Probá de nuevo.';
+
+  @override
+  String get exerciseFeedbackCancel => 'CANCELAR';
+
+  @override
+  String get exerciseFeedbackSubmit => 'ENVIAR';
+
+  @override
+  String get exerciseFeedbackSuccess =>
+      'Listo. Tu PF lo va a ver junto a la serie.';
+
+  @override
+  String get exerciseFeedbackError =>
+      'No pudimos guardar tu reporte. Probá de nuevo.';
 }
