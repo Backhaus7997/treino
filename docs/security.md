@@ -1,9 +1,10 @@
 # docs/security.md
 
-Estado de la superficie de seguridad de TREINO. Hoy contiene **dos secciones**:
-la matriz de cobertura de reglas (Slice A de #680) y el inventario de datos
-personales, contrastado contra el cascade de borrado y contra la Política de
-Privacidad. El threat model por actor y el registro `QA-SEC-xxx` van a vivir acá
+Estado de la superficie de seguridad de TREINO. Hoy contiene **tres secciones**:
+la matriz de cobertura de reglas (Slice A de #680), el inventario de datos
+personales contrastado contra el cascade de borrado y contra la Política de
+Privacidad, y la decisión escrita sobre las lecturas amplias de Storage
+(Slice E). El threat model por actor y el registro `QA-SEC-xxx` van a vivir acá
 también, en secciones aparte.
 
 ---
@@ -108,16 +109,36 @@ Cinco paths siguen **sin una sola aserción negativa**:
 
 | Path | get | list | write | delete |
 |---|---|---|---|---|
-| `avatars/{file}` | — | — | — | — |
+| `avatars/{file}` | ✅† | ✅† | ✅ | — |
 | `temp/uploads/{uid}/**` | — | — | — | — |
-| `customExerciseVideos/{uid}/**` | — | — | — | — |
+| `customExerciseVideos/{uid}/**` | ✅† | ✅† | ✅ | ✅ |
 | `chatMedia/{chatId}/{uid}/**` | 🟡 | 🟡 | — | — |
 | `athleteFiles/{pairId}/**` | ✅ | ✅ | ✅ | ✅ |
 | `postPhotos/{uid}/{file}` | ✅ | ✅ | ✅ | ✅ |
 
-**10 de 24 celdas** (42%). Hay además un séptimo bloque, el catch-all
-`match /{allPaths=**} { allow read, write: if false; }`, que no se testea en
-ningún lado.
+**17 de 24 celdas** (71%). Hay además un séptimo bloque, el catch-all
+`match /{allPaths=**} { allow read, write: if false; }`, que sólo se ejercita
+de refilón: el caso "listar `postPhotos/`" de
+`post-photos-storage-rules.test.ts` cae en él, pero nada lo testea de frente.
+
+> **† — cobertura de piso, no de fondo. Leer esas cuatro celdas como "cubierto"
+> sería un error.** El único negativo que existe sobre ellas es el del usuario
+> **anónimo**. El caso que importa —un autenticado cualquiera operando sobre el
+> objeto de otro— está **abierto en las cuatro** y **sin testear a propósito**:
+>
+> - Los dos `get` son un permiso amplio **deliberado** (§3.2, §3.3). No se
+>   pinean todavía porque pinear un permiso amplio antes de decidirlo congela el
+>   status quo (§1.6 regla 1); la decisión recién se escribió en §3.
+> - Los dos `list` son un **leak**, no una decisión: cualquier autenticado
+>   enumera `avatars/` y `customExerciseVideos/`. Tienen ticket propio —
+>   **QA-SEC-007** y **QA-SEC-008** — y el `assertFails` entra cuando cierren.
+>
+> La celda `delete` de `avatars` sigue en `—` por un motivo distinto: hoy el
+> borrado se deniega **hasta para el dueño**, y por un null deref en
+> `storage.rules:13`, no por falta de permiso. Cualquier test ahí pasaría por el
+> motivo equivocado, que §1.8 prohíbe. Es **QA-SEC-009**.
+>
+> Los tres tickets están medidos contra el emulador y explicados en §3.
 
 ### 1.3 De dónde salen estos números
 
@@ -243,10 +264,16 @@ por un denegado genérico.
 
 Ordenados por lo que me preocuparía primero:
 
-1. **`storage:avatars`, `customExerciseVideos`, `postPhotos` permiten lectura a
-   cualquier autenticado** (punto 5 del issue #680). No hay test porque **no
-   hay decisión escrita**: testear un permiso amplio antes de decidir si es
-   deliberado congela el status quo. Va con Slice E, no acá.
+1. ~~**`storage:avatars`, `customExerciseVideos`, `postPhotos` permiten lectura
+   a cualquier autenticado**~~ — **DECIDIDO** por #680 Slice E: la decisión
+   path por path vive en **§3**. Resumen: `postPhotos` es deliberado y correcto;
+   el `get` de `avatars` y `customExerciseVideos` es defendible pero redundante;
+   y el `list` de esos dos **no era deliberado — es un leak**, medido contra el
+   emulador, con ticket propio (QA-SEC-007 y QA-SEC-008). Se documenta acá y se
+   arregla aparte: aflojar o apretar una regla de lectura de Storage puede
+   romper avatares o videos en producción y merece su propio PR con su propia
+   verificación. Slice E también dejó tests para las celdas que **sí** estaban
+   decididas (§3.7).
 2. **`storage:temp/uploads` y el catch-all `{allPaths=**}`**: cero tests.
    `temp/uploads` es `read: if false` + write por dueño, y ahí van los Excel
    que sube el PF. Barato de cerrar; quedó afuera por tiempo.
@@ -916,4 +943,380 @@ cosas es exactamente lo que este documento encontró.
 ```bash
 npm --prefix functions run test          # incluye delete-account.smoke + cascade/*
 npm --prefix functions run test:rules:emulator   # requiere Java 21+
+```
+
+---
+
+## 3. Lecturas amplias en Storage — decisión path por path
+
+### 3.0 Por qué existe y cómo se midió
+
+`storage.rules` declara tres bloques que permiten lectura a **cualquier usuario
+autenticado**: `avatars/`, `customExerciseVideos/` y `postPhotos/`. Es el punto
+5 del issue #680, y §1.6 lo dejó abierto a propósito: *testear un permiso amplio
+antes de decidir si es deliberado congela el status quo*. Esta sección es la
+decisión que faltaba.
+
+La pregunta no es "¿el nombre del path suena sensible?" sino cuatro preguntas
+concretas, respondidas **path por path**: quién puede leer hoy exactamente, qué
+se expone si un autenticado enumera o adivina, si eso es coherente con lo que el
+producto le promete al usuario, y —la que decide todo— si el permiso es
+deliberado o es un agujero.
+
+**Cómo se midió.** Nada de esta sección sale de leer la regla y deducir. Se
+escribió una suite-sonda temporal que ejecuta cada combinación
+`(actor × operación × path)` contra el **emulador de Storage** y reporta
+ALLOW/DENY en vez de afirmar, de modo que una sola corrida imprime la matriz
+entera. Los actores fueron: dueño del objeto, otro usuario autenticado, anónimo,
+y un uid que es *prefijo estricto* del uid dueño. La matriz resultante está en
+§3.5 y es la fuente de todo lo que sigue. La sonda no quedó en el repo — lo que
+quedó son los tests de §3.7, que pinean sólo lo ya decidido.
+
+> Requiere Java 21. Si `java -version` dice menos, exportá uno que sirva antes
+> de correr nada: `export PATH="/opt/homebrew/opt/openjdk@21/bin:$PATH"`.
+
+### 3.1 El hallazgo que reordena la pregunta: la URL con token no pasa por las reglas
+
+Antes de juzgar los tres bloques hay que corregir una premisa que está escrita
+en los comentarios de `storage.rules` y que resultó **falsa**.
+
+El comentario de `customExerciseVideos` dice que cualquier autenticado puede
+leer *"so the trainer's athletes can play them inline"* — es decir, presenta la
+lectura amplia como un requisito funcional del reproductor. **No lo es.**
+
+Medición, contra el emulador:
+
+| Caso | Resultado |
+|---|---|
+| `GET` de la URL `?alt=media&token=…`, **sin ningún header de auth** | **HTTP 200**, devuelve los bytes |
+| La misma URL con el `&token=` sacado, sin auth | HTTP 403 |
+
+La URL de descarga que emite `getDownloadURL()` es una **credencial al portador**:
+lleva su propio token y **no evalúa `storage.rules`**. Y así es exactamente como
+la app renderiza: los **8** call sites de `getDownloadURL()` en `lib/` son
+`task.ref` / `snapshot.ref`, o sea el **dueño inmediatamente después de subir**.
+Ninguno resuelve el objeto de otro usuario. La URL resultante se persiste en
+Firestore y de ahí la leen los consumidores:
+
+| Path | Dónde vive la URL | Quién lee ese doc |
+|---|---|---|
+| `avatars/` | `users/{uid}.avatarUrl` + `userPublicProfiles/{uid}.avatarUrl` (y `trainerPublicProfiles` cuando corresponde) | `userPublicProfiles`: cualquier autenticado (`firestore.rules:780`) |
+| `customExerciseVideos/` | `users/{tid}/customExercises/{id}.videoUrl` | cualquier autenticado (`firestore.rules:1575`) |
+| `postPhotos/` | `posts/{postId}.photoUrl` | según `posts.privacy` (`firestore.rules:624-633`) |
+
+Los widgets (`TreinoAvatar` → `NetworkImage`, `PostCard` → `CachedNetworkImage`,
+`ExerciseVideoPlayer`) reciben ese string HTTPS y lo bajan. **Nunca**
+reconstruyen un `ref()` ni un `gs://` para leer.
+
+Dos consecuencias que mandan sobre toda la sección:
+
+1. **El `allow read` amplio no es lo que hace andar la app.** Se podría apretar
+   a owner-only y el renderizado no se enteraría: el que sube igual puede mintear
+   su URL (lo hace como dueño), y el que mira nunca consulta la regla. El permiso
+   amplio es superficie de ataque que no compra funcionalidad.
+2. **Por lo tanto, el `get` amplio no se justifica "porque si no se rompe la
+   app".** Si se lo quiere conservar, hay que justificarlo por otra cosa. Es lo
+   que se hace path por path abajo.
+
+> ⚠️ Corolario incómodo, fuera del alcance de este slice: como el token es una
+> credencial al portador y no caduca, **cualquiera que haya visto una URL de
+> `postPhotos` alguna vez la sigue pudiendo bajar aunque después el post pase a
+> privado o se borre el doc**. Apretar las reglas de lectura no lo arregla; lo
+> único que lo corta es rotar el token del objeto o borrarlo. Vale como entrada
+> del threat model, no como acción de esta sección.
+
+### 3.2 `avatars/{uid}.{ext}`
+
+```
+match /avatars/{fileName} {
+  allow read: if request.auth != null;                       // get + list
+  allow write: if request.auth != null
+              && fileName.matches(request.auth.uid + '\\..+')
+              && request.resource.size < 5 * 1024 * 1024
+              && request.resource.contentType.matches('image/.*');
+}
+```
+
+**Quién lee hoy, exactamente.** `read` en Storage es `get` **+** `list`, y acá
+no hay nada que los separe. Medido: un autenticado cualquiera hace `get` del
+avatar de otro (ALLOW) **y también `listAll('avatars/')` (ALLOW)**, que devolvió
+la lista completa de objetos del prefijo. El anónimo queda afuera en ambos casos.
+
+**Qué expone la enumeración.** El nombre del archivo **es el uid**
+(`avatars/{uid}.{ext}`). Enumerar `avatars/` no devuelve "unas fotos": devuelve
+el **padrón de uids que alguna vez subieron avatar**, en una sola llamada.
+
+- *Atenuante:* `userPublicProfiles/{uid}` ya es `allow read: if request.auth != null`
+  para `get` **y** `list` (`firestore.rules:776-780`, deliberado: habilita la
+  búsqueda por prefijo de `searchByDisplayName`). Los uids **ya son enumerables**
+  hoy por Firestore. El comentario de `chatMedia` en `storage.rules` lo dice con
+  todas las letras. O sea: `avatars/` list **no** es la primera puerta.
+- *Agravante:* no es la misma puerta. `avatars/` enumera una población
+  **distinta** — la de objetos que **existen en el bucket**, que incluye a los
+  usuarios que "quitaron" su foto (ver el bug de abajo: nunca se borra) y a
+  cuentas cuyo `userPublicProfiles` haya cambiado. Y es un canal que sobrevive a
+  cualquier endurecimiento futuro de `userPublicProfiles`: si mañana se cierra
+  el `list` de Firestore, `avatars/` lo sigue filtrando y nadie se va a acordar.
+
+**¿Coherente con lo que promete el producto?** La Política de Privacidad
+(`kPrivacySections` §1, `legal_content.dart:119-125`) declara la
+*"foto/avatar si la cargás"* entre los datos de cuenta, y el avatar se muestra
+en feed, chat, reviews y rankings a cualquier autenticado. **Que el contenido
+del avatar sea legible por cualquier autenticado no contradice nada.** Que el
+*directorio* sea enumerable no está declarado ni es necesario — pero tampoco
+agrega una categoría de dato que la política no cubra.
+
+**Veredicto:**
+
+| Operación | Veredicto |
+|---|---|
+| `get` | **Deliberado y defendible**, pero **redundante** (§3.1): el avatar ya viaja por `userPublicProfiles` a la misma audiencia. Se conserva; no se justifica por necesidad técnica sino porque no expone nada nuevo. |
+| `list` | **NO deliberado — leak.** Ningún comentario lo menciona, ningún cliente lo usa, y los dos bloques vecinos que sí lo pensaron (`chatMedia`, `postPhotos`) lo cierran explícitamente. Severidad **baja** por el atenuante de arriba, pero es un canal de enumeración gratuito. → **QA-SEC-007** |
+| `write` | **Deliberado y correcto.** Owner-only, anclado, sólo imágenes, 5 MB. Pineado en §3.7. |
+| `delete` | **ROTO** — ver abajo. → **QA-SEC-009** |
+
+#### 3.2.1 El `delete` de avatars está roto, y falla en silencio
+
+El bloque **no declara `allow delete`**. En Storage, `delete` cae bajo `write`,
+cuya condición dereferencia `request.resource.size` — y en un `delete`
+**`request.resource` es null**. El emulador lo dice con el dedo en la línea:
+
+```
+EvaluationException: Error: storage.rules line [13], column [22]. Null value error.
+```
+
+`storage.rules:13` es exactamente `&& request.resource.size < 5 * 1024 * 1024`.
+
+Medido: **el dueño no puede borrar su propio avatar** (DENY). No es un agujero
+—falla cerrado— pero sí es un bug de producto, y tiene una víctima concreta:
+
+- `avatar_web_uploader.dart:105-113` (`deleteStored()`) borra
+  `avatars/{uid}.jpg` **best-effort, dentro de un `catch (_) {}` vacío**.
+- Lo llama `cuenta_tab.dart:427-443` (`_removePhoto`, el botón "Quitar foto" de
+  Coach Hub), con el comentario *"no dejar el objeto huérfano en
+  `avatars/{uid}.jpg`"*.
+
+El `delete` **siempre** se deniega, el `catch` se lo come, el usuario ve el
+toast *"Foto quitada"*, y el objeto **sigue en el bucket**: bajable por su URL
+con token (que es una credencial al portador, §3.1) y enumerable por cualquier
+autenticado (el leak de arriba). La única limpieza real que existe es
+`deleteAvatar` del cascade de borrado de cuenta, que corre con **Admin SDK** y
+por eso no pega contra esta regla — y que barre *"cualquier extensión"*
+(QA-CMP-002) justamente porque sabe que quedan huérfanos.
+
+Dicho de otra forma: hoy **la app no tiene forma de borrar un avatar salvo
+borrando la cuenta entera**. Contra la §7 de la política (*"podés... solicitar la
+supresión de tus datos... desde la app"*), esto es una divergencia real, del
+mismo tipo que las de §2.3.2.
+
+El arreglo es chico y conocido — separar el `delete` del `write`, como ya hacen
+`customExerciseVideos`, `chatMedia`, `athleteFiles` y `postPhotos`:
+
+```
+allow delete: if request.auth != null
+              && fileName.matches(request.auth.uid + '\\..+');
+```
+
+**No se aplica en este PR.** Es un cambio de comportamiento en una regla de
+producción y merece su propio ticket, su propio test y su propia verificación.
+
+### 3.3 `customExerciseVideos/{uid}/**`
+
+```
+match /customExerciseVideos/{userId}/{file=**} {
+  allow read: if request.auth != null;                    // get + list
+  allow write: if ... uid == userId ... 100 MB ... video/*
+  allow delete: if request.auth != null && request.auth.uid == userId;
+}
+```
+
+**Quién lee hoy, exactamente.** Igual que avatars, `read` no separa `get` de
+`list`. Pero acá el wildcard es `{file=**}`, así que la enumeración es peor.
+Medido, con un autenticado cualquiera (**no** el dueño, **no** un alumno
+vinculado):
+
+| Operación | Resultado medido |
+|---|---|
+| `getBytes(customExerciseVideos/{otro}/clip.mp4)` | ALLOW |
+| `listAll(customExerciseVideos/{otro})` | **ALLOW** — devolvió `items=[clip.mp4]` y `prefixes=[…/nested]` |
+| `listAll(customExerciseVideos/)` ← **la raíz** | **ALLOW** — devolvió `prefixes=[customExerciseVideos/{uid}]` |
+| lo mismo, anónimo | DENY |
+
+**Qué expone.** Dos cosas distintas, y las dos son peores que en avatars:
+
+1. **Listar la raíz devuelve el uid de cada PF que subió videos.** Es un
+   directorio de "qué entrenadores tienen contenido propio" que no existe en
+   ninguna otra parte del producto.
+2. **Listar la carpeta de un PF devuelve su videoteca entera**, recursivamente.
+   No hace falta adivinar nombres de archivo ni conocer un solo
+   `customExercises/{id}`: se enumera y se baja. Para un PF, esos videos son el
+   activo que lo diferencia. Un competidor con una cuenta de atleta gratis se
+   lleva la biblioteca completa de otro PF.
+
+Y la enumeración alcanza **más** que Firestore: `users/{tid}/customExercises/{id}`
+sólo apunta a los videos **vigentes**. El `list` del bucket ve también los
+huérfanos — ejercicios borrados cuya limpieza best-effort
+(`custom_exercise_repository.dart:97-113`) falló.
+
+**¿Coherente con lo que promete el producto?** El comentario de la regla dice
+que la lectura amplia existe para que *"the trainer's athletes"* puedan
+reproducir inline. Dos problemas: (a) el reproductor **no usa la regla**
+(§3.1), y (b) aunque la usara, la regla no dice "los alumnos del PF" — dice
+**cualquier autenticado**. El `get` amplio sí es coherente con la postura de
+Firestore (`customExercises` es legible por cualquier autenticado,
+`firestore.rules:1575`), así que el **contenido** de un video no es más secreto
+que el doc que lo referencia. El **inventario** sí lo es: no hay ningún doc de
+Firestore que lo publique.
+
+**Veredicto:**
+
+| Operación | Veredicto |
+|---|---|
+| `get` | **Deliberado**, aunque el motivo escrito en el comentario es incorrecto y hay que corregirlo. Consistente con `firestore.rules:1575`. Se conserva. |
+| `list` | **NO deliberado — leak, y el peor de los tres.** Exfiltración de la videoteca completa de un PF + directorio de qué PFs tienen contenido. Ningún cliente llama `list`. → **QA-SEC-008** |
+| `write` | **Deliberado y correcto.** Owner-only a cualquier profundidad, sólo video, 100 MB. Pineado en §3.7. |
+| `delete` | **Deliberado y correcto.** Tiene su propio `allow delete` — por eso funciona, a diferencia de `avatars` (§3.2.1). Pineado en §3.7. |
+
+### 3.4 `postPhotos/{uid}/{postId}.{ext}` — el modelo a seguir
+
+```
+match /postPhotos/{userId}/{fileName} {
+  allow get: if request.auth != null;
+  allow list: if false;
+  allow write: if ... uid == userId ... 15 MB ... image/*
+  allow delete: if request.auth != null && request.auth.uid == userId;
+}
+```
+
+Medido: `get` cruzado ALLOW; `listAll(postPhotos/{uid})` **DENY**;
+`listAll(postPhotos/)` **DENY** (esta última no la cubre el `allow list: if false`
+—ese match pide dos segmentos— sino el catch-all `{allPaths=**}`).
+
+**Veredicto: deliberado, correcto y ya documentado en el propio archivo.** Este
+bloque hace explícito lo que los otros dos dejan implícito: separa `get` de
+`list`, cierra `list` incondicionalmente, y explica *por qué* el `get` amplio
+está bien — la visibilidad real del post la gobierna `firestore.rules` sobre
+`posts/`, y la URL con token sólo viaja dentro del doc del post. Esa afirmación
+quedó **confirmada** por la medición de §3.1.
+
+Es el patrón al que hay que llevar `avatars` y `customExerciseVideos`.
+
+Única mejora aplicada en este PR: el test del bloque cubría
+`listAll(postPhotos/{uid})` pero no la **raíz** `postPhotos/`. Se agregó, porque
+si alguien introdujera un `match /postPhotos/{p=**}` descuidado, la enumeración
+de uids se abriría y ningún test se pondría rojo.
+
+### 3.5 La matriz medida
+
+Todo lo de arriba, en una tabla. **ALLOW/DENY son resultados del emulador**, no
+lecturas de la regla. Actor = usuario autenticado que **no** es el dueño, salvo
+donde se aclara.
+
+| Path | `get` ajeno | `list` (carpeta) | `list` (raíz) | `write` ajeno | `delete` dueño | `delete` ajeno |
+|---|---|---|---|---|---|---|
+| `avatars/` | ALLOW | **ALLOW** ⚠️ | n/a (un nivel) | DENY | **DENY** 🐛 | DENY |
+| `customExerciseVideos/` | ALLOW | **ALLOW** ⚠️ | **ALLOW** ⚠️ | DENY | ALLOW | DENY |
+| `postPhotos/` | ALLOW | DENY | DENY | DENY | ALLOW | DENY |
+| `chatMedia/` | DENY (no miembro) | DENY | DENY | DENY | — | DENY |
+| `temp/uploads/` | DENY | DENY | DENY | DENY | — | DENY |
+| catch-all `/` | — | — | DENY | — | — | — |
+
+Anónimo: **DENY en todas las celdas de todos los paths**. El piso está bien.
+
+⚠️ = leak sin decisión previa. 🐛 = deniega, pero por un null deref, no por
+falta de permiso.
+
+`chatMedia` y `temp/uploads` se midieron sólo como control — están fuera del
+alcance de este slice y salieron cerrados en todos los casos probados, lo que
+confirma que el endurecimiento de `chatMedia` (Slice A / AD-2) hace lo que dice.
+
+### 3.6 Veredicto y tickets
+
+**Dos de los tres paths tienen un leak real, y ninguno de los dos se arregla en
+este PR.** Cambiar una regla de lectura de Storage puede romper avatares o
+videos en producción; cada uno necesita su propio change, su test y su
+verificación.
+
+| ID | Qué | Path | Severidad | Arreglo propuesto |
+|---|---|---|---|---|
+| **QA-SEC-007** | `list` abierto a cualquier autenticado; enumera el padrón de uids con avatar | `avatars/` | Baja — los uids ya son enumerables por `userPublicProfiles` (`firestore.rules:780`), pero es un canal paralelo que sobrevive a cerrar aquél | Separar `read` en `get` + `list`; `allow list: if false` |
+| **QA-SEC-008** | `list` abierto en carpeta **y raíz**; exfiltra la videoteca entera de un PF y el directorio de qué PFs tienen contenido | `customExerciseVideos/` | **Media-alta** — no hay ninguna otra vía para obtener el inventario, y el contenido es el activo del PF | Separar `read` en `get` + `list`; `allow list: if false`. Corregir además el comentario, que justifica la lectura amplia con un motivo falso (§3.1) |
+| **QA-SEC-009** | `delete` denegado hasta para el dueño por null deref en `storage.rules:13`; "Quitar foto" miente y el objeto queda huérfano | `avatars/` | Media — no es un agujero (falla cerrado) pero incumple la §7 de la política y deja objetos legibles que el usuario cree borrados | `allow delete` propio, como en los otros cuatro bloques (§3.2.1). Revisar además el `catch (_) {}` de `avatar_web_uploader.dart:110` |
+
+Los tres son chicos y bien acotados. **QA-SEC-008 es el que yo haría primero.**
+
+Nota de alcance: cerrar `list` en los dos paths es **seguro para el cliente** —
+no existe ni una llamada a `listAll()` / `list()` del SDK de Storage en todo
+`lib/`. Lo único que enumera el bucket es `functions/src/cascade/storage.ts`,
+con `bucket.getFiles({ prefix })` del **Admin SDK**, que ignora estas reglas por
+completo (ADR-ACCDEL-013). O sea: el cascade de borrado no se ve afectado.
+
+### 3.7 Qué se testeó en este PR, y qué NO — a propósito
+
+Se agregaron `avatars-storage-rules.test.ts` y
+`custom-exercise-videos-storage-rules.test.ts`, más un caso a
+`post-photos-storage-rules.test.ts`. **29 tests, todos verdes.**
+
+**Sí se pinea** lo que ya estaba decidido y es correcto: el gate de escritura de
+los dos bloques (owner-only, tipo de contenido, y en `avatars` el anclaje del
+regex), el `delete` owner-only de `customExerciseVideos`, y el piso anónimo de
+`get` y `list` en ambos.
+
+**No se pinea, a propósito:**
+
+- **El `list` autenticado de `avatars` y `customExerciseVideos`.** Es el leak.
+  Un `assertSucceeds` ahí congelaría el status quo, que es exactamente lo que
+  §1.6 regla 1 dice que no hay que hacer. Cuando QA-SEC-007 y -008 cierren, esos
+  `assertFails` van en los archivos que este PR dejó preparados con el comentario
+  correspondiente.
+- **El `delete` de `avatars`, en cualquier dirección.** Hoy "el ajeno no puede
+  borrar" es **verdad por accidente**: se deniega por el null deref de
+  `storage.rules:13`, no por un gate de dueño. Un test así pasaría *por el motivo
+  equivocado*, y §1.8 lo prohíbe explícitamente. El test entra junto con
+  QA-SEC-009, cuando la denegación sea por permiso.
+- **Los bounds de tamaño (5 MB / 100 MB).** Empujar esos cuerpos por el emulador
+  en cada corrida es lastre de CI puro, y es el mismo idiom
+  `request.resource.size` que ya corre en los otros bloques. Mismo criterio que
+  ya había tomado `post-photos-storage-rules.test.ts`.
+
+**Verificación de mutación.** §1.8 pide que, antes de dar una celda por cerrada,
+se afloje la regla y se compruebe que el test se pone rojo. Se hizo, con dos
+mutaciones simultáneas:
+
+1. `fileName.matches(request.auth.uid + '\\..+')` → `fileName.matches('.+\\..+')`
+   (la escritura deja de estar atada al uid del caller).
+2. `allow delete: if request.auth != null && request.auth.uid == userId;` →
+   `allow delete: if request.auth != null;` (las tres ocurrencias).
+
+Resultado: **exactamente 6 tests en rojo, y ninguno más** — los tres negativos
+de escritura de `avatars`, los dos de `delete` ajeno de `customExerciseVideos`
+(incluido el anidado) y el de `postPhotos`. Los 23 restantes siguieron verdes.
+Cada negativo nuevo falla cuando —y sólo cuando— se afloja la regla que
+custodia.
+
+### 3.8 Cómo mantener esta sección
+
+Mismo contrato que §1.8 y §2.6: **el PR que cambia la regla actualiza el
+documento**.
+
+1. **Bloque nuevo en `storage.rules` con lectura más amplia que el dueño** →
+   entrada nueva acá con las cuatro preguntas de §3.0 respondidas **antes** de
+   mergear. Un bloque con `allow read: if request.auth != null` y sin párrafo en
+   §3 es, por definición de esta sección, un hueco.
+2. **Nunca `allow read` a secas en un bloque nuevo.** Escribir `get` y `list` por
+   separado, aunque los dos terminen con la misma condición. `read` esconde que
+   `list` es un permiso distinto, y es la causa raíz de los dos leaks de §3.6.
+3. **Toda regla con `request.resource.<algo>` necesita su `allow delete` propio**,
+   o el borrado se rompe en silencio (§3.2.1). Es la lección de QA-SEC-009 y
+   aplica a cualquier bloque futuro.
+4. **Si se cierra un QA-SEC-00x de §3.6** → tacharlo ahí con la referencia al PR,
+   no borrarlo (misma regla que §2.4), agregar el `assertFails` al archivo de
+   test correspondiente y actualizar la celda en la matriz de §1.2.
+5. **La medición no se hereda.** Los ALLOW/DENY de §3.5 valen para el
+   `storage.rules` del día que se escribieron. Si tocás un bloque, volvé a correr
+   la sonda; es media hora y evita razonar sobre reglas por su nombre.
+
+```bash
+export PATH="/opt/homebrew/opt/openjdk@21/bin:$PATH"   # Java 21, macOS
+npm --prefix functions run test:rules:emulator          # incluye los 3 de Storage
 ```
