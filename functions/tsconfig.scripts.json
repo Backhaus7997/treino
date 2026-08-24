@@ -2,7 +2,8 @@
   // Los scripts one-off de `scripts/` NO los compila nadie.
   //
   // `tsconfig.json` incluye solo `src`, asi que `npm run build` —y con el, el
-  // job "Functions Build" de CI— pasaba en verde sobre codigo que ni se miraba.
+  // job "Functions Static Checks" de CI— pasaba en verde sobre codigo que ni se
+  // miraba.
   // Se descubrio con uno que llevaba semanas roto: importaba un modulo borrado
   // (`src/payments/generate-due-payments`, eliminado al desacoplar cobros) y
   // nadie se entero porque nada lo compilaba.
