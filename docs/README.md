@@ -12,6 +12,7 @@ Documentación viva del proyecto. **Cualquier cambio acá entra por PR como cual
 | [performance.md](./performance.md) | State management, rebuilds, batería, multi-device matrix, profiling |
 | [workflow.md](./workflow.md) | Setup nueva máquina, equipo, commits, branching, PRs, SDD, calidad gates |
 | [roadmap.md](./roadmap.md) | Fases 0-6, Fase 1 desglosada en 7 etapas con owner y branch sugeridos |
+| [security.md](./security.md) | Matriz de cobertura de reglas (Firestore + Storage): qué colección × operación tiene test negativo y cuál no. **Se actualiza en el mismo PR que toque las reglas.** |
 
 ## Cómo encontrar info
 
