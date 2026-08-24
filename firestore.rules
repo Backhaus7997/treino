@@ -1793,28 +1793,47 @@ service cloud.firestore {
       }
     }
 
-    // Daily check-in sub-collection (Fase 4 Etapa 6, REQ-WRC-004).
-    // Doc id is the local date key 'YYYY-MM-DD' — one doc per day per user,
-    // providing natural dedup: a second check-in the same day OVERWRITES the
-    // first. That is the design, not an accident.
+    // GYM-PRESENCE check-in sub-collection (Fase 4 Etapa 6, REQ-WRC-004).
+    // Doc id is the local date key 'YYYY-MM-DD'. Reserved for the "are you at
+    // the gym today?" flow — see the still-orphaned checkIn* l10n keys
+    // ("¿ESTÁS EN EL GYM HOY?", "SÍ, ENTRÉ") and SCENARIO-272/273/274 in
+    // scripts/rules_test/rules.test.js, which assert on a
+    // {gymId, gymName, checkedInAt} payload. That feature has no client code
+    // yet; the path stays reserved for it.
     //
-    // First real consumer (#643 slice 1): the post-session wellbeing check-in
-    // (lib/features/checkins/) — how the athlete felt, pain yes/no + zone in
-    // the MuscleGroup vocabulary, and an optional free note. Owner-only R/W
-    // was already the right stance and stays untouched: this is the most
-    // sensitive data the app stores. It is never mirrored to
-    // userPublicProfiles and never shared with a trainer — sharing it would
-    // need its own explicit opt-in and its own issue.
-    //
-    // ⚠️ The path was originally reserved for a location-adjacent GYM
-    // check-in (see the still-orphaned checkIn* l10n keys, "¿ESTÁS EN EL GYM
-    // HOY?"). That feature has no client code. If it ever lands it must NOT
-    // reuse this document: same uid + same date would collide.
-    //
-    // Deliberately NO shape validation: slices 2-3 of #643 still add fields,
-    // and a `hasOnly` here would reproduce the forward-compat trap documented
-    // in #635.
+    // ⚠️ The WELLBEING check-in (#643) used to live here and does NOT any
+    // more: it moved to users/{uid}/wellbeingCheckIns below. Same uid + same
+    // date produced the same document, so the two features would have
+    // collided silently the day gym presence ships. Do not re-point anything
+    // here.
     match /users/{uid}/checkIns/{date} {
+      allow read, write: if request.auth != null
+                         && request.auth.uid == uid;
+    }
+
+    // Wellbeing check-in sub-collection (#643) — how the athlete felt, pain
+    // yes/no + zone in the MuscleGroup vocabulary, and an optional free note.
+    // Captured after a session and from the daily card on Home.
+    //
+    // OWNER-ONLY, read and write, with no exceptions. This is the most
+    // sensitive data the app stores: self-reported health. Three consequences
+    // that must survive future edits to this block:
+    //
+    //   1. It is NEVER mirrored to userPublicProfiles.
+    //   2. session_shares / profile_shares do NOT open it. Those capabilities
+    //      grant a trainer the training history (users/{uid}/sessions/**,
+    //      setLogs/**) and the profile snapshot; wellbeing is deliberately
+    //      outside that grant. #643 puts trainer sharing explicitly out of
+    //      scope: if it ever ships it needs its OWN opt-in and its own issue,
+    //      not a widened read here.
+    //   3. Doc id is '{date}_{millisUTC}', not the date alone. The date alone
+    //      made a second workout on the same day overwrite the first one's
+    //      record — last-write-wins on health data. The date is also a real
+    //      field of the document, which is what the trend range queries.
+    //
+    // Deliberately NO shape validation: a `hasOnly` here would reproduce the
+    // forward-compat trap documented in #635.
+    match /users/{uid}/wellbeingCheckIns/{checkInId} {
       allow read, write: if request.auth != null
                          && request.auth.uid == uid;
     }
