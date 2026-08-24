@@ -49,6 +49,7 @@ Map<String, dynamic> _$$RoutineImplToJson(_$RoutineImpl instance) =>
       'createdBy': instance.createdBy,
       'status': _$RoutineStatusEnumMap[instance.status]!,
       'numWeeks': instance.numWeeks,
+      'summary': instance.summary,
     };
 
 const _$ExperienceLevelEnumMap = {

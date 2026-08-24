@@ -7,12 +7,18 @@ import 'package:treino/features/workout/domain/routine_visibility.dart';
 
 void main() {
   group('Routine', () {
-    // ── summary: leído de Firestore, nunca escrito por el cliente (#648) ────
+    // ── summary: ahora TAMBIÉN lo escribe el cliente (#648) ─────────────────
     //
-    // Esta pareja de tests es lo que mantiene el campo FUERA de
-    // firestore.rules. Si `toJson` empezara a incluirlo, los `hasOnly` de las
-    // rutinas user-created y trainer-assigned lo rechazarían y TODA edición de
-    // rutina fallaría con permission-denied — el modo de falla de #563.
+    // Estos tests decían lo contrario, y era cierto mientras el campo llevaba
+    // `@JsonKey(includeToJson: false)`. Al habilitar los resúmenes autorados
+    // por el PF esa anotación se fue, así que `toJson()` lo emite en TODA
+    // rutina — incluidas las del atleta, que nunca lo escriben a mano.
+    //
+    // Por eso los tres `hasOnly` de firestore.rules tuvieron que aprenderlo:
+    // si a alguno le faltara, esa rama entera de edición fallaría con
+    // permission-denied. Es el modo de falla de #563, y ahora lo cubren los
+    // tests de reglas (`routine-summary-rules.test.ts`), no la ausencia del
+    // campo en el payload.
 
     test('#648: summary se lee desde Firestore', () {
       final decoded = Routine.fromJson(const {
@@ -26,7 +32,7 @@ void main() {
       expect(decoded.summary, 'Empujar, tirar y piernas.');
     });
 
-    test('#648: summary NUNCA sale en toJson — es lo que evita tocar las rules',
+    test('#648: summary SÍ sale en toJson — y por eso las rules lo conocen',
         () {
       const routine = Routine(
         id: 'r1',
@@ -37,10 +43,24 @@ void main() {
       );
 
       expect(
-        routine.toJson().containsKey('summary'),
-        isFalse,
-        reason: 'un payload con summary rompe el hasOnly de firestore.rules',
+        routine.toJson()['summary'],
+        'Una explicación en criollo.',
+        reason: 'si esto vuelve a ser false, el editor del PF deja de guardar',
       );
+    });
+
+    test('#648: una rutina SIN summary no lo mete como null en el payload', () {
+      // Importa para el path del atleta: su `hasOnly` lista `summary` de forma
+      // defensiva, pero cuantos menos campos viajen, menos superficie tiene el
+      // diff que las reglas evalúan.
+      const routine = Routine(
+        id: 'r1',
+        name: 'Rutina',
+        level: ExperienceLevel.beginner,
+        days: [],
+      );
+
+      expect(routine.toJson()['summary'], isNull);
     });
 
     test('#648: summary ausente deserializa a null, sin romper', () {

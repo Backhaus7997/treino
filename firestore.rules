@@ -295,9 +295,16 @@ service cloud.firestore {
                     && request.resource.data.keys().hasOnly(
                          // + numWeeks (periodization, Model B) — mirror RoutineRepository.
                          ['name', 'level', 'days',
-                          'source', 'createdBy', 'visibility', 'createdAt', 'status',
-                          'split', 'estimatedMinutesPerDay', 'imageUrl', 'numWeeks',
-                          'ratingAvg', 'ratingsCount'])
+                         'source', 'createdBy', 'visibility', 'createdAt', 'status',
+                         'split', 'estimatedMinutesPerDay', 'imageUrl', 'numWeeks',
+                         'ratingAvg', 'ratingsCount',
+                         // summary (#648): defensivo, mismo criterio que los
+                         // agregados de rating de arriba. Desde que el campo se
+                         // serializa, el cliente lo manda en TODA rutina que lo
+                         // tenga; sin esta entrada, un atleta cuya rutina tiene
+                         // summary no podria volver a editarla. NO esta en el
+                         // affectedKeys de abajo: puede convivir con el, no cambiarlo.
+                         'summary'])
                     // The diff must touch ONLY content fields (name/level/days/
                     // numWeeks/visibility).
                     && request.resource.data.diff(resource.data).affectedKeys()
@@ -342,14 +349,21 @@ service cloud.firestore {
                     && request.resource.data.keys().hasOnly(
                          // + numWeeks (periodization, Model B) — mirror RoutineRepository.
                          ['name', 'split', 'level', 'days',
-                          'source', 'assignedBy', 'assignedTo', 'visibility',
-                          'status', 'createdBy', 'createdAt',
-                          'estimatedMinutesPerDay', 'imageUrl', 'numWeeks',
-                          'ratingAvg', 'ratingsCount'])
+                         'source', 'assignedBy', 'assignedTo', 'visibility',
+                         'status', 'createdBy', 'createdAt',
+                         'estimatedMinutesPerDay', 'imageUrl', 'numWeeks',
+                         'ratingAvg', 'ratingsCount', 'summary'])
+                       // summary (#648): lo escribe el PF, con tope de largo.
+                       // El tope vive ACA y no en el cliente: un cliente
+                       // parcheado no lo respetaria. Los 7 sembrados miden
+                       // entre 61 y 100 caracteres; 280 deja margen sin
+                       // habilitar un ensayo en el subtitulo de una tarjeta.
+                       && optStrMaxLen(request.resource.data.get('summary', null), 280)
                     // The diff must touch ONLY content fields.
                     && request.resource.data.diff(resource.data).affectedKeys()
                          // + numWeeks (periodization) — repo always sends it.
-                         .hasOnly(['name', 'split', 'level', 'days', 'numWeeks']);
+                         .hasOnly(['name', 'split', 'level', 'days', 'numWeeks',
+                                   'summary']);
 
       // UPDATE path 4: trainer edits content of a trainer template.
       //
@@ -392,14 +406,21 @@ service cloud.firestore {
                     && request.resource.data.keys().hasOnly(
                          // + numWeeks (periodization, Model B) — mirror RoutineRepository.
                          ['name', 'split', 'level', 'days',
-                          'source', 'assignedBy', 'assignedTo', 'visibility',
-                          'status', 'createdBy', 'createdAt',
-                          'estimatedMinutesPerDay', 'imageUrl', 'numWeeks',
-                          'ratingAvg', 'ratingsCount'])
+                         'source', 'assignedBy', 'assignedTo', 'visibility',
+                         'status', 'createdBy', 'createdAt',
+                         'estimatedMinutesPerDay', 'imageUrl', 'numWeeks',
+                         'ratingAvg', 'ratingsCount', 'summary'])
+                       // summary (#648): lo escribe el PF, con tope de largo.
+                       // El tope vive ACA y no en el cliente: un cliente
+                       // parcheado no lo respetaria. Los 7 sembrados miden
+                       // entre 61 y 100 caracteres; 280 deja margen sin
+                       // habilitar un ensayo en el subtitulo de una tarjeta.
+                       && optStrMaxLen(request.resource.data.get('summary', null), 280)
                     // The diff must touch ONLY content fields.
                     && request.resource.data.diff(resource.data).affectedKeys()
                          // + numWeeks (periodization) — repo always sends it.
-                         .hasOnly(['name', 'split', 'level', 'days', 'numWeeks']);
+                         .hasOnly(['name', 'split', 'level', 'days', 'numWeeks',
+                                   'summary']);
 
       // UPDATE path 5 (narrow, Fase W3): the owning trainer publishes /
       // unpublishes their template — flips ONLY `visibility` between
