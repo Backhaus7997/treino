@@ -2,12 +2,17 @@
 // single week, normal sets). Mirrors the mocking pattern of
 // routine_editor_athlete_mode_test.dart (mobile).
 
+import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseException;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/analytics/analytics_service.dart';
+import 'package:treino/features/coach/application/blocked_athletes_providers.dart';
+import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/blocked_students_screen.dart'
+    show kBlockedStudentsRoutePath;
 import 'package:treino/features/coach_hub/presentation/sections/routine_editor/routine_editor_web_screen.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
@@ -29,6 +34,7 @@ import 'package:treino/features/workout/domain/set_enums.dart';
 import 'package:treino/features/workout/domain/set_spec.dart';
 
 import '../../../../../fixtures/exercises.dart';
+import '../../../../../helpers/fake_analytics_service.dart';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -39,11 +45,24 @@ const _athleteId = 'athlete-1';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-List<Override> _overrides({RoutineRepository? repo}) {
+List<Override> _overrides({
+  RoutineRepository? repo,
+  FakeAnalyticsService? analytics,
+  BlockedAthletes? blocked,
+}) {
   final mockRepo = repo ?? _MockRoutineRepository();
   return [
     currentUidProvider.overrideWithValue(_trainerId),
     routineRepositoryProvider.overrideWithValue(mockRepo),
+    // Sin override el provider real queda en AsyncError (no hay app de
+    // Firebase en `flutter test`), que es lo que quieren los tests que no
+    // miran el paywall: nadie lee su valor. Los que sí lo miran pasan el
+    // estado explícito — incluido `BlockedAthletes.unpublished`, que NO es lo
+    // mismo que una lista vacía.
+    if (blocked != null)
+      blockedAthletesProvider.overrideWith((ref) => Stream.value(blocked)),
+    if (analytics != null)
+      analyticsServiceProvider.overrideWithValue(analytics),
     exercisesProvider.overrideWith((ref) async => kExerciseSeed),
     customExercisesForTrainerStreamProvider(
       _trainerId,
@@ -62,6 +81,8 @@ Future<void> _pumpEditor(
   WidgetTester tester, {
   RoutineRepository? repo,
   String? routineId,
+  FakeAnalyticsService? analytics,
+  BlockedAthletes? blocked,
 }) async {
   // Desktop viewport — Coach Hub web dialogs (exercise picker) assume it.
   tester.view.physicalSize = const Size(1400, 900);
@@ -98,12 +119,26 @@ Future<void> _pumpEditor(
           ),
         ),
       ),
+      // Stand-in de la pantalla de solo-lectura: el banner de denegación
+      // ofrece esta salida y sin la ruta el push moriría contra go_router.
+      // Va con la constante COMPARTIDA y no con el literal: que la ruta exista
+      // de verdad lo prueba `routes_test.dart` contra
+      // `facturacionPlanesRoutes`; lo que este stub tiene que garantizar es
+      // que el destino sea el MISMO, no uno paralelo que el test se inventa.
+      GoRoute(
+        path: kBlockedStudentsRoutePath,
+        builder: (_, __) => const Scaffold(body: Text('SOLO_LECTURA')),
+      ),
     ],
   );
 
   await tester.pumpWidget(
     ProviderScope(
-      overrides: _overrides(repo: repo),
+      overrides: _overrides(
+        repo: repo,
+        analytics: analytics,
+        blocked: blocked,
+      ),
       child: MaterialApp.router(theme: AppTheme.dark(), routerConfig: router),
     ),
   );
@@ -1182,6 +1217,387 @@ void main() {
 
       expect(
         find.text('No pudimos guardar la rutina. Probá de nuevo.'),
+        findsOneWidget,
+      );
+    });
+  });
+
+  // -- Paywall: escritura denegada -----------------------------------------
+  //
+  // Bajo enforcement, «No pudimos guardar la rutina. Probá de nuevo.» pasa a
+  // ser ACTIVAMENTE falso: le pide al PF repetir algo que va a fallar siempre.
+  // Estos tests pinean las tres cosas que no pueden romperse — que no se pida
+  // reintentar, que no se afirme una causa que no se puede probar, y que el
+  // copy no diga nunca que el ALUMNO perdió algo.
+  group('RoutineEditorWebScreen — permission-denied al guardar', () {
+    /// La denegación real de Firestore, no un `Exception` genérico:
+    /// `isPermissionDenied` mira `FirebaseException.code`, así que un doble
+    /// más flojo probaría la rama equivocada.
+    FirebaseException denied() =>
+        FirebaseException(plugin: 'cloud_firestore', code: 'permission-denied');
+
+    /// Guarda con el repo tirando `permission-denied`.
+    Future<FakeAnalyticsService> pumpAndDeny(
+      WidgetTester tester, {
+      required BlockedAthletes blocked,
+      double textScale = 1.0,
+      Size? shrinkTo,
+    }) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.createAssigned(any())).thenThrow(denied());
+      final analytics = FakeAnalyticsService();
+      await _pumpEditor(
+        tester,
+        repo: repo,
+        analytics: analytics,
+        blocked: blocked,
+      );
+      await _fillMinimalValidForm(tester);
+      // El form se llena SIEMPRE en escritorio y a escala 1: el picker de
+      // ejercicios es un diálogo que asume ventana ancha, y con el texto al
+      // doble su lista deja de ser manejable desde el test. Las condiciones
+      // adversas se aplican recién acá, que es cuando importan — lo que se
+      // mide es el BANNER, no el picker.
+      if (textScale != 1.0) {
+        tester.platformDispatcher.textScaleFactorTestValue = textScale;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      }
+      if (shrinkTo != null) tester.view.physicalSize = shrinkTo;
+      if (textScale != 1.0 || shrinkTo != null) await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+      return analytics;
+    }
+
+    /// EL MENSAJE del banner, por su propia key.
+    ///
+    /// Antes esto aplanaba todos los `Text` descendientes del banner, y el
+    /// texto del link («Ver mis alumnos en solo lectura») entraba en la bolsa.
+    /// Con eso, `contains('solo lectura')` lo satisfacía el LINK y
+    /// `contains('fuera del cupo de tu plan')` lo satisfacía el FALLBACK: se
+    /// podía borrar la rama de causa probada entera y los tests seguían
+    /// verdes. El mensaje se mira solo.
+    String bannerText(WidgetTester tester) => tester
+        .widget<Text>(find.byKey(const Key('routine_editor_error_message')))
+        .data!;
+
+    testWidgets(
+      'con el alumno fuera del cupo, nombra la causa y no pide reintentar',
+      (tester) async {
+        await pumpAndDeny(
+          tester,
+          blocked: const BlockedAthletes.published({_athleteId}),
+        );
+
+        final text = bannerText(tester);
+        // Frases EXCLUSIVAS de la rama probada. La afirmación («este alumno
+        // quedó fuera») sólo se hace cuando el backend lo publicó, así que
+        // tiene que ser distinguible del hedge del fallback («fijate si quedó
+        // fuera»), no un substring compartido con él.
+        expect(text, contains('Este alumno quedó fuera del cupo de tu plan'));
+        expect(text, contains('Él sigue con sus rutinas'));
+        // Y NO el hedge: si las dos ramas dijeran lo mismo, la decisión
+        // central del slice sería decorativa.
+        expect(text, isNot(contains('Fijate si')));
+        // El pecado original: pedir un reintento que no puede funcionar.
+        expect(text, isNot(contains('Probá de nuevo')));
+      },
+    );
+
+    testWidgets(
+      'sin el alumno en la lista, NO afirma que la causa sea el plan',
+      (tester) async {
+        // `isPermissionDenied` no es exclusivo del paywall. Si el backend no
+        // publicó a este alumno como fuera de cupo, decirle al PF que es su
+        // plan sería inventarle una causa — y lo mandaría a pagar por un bug.
+        await pumpAndDeny(
+          tester,
+          blocked: const BlockedAthletes.published(<String>{}),
+        );
+
+        final text = bannerText(tester);
+        expect(text, isNot(contains('Este alumno quedó fuera del cupo')));
+        expect(text, contains('no tiene permiso'));
+        expect(text, contains('Reintentar no lo va a cambiar'));
+        // Pero sí lo invita a VERIFICARLO, que es lo único honesto que se
+        // puede ofrecer sin saber la causa.
+        expect(text, contains('Fijate si quedó fuera del cupo de tu plan'));
+      },
+    );
+
+    testWidgets('con la lista SIN PUBLICAR tampoco afirma la causa', (
+      tester,
+    ) async {
+      // El backend nunca escribió `blockedAthleteIds` para este PF, así que no
+      // se sabe si el alumno está afuera. Es el estado de cualquier PF cuyo
+      // padrón y suscripción no se movieron todavía, y colapsarlo en
+      // `entitled` diría dos cosas falsas a la vez: al PF, que la causa no es
+      // su cupo; y al on-call, que hay una regla rota.
+      final analytics = await pumpAndDeny(
+        tester,
+        blocked: BlockedAthletes.unpublished,
+      );
+
+      expect(
+        bannerText(tester),
+        isNot(contains('Este alumno quedó fuera del cupo')),
+      );
+      expect(
+        analytics.lastPaywallWriteDenied?['athlete_entitlement'],
+        'unknown',
+      );
+    });
+
+    for (final blocked in [
+      const BlockedAthletes.published({_athleteId}),
+      const BlockedAthletes.published(<String>{}),
+    ]) {
+      testWidgets(
+        'el copy nunca dice que el alumno perdió algo '
+        '(blocked: ${blocked.ids.isNotEmpty})',
+        (tester) async {
+          // La regla de producto: la fricción la come el entrenador, NUNCA el
+          // alumno. El alumno conserva rutinas, historial y chat, así que
+          // cualquier formulación que sugiera lo contrario es falsa — y es el
+          // error más fácil de cometer escribiendo este copy.
+          await pumpAndDeny(tester, blocked: blocked);
+
+          final text = bannerText(tester).toLowerCase();
+          for (final lie in [
+            'sin acceso',
+            'perdió',
+            'perdio',
+            'alumno bloqueado',
+            'se elimina',
+            'dado de baja',
+          ]) {
+            expect(text, isNot(contains(lie)), reason: 'copy dice "$lie"');
+          }
+        },
+      );
+    }
+
+    testWidgets('emite paywall_write_denied con los campos del incidente', (
+      tester,
+    ) async {
+      final analytics = await pumpAndDeny(
+        tester,
+        blocked: const BlockedAthletes.published({_athleteId}),
+      );
+
+      // Se assertea el MAPA COMPLETO a propósito. Este evento es la única
+      // señal server-visible del enforcement (Firestore no loguea las
+      // denegaciones de reglas y el Coach Hub web no tiene Crashlytics), así
+      // que un campo que se cae en silencio no lo agarra nadie hasta el día
+      // del incidente — que es tarde.
+      expect(analytics.lastPaywallWriteDenied, {
+        // Explícito porque la app nunca llama a setUserId: sin esto no se
+        // pueden contar PF únicos ni cruzar contra su subscription.
+        'trainer_id': _trainerId,
+        'athlete_id': _athleteId,
+        'collection': 'routines',
+        'operation': 'create',
+        'surface': 'routine_editor_web',
+        'athlete_entitlement': 'blocked',
+      });
+    });
+
+    testWidgets(
+      "athlete_entitlement es 'entitled' cuando el cupo no lo explica",
+      (tester) async {
+        final analytics = await pumpAndDeny(
+          tester,
+          blocked: const BlockedAthletes.published(<String>{}),
+        );
+
+        // Es EL campo que separa «problema de cobro» de «regla rota». Si
+        // siempre valiera lo mismo, el evento no respondería nada. Y sólo vale
+        // `entitled` cuando el backend SÍ publicó la lista y el alumno no
+        // figura: ahí la afirmación está probada.
+        expect(
+          analytics.lastPaywallWriteDenied?['athlete_entitlement'],
+          'entitled',
+        );
+      },
+    );
+
+    testWidgets("operation distingue 'update' de 'create'", (tester) async {
+      // No es lo mismo no poder tomar trabajo nuevo que no poder tocar lo que
+      // ya tenías; lo segundo es mucho más grave.
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any())).thenAnswer((_) async => _simpleRoutine());
+      when(() => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: any(named: 'draft'))).thenThrow(denied());
+      final analytics = FakeAnalyticsService();
+      await _pumpEditor(
+        tester,
+        repo: repo,
+        routineId: 'r1',
+        analytics: analytics,
+        blocked: const BlockedAthletes.published({_athleteId}),
+      );
+
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      expect(analytics.lastPaywallWriteDenied?['operation'], 'update');
+    });
+
+    testWidgets('un fallo genérico no emite el evento ni ofrece la salida', (
+      tester,
+    ) async {
+      // Contra-prueba del gate: si cualquier error disparara el evento, la
+      // métrica quedaría inservible el día que haya que leerla.
+      final repo = _MockRoutineRepository();
+      when(() => repo.createAssigned(any())).thenThrow(Exception('boom'));
+      final analytics = FakeAnalyticsService();
+      await _pumpEditor(
+        tester,
+        repo: repo,
+        analytics: analytics,
+        blocked: const BlockedAthletes.published({_athleteId}),
+      );
+      await _fillMinimalValidForm(tester);
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      expect(analytics.lastPaywallWriteDenied, isNull);
+      expect(
+        find.text('No pudimos guardar la rutina. Probá de nuevo.'),
+        findsOneWidget,
+      );
+      expect(find.text('Ver mis alumnos en solo lectura'), findsNothing);
+    });
+
+    testWidgets('un error de validación posterior NO arrastra la salida', (
+      tester,
+    ) async {
+      // El doc-comment de `_errorIsDenial` advierte exactamente esto: todo
+      // setState que escriba `_errorMessage` tiene que fijar la bandera, o el
+      // banner sigue ofreciendo «Ver mis alumnos en solo lectura» para un
+      // error que no tiene nada que ver con el cupo — ruido justo en el
+      // momento en que el PF necesita leer el error real.
+      await pumpAndDeny(
+        tester,
+        blocked: const BlockedAthletes.published({_athleteId}),
+      );
+      expect(find.text('Ver mis alumnos en solo lectura'), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const Key('routine_editor_name_field')),
+        '',
+      );
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      expect(bannerText(tester), 'Ponele un nombre a la rutina.');
+      expect(find.text('Ver mis alumnos en solo lectura'), findsNothing);
+    });
+
+    testWidgets('la salida lleva a la pantalla de alumnos en solo lectura', (
+      tester,
+    ) async {
+      await pumpAndDeny(
+        tester,
+        blocked: const BlockedAthletes.published({_athleteId}),
+      );
+
+      await tester.tap(find.text('Ver mis alumnos en solo lectura'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('SOLO_LECTURA'), findsOneWidget);
+    });
+
+    testWidgets('el banner entra en ventana angosta con textScale 2.0', (
+      tester,
+    ) async {
+      // Hay precedente en este repo de un overflow que ningún test agarró
+      // porque todos fijaban un viewport de escritorio. El mensaje de la
+      // denegación son tres frases MÁS un link: es el texto más largo que este
+      // banner mostró nunca.
+      await pumpAndDeny(
+        tester,
+        blocked: const BlockedAthletes.published({_athleteId}),
+        textScale: 2.0,
+        shrinkTo: const Size(800, 700),
+      );
+
+      expect(
+        find.byKey(const Key('routine_editor_error_banner')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  // -- Paywall: LECTURA denegada -------------------------------------------
+  //
+  // La asimetría deliberada del slice, y la rama que más fácil se pierde en un
+  // refactor que «unifica el copy de error»: el enforcement frena ESCRITURAS,
+  // no lecturas, así que darle copy de paywall a un `permission-denied` de
+  // lectura sería inventarle la causa al PF.
+  group('RoutineEditorWebScreen — permission-denied al CARGAR', () {
+    Future<FakeAnalyticsService> pumpDeniedLoad(WidgetTester tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any())).thenThrow(
+        FirebaseException(plugin: 'cloud_firestore', code: 'permission-denied'),
+      );
+      final analytics = FakeAnalyticsService();
+      await _pumpEditor(
+        tester,
+        repo: repo,
+        routineId: 'r1',
+        analytics: analytics,
+        blocked: const BlockedAthletes.published({_athleteId}),
+      );
+      return analytics;
+    }
+
+    testWidgets('dice que reintentar no sirve, y no nombra el plan', (
+      tester,
+    ) async {
+      await pumpDeniedLoad(tester);
+
+      expect(
+        find.textContaining('no tiene permiso para verla'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Reintentar no lo va a cambiar'),
+        findsOneWidget,
+      );
+      // Lo único que se sabe es que el permiso no está. Nombrar el cupo, el
+      // plan o facturación sobre una LECTURA sería fabricar la causa.
+      for (final invented in ['cupo', 'plan', 'facturación', 'suscripción']) {
+        expect(
+          find.textContaining(invented),
+          findsNothing,
+          reason: 'el copy de lectura menciona "$invented"',
+        );
+      }
+      expect(find.text('Ver mis alumnos en solo lectura'), findsNothing);
+    });
+
+    testWidgets('no emite paywall_write_denied', (tester) async {
+      // Es un evento de ESCRITURA. Contaminarlo con lecturas arruina la
+      // métrica el día que haya que leerla, y hoy es la única que existe.
+      final analytics = await pumpDeniedLoad(tester);
+
+      expect(analytics.lastPaywallWriteDenied, isNull);
+    });
+
+    testWidgets('un fallo genérico de carga sí pide reintentar', (
+      tester,
+    ) async {
+      // Contra-prueba: el mensaje viejo sigue siendo el correcto cuando el
+      // reintento SÍ puede funcionar.
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any())).thenThrow(Exception('boom'));
+      await _pumpEditor(tester, repo: repo, routineId: 'r1');
+
+      expect(
+        find.text('No pudimos cargar la rutina. Probá de nuevo.'),
         findsOneWidget,
       );
     });
@@ -2364,6 +2780,8 @@ void main() {
       WidgetTester tester, {
       RoutineRepository? repo,
       String? templateId,
+      FakeAnalyticsService? analytics,
+      BlockedAthletes? blocked,
     }) async {
       tester.view.physicalSize = const Size(1400, 900);
       tester.view.devicePixelRatio = 1.0;
@@ -2390,12 +2808,21 @@ void main() {
               ),
             ),
           ),
+          // Registrada para que el test de denegación pueda probar que el
+          // banner NO ofrece esta salida en modo plantilla: sin la ruta, un
+          // push accidental moriría contra go_router y el fallo se leería como
+          // un problema de routing en vez de como lo que es.
+          GoRoute(
+            path: kBlockedStudentsRoutePath,
+            builder: (_, __) => const Scaffold(body: Text('SOLO_LECTURA')),
+          ),
         ],
       );
 
       await tester.pumpWidget(
         ProviderScope(
-          overrides: _overrides(repo: repo),
+          overrides:
+              _overrides(repo: repo, analytics: analytics, blocked: blocked),
           child: MaterialApp.router(
             theme: AppTheme.dark(),
             routerConfig: router,
@@ -2411,6 +2838,47 @@ void main() {
       );
       await tester.pumpAndSettle();
     }
+
+    testWidgets('una denegación en plantilla no inventa un alumno', (
+      tester,
+    ) async {
+      // Una plantilla no es de nadie: el paywall es POR ALUMNO, así que el
+      // cupo no puede ser la causa. Si esta rama se cae, la denegación de una
+      // plantilla pasa a decir «tu cuenta no tiene permiso para escribir sobre
+      // este alumno» y «fijate si quedó fuera del cupo de tu plan» — sobre un
+      // alumno que no existe. Es exactamente la causa inventada que el slice
+      // dice no cometer, en el único lugar donde no hay ningún dato que la
+      // pueda sostener.
+      final repo = _MockRoutineRepository();
+      when(() => repo.createTemplate(any())).thenThrow(
+        FirebaseException(plugin: 'cloud_firestore', code: 'permission-denied'),
+      );
+      final analytics = FakeAnalyticsService();
+      await pumpTemplate(tester, repo: repo, analytics: analytics);
+
+      await _fillMinimalValidForm(tester);
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      final text = tester
+          .widget<Text>(find.byKey(const Key('routine_editor_error_message')))
+          .data!;
+      expect(text, contains('no tiene permiso para escribirla'));
+      expect(text, contains('Reintentar no lo va a cambiar'));
+      expect(text, isNot(contains('alumno')));
+      expect(text, isNot(contains('cupo')));
+      // Y sin salida a una pantalla que lista alumnos: acá no hay ninguno.
+      expect(find.text('Ver mis alumnos en solo lectura'), findsNothing);
+
+      // `not_applicable` y no `unknown`: no es que no se sepa el entitlement,
+      // es que el campo no aplica. Un pico de `unknown` significa otra cosa
+      // (el backend no publicó la lista) y confundirlos arruina la lectura.
+      expect(
+        analytics.lastPaywallWriteDenied?['athlete_entitlement'],
+        'not_applicable',
+      );
+      expect(analytics.lastPaywallWriteDenied?['athlete_id'], 'none');
+    });
 
     testWidgets('header reads "Nueva plantilla" and names no athlete', (
       tester,
