@@ -28,9 +28,23 @@ aserción que, si la regla se aflojara, se pondría roja.
 
 | Marca | Significado |
 |---|---|
-| ✅ | Hay test negativo **y corre en CI** (`functions/src/__tests__/*-rules.test.ts`) |
-| 🟡 | Hay test negativo, pero **sólo en la suite manual** `scripts/rules_test/` — nada lo ejecuta automáticamente (ver §1.4) |
+| ✅ | Hay test negativo en `functions/src/__tests__/*-rules.test.ts` (job *Functions Test*) |
+| 🟡 | Hay test negativo en la otra suite, `scripts/rules_test/*.test.js` (job *Rules Test*) |
 | — | No hay ningún test negativo |
+
+**Las dos marcas valen lo mismo.** El 🟡 nació distinguiendo "hay test pero
+nada lo corre"; desde #680 Slice B las dos suites corren en CI y lo único que
+separa las marcas es en qué archivo vive la cobertura — dato útil para saber
+dónde tocar, no un nivel de confianza menor. Ver §1.4.
+
+> ⚠️ **`main` no tiene branch protection** (`GET /repos/.../branches/main/protection`
+> → 404, verificado 2026-08-24). Ningún job de CI **impide** mergear hoy — ni
+> éstos ni `Analyze & Test`: fallan en rojo y el botón de merge sigue
+> disponible. `ci.yml` ya lo dice entre paréntesis ("con branch protection
+> activada"), pero conviene que esté acá: mientras eso siga así, todo ✅ de
+> esta matriz garantiza *"esto se ejecuta y alguien ve el rojo"*, no *"esto no
+> puede entrar a main"*. Activarla, y decidir qué checks son obligatorios, es
+> parte pendiente de Slice B.
 
 Las operaciones son las cinco de Firestore (`read` se abre en `get` + `list`
 porque son permisos distintos: `get` protege un documento, `list` protege la
@@ -128,22 +142,38 @@ llamadas — la línea del `import { assertFails, assertSucceeds }` suma uno de
 cada, y hay comentarios en prosa que nombran `assertSucceeds` sin llamarlo. Los
 números de arriba son call sites reales, no líneas.
 
-### 1.4 Hay dos suites de reglas, y una no corre en CI
+### 1.4 Hay dos suites de reglas, y las dos corren en CI
 
-Esto es lo primero que hay que saber antes de confiar en un ✅:
+Esto es lo primero que hay que saber antes de tocar una regla:
 
-| Suite | Archivos | Corre en CI | Cómo se corre |
+| Suite | Archivos | Job de CI | Cómo se corre a mano |
 |---|---|---|---|
-| `functions/src/__tests__/*-rules.test.ts` | 24 | **Sí** — `.github/workflows/ci.yml` job *Functions Test* | `npm --prefix functions run test:rules:emulator` |
-| `scripts/rules_test/*.test.js` | 8 | **No** | `bash scripts/test_rules.sh` (a mano) |
+| `functions/src/__tests__/*-rules.test.ts` | 24 | *Functions Test* | `npm --prefix functions run test:rules:emulator` |
+| `scripts/rules_test/*.test.js` | 8 | *Rules Test* | `bash scripts/test_rules.sh` |
 
-`scripts/test_rules.sh` lo dice en su propio header: *"NOT part of CI — this is
-a manual PR checklist item (reconsider at Fase 6)"*. Por eso las 🟡 de la
-matriz están marcadas distinto: el test existe y pasa, pero **nada garantiza
-que alguien lo corra antes de mergear**. Ocho colecciones dependen hoy
-exclusivamente de esa suite para alguna de sus celdas: `users/{uid}/checkIns`,
+La segunda entró en CI con **#680 Slice B**. Hasta ahí era un ítem de checklist
+de PR — `scripts/test_rules.sh` lo decía en su propio header — y ocho
+colecciones dependían de que alguien se acordara: `users/{uid}/checkIns`,
 `gyms`, `appointments`, `measurements` (delete), `athlete_billing`,
 `athlete_notes`, `payments` (create) y `storage:chatMedia`.
+
+**Lo que costó ese hueco, medido:** al meter la suite en CI estaba **roja**.
+Cuatro aserciones de `rules.test.js` habían quedado obsoletas contra cambios
+deliberados de las reglas, sin que nadie se enterara:
+
+| Escenario | Qué cambió en la regla | Desde |
+|---|---|---|
+| SCENARIO-608a | `routines` UPDATE path 2 — el dueño puede editar `name`/`level`/`days` (REQ-USR-018) | 2026-06-09 |
+| SCENARIO-270 inv. | `userPublicProfiles` create pinea `gymId` con `getAfter(users/{uid})` — el test no seedeaba el doc privado | 2026-07-06 |
+| SCENARIO-602 | `routines` CREATE branch 2 acepta `visibility: 'public'` (#297) | 2026-07-07 |
+| SCENARIO-132 inv. | `friendships` congelada, `update: if false` (ADR-FOLLOW-012) | 2026-08-07 |
+
+Ninguna era un agujero: en los cuatro casos la regla se movió a propósito y el
+test se quedó atrás. Pero eso **es** el problema. Una suite que nadie corre no
+distingue "la regla cambió porque quisimos" de "la regla se rompió" — las dos
+se ven igual, que es como se ven las cuatro de arriba. Y tres de ellas ya
+estaban rojas el 2026-07-21, la última vez que alguien editó ese archivo: ni
+siquiera quien lo tocaba lo estaba corriendo.
 
 Existe además `functions/src/__tests__/rules-read-isolation.test.ts`, que no es
 un test de emulador sino un **scanner estático** sobre el texto de
@@ -232,9 +262,15 @@ Ordenados por lo que me preocuparía primero:
    false` y su comentario dice por qué importa (relay de spam con nuestra
    reputación de remitente + emails de otros usuarios) — es el más barato de
    todos de cerrar.
-7. **Las 8 colecciones que dependen sólo de la suite manual** (§1.4). El
-   arreglo no es escribir más tests: es meter `scripts/test_rules.sh` en CI, o
-   migrar esos archivos a `functions/src/__tests__/`. Es trabajo de Slice B.
+7. ~~**Las 8 colecciones que dependen sólo de la suite manual**~~ — **CERRADO**
+   por #680 Slice B: `scripts/test_rules.sh` es el job *Rules Test* de CI
+   (§1.4). Queda pendiente, como deuda de consolidación y no
+   como hueco de cobertura, **unificar las dos suites**: hoy son dos árboles de
+   dependencias (`@firebase/rules-unit-testing` ^3 en `scripts/rules_test/`
+   contra ^5 en `functions/`), dos lockfiles y dos jobs para el mismo tipo de
+   test. Portar los 8 `.js` a TS bajo `functions/src/__tests__/` los dejaría
+   bajo un solo runner, pero es un diff grande y mecánico que no aporta
+   cobertura — vale la pena hacerlo solo, no colgado de otro cambio.
 8. **`test/firestore/payments_rules_test.dart`** sigue en el repo con los dos
    cuerpos vacíos. Los escenarios que describe (SCENARIO-VENC-14 y -15) ahora
    están cubiertos de verdad en `payments-update-rules.test.ts`; el stub
@@ -268,16 +304,23 @@ sección en el mismo PR.** Concretamente:
 
 1. Si agregás un `match` nuevo → fila nueva en la tabla que corresponda, con
    todas las celdas en `—` salvo las que traigas testeadas.
-2. Si agregás un test negativo → la celda pasa a ✅ (o 🟡 si lo pusiste en
-   `scripts/rules_test/`, cosa que conviene evitar mientras esa suite no corra
-   en CI).
+2. Si agregás un test negativo → la celda pasa a ✅, o a 🟡 si lo pusiste en
+   `scripts/rules_test/`. Para tests nuevos preferí `functions/src/__tests__/`:
+   no porque el otro job valga menos (los dos corren igual en cada PR), sino
+   porque ahí está TypeScript y es donde las dos suites van a converger algún
+   día (§1.6, punto 7).
 3. Recalculá los totales de §1.1 y §1.2. Son conteos, no impresiones.
 4. Los tests de reglas se corren con:
 
    ```bash
    npm --prefix functions run test:rules:emulator   # requiere Java 21+
-   bash scripts/test_rules.sh                       # la suite manual
+   npm --prefix scripts/rules_test ci               # una vez
+   bash scripts/test_rules.sh                       # la otra suite
    ```
+
+   Los dos levantan y bajan su propio emulador. Si `java -version` dice menos
+   de 21, exportá uno que sirva antes de correrlos
+   (`export PATH="/opt/homebrew/opt/openjdk@21/bin:$PATH"` en macOS).
 
 Un test negativo que pasa por el motivo equivocado es peor que no tenerlo:
 antes de dar por cerrada una celda, aflojá la regla y comprobá que el test se
@@ -419,7 +462,7 @@ de terceros: `posts.authorDisplayName`/`authorAvatarUrl` (se van con el post),
 
 ### 2.2 Contraste contra el cascade de borrado
 
-`runDeleteAccount` (`functions/src/delete-account.ts`) ejecuta ocho pasos, cada
+`runDeleteAccount` (`functions/src/delete-account.ts`) ejecuta nueve pasos, cada
 uno en su `try/catch`, y borra el usuario de Auth al final. Esto es lo que cada
 ítem del inventario recibe.
 
@@ -430,7 +473,7 @@ uno en su `try/catch`, y borra el usuario de Auth al final. Esto es lo que cada
 | 1 | `users/{uid}` | ✅ | `deleteUserDocs` → `recursiveDelete` |
 | 2 | `users/{uid}/notifications` | 🟡 **parcial** | El inbox propio se va con el `recursiveDelete`. **Las copias en el inbox de terceros quedan** → QA-CMP-008 |
 | 3 | `exercises` | n/a | Sin PII |
-| 4 | `routines` | ❌ **hueco** | **No hay paso de cascade** → QA-CMP-004 |
+| 4 | `routines` | ✅ | `deleteAthleteRoutines` (PR #753) — `assignedTo == uid` + `createdBy == uid`, con `recursiveDelete`. `assignedBy` queda afuera a propósito, ver QA-CMP-004 |
 | 5 | `routines/*/ratings/{userId}` | ❌ **hueco** | Sin paso; `allow delete: if false` (`firestore.rules:494`) → QA-CMP-006 |
 | 6 | `trainer_links` | 🟡 parcial | `terminateTrainerLinks` marca `status:'terminated'`, `reason:'account-deleted'`. Los uids quedan. Deliberado. |
 | 7 | `posts` | ✅ | `deletePosts` → `recursiveDelete` (borrado real desde la decisión de producto 2026-07-16). Se va el doc **y su subcolección `reactions`** — QA-CMP-005b arreglado |
@@ -473,32 +516,37 @@ sobre el borrado de una cuenta **athlete**:
 
 | Estado | Ítems | Cuáles |
 |---|---|---|
-| ✅ Cubierto | **24** | 1, 7, 9, 10, 13, 16-21, 25-31 + S1-S6 |
+| ✅ Cubierto | **25** | 1, 4, 7, 9, 10, 13, 16-21, 25-31 + S1-S6 |
 | 🟡 Parcial (queda PII recuperable) | **4** | 2, 6, 8, 24 |
 | ⚪ Retenido a propósito, con decisión escrita en el código | **5** | 14, 15, 32, 33, 35 |
-| ❌ Hueco sin decisión escrita | **4** | 4, 5, 12, 34 |
+| ❌ Hueco sin decisión escrita | **3** | 5, 12, 34 |
 | n/a para una cuenta athlete (PII de un PF) | **3** | 11, 22, 23 |
 
-**Titular: 7 de 40 ítems dejan datos personales recuperables sin que exista
-ninguna decisión escrita que lo justifique** (los 4 huecos + los 3 parciales sin
+**Titular: 6 de 40 ítems dejan datos personales recuperables sin que exista
+ninguna decisión escrita que lo justifique** (los 3 huecos + los 3 parciales sin
 decisión escrita: `posts/*/reactions` en posts ajenos, `appointments` y
 `notifications`). El parcial restante, `trainer_links`, sí tiene decisión
 escrita.
 
-Eran 8 cuando se midió por primera vez. Bajó a 7 al cerrarse QA-CMP-004b y
-QA-CMP-005b: `postPhotos/` (S6) pasó de hueco a cubierto, y el ítem 8 pasó de
-hueco a parcial —queda sólo la mitad QA-CMP-005, las reacciones del usuario en
-posts ajenos.
+Eran **8** cuando se midió por primera vez. Bajó a 6 en dos pasos: **#753** cerró
+`routines` (ítem 4, QA-CMP-004), y **#754** cerró `postPhotos/` (S6, QA-CMP-004b)
+y la mitad de las reacciones (QA-CMP-005b) — el ítem 8 pasó de hueco a parcial,
+porque queda pendiente QA-CMP-005, las reacciones del usuario en posts ajenos.
 
-`delete-account.smoke.test.ts` afirma que `deletedCollections` trae las 8
+`delete-account.smoke.test.ts` afirma que `deletedCollections` trae las
 entradas esperadas, pero **ninguna aserción comprueba la ausencia de residuo en
 las colecciones que el cascade no toca** — que es exactamente donde están los
-ítems de arriba. El test verifica lo que el cascade dice que hizo, no lo que
-quedó en la base. Es la debilidad que dejó pasar QA-CMP-004b y QA-CMP-005b, así
-que los tests que los cierran (`cascade/storage.test.ts` y
+seis ítems de arriba. El test verifica lo que el cascade dice que hizo, no lo
+que quedó en la base. Es la debilidad que dejó pasar QA-CMP-004b y QA-CMP-005b,
+así que los tests que los cierran (`cascade/storage.test.ts` y
 `cascade/posts.test.ts`) asertan la **ausencia** de los objetos y documentos
 después del cascade, no la presencia de nombres en `deletedCollections`. El
 smoke test sigue como estaba.
+
+La única excepción, y el patrón a copiar para los que quedan, es
+`__tests__/cascade/routines.test.ts` (PR #753): afirma sobre `exists === false`
+del documento y sobre la desaparición de su subcolección, no sobre el string
+`"routines"` en `deletedCollections`.
 
 #### 2.2.3 Inconsistencia interna que conviene mirar
 
@@ -621,6 +669,9 @@ quedan documentados con precisión para que cada uno salga como ticket.
 
 Se numeran siguiendo la convención `QA-CMP-xxx` que ya usan
 `cascade/storage.ts` (QA-CMP-002) y `cascade/athlete-data.ts` (QA-CMP-003).
+Los que se cierren después quedan **tachados acá con la referencia al PR que
+los cerró**, no borrados — la §2.6 regla 3 lo pide así, y el historial de qué
+se decidió y por qué es la mitad del valor de esta lista.
 
 **Estado:** ~~QA-CMP-004b~~ y ~~QA-CMP-005b~~ están **cerrados** ([#754](https://github.com/Backhaus7997/treino/pull/754)) — los dos
 salían del mismo comentario desactualizado en `cascade/posts.ts` y se
@@ -629,32 +680,51 @@ existieron. Los otros ocho siguen **abiertos**.
 
 ---
 
-**QA-CMP-004 — `routines` no se borra, y hay un guard que asume que sí.**
-`runDeleteAccount` no tiene ningún paso sobre `routines`. Sobreviven las rutinas
-con `createdBy == uid` y —peor— las privadas con `assignedTo == uid`, que son
-los planes que el PF le armó a ese alumno.
+~~**QA-CMP-004 — `routines` no se borra, y hay un guard que asume que sí.**~~
+**CERRADO — PR #753.**
 
-Lo que lo convierte en un hueco de contrato y no en un olvido: el trigger
-`cleanupAssignedPlansOnUnlink` **se saltea explícitamente** el caso, delegándolo
-en un paso que no existe:
+~~`runDeleteAccount` no tiene ningún paso sobre `routines`. Sobreviven las
+rutinas con `createdBy == uid` y —peor— las privadas con `assignedTo == uid`,
+que son los planes que el PF le armó a ese alumno.~~
 
-```ts
-// functions/src/cleanup-assigned-plans.ts:110-113
-// Guard: account-deletion cascade owns its own cleanup — don't interfere.
-if (reason === "account-deleted") {
-  logger.info("cleanupAssignedPlans: skipping cascade reason=account-deleted");
-  return { count: 0 };
-}
-```
-
-Y `"account-deleted"` es exactamente el `reason` que escribe
+~~Lo que lo convierte en un hueco de contrato y no en un olvido: el trigger
+`cleanupAssignedPlansOnUnlink` **se saltea explícitamente** el caso,
+delegándolo en un paso que no existe (`cleanup-assigned-plans.ts:110-113`), y
+`"account-deleted"` es exactamente el `reason` que escribe
 `terminateTrainerLinks`. O sea: el único mecanismo que habría barrido esos
-planes se apaga justo cuando hace falta.
+planes se apagaba justo cuando hacía falta.~~
 
-*Reparación sugerida (no aplicada):* un paso de cascade que borre
-`routines where assignedTo == uid`, y que decida qué hacer con
-`createdBy == uid` según `visibility` (una plantilla pública que otros usan no
-es lo mismo que una rutina privada).
+El paso existe: `cascade/routines.ts` → `deleteAthleteRoutines`, step 8d del
+cascade. La disposición quedó escrita en la cabecera del módulo, con las tres
+decisiones separadas:
+
+- `assignedTo == uid` → **borra**. Son los planes que el PF armó para ese
+  alumno; es literalmente lo que el guard de `cleanupAssignedPlansOnUnlink`
+  venía delegando.
+- `createdBy == uid` → **borra**. El caso que la reparación sugerida marcaba
+  como dudoso —"una plantilla pública que otros usan"— resultó no ser
+  alcanzable por este predicado: las plantillas se llavean por `assignedBy`,
+  no por `createdBy`, y un PF ni siquiera entra al cascade (guard de rol). Una
+  rutina `user-created` con `visibility: 'public'` sí es legible por cualquier
+  autenticado que tenga el id, pero la única superficie que las lista es
+  `publicRoutinesByUserProvider`, la solapa RUTINAS PÚBLICAS del perfil
+  público **de ese mismo usuario**, y `userPublicProfiles/{uid}` se borra en el
+  mismo cascade. El catálogo tampoco las ve: `listSystemTemplates` filtra
+  `source == 'system'` y `listPublishedTemplates` filtra
+  `source == 'trainer-template'`.
+- `assignedBy == uid` → **no se toca, a propósito**. El guard de rol lee
+  `users/{uid}`; en un re-run idempotente posterior a un fallo parcial ese doc
+  ya no existe y el guard **no puede dispararse**. Un barrido por `assignedBy`
+  borraría entonces la biblioteca entera del PF y todos los planes de todos
+  sus alumnos. El residuo que esto deja —una `trainer-template` forjada por un
+  atleta, privada e impublicable— no justifica ese radio de daño. Hay un test
+  que fija la no-eliminación para que nadie ensanche el predicado sin darse
+  cuenta.
+
+Usa `recursiveDelete`, no `batch.delete`, así que se lleva la subcolección
+`ratings` del documento borrado. La otra mitad de QA-CMP-006 —las
+puntuaciones que el usuario borrado dejó en plantillas **ajenas**— sigue
+abierta: necesita un barrido `collectionGroup`, no estas dos queries.
 
 ---
 

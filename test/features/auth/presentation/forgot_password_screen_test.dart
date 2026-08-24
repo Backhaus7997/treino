@@ -10,6 +10,7 @@ import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/auth/domain/auth_failure.dart';
 import 'package:treino/features/auth/presentation/forgot_password_screen.dart';
+import 'package:treino/features/auth/presentation/widgets/auth_failure_banner.dart';
 import 'package:treino/features/auth/presentation/widgets/auth_pill_button.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
@@ -178,5 +179,119 @@ void main() {
 
     // The button should show the spinner (isLoading:true on AuthPillButton)
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Estado de éxito: reenvío, cooldown y salida para el typo
+  //
+  // ux-audit-2026-06-16 (MEDIUM · states): "El estado de éxito no tiene
+  // affordance de 'reenviar' ni forma de volver al formulario. Si el mail nunca
+  // llega (spam, typo) el único recurso del usuario es ir al login y empezar de
+  // nuevo."
+  //
+  // OJO con pumpAndSettle en este bloque: el cooldown es un Timer.periodic, así
+  // que settle corre los 60 ticks hasta el final. Para observar la cuenta
+  // regresiva hay que usar pump() con duraciones explícitas.
+  // ---------------------------------------------------------------------------
+
+  /// Lleva la pantalla al estado de éxito sin consumir el cooldown.
+  Future<void> submitWithoutSettling(WidgetTester tester) async {
+    await tester.enterText(find.byType(TextFormField), 'user@example.com');
+    await tester.pump();
+    await tester.tap(find.byType(AuthPillButton));
+    await tester.pump(); // _isLoading = true
+    await tester.pump(); // el future resuelve -> _markSent()
+  }
+
+  testWidgets('éxito: aparece el hint de spam', (tester) async {
+    final notifier = _TestAuthNotifier(onReset: (_) async {});
+
+    await tester.pumpWidget(_buildApp(notifier: notifier));
+    await tester.pumpAndSettle();
+    await submitWithoutSettling(tester);
+
+    expect(find.textContaining('carpeta de spam'), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 61)); // agota el timer
+  });
+
+  testWidgets('éxito: el reenvío arranca deshabilitado con cuenta regresiva',
+      (tester) async {
+    final notifier = _TestAuthNotifier(onReset: (_) async {});
+
+    await tester.pumpWidget(_buildApp(notifier: notifier));
+    await tester.pumpAndSettle();
+    await submitWithoutSettling(tester);
+
+    // Muestra los segundos que faltan, no un botón muerto sin explicación.
+    expect(find.textContaining('Podés reenviar en'), findsOneWidget);
+    expect(find.text('Reenviar el link'), findsNothing);
+
+    await tester.pump(const Duration(seconds: 61));
+  });
+
+  testWidgets(
+      'éxito: pasado el cooldown el reenvío se habilita y vuelve a pedir',
+      (tester) async {
+    var calls = 0;
+    final notifier = _TestAuthNotifier(onReset: (_) async => calls++);
+
+    await tester.pumpWidget(_buildApp(notifier: notifier));
+    await tester.pumpAndSettle();
+    await submitWithoutSettling(tester);
+    expect(calls, 1);
+
+    await tester.pump(const Duration(seconds: 61));
+    expect(find.text('Reenviar el link'), findsOneWidget);
+
+    await tester.tap(find.text('Reenviar el link'));
+    await tester.pump();
+    await tester.pump();
+
+    expect(calls, 2);
+    // Y el cooldown vuelve a arrancar, así que no se puede martillar.
+    expect(find.textContaining('Podés reenviar en'), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 61));
+  });
+
+  testWidgets('éxito: "usar otra dirección" devuelve al formulario editable',
+      (tester) async {
+    final notifier = _TestAuthNotifier(onReset: (_) async {});
+
+    await tester.pumpWidget(_buildApp(notifier: notifier));
+    await tester.pumpAndSettle();
+    await submitWithoutSettling(tester);
+
+    await tester.tap(find.text('Usar otra dirección'));
+    await tester.pumpAndSettle();
+
+    // REQ-AUTH-011 hace que un typo se vea igual que un envío correcto; sin
+    // esta salida el único recurso es volver al login y empezar de cero.
+    final tf = tester.widget<TextFormField>(find.byType(TextFormField));
+    expect(tf.enabled, isTrue);
+    expect(find.textContaining('Si tu email está registrado'), findsNothing);
+  });
+
+  testWidgets('éxito: un reenvío que falla muestra el banner, no se lo come',
+      (tester) async {
+    var calls = 0;
+    final notifier = _TestAuthNotifier(onReset: (_) async {
+      calls++;
+      if (calls > 1) throw const AuthFailure.networkError();
+    });
+
+    await tester.pumpWidget(_buildApp(notifier: notifier));
+    await tester.pumpAndSettle();
+    await submitWithoutSettling(tester);
+
+    await tester.pump(const Duration(seconds: 61));
+    await tester.tap(find.text('Reenviar el link'));
+    await tester.pump();
+    await tester.pump();
+
+    // Sin esto el estado de éxito se traga el error y el usuario queda sin
+    // ninguna señal — la misma clase de dead-end que la auditoría marcó.
+    expect(find.byType(AuthFailureBanner), findsOneWidget);
   });
 }

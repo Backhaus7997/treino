@@ -15,6 +15,11 @@
 
 /** Stable discriminator: selects the template and drives the dedupe key. */
 export type MailKind =
+  // Auth. Reemplazan las plantillas default de Firebase Auth: el link sigue
+  // siendo el que genera el Admin SDK (apunta al action handler que Firebase
+  // hostea), lo unico que cambia es quien manda el mail y como se ve.
+  | "password-reset"
+  | "email-verification"
   | "appointment-confirmed"
   | "appointment-series-created"
   | "appointment-cancelled"
