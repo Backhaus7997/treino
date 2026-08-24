@@ -221,6 +221,39 @@ void main() {
   });
 
   group('RutinasSection — unified list', () {
+    testWidgets('la tarjeta NO lidera con la jerga del split (#648)',
+        (tester) async {
+      // Antes de #648 esta línea era '{SPLIT} · {NIVEL}' — el split primero y
+      // en mayúsculas. 2 de 5 participantes de usabilidad no supieron qué
+      // significaba, y era la etiqueta más prominente de la pantalla que
+      // tienen que usar para elegir.
+      //
+      // El nombre de la rutina NO contiene el split a propósito: si lo
+      // contuviera, el finder daría un falso negativo contra el título.
+      final routine = Routine(
+        id: 'r-jerga',
+        name: 'Mi Rutina',
+        split: 'Bro Split',
+        level: ExperienceLevel.beginner,
+        days: const [],
+        source: RoutineSource.userCreated,
+        visibility: RoutineVisibility.private,
+        createdBy: 'athlete-1',
+      );
+
+      await _pumpSection(tester, own: [routine]);
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('BRO SPLIT'), findsNothing);
+      expect(find.textContaining('Bro Split'), findsNothing);
+      // Y lo que el principiante SÍ puede evaluar sigue estando.
+      expect(
+        find.textContaining(
+            ExperienceLevel.beginner.displayNameEs.toUpperCase()),
+        findsOneWidget,
+      );
+    });
+
     testWidgets(
         'accessibility text scale stacks header and card status without overflow',
         (tester) async {
