@@ -117,8 +117,22 @@ jobs:
   # main sin que nada lo frenara. Este job corre `tsc` y falla ante cualquiera.
   # Rápido y sin Java → feedback inmediato. Los tests (jest contra el Emulator
   # Suite) viven en el job `functions-test` de abajo.
+  #
+  # Además del build corre el typecheck de `scripts/` y el lint — los tres son
+  # gates estáticos, baratos, y comparten el mismo `npm ci`. De ahí el nombre
+  # "Functions Static Checks": se llamaba "Functions Build" cuando solo corría
+  # `tsc`, y se renombró al sumar el tercero. Se hizo AHORA porque hoy `main`
+  # no tiene branch protection ni rulesets —cero required status checks, o sea
+  # que el rename no deja nada huérfano— y el día que se los pongan van a
+  # referenciar este nombre y renombrarlo pasa a costar.
+  #
+  # La CLAVE del job sigue siendo `functions-build` a propósito, aunque no
+  # coincida con el nombre: no es visible en la lista de checks, nada le hace
+  # `needs:`, y está citada en artefactos SDD ya archivados
+  # (openspec/changes/follow-model/). Cambiarla obligaría a reescribir
+  # documentos históricos para acomodar un rename cosmético.
   functions-build:
-    name: Functions Build
+    name: Functions Static Checks
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -144,6 +158,24 @@ jobs:
       # al desacoplar cobros, y nadie se entero porque nada lo compilaba.
       - name: Typecheck functions scripts
         run: npm --prefix functions run typecheck:scripts
+
+      # El tercer agujero de la misma familia que los dos de arriba: el script
+      # `lint` existía en package.json, estaba roto de punta a punta —76 parsing
+      # errors, uno por cada archivo de src/__tests__/— y ningún job lo corría,
+      # así que nadie se enteraba. Arreglado en el PR que agrega este paso
+      # (functions/tsconfig.eslint.json). Se corre acá y no en un job aparte
+      # porque `functions-build` ya tiene Node 20 y las deps instaladas: sumarlo
+      # cuesta segundos, un job nuevo cuesta otro `npm ci` entero.
+      #
+      # Va DESPUÉS de build y typecheck a propósito: si el código no compila,
+      # los hallazgos del lint —que es typed, usa type information— son ruido
+      # derivado. Primero "¿compila?", después "¿está bien escrito?".
+      #
+      # Gatea sobre ERRORES, no sobre warnings: hoy quedan 10 `max-len` vivos y
+      # limpiarlos es otra discusión. Si algún día se quieren gatear, el flag es
+      # `--max-warnings 0` y hay que barrerlos antes o esto se pone rojo.
+      - name: Lint functions
+        run: npm --prefix functions run lint
 
   # Corre los tests de las Cloud Functions (jest) contra el Firebase Emulator
   # Suite. Era el agujero que faltaba: hasta ahora los tests de functions/ —

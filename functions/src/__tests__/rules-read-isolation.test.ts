@@ -742,26 +742,26 @@ function parseBoolExpr(squeezed: string): BoolNode {
 /** Round-trip partner of the parser: must rebuild the input exactly. */
 function serializeBool(node: BoolNode): string {
   switch (node.kind) {
-    case "atom":
-      return node.text;
-    case "group":
-      return `(${serializeBool(node.inner)})`;
-    case "and":
-      return node.parts.map(serializeBool).join("&&");
-    case "or":
-      return node.parts.map(serializeBool).join("||");
+  case "atom":
+    return node.text;
+  case "group":
+    return `(${serializeBool(node.inner)})`;
+  case "and":
+    return node.parts.map(serializeBool).join("&&");
+  case "or":
+    return node.parts.map(serializeBool).join("||");
   }
 }
 
 function atomsOf(node: BoolNode): string[] {
   switch (node.kind) {
-    case "atom":
-      return [node.text];
-    case "group":
-      return atomsOf(node.inner);
-    case "and":
-    case "or":
-      return node.parts.flatMap(atomsOf);
+  case "atom":
+    return [node.text];
+  case "group":
+    return atomsOf(node.inner);
+  case "and":
+  case "or":
+    return node.parts.flatMap(atomsOf);
   }
 }
 
@@ -779,25 +779,25 @@ function evalShortCircuit(
   hit: { atom: string },
 ): boolean {
   switch (node.kind) {
-    case "group":
-      return evalShortCircuit(node.inner, isOwner, isLookup, assignment, hit);
-    case "and":
-      for (const part of node.parts) {
-        if (!evalShortCircuit(part, isOwner, isLookup, assignment, hit)) return false;
-      }
-      return true;
-    case "or":
-      for (const part of node.parts) {
-        if (evalShortCircuit(part, isOwner, isLookup, assignment, hit)) return true;
-      }
-      return false;
-    case "atom": {
-      if (isOwner(node.text)) return true;
-      if (isLookup(node.text) && hit.atom === "") hit.atom = node.text;
-      const value = assignment.get(node.text);
-      if (value === undefined) throw new Error(`short-circuit eval: no assignment for operand "${node.text}"`);
-      return value;
+  case "group":
+    return evalShortCircuit(node.inner, isOwner, isLookup, assignment, hit);
+  case "and":
+    for (const part of node.parts) {
+      if (!evalShortCircuit(part, isOwner, isLookup, assignment, hit)) return false;
     }
+    return true;
+  case "or":
+    for (const part of node.parts) {
+      if (evalShortCircuit(part, isOwner, isLookup, assignment, hit)) return true;
+    }
+    return false;
+  case "atom": {
+    if (isOwner(node.text)) return true;
+    if (isLookup(node.text) && hit.atom === "") hit.atom = node.text;
+    const value = assignment.get(node.text);
+    if (value === undefined) throw new Error(`short-circuit eval: no assignment for operand "${node.text}"`);
+    return value;
+  }
   }
 }
 

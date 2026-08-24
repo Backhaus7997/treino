@@ -47,10 +47,10 @@ describe("renderMail: escapes user-controlled values", () => {
 
   it("escapes quotes so a name cannot break out of an attribute", () => {
     const out = renderMail("link-accepted", {
-      trainerName: '" onmouseover="evil()',
+      trainerName: "\" onmouseover=\"evil()",
     });
 
-    expect(out.html).not.toContain('onmouseover="evil()"');
+    expect(out.html).not.toContain("onmouseover=\"evil()\"");
     expect(out.html).toContain("&quot;");
   });
 
