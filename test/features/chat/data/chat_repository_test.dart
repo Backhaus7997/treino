@@ -99,6 +99,55 @@ void main() {
       final snap = await firestore.collection('chats').doc('aaa_bbb').get();
       expect(snap.data()!.containsKey('linkId'), isFalse);
     });
+
+    // ─── #637: chat de PRE-CONSULTA ────────────────────────────────────────
+    //
+    // El CTA "CONSULTAR" del perfil público del PF abre un chat SIN vínculo
+    // formal. La marca `kind: 'inquiry'` es lo que selecciona la tercera rama
+    // de `chatCreateOk`, así que estos tests son el espejo cliente de la regla
+    // — si divergen, el botón abre chats que el backend rechaza.
+
+    test('asInquiry sin vínculo → estampa kind: inquiry y NINGÚN linkId',
+        () async {
+      final chat =
+          await repo.getOrCreate(selfId: uidB, otherId: uidA, asInquiry: true);
+
+      final snap = await firestore.collection('chats').doc('aaa_bbb').get();
+      expect(snap.data()!['kind'], 'inquiry');
+      expect(snap.data()!.containsKey('linkId'), isFalse);
+      expect(chat.isInquiry, isTrue);
+    });
+
+    test('sin asInquiry → NO estampa kind (default: chat social)', () async {
+      await repo.getOrCreate(selfId: uidA, otherId: uidB);
+
+      final snap = await firestore.collection('chats').doc('aaa_bbb').get();
+      expect(snap.data()!.containsKey('kind'), isFalse);
+    });
+
+    // Exclusividad: con `linkId` gana la rama Coach en las rules, así que
+    // mandar las dos marcas dejaría un `kind` sin validar en el doc — y la
+    // bandeja mostraría el chat con tu propio PF como si fuese una consulta.
+    test('asInquiry CON vínculo vigente → gana el linkId, sin kind', () async {
+      await seedLink('link-active', 'active');
+
+      final chat =
+          await repo.getOrCreate(selfId: uidB, otherId: uidA, asInquiry: true);
+
+      final snap = await firestore.collection('chats').doc('aaa_bbb').get();
+      expect(snap.data()!['linkId'], 'link-active');
+      expect(snap.data()!.containsKey('kind'), isFalse);
+      expect(chat.isInquiry, isFalse);
+    });
+
+    test('asInquiry sobre un chat que YA existe no lo remarca', () async {
+      await repo.getOrCreate(selfId: uidA, otherId: uidB);
+
+      await repo.getOrCreate(selfId: uidB, otherId: uidA, asInquiry: true);
+
+      final snap = await firestore.collection('chats').doc('aaa_bbb').get();
+      expect(snap.data()!.containsKey('kind'), isFalse);
+    });
   });
 
   // ─── getOrCreate — createdAt sin resolver (#501) ─────────────────────────
