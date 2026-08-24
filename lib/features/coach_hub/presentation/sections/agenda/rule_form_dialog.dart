@@ -197,7 +197,7 @@ class _RuleFormDialogState extends ConsumerState<RuleFormDialog> {
           onPressed: _saving ? null : () => _save(context),
           style: ElevatedButton.styleFrom(
             backgroundColor: palette.accent,
-            foregroundColor: palette.bg,
+            foregroundColor: TreinoButtonTokens.foreground(context),
           ),
           child: Text(
             'GUARDAR', // i18n

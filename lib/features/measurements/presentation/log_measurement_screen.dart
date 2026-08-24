@@ -621,7 +621,7 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
                   onPressed: canSave ? _save : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: canSave ? palette.accent : palette.border,
-                    foregroundColor: palette.bg,
+                    foregroundColor: TreinoButtonTokens.foreground(context),
                     disabledBackgroundColor: palette.border,
                     disabledForegroundColor: palette.textMuted,
                     shape: RoundedRectangleBorder(
@@ -634,7 +634,7 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
                           height: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: palette.bg,
+                            color: TreinoButtonTokens.foreground(context),
                           ),
                         )
                       : Text(

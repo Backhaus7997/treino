@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../app/theme/app_motion.dart';
 import '../../app/theme/app_palette.dart';
@@ -403,7 +404,7 @@ class _FeedActions extends ConsumerWidget {
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
                               height: 1.2,
-                              color: palette.bg,
+                              color: TreinoButtonTokens.foreground(context),
                             ),
                           ),
                         ),
@@ -453,7 +454,7 @@ class _FeedActions extends ConsumerWidget {
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
                               height: 1.2,
-                              color: palette.bg,
+                              color: TreinoButtonTokens.foreground(context),
                             ),
                           ),
                         ),
@@ -500,7 +501,8 @@ class _FeedActions extends ConsumerWidget {
                     color: palette.accent,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(TreinoIcon.plus, size: 20, color: palette.bg),
+                  child: Icon(TreinoIcon.plus,
+                      size: 20, color: TreinoButtonTokens.foreground(context)),
                 ),
               ),
             ),

@@ -89,7 +89,7 @@ class _LocationRationaleSheet extends StatelessWidget {
               onPressed: () => Navigator.of(context).pop(true),
               style: ElevatedButton.styleFrom(
                 backgroundColor: palette.accent,
-                foregroundColor: palette.bg,
+                foregroundColor: TreinoButtonTokens.foreground(context),
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
               child: Text(

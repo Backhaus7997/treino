@@ -315,7 +315,7 @@ class _CustomExerciseEditorScreenState
                     _saving ? null : () => _onSave(context, ref, existing),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: palette.accent,
-                  foregroundColor: palette.bg,
+                  foregroundColor: TreinoButtonTokens.foreground(context),
                   minimumSize: const Size.fromHeight(48),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(AppRadius.full),
@@ -326,7 +326,8 @@ class _CustomExerciseEditorScreenState
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(
-                            strokeWidth: 2.4, color: palette.bg),
+                            strokeWidth: 2.4,
+                            color: TreinoButtonTokens.foreground(context)),
                       )
                     : Text(
                         widget.isEditing

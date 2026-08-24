@@ -313,7 +313,9 @@ class _GranularityButton extends StatelessWidget {
             fontWeight: FontWeight.w700,
             fontSize: 12,
             letterSpacing: 0.8,
-            color: isSelected ? palette.bg : palette.textMuted,
+            color: isSelected
+                ? TreinoButtonTokens.foreground(context)
+                : palette.textMuted,
           ),
         ),
       ),

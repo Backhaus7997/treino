@@ -2594,7 +2594,7 @@ class _NotasPrivadasTabState extends ConsumerState<_NotasPrivadasTab> {
                         : () => _save(trainerUid),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: palette.accent,
-                      foregroundColor: palette.bg,
+                      foregroundColor: TreinoButtonTokens.foreground(context),
                       disabledBackgroundColor:
                           palette.accent.withValues(alpha: 0.3),
                       padding: const EdgeInsets.symmetric(
@@ -2607,7 +2607,7 @@ class _NotasPrivadasTabState extends ConsumerState<_NotasPrivadasTab> {
                             height: 16,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: palette.bg,
+                              color: TreinoButtonTokens.foreground(context),
                             ),
                           )
                         : Text(
@@ -2942,7 +2942,7 @@ class _ArchivosTabState extends ConsumerState<_ArchivosTab> {
                 label: Text(l10n.coachHubAlumnoDetailArchivosUploadButton),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: palette.accent,
-                  foregroundColor: palette.bg,
+                  foregroundColor: TreinoButtonTokens.foreground(context),
                   disabledBackgroundColor:
                       palette.accent.withValues(alpha: 0.3),
                   padding:
@@ -3311,7 +3311,7 @@ class _MedicionesTabState extends ConsumerState<_MedicionesTab> {
                     : 'NUEVA PRUEBA'), // i18n: Fase W2
                 style: ElevatedButton.styleFrom(
                   backgroundColor: palette.accent,
-                  foregroundColor: palette.bg,
+                  foregroundColor: TreinoButtonTokens.foreground(context),
                   padding:
                       const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                   shape: const StadiumBorder(),
@@ -4197,7 +4197,7 @@ class _NuevaMedicionDialogState extends ConsumerState<_NuevaMedicionDialog> {
                     onPressed: _saving ? null : _save,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: palette.accent,
-                      foregroundColor: palette.bg,
+                      foregroundColor: TreinoButtonTokens.foreground(context),
                       padding: const EdgeInsets.symmetric(
                           horizontal: 20, vertical: 12),
                       shape: const StadiumBorder(),
@@ -4208,7 +4208,7 @@ class _NuevaMedicionDialogState extends ConsumerState<_NuevaMedicionDialog> {
                             height: 14,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: palette.bg,
+                              color: TreinoButtonTokens.foreground(context),
                             ),
                           )
                         : const Text('GUARDAR'), // i18n: Fase W2
@@ -4983,7 +4983,7 @@ class _NuevoRendimientoDialogState
                     onPressed: _saving ? null : _save,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: palette.accent,
-                      foregroundColor: palette.bg,
+                      foregroundColor: TreinoButtonTokens.foreground(context),
                       padding: const EdgeInsets.symmetric(
                           horizontal: 20, vertical: 12),
                       shape: const StadiumBorder(),
@@ -4994,7 +4994,7 @@ class _NuevoRendimientoDialogState
                             height: 14,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: palette.bg,
+                              color: TreinoButtonTokens.foreground(context),
                             ),
                           )
                         : const Text('GUARDAR'), // i18n: Fase W2
@@ -5122,7 +5122,7 @@ class _SeguimientoTabState extends ConsumerState<_SeguimientoTab> {
                 label: const Text('NUEVA ENTRADA'), // i18n: Fase W2
                 style: ElevatedButton.styleFrom(
                   backgroundColor: palette.accent,
-                  foregroundColor: palette.bg,
+                  foregroundColor: TreinoButtonTokens.foreground(context),
                   padding:
                       const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                   shape: const StadiumBorder(),
@@ -5482,7 +5482,7 @@ class _NuevaEntradaSeguimientoDialogState
                       onPressed: _saving ? null : _save,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: palette.accent,
-                        foregroundColor: palette.bg,
+                        foregroundColor: TreinoButtonTokens.foreground(context),
                         padding: const EdgeInsets.symmetric(
                             horizontal: 20, vertical: 12),
                         shape: const StadiumBorder(),
@@ -5493,7 +5493,7 @@ class _NuevaEntradaSeguimientoDialogState
                               height: 14,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: palette.bg,
+                                color: TreinoButtonTokens.foreground(context),
                               ),
                             )
                           : const Text('GUARDAR'), // i18n: Fase W2
@@ -5717,7 +5717,7 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
                   onPressed: _saving ? null : _save,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: palette.accent,
-                    foregroundColor: palette.bg,
+                    foregroundColor: TreinoButtonTokens.foreground(context),
                     padding: const EdgeInsets.symmetric(
                         horizontal: 20, vertical: 12),
                     shape: const StadiumBorder(),
@@ -5728,7 +5728,7 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
                           height: 14,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: palette.bg,
+                            color: TreinoButtonTokens.foreground(context),
                           ),
                         )
                       : const Text('GUARDAR PLAN'), // i18n: Fase W2

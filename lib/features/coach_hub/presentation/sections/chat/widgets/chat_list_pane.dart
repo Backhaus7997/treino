@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../../../app/theme/app_palette.dart';
-import '../../../../../../app/theme/tokens/primitives.dart';
 import '../../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../../chat/application/chat_providers.dart';
 import '../../../../../chat/domain/chat.dart';
@@ -308,7 +308,7 @@ class _ChatRow extends ConsumerWidget {
                             child: Icon(
                               Icons.circle,
                               size: 6,
-                              color: palette.bg,
+                              color: TreinoButtonTokens.foreground(context),
                             ),
                           ),
                         ],

@@ -394,7 +394,7 @@ class _BatchCobrarDialogState extends ConsumerState<BatchCobrarDialog> {
           onPressed: _billing ? null : _confirm,
           style: ElevatedButton.styleFrom(
             backgroundColor: palette.accent,
-            foregroundColor: palette.bg,
+            foregroundColor: TreinoButtonTokens.foreground(context),
             shape: const StadiumBorder(),
             disabledBackgroundColor: palette.accent.withValues(alpha: 0.3),
           ),
@@ -404,7 +404,7 @@ class _BatchCobrarDialogState extends ConsumerState<BatchCobrarDialog> {
                   height: 18,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: palette.bg,
+                    color: TreinoButtonTokens.foreground(context),
                   ),
                 )
               : Text(

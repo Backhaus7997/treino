@@ -306,8 +306,9 @@ class _AgendaCalendar extends StatelessWidget {
         outsideTextStyle: GoogleFonts.barlow(color: palette.textMuted),
         todayTextStyle: GoogleFonts.barlow(
             color: palette.textPrimary, fontWeight: FontWeight.w600),
-        selectedTextStyle:
-            GoogleFonts.barlow(color: palette.bg, fontWeight: FontWeight.w700),
+        selectedTextStyle: GoogleFonts.barlow(
+            color: TreinoButtonTokens.foreground(context),
+            fontWeight: FontWeight.w700),
       ),
       headerStyle: HeaderStyle(
         formatButtonVisible: false,

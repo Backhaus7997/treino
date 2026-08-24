@@ -403,7 +403,7 @@ class _SessionDetailSheetState extends ConsumerState<SessionDetailSheet> {
                 onPressed: _saving ? null : _saveNotes,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: palette.accent,
-                  foregroundColor: palette.bg,
+                  foregroundColor: TreinoButtonTokens.foreground(context),
                   minimumSize: const Size.fromHeight(48),
                   shape: const StadiumBorder(),
                   disabledBackgroundColor:
@@ -415,7 +415,7 @@ class _SessionDetailSheetState extends ConsumerState<SessionDetailSheet> {
                         height: 18,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: palette.bg,
+                          color: TreinoButtonTokens.foreground(context),
                         ),
                       )
                     : Text(

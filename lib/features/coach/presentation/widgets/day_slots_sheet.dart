@@ -278,7 +278,7 @@ Future<bool> _confirmDialog(
           onPressed: () => Navigator.of(ctx).pop(true),
           style: ElevatedButton.styleFrom(
             backgroundColor: palette.accent,
-            foregroundColor: palette.bg,
+            foregroundColor: TreinoButtonTokens.foreground(context),
           ),
           child: Text(
             confirmLabel,

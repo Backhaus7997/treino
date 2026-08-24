@@ -2490,7 +2490,9 @@ class _TerminarSessionButton extends StatelessWidget {
             fontWeight: FontWeight.w700,
             fontSize: 16,
             letterSpacing: 1.0,
-            color: enabled ? palette.bg : palette.textMuted,
+            color: enabled
+                ? TreinoButtonTokens.foreground(context)
+                : palette.textMuted,
           ),
         ),
       ),

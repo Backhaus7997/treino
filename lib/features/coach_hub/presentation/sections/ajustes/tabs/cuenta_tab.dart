@@ -3,8 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_palette.dart';
-import 'package:treino/app/theme/tokens/components/treino_focus_tokens.dart';
-import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/image/avatar_cropper.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/motion/treino_shimmer.dart';
@@ -239,7 +238,7 @@ class _CuentaFormState extends ConsumerState<_CuentaForm> {
             onPressed: (_canSave && !_saving) ? _save : null,
             style: ElevatedButton.styleFrom(
               backgroundColor: palette.accent,
-              foregroundColor: palette.bg,
+              foregroundColor: TreinoButtonTokens.foreground(context),
               disabledBackgroundColor: palette.bgCard,
               disabledForegroundColor: palette.textMuted,
               padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
@@ -250,7 +249,7 @@ class _CuentaFormState extends ConsumerState<_CuentaForm> {
                     height: 16,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: palette.bg,
+                      color: TreinoButtonTokens.foreground(context),
                     ),
                   )
                 : const Text('GUARDAR CAMBIOS'), // i18n: Fase W3

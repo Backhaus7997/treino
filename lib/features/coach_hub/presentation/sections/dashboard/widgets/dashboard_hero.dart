@@ -8,8 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_palette.dart';
-import 'package:treino/app/theme/tokens/components/treino_card_tokens.dart';
-import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/utils/argentina_time.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
@@ -166,7 +165,7 @@ class _AlertBannerCta extends StatelessWidget {
             fontWeight: FontWeight.w700,
             fontSize: 12,
             letterSpacing: 0.6,
-            color: palette.bg,
+            color: TreinoButtonTokens.foreground(context),
           ),
         ),
       ),
@@ -402,13 +401,13 @@ class _PrimaryQuickAction extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 15, color: palette.bg),
+            Icon(icon, size: 15, color: TreinoButtonTokens.foreground(context)),
             const SizedBox(width: AppSpacing.s8),
             Text(
               label,
               style: TextStyle(
                 fontFamily: AppFonts.barlowCondensed,
-                color: palette.bg,
+                color: TreinoButtonTokens.foreground(context),
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 1.1,

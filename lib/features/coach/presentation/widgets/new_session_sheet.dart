@@ -335,7 +335,8 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
                             : (_recurring ? _submitRecurring : _submitSingle),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: palette.accent,
-                          foregroundColor: palette.bg,
+                          foregroundColor:
+                              TreinoButtonTokens.foreground(context),
                           disabledBackgroundColor: palette.border,
                           minimumSize: const Size.fromHeight(48),
                           shape: const StadiumBorder(),
@@ -345,7 +346,7 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
                                 width: 20,
                                 height: 20,
                                 child: CircularProgressIndicator(
-                                  color: palette.bg,
+                                  color: TreinoButtonTokens.foreground(context),
                                   strokeWidth: 2,
                                 ),
                               )
@@ -562,7 +563,7 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
             onPressed: () => Navigator.of(ctx).pop(true),
             style: ElevatedButton.styleFrom(
               backgroundColor: palette.accent,
-              foregroundColor: palette.bg,
+              foregroundColor: TreinoButtonTokens.foreground(context),
             ),
             child: Text(
               confirmLabel,
@@ -908,7 +909,9 @@ class _Pill extends StatelessWidget {
                 fontWeight: FontWeight.w700,
                 fontSize: 13,
                 letterSpacing: 0.6,
-                color: selected ? palette.bg : palette.textMuted,
+                color: selected
+                    ? TreinoButtonTokens.foreground(context)
+                    : palette.textMuted,
               ),
             ),
           ),
@@ -982,7 +985,9 @@ class _WeekdayChips extends StatelessWidget {
                     style: GoogleFonts.barlowCondensed(
                       fontWeight: FontWeight.w700,
                       fontSize: 13,
-                      color: isSelected ? palette.bg : palette.textPrimary,
+                      color: isSelected
+                          ? TreinoButtonTokens.foreground(context)
+                          : palette.textPrimary,
                     ),
                   ),
                 ),

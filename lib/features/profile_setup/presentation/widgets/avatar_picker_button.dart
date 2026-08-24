@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
@@ -81,7 +82,8 @@ class AvatarPickerButton extends StatelessWidget {
                     shape: BoxShape.circle,
                     border: Border.all(color: palette.bg, width: 2),
                   ),
-                  child: Icon(TreinoIcon.plus, color: palette.bg, size: 16),
+                  child: Icon(TreinoIcon.plus,
+                      color: TreinoButtonTokens.foreground(context), size: 16),
                 ),
               ),
             ],

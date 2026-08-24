@@ -1021,7 +1021,7 @@ class _PopularBadge extends StatelessWidget {
       child: Text(
         'MÁS POPULAR', // i18n: Fase W3
         style: GoogleFonts.barlowCondensed(
-          color: palette.bg,
+          color: TreinoButtonTokens.foreground(context),
           fontSize: fontSize,
           fontWeight: FontWeight.w800,
           letterSpacing: letterSpacing,
@@ -1095,7 +1095,9 @@ class _PlanCtaButton extends StatelessWidget {
           child: Text(
             isFree ? 'GRATIS' : 'ELEGIR PLAN', // i18n: Fase W3
             style: GoogleFonts.barlowCondensed(
-              color: filled ? palette.bg : palette.textPrimary,
+              color: filled
+                  ? TreinoButtonTokens.foreground(context)
+                  : palette.textPrimary,
               fontSize: 13,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.6,

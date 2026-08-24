@@ -96,7 +96,7 @@ class MyExercisesScreen extends ConsumerWidget {
                 onPressed: () => context.push('/profile/my-exercises/new'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: palette.accent,
-                  foregroundColor: palette.bg,
+                  foregroundColor: TreinoButtonTokens.foreground(context),
                   minimumSize: const Size.fromHeight(48),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(AppRadius.full),

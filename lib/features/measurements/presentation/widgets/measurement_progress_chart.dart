@@ -361,7 +361,9 @@ class _Chip extends StatelessWidget {
           style: GoogleFonts.barlow(
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: isSelected ? palette.bg : palette.textMuted,
+            color: isSelected
+                ? TreinoButtonTokens.foreground(context)
+                : palette.textMuted,
           ),
         ),
       ),

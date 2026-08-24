@@ -313,7 +313,7 @@ class _BellWithBadge extends StatelessWidget {
                       style: GoogleFonts.barlowCondensed(
                         fontWeight: FontWeight.w700,
                         fontSize: 10,
-                        color: palette.bg,
+                        color: TreinoButtonTokens.foreground(context),
                       ),
                     ),
                   ),
@@ -529,7 +529,7 @@ class _PendingRequestCardState extends ConsumerState<_PendingRequestCard> {
                   onPressed: _busy ? null : _accept,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: palette.accent,
-                    foregroundColor: palette.bg,
+                    foregroundColor: TreinoButtonTokens.foreground(context),
                     minimumSize: const Size.fromHeight(40),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(AppRadius.full),
@@ -751,7 +751,7 @@ class _DejarFeedbackSheetState extends ConsumerState<_DejarFeedbackSheet> {
                       _saving || _controller.text.trim().isEmpty ? null : _save,
                   style: FilledButton.styleFrom(
                     backgroundColor: palette.accent,
-                    foregroundColor: palette.bg,
+                    foregroundColor: TreinoButtonTokens.foreground(context),
                     minimumSize: const Size.fromHeight(48),
                     shape: const StadiumBorder(),
                   ),
@@ -761,7 +761,7 @@ class _DejarFeedbackSheetState extends ConsumerState<_DejarFeedbackSheet> {
                           height: 18,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: palette.bg,
+                            color: TreinoButtonTokens.foreground(context),
                           ),
                         )
                       : Text(
@@ -2216,7 +2216,7 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
               onPressed: _saving || activeLinks.isEmpty ? null : _submit,
               style: ElevatedButton.styleFrom(
                 backgroundColor: palette.accent,
-                foregroundColor: palette.bg,
+                foregroundColor: TreinoButtonTokens.foreground(context),
                 disabledBackgroundColor: palette.border,
                 minimumSize: const Size.fromHeight(48),
                 shape: RoundedRectangleBorder(
@@ -2228,7 +2228,7 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
-                        color: palette.bg,
+                        color: TreinoButtonTokens.foreground(context),
                         strokeWidth: 2,
                       ),
                     )
@@ -2461,7 +2461,7 @@ class _BottomActions extends StatelessWidget {
         onPressed: () => context.go('/coach?tab=alumnos'),
         style: ElevatedButton.styleFrom(
           backgroundColor: palette.accent,
-          foregroundColor: palette.bg,
+          foregroundColor: TreinoButtonTokens.foreground(context),
           minimumSize: const Size.fromHeight(48),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.full),

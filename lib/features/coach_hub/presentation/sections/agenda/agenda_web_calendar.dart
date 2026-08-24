@@ -129,7 +129,7 @@ class AgendaWebCalendar extends ConsumerWidget {
           fontWeight: FontWeight.w600,
         ),
         selectedTextStyle: GoogleFonts.barlow(
-          color: palette.bg,
+          color: TreinoButtonTokens.foreground(context),
           fontWeight: FontWeight.w700,
         ),
       ),

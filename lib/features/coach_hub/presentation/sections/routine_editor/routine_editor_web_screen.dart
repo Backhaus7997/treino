@@ -1738,7 +1738,7 @@ class _RoutineEditorWebScreenState
                     onPressed: _submitting ? null : _submit,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: palette.accent,
-                      foregroundColor: palette.bg,
+                      foregroundColor: TreinoButtonTokens.foreground(context),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(AppRadius.full),
                       ),
@@ -2022,7 +2022,9 @@ class _LevelSelector extends StatelessWidget {
               child: Text(
                 level.displayNameEs,
                 style: GoogleFonts.barlowCondensed(
-                  color: selected == level ? palette.bg : palette.textPrimary,
+                  color: selected == level
+                      ? TreinoButtonTokens.foreground(context)
+                      : palette.textPrimary,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -2823,7 +2825,9 @@ class _ModeChip extends StatelessWidget {
         child: Text(
           label,
           style: GoogleFonts.barlowCondensed(
-            color: selected ? palette.bg : palette.textMuted,
+            color: selected
+                ? TreinoButtonTokens.foreground(context)
+                : palette.textMuted,
             fontWeight: FontWeight.w700,
             fontSize: 12,
           ),
@@ -2956,7 +2960,9 @@ class _WeekChip extends StatelessWidget {
             child: Text(
               'Sem ${index + 1}', // i18n
               style: GoogleFonts.barlowCondensed(
-                color: selected ? palette.bg : palette.textMuted,
+                color: selected
+                    ? TreinoButtonTokens.foreground(context)
+                    : palette.textMuted,
                 fontWeight: FontWeight.w700,
                 fontSize: 12,
               ),
@@ -3020,7 +3026,9 @@ class _PresenceChip extends StatelessWidget {
         child: Text(
           '${index + 1}',
           style: GoogleFonts.barlowCondensed(
-            color: present ? palette.bg : palette.textMuted,
+            color: present
+                ? TreinoButtonTokens.foreground(context)
+                : palette.textMuted,
             fontWeight: FontWeight.w700,
             fontSize: 11,
           ),
