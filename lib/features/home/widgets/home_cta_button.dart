@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../app/theme/tokens/components/treino_button_tokens.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
 
 /// Full-width pill CTA used on the Home screen.
@@ -33,9 +34,12 @@ class HomeCTAButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final enabled = onPressed != null;
-    // Mismos colores que tenía el ElevatedButton: accent pleno habilitado,
-    // accent al 50% deshabilitado; el foreground era palette.bg en ambos.
+    // Fondo: accent pleno habilitado, accent al 50% deshabilitado.
+    // Foreground: ink invariante. `palette.bg` sobre accent daba 12.10:1 en
+    // dark pero 1.57:1 en light — la app arranca en ThemeMode.system, así que
+    // el tema claro se sirve desde el primer arranque (AGENTS.md regla 2).
     final bg = enabled ? palette.accent : palette.accent.withValues(alpha: 0.5);
+    final fg = TreinoButtonTokens.foreground(context);
 
     return Semantics(
       button: true,
@@ -54,7 +58,7 @@ class HomeCTAButton extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (leadingIcon != null) ...[
-                Icon(leadingIcon, color: palette.bg, size: 18),
+                Icon(leadingIcon, color: fg, size: 18),
                 const SizedBox(width: 8),
               ],
               Text(
@@ -63,7 +67,7 @@ class HomeCTAButton extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                   fontSize: 16,
                   letterSpacing: 1.0,
-                  color: palette.bg,
+                  color: fg,
                 ),
               ),
             ],
