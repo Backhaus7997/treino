@@ -49,18 +49,29 @@ function esc(value: string | number | undefined): string {
     .replace(/'/g, "&#39;");
 }
 
+/** Fallback CTA target for mails that just send the reader back into the app. */
+const APP_URL = "https://treino.app/coach";
+
 /**
  * Wraps body markup in the branded shell.
  *
  * @param heading  - Large headline, already escaped.
  * @param bodyHtml - Pre-escaped inner markup.
  * @param ctaLabel - Button text; omit for a mail with no action.
+ * @param ctaHref  - Button target. Defaults to the app. The auth mails pass the
+ *                   one-time link the Admin SDK minted, which is why this is a
+ *                   parameter at all.
  */
-function layout(heading: string, bodyHtml: string, ctaLabel?: string): string {
+function layout(
+  heading: string,
+  bodyHtml: string,
+  ctaLabel?: string,
+  ctaHref: string = APP_URL,
+): string {
   const cta = ctaLabel
     ? [
       "<tr><td style=\"padding:8px 32px 32px 32px;\">",
-      "<a href=\"https://treino.app/coach\" style=\"display:inline-block;",
+      `<a href="${esc(ctaHref)}" style="display:inline-block;`,
       `background:${MINT};color:${INK};font-weight:700;font-size:15px;`,
       "text-decoration:none;padding:14px 28px;border-radius:8px;",
       `font-family:${FONT};">${esc(ctaLabel)}</a>`,
@@ -95,27 +106,82 @@ function layout(heading: string, bodyHtml: string, ctaLabel?: string): string {
   ].join("");
 }
 
-/** Builds both MIME parts from a heading, body lines, and an optional CTA. */
+/**
+ * Un valor resaltado dentro de una línea (nombres, fechas, importes).
+ *
+ * Es una CLASE y no un string con markup a propósito. Antes `strong()` devolvía
+ * HTML ya armado y la parte de texto plano se obtenía quitándole los tags con
+ * `replace(/<[^>]+>/g, "")`. CodeQL marcó eso como
+ * `js/incomplete-multi-character-sanitization` (severidad alta) y tiene razón:
+ * una sola pasada de ese regex puede CREAR un tag que antes no existía —
+ * `<<a>script>` queda en `<script>`.
+ *
+ * Acá no era explotable, porque todo lo que viene del usuario ya pasó por
+ * `esc()` antes de llegar, y el resultado va a text/plain, no a HTML. Pero el
+ * arreglo correcto no es endurecer el regex: es dejar de derivar un formato del
+ * otro. Con segmentos, cada representación se construye desde la MISMA fuente
+ * estructurada y ninguna tiene que adivinar dónde termina la otra.
+ */
+class Highlight {
+  constructor(readonly value: string) {}
+}
+
+/** Texto literal nuestro, o un valor resaltado. */
+type Segment = string | Highlight;
+
+/** Una línea del cuerpo: copy propio intercalado con valores. */
+type Line = Segment[];
+
+/** Marca un valor como resaltado. El escape ocurre por formato, no acá. */
+function strong(value: string | number | undefined): Highlight {
+  return new Highlight(String(value ?? ""));
+}
+
+/** Renderiza una línea a HTML. Todo se escapa, venga de donde venga. */
+function lineToHtml(line: Line): string {
+  return line
+    .map((seg) =>
+      seg instanceof Highlight
+        ? `<strong style="color:${BONE};">${esc(seg.value)}</strong>`
+        : esc(seg),
+    )
+    .join("");
+}
+
+/** Renderiza una línea a texto plano. Sin entidades: es text/plain. */
+function lineToText(line: Line): string {
+  return line
+    .map((seg) => (seg instanceof Highlight ? seg.value : seg))
+    .join("");
+}
+
+/**
+ * Builds both MIME parts from a heading, body lines, and an optional CTA.
+ *
+ * When the CTA points somewhere other than the app, the raw URL is appended to
+ * the text/plain part. A password-reset mail whose only link lives inside an
+ * HTML anchor is unusable for anyone reading in plain text — and unusable is
+ * the same as broken when it is the path back into a locked account.
+ */
 function build(
   subject: string,
   heading: string,
-  lines: string[],
+  lines: Line[],
   ctaLabel?: string,
+  ctaHref?: string,
 ): RenderedMail {
   const bodyHtml = lines
-    .map((l) => `<p style="margin:0 0 12px 0;">${l}</p>`)
+    .map((l) => `<p style="margin:0 0 12px 0;">${lineToHtml(l)}</p>`)
     .join("");
 
-  // Strip the inline markup the HTML lines carry to get the text/plain part.
-  const text = [heading, "", ...lines.map((l) => l.replace(/<[^>]+>/g, ""))]
-    .join("\n");
+  const textLines = [heading, "", ...lines.map(lineToText)];
+  if (ctaHref) textLines.push("", ctaHref);
 
-  return { subject, html: layout(heading, bodyHtml, ctaLabel), text };
-}
-
-/** Wraps a value in the light highlight used for names, dates and amounts. */
-function strong(value: string | number | undefined): string {
-  return `<strong style="color:${BONE};">${esc(value)}</strong>`;
+  return {
+    subject,
+    html: layout(heading, bodyHtml, ctaLabel, ctaHref),
+    text: textLines.join("\n"),
+  };
 }
 
 /**
@@ -129,14 +195,53 @@ function strong(value: string | number | undefined): string {
  */
 export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
   switch (kind) {
+  // ── Auth ─────────────────────────────────────────────────────────────────
+  //
+  // `actionLink` es el link de un solo uso que minta el Admin SDK
+  // (`generatePasswordResetLink` / `generateEmailVerificationLink`). Apunta al
+  // action handler que Firebase ya hostea, asi que NO hace falta una pagina
+  // propia para que esto funcione.
+  //
+  // El copy no nombra al usuario ni dice si la cuenta existe: estos mails son
+  // el unico canal donde una diferencia de texto filtraria que una direccion
+  // esta registrada, y el flujo entero se diseño para no filtrarlo
+  // (REQ-AUTH-011).
+  case "password-reset":
+    return build(
+      "Restablecé tu contraseña de TREINO", // i18n: email transaccional
+      "Restablecer contraseña",
+      [
+        ["Recibimos un pedido para cambiar la contraseña de tu cuenta."],
+        ["El link vence en una hora y se puede usar una sola vez."],
+        [
+          "Si no lo pediste vos, ignorá este mail: tu contraseña no cambia " +
+              "hasta que alguien complete el formulario.",
+        ],
+      ],
+      "CAMBIAR MI CONTRASEÑA",
+      String(params.actionLink ?? ""),
+    );
+
+  case "email-verification":
+    return build(
+      "Confirmá tu email en TREINO",
+      "Confirmá tu email",
+      [
+        ["Tocá el botón para confirmar que esta dirección es tuya."],
+        ["Es el último paso para tener la cuenta activa."],
+      ],
+      "CONFIRMAR MI EMAIL",
+      String(params.actionLink ?? ""),
+    );
+
   case "appointment-confirmed":
     return build(
       "Tu sesión quedó confirmada", // i18n: email transaccional
       "Sesión confirmada",
       [
-        `${strong(params.trainerName)} confirmó tu sesión.`,
-        `${strong(params.dateLabel)} a las ${strong(params.timeLabel)}.`,
-        "Si no podés ir, cancelá con más de 24 horas de anticipación.",
+        [strong(params.trainerName), " confirmó tu sesión."],
+        [strong(params.dateLabel), " a las ", strong(params.timeLabel), "."],
+        ["Si no podés ir, cancelá con más de 24 horas de anticipación."],
       ],
       "VER MI AGENDA",
     );
@@ -152,9 +257,8 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
       "Tu entrenador te agendó nuevas sesiones",
       "Tenés sesiones nuevas",
       [
-        `${strong(params.trainerName)} te agendó una serie de sesiones ` +
-            "recurrentes.",
-        "Las tenés todas cargadas en tu agenda, con día y horario.",
+        [strong(params.trainerName), " te agendó una serie de sesiones recurrentes."],
+        ["Las tenés todas cargadas en tu agenda, con día y horario."],
       ],
       "VER MI AGENDA",
     );
@@ -164,9 +268,15 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
       "Se canceló una sesión",
       "Sesión cancelada",
       [
-        `${strong(params.otherName)} canceló la sesión del ` +
-            `${strong(params.dateLabel)} a las ${strong(params.timeLabel)}.`,
-        "El horario vuelve a estar disponible en la agenda.",
+        [
+          strong(params.otherName),
+          " canceló la sesión del ",
+          strong(params.dateLabel),
+          " a las ",
+          strong(params.timeLabel),
+          ".",
+        ],
+        ["El horario vuelve a estar disponible en la agenda."],
       ],
       "VER MI AGENDA",
     );
@@ -177,9 +287,8 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
       "Se cancelaron sesiones de tu serie",
       "Sesiones canceladas",
       [
-        `${strong(params.otherName)} canceló sesiones de una serie ` +
-            "recurrente.",
-        "Revisá tu agenda para ver cómo quedó.",
+        [strong(params.otherName), " canceló sesiones de una serie recurrente."],
+        ["Revisá tu agenda para ver cómo quedó."],
       ],
       "VER MI AGENDA",
     );
@@ -189,8 +298,8 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
       "Tenés una solicitud de vinculación",
       "Nueva solicitud",
       [
-        `${strong(params.athleteName)} quiere entrenar con vos.`,
-        "Aceptá la solicitud para empezar a armarle la rutina.",
+        [strong(params.athleteName), " quiere entrenar con vos."],
+        ["Aceptá la solicitud para empezar a armarle la rutina."],
       ],
       "VER SOLICITUD",
     );
@@ -200,8 +309,8 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
       "¡Ya estás vinculado!",
       "Vinculación aceptada",
       [
-        `${strong(params.trainerName)} aceptó tu solicitud.`,
-        "Ya podés ver las rutinas que te asigne y hablar por el chat.",
+        [strong(params.trainerName), " aceptó tu solicitud."],
+        ["Ya podés ver las rutinas que te asigne y hablar por el chat."],
       ],
       "IR A MI ENTRENADOR",
     );
@@ -211,10 +320,9 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
       "Tenés un pago pendiente",
       "Pago vencido",
       [
-        `Tenés un pago pendiente con ${strong(params.trainerName)}.`,
-        `${strong(params.amountLabel)} — vencía el ` +
-            `${strong(params.dueLabel)}.`,
-        "Coordiná el pago con tu entrenador para seguir entrenando.",
+        ["Tenés un pago pendiente con ", strong(params.trainerName), "."],
+        [strong(params.amountLabel), " — vencía el ", strong(params.dueLabel), "."],
+        ["Coordiná el pago con tu entrenador para seguir entrenando."],
       ],
       "VER MIS PAGOS",
     );

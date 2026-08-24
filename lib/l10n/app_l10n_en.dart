@@ -216,6 +216,20 @@ class AppL10nEn extends AppL10n {
   String get authForgotBackToLogin => '';
 
   @override
+  String get authForgotSpamHint => '';
+
+  @override
+  String get authForgotResendCta => '';
+
+  @override
+  String authForgotResendIn(int seconds) {
+    return '';
+  }
+
+  @override
+  String get authForgotEditEmail => '';
+
+  @override
   String get authTrainerInquiryDialogTitle => '';
 
   @override

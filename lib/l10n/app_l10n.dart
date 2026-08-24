@@ -458,11 +458,35 @@ abstract class AppL10n {
   /// **'Si tu email está registrado, te enviamos un link para resetear la contraseña.'**
   String get authForgotSuccess;
 
-  /// No description provided for @authForgotBackToLogin.
+  /// Forgot-password success state: link back to the login screen.
   ///
   /// In es_AR, this message translates to:
   /// **'Volver al login'**
   String get authForgotBackToLogin;
+
+  /// Forgot-password success state: sets the expectation that the mail may be delayed or filtered, before offering the resend action (ux-audit-2026-06-16, MEDIUM · states).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿No te llegó? Puede tardar un minuto. Revisá también la carpeta de spam.'**
+  String get authForgotSpamHint;
+
+  /// Forgot-password success state: resend the reset link. Enabled once the cooldown elapses.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Reenviar el link'**
+  String get authForgotResendCta;
+
+  /// Forgot-password success state: cooldown label shown while the resend action is still disabled.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Podés reenviar en {seconds}s'**
+  String authForgotResendIn(int seconds);
+
+  /// Forgot-password success state: return to the form to correct a mistyped address. Needed because the anti-enumeration success copy hides a typo (ux-audit-2026-06-16).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Usar otra dirección'**
+  String get authForgotEditEmail;
 
   /// No description provided for @authTrainerInquiryDialogTitle.
   ///

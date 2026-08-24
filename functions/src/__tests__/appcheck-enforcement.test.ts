@@ -29,6 +29,35 @@ describe("QA-SEC-006: App Check enforcement on deployed callables", () => {
     },
   );
 
+  // Los callables de auth estan shelved hasta que el dominio del remitente
+  // este verificado en Resend. `requestPasswordReset` es el UNICO callable del
+  // repo invocable sin sesion, y cada llamada le manda un mail a un tercero:
+  // sin atestacion es un amplificador de spam apuntable. Este test lo cubre en
+  // los dos estados — shelved hoy, y con App Check obligatorio el dia que se
+  // exporte — asi que activarlo sin atestacion no puede pasar en silencio.
+  it.each(["requestPasswordReset", "requestEmailVerification"])(
+    "%s enforces App Check whenever it is exported",
+    (symbol) => {
+      const index = readFileSync(join(SRC, "index.ts"), "utf8");
+      const exported = new RegExp(
+        `^\\s*export\\s*\\{[^}]*\\b${symbol}\\b`,
+        "m",
+      ).test(index);
+
+      // Shelved o no, el archivo ya tiene que declarar la atestacion.
+      const src = readFileSync(join(SRC, "auth/request-auth-email.ts"), "utf8");
+      expect(src).toMatch(/enforceAppCheck:\s*true/);
+
+      if (exported) {
+        // Al exportarse pasa a ser un callable desplegado: se suma al
+        // inventario de DEPLOYED_CALLABLES de arriba.
+        expect(src).toMatch(
+          new RegExp(`export const ${symbol} = functions.onCall`),
+        );
+      }
+    },
+  );
+
   it("resolveGymPlace stays shelved (or, if un-shelved, must enforce App Check)", () => {
     const index = readFileSync(join(SRC, "index.ts"), "utf8");
     const exported = /^\s*export\s*\{\s*resolveGymPlace/m.test(index);

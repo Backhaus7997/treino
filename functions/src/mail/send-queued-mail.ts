@@ -203,6 +203,12 @@ export async function sendQueuedMailHandler(
     attempts,
     sentAt: FieldValue.serverTimestamp(),
     lastError: FieldValue.delete(),
+    // Los mails de auth llevan en `params.actionLink` un link de un solo uso
+    // con su `oobCode`. Una vez enviado, ese secreto no tiene por qué seguir
+    // viviendo en Firestore: la fila de la cola se conserva como registro de
+    // envío, no como copia del token. Sobre un documento sin ese campo el
+    // delete es un no-op, así que no hace falta ramificar por kind.
+    "params.actionLink": FieldValue.delete(),
   });
 
   logger.info("sendQueuedMail: sent", { mailId, kind: data.kind });
