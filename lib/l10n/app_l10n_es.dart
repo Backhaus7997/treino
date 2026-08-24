@@ -219,6 +219,21 @@ class AppL10nEs extends AppL10n {
   String get authForgotBackToLogin => 'Volver al login';
 
   @override
+  String get authForgotSpamHint =>
+      '¿No te llegó? Puede tardar un minuto. Revisá también la carpeta de spam.';
+
+  @override
+  String get authForgotResendCta => 'Reenviar el link';
+
+  @override
+  String authForgotResendIn(int seconds) {
+    return 'Podés reenviar en ${seconds}s';
+  }
+
+  @override
+  String get authForgotEditEmail => 'Usar otra dirección';
+
+  @override
   String get authTrainerInquiryDialogTitle => 'Acceso de entrenador';
 
   @override
@@ -3749,6 +3764,21 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get authForgotBackToLogin => 'Volver al login';
+
+  @override
+  String get authForgotSpamHint =>
+      '¿No te llegó? Puede tardar un minuto. Revisá también la carpeta de spam.';
+
+  @override
+  String get authForgotResendCta => 'Reenviar el link';
+
+  @override
+  String authForgotResendIn(int seconds) {
+    return 'Podés reenviar en ${seconds}s';
+  }
+
+  @override
+  String get authForgotEditEmail => 'Usar otra dirección';
 
   @override
   String get authTrainerInquiryDialogTitle => 'Acceso de entrenador';
