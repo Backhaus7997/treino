@@ -40,6 +40,14 @@ export async function deleteAvatar(
  *    athlete's chats, resolved from Firestore)
  *  - athleteFiles/{trainerId}_{uid}/** (trainer-authored files about the
  *    athlete — deleted per the trainer-authored-data product decision)
+ *  - postPhotos/{uid}/**              (QA-CMP-004b — uid-prefixed tree)
+ *
+ * QA-CMP-004b: `postPhotos/` was missing from this sweep because the header of
+ * `cascade/posts.ts` claimed posts had no Storage-backed media field. They do:
+ * `photoUrl` (firestore.rules:638 and :675) points at
+ * `postPhotos/{uid}/{postId}.{ext}`. Deleting the post document leaves the
+ * object in the bucket with a live download token, and storage.rules grants
+ * `get` on it to any authenticated user.
  *
  * Returns the total number of objects deleted.
  */
@@ -58,6 +66,7 @@ export async function deleteAthleteStorage(
 
   await deleteByPrefix(`temp/uploads/${uid}/`);
   await deleteByPrefix(`customExerciseVideos/${uid}/`);
+  await deleteByPrefix(`postPhotos/${uid}/`);
 
   // chatMedia is keyed chatMedia/{chatId}/{uid}/… — the uid is the SECOND
   // segment, so there is no single prefix. Scope by the athlete's chats.
