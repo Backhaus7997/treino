@@ -323,6 +323,17 @@ class AppL10nEn extends AppL10n {
   String get coachCtaLabel => '';
 
   @override
+  String get coachInquiryCtaLabel => 'ASK A QUESTION';
+
+  @override
+  String get coachInquiryCtaHelp =>
+      'Ask about price, format and availability without committing to anyone.';
+
+  @override
+  String get coachInquiryCtaError =>
+      'We couldn\'t open the chat. Please try again.';
+
+  @override
   String get coachCtaProximamente => '';
 
   @override

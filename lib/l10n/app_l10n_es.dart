@@ -329,6 +329,17 @@ class AppL10nEs extends AppL10n {
   String get coachCtaLabel => 'PEDIR VÍNCULO';
 
   @override
+  String get coachInquiryCtaLabel => 'CONSULTAR';
+
+  @override
+  String get coachInquiryCtaHelp =>
+      'Pregúntale precio, modalidad y horarios sin comprometerte con nadie.';
+
+  @override
+  String get coachInquiryCtaError =>
+      'No pudimos abrir la consulta. Inténtalo de nuevo.';
+
+  @override
   String get coachCtaProximamente => 'Próximamente — Etapa 3';
 
   @override
@@ -3885,6 +3896,17 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get coachCtaLabel => 'PEDIR VÍNCULO';
+
+  @override
+  String get coachInquiryCtaLabel => 'CONSULTAR';
+
+  @override
+  String get coachInquiryCtaHelp =>
+      'Preguntale precio, modalidad y horarios sin comprometerte con nadie.';
+
+  @override
+  String get coachInquiryCtaError =>
+      'No pudimos abrir la consulta. Probá de nuevo.';
 
   @override
   String get coachCtaProximamente => 'Próximamente — Etapa 3';

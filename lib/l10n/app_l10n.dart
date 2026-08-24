@@ -674,6 +674,24 @@ abstract class AppL10n {
   /// **'PEDIR VÍNCULO'**
   String get coachCtaLabel;
 
+  /// CTA primario del perfil público del PF (#637): abre un chat de pre-consulta SIN vínculo formal. Pasa a ser el camino visible y liviano; PEDIR VÍNCULO queda como el compromiso explícito que viene después.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CONSULTAR'**
+  String get coachInquiryCtaLabel;
+
+  /// Línea de ayuda debajo del par de CTAs. Existe porque el atleta necesita entender por qué hay dos botones: varios entrevistados querían consultar antes de decidir, y hoy el único camino compromete. También explica el botón deshabilitado cuando ya tiene un PF.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Preguntale precio, modalidad y horarios sin comprometerte con nadie.'**
+  String get coachInquiryCtaHelp;
+
+  /// Snackbar cuando falla el getOrCreate del chat de consulta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos abrir la consulta. Probá de nuevo.'**
+  String get coachInquiryCtaError;
+
   /// No description provided for @coachCtaProximamente.
   ///
   /// In es_AR, this message translates to:
