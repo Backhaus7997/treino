@@ -476,8 +476,8 @@ uno en su `try/catch`, y borra el usuario de Auth al final. Esto es lo que cada
 | 4 | `routines` | ✅ | `deleteAthleteRoutines` (PR #753) — `assignedTo == uid` + `createdBy == uid`, con `recursiveDelete`. `assignedBy` queda afuera a propósito, ver QA-CMP-004 |
 | 5 | `routines/*/ratings/{userId}` | ❌ **hueco** | Sin paso; `allow delete: if false` (`firestore.rules:494`) → QA-CMP-006 |
 | 6 | `trainer_links` | 🟡 parcial | `terminateTrainerLinks` marca `status:'terminated'`, `reason:'account-deleted'`. Los uids quedan. Deliberado. |
-| 7 | `posts` | ✅ | `deletePosts` (borrado real desde la decisión de producto 2026-07-16). El doc se va; **su subcolección `reactions` no** → QA-CMP-005b |
-| 8 | `posts/*/reactions/{reactorUid}` | ❌ **hueco** | Sin paso, en las dos direcciones → QA-CMP-005 (las del usuario en posts ajenos) y QA-CMP-005b (las de terceros en posts del usuario) |
+| 7 | `posts` | ✅ | `deletePosts` → `recursiveDelete` (borrado real desde la decisión de producto 2026-07-16). Se va el doc **y su subcolección `reactions`** — QA-CMP-005b arreglado |
+| 8 | `posts/*/reactions/{reactorUid}` | 🟡 **parcial** | Las de terceros en los posts del usuario se van con el `recursiveDelete` de `deletePosts` (QA-CMP-005b arreglado). **Las del usuario en posts ajenos quedan** → QA-CMP-005 |
 | 9 | `userPublicProfiles/{uid}` | ✅ | `deleteUserDocs` |
 | 10 | `trainerPublicProfiles/{uid}` | ✅ | `deleteUserDocs` (defensivo) |
 | 11 | `gyms` | n/a athlete | `createdBy` sólo lo escribe un PF, y un PF no puede autoborrarse → QA-CMP-011 |
@@ -506,7 +506,7 @@ uno en su `try/catch`, y borra el usuario de Auth al final. Esto es lo que cada
 | S3 | `customExerciseVideos/{uid}/` | ✅ | `deleteAthleteStorage` |
 | S4 | `chatMedia/{chatId}/{uid}/` | ✅ | `deleteAthleteStorage`, resolviendo los chats desde Firestore |
 | S5 | `athleteFiles/{tid}_{uid}/` | ✅ | `deleteAthleteStorage`, filtrando por sufijo del `pairId` |
-| S6 | `postPhotos/{uid}/` | ❌ **hueco** | **No hay ninguna línea que lo borre** → QA-CMP-004b |
+| S6 | `postPhotos/{uid}/` | ✅ | `deleteAthleteStorage` — QA-CMP-004b arreglado |
 | — | Firebase Auth | ✅ | `admin.auth().deleteUser` — último, por diseño (REQ-ACCDEL-CF-012) |
 
 #### 2.2.2 El número
@@ -516,22 +516,32 @@ sobre el borrado de una cuenta **athlete**:
 
 | Estado | Ítems | Cuáles |
 |---|---|---|
-| ✅ Cubierto | **24** | 1, 4, 7, 9, 10, 13, 16-21, 25-31 + S1-S5 |
-| 🟡 Parcial (queda PII recuperable) | **3** | 2, 6, 24 |
+| ✅ Cubierto | **25** | 1, 4, 7, 9, 10, 13, 16-21, 25-31 + S1-S6 |
+| 🟡 Parcial (queda PII recuperable) | **4** | 2, 6, 8, 24 |
 | ⚪ Retenido a propósito, con decisión escrita en el código | **5** | 14, 15, 32, 33, 35 |
-| ❌ Hueco sin decisión escrita | **5** | 5, 8, 12, 34 + S6 |
+| ❌ Hueco sin decisión escrita | **3** | 5, 12, 34 |
 | n/a para una cuenta athlete (PII de un PF) | **3** | 11, 22, 23 |
 
-**Titular: 7 de 40 ítems dejan datos personales recuperables sin que exista
-ninguna decisión escrita que lo justifique** (los 5 huecos + los 2 parciales que
-dejan nombre o texto identificable: `appointments` y `notifications`). Eran 8
-hasta que el PR #753 cerró `routines`.
+**Titular: 6 de 40 ítems dejan datos personales recuperables sin que exista
+ninguna decisión escrita que lo justifique** (los 3 huecos + los 3 parciales sin
+decisión escrita: `posts/*/reactions` en posts ajenos, `appointments` y
+`notifications`). El parcial restante, `trainer_links`, sí tiene decisión
+escrita.
+
+Eran **8** cuando se midió por primera vez. Bajó a 6 en dos pasos: **#753** cerró
+`routines` (ítem 4, QA-CMP-004), y **#754** cerró `postPhotos/` (S6, QA-CMP-004b)
+y la mitad de las reacciones (QA-CMP-005b) — el ítem 8 pasó de hueco a parcial,
+porque queda pendiente QA-CMP-005, las reacciones del usuario en posts ajenos.
 
 `delete-account.smoke.test.ts` afirma que `deletedCollections` trae las
 entradas esperadas, pero **ninguna aserción comprueba la ausencia de residuo en
 las colecciones que el cascade no toca** — que es exactamente donde están los
-siete ítems de arriba. El test verifica lo que el cascade dice que hizo, no lo
-que quedó en la base.
+seis ítems de arriba. El test verifica lo que el cascade dice que hizo, no lo
+que quedó en la base. Es la debilidad que dejó pasar QA-CMP-004b y QA-CMP-005b,
+así que los tests que los cierran (`cascade/storage.test.ts` y
+`cascade/posts.test.ts`) asertan la **ausencia** de los objetos y documentos
+después del cascade, no la presencia de nombres en `deletedCollections`. El
+smoke test sigue como estaba.
 
 La única excepción, y el patrón a copiar para los que quedan, es
 `__tests__/cascade/routines.test.ts` (PR #753): afirma sobre `exists === false`
@@ -600,7 +610,8 @@ fiscal:
   su conversación). Legítima, pero no es obligación legal.
 - **`audit_log/{uid}`** — el uid y el método de login del usuario borrado quedan
   para siempre, sin período de retención definido.
-- **Los 6 huecos y los 2 parciales de §2.2.2**, que no tienen ni siquiera decisión.
+- **Los 4 huecos y los 3 parciales sin decisión escrita de §2.2.2**, que no
+  tienen ni siquiera decisión.
 
 Además, la §6 **no declara ningún plazo**: ni de la cuenta activa, ni de lo que
 se retiene después del borrado. "Mientras mantengas tu cuenta" no es un período
@@ -652,16 +663,20 @@ imágenes que el PF sube a `athleteFiles`.
 
 ### 2.4 Huecos de borrado detectados
 
-**Ninguno se arregla en este PR.** Tocar un cascade de borrado es una operación
-destructiva: necesita su propio change, su propio test contra el emulador y su
-propia revisión. Acá quedan documentados con precisión para que cada uno salga
-como ticket.
+Tocar un cascade de borrado es una operación destructiva: cada uno necesita su
+propio change, su propio test contra el emulador y su propia revisión. Acá
+quedan documentados con precisión para que cada uno salga como ticket.
 
 Se numeran siguiendo la convención `QA-CMP-xxx` que ya usan
 `cascade/storage.ts` (QA-CMP-002) y `cascade/athlete-data.ts` (QA-CMP-003).
 Los que se cierren después quedan **tachados acá con la referencia al PR que
 los cerró**, no borrados — la §2.6 regla 3 lo pide así, y el historial de qué
 se decidió y por qué es la mitad del valor de esta lista.
+
+**Estado:** ~~QA-CMP-004b~~ y ~~QA-CMP-005b~~ están **cerrados** ([#754](https://github.com/Backhaus7997/treino/pull/754)) — los dos
+salían del mismo comentario desactualizado en `cascade/posts.ts` y se
+arreglaron juntos. El diagnóstico queda escrito abajo porque explica por qué
+existieron. Los otros ocho siguen **abiertos**.
 
 ---
 
@@ -713,29 +728,34 @@ abierta: necesita un barrido `collectionGroup`, no estas dos queries.
 
 ---
 
-**QA-CMP-004b — `postPhotos/{uid}/` queda huérfano en Storage.**
-`deletePosts` borra los documentos; `deleteAthleteStorage` barre cinco prefijos
-y **`postPhotos/` no está entre ellos**. Los objetos quedan en el bucket, con su
-download token vivo y `get` abierto a cualquier autenticado.
+**~~QA-CMP-004b — `postPhotos/{uid}/` queda huérfano en Storage.~~ CERRADO.**
+`deletePosts` borraba los documentos; `deleteAthleteStorage` barría cinco
+prefijos y **`postPhotos/` no estaba entre ellos**. Los objetos quedaban en el
+bucket, con su download token vivo y `get` abierto a cualquier autenticado.
 
-El comentario de cabecera de `cascade/posts.ts:5-6` afirma lo contrario:
+La causa raíz de los dos huecos es el comentario de cabecera que tenía
+`cascade/posts.ts:5-6`, que afirmaba lo contrario:
 
 > "Posts are flat documents with no subcollections and no Storage-backed media
 > fields, so deleting the document is sufficient — there are no orphaned
 > resources to chase."
 
-Era cierto cuando se escribió y **hoy es falso en las dos mitades**. La de
-Storage: `photoUrl` está en la allowlist de `firestore.rules:638` y `:675`, y
+Era cierto cuando se escribió y **había quedado falso en las dos mitades**. La
+de Storage: `photoUrl` está en la allowlist de `firestore.rules:638` y `:675`, y
 `post_photo_upload_service.dart:135` construye `postPhotos/{uid}/{postId}.{ext}`.
 La de subcolecciones, en QA-CMP-005b.
 
-*Reparación sugerida:* agregar `await deleteByPrefix('postPhotos/' + uid + '/')`
-en `deleteAthleteStorage`, y corregir el comentario de `posts.ts`.
+*Arreglado en [#754](https://github.com/Backhaus7997/treino/pull/754):* `deleteAthleteStorage` barre ahora `postPhotos/{uid}/` como un
+prefijo más, y el comentario de `posts.ts` quedó reescrito con las dos mitades
+que se le habían quedado viejas. Cubierto por
+`__tests__/cascade/storage.test.ts`, que asegura que **no queda ningún objeto**
+bajo el prefijo y que la foto de otro atleta sobrevive.
 
 ---
 
-**QA-CMP-005b — Las reacciones ajenas quedan huérfanas bajo el post borrado.**
-`deletePosts` usa `batch.delete(doc.ref)` sobre `posts/{postId}`, y **en
+**~~QA-CMP-005b — Las reacciones ajenas quedan huérfanas bajo el post
+borrado.~~ CERRADO.**
+`deletePosts` usaba `batch.delete(doc.ref)` sobre `posts/{postId}`, y **en
 Firestore borrar un documento NO borra sus subcolecciones**. `posts` sí tiene
 una: `posts/{postId}/reactions/{reactorUid}` (`firestore.rules:693`) — la otra
 mitad falsa del comentario citado arriba.
@@ -749,18 +769,27 @@ evaluación falla → deny— pero siguen en la base.
 
 Es el hueco menos visible de todos, justamente porque no se puede leer.
 
-*Reparación sugerida:* `db.recursiveDelete(doc.ref)` en lugar de
-`batch.delete(doc.ref)` en `cascade/posts.ts`, con el cuidado de perder el
-batching (el BulkWriter del Admin SDK ya batchea internamente).
+*Arreglado en [#754](https://github.com/Backhaus7997/treino/pull/754):* `cascade/posts.ts` usa `db.recursiveDelete(doc.ref, bulkWriter)` en
+lugar de `batch.delete(doc.ref)`, con un único `BulkWriter` compartido entre
+todos los posts del usuario. Se perdió el batching manual de 400 docs y no pasa
+nada: el `BulkWriter` del Admin SDK batchea y throttlea internamente.
+`recursiveDelete` hace `flush()` del writer que recibe pero **no lo cierra**,
+así que el `close()` final es lo que garantiza que los deletes bajaron.
+Cubierto por `__tests__/cascade/posts.test.ts`, que lee la subcolección con el
+Admin SDK —que saltea las reglas, justamente porque desde el cliente estos
+huérfanos son invisibles— y verifica que no quede ni un documento ni la
+subcolección misma.
 
 ---
 
 **QA-CMP-005 — Reacciones en posts ajenos.** `posts/{postId}/reactions/{uid}`
 usa el uid del que reacciona **como doc id**, dentro del post de otra persona.
-El cascade borra los posts propios pero nunca las reacciones. Queda el uid
-publicado, legible por cualquiera que pueda leer el post, y
-`maintainReactionCounters` lo sigue contando. `allow delete` sólo lo permite al
-propio `reactorUid`, que ya no existe.
+El `recursiveDelete` de `deletePosts` sólo alcanza las reacciones que cuelgan de
+los posts **del usuario borrado** (QA-CMP-005b); las que ese usuario dejó en
+posts ajenos cuelgan de documentos que el cascade no toca, y no hay ningún paso
+que las busque. Queda el uid publicado, legible por cualquiera que pueda leer el
+post, y `maintainReactionCounters` lo sigue contando. `allow delete` sólo lo
+permite al propio `reactorUid`, que ya no existe.
 
 ---
 
