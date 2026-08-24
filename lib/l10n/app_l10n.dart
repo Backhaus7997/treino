@@ -1616,6 +1616,30 @@ abstract class AppL10n {
   /// **'Llegaste al máximo de 10 rutinas activas.'**
   String get workoutSelfEditorCapReached;
 
+  /// Acción del detalle de una plantilla que abre el editor con todo precargado para que el atleta arme su propia versión (#647). Es el punto medio entre usar la plantilla tal cual y arrancar de una pantalla en blanco.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Usar como base'**
+  String get workoutRoutineUseAsBase;
+
+  /// Título del editor en modo SelfCustomizing.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Personalizar rutina'**
+  String get workoutRoutineCustomizeTitle;
+
+  /// Botón de guardado en modo SelfCustomizing. Dice explícitamente que el resultado es una rutina del atleta, no una edición de la plantilla original.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'GUARDAR COMO MÍA'**
+  String get workoutRoutineCustomizeSubmitLabel;
+
+  /// Nombre con el que arranca una copia, para que no queden cinco plantillas indistinguibles en MIS RUTINAS. Es editable antes de guardar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{name} (mi versión)'**
+  String workoutRoutineCopyName(String name);
+
   /// Left pill of the athlete Entrenar segmented control (page 0 — own routines + session history). Key is semantic, not a copy of the label, so a future copy change does not strand the identifier the way `plantillas*` did (#638).
   ///
   /// In es_AR, this message translates to:

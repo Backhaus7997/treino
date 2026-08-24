@@ -411,6 +411,27 @@
   "workoutSelfEditorPermissionDenied": "No tenés permisos para hacer esto. Recargá la app.",
   "workoutEditStubToast": "Pronto vas a poder editar el contenido. Por ahora podés archivar y crear de nuevo.",
   "workoutSelfEditorCapReached": "Llegaste al máximo de 10 rutinas activas.",
+  "workoutRoutineUseAsBase": "Usar como base",
+  "@workoutRoutineUseAsBase": {
+    "description": "Acción del detalle de una plantilla que abre el editor con todo precargado para que el atleta arme su propia versión (#647). Es el punto medio entre usar la plantilla tal cual y arrancar de una pantalla en blanco."
+  },
+  "workoutRoutineCustomizeTitle": "Personalizar rutina",
+  "@workoutRoutineCustomizeTitle": {
+    "description": "Título del editor en modo SelfCustomizing."
+  },
+  "workoutRoutineCustomizeSubmitLabel": "GUARDAR COMO MÍA",
+  "@workoutRoutineCustomizeSubmitLabel": {
+    "description": "Botón de guardado en modo SelfCustomizing. Dice explícitamente que el resultado es una rutina del atleta, no una edición de la plantilla original."
+  },
+  "workoutRoutineCopyName": "{name} (mi versión)",
+  "@workoutRoutineCopyName": {
+    "description": "Nombre con el que arranca una copia, para que no queden cinco plantillas indistinguibles en MIS RUTINAS. Es editable antes de guardar.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "workoutTabYours": "TU ENTRENO",
   "@workoutTabYours": {
     "description": "Left pill of the athlete Entrenar segmented control (page 0 — own routines + session history). Key is semantic, not a copy of the label, so a future copy change does not strand the identifier the way `plantillas*` did (#638)."

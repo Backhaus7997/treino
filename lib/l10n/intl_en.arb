@@ -320,6 +320,20 @@
   "workoutSelfEditorPermissionDenied": "",
   "workoutEditStubToast": "",
   "workoutSelfEditorCapReached": "",
+  "workoutRoutineUseAsBase": "Use as a base",
+  "@workoutRoutineUseAsBase": {},
+  "workoutRoutineCustomizeTitle": "Customise routine",
+  "@workoutRoutineCustomizeTitle": {},
+  "workoutRoutineCustomizeSubmitLabel": "SAVE AS MINE",
+  "@workoutRoutineCustomizeSubmitLabel": {},
+  "workoutRoutineCopyName": "{name} (my version)",
+  "@workoutRoutineCopyName": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "workoutTabYours": "YOUR WORKOUT",
   "workoutTabExplore": "EXPLORE",
   "workoutExploreEmptyAll": "No routines yet.",
