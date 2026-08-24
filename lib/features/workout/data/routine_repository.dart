@@ -188,6 +188,12 @@ class RoutineRepository {
     // edit, add it here AND add it to the hasOnly list in firestore.rules
     // (UPDATE path 2). Omitting it from either side will either silently drop
     // data or cause permission-denied on ALL athlete routine updates.
+    //
+    // `summary` (#648) is ABSENT ON PURPOSE — do not "fix" it. UPDATE path 2
+    // lists it in keys() but NOT in affectedKeys(): the athlete may keep
+    // editing a routine that carries a resumen, but may not change it.
+    // Sending it here would make every athlete edit of such a routine fail
+    // with permission-denied. The athlete editor has no summary field either.
     final json = <String, Object?>{
       'name': draft.name,
       'level': draft.level.toJson(),
@@ -204,7 +210,8 @@ class RoutineRepository {
 
   /// Updates the content of an existing trainer-assigned plan.
   ///
-  /// Only mutates content fields (name, split, level, days). The immutable
+  /// Only mutates content fields (name, split, level, days, summary). The
+  /// immutable
   /// identity fields (assignedBy, assignedTo, source, createdBy, createdAt)
   /// are stripped from the payload so the Firestore trainer-update rule does
   /// not see them change, matching the `affectedKeys()` guard in
@@ -242,6 +249,12 @@ class RoutineRepository {
       'days': draft.days.map((d) => d.toJson()).toList(),
       // Periodization: authored week count (mirror in firestore.rules hasOnly).
       'numWeeks': draft.numWeeks,
+      // Plain-language summary (#648) — the PF authors it from the editor.
+      // MUST be sent explicitly: this payload is hand-built, so the field
+      // being back in toJson() (PR #751) does NOT reach here on its own; a
+      // trainer clearing or rewriting the resumen would silently no-op.
+      // Listed in the trainer-assigned UPDATE path's affectedKeys() allowlist.
+      'summary': draft.summary,
     };
 
     await _collection.doc(draft.id).update(json);
@@ -250,7 +263,8 @@ class RoutineRepository {
 
   /// Updates the content of an existing trainer template.
   ///
-  /// Only mutates content fields (name, split, level, days). The immutable
+  /// Only mutates content fields (name, split, level, days, summary). The
+  /// immutable
   /// identity fields (assignedBy, source, createdBy, createdAt, assignedTo)
   /// are stripped from the payload so the Firestore trainer-template-update
   /// rule does not see them change, matching the `affectedKeys()` guard in
@@ -288,6 +302,11 @@ class RoutineRepository {
       'days': draft.days.map((d) => d.toJson()).toList(),
       // Periodization: authored week count (mirror in firestore.rules hasOnly).
       'numWeeks': draft.numWeeks,
+      // Plain-language summary (#648) — same reason as updateAssigned: the
+      // payload is hand-built, so the field must be named here or the
+      // trainer's edit is dropped on the floor. Listed in the
+      // trainer-template UPDATE path's affectedKeys() allowlist.
+      'summary': draft.summary,
     };
 
     await _collection.doc(draft.id).update(json);
