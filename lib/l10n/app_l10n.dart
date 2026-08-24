@@ -6344,6 +6344,48 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'DESHACER'**
   String get sessionTrimUndo;
+
+  /// Entrada al ajuste de tiempo en el player y título de su hoja (#645).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿CUÁNTO TIEMPO TENÉS HOY?'**
+  String get sessionTimeFitPromptTitle;
+
+  /// Duración estimada de la sesión de hoy antes de recortar (#645). El valor ya viene con el prefijo ~ porque siempre es calculado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esta sesión son {value} min'**
+  String sessionTimeFitCurrent(String value);
+
+  /// Respuesta cuando la sesión completa ya cabe en el tiempo declarado (#645).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Con {value} min ya entrás. No hace falta sacar nada.'**
+  String sessionTimeFitAlreadyFits(String value);
+
+  /// Encabezado de la propuesta de recorte, seguido de los nombres de los ejercicios (#645). La app sugiere; el atleta decide.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Si sacás esto, la sesión queda en {value} min:'**
+  String sessionTimeFitTrimHeadline(String value);
+
+  /// Respuesta cuando ni el recorte más profundo entra en el tiempo declarado (#645).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No llegamos a ese tiempo. Lo más corto posible son {value} min:'**
+  String sessionTimeFitCannotFit(String value);
+
+  /// Respuesta cuando no queda ningún ejercicio recortable (#645).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No hay nada que sacar sin dejar la sesión vacía.'**
+  String get sessionTimeFitNothingToTrim;
+
+  /// Confirma el recorte propuesto. Sólo afecta la sesión de hoy; la rutina no se modifica (#645).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'AJUSTAR HOY'**
+  String get sessionTimeFitApply;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {
