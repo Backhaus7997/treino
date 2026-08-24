@@ -23,9 +23,9 @@ import '../domain/check_in.dart';
 /// Devuelve `true` si el usuario guardó, y `null` si salió sin guardar.
 ///
 /// [initialFeeling] precarga el nivel que el usuario ya tocó en el resumen, así
-/// el tap que abre el sheet no se pierde. [existing] precarga un registro que
-/// ese día ya tenía: el id del documento es la fecha, así que guardar lo pisa —
-/// mejor mostrarlo que sobrescribirlo a ciegas.
+/// el tap que abre el sheet no se pierde. [existing] es el registro que ESTA
+/// sesión ya dejó: con él, guardar EDITA ese documento; sin él se crea uno
+/// nuevo, que no pisa lo que hayan registrado otras sesiones del mismo día.
 Future<bool?> showPostSessionCheckInSheet(
   BuildContext context, {
   required String sessionId,
@@ -99,6 +99,7 @@ class _PostSessionCheckInSheetState
             painAreas: _painAreas.toList(),
             note: _noteController.text,
             sessionId: widget.sessionId,
+            existing: widget.existing,
           );
       if (!mounted) return;
       Navigator.of(context).pop(true);
