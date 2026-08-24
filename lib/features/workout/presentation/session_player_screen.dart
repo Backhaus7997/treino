@@ -42,6 +42,7 @@ import 'widgets/coach_note.dart';
 import 'widgets/duration_set_row.dart';
 import 'widgets/mmss.dart';
 import 'widgets/set_entry_sheet.dart';
+import 'widgets/time_fit_sheet.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
 // ── Block gating helpers (top-level, testable) ────────────────────────────────
@@ -523,6 +524,38 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
     );
   }
 
+  /// La ranura del ajuste de tiempo (#645): la invitacion a declararlo cuando
+  /// no hay nada recortado, o el aviso con el resultado y el deshacer cuando
+  /// si lo hay. Nunca las dos: un solo camino a mano en cada estado.
+  ///
+  /// Sin nada medible en el dia no se dibuja NADA. Ofrecer "ajustar" sobre una
+  /// sesion cuya duracion no se puede estimar es prometer una cuenta que la
+  /// pantalla despues no puede mostrar — misma postura que las tarjetas de
+  /// rutina, que ante `minutes == null` no escriben ni "0 min" ni un guion.
+  List<Widget> _buildTimeFitSlot(SessionState state) {
+    if (state.droppedExerciseIds.isNotEmpty) {
+      return [
+        const SizedBox(height: 12),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: _SessionTrimNotice(state: state, onUndo: _undoTrim),
+        ),
+      ];
+    }
+    final current = estimateSessionMinutes(state.day, week: state.activeWeek);
+    if (current == null) return const [];
+    return [
+      const SizedBox(height: 12),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: _TimeFitPrompt(
+          currentMinutes: current,
+          onTap: () => _openTimeFit(state),
+        ),
+      ),
+    ];
+  }
+
   /// Builds the exercise list with block gating: current block fully expanded,
   /// completed blocks collapsed to summary, future blocks locked/dimmed.
   ///
@@ -626,6 +659,32 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
           slot,
           log,
         );
+  }
+
+  /// Abre la hoja donde el atleta declara cuanto tiempo tiene hoy (#645).
+  ///
+  /// Los ejercicios que ya tienen series cargadas viajan como
+  /// `lockedExerciseIds`: el recorte nunca puede esconder trabajo hecho, y el
+  /// recorrido de `planSessionTimeFit` frena ahi.
+  void _openTimeFit(SessionState state) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => TimeFitSheet(
+        day: state.day,
+        week: state.activeWeek,
+        lockedExerciseIds: state.setLogs.map((l) => l.exerciseId).toSet(),
+        onApply: _applyTrim,
+      ),
+    );
+  }
+
+  /// Aplica el recorte que el atleta acepto. Solo toca la sesion de hoy.
+  void _applyTrim(List<String> exerciseIds) {
+    ref
+        .read(sessionNotifierProvider(widget.init).notifier)
+        .dropExercisesForToday(exerciseIds);
   }
 
   /// Devuelve a la sesion todo lo que se habia recortado por tiempo (#645).
@@ -758,16 +817,7 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 20),
                           child: _SessionStatsCard(state: state),
                         ),
-                        if (state.droppedExerciseIds.isNotEmpty) ...[
-                          const SizedBox(height: 12),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            child: _SessionTrimNotice(
-                              state: state,
-                              onUndo: _undoTrim,
-                            ),
-                          ),
-                        ],
+                        ..._buildTimeFitSlot(state),
                         const SizedBox(height: 20),
                         const Padding(
                           padding: EdgeInsets.symmetric(horizontal: 12),
@@ -1028,6 +1078,73 @@ class _SessionStatsCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(2),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── _TimeFitPrompt ────────────────────────────────────────────────────────────
+
+/// La invitación a declarar el tiempo disponible, arriba del listado (#645).
+///
+/// Se dibuja sólo cuando NO hay nada recortado: una vez aplicado el ajuste,
+/// este lugar lo ocupa `_SessionTrimNotice`, que muestra el resultado y el
+/// deshacer. Dos estados de la misma ranura, nunca los dos juntos — así el
+/// atleta siempre tiene un solo camino a mano y no puede apilar recortes sin
+/// entender de dónde salió cada uno.
+class _TimeFitPrompt extends StatelessWidget {
+  const _TimeFitPrompt({required this.currentMinutes, required this.onTap});
+
+  final int currentMinutes;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    return TreinoTappable(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: palette.bgCard,
+          // Contorno tenue en acento: es la unica fila de esta pantalla que
+          // ABRE ALGO sin ser un ejercicio, y el chevron —la senal de "esto
+          // lleva al detalle"— ya esta gastado en las filas del listado.
+          border: Border.all(color: palette.accent.withValues(alpha: 0.35)),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            Icon(TreinoIcon.clock, size: 16, color: palette.accent),
+            const SizedBox(width: AppSpacing.s8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.sessionTimeFitPromptTitle,
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                      letterSpacing: 1.2,
+                      color: palette.accent,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.hairline),
+                  Text(
+                    l10n.sessionTimeFitCurrent('~$currentMinutes'),
+                    style: GoogleFonts.barlow(
+                      fontWeight: FontWeight.w400,
+                      fontSize: 12,
+                      color: palette.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

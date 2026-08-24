@@ -128,6 +128,22 @@ class _RestoreTrackingNotifier extends SessionNotifier {
   Future<void> restoreDroppedExercises() async => onRestore();
 }
 
+/// Stub que registra las llamadas a dropExercisesForToday (#645) sin ejecutar
+/// lógica real — permite verificar qué ids propuso la hoja y que AJUSTAR HOY
+/// los aplica tal cual.
+class _DropTrackingNotifier extends SessionNotifier {
+  _DropTrackingNotifier(this._state, {required this.onDrop});
+  final SessionState _state;
+  final void Function(Iterable<String> exerciseIds) onDrop;
+
+  @override
+  Future<SessionState> build(SessionInit arg) async => _state;
+
+  @override
+  Future<void> dropExercisesForToday(Iterable<String> exerciseIds) async =>
+      onDrop(exerciseIds);
+}
+
 // ── Factories de estado ───────────────────────────────────────────────────────
 
 SessionState _defaultState() => SessionState(
@@ -2094,6 +2110,115 @@ void main() {
       await tester.tap(find.text('DESHACER'));
       await tester.pump();
       expect(restored, equals(1));
+    });
+  });
+
+  // ── #645: la entrada al ajuste de tiempo desde el player ───────────────────
+
+  group('_TimeFitPrompt', () {
+    RoutineSlot minSlot(String id, String name, int minutes) => makeSlot(
+          exerciseId: id,
+          exerciseName: name,
+          targetSets: 1,
+          restSeconds: 0,
+          durationSeconds: minutes * 60,
+        );
+
+    SessionState fitState({Set<String> dropped = const {}}) => SessionState(
+          session: makeSession(),
+          day: makeDay(dayNumber: 1, slots: [
+            minSlot('e1', 'Press de banca', 10),
+            minSlot('e2', 'Sentadilla', 10),
+            minSlot('e3', 'Remo con barra', 10),
+          ]),
+          setLogs: const [],
+          currentExerciseIndex: 0,
+          elapsedSeconds: 0,
+          droppedExerciseIds: dropped,
+        );
+
+    testWidgets('invita a declarar el tiempo y dice cuánto dura la sesión',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(fitState()),
+          locale: const Locale('es', 'AR'),
+        ),
+      );
+      await tester.pump();
+      expect(find.text('¿CUÁNTO TIEMPO TENÉS HOY?'), findsOneWidget);
+      expect(find.text('Esta sesión son ~30 min'), findsOneWidget);
+    });
+
+    testWidgets(
+        'con el ajuste ya aplicado la invitación deja su lugar al aviso — '
+        'nunca los dos juntos', (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(fitState(dropped: const {'e3'})),
+          locale: const Locale('es', 'AR'),
+        ),
+      );
+      await tester.pump();
+      expect(find.text('¿CUÁNTO TIEMPO TENÉS HOY?'), findsNothing);
+      expect(find.text('Fuera de hoy: Remo con barra'), findsOneWidget);
+    });
+
+    testWidgets('un día sin nada medible no ofrece el ajuste', (tester) async {
+      final state = SessionState(
+        session: makeSession(),
+        day: makeDay(dayNumber: 1, slots: const []),
+        setLogs: const [],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      );
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(state),
+          locale: const Locale('es', 'AR'),
+        ),
+      );
+      await tester.pump();
+      expect(find.text('¿CUÁNTO TIEMPO TENÉS HOY?'), findsNothing);
+    });
+
+    testWidgets('el flujo entero: abrir, elegir, aplicar — sin tocar la rutina',
+        (tester) async {
+      List<String>? applied;
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          [
+            sessionNotifierProvider.overrideWith(
+              () => _DropTrackingNotifier(
+                fitState(),
+                onDrop: (ids) => applied = ids.toList(),
+              ),
+            ),
+          ],
+          locale: const Locale('es', 'AR'),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.text('¿CUÁNTO TIEMPO TENÉS HOY?'));
+      await tester.pumpAndSettle();
+      // La hoja está abierta: el título ahora aparece dos veces.
+      expect(find.text('¿CUÁNTO TIEMPO TENÉS HOY?'), findsNWidgets(2));
+
+      await tester.tap(find.text('20 min'));
+      await tester.pumpAndSettle();
+      expect(applied, isNull, reason: 'elegir no aplica');
+
+      await tester.tap(find.text('AJUSTAR HOY'));
+      await tester.pumpAndSettle();
+
+      expect(applied, equals(['e3']));
+      expect(find.text('AJUSTAR HOY'), findsNothing,
+          reason: 'la hoja se cerró');
     });
   });
 }
