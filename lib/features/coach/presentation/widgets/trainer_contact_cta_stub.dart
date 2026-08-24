@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../app/theme/tokens/tokens.dart' show AppSpacing;
 import '../../../../core/analytics/analytics_service.dart';
 import '../../../workout/application/session_providers.dart'
     show currentUidProvider;
@@ -21,6 +22,17 @@ import '../../../../l10n/app_l10n.dart';
 /// "próximamente". Mantenemos el nombre de la clase + archivo para no
 /// romper imports del resto del feature (rename queda como cleanup
 /// futuro).
+///
+/// **Jerarquía (#637): esto ya NO es el CTA primario.** Mientras fue el único
+/// camino del perfil, ser primario era inercia, no decisión — y el efecto era
+/// que la única forma de dirigirle la palabra a un PF fuese pedirle el
+/// compromiso. Con [TrainerInquiryCta] arriba, consultar es el paso liviano y
+/// visible, y pedir vínculo es el compromiso EXPLÍCITO que viene después. Por
+/// eso queda como acción secundaria (outlined, debajo).
+///
+/// El gate de "ya tenés un PF" se mantiene tal cual acá y **no** se replica en
+/// el CTA de consulta: preguntarle a un entrenador no es cambiarse de
+/// entrenador.
 class TrainerContactCtaStub extends ConsumerStatefulWidget {
   const TrainerContactCtaStub({super.key, required this.trainerId});
 
@@ -108,7 +120,12 @@ class _TrainerContactCtaStubState extends ConsumerState<TrainerContactCtaStub> {
           color: disabled ? palette.border : palette.accent,
         ),
         disabledForegroundColor: palette.textMuted,
-        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+        // #637: mismo alto y misma forma que el CTA de consulta de arriba —
+        // los dos botones tienen que leerse como un par, con el contraste en
+        // el relleno (primario lleno vs secundario contorneado), no en la
+        // geometría.
+        minimumSize: const Size.fromHeight(48),
+        shape: const StadiumBorder(),
       ),
       child: _submitting
           ? SizedBox(
@@ -144,10 +161,13 @@ class _TrainerContactCtaStubState extends ConsumerState<TrainerContactCtaStub> {
 
     return Column(
       mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.center,
+      // #637: `stretch`, no `center`. Con `center` el botón se encogía a su
+      // contenido SÓLO en este estado, así que el par de CTAs cambiaba de
+      // ancho según si el atleta ya tenía PF o no.
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         button,
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.s8),
         Semantics(
           liveRegion: true,
           child: Text(

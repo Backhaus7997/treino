@@ -159,6 +159,18 @@
   "coachProfileBioEmpty": "Sin descripción.",
   "coachProfileRateLabel": "Tarifa mensual",
   "coachCtaLabel": "PEDIR VÍNCULO",
+  "coachInquiryCtaLabel": "CONSULTAR",
+  "@coachInquiryCtaLabel": {
+    "description": "CTA primario del perfil público del PF (#637): abre un chat de pre-consulta SIN vínculo formal. Pasa a ser el camino visible y liviano; PEDIR VÍNCULO queda como el compromiso explícito que viene después."
+  },
+  "coachInquiryCtaHelp": "Preguntale precio, modalidad y horarios sin comprometerte con nadie.",
+  "@coachInquiryCtaHelp": {
+    "description": "Línea de ayuda debajo del par de CTAs. Existe porque el atleta necesita entender por qué hay dos botones: varios entrevistados querían consultar antes de decidir, y hoy el único camino compromete. También explica el botón deshabilitado cuando ya tiene un PF."
+  },
+  "coachInquiryCtaError": "No pudimos abrir la consulta. Probá de nuevo.",
+  "@coachInquiryCtaError": {
+    "description": "Snackbar cuando falla el getOrCreate del chat de consulta."
+  },
   "coachCtaProximamente": "Próximamente — Etapa 3",
   "coachLocationSheetTitle": "Permitir ubicación",
   "coachLocationSheetBody": "TREINO usa tu ubicación para mostrarte entrenadores cerca tuyo. Tu ubicación no es visible para otros usuarios.",
