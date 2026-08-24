@@ -21,6 +21,16 @@ service firebase.storage {
     // endurecimiento futuro de aquél. Cerrarlo es seguro: cero llamadas a
     // `listAll()` / `.list()` del SDK de Storage en todo `lib/`. Ver
     // `docs/security.md` §3.2.
+    //
+    // `delete` TIENE que ser una regla propia (QA-SEC-009): sin ella el
+    // borrado cae en `write`, cuya condición dereferencia
+    // `request.resource.size` y `.contentType` — y en un delete
+    // `request.resource` es **null**. La evaluación explotaba con
+    // "Null value error" y el borrado se denegaba **hasta para el dueño**,
+    // que es la regla 3 de `docs/security.md` §3.8: toda regla con
+    // `request.resource.<algo>` necesita su `allow delete` propio o el
+    // borrado se rompe en silencio. El gate es el mismo `fileName.matches`
+    // anclado al uid que usa el `write`, sin tocar `request.resource`.
     match /avatars/{fileName} {
       allow get: if request.auth != null;
       allow list: if false;
@@ -28,6 +38,8 @@ service firebase.storage {
                   && fileName.matches(request.auth.uid + '\\..+')
                   && request.resource.size < 5 * 1024 * 1024
                   && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null
+                    && fileName.matches(request.auth.uid + '\\..+');
     }
 
     // Excel imports: trainers upload Excel plan files under /temp/uploads/{uid}/...

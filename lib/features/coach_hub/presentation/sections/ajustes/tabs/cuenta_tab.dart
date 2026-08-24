@@ -427,8 +427,11 @@ class _FotoEditorState extends ConsumerState<_FotoEditor> {
     if (_busy) return;
     setState(() => _busy = true);
     try {
-      // Borra el archivo de Storage (best-effort) y limpia la referencia para
-      // no dejar el objeto huérfano en avatars/{uid}.jpg.
+      // Borra el archivo de Storage ANTES de limpiar la referencia: si el
+      // borrado falla de verdad, el catch de abajo avisa y no queda un objeto
+      // huérfano en avatars/{uid}.jpg con la UI diciendo que lo quitó. Hasta
+      // #765 esto era best-effort y mentía siempre. `deleteStored()` sí tolera
+      // `object-not-found` — que no haya objeto es el estado deseado.
       await ref.read(avatarWebUploaderProvider).deleteStored();
       await ref
           .read(userRepositoryProvider)

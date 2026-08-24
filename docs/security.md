@@ -109,14 +109,14 @@ Cinco paths siguen **sin una sola aserción negativa**:
 
 | Path | get | list | write | delete |
 |---|---|---|---|---|
-| `avatars/{file}` | ✅† | ✅ | ✅ | — |
+| `avatars/{file}` | ✅† | ✅ | ✅ | ✅ |
 | `temp/uploads/{uid}/**` | — | — | — | — |
 | `customExerciseVideos/{uid}/**` | ✅† | ✅ | ✅ | ✅ |
 | `chatMedia/{chatId}/{uid}/**` | 🟡 | 🟡 | — | — |
 | `athleteFiles/{pairId}/**` | ✅ | ✅ | ✅ | ✅ |
 | `postPhotos/{uid}/{file}` | ✅ | ✅ | ✅ | ✅ |
 
-**17 de 24 celdas** (71%). Hay además un séptimo bloque, el catch-all
+**18 de 24 celdas** (75%). Hay además un séptimo bloque, el catch-all
 `match /{allPaths=**} { allow read, write: if false; }`, que sólo se ejercita
 de refilón: el caso "listar `postPhotos/`" de
 `post-photos-storage-rules.test.ts` cae en él, pero nada lo testea de frente.
@@ -137,11 +137,15 @@ de refilón: el caso "listar `postPhotos/`" de
 > qué PFs tienen contenido. Viven en `avatars-storage-rules.test.ts` y
 > `custom-exercise-videos-storage-rules.test.ts`.
 >
-> La celda `delete` de `avatars` sigue en `—` por un motivo distinto: hoy el
-> borrado se deniega **hasta para el dueño**, y por un null deref en la línea
+> La celda `delete` de `avatars` estuvo en `—` por un motivo distinto: el
+> borrado se denegaba **hasta para el dueño**, y por un null deref en la línea
 > `&& request.resource.size < 5 * 1024 * 1024` del `write`, no por falta de
-> permiso. Cualquier test ahí pasaría por el motivo equivocado, que §1.8
-> prohíbe. Es **QA-SEC-009**.
+> permiso. Cualquier test ahí habría pasado por el motivo equivocado, que §1.8
+> prohíbe. Era **QA-SEC-009** y **cerró en #765** con un `allow delete` propio.
+> Por eso el archivo de test trae el **positivo del dueño** además de los
+> negativos: es el que distingue "deniega por permiso" de "deniega porque la
+> regla explota", y es el único que se pone rojo si alguien saca el
+> `allow delete`.
 >
 > Los tres tickets están medidos contra el emulador y explicados en §3.
 
@@ -1041,12 +1045,16 @@ match /avatars/{fileName} {
               && fileName.matches(request.auth.uid + '\\..+')
               && request.resource.size < 5 * 1024 * 1024
               && request.resource.contentType.matches('image/.*');
+  allow delete: if request.auth != null                      // ← QA-SEC-009, #765
+                && fileName.matches(request.auth.uid + '\\..+');
 }
 ```
 
-> **Estado:** el `list` de este bloque estaba abierto y es el leak QA-SEC-007.
-> **Cerrado en #764.** Lo que sigue es la medición **previa** al arreglo, que es
-> lo que lo justifica; el estado actual está en la fila re-medida de §3.5.
+> **Estado:** este bloque tenía los dos huecos de `avatars/`. El `list` abierto
+> era el leak QA-SEC-007, **cerrado en #764**; el `delete` roto era QA-SEC-009,
+> **arreglado en #765**. Lo que sigue es la medición **previa** a esos
+> arreglos, que es lo que los justifica; el estado actual está en la fila
+> re-medida de §3.5.
 
 **Quién leía, exactamente.** `read` en Storage es `get` **+** `list`, y acá
 no había nada que los separara. Medido **antes de #764**: un autenticado
@@ -1094,52 +1102,73 @@ agrega una categoría de dato que la política no cubra.
 | `get` | **Deliberado y defendible**, pero **redundante** (§3.1): el avatar ya viaja por `userPublicProfiles` a la misma audiencia. Se conserva; no se justifica por necesidad técnica sino porque no expone nada nuevo. |
 | `list` | ~~**NO deliberado — leak.**~~ Ningún comentario lo mencionaba, ningún cliente lo usa, y los dos bloques vecinos que sí lo pensaron (`chatMedia`, `postPhotos`) lo cierran explícitamente. Severidad **baja** por el atenuante de arriba, pero era un canal de enumeración gratuito. → **QA-SEC-007 — CERRADO en #764** con `allow list: if false`. |
 | `write` | **Deliberado y correcto.** Owner-only, anclado, sólo imágenes, 5 MB. Pineado en §3.7. |
-| `delete` | **ROTO** — ver abajo. → **QA-SEC-009** |
+| `delete` | ~~**ROTO**~~ — ver abajo. → **QA-SEC-009 — ARREGLADO en #765** con un `allow delete` propio, anclado al uid igual que el `write` y sin tocar `request.resource`. |
 
-#### 3.2.1 El `delete` de avatars está roto, y falla en silencio
+#### 3.2.1 El `delete` de avatars estaba roto, y fallaba en silencio
 
-El bloque **no declara `allow delete`**. En Storage, `delete` cae bajo `write`,
-cuya condición dereferencia `request.resource.size` — y en un `delete`
-**`request.resource` es null**. El emulador lo dice con el dedo en la línea:
+> **Arreglado en #765.** Esta sub-sección se conserva como diagnóstico: es la
+> evidencia de por qué la regla 3 de §3.8 existe, y el motivo por el cual el
+> test del bloque trae un **positivo del dueño** y no sólo negativos.
+
+El bloque **no declaraba `allow delete`**. En Storage, `delete` cae bajo
+`write`, cuya condición dereferencia `request.resource.size` — y en un `delete`
+**`request.resource` es null**. El emulador lo decía con el dedo en la línea:
 
 ```
 EvaluationException: Error: storage.rules line [13], column [22]. Null value error.
 ```
 
-`storage.rules:13` es exactamente `&& request.resource.size < 5 * 1024 * 1024`.
+Esa línea 13 era exactamente `&& request.resource.size < 5 * 1024 * 1024` (hoy
+está más abajo en el archivo: los comentarios que documentan `get`/`list`/
+`delete` la corrieron).
 
-Medido: **el dueño no puede borrar su propio avatar** (DENY). No es un agujero
-—falla cerrado— pero sí es un bug de producto, y tiene una víctima concreta:
+Medido: **el dueño no podía borrar su propio avatar** (DENY). No era un agujero
+—fallaba cerrado— pero sí era un bug de producto, y tenía una víctima concreta:
 
-- `avatar_web_uploader.dart:105-113` (`deleteStored()`) borra
+- `avatar_web_uploader.dart` (`deleteStored()`) borraba
   `avatars/{uid}.jpg` **best-effort, dentro de un `catch (_) {}` vacío**.
-- Lo llama `cuenta_tab.dart:427-443` (`_removePhoto`, el botón "Quitar foto" de
+- Lo llama `cuenta_tab.dart` (`_removePhoto`, el botón "Quitar foto" de
   Coach Hub), con el comentario *"no dejar el objeto huérfano en
   `avatars/{uid}.jpg`"*.
 
-El `delete` **siempre** se deniega, el `catch` se lo come, el usuario ve el
-toast *"Foto quitada"*, y el objeto **sigue en el bucket**: bajable por su URL
+El `delete` se denegaba **siempre**, el `catch` se lo comía, el usuario veía el
+toast *"Foto quitada"*, y el objeto **seguía en el bucket**: bajable por su URL
 con token (que es una credencial al portador, §3.1) y enumerable por cualquier
-autenticado (el leak de arriba). La única limpieza real que existe es
+autenticado (el leak de arriba). La única limpieza real que existía era
 `deleteAvatar` del cascade de borrado de cuenta, que corre con **Admin SDK** y
 por eso no pega contra esta regla — y que barre *"cualquier extensión"*
 (QA-CMP-002) justamente porque sabe que quedan huérfanos.
 
-Dicho de otra forma: hoy **la app no tiene forma de borrar un avatar salvo
-borrando la cuenta entera**. Contra la §7 de la política (*"podés... solicitar la
-supresión de tus datos... desde la app"*), esto es una divergencia real, del
-mismo tipo que las de §2.3.2.
+Dicho de otra forma: **la app no tenía forma de borrar un avatar salvo borrando
+la cuenta entera**. Contra la §7 de la política (*"podés... solicitar la
+supresión de tus datos... desde la app"*), era una divergencia real, del mismo
+tipo que las de §2.3.2.
 
-El arreglo es chico y conocido — separar el `delete` del `write`, como ya hacen
-`customExerciseVideos`, `chatMedia`, `athleteFiles` y `postPhotos`:
+El arreglo fue chico y conocido — separar el `delete` del `write`, como ya
+hacen `customExerciseVideos`, `chatMedia`, `athleteFiles` y `postPhotos`:
 
 ```
 allow delete: if request.auth != null
               && fileName.matches(request.auth.uid + '\\..+');
 ```
 
-**No se aplica en este PR.** Es un cambio de comportamiento en una regla de
-producción y merece su propio ticket, su propio test y su propia verificación.
+**Aplicado en #765**, junto con las dos mitades que hacían falta para que el
+arreglo sea visible:
+
+- **La regla**, arriba. Anclada con el mismo `matches()` full-match que el
+  `write`, así que un uid que es prefijo estricto del dueño tampoco borra.
+- **El cliente.** `deleteStored()` dejó de tener el `catch (_) {}` vacío: ahora
+  tolera sólo `object-not-found` —que no haya objeto ES el estado deseado del
+  usuario— y **propaga cualquier otro error**, que es el idiom que ya usaban
+  `PostPhotoUploadService`, `ChatMediaUploadService`, `AthleteFileRepository` y
+  `CustomExerciseVideoUploadService`. `_removePhoto` borra el objeto **antes**
+  de limpiar `avatarUrl`, así que si el borrado falla de verdad el usuario ve
+  *"No se pudo quitar la foto"* y no una referencia limpia sobre un objeto
+  huérfano.
+- **El test**, que es la parte que §1.8 vuelve obligatoria: el **positivo del
+  dueño**. Los negativos (ajeno, prefijo, anónimo) ya denegaban antes del
+  arreglo, pero por el crash, no por el gate — habrían pasado *por el motivo
+  equivocado*. El positivo es el único caso que separa las dos cosas.
 
 ### 3.3 `customExerciseVideos/{uid}/**`
 
@@ -1203,7 +1232,7 @@ Firestore que lo publique.
 | `get` | **Deliberado.** El motivo escrito en el comentario era incorrecto y **se corrigió en #763**. Consistente con `firestore.rules:1575`. Se conserva. |
 | `list` | ~~**NO deliberado — leak, y el peor de los tres.**~~ Exfiltración de la videoteca completa de un PF + directorio de qué PFs tienen contenido. Ningún cliente llama `list`. → **QA-SEC-008 — CERRADO en #763** con `allow list: if false`. |
 | `write` | **Deliberado y correcto.** Owner-only a cualquier profundidad, sólo video, 100 MB. Pineado en §3.7. |
-| `delete` | **Deliberado y correcto.** Tiene su propio `allow delete` — por eso funciona, a diferencia de `avatars` (§3.2.1). Pineado en §3.7. |
+| `delete` | **Deliberado y correcto.** Tiene su propio `allow delete` — por eso funciona. Es el bloque que sirvió de modelo para arreglar `avatars` en #765 (§3.2.1). Pineado en §3.7. |
 
 ### 3.4 `postPhotos/{uid}/{postId}.{ext}` — el modelo a seguir
 
@@ -1242,7 +1271,7 @@ donde se aclara.
 
 | Path | `get` ajeno | `list` (carpeta) | `list` (raíz) | `write` ajeno | `delete` dueño | `delete` ajeno |
 |---|---|---|---|---|---|---|
-| `avatars/` | ALLOW | ~~ALLOW~~ → **DENY** ✅ | n/a (un nivel) | DENY | **DENY** 🐛 | DENY |
+| `avatars/` | ALLOW | ~~ALLOW~~ → **DENY** ✅ | n/a (un nivel) | DENY | ~~DENY 🐛~~ → **ALLOW** ✅ | DENY |
 | `customExerciseVideos/` | ALLOW | ~~ALLOW~~ → **DENY** ✅ | ~~ALLOW~~ → **DENY** ✅ | DENY | ALLOW | DENY |
 | `postPhotos/` | ALLOW | DENY | DENY | DENY | ALLOW | DENY |
 | `chatMedia/` | DENY (no miembro) | DENY | DENY | DENY | — | DENY |
@@ -1257,7 +1286,9 @@ celda; el valor después de la flecha es la re-medición contra el
 `storage.rules` actual, como pide §3.8 regla 5. Las celdas `list` de
 `customExerciseVideos/` se re-midieron en **#763** y la de `avatars/` en
 **#764**: las tres son ahora DENY también para el **dueño** (la regla es
-`if false`, no owner-only).
+`if false`, no owner-only). La celda `delete dueño` de `avatars/` se re-midió
+en **#765**: pasó de DENY-por-crash a ALLOW-por-permiso, que es el punto del
+ticket — el 🐛 no era un permiso mal puesto sino una evaluación que explotaba.
 
 `chatMedia` y `temp/uploads` se midieron sólo como control — están fuera del
 alcance de este slice y salieron cerrados en todos los casos probados, lo que
@@ -1274,10 +1305,11 @@ propio change, su test y su verificación.
 |---|---|---|---|---|
 | ~~**QA-SEC-007**~~ | `list` abierto a cualquier autenticado; enumera el padrón de uids con avatar | `avatars/` | Baja — los uids ya son enumerables por `userPublicProfiles` (`firestore.rules:780`), pero es un canal paralelo que sobrevive a cerrar aquél | **CERRADO en #764** (issue #764): `read` separado en `get` + `list`, `allow list: if false` |
 | ~~**QA-SEC-008**~~ | `list` abierto en carpeta **y raíz**; exfiltra la videoteca entera de un PF y el directorio de qué PFs tienen contenido | `customExerciseVideos/` | **Media-alta** — no hay ninguna otra vía para obtener el inventario, y el contenido es el activo del PF | **CERRADO en #763** (issue #763): `read` separado en `get` + `list`, `allow list: if false`, comentario del bloque corregido (justificaba la lectura amplia con un motivo falso — §3.1) |
-| **QA-SEC-009** | `delete` denegado hasta para el dueño por null deref en `storage.rules:13`; "Quitar foto" miente y el objeto queda huérfano | `avatars/` | Media — no es un agujero (falla cerrado) pero incumple la §7 de la política y deja objetos legibles que el usuario cree borrados | `allow delete` propio, como en los otros cuatro bloques (§3.2.1). Revisar además el `catch (_) {}` de `avatar_web_uploader.dart:110` |
+| ~~**QA-SEC-009**~~ | `delete` denegado hasta para el dueño por null deref en el `write`; "Quitar foto" miente y el objeto queda huérfano | `avatars/` | Media — no es un agujero (falla cerrado) pero incumple la §7 de la política y deja objetos legibles que el usuario cree borrados | **CERRADO en #765** (issue #765): `allow delete` propio como en los otros cuatro bloques (§3.2.1), `catch (_) {}` de `deleteStored()` acotado a `object-not-found`, y test positivo del dueño además de los negativos |
 
 Los tres son chicos y bien acotados. **QA-SEC-008 es el que yo haría primero.**
-Y así se hizo: es el que cerró #763.
+Y así se hizo: cerró en #763, seguido de QA-SEC-007 (#764) y QA-SEC-009 (#765).
+**Los tres están cerrados.**
 
 Nota de alcance: cerrar `list` en los dos paths es **seguro para el cliente** —
 no existe ni una llamada a `listAll()` / `list()` del SDK de Storage en todo
@@ -1312,6 +1344,10 @@ regex), el `delete` owner-only de `customExerciseVideos`, y el piso anónimo de
   `storage.rules:13`, no por un gate de dueño. Un test así pasaría *por el motivo
   equivocado*, y §1.8 lo prohíbe explícitamente. El test entra junto con
   QA-SEC-009, cuando la denegación sea por permiso.
+  → **Al día de hoy: -009 cerró en #765.** El test entró con las dos
+  direcciones y —lo que importa— con el **positivo del dueño** adelante: es el
+  único caso que se pone rojo si alguien saca el `allow delete` y devuelve el
+  bloque al null deref. Los negativos solos no lo detectarían.
 - **Los bounds de tamaño (5 MB / 100 MB).** Empujar esos cuerpos por el emulador
   en cada corrida es lastre de CI puro, y es el mismo idiom
   `request.resource.size` que ya corre en los otros bloques. Mismo criterio que

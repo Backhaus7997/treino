@@ -1,25 +1,28 @@
 /**
  * Storage rules tests for the `avatars/{fileName}` block (#680 Slice E;
- * `list` cerrado por QA-SEC-007 / #764).
+ * `list` cerrado por QA-SEC-007 / #764; `delete` arreglado por QA-SEC-009 /
+ * #765).
  *
  * ⚠️  COBERTURA DELIBERADAMENTE PARCIAL — leer `docs/security.md` §3.2 antes de
- * agregar casos acá. Una celda queda sin test **a propósito**:
+ * agregar casos acá.
  *
- *  - `delete`: el bloque NO declara `allow delete`, así que cae en `write`,
- *    cuya condición dereferencia `request.resource.size` — que en un delete es
- *    null. Resultado medido: el borrado se deniega **hasta para el dueño**, y
- *    por "Null value error" sobre esa línea, no por falta de permiso. Un
- *    test de "el ajeno no puede borrar" pasaría por el motivo equivocado, que
- *    §1.8 prohíbe explícitamente. Es QA-SEC-009.
- *
- * `get` amplio tampoco se pinea: es un permiso deliberado (§3.2), y un
+ * `get` amplio NO se pinea: es un permiso deliberado (§3.2), y un
  * `assertSucceeds` ahí congelaría el status quo si mañana se decide apretarlo.
  * Sí se pinea el piso anónimo.
  *
- * Lo que sí se pinea acá: el gate de escritura —owner-only, anclado, limitado
- * a imágenes— y el `list` cerrado, que es el leak QA-SEC-007. El nombre del
- * archivo ES el uid, así que enumerar `avatars/` devolvía el padrón de uids
- * con avatar en una sola llamada.
+ * Lo que sí se pinea acá:
+ *
+ *  - El gate de escritura: owner-only, anclado al uid, sólo imágenes.
+ *  - El `list` cerrado (QA-SEC-007). El nombre del archivo ES el uid, así que
+ *    enumerar `avatars/` devolvía el padrón de uids con avatar en una sola
+ *    llamada.
+ *  - El `delete`, en las DOS direcciones (QA-SEC-009). El positivo del dueño
+ *    no es decorativo: hasta #765 el bloque no declaraba `allow delete`, el
+ *    borrado caía en `write` —cuya condición dereferencia
+ *    `request.resource.size`, null en un delete— y se denegaba hasta para el
+ *    dueño con "Null value error". Sin ese positivo, el negativo del ajeno
+ *    pasaría **por el motivo equivocado**, que es exactamente lo que §1.8
+ *    prohíbe: era verdad por accidente, no por un gate de dueño.
  *
  * El bound de 5 MB no se ejercita — empujar 5 MB por el emulador en cada corrida
  * es puro lastre de CI, y es el mismo idiom `request.resource.size` que ya
@@ -37,7 +40,13 @@ import {
   initializeTestEnvironment,
   RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
-import { getBytes, listAll, ref, uploadString } from "firebase/storage";
+import {
+  deleteObject,
+  getBytes,
+  listAll,
+  ref,
+  uploadString,
+} from "firebase/storage";
 
 const PROJECT_ID = "treino-rules-test-avatars";
 const RULES_PATH = path.resolve(__dirname, "../../../storage.rules");
@@ -174,5 +183,32 @@ describe("avatars/{fileName} — storage rules", () => {
 
   it("DENIES an unauthenticated list of avatars/", async () => {
     await assertFails(listAll(ref(storageAs(null), "avatars")));
+  });
+
+  // --- borrado: owner-only, y por el motivo correcto (QA-SEC-009) -----------
+
+  it("allows the owner to delete their own avatar", async () => {
+    // ESTE es el caso que estaba roto y el que sostiene a los negativos de
+    // abajo. Sin `allow delete` propio el borrado caía en `write`, que
+    // dereferencia `request.resource.size` — null en un delete — y explotaba
+    // con "Null value error", denegando hasta al dueño. Si alguien borrara el
+    // `allow delete` del bloque, este test se pone rojo y los negativos NO,
+    // porque seguirían denegando por el crash. Ver `docs/security.md` §3.2.1.
+    await assertSucceeds(deleteObject(ref(storageAs(OWNER), AVATAR_PATH)));
+  });
+
+  it("DENIES deleting ANOTHER user's avatar", async () => {
+    await assertFails(deleteObject(ref(storageAs(OTHER), AVATAR_PATH)));
+  });
+
+  it("DENIES a delete from a uid that is only a PREFIX of the filename", async () => {
+    // Mismo anclaje que el `write`: `fileName.matches(uid + '\\..+')` es
+    // full-match, así que 'own' no puede borrar 'owneruid.jpg'. Si alguien
+    // cambiara el gate por un startsWith, esto se pone rojo.
+    await assertFails(deleteObject(ref(storageAs(PREFIX_UID), AVATAR_PATH)));
+  });
+
+  it("DENIES an unauthenticated delete", async () => {
+    await assertFails(deleteObject(ref(storageAs(null), AVATAR_PATH)));
   });
 });
