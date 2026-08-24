@@ -9,10 +9,15 @@
  * QUE SIGNIFICA BLOQUEADO HOY: el vinculo deja de contar para el limite del
  * PF. Nada mas — ninguna clausula de firestore.rules AUTORIZA nada en funcion
  * de `entitlement`. Ojo con la precision, porque el campo SI figura en el
- * archivo: firestore.rules ~:570 lo pinnea como CF-write-only (`get('entitlement',
+ * archivo: firestore.rules ~:633 lo pinnea como CF-write-only (`get('entitlement',
  * null) == resource.data.get('entitlement', null)`), que es una restriccion de
  * ESCRITURA sobre el propio campo, no un gate sobre datos del alumno.
- * `blockedAthleteIds` todavia no figura en absoluto. El enforcement del lado
+ * `blockedAthleteIds` figura desde el slice 5 y es exactamente lo mismo: un pin
+ * de escritura en `users/{uid}`, no una lectura. Igual que `acceptedAt`, que se
+ * pineo en el mismo slice porque es la clave de orden de este archivo y sin pin
+ * cualquier member la reescribia para empujar a OTRO alumno fuera del cupo. Los
+ * dos estan pinneados en create Y en update: media escritura cerrada no cierra
+ * nada. El enforcement del lado
  * del PF llega en un slice posterior. **El alumno NO pierde nada en ningun caso**:
  * conserva rutinas, historial y chat. La presion va sobre quien paga, no sobre
  * quien no decide.

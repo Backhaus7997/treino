@@ -10,7 +10,7 @@
  * QUE SIGNIFICA BLOQUEADO HOY: el vinculo deja de contar para el limite. Nada
  * mas — ninguna clausula de firestore.rules AUTORIZA nada en funcion de
  * `entitlement`. Con precision, porque el campo SI figura en el archivo:
- * firestore.rules ~:570 lo pinnea como CF-write-only, que restringe QUIEN
+ * firestore.rules ~:633 lo pinnea como CF-write-only, que restringe QUIEN
  * escribe ese campo y no gatea ningun dato del alumno. El enforcement del lado
  * del PF llega en un slice posterior.
  * **El alumno NO pierde nada en ningun caso**: conserva rutinas, historial y
@@ -22,24 +22,27 @@
  * clausula lo lee. Se escribe ya para que el dato exista y sea correcto ANTES
  * de que algo dependa de el.
  *
- * BLOQUEANTE PARA EL SLICE DE ENFORCEMENT — el campo NO ESTA PINNEADO EN
- * `firestore.rules`. La clausula `allow update` de `users/{uid}`
- * (firestore.rules ~84-99) es una conjuncion de pins campo por campo, SIN
- * `hasOnly`: pinea `uid`, `role`, `email`, `createdAt`, `subscription` y
- * `weightedLoad`, y su propio comentario dice que el duenio "can still freely
- * update every OTHER field on their own doc". `blockedAthleteIds` es uno de
- * esos otros, asi que hoy el PF puede hacer `update({blockedAthleteIds: []})`
- * desde el cliente — y esa escritura no toca el mapa `subscription`, o sea que
- * `subscriptionChanged` devuelve false y ningun trigger reconcilia: la mentira
- * vive hasta el barrido de las 04:00. Mientras el campo sea INERTE eso no
- * hace danio; el dia que una regla lo lea es un bypass del paywall de una sola
- * escritura. El pin es una linea calcada del idiom de al lado
+ * EL CAMPO YA ESTA PINNEADO (slice 5), en los DOS verbos del cliente. La
+ * clausula `allow update` de `users/{uid}` lo pinea equal-to-existing
  * (`request.resource.data.get('blockedAthleteIds', null) ==
- * resource.data.get('blockedAthleteIds', null)`) mas su `assertFails` en
- * users-subscription-rules.test.ts, y va a poner en rojo el inventario
- * congelado (§5) de rules-read-isolation.test.ts, que es exactamente para lo
- * que ese test existe. No se hace aca porque `firestore.rules` esta fuera de
- * este slice.
+ * resource.data.get('blockedAthleteIds', null)`) y el `allow create` lo rechaza
+ * salvo null — si no, un valor sembrado al crear el doc quedaba INDELEBLE,
+ * porque el pin de update ya no deja sacarlo y reconcileEntitlements solo corre
+ * para PFs. Con los dos cerrados, esta CF es la unica que lo escribe: el Admin
+ * SDK bypasea rules. Es un pin de ESCRITURA — sigue sin haber una sola
+ * clausula que LEA el campo para autorizar nada.
+ *
+ * Por que se pineo antes del enforcement: la clausula es una conjuncion de
+ * pins campo por campo SIN `hasOnly`, o sea que todo campo no pineado es
+ * libremente escribible por el duenio. Sin el pin, el PF se vaciaba
+ * `blockedAthleteIds` con un solo `update` desde el cliente, y como esa
+ * escritura no toca el mapa `subscription`, `subscriptionChanged` devuelve
+ * false y ningun trigger reconcilia: la mentira sobrevivia hasta el barrido de
+ * las 04:00. Mientras el campo sea INERTE eso no hacia danio; el dia que una
+ * regla lo lea habria sido un bypass del paywall de una sola escritura.
+ * Cobertura: `assertFails` en users-subscription-rules.test.ts §3 (update) y §4
+ * (create), y las dos clausulas figuran en el inventario congelado (§5) de
+ * rules-read-isolation.test.ts, las dos como clausulas de ESCRITURA.
  *
  * DATOS DEGRADADOS: si `subscription` no se pudo leer bien, este barrido NO
  * bloquea a nadie — solo devuelve. Ver la valvula mas abajo y la POLITICA en
@@ -64,12 +67,24 @@ import { reconcileEntitlements, BlockableLink } from "./select-blocked-links";
  * Lee los millis de un valor que DEBERIA ser un Timestamp, sin confiar en que
  * lo sea. Total: cualquier cosa que no sirva devuelve null.
  *
- * Existe porque `acceptedAt` es alcanzable desde el cliente — firestore.rules
- * no lo pinnea y el `allow update` de trainer_links autoriza a cualquiera de
- * los dos members — y una llamada a `.toMillis()` sobre un string tiraba
- * TypeError, volteaba la transaccion entera, y como los dos llamadores hacen
+ * Existe porque una llamada a `.toMillis()` sobre un string tiraba TypeError,
+ * volteaba la transaccion entera, y como los dos llamadores hacen
  * catch-and-log sin relanzar, ese PF dejaba de reconciliar para TODOS sus
- * alumnos.
+ * alumnos: un solo dato roto en un vinculo le apagaba el barrido al entrenador
+ * completo.
+ *
+ * NO ALCANZA con el pin de firestore.rules, y esa es la razon por la que la
+ * funcion sobrevive al slice 5. El pin cierra los dos verbos del cliente
+ * (create solo admite null, update lo congela equal-to-existing), pero:
+ *   1. el Admin SDK bypasea rules — un bug en una callable, un backfill o una
+ *      edicion por consola escriben cualquier cosa;
+ *   2. los docs escritos ANTES del pin siguen en la base tal como quedaron. La
+ *      regla vieja dejaba a cualquiera de los dos members reescribir
+ *      `acceptedAt` por update, asi que la basura ya existente no se limpia
+ *      sola.
+ * La consulta de abajo ademas trae TODOS los vinculos del PF sin filtrar por
+ * status, o sea que un doc corrupto entra al map aunque nunca vaya a competir
+ * por un cupo.
  */
 function readMillis(raw: unknown): number | null {
   if (raw == null) return null;
@@ -131,24 +146,21 @@ export async function syncTrainerEntitlements(
 
     const rawLinks: BlockableLink[] = linksSnap.docs.map((doc) => {
       const d = doc.data() as admin.firestore.DocumentData;
-      // `acceptedAt` tampoco puede ir con cast a ciegas, y es el PEOR de los
-      // tres: firestore.rules NO lo pinnea (`rg -c acceptedAt firestore.rules`
-      // da 0) y el `allow update` de trainer_links autoriza a CUALQUIERA de los
-      // dos members. O sea que es alcanzable desde el cliente. Con
-      // `acceptedAt.toMillis()` a secas, un member que escriba ahi un string
-      // tira TypeError, la transaccion se cae ENTERA, y los dos llamadores
-      // hacen catch-and-log sin relanzar: ese PF deja de reconciliar para
-      // TODOS sus alumnos, no solo para el vinculo roto. Un miembro podia
-      // voltearle el barrido al entrenador con un solo write.
+      // `acceptedAt` tampoco puede ir con cast a ciegas. Desde el slice 5
+      // firestore.rules SI lo pinnea, y en los dos verbos: el `allow create` de
+      // trainer_links solo admite null y el `allow update` lo congela
+      // equal-to-existing, asi que hoy ningun member le mete un string. Eso NO
+      // vuelve obsoleta esta lectura defensiva (ver el docblock de
+      // `readMillis`): el Admin SDK bypasea rules y los docs escritos antes del
+      // pin siguen ahi. Con `acceptedAt.toMillis()` a secas, un valor que no
+      // sea Timestamp tira TypeError, la transaccion se cae ENTERA, y los dos
+      // llamadores hacen catch-and-log sin relanzar: ese PF deja de reconciliar
+      // para TODOS sus alumnos, no solo para el vinculo roto.
       //
       // Degradar a null falla del lado correcto: `reconcileEntitlements` trata
       // el faltante como POSITIVE_INFINITY, o sea que el vinculo con la fecha
       // corrupta cae PRIMERO. El costo de romper el propio dato lo paga quien
       // lo rompio, y nadie mas.
-      //
-      // El pin en las reglas llega en el slice de pines. Esto no lo reemplaza:
-      // el Admin SDK bypasea rules, asi que la lectura defensiva hace falta
-      // igual.
       // El chequeo es por FORMA, no `instanceof admin.firestore.Timestamp`:
       // Firestore solo guarda primitivos, mapas, arrays, Timestamp, GeoPoint y
       // Reference, asi que un `toMillis` invocable no lo puede falsificar el

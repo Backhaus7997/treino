@@ -75,13 +75,25 @@ const RAW_RULES = fs.readFileSync(RULES_PATH, "utf8");
 
 /**
  * Tokens that mean "this clause knows about the paywall block state".
- * `blockedAthleteIds` is not in firestore.rules today — it is listed because
+ *
+ * `blockedAthleteIds` was listed BEFORE it existed in firestore.rules, because
  * the denormalized-list shape is the most likely way a future enforcement
- * lands, and the scanner has to be armed BEFORE it is written.
+ * lands and the scanner has to be armed first. As of paywall slice 5 it is in
+ * the file — pinned equal-to-existing on `users/{uid}` update and refused
+ * outright on create, both WRITE clauses, both frozen below. Arming it early
+ * paid off: the entry landed in the inventory the moment the clause appeared,
+ * instead of someone having to remember.
+ *
+ * `acceptedAt` is listed for the same reason and is already in the file
+ * (trainer_links create + update). It is paywall-load-bearing by definition:
+ * it is the ONLY ordering key of reconcileEntitlements, so it decides WHICH
+ * athlete loses the slot when a trainer goes over the cap. If it ever shows up
+ * in a read/get/list clause, §6 must go red.
  */
 const PAYWALL_TOKENS = [
   "trainer_links",
   "entitlement",
+  "acceptedAt",
   "blockedAthleteIds",
   "blockedAt",
   "blockedReason",
@@ -509,8 +521,36 @@ describe("rules scanner sanity", () => {
 
 const FROZEN_PAYWALL_AWARE_CLAUSES: Readonly<Record<string, readonly string[]>> = {
   // The entitlement field-pin: entitlement/blockedAt/blockedReason are
-  // CF-write-only (paywall Fase 7 PR1, design 5.2).
-  "/trainer_links/{linkId} :: update": ["blockedAt", "blockedReason", "entitlement"],
+  // CF-write-only (paywall Fase 7 PR1, design 5.2). `acceptedAt` joins them in
+  // slice 5 — pinned equal-to-existing so no member can rewrite the ordering
+  // key that decides who keeps the slot.
+  "/trainer_links/{linkId} :: update": [
+    "acceptedAt", "blockedAt", "blockedReason", "entitlement",
+  ],
+  // The other half of the acceptedAt write path. The client DOES send this
+  // field on create (TrainerLinkRepository.request() does set(toJson())), so
+  // the create clause admits it only as null. A pin on one verb, documented as
+  // if it covered both, is worse than no pin.
+  "/trainer_links/{linkId} :: create": ["acceptedAt"],
+  // Same shape for the trainer's own doc: create refuses `blockedAthleteIds`
+  // outright, because the update pin below would make a value planted at
+  // create INDELIBLE from the client.
+  "/users/{uid} :: create": ["blockedAthleteIds"],
+  // ADDED deliberately (paywall slice 5), not to make this test pass. The
+  // `blockedAthleteIds` field-pin: the trainer's own doc now pins the
+  // denormalized blocked-athlete list equal-to-existing, so only the Admin SDK
+  // (reconcileEntitlements) can move it.
+  //
+  // The verb is what makes this admissible, and it is the only thing worth
+  // checking here — for this entry and for the three slice-5 entries above:
+  // every one of them is a `create` or `update` clause. They restrict WHO MAY
+  // WRITE the field; none of them reads the field to authorize anything, and
+  // no read verb shares an expression or a helper with them. §6 stays green
+  // ON ITS OWN — it
+  // is not suppressed and it was not touched. If a future edit lands
+  // `blockedAthleteIds` in a read/get/list clause, §6 goes red and the answer
+  // is to move the check to the write path, never to widen this table.
+  "/users/{uid} :: update": ["blockedAthleteIds"],
   // chatCreateOk() reads the named link to prove a coach relationship before
   // a chat may be opened. Reaches trainer_links through the helper.
   "/chats/{chatId} :: create": ["trainer_links"],
