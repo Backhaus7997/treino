@@ -31,10 +31,19 @@ aserción que, si la regla se aflojara, se pondría roja.
 | 🟡 | Hay test negativo en la otra suite, `scripts/rules_test/*.test.js` (job *Rules Test*) |
 | — | No hay ningún test negativo |
 
-**Las dos marcas bloquean el merge.** El 🟡 nació distinguiendo "hay test pero
-nada lo corre"; desde #680 Slice B las dos suites son gates de CI y lo único
-que separa las marcas es en qué archivo vive la cobertura — dato útil para
-saber dónde tocar, no un nivel de confianza menor. Ver §1.4.
+**Las dos marcas valen lo mismo.** El 🟡 nació distinguiendo "hay test pero
+nada lo corre"; desde #680 Slice B las dos suites corren en CI y lo único que
+separa las marcas es en qué archivo vive la cobertura — dato útil para saber
+dónde tocar, no un nivel de confianza menor. Ver §1.4.
+
+> ⚠️ **`main` no tiene branch protection** (`GET /repos/.../branches/main/protection`
+> → 404, verificado 2026-08-24). Ningún job de CI **impide** mergear hoy — ni
+> éstos ni `Analyze & Test`: fallan en rojo y el botón de merge sigue
+> disponible. `ci.yml` ya lo dice entre paréntesis ("con branch protection
+> activada"), pero conviene que esté acá: mientras eso siga así, todo ✅ de
+> esta matriz garantiza *"esto se ejecuta y alguien ve el rojo"*, no *"esto no
+> puede entrar a main"*. Activarla, y decidir qué checks son obligatorios, es
+> parte pendiente de Slice B.
 
 Las operaciones son las cinco de Firestore (`read` se abre en `get` + `list`
 porque son permisos distintos: `get` protege un documento, `list` protege la

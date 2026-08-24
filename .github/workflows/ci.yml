@@ -224,9 +224,12 @@ jobs:
   # el ^5 de functions/, con su propio lockfile— y (2) corriendo en paralelo el
   # rojo se atribuye solo, sin abrir el log a ver cuál de las dos suites cayó.
   #
-  # BLOQUEA el merge, igual que el resto de los jobs. Se mergea en verde
-  # (8 suites / 139 tests) y los dos negativos nuevos se verificaron por
-  # mutación, no sólo por verde — ver docs/security.md §1.8.
+  # Es un gate duro igual que el resto: falla el job y (con branch protection
+  # activada) el PR no se puede mergear. OJO que hoy `main` NO tiene branch
+  # protection, así que en la práctica ningún job frena nada todavía — ver la
+  # nota en docs/security.md §1. Se mergea en verde igual (8 suites / 139
+  # tests) y los dos negativos nuevos se verificaron por mutación, no sólo por
+  # verde — ver docs/security.md §1.8.
   rules-test:
     name: Rules Test (scripts/rules_test)
     runs-on: ubuntu-latest
