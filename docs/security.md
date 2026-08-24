@@ -109,7 +109,7 @@ Cinco paths siguen **sin una sola aserción negativa**:
 
 | Path | get | list | write | delete |
 |---|---|---|---|---|
-| `avatars/{file}` | ✅† | ✅† | ✅ | — |
+| `avatars/{file}` | ✅† | ✅ | ✅ | — |
 | `temp/uploads/{uid}/**` | — | — | — | — |
 | `customExerciseVideos/{uid}/**` | ✅† | ✅ | ✅ | ✅ |
 | `chatMedia/{chatId}/{uid}/**` | 🟡 | 🟡 | — | — |
@@ -121,27 +121,27 @@ Cinco paths siguen **sin una sola aserción negativa**:
 de refilón: el caso "listar `postPhotos/`" de
 `post-photos-storage-rules.test.ts` cae en él, pero nada lo testea de frente.
 
-> **† — cobertura de piso, no de fondo. Leer esas tres celdas como "cubierto"
+> **† — cobertura de piso, no de fondo. Leer esas dos celdas como "cubierto"
 > sería un error.** El único negativo que existe sobre ellas es el del usuario
-> **anónimo**. El caso que importa —un autenticado cualquiera operando sobre el
-> objeto de otro— está **abierto en las tres** y **sin testear a propósito**:
+> **anónimo**. El caso que importa —un autenticado cualquiera leyendo el objeto
+> de otro— está **abierto en las dos** y **sin testear a propósito**: los dos
+> `get` son un permiso amplio **deliberado** (§3.2, §3.3), y pinear un permiso
+> amplio congela el status quo (§1.6 regla 1). Si mañana se decide apretarlos,
+> el test habría que borrarlo en vez de que guíe.
 >
-> - Los dos `get` son un permiso amplio **deliberado** (§3.2, §3.3). No se
->   pinean todavía porque pinear un permiso amplio antes de decidirlo congela el
->   status quo (§1.6 regla 1); la decisión recién se escribió en §3.
-> - El `list` de `avatars/` es un **leak**, no una decisión: cualquier
->   autenticado enumera el prefijo y el nombre del archivo ES el uid. Tiene
->   ticket propio — **QA-SEC-007** — y el `assertFails` entra cuando cierre.
->
-> El `list` de `customExerciseVideos/` **ya no lleva †**: era el otro leak
-> (**QA-SEC-008**) y quedó cerrado con `allow list: if false`. Los cuatro
-> `assertFails` que lo pinean —carpeta y raíz, para el ajeno **y para el
-> dueño**— viven en `custom-exercise-videos-storage-rules.test.ts`.
+> Las dos celdas `list` **ya no llevan †**: eran los leaks **QA-SEC-007**
+> (`avatars/`) y **QA-SEC-008** (`customExerciseVideos/`), y las dos quedaron
+> cerradas con `allow list: if false`. Los `assertFails` que las pinean cubren
+> al ajeno **y al dueño** —la regla es `if false`, no owner-only— y en
+> `customExerciseVideos` cubren además la **raíz**, que era el directorio de
+> qué PFs tienen contenido. Viven en `avatars-storage-rules.test.ts` y
+> `custom-exercise-videos-storage-rules.test.ts`.
 >
 > La celda `delete` de `avatars` sigue en `—` por un motivo distinto: hoy el
-> borrado se deniega **hasta para el dueño**, y por un null deref en
-> `storage.rules:13`, no por falta de permiso. Cualquier test ahí pasaría por el
-> motivo equivocado, que §1.8 prohíbe. Es **QA-SEC-009**.
+> borrado se deniega **hasta para el dueño**, y por un null deref en la línea
+> `&& request.resource.size < 5 * 1024 * 1024` del `write`, no por falta de
+> permiso. Cualquier test ahí pasaría por el motivo equivocado, que §1.8
+> prohíbe. Es **QA-SEC-009**.
 >
 > Los tres tickets están medidos contra el emulador y explicados en §3.
 
@@ -278,7 +278,8 @@ Ordenados por lo que me preocuparía primero:
    arregla aparte: aflojar o apretar una regla de lectura de Storage puede
    romper avatares o videos en producción y merece su propio PR con su propia
    verificación. Slice E también dejó tests para las celdas que **sí** estaban
-   decididas (§3.7). **QA-SEC-008 ya cerró (#763)**; QA-SEC-007 sigue abierto.
+   decididas (§3.7). **Los dos leaks ya cerraron: QA-SEC-008 en #763 y
+   QA-SEC-007 en #764.**
 2. **`storage:temp/uploads` y el catch-all `{allPaths=**}`**: cero tests.
    `temp/uploads` es `read: if false` + write por dueño, y ahí van los Excel
    que sube el PF. Barato de cerrar; quedó afuera por tiempo.
@@ -1034,7 +1035,8 @@ Dos consecuencias que mandan sobre toda la sección:
 
 ```
 match /avatars/{fileName} {
-  allow read: if request.auth != null;                       // get + list
+  allow get: if request.auth != null;
+  allow list: if false;                                      // ← QA-SEC-007, #764
   allow write: if request.auth != null
               && fileName.matches(request.auth.uid + '\\..+')
               && request.resource.size < 5 * 1024 * 1024
@@ -1042,10 +1044,24 @@ match /avatars/{fileName} {
 }
 ```
 
-**Quién lee hoy, exactamente.** `read` en Storage es `get` **+** `list`, y acá
-no hay nada que los separe. Medido: un autenticado cualquiera hace `get` del
-avatar de otro (ALLOW) **y también `listAll('avatars/')` (ALLOW)**, que devolvió
-la lista completa de objetos del prefijo. El anónimo queda afuera en ambos casos.
+> **Estado:** el `list` de este bloque estaba abierto y es el leak QA-SEC-007.
+> **Cerrado en #764.** Lo que sigue es la medición **previa** al arreglo, que es
+> lo que lo justifica; el estado actual está en la fila re-medida de §3.5.
+
+**Quién leía, exactamente.** `read` en Storage es `get` **+** `list`, y acá
+no había nada que los separara. Medido **antes de #764**: un autenticado
+cualquiera hacía `get` del avatar de otro (ALLOW) **y también
+`listAll('avatars/')` (ALLOW)**, que devolvió la lista completa de objetos del
+prefijo. El anónimo quedaba afuera en ambos casos.
+
+> Ojo con la intuición del match: `match /avatars/{fileName}` pide dos
+> segmentos, así que uno esperaría que listar el prefijo `avatars/` —un solo
+> segmento— cayera en el catch-all, como pasa con `postPhotos/` (§3.4). No es
+> así: para un `list`, el motor evalúa el prefijo **más un segmento comodín**,
+> o sea `avatars/{fileName}`, que es exactamente este bloque. Por eso el
+> `allow list: if false` de acá **sí** cierra la enumeración de la raíz, y por
+> eso en `postPhotos` hace falta el catch-all para el mismo efecto. Está
+> pineado por test en los dos archivos.
 
 **Qué expone la enumeración.** El nombre del archivo **es el uid**
 (`avatars/{uid}.{ext}`). Enumerar `avatars/` no devuelve "unas fotos": devuelve
@@ -1076,7 +1092,7 @@ agrega una categoría de dato que la política no cubra.
 | Operación | Veredicto |
 |---|---|
 | `get` | **Deliberado y defendible**, pero **redundante** (§3.1): el avatar ya viaja por `userPublicProfiles` a la misma audiencia. Se conserva; no se justifica por necesidad técnica sino porque no expone nada nuevo. |
-| `list` | **NO deliberado — leak.** Ningún comentario lo menciona, ningún cliente lo usa, y los dos bloques vecinos que sí lo pensaron (`chatMedia`, `postPhotos`) lo cierran explícitamente. Severidad **baja** por el atenuante de arriba, pero es un canal de enumeración gratuito. → **QA-SEC-007** |
+| `list` | ~~**NO deliberado — leak.**~~ Ningún comentario lo mencionaba, ningún cliente lo usa, y los dos bloques vecinos que sí lo pensaron (`chatMedia`, `postPhotos`) lo cierran explícitamente. Severidad **baja** por el atenuante de arriba, pero era un canal de enumeración gratuito. → **QA-SEC-007 — CERRADO en #764** con `allow list: if false`. |
 | `write` | **Deliberado y correcto.** Owner-only, anclado, sólo imágenes, 5 MB. Pineado en §3.7. |
 | `delete` | **ROTO** — ver abajo. → **QA-SEC-009** |
 
@@ -1226,7 +1242,7 @@ donde se aclara.
 
 | Path | `get` ajeno | `list` (carpeta) | `list` (raíz) | `write` ajeno | `delete` dueño | `delete` ajeno |
 |---|---|---|---|---|---|---|
-| `avatars/` | ALLOW | **ALLOW** ⚠️ | n/a (un nivel) | DENY | **DENY** 🐛 | DENY |
+| `avatars/` | ALLOW | ~~ALLOW~~ → **DENY** ✅ | n/a (un nivel) | DENY | **DENY** 🐛 | DENY |
 | `customExerciseVideos/` | ALLOW | ~~ALLOW~~ → **DENY** ✅ | ~~ALLOW~~ → **DENY** ✅ | DENY | ALLOW | DENY |
 | `postPhotos/` | ALLOW | DENY | DENY | DENY | ALLOW | DENY |
 | `chatMedia/` | DENY (no miembro) | DENY | DENY | DENY | — | DENY |
@@ -1239,8 +1255,9 @@ Anónimo: **DENY en todas las celdas de todos los paths**. El piso está bien.
 falta de permiso. ~~Tachado~~ = valor medido **antes** del PR que cerró la
 celda; el valor después de la flecha es la re-medición contra el
 `storage.rules` actual, como pide §3.8 regla 5. Las celdas `list` de
-`customExerciseVideos/` se re-midieron en **#763** y ahora son DENY también
-para el **dueño** (la regla es `if false`, no owner-only).
+`customExerciseVideos/` se re-midieron en **#763** y la de `avatars/` en
+**#764**: las tres son ahora DENY también para el **dueño** (la regla es
+`if false`, no owner-only).
 
 `chatMedia` y `temp/uploads` se midieron sólo como control — están fuera del
 alcance de este slice y salieron cerrados en todos los casos probados, lo que
@@ -1255,7 +1272,7 @@ propio change, su test y su verificación.
 
 | ID | Qué | Path | Severidad | Arreglo propuesto |
 |---|---|---|---|---|
-| **QA-SEC-007** | `list` abierto a cualquier autenticado; enumera el padrón de uids con avatar | `avatars/` | Baja — los uids ya son enumerables por `userPublicProfiles` (`firestore.rules:780`), pero es un canal paralelo que sobrevive a cerrar aquél | Separar `read` en `get` + `list`; `allow list: if false` |
+| ~~**QA-SEC-007**~~ | `list` abierto a cualquier autenticado; enumera el padrón de uids con avatar | `avatars/` | Baja — los uids ya son enumerables por `userPublicProfiles` (`firestore.rules:780`), pero es un canal paralelo que sobrevive a cerrar aquél | **CERRADO en #764** (issue #764): `read` separado en `get` + `list`, `allow list: if false` |
 | ~~**QA-SEC-008**~~ | `list` abierto en carpeta **y raíz**; exfiltra la videoteca entera de un PF y el directorio de qué PFs tienen contenido | `customExerciseVideos/` | **Media-alta** — no hay ninguna otra vía para obtener el inventario, y el contenido es el activo del PF | **CERRADO en #763** (issue #763): `read` separado en `get` + `list`, `allow list: if false`, comentario del bloque corregido (justificaba la lectura amplia con un motivo falso — §3.1) |
 | **QA-SEC-009** | `delete` denegado hasta para el dueño por null deref en `storage.rules:13`; "Quitar foto" miente y el objeto queda huérfano | `avatars/` | Media — no es un agujero (falla cerrado) pero incumple la §7 de la política y deja objetos legibles que el usuario cree borrados | `allow delete` propio, como en los otros cuatro bloques (§3.2.1). Revisar además el `catch (_) {}` de `avatar_web_uploader.dart:110` |
 
@@ -1286,9 +1303,10 @@ regex), el `delete` owner-only de `customExerciseVideos`, y el piso anónimo de
   §1.6 regla 1 dice que no hay que hacer. Cuando QA-SEC-007 y -008 cierren, esos
   `assertFails` van en los archivos que este PR dejó preparados con el comentario
   correspondiente.
-  → **Al día de hoy: -008 cerró en #763** y los cuatro `assertFails` ya viven en
-  `custom-exercise-videos-storage-rules.test.ts` (carpeta y raíz, ajeno y
-  dueño). El de `avatars` sigue pendiente de QA-SEC-007.
+  → **Al día de hoy los dos cerraron**: -008 en #763 y -007 en #764. Los
+  `assertFails` viven en `custom-exercise-videos-storage-rules.test.ts`
+  (carpeta y raíz, ajeno y dueño) y en `avatars-storage-rules.test.ts`
+  (prefijo, ajeno y dueño).
 - **El `delete` de `avatars`, en cualquier dirección.** Hoy "el ajeno no puede
   borrar" es **verdad por accidente**: se deniega por el null deref de
   `storage.rules:13`, no por un gate de dueño. Un test así pasaría *por el motivo

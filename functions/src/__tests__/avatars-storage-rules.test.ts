@@ -1,26 +1,25 @@
 /**
- * Storage rules tests for the `avatars/{fileName}` block (#680 Slice E).
+ * Storage rules tests for the `avatars/{fileName}` block (#680 Slice E;
+ * `list` cerrado por QA-SEC-007 / #764).
  *
  * ⚠️  COBERTURA DELIBERADAMENTE PARCIAL — leer `docs/security.md` §3.2 antes de
- * agregar casos acá. Este archivo pinea SOLO la mitad del bloque que ya está
- * decidida (la escritura). Dos celdas quedan sin test **a propósito**:
- *
- *  - `list`: hoy `allow read: if request.auth != null` deja que cualquier
- *    autenticado enumere `avatars/`, y como el nombre del archivo ES el uid,
- *    eso devuelve el padrón de uids con avatar. Es el leak QA-SEC-007 y se
- *    arregla en su propio PR. Testearlo ahora congelaría el status quo
- *    (§1.6 regla 1). Cuando QA-SEC-007 cierre, acá va el `assertFails` del
- *    `listAll`.
+ * agregar casos acá. Una celda queda sin test **a propósito**:
  *
  *  - `delete`: el bloque NO declara `allow delete`, así que cae en `write`,
  *    cuya condición dereferencia `request.resource.size` — que en un delete es
  *    null. Resultado medido: el borrado se deniega **hasta para el dueño**, y
- *    por "Null value error" en storage.rules:13, no por falta de permiso. Un
+ *    por "Null value error" sobre esa línea, no por falta de permiso. Un
  *    test de "el ajeno no puede borrar" pasaría por el motivo equivocado, que
  *    §1.8 prohíbe explícitamente. Es QA-SEC-009.
  *
- * Lo que sí se pinea acá: el gate de escritura, que es owner-only, anclado,
- * limitado a imágenes, y correcto.
+ * `get` amplio tampoco se pinea: es un permiso deliberado (§3.2), y un
+ * `assertSucceeds` ahí congelaría el status quo si mañana se decide apretarlo.
+ * Sí se pinea el piso anónimo.
+ *
+ * Lo que sí se pinea acá: el gate de escritura —owner-only, anclado, limitado
+ * a imágenes— y el `list` cerrado, que es el leak QA-SEC-007. El nombre del
+ * archivo ES el uid, así que enumerar `avatars/` devolvía el padrón de uids
+ * con avatar en una sola llamada.
  *
  * El bound de 5 MB no se ejercita — empujar 5 MB por el emulador en cada corrida
  * es puro lastre de CI, y es el mismo idiom `request.resource.size` que ya
@@ -156,14 +155,24 @@ describe("avatars/{fileName} — storage rules", () => {
     );
   });
 
-  // --- lectura: sólo se pinea el piso (anónimo), NO el caso cruzado ---------
+  // --- get: sólo se pinea el piso (anónimo), NO el caso cruzado ------------
 
   it("DENIES an unauthenticated get", async () => {
     await assertFails(getBytes(ref(storageAs(null), AVATAR_PATH)));
   });
 
+  // --- list: cerrado incondicionalmente (QA-SEC-007) ------------------------
+
+  it("DENIES listing avatars/ — no uid enumeration", async () => {
+    // `avatars/{uid}.{ext}`: el nombre del archivo ES el uid, así que este
+    // listado devolvía el padrón de uids con avatar. La regla es `if false`,
+    // no owner-only — por eso el dueño también tiene que dar rojo. Ver
+    // `docs/security.md` §3.2.
+    await assertFails(listAll(ref(storageAs(OTHER), "avatars")));
+    await assertFails(listAll(ref(storageAs(OWNER), "avatars")));
+  });
+
   it("DENIES an unauthenticated list of avatars/", async () => {
-    // El caso AUTENTICADO está abierto y es QA-SEC-007 — no se testea acá.
     await assertFails(listAll(ref(storageAs(null), "avatars")));
   });
 });

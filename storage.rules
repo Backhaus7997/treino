@@ -6,8 +6,24 @@ service firebase.storage {
   match /b/{bucket}/o {
     // Avatars: any image extension owned by the authenticated user.
     // Path pattern: /avatars/{uid}.{ext}  e.g. avatars/abc123.jpg, avatars/abc123.heic
+    //
+    // `get` es amplio a propósito: el avatar se muestra en feed, chat, reviews
+    // y rankings a cualquier autenticado, y la misma imagen ya viaja por
+    // `userPublicProfiles/{uid}.avatarUrl`, que es world-readable a la misma
+    // audiencia (`firestore.rules:780`). No expone nada nuevo.
+    //
+    // `list` va cerrado (QA-SEC-007): el nombre del archivo **ES el uid**, así
+    // que enumerar el prefijo no devolvía "unas fotos" sino el padrón de uids
+    // que alguna vez subieron avatar, en una sola llamada. Los uids ya son
+    // enumerables por `userPublicProfiles`, así que esto no era la primera
+    // puerta — pero es una puerta **paralela**, sobre una población distinta
+    // (los objetos que existen en el bucket) y que sobreviviría a cualquier
+    // endurecimiento futuro de aquél. Cerrarlo es seguro: cero llamadas a
+    // `listAll()` / `.list()` del SDK de Storage en todo `lib/`. Ver
+    // `docs/security.md` §3.2.
     match /avatars/{fileName} {
-      allow read: if request.auth != null;
+      allow get: if request.auth != null;
+      allow list: if false;
       allow write: if request.auth != null
                   && fileName.matches(request.auth.uid + '\\..+')
                   && request.resource.size < 5 * 1024 * 1024
