@@ -61,18 +61,26 @@ mixin _$Routine {
 // "Bro Split", "PPL", "Upper/Lower" — and 2 of 5 usability participants
 // could not tell what those meant; the term is not hidden, it is explained.
 //
-// Seeded via scripts/seed_templates.js (Admin SDK, bypasses rules).
-// `includeToJson: false` for the same reason as the rating aggregates
-// above, and it is what keeps this field OUT of firestore.rules: the
-// client never puts it in a write payload, so no `hasOnly` list has to
-// learn about it and no athlete/trainer routine update can break on it
-// (the #563 failure mode). Routine writes use `update()`, never `set()`,
-// so an excluded field survives untouched.
+// Seeded via scripts/seed_templates.js (Admin SDK, bypasses rules) for the
+// 7 system templates, and escribible por el PF desde el editor.
 //
-// Trainer-authored summaries would need the editor AND the rules
-// allowlists — deliberately a separate slice.
-// ignore: invalid_annotation_target
-  @JsonKey(includeToJson: false)
+// Ya NO lleva `includeToJson: false`. Sacarlo es lo que habilita que el PF
+// lo escriba, y es también lo que obliga a que firestore.rules lo conozca:
+// `toJson()` ahora lo emite en TODA rutina, así que los tres `hasOnly` de
+// los paths de update tuvieron que aprenderlo. Si alguno se quedara sin él,
+// esa rama entera de edición falla con permission-denied — el modo de falla
+// de #563.
+//
+// El reparto NO es simétrico, y es deliberado:
+//   • paths 3 y 4 (PF): `summary` está en `keys()` Y en `affectedKeys()`.
+//     El PF lo escribe y lo edita.
+//   • path 2 (atleta): está SÓLO en `keys()`. El atleta puede seguir
+//     editando una rutina que lo tenga, pero no puede cambiarlo. Mismo
+//     criterio que ratingAvg/ratingsCount, que se listan defensivamente por
+//     esa misma razón.
+//
+// El tope de largo (280) vive en las reglas, no acá: un cliente parcheado
+// no lo respetaría. Los 7 sembrados miden entre 61 y 100 caracteres.
   String? get summary => throw _privateConstructorUsedError;
 
   /// Serializes this Routine to a JSON map.
@@ -106,7 +114,7 @@ abstract class $RoutineCopyWith<$Res> {
       int numWeeks,
       @JsonKey(includeToJson: false) double? ratingAvg,
       @JsonKey(includeToJson: false) int? ratingsCount,
-      @JsonKey(includeToJson: false) String? summary});
+      String? summary});
 }
 
 /// @nodoc
@@ -239,7 +247,7 @@ abstract class _$$RoutineImplCopyWith<$Res> implements $RoutineCopyWith<$Res> {
       int numWeeks,
       @JsonKey(includeToJson: false) double? ratingAvg,
       @JsonKey(includeToJson: false) int? ratingsCount,
-      @JsonKey(includeToJson: false) String? summary});
+      String? summary});
 }
 
 /// @nodoc
@@ -366,7 +374,7 @@ class _$RoutineImpl implements _Routine {
       this.numWeeks = 1,
       @JsonKey(includeToJson: false) this.ratingAvg,
       @JsonKey(includeToJson: false) this.ratingsCount,
-      @JsonKey(includeToJson: false) this.summary})
+      this.summary})
       : _days = days;
 
   factory _$RoutineImpl.fromJson(Map<String, dynamic> json) =>
@@ -439,19 +447,27 @@ class _$RoutineImpl implements _Routine {
 // "Bro Split", "PPL", "Upper/Lower" — and 2 of 5 usability participants
 // could not tell what those meant; the term is not hidden, it is explained.
 //
-// Seeded via scripts/seed_templates.js (Admin SDK, bypasses rules).
-// `includeToJson: false` for the same reason as the rating aggregates
-// above, and it is what keeps this field OUT of firestore.rules: the
-// client never puts it in a write payload, so no `hasOnly` list has to
-// learn about it and no athlete/trainer routine update can break on it
-// (the #563 failure mode). Routine writes use `update()`, never `set()`,
-// so an excluded field survives untouched.
+// Seeded via scripts/seed_templates.js (Admin SDK, bypasses rules) for the
+// 7 system templates, and escribible por el PF desde el editor.
 //
-// Trainer-authored summaries would need the editor AND the rules
-// allowlists — deliberately a separate slice.
-// ignore: invalid_annotation_target
+// Ya NO lleva `includeToJson: false`. Sacarlo es lo que habilita que el PF
+// lo escriba, y es también lo que obliga a que firestore.rules lo conozca:
+// `toJson()` ahora lo emite en TODA rutina, así que los tres `hasOnly` de
+// los paths de update tuvieron que aprenderlo. Si alguno se quedara sin él,
+// esa rama entera de edición falla con permission-denied — el modo de falla
+// de #563.
+//
+// El reparto NO es simétrico, y es deliberado:
+//   • paths 3 y 4 (PF): `summary` está en `keys()` Y en `affectedKeys()`.
+//     El PF lo escribe y lo edita.
+//   • path 2 (atleta): está SÓLO en `keys()`. El atleta puede seguir
+//     editando una rutina que lo tenga, pero no puede cambiarlo. Mismo
+//     criterio que ratingAvg/ratingsCount, que se listan defensivamente por
+//     esa misma razón.
+//
+// El tope de largo (280) vive en las reglas, no acá: un cliente parcheado
+// no lo respetaría. Los 7 sembrados miden entre 61 y 100 caracteres.
   @override
-  @JsonKey(includeToJson: false)
   final String? summary;
 
   @override
@@ -548,7 +564,7 @@ abstract class _Routine implements Routine {
       final int numWeeks,
       @JsonKey(includeToJson: false) final double? ratingAvg,
       @JsonKey(includeToJson: false) final int? ratingsCount,
-      @JsonKey(includeToJson: false) final String? summary}) = _$RoutineImpl;
+      final String? summary}) = _$RoutineImpl;
 
   factory _Routine.fromJson(Map<String, dynamic> json) = _$RoutineImpl.fromJson;
 
@@ -602,19 +618,27 @@ abstract class _Routine implements Routine {
 // "Bro Split", "PPL", "Upper/Lower" — and 2 of 5 usability participants
 // could not tell what those meant; the term is not hidden, it is explained.
 //
-// Seeded via scripts/seed_templates.js (Admin SDK, bypasses rules).
-// `includeToJson: false` for the same reason as the rating aggregates
-// above, and it is what keeps this field OUT of firestore.rules: the
-// client never puts it in a write payload, so no `hasOnly` list has to
-// learn about it and no athlete/trainer routine update can break on it
-// (the #563 failure mode). Routine writes use `update()`, never `set()`,
-// so an excluded field survives untouched.
+// Seeded via scripts/seed_templates.js (Admin SDK, bypasses rules) for the
+// 7 system templates, and escribible por el PF desde el editor.
 //
-// Trainer-authored summaries would need the editor AND the rules
-// allowlists — deliberately a separate slice.
-// ignore: invalid_annotation_target
+// Ya NO lleva `includeToJson: false`. Sacarlo es lo que habilita que el PF
+// lo escriba, y es también lo que obliga a que firestore.rules lo conozca:
+// `toJson()` ahora lo emite en TODA rutina, así que los tres `hasOnly` de
+// los paths de update tuvieron que aprenderlo. Si alguno se quedara sin él,
+// esa rama entera de edición falla con permission-denied — el modo de falla
+// de #563.
+//
+// El reparto NO es simétrico, y es deliberado:
+//   • paths 3 y 4 (PF): `summary` está en `keys()` Y en `affectedKeys()`.
+//     El PF lo escribe y lo edita.
+//   • path 2 (atleta): está SÓLO en `keys()`. El atleta puede seguir
+//     editando una rutina que lo tenga, pero no puede cambiarlo. Mismo
+//     criterio que ratingAvg/ratingsCount, que se listan defensivamente por
+//     esa misma razón.
+//
+// El tope de largo (280) vive en las reglas, no acá: un cliente parcheado
+// no lo respetaría. Los 7 sembrados miden entre 61 y 100 caracteres.
   @override
-  @JsonKey(includeToJson: false)
   String? get summary;
 
   /// Create a copy of Routine
