@@ -283,14 +283,33 @@ test('SCENARIO-270 inverse: owner can write their own public profile', async () 
 // smoke test. Pre-existing rule denied this case, causing
 // publicProfileViewProvider to error when viewing profiles with no
 // prior friendship interaction.
+//
+// QA-SEC-010 — ACOTADO al par que el doc id encodea. La versión anterior de
+// este test lo afirmaba desde `u3`, un TERCERO ajeno al par `u1_u2`, y eso era
+// más ancho que el flujo que venía a proteger: quien mira un perfil público es
+// una de las dos puntas de la relación (`viewer_target`), nunca un tercero. Con
+// el permiso abierto a cualquiera, la diferencia entre "snapshot vacío" y
+// "PERMISSION_DENIED" respondía «¿estas dos personas son amigas?» a cualquier
+// cuenta gratis, sobre un doc id que es el par ordenado y con los dos padrones
+// de uid enumerables. Ahora el test cubre las DOS direcciones: el miembro
+// resuelve el vacío (que es lo que el escenario protege) y el tercero no
+// distingue un estado del otro.
 // ---------------------------------------------------------------------------
-test('SCENARIO-271: non-member can get a non-existent friendship doc (returns empty)', async () => {
+test('SCENARIO-271: member can get a non-existent friendship doc (returns empty)', async () => {
   // Do NOT seed any friendship — verify .get() returns empty snap, not failure.
-  const u3 = testEnv.authenticatedContext('u3');
+  const u1 = testEnv.authenticatedContext('u1');
   const snap = await assertSucceeds(
-    u3.firestore().collection('friendships').doc('u1_u2').get(),
+    u1.firestore().collection('friendships').doc('u1_u2').get(),
   );
   expect(snap.exists).toBe(false);
+});
+
+test('SCENARIO-271b: a non-member cannot tell a missing friendship from a private one', async () => {
+  // Sin sembrar nada: si esto pasara, el vacío sería la respuesta.
+  const u3 = testEnv.authenticatedContext('u3');
+  await assertFails(
+    u3.firestore().collection('friendships').doc('u1_u2').get(),
+  );
 });
 
 // ---------------------------------------------------------------------------
