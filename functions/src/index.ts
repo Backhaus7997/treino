@@ -33,6 +33,9 @@ export { reassignFcmToken } from "./notifications/reassign-fcm-token";
 export { maintainFollowCounters } from "./social/maintain-follow-counters";
 export { maintainReactionCounters } from "./social/maintain-reaction-counters";
 export { notifyOnReview } from "./notifications/notify-review";
+// #628: canal alumno → PF durante la sesión. Notifica SOLO cuando
+// kind === 'discomfort' — un comment no debe vibrarle el teléfono al PF.
+export { notifyOnExerciseFeedback } from "./notifications/notify-exercise-feedback";
 export { cleanupAssignedPlansOnUnlink } from "./cleanup-assigned-plans";
 export { addAlias } from "./add-alias";
 export { syncSessionShareOnTrainerLink } from "./sync-session-share";
