@@ -23,10 +23,13 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get homeAthleteFirstRunBody =>
-      'Creá tu primera rutina o buscá un entrenador para empezar.';
+      'Creá tu propia rutina, explorá planes ya armados o buscá un entrenador que te guíe.';
 
   @override
   String get homeAthleteFirstRunCreateCta => 'CREAR RUTINA';
+
+  @override
+  String get homeAthleteFirstRunExplorePlansCta => 'Explorar planes';
 
   @override
   String get homeAthleteFirstRunFindTrainerCta => 'Buscar entrenador';
@@ -3570,10 +3573,13 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get homeAthleteFirstRunBody =>
-      'Creá tu primera rutina o buscá un entrenador para empezar.';
+      'Creá tu propia rutina, explorá planes ya armados o buscá un entrenador que te guíe.';
 
   @override
   String get homeAthleteFirstRunCreateCta => 'CREAR RUTINA';
+
+  @override
+  String get homeAthleteFirstRunExplorePlansCta => 'Explorar planes';
 
   @override
   String get homeAthleteFirstRunFindTrainerCta => 'Buscar entrenador';

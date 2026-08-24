@@ -167,7 +167,31 @@ bool _isEmptyData(AsyncValue<List<Object?>> async) =>
 
 /// First-run empty state shown on Home when the athlete has no self-created
 /// routine and no trainer-assigned plan. Replaces the hardcoded fake workout
-/// card with an honest onboarding surface and two CTAs (finding 5).
+/// card with an honest onboarding surface and three CTAs (finding 5, #636).
+///
+/// ## Los tres caminos y su orden (#636)
+///
+/// Las entrevistas de la auditoría sacaron tres perfiles de atleta nuevo: el
+/// que se arma la rutina solo, el que quiere agarrar un plan ya hecho, y el
+/// que quiere un PF que lo guíe. Los tres tienen que ser legibles de un
+/// vistazo — por eso el camino de PLANES es un botón con el MISMO peso visual
+/// que "Buscar entrenador", no un link chiquito abajo.
+///
+/// El orden es **CREAR RUTINA → Explorar planes → Buscar entrenador**, y no
+/// el "menor esfuerzo primero" que sugería el issue, por dos razones:
+///
+/// 1. El propio issue descartó rotar cuál de los tres gana la jerarquía
+///    ("Reemplazar 'Crear rutina' por 'Elegir plantilla' como CTA primario.
+///    Descartado"). Poner un `OutlinedButton` ARRIBA del botón lleno no
+///    entrega esa prioridad: el peso visual le gana al orden de lectura y el
+///    ojo cae igual en el botón lleno. Sería una jerarquía contradictoria,
+///    no la que se buscaba.
+/// 2. Entre los dos secundarios —que sí pesan igual— el orden manda de
+///    verdad, y ahí PLANES va primero. Ahí es donde la hipótesis del issue
+///    se puede aplicar sin romper el punto 1.
+///
+/// El body de l10n enumera los tres caminos EN ESTE MISMO ORDEN. Si alguien
+/// reordena los botones, tiene que reescribir `homeAthleteFirstRunBody`.
 class _AthleteFirstRunCard extends StatelessWidget {
   const _AthleteFirstRunCard();
 
@@ -208,23 +232,66 @@ class _AthleteFirstRunCard extends StatelessWidget {
               onPressed: () => context.push('/workout/my-routine-editor'),
             ),
             const SizedBox(height: 10),
+            // Secondary CTA: la página EXPLORAR de la tab Entrenar, donde
+            // viven los planes ya armados.
+            //
+            // ⚠️ El valor del deep-link sigue siendo `plantillas` a propósito:
+            // el copy del tab pasó a "EXPLORAR" en #638 pero la ruta NO se
+            // movió, porque hay bookmarks y notificaciones vivas apuntándole
+            // (ver `_AthleteWorkout._resolveInitialIndex`). Etiqueta y ruta
+            // divergen por diseño — no "arreglar" una para que matchee la otra.
+            //
+            // `go` y no `push`: es una tab raíz del shell, igual que /coach.
+            _FirstRunSecondaryCta(
+              label: l10n.homeAthleteFirstRunExplorePlansCta,
+              icon: TreinoIcon.dumbbell,
+              onPressed: () => context.go('/workout?tab=plantillas'),
+            ),
+            const SizedBox(height: 10),
             // Secondary CTA: route to the Coach tab where athletes browse and
             // request a trainer.
-            OutlinedButton.icon(
+            _FirstRunSecondaryCta(
+              label: l10n.homeAthleteFirstRunFindTrainerCta,
+              icon: TreinoIcon.search,
               onPressed: () => context.go('/coach'),
-              icon: Icon(TreinoIcon.search, size: 16, color: palette.accent),
-              label: Text(
-                l10n.homeAthleteFirstRunFindTrainerCta,
-                style: TextStyle(color: palette.accent),
-              ),
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size.fromHeight(48),
-                side: BorderSide(color: palette.accent.withValues(alpha: 0.6)),
-                shape: const StadiumBorder(),
-              ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Camino secundario del primer arranque: pill outlined, ancho completo, 48
+/// de alto. Extraído cuando #636 sumó el tercer camino — los dos secundarios
+/// tienen que pesar exactamente lo mismo, y dos copias del mismo
+/// `OutlinedButton.styleFrom` se desincronizan a la primera edición.
+class _FirstRunSecondaryCta extends StatelessWidget {
+  const _FirstRunSecondaryCta({
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  final String label;
+
+  /// Constante de [TreinoIcon] — nunca un `PhosphorIcons.*` directo.
+  final IconData icon;
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 16, color: palette.accent),
+      label: Text(label, style: TextStyle(color: palette.accent)),
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size.fromHeight(48),
+        side: BorderSide(color: palette.accent.withValues(alpha: 0.6)),
+        shape: const StadiumBorder(),
       ),
     );
   }

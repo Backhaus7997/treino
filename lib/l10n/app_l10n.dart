@@ -122,10 +122,10 @@ abstract class AppL10n {
   /// **'Arrancá tu entrenamiento'**
   String get homeAthleteFirstRunTitle;
 
-  /// Home first-run empty-state body offering both the create-routine and find-trainer paths (finding 6).
+  /// Home first-run empty-state body naming the three onboarding paths: create a routine, explore ready-made plans, find a trainer (#636). Order must match the CTA order in _AthleteFirstRunCard.
   ///
   /// In es_AR, this message translates to:
-  /// **'Creá tu primera rutina o buscá un entrenador para empezar.'**
+  /// **'Creá tu propia rutina, explorá planes ya armados o buscá un entrenador que te guíe.'**
   String get homeAthleteFirstRunBody;
 
   /// Home first-run primary CTA to create a routine (finding 6).
@@ -133,6 +133,12 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'CREAR RUTINA'**
   String get homeAthleteFirstRunCreateCta;
+
+  /// Home first-run secondary CTA to the EXPLORAR page of the Entrenar tab, where ready-made plans live (#636). Wording tracks the tab label (workoutTabExplore), NOT the legacy 'plantillas' deep-link value.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Explorar planes'**
+  String get homeAthleteFirstRunExplorePlansCta;
 
   /// Home first-run secondary CTA to browse trainers (finding 6).
   ///
