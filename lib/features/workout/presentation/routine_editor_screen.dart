@@ -1708,7 +1708,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       final errorText = switch (widget.mode) {
         TrainerAssigning() => l10n.coachCreatePlanError,
         TrainerTemplating() => l10n.coachCreatePlanError,
-        SelfCreating() || SelfCustomizing() =>
+        SelfCreating() ||
+        SelfCustomizing() =>
           e.toString().contains('permission-denied')
               ? l10n.workoutSelfEditorPermissionDenied
               : l10n.workoutSelfEditorError,

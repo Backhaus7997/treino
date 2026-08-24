@@ -92,8 +92,7 @@ Future<void> _pump(
         routineByIdStreamProvider('r-1')
             .overrideWith((ref) => Stream.value(routine)),
         currentUidProvider.overrideWithValue(uid),
-        userProfileProvider
-            .overrideWith((ref) => Stream.value(_profile(role))),
+        userProfileProvider.overrideWith((ref) => Stream.value(_profile(role))),
       ],
       child: MaterialApp(
         theme: AppTheme.dark(),
@@ -140,7 +139,8 @@ void main() {
       expect(find.byKey(_chip), findsNothing);
     });
 
-    testWidgets('plan asignado por el PF — es una prescripción', (tester) async {
+    testWidgets('plan asignado por el PF — es una prescripción',
+        (tester) async {
       await _pump(
         tester,
         _routine(
