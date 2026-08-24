@@ -8,8 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_palette.dart';
-import 'package:treino/app/theme/tokens/components/treino_card_tokens.dart';
-import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/utils/argentina_time.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
@@ -26,7 +25,6 @@ import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
 import 'package:treino/l10n/app_l10n.dart';
-import '../../../../../../app/theme/tokens/components/treino_button_tokens.dart';
 
 // ── Alert banner (REAL — composes vencidos + solicitudes + inactivos) ────────
 

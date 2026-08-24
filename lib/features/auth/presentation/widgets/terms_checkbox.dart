@@ -1,9 +1,9 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
-import '../../../../app/theme/tokens/components/treino_button_tokens.dart';
 import '../legal/legal_content.dart';
 import '../legal/legal_document_screen.dart';
 

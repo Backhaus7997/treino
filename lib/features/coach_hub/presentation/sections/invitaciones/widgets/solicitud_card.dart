@@ -22,15 +22,12 @@ library;
 import 'package:flutter/material.dart';
 
 import 'package:treino/app/theme/app_palette.dart';
-import 'package:treino/app/theme/tokens/components/treino_card_tokens.dart';
-import 'package:treino/app/theme/tokens/components/treino_focus_tokens.dart';
-import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/treino_interactive_state.dart';
 import 'package:treino/features/feed/presentation/widgets/post_avatar.dart';
 import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/core/utils/argentina_time.dart';
-import '../../../../../../app/theme/tokens/components/treino_button_tokens.dart';
 
 class SolicitudCard extends StatelessWidget {
   const SolicitudCard({

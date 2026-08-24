@@ -23,7 +23,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_palette.dart';
-import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/features/coach/domain/trainer_specialty.dart';
 import 'package:treino/features/coach/presentation/widgets/trainer_specialty_chips.dart'
@@ -31,7 +31,6 @@ import 'package:treino/features/coach/presentation/widgets/trainer_specialty_chi
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
-import '../../../../../../app/theme/tokens/components/treino_button_tokens.dart';
 
 /// Card «ESPECIALIDAD» + «PRECIO MENSUAL» — columna izquierda de
 /// `PerfilPublicoScreen` (WU-04).

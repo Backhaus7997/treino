@@ -17,6 +17,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/utils/argentina_time.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart'
@@ -28,7 +29,6 @@ import 'package:treino/features/profile/application/user_public_profile_provider
     show userPublicProfilesBatchProvider;
 
 import 'thousands_input_formatter.dart';
-import '../../../../../../app/theme/tokens/components/treino_button_tokens.dart';
 
 /// Resultado del diálogo: todo lo que el caller necesita para construir el
 /// [Payment]. `dueAt` ya viene normalizado (ART 23:59:59 → instante UTC) —

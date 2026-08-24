@@ -5,11 +5,10 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../../../app/theme/app_motion.dart';
 import '../../../../../../app/theme/app_palette.dart';
-import '../../../../../../app/theme/tokens/primitives.dart';
-import '../../../../../../app/theme/tokens/components/treino_button_tokens.dart';
 import '../../../../../../core/widgets/exercise_asset_image.dart';
 import '../../../../../workout/domain/exercise.dart';
 import '../../../../../workout/domain/muscle_group.dart';

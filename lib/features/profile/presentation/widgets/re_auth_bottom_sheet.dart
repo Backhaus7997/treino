@@ -3,10 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/auth/domain/auth_failure.dart';
 import 'package:treino/l10n/app_l10n.dart';
-import '../../../../app/theme/tokens/components/treino_button_tokens.dart';
 
 /// Provider-aware re-authentication bottom sheet (Fase 6 Etapa 3).
 ///

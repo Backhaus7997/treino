@@ -3,10 +3,10 @@ import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../app/theme/app_motion.dart';
 import '../../app/theme/app_palette.dart';
-import '../../app/theme/tokens/components/treino_button_tokens.dart';
 import 'treino_glass_surface.dart';
 import 'treino_icon.dart';
 

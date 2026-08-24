@@ -5,9 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
-import '../../../app/theme/tokens/components/treino_button_tokens.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../application/plan_import_providers.dart';
 import '../data/plan_import_repository.dart';

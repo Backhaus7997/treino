@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
-import '../../../../app/theme/tokens/components/treino_button_tokens.dart';
 import '../../../../core/utils/argentina_time.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../domain/day_insights.dart';

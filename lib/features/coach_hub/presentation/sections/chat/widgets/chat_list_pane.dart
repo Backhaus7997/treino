@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../../../app/theme/app_palette.dart';
-import '../../../../../../app/theme/tokens/primitives.dart';
-import '../../../../../../app/theme/tokens/components/treino_button_tokens.dart';
 import '../../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../../chat/application/chat_providers.dart';
 import '../../../../../chat/domain/chat.dart';

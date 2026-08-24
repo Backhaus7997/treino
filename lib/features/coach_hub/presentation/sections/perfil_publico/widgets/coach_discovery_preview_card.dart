@@ -18,7 +18,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/app/theme/app_palette.dart';
-import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/widgets/motion/treino_shimmer.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
@@ -33,7 +33,6 @@ import 'package:treino/features/coach/presentation/widgets/trainer_specialty_chi
     show SpecialtyLabels;
 import 'package:treino/features/feed/presentation/widgets/post_avatar.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
-import '../../../../../../app/theme/tokens/components/treino_button_tokens.dart';
 
 const double _bannerHeight = 56;
 const double _avatarSize = 64;

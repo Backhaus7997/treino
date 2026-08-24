@@ -14,8 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_palette.dart';
-import 'package:treino/app/theme/tokens/components/treino_focus_tokens.dart';
-import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
@@ -38,7 +37,6 @@ import 'widgets/pagos_buckets_provider.dart';
 import 'widgets/pagos_filtro_provider.dart';
 import 'widgets/pagos_kpi_row.dart';
 import 'widgets/pagos_web_table.dart';
-import '../../../../../app/theme/tokens/components/treino_button_tokens.dart';
 
 /// Etiquetas (es-AR) de cada [PagosFiltro], en el orden en que se muestran
 /// los chips.
