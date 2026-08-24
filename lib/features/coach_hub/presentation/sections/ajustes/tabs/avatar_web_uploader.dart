@@ -99,16 +99,26 @@ class AvatarWebUploader {
     return task.ref.getDownloadURL();
   }
 
-  /// Borra el objeto de Storage del avatar (best-effort). NO lanza si el objeto
-  /// no existe (nunca se subió / otra extensión) — limpiar la referencia en
-  /// Firestore es lo que importa para el usuario.
+  /// Borra el objeto de Storage del avatar.
+  ///
+  /// Tolera `object-not-found` —el usuario nunca subió foto, o ya la quitó—
+  /// porque para él ese ES el estado deseado. **Cualquier otro error se
+  /// propaga**: el caller decide qué decirle al usuario.
+  ///
+  /// Hasta #765 esto era un `catch (_) {}` vacío que se comía TODAS las
+  /// excepciones, y la regla de Storage denegaba el borrado incluso al dueño
+  /// (el bloque no declaraba `allow delete`, así que caía en `write`, que
+  /// dereferencia `request.resource.size` — null en un delete). Resultado: el
+  /// borrado fallaba SIEMPRE, la UI mostraba "Foto quitada" y el objeto se
+  /// quedaba en el bucket para siempre. Ver `docs/security.md` §3.2.1.
   Future<void> deleteStored() async {
     final user = _auth.currentUser;
     if (user == null) return;
     try {
       await _storage.ref().child('avatars/${user.uid}.jpg').delete();
-    } catch (_) {
-      // Best-effort: object-not-found u otros — no es un error para el usuario.
+    } on FirebaseException catch (e) {
+      if (e.code == 'object-not-found') return;
+      rethrow;
     }
   }
 }

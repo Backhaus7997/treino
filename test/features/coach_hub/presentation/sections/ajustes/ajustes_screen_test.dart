@@ -259,6 +259,39 @@ void main() {
 
       verify(() => uploader.deleteStored()).called(1);
       verify(() => repo.update('pf1', {'avatarUrl': null})).called(1);
+      expect(find.text('Foto quitada'), findsOneWidget);
+    });
+
+    testWidgets(
+        'QUITAR no miente si el borrado de Storage falla: avisa y no limpia '
+        'avatarUrl', (tester) async {
+      // Regresión de #765 (QA-SEC-009). `deleteStored()` se comía TODAS las
+      // excepciones en un `catch (_) {}` vacío, y como la regla de Storage
+      // denegaba el borrado hasta para el dueño, este camino era el REAL: el
+      // usuario veía "Foto quitada" y el objeto seguía en el bucket.
+      final repo = _MockUserRepo();
+      final uploader = _MockUploader();
+      when(() => uploader.deleteStored())
+          .thenAnswer((_) async => throw Exception('storage denied'));
+      when(() => repo.update(any(), any())).thenAnswer((_) async {});
+
+      await tester.pumpWidget(_harness(
+        profile: _trainer().copyWith(avatarUrl: 'https://cdn/old.jpg'),
+        repo: repo,
+        uploader: uploader,
+      ));
+      await tester.pump();
+
+      await tester.tap(find.text('QUITAR'));
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('Foto quitada'), findsNothing);
+      expect(
+        find.text('No se pudo quitar la foto. Probá de nuevo.'),
+        findsOneWidget,
+      );
+      verifyNever(() => repo.update(any(), any()));
     });
   });
 }
