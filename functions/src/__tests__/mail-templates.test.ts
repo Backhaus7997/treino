@@ -160,7 +160,7 @@ describe("plantillas de auth: el action link llega entero", () => {
 
   it("escapa el link en vez de inyectarlo crudo en el atributo", () => {
     const out = renderMail("password-reset", {
-      actionLink: 'https://x.test/?a="><script>alert(1)</script>',
+      actionLink: "https://x.test/?a=\"><script>alert(1)</script>",
     });
     expect(out.html).not.toContain("<script>");
   });
