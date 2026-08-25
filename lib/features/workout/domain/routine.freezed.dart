@@ -81,7 +81,26 @@ mixin _$Routine {
 //
 // El tope de largo (280) vive en las reglas, no acá: un cliente parcheado
 // no lo respetaría. Los 7 sembrados miden entre 61 y 100 caracteres.
-  String? get summary => throw _privateConstructorUsedError;
+  String? get summary =>
+      throw _privateConstructorUsedError; // ── Para qué sirve esta rutina (#635 PR#1) ───────────────────────────────
+// Multi-valor a propósito: una Full Body sirve a *salud* y a *estética* a
+// la vez, y forzar un objetivo único mentiría. Lista vacía = sin declarar,
+// que el scoring de PLANTILLAS tiene que tratar como NEUTRO — no rankea
+// alto, pero tampoco desaparece. Toda plantilla publicada por la comunidad
+// antes de este cambio llega así, y son la mayoría del catálogo.
+//
+// Es el único de los dos campos de #635 que se GUARDA. El otro
+// ([primaryMuscleGroups]) se deriva — ver su dartdoc.
+//
+// Reparto en firestore.rules, mismo criterio asimétrico que `summary` y
+// por la misma razón (el modo de falla de #563):
+//   • paths 3 y 4 (PF): en `keys()` Y en `affectedKeys()`. El PF lo
+//     declara y lo edita desde el editor de plantillas.
+//   • path 2 (atleta): SÓLO en `keys()`. Puede seguir editando una rutina
+//     que lo tenga, pero no cambiarlo: el objetivo es una afirmación
+//     editorial de quien publica, no una preferencia de quien la usa.
+  @RoutineGoalListConverter()
+  List<RoutineGoal> get goals => throw _privateConstructorUsedError;
 
   /// Serializes this Routine to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -114,7 +133,8 @@ abstract class $RoutineCopyWith<$Res> {
       int numWeeks,
       @JsonKey(includeToJson: false) double? ratingAvg,
       @JsonKey(includeToJson: false) int? ratingsCount,
-      String? summary});
+      String? summary,
+      @RoutineGoalListConverter() List<RoutineGoal> goals});
 }
 
 /// @nodoc
@@ -149,6 +169,7 @@ class _$RoutineCopyWithImpl<$Res, $Val extends Routine>
     Object? ratingAvg = freezed,
     Object? ratingsCount = freezed,
     Object? summary = freezed,
+    Object? goals = null,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -219,6 +240,10 @@ class _$RoutineCopyWithImpl<$Res, $Val extends Routine>
           ? _value.summary
           : summary // ignore: cast_nullable_to_non_nullable
               as String?,
+      goals: null == goals
+          ? _value.goals
+          : goals // ignore: cast_nullable_to_non_nullable
+              as List<RoutineGoal>,
     ) as $Val);
   }
 }
@@ -247,7 +272,8 @@ abstract class _$$RoutineImplCopyWith<$Res> implements $RoutineCopyWith<$Res> {
       int numWeeks,
       @JsonKey(includeToJson: false) double? ratingAvg,
       @JsonKey(includeToJson: false) int? ratingsCount,
-      String? summary});
+      String? summary,
+      @RoutineGoalListConverter() List<RoutineGoal> goals});
 }
 
 /// @nodoc
@@ -280,6 +306,7 @@ class __$$RoutineImplCopyWithImpl<$Res>
     Object? ratingAvg = freezed,
     Object? ratingsCount = freezed,
     Object? summary = freezed,
+    Object? goals = null,
   }) {
     return _then(_$RoutineImpl(
       id: null == id
@@ -350,13 +377,17 @@ class __$$RoutineImplCopyWithImpl<$Res>
           ? _value.summary
           : summary // ignore: cast_nullable_to_non_nullable
               as String?,
+      goals: null == goals
+          ? _value._goals
+          : goals // ignore: cast_nullable_to_non_nullable
+              as List<RoutineGoal>,
     ));
   }
 }
 
 /// @nodoc
 @JsonSerializable()
-class _$RoutineImpl implements _Routine {
+class _$RoutineImpl extends _Routine {
   const _$RoutineImpl(
       {required this.id,
       required this.name,
@@ -374,8 +405,12 @@ class _$RoutineImpl implements _Routine {
       this.numWeeks = 1,
       @JsonKey(includeToJson: false) this.ratingAvg,
       @JsonKey(includeToJson: false) this.ratingsCount,
-      this.summary})
-      : _days = days;
+      this.summary,
+      @RoutineGoalListConverter()
+      final List<RoutineGoal> goals = const <RoutineGoal>[]})
+      : _days = days,
+        _goals = goals,
+        super._();
 
   factory _$RoutineImpl.fromJson(Map<String, dynamic> json) =>
       _$$RoutineImplFromJson(json);
@@ -469,10 +504,53 @@ class _$RoutineImpl implements _Routine {
 // no lo respetaría. Los 7 sembrados miden entre 61 y 100 caracteres.
   @override
   final String? summary;
+// ── Para qué sirve esta rutina (#635 PR#1) ───────────────────────────────
+// Multi-valor a propósito: una Full Body sirve a *salud* y a *estética* a
+// la vez, y forzar un objetivo único mentiría. Lista vacía = sin declarar,
+// que el scoring de PLANTILLAS tiene que tratar como NEUTRO — no rankea
+// alto, pero tampoco desaparece. Toda plantilla publicada por la comunidad
+// antes de este cambio llega así, y son la mayoría del catálogo.
+//
+// Es el único de los dos campos de #635 que se GUARDA. El otro
+// ([primaryMuscleGroups]) se deriva — ver su dartdoc.
+//
+// Reparto en firestore.rules, mismo criterio asimétrico que `summary` y
+// por la misma razón (el modo de falla de #563):
+//   • paths 3 y 4 (PF): en `keys()` Y en `affectedKeys()`. El PF lo
+//     declara y lo edita desde el editor de plantillas.
+//   • path 2 (atleta): SÓLO en `keys()`. Puede seguir editando una rutina
+//     que lo tenga, pero no cambiarlo: el objetivo es una afirmación
+//     editorial de quien publica, no una preferencia de quien la usa.
+  final List<RoutineGoal> _goals;
+// ── Para qué sirve esta rutina (#635 PR#1) ───────────────────────────────
+// Multi-valor a propósito: una Full Body sirve a *salud* y a *estética* a
+// la vez, y forzar un objetivo único mentiría. Lista vacía = sin declarar,
+// que el scoring de PLANTILLAS tiene que tratar como NEUTRO — no rankea
+// alto, pero tampoco desaparece. Toda plantilla publicada por la comunidad
+// antes de este cambio llega así, y son la mayoría del catálogo.
+//
+// Es el único de los dos campos de #635 que se GUARDA. El otro
+// ([primaryMuscleGroups]) se deriva — ver su dartdoc.
+//
+// Reparto en firestore.rules, mismo criterio asimétrico que `summary` y
+// por la misma razón (el modo de falla de #563):
+//   • paths 3 y 4 (PF): en `keys()` Y en `affectedKeys()`. El PF lo
+//     declara y lo edita desde el editor de plantillas.
+//   • path 2 (atleta): SÓLO en `keys()`. Puede seguir editando una rutina
+//     que lo tenga, pero no cambiarlo: el objetivo es una afirmación
+//     editorial de quien publica, no una preferencia de quien la usa.
+  @override
+  @JsonKey()
+  @RoutineGoalListConverter()
+  List<RoutineGoal> get goals {
+    if (_goals is EqualUnmodifiableListView) return _goals;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_goals);
+  }
 
   @override
   String toString() {
-    return 'Routine(id: $id, name: $name, split: $split, level: $level, days: $days, estimatedMinutesPerDay: $estimatedMinutesPerDay, imageUrl: $imageUrl, source: $source, assignedBy: $assignedBy, assignedTo: $assignedTo, visibility: $visibility, createdBy: $createdBy, status: $status, numWeeks: $numWeeks, ratingAvg: $ratingAvg, ratingsCount: $ratingsCount, summary: $summary)';
+    return 'Routine(id: $id, name: $name, split: $split, level: $level, days: $days, estimatedMinutesPerDay: $estimatedMinutesPerDay, imageUrl: $imageUrl, source: $source, assignedBy: $assignedBy, assignedTo: $assignedTo, visibility: $visibility, createdBy: $createdBy, status: $status, numWeeks: $numWeeks, ratingAvg: $ratingAvg, ratingsCount: $ratingsCount, summary: $summary, goals: $goals)';
   }
 
   @override
@@ -505,7 +583,8 @@ class _$RoutineImpl implements _Routine {
                 other.ratingAvg == ratingAvg) &&
             (identical(other.ratingsCount, ratingsCount) ||
                 other.ratingsCount == ratingsCount) &&
-            (identical(other.summary, summary) || other.summary == summary));
+            (identical(other.summary, summary) || other.summary == summary) &&
+            const DeepCollectionEquality().equals(other._goals, _goals));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -528,7 +607,8 @@ class _$RoutineImpl implements _Routine {
       numWeeks,
       ratingAvg,
       ratingsCount,
-      summary);
+      summary,
+      const DeepCollectionEquality().hash(_goals));
 
   /// Create a copy of Routine
   /// with the given fields replaced by the non-null parameter values.
@@ -546,25 +626,28 @@ class _$RoutineImpl implements _Routine {
   }
 }
 
-abstract class _Routine implements Routine {
+abstract class _Routine extends Routine {
   const factory _Routine(
-      {required final String id,
-      required final String name,
-      final String? split,
-      required final ExperienceLevel level,
-      required final List<RoutineDay> days,
-      final int? estimatedMinutesPerDay,
-      final String? imageUrl,
-      final RoutineSource source,
-      final String? assignedBy,
-      final String? assignedTo,
-      final RoutineVisibility visibility,
-      final String? createdBy,
-      final RoutineStatus status,
-      final int numWeeks,
-      @JsonKey(includeToJson: false) final double? ratingAvg,
-      @JsonKey(includeToJson: false) final int? ratingsCount,
-      final String? summary}) = _$RoutineImpl;
+          {required final String id,
+          required final String name,
+          final String? split,
+          required final ExperienceLevel level,
+          required final List<RoutineDay> days,
+          final int? estimatedMinutesPerDay,
+          final String? imageUrl,
+          final RoutineSource source,
+          final String? assignedBy,
+          final String? assignedTo,
+          final RoutineVisibility visibility,
+          final String? createdBy,
+          final RoutineStatus status,
+          final int numWeeks,
+          @JsonKey(includeToJson: false) final double? ratingAvg,
+          @JsonKey(includeToJson: false) final int? ratingsCount,
+          final String? summary,
+          @RoutineGoalListConverter() final List<RoutineGoal> goals}) =
+      _$RoutineImpl;
+  const _Routine._() : super._();
 
   factory _Routine.fromJson(Map<String, dynamic> json) = _$RoutineImpl.fromJson;
 
@@ -639,7 +722,27 @@ abstract class _Routine implements Routine {
 // El tope de largo (280) vive en las reglas, no acá: un cliente parcheado
 // no lo respetaría. Los 7 sembrados miden entre 61 y 100 caracteres.
   @override
-  String? get summary;
+  String?
+      get summary; // ── Para qué sirve esta rutina (#635 PR#1) ───────────────────────────────
+// Multi-valor a propósito: una Full Body sirve a *salud* y a *estética* a
+// la vez, y forzar un objetivo único mentiría. Lista vacía = sin declarar,
+// que el scoring de PLANTILLAS tiene que tratar como NEUTRO — no rankea
+// alto, pero tampoco desaparece. Toda plantilla publicada por la comunidad
+// antes de este cambio llega así, y son la mayoría del catálogo.
+//
+// Es el único de los dos campos de #635 que se GUARDA. El otro
+// ([primaryMuscleGroups]) se deriva — ver su dartdoc.
+//
+// Reparto en firestore.rules, mismo criterio asimétrico que `summary` y
+// por la misma razón (el modo de falla de #563):
+//   • paths 3 y 4 (PF): en `keys()` Y en `affectedKeys()`. El PF lo
+//     declara y lo edita desde el editor de plantillas.
+//   • path 2 (atleta): SÓLO en `keys()`. Puede seguir editando una rutina
+//     que lo tenga, pero no cambiarlo: el objetivo es una afirmación
+//     editorial de quien publica, no una preferencia de quien la usa.
+  @override
+  @RoutineGoalListConverter()
+  List<RoutineGoal> get goals;
 
   /// Create a copy of Routine
   /// with the given fields replaced by the non-null parameter values.
