@@ -2286,7 +2286,7 @@ Verificado por mutación a mano, no sólo por el caso negativo sintético: sacá
 asserts que corresponden y ninguno más; restaurándolo vuelve a verde. La tabla
 está en el cuerpo del PR.
 
-**Endurecido después por la review de Codex** ([#806](https://github.com/Backhaus7997/treino/pull/806)),
+**Endurecido después por la review de Codex** ([#809](https://github.com/Backhaus7997/treino/pull/809)),
 dos formas de evadir el guard que la primera versión dejaba abiertas:
 
 | Evasión | Por qué pasaba | Cómo se cierra |
