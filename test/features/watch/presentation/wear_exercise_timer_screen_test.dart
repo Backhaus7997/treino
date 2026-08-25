@@ -6,6 +6,7 @@ import 'package:treino/features/watch/data/wear_workout_service.dart';
 import 'package:treino/features/watch/domain/watch_effort.dart';
 import 'package:treino/features/watch/presentation/wear/wear_exercise_timer_screen.dart';
 import 'package:treino/features/watch/presentation/wear/wear_strings.dart';
+import 'package:treino/features/watch/presentation/wear/wear_widgets.dart';
 
 /// Renderiza la pantalla del temporizador EN EL TAMAÑO REAL del reloj.
 ///
@@ -135,6 +136,70 @@ void main() {
 
     expect(find.text('Ocultar'), findsOneWidget);
     expect(find.text('Cancelar'), findsOneWidget);
+  });
+
+  /// El lado del viewport en dp, que en un reloj redondo es también el diámetro.
+  double lado(WidgetTester tester) =>
+      tester.view.physicalSize.width / tester.view.devicePixelRatio;
+
+  testWidgets('los dos botones entran ENTEROS sin girar la corona',
+      (tester) async {
+    // El defecto: el contenido no entraba en el viewport de 206,1 dp y la fila
+    // de botones terminaba en y=267. Se llegaba con la corona, pero de entrada
+    // se veía media píldora cortada contra el borde. Ahora va de 147,5 a 195,5.
+    //
+    // «Entero» se mide sobre la píldora, no sobre la etiqueta: lo que se veía
+    // cortado era el borde del botón.
+    await montar(tester);
+
+    final alto = lado(tester);
+    for (var i = 0; i < 2; i++) {
+      final boton = tester.getRect(find.byType(WearButton).at(i));
+      expect(
+        boton.bottom,
+        lessThanOrEqualTo(alto),
+        reason: 'el botón $i termina en ${boton.bottom} y la pantalla en $alto',
+      );
+      expect(boton.top, greaterThanOrEqualTo(0));
+    }
+  });
+
+  testWidgets('las etiquetas quedan dentro del CÍRCULO de la pantalla',
+      (tester) async {
+    // Que entren en el rectángulo no alcanza: la pantalla es REDONDA. A la
+    // altura donde estaban los botones la cuerda visible terminaba en x=156 y
+    // «Cancelar» llegaba hasta x=176 — de ahí el «Cancela» del reporte, con la
+    // «r» comida por el bisel.
+    //
+    // Se miden los extremos a la altura MEDIA de la etiqueta y no las esquinas
+    // de su caja: la caja de un texto incluye el hueco de los descendentes, así
+    // que sus esquinas caen más abajo que cualquier glifo real. Medir ahí
+    // reprobaría un texto que se lee perfecto.
+    //
+    // La píldora entera NO entra en el círculo, y no es un ajuste pendiente: con
+    // dos botones a lo ancho las esquinas externas caen fuera a cualquier altura
+    // que deje lugar para el anillo. Lo que se garantiza es que el corte pase
+    // por el borde del botón y nunca por la mitad de una palabra.
+    await montar(tester);
+
+    final diametro = lado(tester);
+    final centro = Offset(diametro / 2, diametro / 2);
+    final radio = diametro / 2;
+
+    for (final etiqueta in ['Ocultar', 'Cancelar']) {
+      final caja = tester.getRect(find.text(etiqueta));
+      for (final borde in [
+        Offset(caja.left, caja.center.dy),
+        Offset(caja.right, caja.center.dy),
+      ]) {
+        expect(
+          (borde - centro).distance,
+          lessThanOrEqualTo(radio),
+          reason: '«$etiqueta» se sale del círculo en $borde '
+              '(a ${(borde - centro).distance} del centro, radio $radio)',
+        );
+      }
+    }
   });
 
   testWidgets('sin medición todavía, muestra guiones en vez de nada',

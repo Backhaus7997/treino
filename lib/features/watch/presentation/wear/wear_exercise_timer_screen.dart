@@ -60,6 +60,52 @@ class WearExerciseTimerScreen extends StatelessWidget {
   /// «Ocultar» sí queda: esconder el espejo no le hace nada a la cuenta.
   final bool puedeCancelar;
 
+  /// Diámetro del anillo, en dp.
+  ///
+  /// ## De dónde sale el número
+  ///
+  /// De una resta, no de un gusto. En el SM-L500 el viewport son 206,1 dp y la
+  /// pantalla gasta, de arriba a abajo: 34,3 de margen superior (el 16,64 % que
+  /// pide Horologist para una lista que arranca con texto), 14,3 de nombre, 8,
+  /// el anillo, 8, 16 de la fila de esfuerzo, 8, y 48 de botones —el mínimo
+  /// táctil de Wear OS, que no se toca—. Todo lo que no es el anillo suma 136,6.
+  ///
+  /// Con el anillo en 84 esa cuenta da 220,6 contra un viewport de 206,1: los
+  /// botones no entran ni con la etiqueta clavada en un renglón. Medido sobre el
+  /// código anterior era todavía peor —la fila terminaba en `y=267`— porque la
+  /// etiqueta además envolvía; ese pedazo lo arregla el `maxLines: 1` de
+  /// [WearButton]. Se llegaba con la corona, pero de entrada se veía media
+  /// píldora cortada contra el borde.
+  ///
+  /// En 60 entra: el widget test a 206 dp mide la fila de botones en
+  /// `y=147,5 → 195,5`, con 10,6 dp de sobra para el bisel físico — que es lo
+  /// que un screenshot por adb NO muestra y la muñeca sí.
+  ///
+  /// ## Por qué el anillo y no otra cosa
+  ///
+  /// Porque es lo único con holgura. El margen superior es la constante de
+  /// Horologist y bajarlo devuelve el nombre cortado arriba; los separadores ya
+  /// están en 8, el mínimo de la escala; y 48 dp de botón es el piso táctil.
+  ///
+  /// ## Lo que este número NO puede arreglar
+  ///
+  /// Que la píldora entre ENTERA en el círculo. Con dos botones a lo ancho, las
+  /// esquinas inferiores externas caen fuera de la circunferencia a cualquier
+  /// altura que deje lugar para el anillo — es geometría, no ajuste. Lo que sí
+  /// se garantiza, y lo que el test clava, es que las ETIQUETAS queden dentro:
+  /// el corte pasa por el borde de la píldora y no por la mitad de una palabra.
+  static const double _anilloLado = 60;
+
+  /// Trazo del anillo, en dp.
+  ///
+  /// 4 y no 5, y no es un achique proporcional: sobre 60 dp un trazo de 4 pesa
+  /// 6,7 % del diámetro, un poco MÁS que el 6,0 % que pesaban 5 sobre 84. El
+  /// arco no se afina a la vista al achicarse el anillo, que era el riesgo.
+  ///
+  /// Y deja 52 dp de diámetro interno, contra los 46,3 que mide `00:24` en
+  /// Barlow Condensed 700 a 22 — el tiempo entra con aire a cada lado.
+  static const double _anilloTrazo = 4;
+
   /// Fracción ya transcurrida, de 0 a 1.
   double get _progreso {
     if (timer.totalMs <= 0) return 0;
@@ -112,7 +158,10 @@ class WearExerciseTimerScreen extends StatelessWidget {
     // esfuerzo, y los botones al final — son lo único que puede quedar fuera de
     // vista, porque para eso está la corona.
     return WearRoundScaffold.list(
-      // `card` da más aire arriba, que es lo que el bisel se come.
+      // `text` porque el primer ítem ES texto: el 16,64 % que pide Horologist
+      // para ese caso. Se probó bajarlo para ganar alto y volvió el nombre
+      // cortado arriba contra el bisel — el aire de arriba no es desperdicio,
+      // es la curva. El alto se recuperó del anillo, ver `_anilloLado`.
       firstItem: WearItemType.text,
       // `multiButton` deja abajo lugar para los DOS: ocultar y cancelar.
       lastItem: WearItemType.multiButton,
@@ -135,15 +184,15 @@ class WearExerciseTimerScreen extends StatelessWidget {
         // ancho completo vuelve a deformar el anillo.
         Center(
           child: SizedBox(
-            width: 84,
-            height: 84,
+            width: _anilloLado,
+            height: _anilloLado,
             child: Stack(
               alignment: Alignment.center,
               children: [
                 SizedBox.expand(
                   child: CircularProgressIndicator(
                     value: _progreso,
-                    strokeWidth: 5,
+                    strokeWidth: _anilloTrazo,
                     // Track visible: sobre el fondo negro del reloj, un track
                     // oscuro no se distingue y el anillo parece descentrado.
                     backgroundColor: palette.border,
@@ -152,13 +201,23 @@ class WearExerciseTimerScreen extends StatelessWidget {
                     valueColor: AlwaysStoppedAnimation<Color>(palette.accent),
                   ),
                 ),
-                Text(
-                  _tiempo,
-                  style: GoogleFonts.barlowCondensed(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w700,
-                    height: 1,
-                    color: termino ? palette.accent : palette.textPrimary,
+                // Acotado al DIÁMETRO INTERNO y con `scaleDown`. El `Stack`
+                // clipea por defecto, así que un tiempo más ancho que el anillo
+                // no se ve mal: directamente se corta. Sin el tope pasaba con la
+                // letra agrandada del sistema, que en Wear OS llega a 1,24×.
+                SizedBox(
+                  width: _anilloLado - _anilloTrazo * 2,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      _tiempo,
+                      style: GoogleFonts.barlowCondensed(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                        height: 1,
+                        color: termino ? palette.accent : palette.textPrimary,
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -173,7 +232,7 @@ class WearExerciseTimerScreen extends StatelessWidget {
           fit: BoxFit.scaleDown,
           child: WearEffortRow(effort: effort, mostrarSinDatos: true),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         // No hay botón de «marcar»: al vencer, la serie se marca SOLA y esta
         // pantalla se va. Pedirle al atleta que confirme algo que el reloj ya
         // sabe es trabajo de más justo cuando está sin aire.
@@ -183,6 +242,12 @@ class WearExerciseTimerScreen extends StatelessWidget {
         // construye lo que no se ve, el botón directamente no existía y no
         // había forma de llegar a él ni girando la corona. Medido con un widget
         // test a 206 dp, que es como se encontró.
+        //
+        // Que la fila ENTRE en la primera vista no lo decide este `Row`: lo
+        // decide lo que hay arriba. Ver `_anilloLado` para la resta completa, y
+        // `wear_exercise_timer_screen_test.dart` para los dos tests que la
+        // clavan — uno contra el rectángulo del viewport y otro contra el
+        // círculo de la pantalla, que es el que caza el corte de «Cancela».
         Row(
           children: [
             Expanded(

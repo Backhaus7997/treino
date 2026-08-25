@@ -160,6 +160,19 @@ class WearButton extends StatelessWidget {
           child: Text(
             label,
             textAlign: TextAlign.center,
+            // UNA LÍNEA, siempre. Sin esto el alto del botón lo decide el texto,
+            // y ahí el botón deja de ser un bloque de 48 dp para volverse una
+            // variable: una etiqueta más larga, o la letra agrandada del sistema
+            // —Wear OS llega a 1,24×—, envuelve a dos o tres renglones y empuja
+            // toda la fila fuera de la pantalla. Que es exactamente el defecto
+            // que se venía persiguiendo por abajo, cortando otras cosas.
+            //
+            // Cortar con ellipsis es la misma decisión que ya toma
+            // `wearFittedFontSize` para los nombres de ejercicio: en un reloj es
+            // preferible una etiqueta cortada y legible a un layout entero
+            // corrido de lugar.
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: GoogleFonts.barlowCondensed(
               fontSize: 15,
               fontWeight: FontWeight.w700,
