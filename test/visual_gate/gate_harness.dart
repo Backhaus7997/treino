@@ -326,12 +326,22 @@ void _expectLandedOn(WidgetTester tester, GoRouter router, String route) {
   // `find.byType` —lo que usan los tests— lo saltea. Esa diferencia costó tres
   // corridas de CI: el chequeo de arriba pasaba, el test de al lado fallaba
   // con "Found 0 widgets", y los dos decían la verdad sobre el mismo árbol.
+  final offstage = tester
+      .widgetList<Offstage>(find.byType(Offstage, skipOffstage: false))
+      .where((o) => o.offstage)
+      .length;
+  final shells = tester
+      .widgetList(find.byType(CoachHubScaffold, skipOffstage: false))
+      .length;
+
   expect(
     find.byType(CoachHubScaffold),
     findsOneWidget,
     reason: 'el shell está en el árbol pero OFFSTAGE en $landed: la '
         'transición de ruta no terminó. Un golden sacado acá fotografía la '
-        'pantalla anterior.',
+        'pantalla anterior.\n'
+        'shells=$shells offstage-activos=$offstage\n'
+        'widgets: ${types.join(", ")}',
   );
 }
 
