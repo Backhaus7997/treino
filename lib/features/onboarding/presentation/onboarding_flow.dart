@@ -106,7 +106,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(24, 14, 24, 0),
+                padding: const EdgeInsets.fromLTRB(AppSpacing.s20, AppSpacing.s14, AppSpacing.s20, 0),
                 child: Row(
                   children: [
                     Expanded(
@@ -141,7 +141,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(24, 26, 24, 22),
+                padding: const EdgeInsets.fromLTRB(AppSpacing.s20, AppSpacing.s20, AppSpacing.s20, AppSpacing.s20),
                 child: Column(
                   children: [
                     // No drawn home-indicator bar: the handoff removed it so the
@@ -180,11 +180,11 @@ class _SlideView extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(0, 18, 0, 6),
+                padding: const EdgeInsets.fromLTRB(0, AppSpacing.s18, 0, AppSpacing.s8),
                 child: OnboardingDevicePreview(child: slide.preview),
               ),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -253,7 +253,7 @@ class _ProgressBar extends StatelessWidget {
           child: AnimatedContainer(
             duration: AppMotion.resolve(context, AppMotion.fast),
             curve: AppMotion.standard,
-            margin: EdgeInsets.only(right: i == total - 1 ? 0 : 11),
+            margin: EdgeInsets.only(right: i == total - 1 ? 0 : AppSpacing.s12),
             height: 4,
             decoration: BoxDecoration(
               color: i <= current ? palette.accent : palette.border,

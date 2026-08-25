@@ -42,7 +42,7 @@ class OnboardingModuleCard extends StatelessWidget {
     return Dialog(
       backgroundColor: Colors.transparent,
       elevation: 0,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      insetPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20, vertical: AppSpacing.s20),
       child: ConstrainedBox(
         // Fixed max width, no breakpoints — the idiom every dialog in this repo
         // already uses. SingleChildScrollView absorbs short viewports and large
@@ -148,7 +148,7 @@ class _Bullet extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(top: 6),
+          padding: const EdgeInsets.only(top: AppSpacing.s8),
           child: Container(
             width: 5,
             height: 5,
@@ -158,7 +158,7 @@ class _Bullet extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: AppSpacing.s12),
         Expanded(
           child: Text(
             text,

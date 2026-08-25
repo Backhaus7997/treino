@@ -190,7 +190,7 @@ class _TourProgressBars extends StatelessWidget {
           child: AnimatedContainer(
             duration: AppMotion.resolve(context, AppMotion.fast),
             curve: AppMotion.standard,
-            margin: EdgeInsets.only(right: i == total - 1 ? 0 : 6),
+            margin: EdgeInsets.only(right: i == total - 1 ? 0 : AppSpacing.s8),
             height: 4,
             decoration: BoxDecoration(
               color: filled ? palette.accent : palette.border,
@@ -246,7 +246,7 @@ class _Slide extends StatelessWidget {
                     child: content.illustration,
                   ),
                 ),
-                const SizedBox(height: 26),
+                const SizedBox(height: AppSpacing.s20),
                 // Left accent bar over the headline — the WelcomeScreen
                 // signature. A left Border spans the child's height on its own,
                 // so no IntrinsicHeight is needed.
@@ -262,7 +262,7 @@ class _Slide extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Icon(content.icon, size: 24, color: palette.accent),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: AppSpacing.s12),
                         Expanded(
                           child: Text(
                             content.title,
@@ -321,7 +321,7 @@ class _Bullet extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(top: 7),
+          padding: const EdgeInsets.only(top: AppSpacing.s8),
           child: Container(
             width: 6,
             height: 6,
