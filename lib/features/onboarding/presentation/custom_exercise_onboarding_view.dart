@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
-import '../../../core/widgets/motion/treino_tappable.dart';
 import 'onboarding_card_content.dart';
-import '../../../app/theme/tokens/primitives.dart';
+import 'onboarding_chrome.dart';
+
+// Finder keys. They live here rather than in `OnboardingChrome` because the
+// chrome is now shared with the PLANTILLAS onboarding (#635) and each surface
+// keeps the names its own tests already assert on.
+const _skipKey = Key('custom_exercise_onboarding_skip_button');
+const _ctaKey = Key('custom_exercise_onboarding_primary_cta');
 
 /// How the onboarding is being presented.
 ///
@@ -136,7 +140,7 @@ class _CustomExerciseOnboardingViewState
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const _Grabber(),
+            const OnboardingGrabber(),
             SizedBox(
               height: pagerHeight,
               child: PageView.builder(
@@ -151,13 +155,15 @@ class _CustomExerciseOnboardingViewState
               ),
             ),
             const SizedBox(height: 14),
-            _Dots(
+            OnboardingDots(
               current: _index,
               total: total,
               semanticsLabel: widget.stepSemanticsLabel(_index + 1, total),
             ),
             const SizedBox(height: 14),
-            _Actions(
+            OnboardingActions(
+              skipKey: _skipKey,
+              primaryKey: _ctaKey,
               showSkip: !_isLast,
               skipLabel: widget.skipLabel,
               primaryLabel: _isLast ? widget.finishLabel : widget.nextLabel,
@@ -198,13 +204,15 @@ class _CustomExerciseOnboardingViewState
         const SizedBox(height: 20),
         Row(
           children: [
-            _Dots(
+            OnboardingDots(
               current: _index,
               total: total,
               semanticsLabel: widget.stepSemanticsLabel(_index + 1, total),
             ),
             const Spacer(),
-            _Actions(
+            OnboardingActions(
+              skipKey: _skipKey,
+              primaryKey: _ctaKey,
               showSkip: !_isLast,
               skipLabel: widget.skipLabel,
               primaryLabel: _isLast ? widget.finishLabel : widget.nextLabel,
@@ -243,11 +251,11 @@ class _SheetSlide extends StatelessWidget {
             child: SizedBox(height: 150, child: content.illustration),
           ),
           const SizedBox(height: 14),
-          _Kicker(step),
+          OnboardingKicker(step),
           const SizedBox(height: 8),
-          _Title(content.title),
+          OnboardingTitle(content.title),
           const SizedBox(height: 8),
-          _Body(content.body),
+          OnboardingBody(content.body),
         ],
       ),
     );
@@ -275,273 +283,16 @@ class _DialogSlide extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                _Kicker(step),
+                OnboardingKicker(step),
                 const SizedBox(height: 8),
-                _Title(content.title, size: 32),
+                OnboardingTitle(content.title, size: 32),
                 const SizedBox(height: 12),
-                _Body(content.body, size: 16),
+                OnboardingBody(content.body, size: 16),
               ],
             ),
           ),
         ),
       ],
-    );
-  }
-}
-
-// ──────────────────────────────────────────────────────────────────── bits
-
-/// "PASO 1 DE 3" over the headline.
-class _Kicker extends StatelessWidget {
-  const _Kicker(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-
-    return Text(
-      text.toUpperCase(),
-      style: GoogleFonts.barlowCondensed(
-        fontSize: 12,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 1.6,
-        height: 1.0,
-        color: palette.accent,
-      ),
-    );
-  }
-}
-
-class _Title extends StatelessWidget {
-  const _Title(this.text, {this.size = 22});
-
-  final String text;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-
-    return Text(
-      text,
-      style: GoogleFonts.barlowCondensed(
-        fontSize: size,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 0.5,
-        height: 1.05,
-        color: palette.textPrimary,
-      ),
-    );
-  }
-}
-
-class _Body extends StatelessWidget {
-  const _Body(this.text, {this.size = 14});
-
-  final String text;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-
-    return Text(
-      text,
-      style: GoogleFonts.barlow(
-        fontSize: size,
-        fontWeight: FontWeight.w400,
-        height: 1.45,
-        color: palette.textMuted,
-      ),
-    );
-  }
-}
-
-class _Grabber extends StatelessWidget {
-  const _Grabber();
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 18),
-      child: Container(
-        width: 40,
-        height: AppSpacing.hairline,
-        decoration: BoxDecoration(
-          color: palette.border,
-          borderRadius: BorderRadius.circular(AppRadius.full),
-        ),
-      ),
-    );
-  }
-}
-
-/// Progress dots. The active one is a pill, so progress survives greyscale and
-/// does not depend on colour alone.
-class _Dots extends StatelessWidget {
-  const _Dots({
-    required this.current,
-    required this.total,
-    required this.semanticsLabel,
-  });
-
-  final int current;
-  final int total;
-  final String semanticsLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-
-    return Semantics(
-      label: semanticsLabel,
-      excludeSemantics: true,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (var i = 0; i < total; i++)
-            AnimatedContainer(
-              duration: AppMotion.resolve(context, AppMotion.fast),
-              curve: AppMotion.standard,
-              margin: EdgeInsets.only(right: i == total - 1 ? 0 : 8),
-              width: i == current ? 22 : 6,
-              height: 6,
-              decoration: BoxDecoration(
-                color: i == current
-                    ? palette.accent
-                    : palette.textPrimary.withValues(alpha: 0.25),
-                borderRadius: BorderRadius.circular(AppRadius.full),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Actions extends StatelessWidget {
-  const _Actions({
-    required this.showSkip,
-    required this.skipLabel,
-    required this.primaryLabel,
-    required this.onSkip,
-    required this.onPrimary,
-    required this.ctaHeight,
-    this.expandCta = true,
-  });
-
-  final bool showSkip;
-  final String skipLabel;
-  final String primaryLabel;
-  final VoidCallback onSkip;
-  final VoidCallback onPrimary;
-  final double ctaHeight;
-  final bool expandCta;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-
-    final cta = _PrimaryCta(
-      label: primaryLabel,
-      onPressed: onPrimary,
-      height: ctaHeight,
-    );
-
-    return Row(
-      mainAxisSize: expandCta ? MainAxisSize.max : MainAxisSize.min,
-      children: [
-        if (showSkip) ...[
-          TextButton(
-            key: const Key('custom_exercise_onboarding_skip_button'),
-            onPressed: onSkip,
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              // 44pt minimum touch target (a11y, #619).
-              minimumSize: const Size(44, 44),
-              foregroundColor: palette.textMuted,
-            ),
-            child: Text(
-              skipLabel,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.barlowCondensed(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.2,
-                color: palette.textMuted,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-        ],
-        if (expandCta) Expanded(child: cta) else cta,
-      ],
-    );
-  }
-}
-
-/// Pill CTA.
-///
-/// `TreinoTappable` + `Container` rather than `ElevatedButton`, the
-/// post-Motion-PR3 construction `HomeCTAButton` documents. `TreinoTappable`
-/// contributes no semantics of its own, so the `Semantics(button: true)` around
-/// it is required, not decoration.
-class _PrimaryCta extends StatelessWidget {
-  const _PrimaryCta({
-    required this.label,
-    required this.onPressed,
-    required this.height,
-  });
-
-  final String label;
-  final VoidCallback onPressed;
-  final double height;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-
-    return Semantics(
-      button: true,
-      label: label,
-      child: TreinoTappable(
-        key: const Key('custom_exercise_onboarding_primary_cta'),
-        onTap: onPressed,
-        child: Container(
-          height: height,
-          alignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          decoration: BoxDecoration(
-            color: palette.accent,
-            borderRadius: BorderRadius.circular(AppRadius.full),
-            boxShadow: [
-              BoxShadow(
-                color: palette.accent.withValues(alpha: 0.18),
-                blurRadius: 24,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.barlowCondensed(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.4,
-              // Ink on accent, never `palette.bg` — see the `_onAccent` note in
-              // custom_exercise_onboarding_art.dart for the contrast numbers.
-              color: AppColors.ink,
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
