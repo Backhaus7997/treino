@@ -14,8 +14,11 @@
 /// `day_timeline.dart`. Use it for EVERY comparison against `startsAt`
 /// (QA-COA-003).
 ///
-/// The optional [now] parameter exists so tests can inject a fixed clock; it
-/// defaults to `DateTime.now()` (device-local).
+/// The optional [now] parameter exists so tests can inject a fixed clock at the
+/// call site; it defaults to [AppClock.now] (device-local), so freezing
+/// `AppClock` freezes every caller that does NOT pass one — which is how the
+/// Coach Hub visual gate (#761) gets stable pixels out of screens that compare
+/// against `startsAt`.
 ///
 /// NOTE: this is intentionally distinct from `argentinaNow()` (a fixed UTC-3
 /// offset from real UTC — see core/utils/argentina_time.dart), which is
@@ -23,9 +26,11 @@
 /// wall-clock-vs-wall-clock; in Argentina the two coincide.
 library;
 
+import 'package:treino/core/utils/app_clock.dart';
+
 /// Returns "now" as a wall-clock UTC [DateTime] — the device-local calendar
 /// fields (down to the minute) re-labelled as UTC. See the library doc above.
 DateTime nowWall({DateTime? now}) {
-  final n = now ?? DateTime.now();
+  final n = now ?? AppClock.now();
   return DateTime.utc(n.year, n.month, n.day, n.hour, n.minute);
 }

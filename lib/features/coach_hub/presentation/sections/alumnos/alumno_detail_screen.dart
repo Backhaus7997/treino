@@ -10,6 +10,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/core/utils/app_clock.dart';
 import 'package:treino/core/utils/date_labels.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/motion/treino_success_check.dart';
@@ -725,7 +726,7 @@ class _ResumenTab extends ConsumerWidget {
       sessions: sessions,
       measurements: measAsync.requireValue,
       weeklyTarget: active?.days.length ?? 0,
-      now: DateTime.now(),
+      now: AppClock.now(),
     );
 
     final adh = m.adherencia30dPct;
@@ -994,7 +995,7 @@ class _NoteCard extends ConsumerWidget {
   final String athleteId;
 
   String _haceDias(DateTime updatedAt) {
-    final diff = DateTime.now().difference(updatedAt.toLocal());
+    final diff = AppClock.now().difference(updatedAt.toLocal());
     final days = diff.inDays;
     if (days == 0) return 'hoy';
     if (days == 1) return 'hace 1 día';
