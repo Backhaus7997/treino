@@ -34,6 +34,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:treino/app/coach_hub_router.dart';
@@ -274,7 +275,32 @@ Future<ProviderContainer> pumpGate(
     await _settle(tester);
   }
 
+  _expectLandedOn(tester, router, route);
   return container;
+}
+
+/// La captura salió de la ruta que se pidió, y no de otra.
+///
+/// Existe porque el modo de falla sin esto es ilegible. El redirect del Coach
+/// Hub manda a `/login` o `/not-allowed` ante auth o perfil sin resolver, y lo
+/// único que ve el que lee el log es *"Found 0 widgets with type
+/// CoachHubScaffold"* — cero pistas sobre qué se rindió en su lugar.
+///
+/// Pasó de verdad: el gate rompió en CI con ese mensaje y hubo que bajar el
+/// log de tres jobs para descartar hipótesis. Este chequeo convierte eso en
+/// una línea que dice a dónde fue a parar la captura.
+void _expectLandedOn(WidgetTester tester, GoRouter router, String route) {
+  final landed = router.routerDelegate.currentConfiguration.uri.toString();
+  final onScreen = tester.widgetList<Scaffold>(find.byType(Scaffold)).length;
+
+  expect(
+    landed,
+    route,
+    reason: 'la captura tenía que salir de $route y el router quedó en '
+        '$landed ($onScreen Scaffold en el árbol). Si es /login o '
+        '/not-allowed, el redirect corrió antes de que auth o el perfil '
+        'estuvieran resueltos — mirá el warm-up de pumpGate.',
+  );
 }
 
 /// El árbol resolvió la paleta que el test pidió.
