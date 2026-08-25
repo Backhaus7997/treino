@@ -68,7 +68,21 @@ class _OnboardingGateState extends ConsumerState<OnboardingGate> {
             ? athleteOnboardingSlides
             : trainerOnboardingSlides;
 
-        ref.read(onboardingTourOpenProvider.notifier).state = true;
+        // Capturados ANTES del await. Si un redirect de auth o un reemplazo
+        // de ruta desmonta el gate con el tour abierto, `mounted` es false y
+        // el `finally` guardado por `mounted` dejaba el flag en `true` para
+        // siempre: `onboardingBlocksProvider` pasaba a suprimir TODO
+        // onboarding posterior —incluido el de otro login— hasta reiniciar el
+        // proceso. Y el `ref.read` de `markSeen` corría sobre un `WidgetRef`
+        // ya dispuesto, que además puede tirar.
+        //
+        // Los dos providers son root-scoped: sobreviven al widget, así que
+        // leerlos antes es seguro y el cleanup deja de depender de que el
+        // gate siga vivo.
+        final tourOpen = ref.read(onboardingTourOpenProvider.notifier);
+        final onboardingController = ref.read(onboardingControllerProvider);
+
+        tourOpen.state = true;
         try {
           await Navigator.of(context, rootNavigator: true).push<void>(
             PageRouteBuilder<void>(
@@ -97,12 +111,10 @@ class _OnboardingGateState extends ConsumerState<OnboardingGate> {
             ),
           );
         } finally {
-          if (mounted) {
-            ref.read(onboardingTourOpenProvider.notifier).state = false;
-          }
+          tourOpen.state = false;
           // Persist only after the route is gone. Failures are swallowed by the
           // controller and guarded by its session flag.
-          await ref.read(onboardingControllerProvider).markSeen(surface);
+          await onboardingController.markSeen(surface);
         }
       });
     }
