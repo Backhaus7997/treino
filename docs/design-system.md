@@ -76,7 +76,8 @@ Container(color: p.accent);
 
 ### AppSpacing
 
-Escala **cerrada**: `8 · 12 · 14 · 18 · 20` px. No existen `s4`, `s16` ni `s24`.
+Escala **cerrada** para separar elementos: `8 · 12 · 14 · 18 · 20` px. No existen
+`s4`, `s16` ni `s24`.
 
 | Token | Valor | Uso típico |
 |---|---|---|
@@ -85,6 +86,7 @@ Escala **cerrada**: `8 · 12 · 14 · 18 · 20` px. No existen `s4`, `s16` ni `s
 | `AppSpacing.s14` | `14.0` | Padding de secciones compactas |
 | `AppSpacing.s18` | `18.0` | Padding horizontal de pantallas |
 | `AppSpacing.s20` | `20.0` | Padding de hero cards, secciones amplias |
+| `AppSpacing.hairline` | `4.0` | **Excepción** — ver abajo |
 
 ```dart
 // ✅ BIEN
@@ -94,6 +96,35 @@ Padding(padding: EdgeInsets.symmetric(horizontal: AppSpacing.s18));
 Padding(padding: EdgeInsets.all(16));
 ```
 
+#### La excepción: `hairline`
+
+La escala cerrada gobierna el espacio **entre elementos que compone el layout**.
+No sabe expresar dos casos sub-8 que igual existen, y para esos está `hairline`:
+
+1. **Separaciones ópticas** entre cosas que se leen como una sola unidad —
+   valor-a-label, ícono-a-texto, título-a-subtítulo.
+2. **Gutters internos de un componente del kit**, cuando dos capas del mismo
+   control se tocan. El caso vivo es `TreinoSegmentedPill`: los 4px entre el
+   contorno de la pista y el thumb.
+
+La distinción es **de dueño del espacio**. Si lo posee un componente y nadie de
+afuera puede razonar sobre él, es `hairline`. Si separa cosas que el layout
+acomoda, es la escala cerrada. En la duda, escala cerrada.
+
+```dart
+// ✅ BIEN — geometría interna del control
+Container(padding: EdgeInsets.all(AppSpacing.hairline), child: TabBar(...));
+
+// ❌ MAL — esto es layout, va a la escala
+Column(children: [a, SizedBox(height: AppSpacing.hairline), b]);
+```
+
+El caso 2 se agregó con #646. Antes la regla prohibía todo padding sub-8, así
+que el gutter no tenía token válido y las cinco copias del control segmentado lo
+resolvían con `EdgeInsets.all(4)` crudo — exactamente lo que `hairline` existe
+para evitar. **No agregues más excepciones sin ampliar esta sección**: un
+micro-token ad-hoc por componente es cómo se pierde una escala.
+
 ### AppRadius
 
 | Token | Valor | Uso típico |
@@ -102,6 +133,9 @@ Padding(padding: EdgeInsets.all(16));
 | `AppRadius.md` | `16.0` | Cards default |
 | `AppRadius.lg` | `20.0` | Hero cards, bottom sheets |
 | `AppRadius.full` | `9999.0` | CTAs pill, avatares |
+
+La escala es **cerrada**: un radio nuevo se pide como excepción, no se inventa
+inline. Ver [Excepciones a la escala de radios](#excepciones-a-la-escala-de-radios).
 
 ### AppFonts
 
@@ -382,7 +416,7 @@ Container(color: palette.accent);
 
 Tokens disponibles: `accent`, `highlight`, `bg`, `bgCard`, `border`, `borderHover`, `textPrimary`, `textMuted`, `sage`, `espresso`, `danger`, `warning`, `onDanger`, `scrimDark`.
 
-El test `test/app/theme/tokens/no_hex_scan_test.dart` falla si se agrega un HEX fuera de la allowlist (primitives.dart + app_palette.dart). Este test corre en CI.
+El test `test/app/theme/tokens/no_hex_scan_test.dart` falla si se agrega un HEX fuera de la allowlist (hoy: sólo `primitives.dart` — `app_palette.dart` salió de la lista en WU-02). Este test corre en CI.
 
 ### 2. Nunca PhosphorIcons directo
 
@@ -400,6 +434,61 @@ Si falta un ícono, agregarlo a `lib/core/widgets/treino_icon.dart` con nombre s
 
 Tab labels, feature names, mensajes — centralizar en constantes o en archivos de localización (`lib/l10n/`).
 
+### 4. Nunca radio crudo en widgets
+
+```dart
+// ❌ MAL
+BorderRadius.circular(16);
+
+// ✅ BIEN
+BorderRadius.circular(AppRadius.md);
+```
+
+El test `test/app/theme/tokens/no_raw_radius_scan_test.dart` falla si se agrega
+un `Radius.circular(<literal>)` fuera de la allowlist. Corre en CI.
+
+A diferencia del scanner de HEX, este arranca con una allowlist grande: al
+congelarse el guard había **677 literales en 150 archivos** contra ~71 usos de
+`AppRadius`. La allowlist es un **registro de deuda**, no una licencia — estar
+en la lista significa "pendiente de migrar", no "exento".
+
+El guard tiene cuatro reglas, y la tercera es la que le falta al de HEX:
+
+1. Ningún archivo fuera de la allowlist puede tener un radio crudo.
+2. La allowlist nunca crece.
+3. **La deuda total nunca crece** — sumar un radio crudo a un archivo que ya
+   está en la lista también rompe el build. Sin esta regla, un archivo listado
+   podía acumular literales sin que nadie lo viera, que es exactamente cómo se
+   llegó a esa cifra.
+4. Un archivo que ya no tiene radios crudos debe salir de la allowlist.
+
+Si tocás un archivo de la allowlist, migrá sus radios y sacalo de la lista. Es
+la única forma en que el número baja.
+
+#### Excepciones a la escala de radios
+
+Hay valores que no están en la escala y **no son un descuido**: la cola
+asimétrica de la burbuja de chat (`14/14/14/4`) viene del mockup aprobado en
+#339. Cambiarlos a `AppRadius` altera un diseño firmado.
+
+Cuando necesitás un radio que no está en la escala:
+
+1. **Verificá que no exista ya.** `AppRadius.sm` (12) y `AppRadius.md` (16)
+   cubren casi todo lo que se pide como "14".
+2. **Abrí un issue con la evidencia**: mockup o captura, el valor, y por qué
+   un token existente no sirve. No lo resuelvas en el PR de la feature.
+3. **Con el diseño aprobado, elegí una de dos** — y decidilo con el reviewer,
+   no por tu cuenta:
+   - **Ampliar la escala**: agregar el token a `AppRadius` en
+     `lib/app/theme/tokens/primitives.dart`, documentarlo en la tabla de arriba
+     y usarlo. Esta es la opción por defecto si el valor se repite.
+   - **Aceptar la excepción**: dejar el literal, sumar el archivo a la
+     allowlist del scanner y subir los dos techos. Requiere aprobación
+     explícita del reviewer en el PR, porque va contra el ratchet.
+
+Lo que **no** se hace: agregar el archivo a la allowlist en silencio, o subir
+un techo sin que nadie lo mire. Los techos son la memoria del sistema.
+
 ---
 
 ## Componentes base disponibles
@@ -409,6 +498,7 @@ Viven en `lib/core/widgets/`:
 - `AppBackground` — Container con fondo `bg`.
 - `TreinoIcon` — wrapper semántico sobre Phosphor (regular + fill).
 - `TreinoBottomBar` — tab bar de 5 ítems.
+- `TreinoSegmentedPill` — control segmentado de sub-navegación (TU ENTRENO/PLANTILLAS, FEED/RANKINGS, ALUMNOS/AGENDA, PRESENCIAL/ONLINE). Lee el `DefaultTabController` ambiente; no lo posee. Casi nada es parametrizable a propósito: las 4 copias que reemplaza habían divergido en radio, alto, tipografía y overflow. Tokens en `TreinoSegmentedPillTokens`, que documenta por qué el contorno es más fuerte que el de las cards (WCAG 1.4.11, #646).
 - `TreinoStateSwitcher` — transición animada entre estados async (loading/error/data).
 - `TreinoFadeSlideIn` — entrada one-shot fade+slide para secciones eager.
 - `TreinoTappable` — feedback de presión para CTAs, cards y tiles propios.

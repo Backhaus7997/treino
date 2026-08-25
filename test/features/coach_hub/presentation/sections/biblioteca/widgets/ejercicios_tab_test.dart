@@ -10,8 +10,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
+import 'package:treino/core/widgets/motion/treino_shimmer.dart';
+import 'package:treino/features/coach_hub/presentation/sections/biblioteca/widgets/biblioteca_filter_chips.dart';
 import 'package:treino/features/coach_hub/presentation/sections/biblioteca/widgets/ejercicios_tab.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/workout/application/custom_exercise_providers.dart';
 import 'package:treino/features/workout/application/exercise_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
@@ -91,7 +96,7 @@ void main() {
   });
 
   group('EjerciciosTab — smoke renders', () {
-    testWidgets('shows CircularProgressIndicator when AsyncLoading',
+    testWidgets('shows TreinoShimmer skeleton when AsyncLoading',
         (tester) async {
       tester.view.physicalSize = const Size(1280, 900);
       tester.view.devicePixelRatio = 1.0;
@@ -103,7 +108,8 @@ void main() {
       );
       await tester.pump(); // single frame — catalog future still pending
 
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.byType(TreinoShimmer), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
     });
 
     testWidgets('shows error text when catalog AsyncError', (tester) async {
@@ -150,9 +156,36 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Should NOT show a grid, should show an empty-state cue
+      // Should NOT show a grid, should show the kit's empty-state widget.
       expect(find.byType(GridView), findsNothing);
+      expect(find.byType(TreinoEmptyState), findsOneWidget);
       expect(find.textContaining('ejercicio'), findsWidgets);
+    });
+  });
+
+  group('EjerciciosTab — stagger de entrada (ADR-B7-03)', () {
+    testWidgets(
+        'BibliotecaFilterChips está envuelto en TreinoFadeSlideIn con delay '
+        'staggered (índice 1)', (tester) async {
+      tester.view.physicalSize = const Size(1280, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        _wrap(const EjerciciosTab(), catalog: const [_bench]),
+      );
+      await tester.pump();
+
+      final fadeSlideInAncestor = tester.widget<TreinoFadeSlideIn>(
+        find.ancestor(
+          of: find.byType(BibliotecaFilterChips),
+          matching: find.byType(TreinoFadeSlideIn),
+        ),
+      );
+
+      expect(fadeSlideInAncestor.delay, AppMotion.stagger(1));
+      expect(fadeSlideInAncestor.delay, isNot(Duration.zero));
     });
   });
 
@@ -196,7 +229,7 @@ void main() {
   });
 
   group('EjerciciosTab — exercise detail dialog', () {
-    testWidgets('tap exercise card opens AlertDialog — SCENARIO-BIBW-07a',
+    testWidgets('tap exercise card opens TreinoDialog — SCENARIO-BIBW-07a',
         (tester) async {
       tester.view.physicalSize = const Size(1280, 900);
       tester.view.devicePixelRatio = 1.0;
@@ -214,8 +247,10 @@ void main() {
       await tester.tap(find.text('Press de Banca'));
       await tester.pumpAndSettle();
 
-      // AlertDialog should be present
-      expect(find.byType(AlertDialog), findsOneWidget);
+      // TreinoDialog (kit) should be present, with the exercise name as
+      // title — no bare AlertDialog anymore.
+      expect(find.byType(TreinoDialog), findsOneWidget);
+      expect(find.byType(AlertDialog), findsNothing);
       // No BottomSheet
       expect(find.byType(BottomSheet), findsNothing);
     });
@@ -244,7 +279,7 @@ void main() {
       await tester.tap(find.text('Cerrar'));
       await tester.pumpAndSettle();
 
-      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.byType(TreinoDialog), findsNothing);
     });
   });
 }

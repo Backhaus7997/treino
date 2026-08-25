@@ -62,6 +62,24 @@ Widget _buildRow({
 }
 
 void main() {
+  testWidgets('un plan actualizado 22:30 ART muestra la fecha ARGENTINA (#671)',
+      (tester) async {
+    // Mismo defecto y mismo remedio que solicitud_card: 2020-06-17 01:30 UTC
+    // es 2020-06-16 22:30 ART. Instante fijo y viejo → determinista y toma la
+    // rama dd/mm, que es donde estaba el bug.
+    final entry = (
+      link: _link(),
+      plan: _plan(updatedAt: DateTime.utc(2020, 6, 17, 1, 30)),
+      planLoading: false,
+    );
+    await tester.pumpWidget(_buildRow(entry: entry));
+    await tester.pump();
+
+    // El helper se concatena dentro del subtítulo, así que se busca contenido.
+    expect(find.textContaining('actualizado 16/06'), findsOneWidget);
+    expect(find.textContaining('17/06'), findsNothing);
+  });
+
   testWidgets('con plan muestra la cantidad de comidas', (tester) async {
     final entry = (
       link: _link(),
@@ -139,5 +157,32 @@ void main() {
     await tester.pump();
 
     expect(tapped, isTrue);
+  });
+
+  testWidgets('avatar → Semantics(image) con a11yAvatarLabel(nombre)',
+      (tester) async {
+    final handle = tester.ensureSemantics();
+    final entry = (
+      link: _link(),
+      plan: _plan(meals: 2),
+      planLoading: false,
+    );
+
+    await tester.pumpWidget(_buildRow(entry: entry));
+    await tester.pump();
+
+    final l10n = AppL10n.of(tester.element(find.text('Ana García')));
+    // El label del avatar puede fundirse con el fallback de inicial en el
+    // mismo SemanticsNode (mismo criterio que solicitud_card_test
+    // SCENARIO-SC-04) — se valida con RegExp (substring) en vez de igualdad
+    // exacta.
+    expect(
+      find.bySemanticsLabel(RegExp(RegExp.escape(
+        l10n.a11yAvatarLabel('Ana García'),
+      ))),
+      findsOneWidget,
+    );
+
+    handle.dispose();
   });
 }

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart' as intl;
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/motion/treino_success_check.dart';
@@ -534,11 +535,11 @@ class _LogPerformanceTestScreenState
                   onPressed: canSave ? _save : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: canSave ? palette.accent : palette.border,
-                    foregroundColor: palette.bg,
+                    foregroundColor: TreinoButtonTokens.foreground(context),
                     disabledBackgroundColor: palette.border,
                     disabledForegroundColor: palette.textMuted,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(9999),
+                      borderRadius: BorderRadius.circular(AppRadius.full),
                     ),
                   ),
                   child: _saving
@@ -547,7 +548,7 @@ class _LogPerformanceTestScreenState
                           height: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: palette.bg,
+                            color: TreinoButtonTokens.foreground(context),
                           ),
                         )
                       : Text(
@@ -604,19 +605,19 @@ InputDecoration _inputDecoration({
     fillColor: palette.bgCard,
     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
     border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppRadius.sm),
       borderSide: BorderSide(
         color: palette.textMuted.withValues(alpha: 0.2),
       ),
     ),
     enabledBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppRadius.sm),
       borderSide: BorderSide(
         color: palette.textMuted.withValues(alpha: 0.2),
       ),
     ),
     focusedBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppRadius.sm),
       borderSide: BorderSide(color: palette.accent),
     ),
   );

@@ -60,6 +60,7 @@ class ChatRepository {
   Future<Chat> getOrCreate({
     required String selfId,
     required String otherId,
+    bool asInquiry = false,
   }) async {
     final id = chatIdFor(selfId, otherId);
     final ref = _chats.doc(id);
@@ -78,6 +79,16 @@ class ChatRepository {
       'members': members,
       'createdAt': FieldValue.serverTimestamp(),
       if (linkId != null) 'linkId': linkId,
+      // #637: la marca de pre-consulta va SÓLO cuando no hay vínculo vigente.
+      // Es el espejo exacto de la exclusividad del ternario en `chatCreateOk`:
+      // con `linkId` presente gana la rama Coach y `kind` quedaría persistido
+      // sin validar. Mandar los dos no rompe la regla, pero deja un campo
+      // mentiroso en el doc — y la lista de chats lo mostraría como consulta.
+      //
+      // El orden también es el correcto para el producto: si el atleta abre la
+      // consulta con el PF que YA es su entrenador, lo que quiere es su chat de
+      // Coach de siempre, no una consulta nueva.
+      if (linkId == null && asInquiry) 'kind': Chat.inquiryKind,
     }).boundedWrite;
     final created = await ref.get();
     return _chatFromDocOrPending(created, membersFallback: members);

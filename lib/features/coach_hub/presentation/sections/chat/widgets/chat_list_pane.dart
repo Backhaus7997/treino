@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../../../app/theme/app_palette.dart';
 import '../../../../../../core/widgets/motion/treino_tappable.dart';
@@ -100,14 +100,20 @@ class _ChatListPaneState extends ConsumerState<ChatListPane> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
             child: TextField(
+              // key conservada de la Fase 8 para sus tests de busqueda.
+              key: const Key('chat_search_field'),
               controller: _searchCtrl,
               onChanged: (v) => setState(() => _query = v.trim().toLowerCase()),
-              style:
-                  GoogleFonts.barlow(fontSize: 13, color: palette.textPrimary),
+              style: TextStyle(
+                  fontFamily: AppFonts.barlow,
+                  fontSize: 13,
+                  color: palette.textPrimary),
               decoration: InputDecoration(
                 hintText: 'Buscar conversación', // i18n: Fase W2
-                hintStyle:
-                    GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+                hintStyle: TextStyle(
+                    fontFamily: AppFonts.barlow,
+                    fontSize: 13,
+                    color: palette.textMuted),
                 prefixIcon:
                     Icon(Icons.search, size: 18, color: palette.textMuted),
                 isDense: true,
@@ -211,7 +217,8 @@ class _ChatRow extends ConsumerWidget {
                               (p?.displayName ?? '?').isNotEmpty
                                   ? (p?.displayName ?? '?')[0].toUpperCase()
                                   : '?',
-                              style: GoogleFonts.barlowCondensed(
+                              style: const TextStyle(
+                                fontFamily: AppFonts.barlowCondensed,
                                 fontWeight: FontWeight.w700,
                                 fontSize: 16,
                                 color: Colors.white,
@@ -237,7 +244,8 @@ class _ChatRow extends ConsumerWidget {
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.barlow(
+                            style: TextStyle(
+                              fontFamily: AppFonts.barlow,
                               fontWeight:
                                   hasUnread ? FontWeight.w700 : FontWeight.w600,
                               fontSize: 14,
@@ -249,7 +257,8 @@ class _ChatRow extends ConsumerWidget {
                           const SizedBox(width: 6),
                           Text(
                             _formatTimestamp(chat.lastMessageAt!),
-                            style: GoogleFonts.barlow(
+                            style: TextStyle(
+                              fontFamily: AppFonts.barlow,
                               fontWeight: FontWeight.w400,
                               fontSize: 11,
                               color: hasUnread
@@ -270,7 +279,8 @@ class _ChatRow extends ConsumerWidget {
                                 : chat.lastMessageText!,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.barlow(
+                            style: TextStyle(
+                              fontFamily: AppFonts.barlow,
                               fontWeight:
                                   hasUnread ? FontWeight.w600 : FontWeight.w400,
                               fontSize: 12,
@@ -292,12 +302,13 @@ class _ChatRow extends ConsumerWidget {
                             padding: const EdgeInsets.symmetric(horizontal: 5),
                             decoration: BoxDecoration(
                               color: palette.accent,
-                              borderRadius: BorderRadius.circular(9999),
+                              borderRadius:
+                                  BorderRadius.circular(AppRadius.full),
                             ),
                             child: Icon(
                               Icons.circle,
                               size: 6,
-                              color: palette.bg,
+                              color: TreinoButtonTokens.foreground(context),
                             ),
                           ),
                         ],
@@ -340,7 +351,8 @@ class _EmptyListState extends StatelessWidget {
         child: Text(
           'Todavía no tenés conversaciones.\nLos chats aparecen cuando un alumno te escribe.', // i18n: Fase W2
           textAlign: TextAlign.center,
-          style: GoogleFonts.barlow(
+          style: TextStyle(
+            fontFamily: AppFonts.barlow,
             fontWeight: FontWeight.w400,
             fontSize: 13,
             color: palette.textMuted,
@@ -358,7 +370,8 @@ class _ErrorState extends StatelessWidget {
     return Center(
       child: Text(
         'No pudimos cargar tus chats.', // i18n: Fase W2
-        style: GoogleFonts.barlow(
+        style: TextStyle(
+          fontFamily: AppFonts.barlow,
           fontWeight: FontWeight.w400,
           fontSize: 13,
           color: palette.textMuted,
@@ -377,7 +390,10 @@ class _NoMatchState extends StatelessWidget {
     return Center(
       child: Text(
         'Sin resultados.', // i18n: Fase W2
-        style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+        style: TextStyle(
+            fontFamily: AppFonts.barlow,
+            fontSize: 13,
+            color: palette.textMuted),
       ),
     );
   }

@@ -1,9 +1,11 @@
-// Tests del modelo de check-in (#643 slice 1).
+// Tests del modelo de check-in (#643).
 //
 // El foco NO es "freezed serializa" — eso lo garantiza el generador. Es el
-// contrato que sí puede romperse en silencio: la clave de fecha LOCAL que hace
-// de id del documento, y que las zonas de dolor viajen en el vocabulario
-// canónico de MuscleGroup y no en nombres de símbolos Dart.
+// contrato que sí puede romperse en silencio: la clave de fecha LOCAL a la que
+// se imputa el registro, el id del documento que dejó de ser esa fecha (y con
+// eso dejó de pisar el registro anterior del día), y que las zonas de dolor
+// viajen en el vocabulario canónico de MuscleGroup y no en nombres de símbolos
+// Dart.
 
 import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:flutter_test/flutter_test.dart';
@@ -27,12 +29,54 @@ void main() {
       expect(checkInDateKey(local), isNot(contains('19')));
     });
 
-    test('la hora no cambia la clave: todo el día cae en el mismo documento',
+    test('la hora no cambia la clave: todo el día se imputa a la misma fecha',
         () {
       expect(
         checkInDateKey(DateTime(2026, 5, 18, 0, 0)),
         checkInDateKey(DateTime(2026, 5, 18, 23, 59)),
       );
+    });
+  });
+
+  // ── checkInDocId ──────────────────────────────────────────────────────────
+
+  group('checkInDocId', () {
+    test('empieza por la fecha, para que el id ordene cronológicamente', () {
+      final id = checkInDocId('2026-05-18', DateTime.utc(2026, 5, 18, 23, 30));
+      expect(id, startsWith('2026-05-18_'));
+    });
+
+    test('dos registros del mismo día dan ids DISTINTOS', () {
+      // Es el bug de la slice 1 en una línea: con la fecha como id, estos dos
+      // eran el mismo documento y el segundo borraba al primero. Dolor
+      // reportado a la mañana, perdido a la tarde, sin ningún aviso.
+      final manana =
+          checkInDocId('2026-05-18', DateTime.utc(2026, 5, 18, 9, 0));
+      final tarde =
+          checkInDocId('2026-05-18', DateTime.utc(2026, 5, 18, 19, 0));
+
+      expect(manana, isNot(tarde));
+      expect(manana.compareTo(tarde), lessThan(0));
+    });
+
+    test('es determinístico y normaliza a UTC', () {
+      final utc = DateTime.utc(2026, 5, 18, 12);
+      expect(checkInDocId('2026-05-18', utc), checkInDocId('2026-05-18', utc));
+      // El mismo instante expresado en otra zona tiene que dar el mismo id.
+      expect(
+        checkInDocId('2026-05-18', utc.toLocal()),
+        checkInDocId('2026-05-18', utc),
+      );
+    });
+
+    test('el sufijo es de ancho fijo: el orden lexicográfico es el temporal',
+        () {
+      final ids = [
+        checkInDocId('2026-05-18', DateTime.utc(2026, 5, 18, 8)),
+        checkInDocId('2026-05-18', DateTime.utc(2026, 5, 18, 13)),
+        checkInDocId('2026-05-18', DateTime.utc(2026, 5, 18, 21)),
+      ];
+      expect(ids.toList()..sort(), ids);
     });
   });
 
@@ -84,6 +128,11 @@ void main() {
       expect(json['painAreas'], isNot(contains('cuadriceps')));
     });
 
+    test('el id NO viaja en el body: ya lo lleva el documento', () {
+      final json = build().copyWith(id: '2026-05-18_1779000000000').toJson();
+      expect(json.containsKey('id'), isFalse);
+    });
+
     test('round-trip completo conserva todos los campos', () {
       final original = build(
         hasPain: true,
@@ -95,6 +144,16 @@ void main() {
       final decoded = CheckIn.fromJson(original.toJson());
 
       expect(decoded, original);
+    });
+
+    test('el id sobrevive al round-trip sólo si lo reinyecta el repositorio',
+        () {
+      final original = build().copyWith(id: '2026-05-18_1779000000000');
+      final decoded = CheckIn.fromJson(original.toJson());
+
+      // fromJson no lo puede saber — el id vive en el doc, no en sus campos.
+      expect(decoded.id, isNull);
+      expect(decoded.copyWith(id: original.id), original);
     });
 
     test('lee etiquetas en español legacy y las canonicaliza', () {

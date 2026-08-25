@@ -21,26 +21,29 @@ import '../application/routine_providers.dart';
 import '../application/session_init.dart';
 import '../application/session_notifier.dart';
 import '../application/session_providers.dart';
+import '../application/phone_duration_timer.dart';
 import '../application/session_state.dart';
+import '../application/workout_clock.dart';
+import '../domain/duration_timer.dart';
 import '../domain/routine.dart';
+import '../domain/superset_order.dart';
 import '../domain/routine_slot.dart';
 import '../domain/set_enums.dart';
 import '../domain/set_limits.dart';
+import '../domain/session_time_fit.dart';
 import '../domain/set_log.dart';
+import '../../watch/application/watch_effort_notifier.dart';
+import '../../watch/application/watch_timer_control_notifier.dart';
+import '../../watch/domain/watch_effort.dart';
 import '../domain/set_spec.dart';
 import 'exercise_detail_screen.dart';
 import 'widgets/bounded_number_formatter.dart';
 import 'widgets/coach_note.dart';
+import 'widgets/duration_set_row.dart';
+import 'widgets/mmss.dart';
 import 'widgets/set_entry_sheet.dart';
-
-// ── Helpers de formato ────────────────────────────────────────────────────────
-
-/// Formatea segundos totales como MM:SS (máx 99:59). Diseño §9.4.
-String _formatMMSS(int totalSeconds) {
-  final m = (totalSeconds ~/ 60).clamp(0, 99).toString().padLeft(2, '0');
-  final s = (totalSeconds % 60).toString().padLeft(2, '0');
-  return '$m:$s';
-}
+import 'widgets/time_fit_sheet.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 // ── Block gating helpers (top-level, testable) ────────────────────────────────
 
@@ -171,7 +174,7 @@ String repsDisplayText(SetSpec? spec, ExerciseMode mode) {
   if (spec.type == SetType.failure) return 'Al fallo';
   if (mode == ExerciseMode.duration) {
     final secs = spec.durationSeconds ?? 0;
-    return _formatMMSS(secs);
+    return formatMMSS(secs);
   }
   if (spec.reps != null) return '${spec.reps} reps';
   final min = spec.repsMin;
@@ -219,6 +222,19 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
   // hacer removeListener con el mismo objeto en dispose.
   SessionNotifier? _notifier;
 
+  /// El cronómetro por tiempo que corre en este teléfono.
+  ///
+  /// La PANTALLA es la autoridad de completado, no la fila. La fila se desmonta
+  /// al scrollear —el `ListView` de ejercicios no tiene keep-alive— y con ella
+  /// moría la cuenta: el tiempo se perdía y nadie marcaba la serie. Esta
+  /// pantalla, en cambio, está montada todo el tiempo que el player está
+  /// abierto, y además es la que tiene los slots para armar el `SetLog`.
+  PhoneDurationTimerNotifier? _cronometro;
+  Timer? _cronometroTick;
+
+  /// El canal por el que el RELOJ pide cortar la cuenta del teléfono.
+  WatchTimerControlNotifier? _controlDelReloj;
+
   @override
   void initState() {
     super.initState();
@@ -229,13 +245,122 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
       if (!mounted) return;
       _notifier = ref.read(sessionNotifierProvider(widget.init).notifier);
       _notifier!.logSetError.addListener(_onLogSetError);
+      _notifier!.finishedElsewhere.addListener(_onFinishedElsewhere);
+
+      final cronometro = ref.read(phoneDurationTimerProvider);
+      cronometro.addListener(_onCronometroCambio);
+      _cronometro = cronometro;
+
+      final control = ref.read(watchTimerControlNotifierProvider);
+      control.addListener(_onElRelojPideCancelar);
+      _controlDelReloj = control;
+      _onCronometroCambio();
     });
+  }
+
+  /// Arranca o corta el tick que vigila el vencimiento de la cuenta.
+  ///
+  /// Es UNO por pantalla, no uno por fila: la cuenta es una sola.
+  void _onCronometroCambio() {
+    final hay = _cronometro?.value != null;
+    if (hay && _cronometroTick == null) {
+      _cronometroTick = Timer.periodic(
+        DurationTimerRules.tickInterval,
+        (_) => _revisarCronometro(),
+      );
+    } else if (!hay && _cronometroTick != null) {
+      _cronometroTick!.cancel();
+      _cronometroTick = null;
+    }
+  }
+
+  /// La cuenta llegó a cero: vibra y marca la serie.
+  ///
+  /// Corre acá y no en la fila para que el scroll no pueda impedirlo. Al reloj
+  /// NO se le avisa: llega a cero solo, porque cuenta contra el mismo instante
+  /// de fin.
+  void _revisarCronometro() {
+    final cuenta = _cronometro?.value;
+    if (cuenta == null) return;
+    final ahora = ref.read(workoutClockProvider)().toUtc();
+    if (!DurationTimerRules.isFinished(endsAt: cuenta.endsAt, now: ahora)) {
+      return;
+    }
+
+    // Se limpia ANTES de marcar: `logSet` puede fallar y dejar la fila
+    // interactiva a propósito, y con la cuenta vencida todavía puesta el botón
+    // "Iniciar" quedaría muerto.
+    _cronometro!.clear();
+    HapticFeedback.heavyImpact();
+
+    final slot = _slotDe(cuenta.exerciseId);
+    if (slot == null) return;
+    _logSet(slot, cuenta.setNumber, 0, 0.0);
+  }
+
+  /// El reloj pidió cortar la cuenta que corre acá.
+  ///
+  /// Se compara la IDENTIDAD: el pedido nombra la serie, y cancelar la
+  /// equivocada le mataría al atleta una plancha que está aguantando.
+  ///
+  /// Se le contesta al reloj —`cancel()` avisa— y eso no es un eco: es el
+  /// acuse. `WCSession` no da callback de éxito, así que sin esto la muñeca no
+  /// sabe si el pedido llegó. El ida y vuelta termina ahí.
+  void _onElRelojPideCancelar() {
+    final pedido = _controlDelReloj?.value;
+    final cuenta = _cronometro?.value;
+    if (pedido == null || cuenta == null) return;
+    if (!pedido.aplicaA(
+      exerciseId: cuenta.exerciseId,
+      setNumber: cuenta.setNumber,
+    )) {
+      return;
+    }
+    unawaited(_cronometro!.cancel());
+  }
+
+  /// El slot de un ejercicio del día, o null si ya no está.
+  RoutineSlot? _slotDe(String exerciseId) {
+    final day = ref.read(sessionNotifierProvider(widget.init)).value?.day;
+    if (day == null) return null;
+    for (final slot in day.slots) {
+      if (slot.exerciseId == exerciseId) return slot;
+    }
+    return null;
   }
 
   @override
   void dispose() {
     _notifier?.logSetError.removeListener(_onLogSetError);
+    _notifier?.finishedElsewhere.removeListener(_onFinishedElsewhere);
+    _cronometro?.removeListener(_onCronometroCambio);
+    _controlDelReloj?.removeListener(_onElRelojPideCancelar);
+    _cronometroTick?.cancel();
     super.dispose();
+  }
+
+  /// El entreno se cerró desde el RELOJ. Se sale del player.
+  ///
+  /// Quedarse acá sería peor que salir: la sesión ya está terminada en el
+  /// historial, con su volumen y su duración calculados, y cualquier cosa que
+  /// el atleta marcara desde esta pantalla escribiría sobre un entreno cerrado.
+  void _onFinishedElsewhere() {
+    final notifier = _notifier;
+    if (notifier == null || !notifier.finishedElsewhere.value) return;
+    if (!mounted) return;
+    final l10n = AppL10n.of(context);
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(l10n.sessionFinishedOnWatch),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    // `canPop` para no explotar si el player ya no es la ruta de arriba (el
+    // atleta pudo navegar a un ejercicio mientras el reloj cerraba).
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) navigator.pop();
   }
 
   /// Reacciona a un fallo de log/update de set: muestra un SnackBar con
@@ -399,14 +524,57 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
     );
   }
 
+  /// La ranura del ajuste de tiempo (#645): la invitacion a declararlo cuando
+  /// no hay nada recortado, o el aviso con el resultado y el deshacer cuando
+  /// si lo hay. Nunca las dos: un solo camino a mano en cada estado.
+  ///
+  /// Sin nada medible en el dia no se dibuja NADA. Ofrecer "ajustar" sobre una
+  /// sesion cuya duracion no se puede estimar es prometer una cuenta que la
+  /// pantalla despues no puede mostrar — misma postura que las tarjetas de
+  /// rutina, que ante `minutes == null` no escriben ni "0 min" ni un guion.
+  List<Widget> _buildTimeFitSlot(SessionState state) {
+    if (state.droppedExerciseIds.isNotEmpty) {
+      return [
+        const SizedBox(height: 12),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: _SessionTrimNotice(state: state, onUndo: _undoTrim),
+        ),
+      ];
+    }
+    final current = estimateSessionMinutes(state.day, week: state.activeWeek);
+    if (current == null) return const [];
+    return [
+      const SizedBox(height: 12),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: _TimeFitPrompt(
+          currentMinutes: current,
+          onTap: () => _openTimeFit(state),
+        ),
+      ),
+    ];
+  }
+
   /// Builds the exercise list with block gating: current block fully expanded,
   /// completed blocks collapsed to summary, future blocks locked/dimmed.
+  ///
+  /// La lista se arma sobre [SessionState.activeSlots], no sobre `day.slots`:
+  /// un ejercicio recortado (#645) no se dibuja. Dibujarlo lo mostraria como
+  /// bloque COMPLETADO —`plannedSetsFor` le da 0 y `computeBlockStatuses` lee
+  /// eso como "todo hecho"—, o sea, la lista le diria "lo hiciste" sobre algo
+  /// que el atleta saco. Lo que salio se cuenta en `_SessionTrimNotice`, que
+  /// es tambien donde esta el deshacer.
+  ///
+  /// Los indices de `_activatedBlocks` siguen siendo validos: el recorte es
+  /// siempre una cola contigua del final (`planSessionTimeFit`), asi que lo
+  /// que queda es un PREFIJO de los bloques y ningun indice se corre.
   List<Widget> _buildExerciseList(SessionState state) {
     final palette = AppPalette.of(context);
     // Source week ONCE here and thread down — single-week sessions use 0
     // so effectiveSetsForWeek(0) falls back to effectiveSets (REQ-PERIOD-042).
     final week = state.session.weekNumber;
-    final blocks = buildBlocks(state.day.slots);
+    final blocks = buildBlocks(state.activeSlots.toList(growable: false));
     // live-set-editing AD-5: single resolver every gating/render denominator
     // routes through. Bound method closes over `state`, so callers never
     // read the raw plan count directly.
@@ -491,6 +659,39 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
           slot,
           log,
         );
+  }
+
+  /// Abre la hoja donde el atleta declara cuanto tiempo tiene hoy (#645).
+  ///
+  /// Los ejercicios que ya tienen series cargadas viajan como
+  /// `lockedExerciseIds`: el recorte nunca puede esconder trabajo hecho, y el
+  /// recorrido de `planSessionTimeFit` frena ahi.
+  void _openTimeFit(SessionState state) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => TimeFitSheet(
+        day: state.day,
+        week: state.activeWeek,
+        lockedExerciseIds: state.setLogs.map((l) => l.exerciseId).toSet(),
+        onApply: _applyTrim,
+      ),
+    );
+  }
+
+  /// Aplica el recorte que el atleta acepto. Solo toca la sesion de hoy.
+  void _applyTrim(List<String> exerciseIds) {
+    ref
+        .read(sessionNotifierProvider(widget.init).notifier)
+        .dropExercisesForToday(exerciseIds);
+  }
+
+  /// Devuelve a la sesion todo lo que se habia recortado por tiempo (#645).
+  void _undoTrim() {
+    ref
+        .read(sessionNotifierProvider(widget.init).notifier)
+        .restoreDroppedExercises();
   }
 
   /// Callback wired to each row's delete icon (AD-6). Una fila SIN loguear
@@ -616,6 +817,7 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 20),
                           child: _SessionStatsCard(state: state),
                         ),
+                        ..._buildTimeFitSlot(state),
                         const SizedBox(height: 20),
                         const Padding(
                           padding: EdgeInsets.symmetric(horizontal: 12),
@@ -714,7 +916,7 @@ class _SessionHeader extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               minimumSize: const Size(0, 44),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(9999),
+                borderRadius: BorderRadius.circular(AppRadius.full),
               ),
             ),
             child: Text(
@@ -756,7 +958,7 @@ class _AttendanceCard extends ConsumerWidget {
     return Container(
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Row(
@@ -812,14 +1014,16 @@ class _SessionStatsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final total = state.day.slots.length;
+    // Los ejercicios recortados (#645) no estan en el denominador: la barra
+    // mide lo que se hace HOY, no lo que decia el plan.
+    final total = state.activeExerciseCount;
     final completed = state.completedExerciseCount;
     final progress = total > 0 ? completed / total : 0.0;
 
     return Container(
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Column(
@@ -848,13 +1052,20 @@ class _SessionStatsCard extends StatelessWidget {
                   ),
                 ),
               ),
-              Text(
-                _formatMMSS(state.elapsedSeconds),
-                style: GoogleFonts.barlowCondensed(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 40,
-                  color: palette.accent,
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    formatMMSS(state.elapsedSeconds),
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 40,
+                      color: palette.accent,
+                    ),
+                  ),
+                  const _WatchTimerRow(),
+                  const _WatchEffortRow(),
+                ],
               ),
             ],
           ),
@@ -865,6 +1076,165 @@ class _SessionStatsCard extends StatelessWidget {
             valueColor: AlwaysStoppedAnimation<Color>(palette.accent),
             minHeight: 4,
             borderRadius: BorderRadius.circular(2),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── _TimeFitPrompt ────────────────────────────────────────────────────────────
+
+/// La invitación a declarar el tiempo disponible, arriba del listado (#645).
+///
+/// Se dibuja sólo cuando NO hay nada recortado: una vez aplicado el ajuste,
+/// este lugar lo ocupa `_SessionTrimNotice`, que muestra el resultado y el
+/// deshacer. Dos estados de la misma ranura, nunca los dos juntos — así el
+/// atleta siempre tiene un solo camino a mano y no puede apilar recortes sin
+/// entender de dónde salió cada uno.
+class _TimeFitPrompt extends StatelessWidget {
+  const _TimeFitPrompt({required this.currentMinutes, required this.onTap});
+
+  final int currentMinutes;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    return TreinoTappable(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: palette.bgCard,
+          // Contorno tenue en acento: es la unica fila de esta pantalla que
+          // ABRE ALGO sin ser un ejercicio, y el chevron —la senal de "esto
+          // lleva al detalle"— ya esta gastado en las filas del listado.
+          border: Border.all(color: palette.accent.withValues(alpha: 0.35)),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            Icon(TreinoIcon.clock, size: 16, color: palette.accent),
+            const SizedBox(width: AppSpacing.s8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.sessionTimeFitPromptTitle,
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                      letterSpacing: 1.2,
+                      color: palette.accent,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.hairline),
+                  Text(
+                    l10n.sessionTimeFitCurrent('~$currentMinutes'),
+                    style: GoogleFonts.barlow(
+                      fontWeight: FontWeight.w400,
+                      fontSize: 12,
+                      color: palette.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── _SessionTrimNotice ────────────────────────────────────────────────────────
+
+/// El aviso de que la sesión de hoy va recortada para entrar en el tiempo que
+/// el atleta declaró tener (#645).
+///
+/// Existe SÓLO cuando hay algo recortado, y es el único lugar de la pantalla
+/// que nombra lo que salió: la lista de abajo dibuja la sesión de hoy y nada
+/// más. Sin este aviso el recorte sería invisible —la sesión se vería como una
+/// rutina más corta, sin rastro de la decisión— y no habría forma de volver
+/// atrás. Por eso el deshacer vive acá y no escondido en un menú.
+///
+/// El número se recalcula sobre lo que QUEDA ([estimateSessionMinutes]), no
+/// sobre el día del plan, y lleva siempre "~" porque siempre es calculado —
+/// misma convención que la duración de las tarjetas (#639).
+class _SessionTrimNotice extends StatelessWidget {
+  const _SessionTrimNotice({required this.state, required this.onUndo});
+
+  final SessionState state;
+  final VoidCallback onUndo;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+
+    // En el orden del día, no en el orden en que se sacaron.
+    final names = state.day.slots
+        .where((s) => state.droppedExerciseIds.contains(s.exerciseId))
+        .map((s) => s.exerciseName)
+        .join(' · ');
+    final minutes = estimateSessionMinutes(
+      state.day,
+      week: state.activeWeek,
+      droppedExerciseIds: state.droppedExerciseIds,
+    );
+
+    return Container(
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+      ),
+      padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(TreinoIcon.clock, size: 16, color: palette.accent),
+          const SizedBox(width: AppSpacing.s8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (minutes != null) ...[
+                  Text(
+                    l10n.sessionTrimAdjustedTo('~$minutes'),
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                      letterSpacing: 1.2,
+                      color: palette.accent,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.hairline),
+                ],
+                Text(
+                  l10n.sessionTrimDroppedList(names),
+                  style: GoogleFonts.barlow(
+                    fontWeight: FontWeight.w400,
+                    fontSize: 12,
+                    color: palette.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: onUndo,
+            child: Text(
+              l10n.sessionTrimUndo,
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                letterSpacing: 0.5,
+                color: palette.accent,
+              ),
+            ),
           ),
         ],
       ),
@@ -1375,29 +1745,29 @@ class _SupersetSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
 
-    // Vueltas totales = el ejercicio más largo del bloque.
-    final maxRounds = entries.fold<int>(
-        0, (m, e) => plannedCountFor(e.slot) > m ? plannedCountFor(e.slot) : m);
+    // La regla del round-robin vive en `SupersetOrder`, no acá.
+    //
+    // Estaba escrita adentro de este `build()`, y por eso el reloj no podía
+    // portarla: reimplementaba el recorrido por su cuenta, ejercicio por
+    // ejercicio en vez de vuelta por vuelta, y producía 1a, 2a, 3a, 1b… El dato
+    // salía válido y el orden equivocado, que en una superserie es el
+    // entrenamiento entero. Ahora las dos implementaciones responden al mismo
+    // fixture: `conformance/superset_order.json`.
+    final miembros = [
+      for (final e in entries)
+        (
+          exerciseId: e.slot.exerciseId,
+          plannedSets: plannedCountFor(e.slot),
+          loggedSets: e.logs.length,
+        ),
+    ];
+    final maxRounds = SupersetOrder.totalRounds(miembros);
+    final celda = SupersetOrder.nextCell(miembros);
 
-    // Scan round-robin: la celda activa es el primer par (vuelta, ejercicio)
-    // que aún no fue logueado.
-    String? activeId;
-    int? activeSet;
-    var activeRound = 0;
-    outer:
-    for (var round = 1; round <= maxRounds; round++) {
-      for (final e in entries) {
-        if (round > plannedCountFor(e.slot)) continue;
-        if (e.logs.length < round) {
-          activeId = e.slot.exerciseId;
-          activeSet = round;
-          activeRound = round;
-          break outer;
-        }
-      }
-    }
-    final blockDone = activeId == null;
-    final displayRound = blockDone ? maxRounds : activeRound;
+    final String? activeId = celda?.exerciseId;
+    final int? activeSet = celda?.setNumber;
+    final blockDone = celda == null;
+    final displayRound = blockDone ? maxRounds : celda.round;
 
     final children = <Widget>[];
     for (var i = 0; i < entries.length; i++) {
@@ -1616,13 +1986,15 @@ class _ExerciseSectionState extends State<_ExerciseSection> {
           widget.onRemoveSet != null && (isRowDone || isAddedUnlogged);
 
       Widget innerRow = isDurationSet
-          ? _DurationSetRow(
+          ? DurationSetRow(
               key: ValueKey('dur-$setNumber-${logged?.id ?? "pending"}'),
+              exerciseId: widget.slot.exerciseId,
               setNumber: setNumber,
               targetSeconds: targetSeconds,
               isDone: isRowDone,
-              onDone:
-                  isCurrent ? () => widget.onSetCheck(setNumber, 0, 0.0) : null,
+              // Sin callback de marcado: la serie la marca la pantalla cuando
+              // la cuenta llega a cero, esté esta fila montada o no.
+              enabled: isCurrent,
             )
           : _RepsSetRow(
               key: ValueKey('set-$setNumber-${logged?.id ?? "pending"}'),
@@ -1769,7 +2141,7 @@ class _ExerciseSectionState extends State<_ExerciseSection> {
                 color: isDone
                     ? palette.accent.withValues(alpha: 0.15)
                     : palette.bg,
-                borderRadius: BorderRadius.circular(9999),
+                borderRadius: BorderRadius.circular(AppRadius.full),
                 border: Border.all(
                   color: isDone ? palette.accent : palette.border,
                   width: 1,
@@ -1832,7 +2204,7 @@ class _AddSetButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
           color: palette.bg,
-          borderRadius: BorderRadius.circular(9999),
+          borderRadius: BorderRadius.circular(AppRadius.full),
           border: Border.all(color: palette.border),
         ),
         child: Row(
@@ -1905,7 +2277,7 @@ class _RemoveSetConfirmDialog extends StatelessWidget {
     return AlertDialog(
       backgroundColor: palette.bgCard,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
       ),
       title: Text(
         'Eliminar serie',
@@ -2325,176 +2697,6 @@ class _RepsField extends StatelessWidget {
   }
 }
 
-// ── _DurationSetRow ───────────────────────────────────────────────────────────
-
-/// Fila de un set basado en duración.
-/// Muestra el tiempo objetivo como MM:SS y un countdown timer.
-/// "Iniciar" arranca el contador; al llegar a 0 auto-marca done con vibración.
-class _DurationSetRow extends StatefulWidget {
-  const _DurationSetRow({
-    super.key,
-    required this.setNumber,
-    required this.targetSeconds,
-    required this.isDone,
-    required this.onDone,
-  });
-
-  final int setNumber;
-  final int targetSeconds;
-  final bool isDone;
-
-  /// Called when the set is marked done. Null means not interactive.
-  final VoidCallback? onDone;
-
-  @override
-  State<_DurationSetRow> createState() => _DurationSetRowState();
-}
-
-class _DurationSetRowState extends State<_DurationSetRow> {
-  Timer? _timer;
-  int _remaining = 0;
-  bool _running = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _remaining = widget.targetSeconds;
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  void _startTimer() {
-    if (_running || widget.isDone) return;
-    setState(() => _running = true);
-    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (!mounted) {
-        t.cancel();
-        return;
-      }
-      setState(() {
-        if (_remaining > 0) {
-          _remaining--;
-        } else {
-          t.cancel();
-          _running = false;
-          // Buzz to alert the user that time is up.
-          HapticFeedback.heavyImpact();
-          // Auto-mark done when countdown reaches 0.
-          widget.onDone?.call();
-        }
-      });
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    final l10n = AppL10n.of(context);
-    final textColor = widget.isDone ? palette.textMuted : palette.textPrimary;
-    final isInteractive = widget.onDone != null && !widget.isDone;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-      decoration: BoxDecoration(
-        // bgCard (no bg): misma delimitación por-fila que _RepsSetRow.
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 20,
-            child: Text(
-              '${widget.setNumber}',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
-                color: textColor,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          // Timer display.
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _running ||
-                          (!widget.isDone && _remaining < widget.targetSeconds)
-                      ? _formatMMSS(_remaining)
-                      : _formatMMSS(widget.targetSeconds),
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 22,
-                    color: _running ? palette.accent : textColor,
-                  ),
-                ),
-                if (!widget.isDone)
-                  Text(
-                    'objetivo: ${_formatMMSS(widget.targetSeconds)}',
-                    style: GoogleFonts.barlow(
-                      fontWeight: FontWeight.w400,
-                      fontSize: 11,
-                      color: palette.textMuted,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Action button.
-          if (widget.isDone)
-            Icon(TreinoIcon.checkCircleFill, color: palette.accent, size: 22)
-          else if (!_running)
-            Semantics(
-              button: true,
-              label: l10n.sessionPlayerTimerStartA11y,
-              // TREINO Motion PR3: TreinoTappable reemplaza al
-              // GestureDetector (absorbe su onTap). onTap null cuando no es
-              // interactivo → child pelado, mismo no-op que antes.
-              child: TreinoTappable(
-                onTap: isInteractive ? _startTimer : null,
-                child: Container(
-                  constraints:
-                      const BoxConstraints(minWidth: 44, minHeight: 44),
-                  alignment: Alignment.center,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: isInteractive
-                        ? palette.accent.withValues(alpha: 0.15)
-                        : palette.bg,
-                    borderRadius: BorderRadius.circular(9999),
-                    border: Border.all(
-                      color: isInteractive ? palette.accent : palette.border,
-                    ),
-                  ),
-                  child: Text(
-                    'Iniciar',
-                    style: GoogleFonts.barlowCondensed(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                      color: isInteractive ? palette.accent : palette.textMuted,
-                    ),
-                  ),
-                ),
-              ),
-            )
-          else
-            // Timer running — show countdown-only state, no manual completion.
-            Icon(TreinoIcon.timer, color: palette.accent, size: 22),
-        ],
-      ),
-    );
-  }
-}
-
 // ── _TerminarSessionButton ────────────────────────────────────────────────────
 
 class _TerminarSessionButton extends StatelessWidget {
@@ -2519,7 +2721,7 @@ class _TerminarSessionButton extends StatelessWidget {
           disabledBackgroundColor: palette.bgCard,
           minimumSize: const Size.fromHeight(56),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(9999),
+            borderRadius: BorderRadius.circular(AppRadius.full),
           ),
         ),
         child: Text(
@@ -2528,7 +2730,9 @@ class _TerminarSessionButton extends StatelessWidget {
             fontWeight: FontWeight.w700,
             fontSize: 16,
             letterSpacing: 1.0,
-            color: enabled ? palette.bg : palette.textMuted,
+            color: enabled
+                ? TreinoButtonTokens.foreground(context)
+                : palette.textMuted,
           ),
         ),
       ),
@@ -2554,7 +2758,7 @@ class _AbandonConfirmDialog extends StatelessWidget {
     return AlertDialog(
       backgroundColor: palette.bgCard,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
       ),
       content: Text(
         '¿Seguro que querés abandonar? Se va a guardar tu progreso hasta acá.',
@@ -2590,6 +2794,175 @@ class _AbandonConfirmDialog extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// El esfuerzo que esta midiendo el reloj, al lado del tiempo del entreno.
+///
+/// Change `watch-workout-session`, fase F4.
+///
+/// **Es un agregado.** Sin reloj conectado no se dibuja NADA y la pantalla
+/// queda exactamente como estaba: ni un hueco, ni un "--", ni un aviso de que
+/// falta un reloj. El atleta que entrena sin reloj no tiene por que enterarse
+/// de que existe esta fila.
+///
+/// Es un widget aparte y no parte del header por rendimiento: el dato cambia
+/// cada pocos segundos, y metiendolo inline haria rebuild de toda la cabecera
+/// del player —incluido el cronometro y la barra de progreso— por un dato
+/// secundario. Asi el rebuild queda acotado a esta fila.
+/// La cuenta regresiva de un ejercicio por tiempo que corre EN EL RELOJ.
+///
+/// El reloj manda el INSTANTE DE FIN, no los segundos restantes, así que acá se
+/// calcula la cuenta sola. Eso hace que no haga falta tráfico por segundo entre
+/// los dispositivos, y que un envío que llega tarde —el reloj throttlea a 5s—
+/// muestre igual el número correcto.
+///
+/// Es stateful porque hay que redibujar cada segundo: el notifier del esfuerzo
+/// solo emite cuando llega un payload nuevo, y entre payload y payload la
+/// cuenta tiene que seguir bajando.
+class _WatchTimerRow extends ConsumerStatefulWidget {
+  const _WatchTimerRow();
+
+  @override
+  ConsumerState<_WatchTimerRow> createState() => _WatchTimerRowState();
+}
+
+class _WatchTimerRowState extends ConsumerState<_WatchTimerRow> {
+  Timer? _tick;
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    super.dispose();
+  }
+
+  /// Arranca o corta el tick según haya o no cuenta viva.
+  ///
+  /// No se deja corriendo siempre: un timer por segundo en la pantalla más
+  /// caliente de la app, para no mostrar nada, es exactamente el tipo de
+  /// rebuild que este proyecto evita.
+  void _syncTick(bool debeCorrer) {
+    if (debeCorrer && _tick == null) {
+      _tick = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() {});
+      });
+    } else if (!debeCorrer && _tick != null) {
+      _tick!.cancel();
+      _tick = null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final notifier = ref.watch(watchEffortNotifierProvider);
+
+    return ValueListenableBuilder<WatchEffort?>(
+      valueListenable: notifier,
+      builder: (context, effort, _) {
+        final endsAt = effort?.timerEndsAt;
+        final restante = endsAt == null
+            ? 0
+            : endsAt.difference(DateTime.now().toUtc()).inSeconds;
+
+        // Vencido o inexistente: nada que mostrar. Que se apague solo al llegar
+        // a cero es la red contra un "se apagó" que no llegue.
+        final vivo = endsAt != null && restante > 0;
+        WidgetsBinding.instance.addPostFrameCallback((_) => _syncTick(vivo));
+        if (!vivo) return const SizedBox.shrink();
+
+        return Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(TreinoIcon.timer, size: 12, color: palette.accent),
+              const SizedBox(width: 4),
+              Text(
+                formatMMSS(restante),
+                style: GoogleFonts.barlow(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                  color: palette.accent,
+                ),
+              ),
+              const SizedBox(width: 4),
+              // De dónde viene. Sin esto es un MM:SS suelto pegado abajo del
+              // cronómetro de sesión de 40px, sin nada que diga qué cuenta es
+              // ni de qué ejercicio. La cuenta de la serie se ve en su propia
+              // fila; esto es el recordatorio para cuando el atleta scrolleó y
+              // esa fila no está en pantalla.
+              Text(
+                'en el reloj',
+                style: GoogleFonts.barlow(
+                  fontWeight: FontWeight.w400,
+                  fontSize: 11,
+                  color: palette.textMuted,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _WatchEffortRow extends ConsumerWidget {
+  const _WatchEffortRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final notifier = ref.watch(watchEffortNotifierProvider);
+
+    return ValueListenableBuilder<WatchEffort?>(
+      valueListenable: notifier,
+      builder: (context, effort, _) {
+        final display = WatchEffortRules.display(
+          effort: effort,
+          now: DateTime.now().toUtc(),
+        );
+        if (display.isEmpty) return const SizedBox.shrink();
+
+        return Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (display.bpm != null) ...[
+                Icon(TreinoIcon.heartRate,
+                    size: 12, color: palette.reactionLike),
+                const SizedBox(width: 4),
+                Text(
+                  '${display.bpm}',
+                  style: GoogleFonts.barlow(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                    color: palette.textMuted,
+                  ),
+                ),
+              ],
+              if (display.bpm != null && display.kcal != null)
+                const SizedBox(width: 12),
+              if (display.kcal != null) ...[
+                Icon(TreinoIcon.calories,
+                    size: 12, color: palette.reactionFire),
+                const SizedBox(width: 4),
+                Text(
+                  '${display.kcal} kcal',
+                  style: GoogleFonts.barlow(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                    color: palette.textMuted,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 }

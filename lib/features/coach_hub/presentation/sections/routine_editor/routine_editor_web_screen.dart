@@ -4,9 +4,11 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../../app/theme/app_palette.dart';
 import '../../../../../core/widgets/motion/treino_state_switcher.dart';
@@ -156,6 +158,39 @@ class _EditorSlot {
   bool isPresentInWeek(int w) => activeWeeks.isEmpty || activeWeeks.contains(w);
 }
 
+/// Copies the prescription of [source] onto [target] for the 0-based [week]
+/// (#655). Port of mobile's `copyPrescriptionInto` — same contract, its own
+/// editor model.
+///
+/// "Prescription" = the measurement mode (`exerciseMode` + `repMode`) plus that
+/// week's set list, deep-copied via [_EditorSet.copy] so W/D/F types survive
+/// and the two slots never share set instances (same rule as "Copiar Sem N
+/// acá", REQ-PERIOD-014).
+///
+/// Deliberately NOT copied:
+/// - `activeWeeks`: presence is orthogonal to prescription — a copy must never
+///   add or remove an exercise from a week (ADR-WPRES).
+/// - other weeks: mirrors "Copiar Sem N acá", which acts on the visible week
+///   only. Copying every week would silently overwrite a periodized plan.
+/// - `restSeconds`, `notes`, `exercise`, `linkedToNext`: identity, coaching and
+///   grouping data, not the set grid.
+///
+/// The mode IS copied on purpose: pasting duration sets into a slot that still
+/// renders REPS/KG columns would show empty, invalid rows. Since the mode is a
+/// slot-level field, this also re-modes the target's OTHER weeks — the same
+/// blast radius the existing Reps/Rango/Tiempo chips already have, and it is
+/// surfaced by the per-week validation dots rather than failing silently.
+void _copyPrescriptionInto(_EditorSlot source, _EditorSlot target, int week) {
+  if (week < 0) return;
+  if (week >= source.weeklySets.length || week >= target.weeklySets.length) {
+    return;
+  }
+  target.exerciseMode = source.exerciseMode;
+  target.repMode = source.repMode;
+  target.weeklySets[week] =
+      source.weeklySets[week].map((s) => s.copy()).toList();
+}
+
 class _EditorDay {
   _EditorDay({required this.dayNumber, required this.name});
   int dayNumber;
@@ -166,6 +201,14 @@ class _EditorDay {
 const _kMaxDays = 7; // mirrors mobile's _kMaxDays
 const _kMaxWeeks = 16; // mirrors mobile's _kMaxWeeks
 
+/// Client-side cap of the resumen field (#648) — mirrors mobile's own
+/// `_kSummaryMaxLength` and, above both, the `optStrMaxLen(..., 280)` guard on
+/// the two trainer UPDATE paths of firestore.rules. The rule is the real
+/// enforcement (a patched client would ignore this one); this is the
+/// affordance that keeps an honest PF from ever meeting it as a
+/// permission-denied. The 7 seeded system resúmenes measure 61–100 characters.
+const _kSummaryMaxLength = 280;
+
 /// Scope choice when deleting an exercise from a multi-week plan (REQ-WPRES-010,
 /// mirrors mobile's `_DeleteScope`).
 enum _DeleteScope { thisWeek, allWeeks }
@@ -174,6 +217,11 @@ class _RoutineEditorWebScreenState
     extends ConsumerState<RoutineEditorWebScreen> {
   final _nameCtrl = TextEditingController();
   final _splitCtrl = TextEditingController();
+
+  /// Plain-language resumen of the routine (#648). Both modes of this screen
+  /// are PF modes, so unlike mobile there is nothing to gate here: the athlete
+  /// never reaches Coach Hub web.
+  final _summaryCtrl = TextEditingController();
   ExperienceLevel _level = ExperienceLevel.beginner;
   int _numWeeks = 1;
 
@@ -201,6 +249,17 @@ class _RoutineEditorWebScreenState
 
   /// Noun for user-facing messages ("No pudimos guardar la …").
   String get _noun => widget.isTemplate ? 'plantilla' : 'rutina'; // i18n
+
+  /// The resumen to persist, or `null` when the PF left it blank (#648).
+  ///
+  /// The field is OPTIONAL: an empty (or whitespace-only) box saves as `null`,
+  /// not as `''`. An empty string would make `routine.summary != null` true on
+  /// the detail screen and render an empty paragraph where the layout is
+  /// supposed to collapse.
+  String? get _summaryOrNull {
+    final trimmed = _summaryCtrl.text.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
 
   /// The routine being edited (its identity fields are preserved on save).
   Routine? _loadedRoutine;
@@ -251,6 +310,7 @@ class _RoutineEditorWebScreenState
   void _populate(Routine routine) {
     _nameCtrl.text = routine.name;
     _splitCtrl.text = routine.split ?? '';
+    _summaryCtrl.text = routine.summary ?? '';
     _level = routine.level;
     _numWeeks = routine.numWeeks.clamp(1, _kMaxWeeks);
     _days
@@ -320,6 +380,7 @@ class _RoutineEditorWebScreenState
   void dispose() {
     _nameCtrl.dispose();
     _splitCtrl.dispose();
+    _summaryCtrl.dispose();
     super.dispose();
   }
 
@@ -645,6 +706,109 @@ class _RoutineEditorWebScreenState
     if (slot.exercise?.id == replacement.id) return; // same exercise → no-op
     _markDirty();
     setState(() => slot.exercise = replacement);
+  }
+
+  // ── Copiar prescripción entre ejercicios (#655) ──────────────────────────
+
+  /// The nearest slot BEFORE [slotIndex] that can act as a copy source: it must
+  /// already have an exercise and be present in the viewed week (a slot absent
+  /// this week has no visible prescription to copy, ADR-WPRES). Returns null
+  /// for the first exercise of the day.
+  _EditorSlot? _copySourceFor(int dayIndex, int slotIndex) {
+    final slots = _days[dayIndex].slots;
+    for (var i = slotIndex - 1; i >= 0; i--) {
+      final candidate = slots[i];
+      if (candidate.exercise == null) continue;
+      if (!candidate.isPresentInWeek(_selectedWeek)) continue;
+      return candidate;
+    }
+    return null;
+  }
+
+  /// Returns the copy callback for the slot at [slotIndex], or null — which
+  /// renders the header button DISABLED. Two reasons to disable: there is no
+  /// eligible previous exercise, or the target itself is absent from the
+  /// viewed week (web dims those cards instead of hiding them like mobile, so
+  /// unlike mobile the button is reachable on a slot with nothing to overwrite
+  /// on screen).
+  VoidCallback? _copyPreviousCallback(int dayIndex, int slotIndex) {
+    if (!_days[dayIndex].slots[slotIndex].isPresentInWeek(_selectedWeek)) {
+      return null;
+    }
+    if (_copySourceFor(dayIndex, slotIndex) == null) return null;
+    return () => _copyPrescriptionFromPrevious(dayIndex, slotIndex);
+  }
+
+  /// Confirmation + copy for "Copiar sets del anterior".
+  /// Mirrors `_duplicateWeek`: confirm → mutate → setState so the live
+  /// validation (and the red slot border) recalculates. Overwriting the
+  /// target's sets is destructive, hence the same confirm step.
+  Future<void> _copyPrescriptionFromPrevious(
+    int dayIndex,
+    int slotIndex,
+  ) async {
+    final source = _copySourceFor(dayIndex, slotIndex);
+    if (source == null) return;
+    // Drop focus before the dialog: the copy REPLACES every set row of the
+    // target (see the ObjectKey on _SetRow), so a field that still held focus
+    // would be disposed mid-edit.
+    FocusManager.instance.primaryFocus?.unfocus();
+
+    final confirmed = await _confirmCopyPrescription(source.exercise!.name);
+    if (confirmed != true || !mounted) return;
+
+    _markDirty();
+    setState(() {
+      _copyPrescriptionInto(
+        source,
+        _days[dayIndex].slots[slotIndex],
+        _selectedWeek,
+      );
+    });
+  }
+
+  Future<bool?> _confirmCopyPrescription(String sourceName) {
+    final palette = AppPalette.of(context);
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: palette.bgCard,
+        title: Text(
+          '¿Copiar sets?', // i18n
+          style: GoogleFonts.barlow(
+            color: palette.textPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        content: Text(
+          'Se van a reemplazar los sets de este ejercicio por los de '
+          '«$sourceName».', // i18n
+          style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            // Keyed: the form footer has its own "Cancelar" too.
+            key: const Key('copy_prescription_cancel_button'),
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(
+              'Cancelar', // i18n
+              style: GoogleFonts.barlow(color: palette.textMuted),
+            ),
+          ),
+          TextButton(
+            key: const Key('copy_prescription_confirm_button'),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(
+              'Copiar', // i18n
+              style: GoogleFonts.barlow(
+                color: palette.accent,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   /// Groups [slots] into blocks: a superset run, or a lone standalone slot.
@@ -1224,18 +1388,17 @@ class _RoutineEditorWebScreenState
     try {
       if (_isEditing) {
         // Preserve the loaded routine's identity (id, assignedBy/To, source,
-        // createdAt, …). updateAssigned only writes name/split/level/days/
-        // numWeeks — `days` is rebuilt from a form that models 100% of
-        // RoutineSlot's schema, so nothing is lost on re-save (Fase 4c).
-        // updateTemplate/updateAssigned each write only name/split/level/days/
-        // numWeeks — `days` is rebuilt from a form that models 100% of
-        // RoutineSlot's schema, so nothing is lost on re-save.
+        // createdAt, …). updateTemplate/updateAssigned each write only
+        // name/split/level/days/numWeeks/summary — `days` is rebuilt from a
+        // form that models 100% of RoutineSlot's schema, so nothing is lost on
+        // re-save (Fase 4c).
         final draft = _loadedRoutine!.copyWith(
           name: _nameCtrl.text.trim(),
           split: _splitCtrl.text.trim(),
           level: _level,
           days: days,
           numWeeks: _numWeeks,
+          summary: _summaryOrNull,
         );
         if (widget.isTemplate) {
           await repo.updateTemplate(uid: trainerUid, draft: draft);
@@ -1253,6 +1416,7 @@ class _RoutineEditorWebScreenState
           level: _level,
           days: days,
           numWeeks: _numWeeks,
+          summary: _summaryOrNull,
           source: RoutineSource.trainerTemplate,
           assignedBy: trainerUid,
           visibility: RoutineVisibility.private,
@@ -1266,6 +1430,7 @@ class _RoutineEditorWebScreenState
           level: _level,
           days: days,
           numWeeks: _numWeeks,
+          summary: _summaryOrNull,
           source: RoutineSource.trainerAssigned,
           assignedBy: trainerUid,
           assignedTo: widget.athleteId,
@@ -1466,6 +1631,70 @@ class _RoutineEditorWebScreenState
                                     ), // i18n
                                   ),
                                   const SizedBox(height: 16),
+                                  // ── Resumen en criollo (#648) ──────────
+                                  //
+                                  // Sits right under SPLIT because SPLIT is
+                                  // the jargon it exists to translate: the
+                                  // routine detail badge opens with
+                                  // "PPL · DÍA 1" and 2 of 5 usability
+                                  // participants could not say what that
+                                  // meant. Asking for the plain sentence next
+                                  // to the term that needs it is what makes
+                                  // the field self-explanatory.
+                                  _FieldLabel('RESUMEN', palette), // i18n
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    // i18n
+                                    'Una frase que explique qué es la rutina, '
+                                    'para alguien que nunca pisó un gimnasio.',
+                                    style: GoogleFonts.barlow(
+                                      color: palette.textMuted,
+                                      fontSize: 12,
+                                      height: 1.35,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  TextField(
+                                    key: const Key(
+                                      'routine_editor_summary_field',
+                                    ),
+                                    controller: _summaryCtrl,
+                                    onChanged: (_) {
+                                      _markDirty();
+                                      // Unlike NOMBRE/SPLIT this DOES rebuild:
+                                      // the character counter under the field
+                                      // is the only thing on this screen that
+                                      // has to track a controller live.
+                                      setState(() {});
+                                    },
+                                    // 2–3 lines: the 7 seeded resúmenes measure
+                                    // 61–100 characters. A taller box would
+                                    // invite the essay the cap exists to stop.
+                                    minLines: 2,
+                                    maxLines: 3,
+                                    maxLength: _kSummaryMaxLength,
+                                    maxLengthEnforcement:
+                                        MaxLengthEnforcement.enforced,
+                                    textCapitalization:
+                                        TextCapitalization.sentences,
+                                    style: GoogleFonts.barlow(
+                                      color: palette.textPrimary,
+                                    ),
+                                    decoration: _inputDecoration(
+                                      palette,
+                                      'Ej: Empujar, tirar y piernas: cada día '
+                                      'trabajás un tipo de movimiento distinto.',
+                                    ).copyWith(
+                                      // The counter STAYS visible: the cap is
+                                      // an editorial constraint the PF writes
+                                      // against, not a defensive ceiling.
+                                      counterStyle: GoogleFonts.barlow(
+                                        fontSize: 11,
+                                        color: palette.textMuted,
+                                      ),
+                                    ), // i18n
+                                  ),
+                                  const SizedBox(height: 16),
                                   _FieldLabel('NIVEL', palette), // i18n
                                   const SizedBox(height: 8),
                                   _LevelSelector(
@@ -1563,6 +1792,8 @@ class _RoutineEditorWebScreenState
                                           _replaceSlotExercise(i, s),
                                       onMoveSlot: (s, dir) =>
                                           _moveSlot(i, s, dir),
+                                      copyPreviousCallbackFor: (s) =>
+                                          _copyPreviousCallback(i, s),
                                       onRestChanged: (s, v) =>
                                           _onRestChanged(i, s, v),
                                       onAddSet: (s) => _addSet(i, s),
@@ -1645,9 +1876,9 @@ class _RoutineEditorWebScreenState
                     onPressed: _submitting ? null : _submit,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: palette.accent,
-                      foregroundColor: palette.bg,
+                      foregroundColor: TreinoButtonTokens.foreground(context),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(9999),
+                        borderRadius: BorderRadius.circular(AppRadius.full),
                       ),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 24,
@@ -1876,7 +2107,7 @@ class _StepButton extends StatelessWidget {
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: palette.bgCard,
-          borderRadius: BorderRadius.circular(9999),
+          borderRadius: BorderRadius.circular(AppRadius.full),
           border: Border.all(
             color: enabled
                 ? palette.border
@@ -1921,7 +2152,7 @@ class _LevelSelector extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
                 color: selected == level ? palette.accent : palette.bgCard,
-                borderRadius: BorderRadius.circular(9999),
+                borderRadius: BorderRadius.circular(AppRadius.full),
                 border: Border.all(
                   color: selected == level ? palette.accent : palette.border,
                 ),
@@ -1929,7 +2160,9 @@ class _LevelSelector extends StatelessWidget {
               child: Text(
                 level.displayNameEs,
                 style: GoogleFonts.barlowCondensed(
-                  color: selected == level ? palette.bg : palette.textPrimary,
+                  color: selected == level
+                      ? TreinoButtonTokens.foreground(context)
+                      : palette.textPrimary,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -1958,6 +2191,7 @@ class _DayCard extends StatelessWidget {
     required this.onRemoveSlot,
     required this.onReplaceSlot,
     required this.onMoveSlot,
+    required this.copyPreviousCallbackFor,
     required this.onSetTypeChanged,
     required this.onRestChanged,
     required this.onAddSet,
@@ -1999,6 +2233,12 @@ class _DayCard extends StatelessWidget {
   final void Function(int slotIndex) onRemoveSlot;
   final void Function(int slotIndex) onReplaceSlot;
   final void Function(int slotIndex, int dir) onMoveSlot;
+
+  /// Per-slot "copiar sets del anterior" callback (#655), or null when the
+  /// slot has no eligible source — which renders its header button disabled.
+  /// A function (not a plain callback) because eligibility is decided by the
+  /// parent state, which owns the day's slot list and the viewed week.
+  final VoidCallback? Function(int slotIndex) copyPreviousCallbackFor;
   final void Function(int slotIndex, String value) onRestChanged;
   final void Function(int slotIndex) onAddSet;
   final void Function(int slotIndex, int setIndex) onRemoveSet;
@@ -2026,7 +2266,7 @@ class _DayCard extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         border: Border.all(
           color:
               hasError ? palette.danger.withValues(alpha: 0.6) : palette.border,
@@ -2095,6 +2335,7 @@ class _DayCard extends StatelessWidget {
               onReplace: () => onReplaceSlot(i),
               onMoveUp: () => onMoveSlot(i, -1),
               onMoveDown: () => onMoveSlot(i, 1),
+              onCopyPrevious: copyPreviousCallbackFor(i),
               onRestChanged: (v) => onRestChanged(i, v),
               onAddSet: () => onAddSet(i),
               onRemoveSet: (set) => onRemoveSet(i, set),
@@ -2152,6 +2393,7 @@ class _SlotCard extends StatelessWidget {
     required this.onReplace,
     required this.onMoveUp,
     required this.onMoveDown,
+    required this.onCopyPrevious,
     required this.onSetTypeChanged,
     required this.onRestChanged,
     required this.onAddSet,
@@ -2191,6 +2433,11 @@ class _SlotCard extends StatelessWidget {
   final VoidCallback onReplace;
   final VoidCallback onMoveUp;
   final VoidCallback onMoveDown;
+
+  /// "Copiar sets del anterior" (#655). Null → the button renders disabled:
+  /// this is the day's first exercise, or the card is absent from the viewed
+  /// week and has no visible prescription to overwrite.
+  final VoidCallback? onCopyPrevious;
   final ValueChanged<String> onRestChanged;
   final VoidCallback onAddSet;
   final void Function(int setIndex) onRemoveSet;
@@ -2253,6 +2500,14 @@ class _SlotCard extends StatelessWidget {
                 tooltip: 'Cambiar ejercicio', // i18n
                 icon: Icon(TreinoIcon.edit, size: 15, color: palette.textMuted),
                 onPressed: onReplace,
+                visualDensity: VisualDensity.compact,
+              ),
+              // Always rendered so the shortcut is discoverable; disabled on
+              // the day's first exercise (no source to copy from).
+              IconButton(
+                tooltip: 'Copiar sets del anterior', // i18n
+                icon: Icon(TreinoIcon.copy, size: 15, color: palette.textMuted),
+                onPressed: onCopyPrevious,
                 visualDensity: VisualDensity.compact,
               ),
               IconButton(
@@ -2385,10 +2640,27 @@ class _SlotCard extends StatelessWidget {
           const SizedBox(height: 4),
           for (var i = 0; i < weekSets.length; i++)
             _SetRow(
-              // Key by week so switching weeks REBUILDS the fields fresh from
-              // the model. Without it the uncontrolled TextFormFields keep the
-              // previous week's controller text and show stale values.
-              key: ValueKey('w${selectedWeek}s$i'),
+              // Key by SET IDENTITY, not by position (#655).
+              //
+              // [_SetRow] is stateless, but its number fields are
+              // `TextFormField(initialValue: …)` — uncontrolled: each one seeds
+              // its controller ONCE, when its element is created, and ignores
+              // later `initialValue` changes. So the only way to make a field
+              // show a new model value is to give its row a key the framework
+              // can't match, forcing a fresh element.
+              //
+              // Every mutation that REPLACES set instances — "copiar sets del
+              // anterior", "Copiar Sem N acá", switching weeks, removing a row
+              // — hands us new [_EditorSet] objects, so an [ObjectKey] flips
+              // exactly then and only then. A positional key (`w0s1`) survives
+              // all of those and leaves the old text on screen while the model
+              // underneath already changed: the copy would look like a no-op
+              // and only surface on save.
+              //
+              // Typing does NOT replace the instance (the mutators write the
+              // fields in place), so the key holds and the focused field keeps
+              // its text and cursor.
+              key: ObjectKey(weekSets[i]),
               index: i,
               set: weekSets[i],
               palette: palette,
@@ -2724,13 +2996,15 @@ class _ModeChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
         decoration: BoxDecoration(
           color: selected ? palette.accent : palette.bgCard,
-          borderRadius: BorderRadius.circular(9999),
+          borderRadius: BorderRadius.circular(AppRadius.full),
           border: Border.all(color: selected ? palette.accent : palette.border),
         ),
         child: Text(
           label,
           style: GoogleFonts.barlowCondensed(
-            color: selected ? palette.bg : palette.textMuted,
+            color: selected
+                ? TreinoButtonTokens.foreground(context)
+                : palette.textMuted,
             fontWeight: FontWeight.w700,
             fontSize: 12,
           ),
@@ -2855,7 +3129,7 @@ class _WeekChip extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
             decoration: BoxDecoration(
               color: selected ? palette.accent : palette.bgCard,
-              borderRadius: BorderRadius.circular(9999),
+              borderRadius: BorderRadius.circular(AppRadius.full),
               border: Border.all(
                 color: selected ? palette.accent : palette.border,
               ),
@@ -2863,7 +3137,9 @@ class _WeekChip extends StatelessWidget {
             child: Text(
               'Sem ${index + 1}', // i18n
               style: GoogleFonts.barlowCondensed(
-                color: selected ? palette.bg : palette.textMuted,
+                color: selected
+                    ? TreinoButtonTokens.foreground(context)
+                    : palette.textMuted,
                 fontWeight: FontWeight.w700,
                 fontSize: 12,
               ),
@@ -2921,13 +3197,15 @@ class _PresenceChip extends StatelessWidget {
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: present ? palette.accent : palette.bgCard,
-          borderRadius: BorderRadius.circular(9999),
+          borderRadius: BorderRadius.circular(AppRadius.full),
           border: Border.all(color: present ? palette.accent : palette.border),
         ),
         child: Text(
           '${index + 1}',
           style: GoogleFonts.barlowCondensed(
-            color: present ? palette.bg : palette.textMuted,
+            color: present
+                ? TreinoButtonTokens.foreground(context)
+                : palette.textMuted,
             fontWeight: FontWeight.w700,
             fontSize: 11,
           ),

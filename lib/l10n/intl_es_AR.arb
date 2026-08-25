@@ -3,17 +3,13 @@
   "notFoundBody": "La ruta que buscás no existe o el enlace es inválido.",
   "notFoundCta": "Volver al inicio",
   "homeAthleteFirstRunTitle": "Arrancá tu entrenamiento",
-  "@homeAthleteFirstRunTitle": {
-    "description": "Home first-run empty-state title for an athlete with no routine (usability finding 6)."
-  },
-  "homeAthleteFirstRunBody": "Creá tu primera rutina o buscá un entrenador para empezar.",
-  "@homeAthleteFirstRunBody": {
-    "description": "Home first-run empty-state body offering both the create-routine and find-trainer paths (finding 6)."
-  },
+  "@homeAthleteFirstRunTitle": {"description": "Home first-run empty-state title for an athlete with no routine (usability finding 6)."},
+  "homeAthleteFirstRunBody": "Creá tu propia rutina, explorá planes ya armados o buscá un entrenador que te guíe.",
+  "@homeAthleteFirstRunBody": {"description": "Home first-run empty-state body naming the three onboarding paths: create a routine, explore ready-made plans, find a trainer (#636). Order must match the CTA order in _AthleteFirstRunCard."},
   "homeAthleteFirstRunCreateCta": "CREAR RUTINA",
-  "@homeAthleteFirstRunCreateCta": {
-    "description": "Home first-run primary CTA to create a routine (finding 6)."
-  },
+  "@homeAthleteFirstRunCreateCta": {"description": "Home first-run primary CTA to create a routine (finding 6)."},
+  "homeAthleteFirstRunExplorePlansCta": "Explorar planes",
+  "@homeAthleteFirstRunExplorePlansCta": {"description": "Home first-run secondary CTA to the EXPLORAR page of the Entrenar tab, where ready-made plans live (#636). Wording tracks the tab label (workoutTabExplore), NOT the legacy 'plantillas' deep-link value."},
   "homeAthleteFirstRunFindTrainerCta": "Buscar entrenador",
   "@homeAthleteFirstRunFindTrainerCta": {
     "description": "Home first-run secondary CTA to browse trainers (finding 6)."
@@ -111,8 +107,24 @@
   },
   "@@locale": "es_AR",
   "authSplashTagline": "ENTRENÁ. COMPARTÍ. CRECÉ.",
+  "authBrandHeadline1Light": "DEJÁ DE ",
+  "@authBrandHeadline1Light": {
+    "description": "Brand headline, line 1, LIGHT half (w500). Rendered by splash_screen and welcome_screen from the same keys so the two screens can't drift apart. The trailing space is load-bearing — the light and bold halves are adjacent TextSpans, not separate widgets."
+  },
+  "authBrandHeadline1Bold": "IMPROVISAR.",
+  "@authBrandHeadline1Bold": {
+    "description": "Brand headline, line 1, BOLD half (w900). This is the punchline of the line — keep the emphasis on the payoff word, not the setup."
+  },
+  "authBrandHeadline2Light": "EMPEZÁ A ",
+  "@authBrandHeadline2Light": {
+    "description": "Brand headline, line 2, LIGHT half (w500). Trailing space is load-bearing, same as line 1."
+  },
+  "authBrandHeadline2Bold": "PROGRESAR.",
+  "@authBrandHeadline2Bold": {
+    "description": "Brand headline, line 2, BOLD half (w900). Deliberately does NOT name a modality: the old copy said 'EL HIERRO', which read as gym-only and excluded the calisthenics catalogue the app actually ships."
+  },
   "authWelcomeEyebrow": "ENTRENAMIENTO · GYM · COACH",
-  "authWelcomeBody": "Cargá tu rutina, ejecutá los sets, seguí a tus pibes y encontrá un coach cerca tuyo.",
+  "authWelcomeBody": "Tu rutina, tus series y tus cargas en un solo lugar. Con un coach atrás si lo querés.",
   "authWelcomeCta": "EMPEZAR",
   "authWelcomeHaveAccount": "Ya tengo cuenta",
   "authWelcomeSignIn": "Iniciar sesión",
@@ -141,6 +153,15 @@
   "authForgotCta": "ENVIAR LINK",
   "authForgotSuccess": "Si tu email está registrado, te enviamos un link para resetear la contraseña.",
   "authForgotBackToLogin": "Volver al login",
+  "@authForgotBackToLogin": {"description": "Forgot-password success state: link back to the login screen."},
+  "authForgotSpamHint": "¿No te llegó? Puede tardar un minuto. Revisá también la carpeta de spam.",
+  "@authForgotSpamHint": {"description": "Forgot-password success state: sets the expectation that the mail may be delayed or filtered, before offering the resend action (ux-audit-2026-06-16, MEDIUM · states)."},
+  "authForgotResendCta": "Reenviar el link",
+  "@authForgotResendCta": {"description": "Forgot-password success state: resend the reset link. Enabled once the cooldown elapses."},
+  "authForgotResendIn": "Podés reenviar en {seconds}s",
+  "@authForgotResendIn": {"description": "Forgot-password success state: cooldown label shown while the resend action is still disabled.", "placeholders": {"seconds": {"type": "int"}}},
+  "authForgotEditEmail": "Usar otra dirección",
+  "@authForgotEditEmail": {"description": "Forgot-password success state: return to the form to correct a mistyped address. Needed because the anti-enumeration success copy hides a typo (ux-audit-2026-06-16)."},
   "authTrainerInquiryDialogTitle": "Acceso de entrenador",
   "authTrainerInquiryDialogBody": "Para alta de entrenador, escribinos a equipo@treino.app",
   "authTrainerInquiryDialogClose": "Cerrar",
@@ -172,6 +193,18 @@
   "coachProfileBioEmpty": "Sin descripción.",
   "coachProfileRateLabel": "Tarifa mensual",
   "coachCtaLabel": "PEDIR VÍNCULO",
+  "coachInquiryCtaLabel": "CONSULTAR",
+  "@coachInquiryCtaLabel": {
+    "description": "CTA primario del perfil público del PF (#637): abre un chat de pre-consulta SIN vínculo formal. Pasa a ser el camino visible y liviano; PEDIR VÍNCULO queda como el compromiso explícito que viene después."
+  },
+  "coachInquiryCtaHelp": "Preguntale precio, modalidad y horarios sin comprometerte con nadie.",
+  "@coachInquiryCtaHelp": {
+    "description": "Línea de ayuda debajo del par de CTAs. Existe porque el atleta necesita entender por qué hay dos botones: varios entrevistados querían consultar antes de decidir, y hoy el único camino compromete. También explica el botón deshabilitado cuando ya tiene un PF."
+  },
+  "coachInquiryCtaError": "No pudimos abrir la consulta. Probá de nuevo.",
+  "@coachInquiryCtaError": {
+    "description": "Snackbar cuando falla el getOrCreate del chat de consulta."
+  },
   "coachCtaProximamente": "Próximamente — Etapa 3",
   "coachLocationSheetTitle": "Permitir ubicación",
   "coachLocationSheetBody": "TREINO usa tu ubicación para mostrarte entrenadores cerca tuyo. Tu ubicación no es visible para otros usuarios.",
@@ -313,6 +346,14 @@
   "workoutSnackShareSuccess": "¡Post compartido!",
   "workoutSnackShareError": "No pudimos compartir tu post. Intentá de nuevo.",
   "workoutPostAutoCompleteText": "¡Terminé mi entreno! 💪",
+  "wellbeingDailyTitle": "¿CÓMO TE SENTÍS HOY?",
+  "@wellbeingDailyTitle": {
+    "description": "Title of the daily wellbeing card on Home, and of the sheet it opens. Present tense on purpose: the daily check-in does not assume a workout happened. Concrete, never abstract — the segment that asked for this feature is the one that tolerates abstraction worst."
+  },
+  "wellbeingDailyPrompt": "Anotá cómo amanecés, entrenes o no.",
+  "@wellbeingDailyPrompt": {
+    "description": "Subtitle of the daily wellbeing card on Home. Says plainly what the card is for. Must NOT promise any interpretation, advice or diagnosis derived from the answer."
+  },
   "wellbeingCheckInTitle": "¿CÓMO TE SENTISTE?",
   "@wellbeingCheckInTitle": {
     "description": "Title of the skippable post-session check-in step, and of the sheet it opens. Asks how the athlete felt — subjective, never a performance metric."
@@ -424,6 +465,47 @@
   "workoutSelfEditorPermissionDenied": "No tenés permisos para hacer esto. Recargá la app.",
   "workoutEditStubToast": "Pronto vas a poder editar el contenido. Por ahora podés archivar y crear de nuevo.",
   "workoutSelfEditorCapReached": "Llegaste al máximo de 10 rutinas activas.",
+  "workoutRoutineUseAsBase": "Usar como base",
+  "@workoutRoutineUseAsBase": {
+    "description": "Acción del detalle de una plantilla que abre el editor con todo precargado para que el atleta arme su propia versión (#647). Es el punto medio entre usar la plantilla tal cual y arrancar de una pantalla en blanco."
+  },
+  "workoutRoutineCustomizeTitle": "Personalizar rutina",
+  "@workoutRoutineCustomizeTitle": {
+    "description": "Título del editor en modo SelfCustomizing."
+  },
+  "workoutRoutineCustomizeSubmitLabel": "GUARDAR COMO MÍA",
+  "@workoutRoutineCustomizeSubmitLabel": {
+    "description": "Botón de guardado en modo SelfCustomizing. Dice explícitamente que el resultado es una rutina del atleta, no una edición de la plantilla original."
+  },
+  "workoutRoutineCopyName": "{name} (mi versión)",
+  "@workoutRoutineCopyName": {
+    "description": "Nombre con el que arranca una copia, para que no queden cinco plantillas indistinguibles en MIS RUTINAS. Es editable antes de guardar.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "workoutTabYours": "TU ENTRENO",
+  "@workoutTabYours": {
+    "description": "Left pill of the athlete Entrenar segmented control (page 0 — own routines + session history). Key is semantic, not a copy of the label, so a future copy change does not strand the identifier the way `plantillas*` did (#638)."
+  },
+  "workoutTabExplore": "EXPLORAR",
+  "@workoutTabExplore": {
+    "description": "Right pill of the athlete Entrenar segmented control (page 1 — trainer-built routine catalogue). A VERB on purpose: the left pill already owns the noun 'rutinas' via workoutMisRutinasSectionTitle, and two nouns in one toggle is what made the old 'PLANTILLAS' label test badly (#638). Keep it short — over ~12 chars the TabBar starts scrolling on small screens."
+  },
+  "workoutExploreEmptyAll": "No hay rutinas todavía.",
+  "@workoutExploreEmptyAll": {
+    "description": "Empty state of the EXPLORAR catalogue grid when no trainer has published anything yet and no level filter is active (#638)."
+  },
+  "workoutExploreEmptyLevel": "No hay rutinas para este nivel.",
+  "@workoutExploreEmptyLevel": {
+    "description": "Empty state of the EXPLORAR catalogue grid when a level filter pill is active and nothing matches it (#638)."
+  },
+  "workoutExploreLoadError": "Hubo un error cargando las rutinas.",
+  "@workoutExploreLoadError": {
+    "description": "Error state of the EXPLORAR catalogue grid. Paired with plantillasRetryLabel as the retry CTA (#638)."
+  },
   "workoutMisRutinasSectionTitle": "MIS RUTINAS",
   "workoutMisRutinasCta": "CREAR RUTINA",
   "workoutMisRutinasCtaDisabledTooltip": "Llegaste al máximo de 10 rutinas activas. Archivá una para crear otra.",
@@ -456,7 +538,7 @@
   "@templateRatingsTitle": {
     "description": "Section header of the community ratings block in the detail of a published trainer template. Workout-area redesign slice 3."
   },
-  "templateRatingsNoneYet": "Todavía nadie calificó esta plantilla. ¡Sé el primero!",
+  "templateRatingsNoneYet": "Todavía nadie calificó esta rutina. ¡Sé el primero!",
   "@templateRatingsNoneYet": {
     "description": "Shown instead of the average when a published template has zero ratings."
   },
@@ -493,7 +575,7 @@
   "@templateRatingsError": {
     "description": "Error state of the comment list in the published-template detail."
   },
-  "templateRatingSheetTitle": "Calificá esta plantilla",
+  "templateRatingSheetTitle": "Calificá esta rutina",
   "@templateRatingSheetTitle": {
     "description": "Title of the rating bottom sheet when creating a new rating."
   },
@@ -501,7 +583,7 @@
   "@templateRatingSheetTitleEdit": {
     "description": "Title of the rating bottom sheet when editing an existing rating."
   },
-  "templateRatingSheetCommentHint": "Contá cómo te fue con esta plantilla (opcional)",
+  "templateRatingSheetCommentHint": "Contá cómo te fue con esta rutina (opcional)",
   "@templateRatingSheetCommentHint": {
     "description": "Hint of the optional comment field in the template rating sheet, max 500 chars."
   },
@@ -521,7 +603,7 @@
   "@templateRatingSheetError": {
     "description": "SnackBar shown when saving a rating fails."
   },
-  "workoutSplitFallback": "Sin split",
+  "workoutSplitFallback": "Rutina libre",
   "workoutPickerMuscleFilter": "Músculos",
   "workoutPickerEquipmentFilter": "Equipamiento",
   "workoutPickerMuscleSheetTitle": "Grupo muscular",
@@ -1065,6 +1147,18 @@
   "@routineEditorNotesLabel": {},
   "routineEditorNotesHint": "Técnica, tempo, RIR…",
   "@routineEditorNotesHint": {},
+  "routineEditorSummaryLabel": "RESUMEN",
+  "@routineEditorSummaryLabel": {
+    "description": "Section label of the plain-language routine summary field (#648). Trainer modes only — the athlete editor never shows it, and firestore.rules does not let an athlete write the field."
+  },
+  "routineEditorSummaryHelp": "Una frase que explique qué es la rutina, para alguien que nunca pisó un gimnasio.",
+  "@routineEditorSummaryHelp": {
+    "description": "Help line under the RESUMEN label explaining what the field is for. The catalogue leads with jargon (PPL, Bro Split) and 2 of 5 usability participants could not tell what those meant."
+  },
+  "routineEditorSummaryHint": "Ej: Empujar, tirar y piernas: cada día trabajás un tipo de movimiento distinto.",
+  "@routineEditorSummaryHint": {
+    "description": "Hint of the routine summary field. Verbatim one of the 7 seeded system-template summaries, so its length (78 chars) calibrates the expected answer."
+  },
   "exerciseNoteFromCoachTag": "DEL COACH",
   "@exerciseNoteFromCoachTag": {},
   "routineEditorIncompleteSetsFeedback": "Completá los sets de \"{exerciseName}\" antes de guardar.",
@@ -1544,6 +1638,14 @@
   "@coachHubDashboardResumeLinkError": {
     "description": "Coach Hub web dashboard — snackbar when resume() fails."
   },
+  "coachHubDashboardResumePrecondition": "Este vínculo ya no está disponible.",
+  "@coachHubDashboardResumePrecondition": {
+    "description": "Coach Hub web dashboard — snackbar when resumeTrainerLink fails with a non-quota precondition (not-found/permission-denied/failed-precondition): the link is no longer valid, retrying won't help (paywall Fase 7, PR4, slice 3, design D-5)."
+  },
+  "coachHubDashboardResumeUnavailable": "Revisá tu conexión y probá de nuevo.",
+  "@coachHubDashboardResumeUnavailable": {
+    "description": "Coach Hub web dashboard — snackbar when resumeTrainerLink fails with a network/unknown error, safe to retry (paywall Fase 7, PR4, slice 3, design D-5)."
+  },
   "coachHubDashboardAcceptSuccess": "Vínculo aceptado.",
   "@coachHubDashboardAcceptSuccess": {
     "description": "Coach Hub web dashboard — snackbar after accepting a pending link request."
@@ -1551,6 +1653,14 @@
   "coachHubDashboardAcceptError": "No pudimos aceptar el vínculo.",
   "@coachHubDashboardAcceptError": {
     "description": "Coach Hub web dashboard — snackbar when accept() fails."
+  },
+  "coachHubDashboardAcceptPrecondition": "Esta solicitud ya no está disponible.",
+  "@coachHubDashboardAcceptPrecondition": {
+    "description": "Coach Hub web dashboard — snackbar when acceptTrainerLink fails with a non-quota precondition (not-found/permission-denied/failed-precondition): the request is no longer valid, retrying won't help (paywall Fase 7, PR4, design D-5)."
+  },
+  "coachHubDashboardAcceptUnavailable": "Revisá tu conexión y probá de nuevo.",
+  "@coachHubDashboardAcceptUnavailable": {
+    "description": "Coach Hub web dashboard — snackbar when acceptTrainerLink fails with a network/unknown error, safe to retry (paywall Fase 7, PR4, design D-5)."
   },
   "coachHubDashboardRejectSuccess": "Solicitud rechazada.",
   "@coachHubDashboardRejectSuccess": {
@@ -1665,6 +1775,18 @@
   "coachHubAlumnosStatusDebt": "Con deuda",
   "@coachHubAlumnosStatusDebt": {
     "description": "Coach Hub web alumnos section — status badge for athletes with outstanding payments."
+  },
+  "coachHubAlumnosStatusBlocked": "Bloqueado",
+  "@coachHubAlumnosStatusBlocked": {
+    "description": "Coach Hub alumnos — status badge for a link blocked by the trainer plan limit (paywall Fase 7 downgrade). NOT the athlete fault: the trainer subscription lapsed."
+  },
+  "coachHubAlumnosFilterBloqueados": "Bloqueados",
+  "@coachHubAlumnosFilterBloqueados": {
+    "description": "Coach Hub web alumnos section — filter chip for athletes blocked by the plan limit."
+  },
+  "coachHubAlumnosBlockedHint": "Superaste el límite de tu plan. Este alumno no cuenta y no podés trabajar con él hasta que regularices.",
+  "@coachHubAlumnosBlockedHint": {
+    "description": "Coach Hub alumnos — tooltip explaining why an athlete is blocked and that the trainer must fix their subscription."
   },
   "coachHubAlumnosStatusPaused": "Pausado",
   "@coachHubAlumnosStatusPaused": {
@@ -1818,6 +1940,10 @@
   "sessionDetailNoSets": "Esta sesión no tiene sets registrados.",
   "@sessionDetailNoSets": {
     "description": "Empty state for session_detail_screen when setLogs is empty (finding 18)."
+  },
+  "sessionFinishedOnWatch": "Terminaste este entrenamiento desde el reloj.",
+  "@sessionFinishedOnWatch": {
+    "description": "Snackbar al salir del player porque el reloj cerro el entreno. El reloj escribe en la misma sesion, asi que terminar alla termina aca."
   },
   "sessionLogSetError": "No pudimos guardar la serie. Reintentá.",
   "@sessionLogSetError": {
@@ -3082,9 +3208,31 @@
     "description": "Semantics del contador de SEGUIDORES del perfil, que abre la lista."
   },
   "followListOpenFollowingA11y": "Ver seguidos",
-  "@followListOpenFollowingA11y": {
-    "description": "Semantics del contador de SIGUIENDO del perfil, que abre la lista."
-  },
+  "@followListOpenFollowingA11y": {"description": "Semantics del contador de SIGUIENDO del perfil, que abre la lista."},
+  "routineCardDaysPerWeek": "{days, plural, =1{1 día/sem} other{{days} días/sem}}",
+  "@routineCardDaysPerWeek": {"description": "Días por semana en la línea de metadata de la tarjeta de rutina.", "placeholders": {"days": {"type": "int"}}},
+  "routineCardMinutes": "{value} min",
+  "@routineCardMinutes": {"description": "Duración estimada por sesión en la tarjeta de rutina. El valor ya viene con el prefijo ~ cuando es calculado.", "placeholders": {"value": {"type": "String"}}},
+  "sessionTrimAdjustedTo": "Ajustado a {value} min",
+  "@sessionTrimAdjustedTo": {"description": "Título del aviso de sesión recortada en el player (#645). El valor ya viene con el prefijo ~ cuando es calculado.", "placeholders": {"value": {"type": "String"}}},
+  "sessionTrimDroppedList": "Fuera de hoy: {names}",
+  "@sessionTrimDroppedList": {"description": "Ejercicios que el atleta dejó fuera de la sesión de hoy para que entrara en su tiempo (#645). La rutina no se modifica.", "placeholders": {"names": {"type": "String"}}},
+  "sessionTrimUndo": "DESHACER",
+  "@sessionTrimUndo": {"description": "Acción que devuelve a la sesión todo lo que se había recortado (#645)."},
+  "sessionTimeFitPromptTitle": "¿CUÁNTO TIEMPO TENÉS HOY?",
+  "@sessionTimeFitPromptTitle": {"description": "Entrada al ajuste de tiempo en el player y título de su hoja (#645)."},
+  "sessionTimeFitCurrent": "Esta sesión son {value} min",
+  "@sessionTimeFitCurrent": {"description": "Duración estimada de la sesión de hoy antes de recortar (#645). El valor ya viene con el prefijo ~ porque siempre es calculado.", "placeholders": {"value": {"type": "String"}}},
+  "sessionTimeFitAlreadyFits": "Con {value} min ya entrás. No hace falta sacar nada.",
+  "@sessionTimeFitAlreadyFits": {"description": "Respuesta cuando la sesión completa ya cabe en el tiempo declarado (#645).", "placeholders": {"value": {"type": "String"}}},
+  "sessionTimeFitTrimHeadline": "Si sacás esto, la sesión queda en {value} min:",
+  "@sessionTimeFitTrimHeadline": {"description": "Encabezado de la propuesta de recorte, seguido de los nombres de los ejercicios (#645). La app sugiere; el atleta decide.", "placeholders": {"value": {"type": "String"}}},
+  "sessionTimeFitCannotFit": "No llegamos a ese tiempo. Lo más corto posible son {value} min:",
+  "@sessionTimeFitCannotFit": {"description": "Respuesta cuando ni el recorte más profundo entra en el tiempo declarado (#645).", "placeholders": {"value": {"type": "String"}}},
+  "sessionTimeFitNothingToTrim": "No hay nada que sacar sin dejar la sesión vacía.",
+  "@sessionTimeFitNothingToTrim": {"description": "Respuesta cuando no queda ningún ejercicio recortable (#645)."},
+  "sessionTimeFitApply": "AJUSTAR HOY",
+  "@sessionTimeFitApply": {"description": "Confirma el recorte propuesto. Sólo afecta la sesión de hoy; la rutina no se modifica (#645)."},
   "onboardingCardDismiss": "ENTENDIDO",
   "@onboardingCardDismiss": {
     "description": "Única salida de la card de onboarding de un módulo. Al tocarla se persiste el flag y la card no vuelve."

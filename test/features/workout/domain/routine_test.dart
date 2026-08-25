@@ -7,6 +7,73 @@ import 'package:treino/features/workout/domain/routine_visibility.dart';
 
 void main() {
   group('Routine', () {
+    // ── summary: ahora TAMBIÉN lo escribe el cliente (#648) ─────────────────
+    //
+    // Estos tests decían lo contrario, y era cierto mientras el campo llevaba
+    // `@JsonKey(includeToJson: false)`. Al habilitar los resúmenes autorados
+    // por el PF esa anotación se fue, así que `toJson()` lo emite en TODA
+    // rutina — incluidas las del atleta, que nunca lo escriben a mano.
+    //
+    // Por eso los tres `hasOnly` de firestore.rules tuvieron que aprenderlo:
+    // si a alguno le faltara, esa rama entera de edición fallaría con
+    // permission-denied. Es el modo de falla de #563, y ahora lo cubren los
+    // tests de reglas (`routine-summary-rules.test.ts`), no la ausencia del
+    // campo en el payload.
+
+    test('#648: summary se lee desde Firestore', () {
+      final decoded = Routine.fromJson(const {
+        'id': 'ppl-beginner',
+        'name': 'Push Pull Legs — Principiante',
+        'level': 'beginner',
+        'days': <Object?>[],
+        'summary': 'Empujar, tirar y piernas.',
+      });
+
+      expect(decoded.summary, 'Empujar, tirar y piernas.');
+    });
+
+    test('#648: summary SÍ sale en toJson — y por eso las rules lo conocen',
+        () {
+      const routine = Routine(
+        id: 'r1',
+        name: 'Rutina',
+        level: ExperienceLevel.beginner,
+        days: [],
+        summary: 'Una explicación en criollo.',
+      );
+
+      expect(
+        routine.toJson()['summary'],
+        'Una explicación en criollo.',
+        reason: 'si esto vuelve a ser false, el editor del PF deja de guardar',
+      );
+    });
+
+    test('#648: una rutina SIN summary no lo mete como null en el payload', () {
+      // Importa para el path del atleta: su `hasOnly` lista `summary` de forma
+      // defensiva, pero cuantos menos campos viajen, menos superficie tiene el
+      // diff que las reglas evalúan.
+      const routine = Routine(
+        id: 'r1',
+        name: 'Rutina',
+        level: ExperienceLevel.beginner,
+        days: [],
+      );
+
+      expect(routine.toJson()['summary'], isNull);
+    });
+
+    test('#648: summary ausente deserializa a null, sin romper', () {
+      final decoded = Routine.fromJson(const {
+        'id': 'r1',
+        'name': 'Rutina',
+        'level': 'beginner',
+        'days': <Object?>[],
+      });
+
+      expect(decoded.summary, isNull);
+    });
+
     test('SCENARIO-049: required-only roundtrip, nullable fields null', () {
       const routine = Routine(
         id: 'ppl-beginner',

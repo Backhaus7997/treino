@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../app/theme/app_motion.dart';
 import '../../app/theme/app_palette.dart';
@@ -17,8 +20,12 @@ import '../workout/application/session_duration.dart';
 import '../workout/application/session_providers.dart';
 import '../workout/application/user_routines_providers.dart';
 import '../workout/domain/session.dart';
+import '../watch/application/watch_credential_providers.dart'
+    show watchNudgeServiceProvider;
+import '../watch/data/watch_nudge_service.dart';
 import '../workout/domain/set_log.dart';
 import '../workout/presentation/widgets/resume_session_modal.dart';
+import 'widgets/daily_check_in_card.dart';
 import 'widgets/empezar_entrenamiento_card.dart';
 import 'widgets/esta_semana_card.dart';
 import 'widgets/home_cta_button.dart';
@@ -152,6 +159,14 @@ class _AthleteHome extends ConsumerWidget {
               delay: AppMotion.stagger(2),
               child: const EstaSemanaCard(),
             ),
+            const SizedBox(height: 12),
+            // Debajo de "Esta semana" a propósito: lo que trae al atleta a
+            // Inicio sigue siendo entrenar. El check-in SUMA una dimensión, no
+            // reemplaza ni desplaza a las métricas objetivas (#643).
+            TreinoFadeSlideIn(
+              delay: AppMotion.stagger(3),
+              child: const DailyCheckInCard(),
+            ),
           ],
         ),
       ),
@@ -167,7 +182,31 @@ bool _isEmptyData(AsyncValue<List<Object?>> async) =>
 
 /// First-run empty state shown on Home when the athlete has no self-created
 /// routine and no trainer-assigned plan. Replaces the hardcoded fake workout
-/// card with an honest onboarding surface and two CTAs (finding 5).
+/// card with an honest onboarding surface and three CTAs (finding 5, #636).
+///
+/// ## Los tres caminos y su orden (#636)
+///
+/// Las entrevistas de la auditoría sacaron tres perfiles de atleta nuevo: el
+/// que se arma la rutina solo, el que quiere agarrar un plan ya hecho, y el
+/// que quiere un PF que lo guíe. Los tres tienen que ser legibles de un
+/// vistazo — por eso el camino de PLANES es un botón con el MISMO peso visual
+/// que "Buscar entrenador", no un link chiquito abajo.
+///
+/// El orden es **CREAR RUTINA → Explorar planes → Buscar entrenador**, y no
+/// el "menor esfuerzo primero" que sugería el issue, por dos razones:
+///
+/// 1. El propio issue descartó rotar cuál de los tres gana la jerarquía
+///    ("Reemplazar 'Crear rutina' por 'Elegir plantilla' como CTA primario.
+///    Descartado"). Poner un `OutlinedButton` ARRIBA del botón lleno no
+///    entrega esa prioridad: el peso visual le gana al orden de lectura y el
+///    ojo cae igual en el botón lleno. Sería una jerarquía contradictoria,
+///    no la que se buscaba.
+/// 2. Entre los dos secundarios —que sí pesan igual— el orden manda de
+///    verdad, y ahí PLANES va primero. Ahí es donde la hipótesis del issue
+///    se puede aplicar sin romper el punto 1.
+///
+/// El body de l10n enumera los tres caminos EN ESTE MISMO ORDEN. Si alguien
+/// reordena los botones, tiene que reescribir `homeAthleteFirstRunBody`.
 class _AthleteFirstRunCard extends StatelessWidget {
   const _AthleteFirstRunCard();
 
@@ -180,7 +219,7 @@ class _AthleteFirstRunCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: palette.border, width: 1),
       ),
       child: Padding(
@@ -208,23 +247,66 @@ class _AthleteFirstRunCard extends StatelessWidget {
               onPressed: () => context.push('/workout/my-routine-editor'),
             ),
             const SizedBox(height: 10),
+            // Secondary CTA: la página EXPLORAR de la tab Entrenar, donde
+            // viven los planes ya armados.
+            //
+            // ⚠️ El valor del deep-link sigue siendo `plantillas` a propósito:
+            // el copy del tab pasó a "EXPLORAR" en #638 pero la ruta NO se
+            // movió, porque hay bookmarks y notificaciones vivas apuntándole
+            // (ver `_AthleteWorkout._resolveInitialIndex`). Etiqueta y ruta
+            // divergen por diseño — no "arreglar" una para que matchee la otra.
+            //
+            // `go` y no `push`: es una tab raíz del shell, igual que /coach.
+            _FirstRunSecondaryCta(
+              label: l10n.homeAthleteFirstRunExplorePlansCta,
+              icon: TreinoIcon.dumbbell,
+              onPressed: () => context.go('/workout?tab=plantillas'),
+            ),
+            const SizedBox(height: 10),
             // Secondary CTA: route to the Coach tab where athletes browse and
             // request a trainer.
-            OutlinedButton.icon(
+            _FirstRunSecondaryCta(
+              label: l10n.homeAthleteFirstRunFindTrainerCta,
+              icon: TreinoIcon.search,
               onPressed: () => context.go('/coach'),
-              icon: Icon(TreinoIcon.search, size: 16, color: palette.accent),
-              label: Text(
-                l10n.homeAthleteFirstRunFindTrainerCta,
-                style: TextStyle(color: palette.accent),
-              ),
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size.fromHeight(48),
-                side: BorderSide(color: palette.accent.withValues(alpha: 0.6)),
-                shape: const StadiumBorder(),
-              ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Camino secundario del primer arranque: pill outlined, ancho completo, 48
+/// de alto. Extraído cuando #636 sumó el tercer camino — los dos secundarios
+/// tienen que pesar exactamente lo mismo, y dos copias del mismo
+/// `OutlinedButton.styleFrom` se desincronizan a la primera edición.
+class _FirstRunSecondaryCta extends StatelessWidget {
+  const _FirstRunSecondaryCta({
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  final String label;
+
+  /// Constante de [TreinoIcon] — nunca un `PhosphorIcons.*` directo.
+  final IconData icon;
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 16, color: palette.accent),
+      label: Text(label, style: TextStyle(color: palette.accent)),
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size.fromHeight(48),
+        side: BorderSide(color: palette.accent.withValues(alpha: 0.6)),
+        shape: const StadiumBorder(),
       ),
     );
   }
@@ -241,65 +323,143 @@ void _maybeShowResumePrompt(
 
   WidgetsBinding.instance.addPostFrameCallback((_) {
     if (!context.mounted) return;
+    // ⚠️ Solo si HOME es la pantalla visible.
+    //
+    // Home queda MONTADA abajo del player. Desde que
+    // `activeSessionForUidProvider` es reactivo —para enterarse de un entreno
+    // que arrancó el reloj— empezar uno DESDE EL TELÉFONO también lo hace
+    // re-emitir, y este aviso saltaba encima del entreno en el que el atleta
+    // acababa de entrar, ofreciéndole "continuar o descartar" lo que estaba
+    // haciendo. Peor: descartar ahí lo cerraba de verdad.
+    //
+    // `isCurrent` es false mientras haya cualquier ruta encima, que es
+    // exactamente la condición que queremos.
+    final route = ModalRoute.of(context);
+    if (route != null && !route.isCurrent) return;
     showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (dialogCtx) => ResumeSessionModal(
-        session: session,
-        onContinue: () {
-          Navigator.of(dialogCtx, rootNavigator: true).pop();
-          context.push('/workout/session/resume/${session.id}');
-        },
-        onDiscard: () async {
-          final repo = ref.read(sessionRepositoryProvider);
-          // QA-WKT-011: clamp the discarded session's duration with the same
-          // policy SessionNotifier uses (recover from the set-log timeline, cap
-          // at maxWorkoutDuration) instead of raw wall-clock minutes — a session
-          // left open overnight was persisting durationMin well over 480.
-          final elapsedSecs = sanitizedActiveSessionElapsedSeconds(
-            session: session,
-            setLogs: record.setLogs,
-            now: DateTime.now(),
+      // ⚠️ El diálogo se cierra SOLO cuando su sujeto deja de existir.
+      //
+      // Sin esto, terminar el entreno DESDE EL RELOJ dejaba este modal abierto
+      // sobre una sesión que ya no está activa. Y como es `barrierDismissible:
+      // false`, el atleta quedaba encerrado con dos salidas y las dos malas:
+      // CONTINUAR tiraba `StateError` en `_buildResume` (pantalla en blanco), y
+      // DESCARTAR le pisaba el volumen y la duración a un entreno YA TERMINADO
+      // con datos viejos, dejándolo sin contar. Se reportó como "se borra del
+      // historial": no se borraba, se mutilaba.
+      //
+      // Va como `Consumer` y no como estado de `_AthleteHome` a propósito: el
+      // diálogo se apaga solo, sin convertir un `ConsumerWidget` caliente en
+      // stateful ni rastrear rutas desde afuera.
+      builder: (dialogCtx) => Consumer(
+        builder: (consumerCtx, dialogRef, _) {
+          dialogRef
+              .listen<AsyncValue<({Session session, List<SetLog> setLogs})?>>(
+            activeSessionForUidProvider,
+            (_, next) {
+              // `loading` no cierra: durante un refetch el valor es transitorio
+              // y cerrar ahí haría parpadear el diálogo.
+              if (next.isLoading) return;
+              final vigente = next.valueOrNull?.session.id;
+              if (vigente == session.id) return;
+              if (dialogCtx.mounted) {
+                Navigator.of(dialogCtx, rootNavigator: true).pop();
+              }
+            },
           );
-          final durationMin = elapsedSecs <= 0 ? 1 : (elapsedSecs + 59) ~/ 60;
-          try {
-            await repo
-                .finish(
-                  uid: session.uid,
-                  sessionId: session.id,
-                  finishedAt: DateTime.now(),
-                  totalVolumeKg: _sumVolume(record.setLogs),
-                  durationMin: durationMin,
-                )
-                .timeout(const Duration(seconds: 15));
-          } catch (_) {
-            // QA-WKT-011: the write can throw or (offline) stall indefinitely.
-            // Don't leave the barrierDismissible:false dialog stuck with an
-            // unhandled exception — close it and surface a retryable error.
-            if (dialogCtx.mounted) {
-              Navigator.of(dialogCtx, rootNavigator: true).pop();
-            }
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(AppL10n.of(context).workoutDiscardError),
-                ),
-              );
-            }
-            return;
-          }
-          // _AthleteHome may have been disposed during the finish() write
-          // (user navigated away). Invalidating through a torn-down ref throws,
-          // so guard on the host context before touching ref again.
-          if (!context.mounted) return;
-          if (dialogCtx.mounted) {
-            Navigator.of(dialogCtx, rootNavigator: true).pop();
-          }
-          ref.invalidate(activeSessionForUidProvider);
+          return _resumeModal(context, ref, dialogCtx, session, record);
         },
       ),
     );
   });
+}
+
+/// El modal en sí, extraído para que el `Consumer` de arriba quede legible.
+Widget _resumeModal(
+  BuildContext context,
+  WidgetRef ref,
+  BuildContext dialogCtx,
+  Session session,
+  ({Session session, List<SetLog> setLogs}) record,
+) {
+  return ResumeSessionModal(
+    session: session,
+    onContinue: () {
+      Navigator.of(dialogCtx, rootNavigator: true).pop();
+      context.push('/workout/session/resume/${session.id}');
+    },
+    onDiscard: () async {
+      final repo = ref.read(sessionRepositoryProvider);
+      // Carrera: el atleta puede tocar DESCARTAR en el mismo instante en
+      // que el reloj termina el entreno. Sin esta relectura, `finish()`
+      // pisaría los totales de una sesión ya cerrada. El cierre automático
+      // del diálogo cubre el caso normal; esto cubre el toque simultáneo.
+      final vigente = await repo.getActive(session.uid).catchError(
+            (_) => null,
+          );
+      if (vigente == null || vigente.id != session.id) {
+        if (dialogCtx.mounted) {
+          Navigator.of(dialogCtx, rootNavigator: true).pop();
+        }
+        return;
+      }
+      // QA-WKT-011: clamp the discarded session's duration with the same
+      // policy SessionNotifier uses (recover from the set-log timeline, cap
+      // at maxWorkoutDuration) instead of raw wall-clock minutes — a session
+      // left open overnight was persisting durationMin well over 480.
+      final elapsedSecs = sanitizedActiveSessionElapsedSeconds(
+        session: session,
+        setLogs: record.setLogs,
+        now: DateTime.now(),
+      );
+      final durationMin = elapsedSecs <= 0 ? 1 : (elapsedSecs + 59) ~/ 60;
+      try {
+        await repo
+            .finish(
+              uid: session.uid,
+              sessionId: session.id,
+              finishedAt: DateTime.now(),
+              totalVolumeKg: _sumVolume(record.setLogs),
+              durationMin: durationMin,
+            )
+            .timeout(const Duration(seconds: 15));
+      } catch (_) {
+        // QA-WKT-011: the write can throw or (offline) stall indefinitely.
+        // Don't leave the barrierDismissible:false dialog stuck with an
+        // unhandled exception — close it and surface a retryable error.
+        if (dialogCtx.mounted) {
+          Navigator.of(dialogCtx, rootNavigator: true).pop();
+        }
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(AppL10n.of(context).workoutDiscardError),
+            ),
+          );
+        }
+        return;
+      }
+      // _AthleteHome may have been disposed during the finish() write
+      // (user navigated away). Invalidating through a torn-down ref throws,
+      // so guard on the host context before touching ref again.
+      if (!context.mounted) return;
+      if (dialogCtx.mounted) {
+        Navigator.of(dialogCtx, rootNavigator: true).pop();
+      }
+      ref.invalidate(activeSessionForUidProvider);
+      // El reloj no tiene listeners: sin este aviso descartar acá cerraba
+      // la sesión en Firestore y en el teléfono, pero la muñeca se quedaba
+      // con la pantalla de entreno abierta sobre algo que ya no existe.
+      // El aviso desde `SessionNotifier` no cubre este camino: acá el
+      // notifier ni siquiera está vivo.
+      unawaited(
+        ref.read(watchNudgeServiceProvider).nudge(
+              reason: WatchNudgeService.reasonWorkoutFinished,
+            ),
+      );
+    },
+  );
 }
 
 double _sumVolume(List<SetLog> logs) =>

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../l10n/app_l10n.dart';
@@ -21,7 +22,7 @@ Future<void> showTemplateRatingSheet(
     isScrollControlled: true,
     backgroundColor: AppPalette.of(context).bgCard,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
     ),
     builder: (_) => TemplateRatingSheet(
       routineId: routineId,
@@ -168,11 +169,11 @@ class _TemplateRatingSheetState extends ConsumerState<TemplateRatingSheet> {
                 hintStyle: GoogleFonts.barlow(color: palette.textMuted),
                 enabledBorder: OutlineInputBorder(
                   borderSide: BorderSide(color: palette.border),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderSide: BorderSide(color: palette.accent),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
                 ),
               ),
             ),
@@ -203,10 +204,10 @@ class _TemplateRatingSheetState extends ConsumerState<TemplateRatingSheet> {
                         : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: palette.accent,
-                      foregroundColor: palette.bg,
+                      foregroundColor: TreinoButtonTokens.foreground(context),
                       minimumSize: const Size.fromHeight(48),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(9999),
+                        borderRadius: BorderRadius.circular(AppRadius.full),
                       ),
                     ),
                     child: _submitting
@@ -215,7 +216,7 @@ class _TemplateRatingSheetState extends ConsumerState<TemplateRatingSheet> {
                             height: 18,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: palette.bg,
+                              color: TreinoButtonTokens.foreground(context),
                             ),
                           )
                         : Text(

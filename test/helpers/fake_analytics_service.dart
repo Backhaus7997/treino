@@ -125,4 +125,41 @@ class FakeAnalyticsService implements AnalyticsService {
       }
     ));
   }
+
+  @override
+  Future<void> logScreenViewed({required String route}) async {
+    events.add('screen_view');
+    calls.add((name: 'screen_view', params: {'route': route}));
+  }
+
+  /// Atajo para los tests de navegación: las rutas capturadas, en orden.
+  List<String> get screenRoutes => calls
+      .where((c) => c.name == 'screen_view')
+      .map((c) => c.params['route']! as String)
+      .toList();
+
+  @override
+  Future<void> logSubTabViewed({
+    required String surface,
+    required String tab,
+  }) async {
+    events.add('sub_tab_viewed');
+    calls.add((
+      name: 'sub_tab_viewed',
+      params: {
+        'surface': surface,
+        'tab': tab,
+      }
+    ));
+  }
+
+  /// Atajo para los tests de sub-navegación: los `tab` capturados para una
+  /// superficie, en orden. Evita repetir el filtro sobre `calls` en cada
+  /// expect y hace que el fallo se lea solo (`['feed', 'rankings']` en vez de
+  /// un dump de records).
+  List<String> subTabsFor(String surface) => calls
+      .where(
+          (c) => c.name == 'sub_tab_viewed' && c.params['surface'] == surface)
+      .map((c) => c.params['tab']! as String)
+      .toList();
 }

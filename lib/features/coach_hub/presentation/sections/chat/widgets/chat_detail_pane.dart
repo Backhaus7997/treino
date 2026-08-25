@@ -2,10 +2,10 @@ import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../../../../app/theme/app_palette.dart';
+import '../../../../../../app/theme/tokens/primitives.dart';
 import '../../../../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../../../core/widgets/treino_icon.dart';
@@ -153,7 +153,8 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
               leading: Icon(TreinoIcon.image, color: palette.textPrimary),
               title: Text(
                 'Foto', // i18n: Fase W2
-                style: GoogleFonts.barlow(color: palette.textPrimary),
+                style: TextStyle(
+                    fontFamily: AppFonts.barlow, color: palette.textPrimary),
               ),
               onTap: () => Navigator.of(ctx).pop(MediaType.image),
             ),
@@ -162,7 +163,8 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
               leading: Icon(TreinoIcon.play, color: palette.textPrimary),
               title: Text(
                 'Video', // i18n: Fase W2
-                style: GoogleFonts.barlow(color: palette.textPrimary),
+                style: TextStyle(
+                    fontFamily: AppFonts.barlow, color: palette.textPrimary),
               ),
               onTap: () => Navigator.of(ctx).pop(MediaType.video),
             ),
@@ -245,7 +247,8 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
                 error: (_, __) => Center(
                   child: Text(
                     'No pudimos cargar los mensajes.', // i18n: Fase W2
-                    style: GoogleFonts.barlow(
+                    style: TextStyle(
+                      fontFamily: AppFonts.barlow,
                       fontWeight: FontWeight.w400,
                       fontSize: 13,
                       color: palette.textMuted,
@@ -366,7 +369,8 @@ class _Header extends ConsumerWidget {
                   (p?.avatarUrl == null || (p?.avatarUrl ?? '').isEmpty)
                       ? Text(
                           _avatarInitial(p?.displayName),
-                          style: GoogleFonts.barlowCondensed(
+                          style: const TextStyle(
+                            fontFamily: AppFonts.barlowCondensed,
                             fontWeight: FontWeight.w700,
                             fontSize: 14,
                             color: Colors.white,
@@ -385,7 +389,8 @@ class _Header extends ConsumerWidget {
                   ? const SizedBox.shrink()
                   : Text(
                       _avatarInitial(null),
-                      style: GoogleFonts.barlowCondensed(
+                      style: const TextStyle(
+                        fontFamily: AppFonts.barlowCondensed,
                         fontWeight: FontWeight.w700,
                         fontSize: 14,
                         color: Colors.white,
@@ -399,7 +404,8 @@ class _Header extends ConsumerWidget {
               resolvedName,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.barlow(
+              style: TextStyle(
+                fontFamily: AppFonts.barlow,
                 fontWeight: FontWeight.w600,
                 fontSize: 15,
                 color: palette.textPrimary,
@@ -447,7 +453,8 @@ class _MessagesList extends StatelessWidget {
           child: Text(
             'Sin mensajes todavía. Escribí el primero abajo.', // i18n: Fase W2
             textAlign: TextAlign.center,
-            style: GoogleFonts.barlow(
+            style: TextStyle(
+              fontFamily: AppFonts.barlow,
               fontWeight: FontWeight.w400,
               fontSize: 13,
               color: palette.textMuted,
@@ -562,14 +569,16 @@ class _Composer extends StatelessWidget {
               textInputAction: TextInputAction.send,
               onSubmitted: (_) => onSend(),
               enabled: !sending,
-              style: GoogleFonts.barlow(
+              style: TextStyle(
+                fontFamily: AppFonts.barlow,
                 fontWeight: FontWeight.w400,
                 fontSize: 14,
                 color: palette.textPrimary,
               ),
               decoration: InputDecoration(
                 hintText: 'Escribí un mensaje…', // i18n: Fase W2
-                hintStyle: GoogleFonts.barlow(
+                hintStyle: TextStyle(
+                  fontFamily: AppFonts.barlow,
                   fontWeight: FontWeight.w400,
                   fontSize: 14,
                   color: palette.textMuted,
@@ -579,15 +588,15 @@ class _Composer extends StatelessWidget {
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
                   borderSide: BorderSide(color: palette.border),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
                   borderSide: BorderSide(color: palette.border),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
                   borderSide: BorderSide(color: palette.accent),
                 ),
               ),
@@ -607,7 +616,7 @@ class _Composer extends StatelessWidget {
                 color: sending
                     ? palette.accent.withValues(alpha: 0.5)
                     : palette.accent,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
               ),
               child: sending
                   ? SizedBox(

@@ -36,11 +36,12 @@ Estas son las que más fácil se olvidan o más fácil rompen el producto. Si el
 
 ### 2. Diseño (no negociable)
 
-- **Paleta default**: Mint Magenta (`accent #2CE5A2`, `highlight #C123E0`, `ink #0A0A0A`). Alterna: Electric Violet.
-- **Modo oscuro siempre**. No hay light theme.
+- **Paleta única**: Mint Magenta (`accent #2CE5A2`, `highlight #C123E0`, `ink #0A0A0A`). No hay alterna — Electric Violet fue dropeada antes del lanzamiento.
+- **Dos temas**: `AppPalette.mintMagenta` (dark) y `mintMagentaLight` (light). La app arranca en `ThemeMode.system` — el tema claro se sirve desde el primer arranque.
+- **Todo par de tokens donde `accent` sea FONDO se mide en las DOS paletas.** El mint es idéntico en ambas pero `bg` no: `palette.bg` sobre `accent` da 12.10:1 en dark y **1.57:1 en light**. Para texto sobre acento va `TreinoButtonTokens.foreground` (ink invariante), nunca `palette.bg`.
 - **Headings**: Barlow Condensed 700 UPPERCASE.
 - **Body**: Barlow 400/600/700.
-- **Spacing**: sólo `8 · 12 · 14 · 18 · 20` px. No 4/16/24.
+- **Spacing**: sólo `8 · 12 · 14 · 18 · 20` px para separar elementos. No 16/24. El 4 existe **sólo** como `AppSpacing.hairline`, para separaciones ópticas sub-8 y gutters internos de un componente del kit — nunca como padding de layout. Ver su dartdoc.
 - **Nunca** HEX literal en widgets — usar `AppPalette.of(context).accent`.
 - **Nunca** PhosphorIcons directo — usar `TreinoIcon.X`.
 
@@ -64,15 +65,14 @@ Si el usuario pide alguno → **frená y confirmá**.
 
 **Rankings SÍ está en scope** y ya está implementado: ranking por gym, opt-in
 explícito del atleta (rachas / volumen / main lifts). Vive en la 2da página
-swipeable del tab **Feed** (`/feed?tab=rankings`), detrás del pill
-`[FEED | RANKINGS]` — `feed_screen.dart`, `_AthleteFeed`. Estuvo en Entrenar
-hasta rankings-v2; `/workout?tab=rankings` y `/profile/rankings` hoy son
-redirects legacy (`router.dart`). No lo confundas con "Gamificación" de la lista
-de arriba. → Detalle en [docs/product.md](./docs/product.md).
+swipeable del tab **Feed** (`/feed?tab=rankings`). `/workout?tab=rankings` y
+`/profile/rankings` son hosts anteriores y redirigen ahí — no los borres, hay
+bookmarks y notificaciones vivas apuntándoles. No lo confundas con
+"Gamificación" de la lista de arriba. → Detalle en [docs/product.md](./docs/product.md).
 
 ### 5. Tab bar (5 tabs, Inicio al medio)
 
-`Entrenar · Feed · Inicio · Coach · Perfil`. Discovery de PFs vive **sólo** en la tab Coach — la tab Feed no vende nada ni lista entrenadores. "Social" describe qué NO va en Feed (marketplace), no que sea una sola página: Feed tiene dos, `[FEED | RANKINGS]` (ver §4).
+`Entrenar · Feed · Inicio · Coach · Perfil`. Discovery de PFs vive **sólo** en la tab Coach. Feed es 100% social.
 
 ### 6. Performance (cero rebuilds innecesarios)
 

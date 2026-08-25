@@ -8,6 +8,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../../app/theme/app_motion.dart';
 import '../../../../../app/theme/app_palette.dart';
@@ -212,15 +213,15 @@ class _BatchCobrarDialogState extends ConsumerState<BatchCobrarDialog> {
           filled: true,
           fillColor: palette.bg,
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
             borderSide: BorderSide(color: palette.border),
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
             borderSide: BorderSide(color: palette.border),
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
             borderSide: BorderSide(color: palette.accent, width: 1.5),
           ),
         );
@@ -240,7 +241,8 @@ class _BatchCobrarDialogState extends ConsumerState<BatchCobrarDialog> {
 
     return AlertDialog(
       backgroundColor: palette.bgCard,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg)),
       titlePadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
       contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
       actionsPadding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
@@ -309,7 +311,7 @@ class _BatchCobrarDialogState extends ConsumerState<BatchCobrarDialog> {
                       const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                   decoration: BoxDecoration(
                     color: palette.bg,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
                     border: Border.all(color: palette.border),
                   ),
                   child: Row(
@@ -392,7 +394,7 @@ class _BatchCobrarDialogState extends ConsumerState<BatchCobrarDialog> {
           onPressed: _billing ? null : _confirm,
           style: ElevatedButton.styleFrom(
             backgroundColor: palette.accent,
-            foregroundColor: palette.bg,
+            foregroundColor: TreinoButtonTokens.foreground(context),
             shape: const StadiumBorder(),
             disabledBackgroundColor: palette.accent.withValues(alpha: 0.3),
           ),
@@ -402,7 +404,7 @@ class _BatchCobrarDialogState extends ConsumerState<BatchCobrarDialog> {
                   height: 18,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: palette.bg,
+                    color: TreinoButtonTokens.foreground(context),
                   ),
                 )
               : Text(

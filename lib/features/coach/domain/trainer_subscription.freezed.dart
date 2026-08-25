@@ -26,7 +26,11 @@ mixin _$TrainerSubscription {
       throw _privateConstructorUsedError; // Límite de peso ponderado cacheado (denormalizado) — el CF lo escribe
 // junto con `tier` para que UI/rules lean sin lookup. Nunca confiar en
 // un valor client-provisto (rules lo pinnea CF-write-only).
-  int get weightLimit => throw _privateConstructorUsedError;
+//
+// `null` = SIN LÍMITE (plan3). Ojo: null acá es un valor legítimo, no
+// una ausencia — no lo colapses con `?? algo` o el plan más caro pasa a
+// valer menos que el más barato.
+  int? get weightLimit => throw _privateConstructorUsedError;
   @TimestampConverter()
   DateTime? get currentPeriodEnd => throw _privateConstructorUsedError;
   @TimestampConverter()
@@ -56,7 +60,7 @@ abstract class $TrainerSubscriptionCopyWith<$Res> {
       {SubscriptionTier tier,
       SubscriptionStatus status,
       SubscriptionCycle? cycle,
-      int weightLimit,
+      int? weightLimit,
       @TimestampConverter() DateTime? currentPeriodEnd,
       @TimestampConverter() DateTime? graceUntil,
       String? mpPreapprovalId,
@@ -82,7 +86,7 @@ class _$TrainerSubscriptionCopyWithImpl<$Res, $Val extends TrainerSubscription>
     Object? tier = null,
     Object? status = null,
     Object? cycle = freezed,
-    Object? weightLimit = null,
+    Object? weightLimit = freezed,
     Object? currentPeriodEnd = freezed,
     Object? graceUntil = freezed,
     Object? mpPreapprovalId = freezed,
@@ -102,10 +106,10 @@ class _$TrainerSubscriptionCopyWithImpl<$Res, $Val extends TrainerSubscription>
           ? _value.cycle
           : cycle // ignore: cast_nullable_to_non_nullable
               as SubscriptionCycle?,
-      weightLimit: null == weightLimit
+      weightLimit: freezed == weightLimit
           ? _value.weightLimit
           : weightLimit // ignore: cast_nullable_to_non_nullable
-              as int,
+              as int?,
       currentPeriodEnd: freezed == currentPeriodEnd
           ? _value.currentPeriodEnd
           : currentPeriodEnd // ignore: cast_nullable_to_non_nullable
@@ -142,7 +146,7 @@ abstract class _$$TrainerSubscriptionImplCopyWith<$Res>
       {SubscriptionTier tier,
       SubscriptionStatus status,
       SubscriptionCycle? cycle,
-      int weightLimit,
+      int? weightLimit,
       @TimestampConverter() DateTime? currentPeriodEnd,
       @TimestampConverter() DateTime? graceUntil,
       String? mpPreapprovalId,
@@ -166,7 +170,7 @@ class __$$TrainerSubscriptionImplCopyWithImpl<$Res>
     Object? tier = null,
     Object? status = null,
     Object? cycle = freezed,
-    Object? weightLimit = null,
+    Object? weightLimit = freezed,
     Object? currentPeriodEnd = freezed,
     Object? graceUntil = freezed,
     Object? mpPreapprovalId = freezed,
@@ -186,10 +190,10 @@ class __$$TrainerSubscriptionImplCopyWithImpl<$Res>
           ? _value.cycle
           : cycle // ignore: cast_nullable_to_non_nullable
               as SubscriptionCycle?,
-      weightLimit: null == weightLimit
+      weightLimit: freezed == weightLimit
           ? _value.weightLimit
           : weightLimit // ignore: cast_nullable_to_non_nullable
-              as int,
+              as int?,
       currentPeriodEnd: freezed == currentPeriodEnd
           ? _value.currentPeriodEnd
           : currentPeriodEnd // ignore: cast_nullable_to_non_nullable
@@ -221,7 +225,7 @@ class _$TrainerSubscriptionImpl implements _TrainerSubscription {
       {required this.tier,
       required this.status,
       this.cycle,
-      required this.weightLimit,
+      this.weightLimit,
       @TimestampConverter() this.currentPeriodEnd,
       @TimestampConverter() this.graceUntil,
       this.mpPreapprovalId,
@@ -240,8 +244,12 @@ class _$TrainerSubscriptionImpl implements _TrainerSubscription {
 // Límite de peso ponderado cacheado (denormalizado) — el CF lo escribe
 // junto con `tier` para que UI/rules lean sin lookup. Nunca confiar en
 // un valor client-provisto (rules lo pinnea CF-write-only).
+//
+// `null` = SIN LÍMITE (plan3). Ojo: null acá es un valor legítimo, no
+// una ausencia — no lo colapses con `?? algo` o el plan más caro pasa a
+// valer menos que el más barato.
   @override
-  final int weightLimit;
+  final int? weightLimit;
   @override
   @TimestampConverter()
   final DateTime? currentPeriodEnd;
@@ -319,7 +327,7 @@ abstract class _TrainerSubscription implements TrainerSubscription {
       {required final SubscriptionTier tier,
       required final SubscriptionStatus status,
       final SubscriptionCycle? cycle,
-      required final int weightLimit,
+      final int? weightLimit,
       @TimestampConverter() final DateTime? currentPeriodEnd,
       @TimestampConverter() final DateTime? graceUntil,
       final String? mpPreapprovalId,
@@ -338,8 +346,12 @@ abstract class _TrainerSubscription implements TrainerSubscription {
       get cycle; // Límite de peso ponderado cacheado (denormalizado) — el CF lo escribe
 // junto con `tier` para que UI/rules lean sin lookup. Nunca confiar en
 // un valor client-provisto (rules lo pinnea CF-write-only).
+//
+// `null` = SIN LÍMITE (plan3). Ojo: null acá es un valor legítimo, no
+// una ausencia — no lo colapses con `?? algo` o el plan más caro pasa a
+// valer menos que el más barato.
   @override
-  int get weightLimit;
+  int? get weightLimit;
   @override
   @TimestampConverter()
   DateTime? get currentPeriodEnd;

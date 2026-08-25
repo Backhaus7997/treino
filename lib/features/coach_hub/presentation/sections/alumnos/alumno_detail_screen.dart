@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/core/utils/date_labels.dart';
@@ -19,6 +20,7 @@ import 'package:treino/features/coach/application/athlete_file_providers.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/application/athlete_note_providers.dart';
 import 'package:treino/features/coach/domain/appointment.dart';
+import 'package:treino/features/coach/domain/wall_clock.dart';
 import 'package:treino/features/coach/application/follow_up_entry_providers.dart';
 import 'package:treino/features/coach/application/nutrition_plan_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
@@ -74,6 +76,7 @@ import '../pagos/widgets/pagos_table.dart';
 import '../pagos/widgets/payment_format.dart';
 import 'alumnos_screen.dart' show AlumnoEstado, AlumnoEstadoX, estadoForLink;
 import 'resumen_metrics.dart';
+import 'package:treino/core/widgets/treino_segmented_pill.dart';
 
 /// Detalle del alumno (`/alumnos/:id`, Fase W2 PR2).
 ///
@@ -162,7 +165,7 @@ class AlumnoDetailScreen extends ConsumerWidget {
                   palette: palette,
                 ),
                 const SizedBox(height: 14),
-                _Tabs(palette: palette, labels: _tabs),
+                const TreinoSegmentedPill(labels: _tabs, scrollable: true),
               ],
             ),
           ),
@@ -261,7 +264,9 @@ class _Header extends StatelessWidget {
     // .toUtc() para compartir reloj con el pipeline de billing (monthKey/weekKey
     // de pagosPorCobrarProvider y las escrituras usan UTC); evita un desfase de
     // 1 día en el borde del período en AR (UTC-3).
-    final proxCobro = b == null ? null : nextDueDate(b, DateTime.now().toUtc());
+    // Bucket de MES en ART (#671): con UTC, "Prox. cobro" mostraba el mes
+    // siguiente al correcto.
+    final proxCobro = b == null ? null : nextDueDate(b, argentinaNow());
     // Mismo criterio determinístico que el chat (avatar_color.dart) y el
     // roster (alumnos_screen.dart): sin foto de red, círculo de color estable
     // seedeado por uid + inicial en blanco — evita que todos los alumnos sin
@@ -434,40 +439,6 @@ class _MetricChip extends StatelessWidget {
                   fontSize: 18,
                   fontWeight: FontWeight.w700)),
         ],
-      ),
-    );
-  }
-}
-
-class _Tabs extends StatelessWidget {
-  const _Tabs({required this.palette, required this.labels});
-  final AppPalette palette;
-  final List<String> labels;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: palette.border),
-      ),
-      child: TabBar(
-        isScrollable: true,
-        tabAlignment: TabAlignment.start,
-        dividerColor: Colors.transparent,
-        indicatorSize: TabBarIndicatorSize.tab,
-        indicator: BoxDecoration(
-          color: palette.accent,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        splashBorderRadius: BorderRadius.circular(20),
-        labelColor: palette.bg,
-        unselectedLabelColor: palette.textMuted,
-        labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-        unselectedLabelStyle: const TextStyle(fontSize: 13),
-        tabs: [for (final l in labels) Tab(text: l, height: 38)],
       ),
     );
   }
@@ -926,7 +897,7 @@ class _MetricCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: palette.bgCard,
           border: Border.all(color: palette.border),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1068,7 +1039,7 @@ class _NoteCard extends ConsumerWidget {
               decoration: BoxDecoration(
                 color: palette.bgCard,
                 border: Border.all(color: palette.border),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
               ),
               child: note == null || note.note.trim().isEmpty
                   ? Text(
@@ -1141,7 +1112,9 @@ class _ProxSesionCard extends ConsumerWidget {
     // day-truncada ESTABLE y filtramos el alumno en memoria: sin permission-denied
     // y sin índice nuevo.
     final trainerId = ref.watch(currentUidProvider) ?? '';
-    final now = DateTime.now().toUtc();
+    // Wall-clock ADR-7 (#671): con el instante UTC real, "Proxima sesion"
+    // descartaba los turnos de las proximas 3h.
+    final now = nowWall();
     final todayStart = DateTime.utc(now.year, now.month, now.day);
     final async = ref.watch(trainerAppointmentsStreamProvider(
       TrainerAppointmentsKey(
@@ -1189,7 +1162,7 @@ class _ProxSesionCard extends ConsumerWidget {
               decoration: BoxDecoration(
                 color: palette.bgCard,
                 border: Border.all(color: palette.border),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
               ),
               child: next == null
                   ? Text(
@@ -1274,7 +1247,7 @@ class _UltimaSessionCard extends ConsumerWidget {
               decoration: BoxDecoration(
                 color: palette.bgCard,
                 border: Border.all(color: palette.border),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
               ),
               child: child,
             ),
@@ -1491,7 +1464,7 @@ class _AdherenciaHeatmap extends StatelessWidget {
       decoration: BoxDecoration(
         color: palette.bgCard,
         border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2054,7 +2027,7 @@ class _RutinaCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: palette.bgCard,
         border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2149,7 +2122,7 @@ class _HistorialTable extends StatelessWidget {
       decoration: BoxDecoration(
         color: palette.bgCard,
         border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Column(
         children: [
@@ -2569,7 +2542,7 @@ class _NotasPrivadasTabState extends ConsumerState<_NotasPrivadasTab> {
                   // the ClipRRect ancestor.
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
                       border: Border.all(color: palette.border),
                     ),
                     child: ClipRRect(
@@ -2621,7 +2594,7 @@ class _NotasPrivadasTabState extends ConsumerState<_NotasPrivadasTab> {
                         : () => _save(trainerUid),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: palette.accent,
-                      foregroundColor: palette.bg,
+                      foregroundColor: TreinoButtonTokens.foreground(context),
                       disabledBackgroundColor:
                           palette.accent.withValues(alpha: 0.3),
                       padding: const EdgeInsets.symmetric(
@@ -2634,7 +2607,7 @@ class _NotasPrivadasTabState extends ConsumerState<_NotasPrivadasTab> {
                             height: 16,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: palette.bg,
+                              color: TreinoButtonTokens.foreground(context),
                             ),
                           )
                         : Text(
@@ -2768,7 +2741,7 @@ class _SessionStatusPill extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(9999),
+        borderRadius: BorderRadius.circular(AppRadius.full),
         border: Border.all(color: color.withValues(alpha: 0.5), width: 1),
       ),
       child: Text(
@@ -2969,7 +2942,7 @@ class _ArchivosTabState extends ConsumerState<_ArchivosTab> {
                 label: Text(l10n.coachHubAlumnoDetailArchivosUploadButton),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: palette.accent,
-                  foregroundColor: palette.bg,
+                  foregroundColor: TreinoButtonTokens.foreground(context),
                   disabledBackgroundColor:
                       palette.accent.withValues(alpha: 0.3),
                   padding:
@@ -3338,7 +3311,7 @@ class _MedicionesTabState extends ConsumerState<_MedicionesTab> {
                     : 'NUEVA PRUEBA'), // i18n: Fase W2
                 style: ElevatedButton.styleFrom(
                   backgroundColor: palette.accent,
-                  foregroundColor: palette.bg,
+                  foregroundColor: TreinoButtonTokens.foreground(context),
                   padding:
                       const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                   shape: const StadiumBorder(),
@@ -4224,7 +4197,7 @@ class _NuevaMedicionDialogState extends ConsumerState<_NuevaMedicionDialog> {
                     onPressed: _saving ? null : _save,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: palette.accent,
-                      foregroundColor: palette.bg,
+                      foregroundColor: TreinoButtonTokens.foreground(context),
                       padding: const EdgeInsets.symmetric(
                           horizontal: 20, vertical: 12),
                       shape: const StadiumBorder(),
@@ -4235,7 +4208,7 @@ class _NuevaMedicionDialogState extends ConsumerState<_NuevaMedicionDialog> {
                             height: 14,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: palette.bg,
+                              color: TreinoButtonTokens.foreground(context),
                             ),
                           )
                         : const Text('GUARDAR'), // i18n: Fase W2
@@ -5010,7 +4983,7 @@ class _NuevoRendimientoDialogState
                     onPressed: _saving ? null : _save,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: palette.accent,
-                      foregroundColor: palette.bg,
+                      foregroundColor: TreinoButtonTokens.foreground(context),
                       padding: const EdgeInsets.symmetric(
                           horizontal: 20, vertical: 12),
                       shape: const StadiumBorder(),
@@ -5021,7 +4994,7 @@ class _NuevoRendimientoDialogState
                             height: 14,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: palette.bg,
+                              color: TreinoButtonTokens.foreground(context),
                             ),
                           )
                         : const Text('GUARDAR'), // i18n: Fase W2
@@ -5149,7 +5122,7 @@ class _SeguimientoTabState extends ConsumerState<_SeguimientoTab> {
                 label: const Text('NUEVA ENTRADA'), // i18n: Fase W2
                 style: ElevatedButton.styleFrom(
                   backgroundColor: palette.accent,
-                  foregroundColor: palette.bg,
+                  foregroundColor: TreinoButtonTokens.foreground(context),
                   padding:
                       const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                   shape: const StadiumBorder(),
@@ -5311,7 +5284,7 @@ class _TagChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(9999),
+        borderRadius: BorderRadius.circular(AppRadius.full),
         border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
       child: Text(
@@ -5509,7 +5482,7 @@ class _NuevaEntradaSeguimientoDialogState
                       onPressed: _saving ? null : _save,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: palette.accent,
-                        foregroundColor: palette.bg,
+                        foregroundColor: TreinoButtonTokens.foreground(context),
                         padding: const EdgeInsets.symmetric(
                             horizontal: 20, vertical: 12),
                         shape: const StadiumBorder(),
@@ -5520,7 +5493,7 @@ class _NuevaEntradaSeguimientoDialogState
                               height: 14,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: palette.bg,
+                                color: TreinoButtonTokens.foreground(context),
                               ),
                             )
                           : const Text('GUARDAR'), // i18n: Fase W2
@@ -5744,7 +5717,7 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
                   onPressed: _saving ? null : _save,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: palette.accent,
-                    foregroundColor: palette.bg,
+                    foregroundColor: TreinoButtonTokens.foreground(context),
                     padding: const EdgeInsets.symmetric(
                         horizontal: 20, vertical: 12),
                     shape: const StadiumBorder(),
@@ -5755,7 +5728,7 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
                           height: 14,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: palette.bg,
+                            color: TreinoButtonTokens.foreground(context),
                           ),
                         )
                       : const Text('GUARDAR PLAN'), // i18n: Fase W2
@@ -6124,7 +6097,7 @@ class _SelectionModeSelector extends StatelessWidget {
           color: active
               ? palette.accent.withValues(alpha: 0.18)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(9999),
+          borderRadius: BorderRadius.circular(AppRadius.full),
           border: Border.all(
             color: active ? palette.accent : palette.border,
           ),

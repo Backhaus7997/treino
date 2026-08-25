@@ -657,6 +657,45 @@ void main() {
         expect(
             find.byKey(const Key('rankings_section_streak')), findsOneWidget);
       });
+
+      // ──────────────────────────────────────────────────────────────────
+      // #642 — the CTA must not read as the app re-selling an opt-in feature
+      // to the athlete who already declined it. It was a 56pt edge-to-edge
+      // accent slab; it is now a compact button. Asserting the geometry (not
+      // just the styling) is what stops a future refactor from quietly
+      // restoring `width: double.infinity`.
+      // ──────────────────────────────────────────────────────────────────
+      testWidgets('the CTA is compact, not full-bleed (#642)', (tester) async {
+        await tester.pumpWidget(_buildScreen(overrides: [
+          ...baseOverrides(rankingOptIn: false),
+          rankingOptInControllerProvider
+              .overrideWithValue(_FakeRankingOptInController()),
+        ]));
+        await tester.pumpAndSettle();
+
+        final ctaWidth = tester.getSize(find.byType(ElevatedButton)).width;
+        final surfaceWidth = tester.getSize(find.byType(MaterialApp)).width;
+
+        // Comfortably narrower than the surface: the old full-bleed button
+        // spanned it minus the state's own 20pt horizontal padding.
+        expect(ctaWidth, lessThan(surfaceWidth - 40));
+      });
+
+      testWidgets('the CTA keeps a 44pt tap target (#642)', (tester) async {
+        await tester.pumpWidget(_buildScreen(overrides: [
+          ...baseOverrides(rankingOptIn: false),
+          rankingOptInControllerProvider
+              .overrideWithValue(_FakeRankingOptInController()),
+        ]));
+        await tester.pumpAndSettle();
+
+        // Shrinking prominence must not shrink reachability below the HIG
+        // floor — issue #646 already reports these controls go unnoticed.
+        expect(
+          tester.getSize(find.byType(ElevatedButton)).height,
+          greaterThanOrEqualTo(44.0),
+        );
+      });
     });
   });
 

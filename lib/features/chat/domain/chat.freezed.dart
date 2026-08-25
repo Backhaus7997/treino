@@ -41,6 +41,18 @@ mixin _$Chat {
   /// y el pin de inmutabilidad en `chats/update`; acá sólo se lee.
   String? get linkId => throw _privateConstructorUsedError;
 
+  /// Naturaleza del chat cuando NO lo respalda un vínculo formal.
+  ///
+  /// Hoy el único valor es `'inquiry'`: la PRE-CONSULTA de #637, que un
+  /// atleta abre desde el perfil público de un PF para preguntar antes de
+  /// comprometerse. Un chat social no lleva el campo.
+  ///
+  /// Espeja la tercera rama de `chatCreateOk`: las rules escapan por
+  /// `kind == 'inquiry'` en `senderMayPost`/`chatWriterOk` igual que por
+  /// `linkId`, y lo tienen pineado inmutable en `chats/update`. Acá sólo se
+  /// lee — la validez la garantiza el servidor al crear el doc.
+  String? get kind => throw _privateConstructorUsedError;
+
   /// Serializes this Chat to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
 
@@ -63,7 +75,8 @@ abstract class $ChatCopyWith<$Res> {
       String? lastMessageText,
       String? lastMessageSenderId,
       @TimestampMapConverter() Map<String, DateTime>? lastRead,
-      String? linkId});
+      String? linkId,
+      String? kind});
 }
 
 /// @nodoc
@@ -89,6 +102,7 @@ class _$ChatCopyWithImpl<$Res, $Val extends Chat>
     Object? lastMessageSenderId = freezed,
     Object? lastRead = freezed,
     Object? linkId = freezed,
+    Object? kind = freezed,
   }) {
     return _then(_value.copyWith(
       chatId: null == chatId
@@ -123,6 +137,10 @@ class _$ChatCopyWithImpl<$Res, $Val extends Chat>
           ? _value.linkId
           : linkId // ignore: cast_nullable_to_non_nullable
               as String?,
+      kind: freezed == kind
+          ? _value.kind
+          : kind // ignore: cast_nullable_to_non_nullable
+              as String?,
     ) as $Val);
   }
 }
@@ -142,7 +160,8 @@ abstract class _$$ChatImplCopyWith<$Res> implements $ChatCopyWith<$Res> {
       String? lastMessageText,
       String? lastMessageSenderId,
       @TimestampMapConverter() Map<String, DateTime>? lastRead,
-      String? linkId});
+      String? linkId,
+      String? kind});
 }
 
 /// @nodoc
@@ -165,6 +184,7 @@ class __$$ChatImplCopyWithImpl<$Res>
     Object? lastMessageSenderId = freezed,
     Object? lastRead = freezed,
     Object? linkId = freezed,
+    Object? kind = freezed,
   }) {
     return _then(_$ChatImpl(
       chatId: null == chatId
@@ -199,13 +219,17 @@ class __$$ChatImplCopyWithImpl<$Res>
           ? _value.linkId
           : linkId // ignore: cast_nullable_to_non_nullable
               as String?,
+      kind: freezed == kind
+          ? _value.kind
+          : kind // ignore: cast_nullable_to_non_nullable
+              as String?,
     ));
   }
 }
 
 /// @nodoc
 @JsonSerializable()
-class _$ChatImpl implements _Chat {
+class _$ChatImpl extends _Chat {
   const _$ChatImpl(
       {required this.chatId,
       required final List<String> members,
@@ -214,9 +238,11 @@ class _$ChatImpl implements _Chat {
       this.lastMessageText,
       this.lastMessageSenderId,
       @TimestampMapConverter() final Map<String, DateTime>? lastRead,
-      this.linkId})
+      this.linkId,
+      this.kind})
       : _members = members,
-        _lastRead = lastRead;
+        _lastRead = lastRead,
+        super._();
 
   factory _$ChatImpl.fromJson(Map<String, dynamic> json) =>
       _$$ChatImplFromJson(json);
@@ -263,9 +289,22 @@ class _$ChatImpl implements _Chat {
   @override
   final String? linkId;
 
+  /// Naturaleza del chat cuando NO lo respalda un vínculo formal.
+  ///
+  /// Hoy el único valor es `'inquiry'`: la PRE-CONSULTA de #637, que un
+  /// atleta abre desde el perfil público de un PF para preguntar antes de
+  /// comprometerse. Un chat social no lleva el campo.
+  ///
+  /// Espeja la tercera rama de `chatCreateOk`: las rules escapan por
+  /// `kind == 'inquiry'` en `senderMayPost`/`chatWriterOk` igual que por
+  /// `linkId`, y lo tienen pineado inmutable en `chats/update`. Acá sólo se
+  /// lee — la validez la garantiza el servidor al crear el doc.
+  @override
+  final String? kind;
+
   @override
   String toString() {
-    return 'Chat(chatId: $chatId, members: $members, createdAt: $createdAt, lastMessageAt: $lastMessageAt, lastMessageText: $lastMessageText, lastMessageSenderId: $lastMessageSenderId, lastRead: $lastRead, linkId: $linkId)';
+    return 'Chat(chatId: $chatId, members: $members, createdAt: $createdAt, lastMessageAt: $lastMessageAt, lastMessageText: $lastMessageText, lastMessageSenderId: $lastMessageSenderId, lastRead: $lastRead, linkId: $linkId, kind: $kind)';
   }
 
   @override
@@ -284,7 +323,8 @@ class _$ChatImpl implements _Chat {
             (identical(other.lastMessageSenderId, lastMessageSenderId) ||
                 other.lastMessageSenderId == lastMessageSenderId) &&
             const DeepCollectionEquality().equals(other._lastRead, _lastRead) &&
-            (identical(other.linkId, linkId) || other.linkId == linkId));
+            (identical(other.linkId, linkId) || other.linkId == linkId) &&
+            (identical(other.kind, kind) || other.kind == kind));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -298,7 +338,8 @@ class _$ChatImpl implements _Chat {
       lastMessageText,
       lastMessageSenderId,
       const DeepCollectionEquality().hash(_lastRead),
-      linkId);
+      linkId,
+      kind);
 
   /// Create a copy of Chat
   /// with the given fields replaced by the non-null parameter values.
@@ -316,7 +357,7 @@ class _$ChatImpl implements _Chat {
   }
 }
 
-abstract class _Chat implements Chat {
+abstract class _Chat extends Chat {
   const factory _Chat(
       {required final String chatId,
       required final List<String> members,
@@ -325,7 +366,9 @@ abstract class _Chat implements Chat {
       final String? lastMessageText,
       final String? lastMessageSenderId,
       @TimestampMapConverter() final Map<String, DateTime>? lastRead,
-      final String? linkId}) = _$ChatImpl;
+      final String? linkId,
+      final String? kind}) = _$ChatImpl;
+  const _Chat._() : super._();
 
   factory _Chat.fromJson(Map<String, dynamic> json) = _$ChatImpl.fromJson;
 
@@ -357,6 +400,19 @@ abstract class _Chat implements Chat {
   /// y el pin de inmutabilidad en `chats/update`; acá sólo se lee.
   @override
   String? get linkId;
+
+  /// Naturaleza del chat cuando NO lo respalda un vínculo formal.
+  ///
+  /// Hoy el único valor es `'inquiry'`: la PRE-CONSULTA de #637, que un
+  /// atleta abre desde el perfil público de un PF para preguntar antes de
+  /// comprometerse. Un chat social no lleva el campo.
+  ///
+  /// Espeja la tercera rama de `chatCreateOk`: las rules escapan por
+  /// `kind == 'inquiry'` en `senderMayPost`/`chatWriterOk` igual que por
+  /// `linkId`, y lo tienen pineado inmutable en `chats/update`. Acá sólo se
+  /// lee — la validez la garantiza el servidor al crear el doc.
+  @override
+  String? get kind;
 
   /// Create a copy of Chat
   /// with the given fields replaced by the non-null parameter values.

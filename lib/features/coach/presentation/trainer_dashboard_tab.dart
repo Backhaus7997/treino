@@ -1,13 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../../core/utils/appointment_window.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../coach_hub/presentation/sections/facturacion_planes/plan_limit_paywall.dart';
 import '../../coach_hub/presentation/sections/pagos/widgets/thousands_input_formatter.dart';
 import '../../payments/application/pagos_por_cobrar_provider.dart';
 import '../../payments/application/payment_providers.dart';
@@ -23,6 +27,7 @@ import '../application/follow_up_entry_providers.dart';
 import '../application/recent_activity_provider.dart';
 import '../application/trained_today_provider.dart';
 import '../application/trainer_link_providers.dart';
+import '../data/trainer_link_promotion_service.dart';
 import '../domain/appointment.dart';
 import '../domain/follow_up_entry.dart' show FollowUpTag;
 import '../domain/wall_clock.dart';
@@ -300,7 +305,7 @@ class _BellWithBadge extends StatelessWidget {
                     ),
                     decoration: BoxDecoration(
                       color: palette.accent,
-                      borderRadius: BorderRadius.circular(9999),
+                      borderRadius: BorderRadius.circular(AppRadius.full),
                       border: Border.all(color: palette.bg, width: 1),
                     ),
                     child: Text(
@@ -308,7 +313,7 @@ class _BellWithBadge extends StatelessWidget {
                       style: GoogleFonts.barlowCondensed(
                         fontWeight: FontWeight.w700,
                         fontSize: 10,
-                        color: palette.bg,
+                        color: TreinoButtonTokens.foreground(context),
                       ),
                     ),
                   ),
@@ -419,14 +424,40 @@ class _PendingRequestCardState extends ConsumerState<_PendingRequestCard> {
   Future<void> _accept() async {
     if (_busy) return;
     setState(() => _busy = true);
+    final l10n = AppL10n.of(context);
     try {
-      await ref.read(trainerLinkRepositoryProvider).accept(widget.link.id);
+      await ref
+          .read(trainerLinkPromotionServiceProvider)
+          .accept(widget.link.id);
       ref
           .read(analyticsServiceProvider)
           .logLinkAccepted(linkId: widget.link.id);
-    } catch (_) {
+    } on LinkPromotionFailure$PlanLimitReached catch (failure) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      unawaited(
+        showPlanLimitPaywall(
+          context,
+          currentTier: failure.tier,
+          reason: failure.reason == 'subscription-inactive'
+              ? PlanLimitReason.subscriptionInactive
+              : PlanLimitReason.planLimit,
+        ),
+      );
+    } on LinkPromotionFailure$PromotionPrecondition {
       if (mounted) setState(() => _busy = false);
-      _showError('No pudimos aceptar la solicitud. Probá de nuevo.');
+      _showError(l10n.coachHubDashboardAcceptPrecondition);
+    } on LinkPromotionFailure catch (_) {
+      if (mounted) setState(() => _busy = false);
+      _showError(l10n.coachHubDashboardAcceptUnavailable);
+    } catch (_) {
+      // QA H5: el catch-all NO se puede angostar a LinkPromotionFailure. Lo
+      // que no sea de esa jerarquia (un bug del servicio, un error de
+      // plataforma) escaparia dejando _busy en true para siempre: boton
+      // muerto, sin feedback, y el PF creyendo que acepto cuando no paso
+      // nada. Es exactamente el bug que este metodo ya tuvo una vez.
+      if (mounted) setState(() => _busy = false);
+      _showError(l10n.coachHubDashboardAcceptUnavailable);
     }
   }
 
@@ -445,7 +476,7 @@ class _PendingRequestCardState extends ConsumerState<_PendingRequestCard> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: palette.border, width: 1),
       ),
       child: Column(
@@ -479,7 +510,7 @@ class _PendingRequestCardState extends ConsumerState<_PendingRequestCard> {
                     foregroundColor: palette.highlight,
                     minimumSize: const Size.fromHeight(40),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(9999),
+                      borderRadius: BorderRadius.circular(AppRadius.full),
                     ),
                   ),
                   child: Text(
@@ -498,10 +529,10 @@ class _PendingRequestCardState extends ConsumerState<_PendingRequestCard> {
                   onPressed: _busy ? null : _accept,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: palette.accent,
-                    foregroundColor: palette.bg,
+                    foregroundColor: TreinoButtonTokens.foreground(context),
                     minimumSize: const Size.fromHeight(40),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(9999),
+                      borderRadius: BorderRadius.circular(AppRadius.full),
                     ),
                   ),
                   child: Text(
@@ -546,7 +577,7 @@ void _showDejarFeedbackSheet(BuildContext context) {
     backgroundColor: palette.bgCard,
     isScrollControlled: true,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
     ),
     builder: (_) => const _DejarFeedbackSheet(),
   );
@@ -720,7 +751,7 @@ class _DejarFeedbackSheetState extends ConsumerState<_DejarFeedbackSheet> {
                       _saving || _controller.text.trim().isEmpty ? null : _save,
                   style: FilledButton.styleFrom(
                     backgroundColor: palette.accent,
-                    foregroundColor: palette.bg,
+                    foregroundColor: TreinoButtonTokens.foreground(context),
                     minimumSize: const Size.fromHeight(48),
                     shape: const StadiumBorder(),
                   ),
@@ -730,7 +761,7 @@ class _DejarFeedbackSheetState extends ConsumerState<_DejarFeedbackSheet> {
                           height: 18,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: palette.bg,
+                            color: TreinoButtonTokens.foreground(context),
                           ),
                         )
                       : Text(
@@ -880,7 +911,7 @@ void _showPendingRequestsSheet(BuildContext context) {
     backgroundColor: palette.bgCard,
     isScrollControlled: true,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
     ),
     builder: (_) => const _PendingRequestsSheet(),
   );
@@ -1071,7 +1102,7 @@ class _ResumenDelDiaCard extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: palette.border, width: 1),
       ),
       child: Column(
@@ -1297,7 +1328,7 @@ class _ProximasSesionesList extends ConsumerWidget {
         return Container(
           decoration: BoxDecoration(
             color: palette.bgCard,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppRadius.md),
             border: Border.all(color: palette.border, width: 1),
           ),
           child: Column(
@@ -1345,14 +1376,15 @@ class _ProximaSesionRow extends ConsumerWidget {
         backgroundColor: AppPalette.of(context).bgCard,
         isScrollControlled: true,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
         ),
         builder: (_) => AppointmentDetailSheet(
           appointment: appointment,
           trainerId: ref.watch(currentUidProvider) ?? '',
         ),
       ),
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(AppRadius.md),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         child: Row(
@@ -1440,7 +1472,7 @@ class _EntrenaronHoyList extends ConsumerWidget {
     return Container(
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: palette.border, width: 1),
       ),
       child: Column(
@@ -1479,7 +1511,7 @@ class _EntrenaronHoyRow extends ConsumerWidget {
 
     return InkWell(
       onTap: () => context.push('/coach/athlete/${entry.athleteId}'),
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(AppRadius.md),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         child: Row(
@@ -1568,7 +1600,7 @@ class _ActividadRecienteList extends ConsumerWidget {
     return Container(
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: palette.border, width: 1),
       ),
       child: Column(
@@ -1607,7 +1639,7 @@ class _ActividadRecienteRow extends ConsumerWidget {
 
     return InkWell(
       onTap: () => context.push('/coach/athlete/${entry.athleteId}'),
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(AppRadius.md),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         child: Row(
@@ -1682,7 +1714,8 @@ class _PagosPorCobrarSection extends ConsumerWidget {
         backgroundColor: palette.bgCard,
         isScrollControlled: true,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
         ),
         builder: (_) => _AddSueltoSheet(trainerId: trainerId),
       );
@@ -1737,7 +1770,7 @@ class _PagosPorCobrarList extends ConsumerWidget {
     return Container(
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: palette.border, width: 1),
       ),
       child: Column(
@@ -1943,7 +1976,7 @@ class _CobroPendienteRow extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: palette.accent.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(9999),
+                borderRadius: BorderRadius.circular(AppRadius.full),
               ),
               child: Text(
                 l10n.dashboardCobradoLabel,
@@ -2068,15 +2101,15 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
               filled: true,
               fillColor: palette.bg,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
                 borderSide: BorderSide(color: palette.border),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
                 borderSide: BorderSide(color: palette.border),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
                 borderSide: BorderSide(color: palette.accent, width: 1.5),
               ),
             ),
@@ -2104,15 +2137,15 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
               filled: true,
               fillColor: palette.bg,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
                 borderSide: BorderSide(color: palette.border),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
                 borderSide: BorderSide(color: palette.border),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
                 borderSide: BorderSide(color: palette.accent, width: 1.5),
               ),
             ),
@@ -2130,12 +2163,12 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
           const SizedBox(height: 8),
           InkWell(
             onTap: _pickDueDate,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               decoration: BoxDecoration(
                 color: palette.bg,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
                 border: Border.all(color: palette.border),
               ),
               child: Row(
@@ -2183,11 +2216,11 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
               onPressed: _saving || activeLinks.isEmpty ? null : _submit,
               style: ElevatedButton.styleFrom(
                 backgroundColor: palette.accent,
-                foregroundColor: palette.bg,
+                foregroundColor: TreinoButtonTokens.foreground(context),
                 disabledBackgroundColor: palette.border,
                 minimumSize: const Size.fromHeight(48),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(9999),
+                  borderRadius: BorderRadius.circular(AppRadius.full),
                 ),
               ),
               child: _saving
@@ -2195,7 +2228,7 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
-                        color: palette.bg,
+                        color: TreinoButtonTokens.foreground(context),
                         strokeWidth: 2,
                       ),
                     )
@@ -2349,15 +2382,15 @@ class _AthleteDropdown extends ConsumerWidget {
         filled: true,
         fillColor: palette.bg,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           borderSide: BorderSide(color: palette.border),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           borderSide: BorderSide(color: palette.border),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           borderSide: BorderSide(color: palette.accent, width: 1.5),
         ),
       ),
@@ -2393,7 +2426,7 @@ class _PlaceholderCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: palette.border, width: 1),
       ),
       child: Text(
@@ -2428,10 +2461,10 @@ class _BottomActions extends StatelessWidget {
         onPressed: () => context.go('/coach?tab=alumnos'),
         style: ElevatedButton.styleFrom(
           backgroundColor: palette.accent,
-          foregroundColor: palette.bg,
+          foregroundColor: TreinoButtonTokens.foreground(context),
           minimumSize: const Size.fromHeight(48),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(9999),
+            borderRadius: BorderRadius.circular(AppRadius.full),
           ),
         ),
         child: Text(

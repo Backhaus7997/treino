@@ -255,8 +255,19 @@ abstract final class AppSpacing {
 
   /// `4.0` — Micro-gap EXCEPCIONAL, fuera de la escala cerrada. Reservado a
   /// separaciones ópticas sub-8 entre elementos (ej. valor-a-label,
-  /// ícono-a-texto, título-a-subtítulo). Nunca usar para padding — el
-  /// padding siempre resuelve a un valor de la escala cerrada.
+  /// ícono-a-texto, título-a-subtítulo), y al gutter INTERNO de un componente
+  /// del kit cuando dos capas del mismo control se tocan (ej. contorno-a-thumb
+  /// en `TreinoSegmentedPill`).
+  ///
+  /// Nunca para padding de LAYOUT — la separación entre elementos de una
+  /// pantalla siempre resuelve a un valor de la escala cerrada. La distinción
+  /// es dueño: si el espacio es geometría interna de un componente, es
+  /// [hairline]; si separa cosas que el layout compone, es la escala.
+  ///
+  /// El caso del gutter se agregó con #646: la redacción anterior prohibía todo
+  /// padding, lo que dejaba a esa separación sin token válido y empujaba a los
+  /// componentes a escribir `4` crudo — que es justo lo que este token existe
+  /// para evitar.
   static const double hairline = 4.0;
 }
 

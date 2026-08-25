@@ -15,6 +15,7 @@ import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets
 import 'package:treino/features/feed/presentation/widgets/post_avatar.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/l10n/app_l10n.dart';
+import 'package:treino/core/utils/argentina_time.dart';
 
 class NutricionPlanRow extends ConsumerWidget {
   const NutricionPlanRow({super.key, required this.entry, this.onTap})
@@ -91,7 +92,12 @@ String _relativeTime(DateTime updatedAt) {
   if (delta.inHours < 1) return 'hace ${delta.inMinutes}m';
   if (delta.inDays < 1) return 'hace ${delta.inHours}h';
   if (delta.inDays < 7) return 'hace ${delta.inDays}d';
-  final d = updatedAt.day.toString().padLeft(2, '0');
-  final m = updatedAt.month.toString().padLeft(2, '0');
+  // El delta de arriba está bien: `difference` compara instantes reales, sin
+  // importar el flag UTC. Lo que estaba mal es esto: leer los campos crudos de
+  // un instante UTC muestra el día UTC, y una solicitud de las 22:30 ART cae
+  // en el día siguiente (#671). El día CALENDARIO se deriva en ART.
+  final art = toArgentina(updatedAt.toUtc());
+  final d = art.day.toString().padLeft(2, '0');
+  final m = art.month.toString().padLeft(2, '0');
   return '$d/$m';
 }

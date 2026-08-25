@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../core/widgets/treino_icon.dart';
-import '../../../profile/domain/experience_level.dart';
+import '../../../../l10n/app_l10n.dart';
 import '../../domain/routine.dart';
+import 'routine_meta.dart';
 
 /// Visual variant of [RoutineCard]. Used to alternate between mint (accent)
 /// and magenta (highlight) glow per the design mockup.
@@ -40,10 +42,15 @@ class RoutineCard extends StatelessWidget {
   /// single-column surfaces (feed, profile) keep their content-sized look.
   final bool reserveTitleLines;
 
-  /// Total exercises across all days. Computed inline (no [Routine.totalExercises]
-  /// getter — domain model is unchanged per ADR-D5).
-  int get _totalExercises =>
-      routine.days.fold(0, (sum, day) => sum + day.slots.length);
+  /// Metadata caption: level, days per week and estimated session length.
+  ///
+  /// Replaces the old `level · N ej.` line (#639). That exercise count summed
+  /// the slots of EVERY day, so a 5-day split read "30 ej." on a card the user
+  /// parses as one session — it was not just insufficient, it was wrong. What
+  /// the reader actually needs to choose a routine is how many days it asks of
+  /// them and how long a session runs; the exact per-day exercise and set
+  /// counts already live one tap away, on the detail screen's stat row.
+  ///
 
   @override
   Widget build(BuildContext context) {
@@ -82,9 +89,42 @@ class RoutineCard extends StatelessWidget {
       // clipped if the measured reservation is off by a sub-pixel.
       title = ConstrainedBox(
         constraints: BoxConstraints(
-          minHeight: _twoTitleLinesHeight(context, titleStyle, titleStrut!),
+          minHeight: _twoLinesHeight(context, titleStyle, titleStrut!),
         ),
         child: title,
+      );
+    }
+
+    // Metadata caption. Three segments no longer fit one line on a 2-up grid
+    // card, so it wraps to two — deliberately, because an ellipsis would eat
+    // the duration, which is the whole datum #639 adds.
+    final metaStyle = theme.textTheme.bodySmall?.copyWith(
+      color: palette.textMuted,
+    );
+    StrutStyle? metaStrut;
+    if (reserveTitleLines && !useAccessibleLayout) {
+      metaStrut = StrutStyle.fromTextStyle(
+        _effectiveStyle(context, metaStyle),
+        forceStrutHeight: true,
+      );
+    }
+    Widget meta = Text(
+      routineMetaSegments(routine, AppL10n.of(context)).join(' · '),
+      style: metaStyle,
+      strutStyle: metaStrut,
+      maxLines: useAccessibleLayout ? null : 2,
+      overflow:
+          useAccessibleLayout ? TextOverflow.visible : TextOverflow.ellipsis,
+    );
+    if (reserveTitleLines && !useAccessibleLayout) {
+      // Same reason the title reserves its lines: on a 2-up grid the caption
+      // wraps to one or two lines depending on the routine, and a card whose
+      // height tracks its own content de-aligns the row pair again (#402).
+      meta = ConstrainedBox(
+        constraints: BoxConstraints(
+          minHeight: _twoLinesHeight(context, metaStyle, metaStrut!),
+        ),
+        child: meta,
       );
     }
 
@@ -94,7 +134,7 @@ class RoutineCard extends StatelessWidget {
       height: 40,
       decoration: BoxDecoration(
         color: tint.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         border: Border.all(
           color: tint.withValues(alpha: 0.3),
           width: 1,
@@ -109,7 +149,7 @@ class RoutineCard extends StatelessWidget {
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
           color: palette.bgCard,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           border: Border.all(color: tint.withValues(alpha: 0.35), width: 1),
           boxShadow: [
             BoxShadow(
@@ -154,16 +194,7 @@ class RoutineCard extends StatelessWidget {
             const SizedBox(height: 12),
             title,
             const SizedBox(height: 8),
-            Text(
-              '${routine.level.displayNameEs} · $_totalExercises ej.',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: palette.textMuted,
-              ),
-              maxLines: useAccessibleLayout ? null : 1,
-              overflow: useAccessibleLayout
-                  ? TextOverflow.visible
-                  : TextOverflow.ellipsis,
-            ),
+            meta,
           ],
         ),
       ),
@@ -177,11 +208,11 @@ class RoutineCard extends StatelessWidget {
     return DefaultTextStyle.of(context).style.merge(style);
   }
 
-  /// Height of exactly two laid-out title lines (same effective style,
+  /// Height of exactly two laid-out lines (same effective style,
   /// textScaler and strut the real title uses), so the reserved block matches
   /// what a two-line title occupies. Single O(1) measure per build — unlike
   /// [IntrinsicHeight], it never re-runs a dry-layout over the card subtree.
-  static double _twoTitleLinesHeight(
+  static double _twoLinesHeight(
     BuildContext context,
     TextStyle? style,
     StrutStyle strut,

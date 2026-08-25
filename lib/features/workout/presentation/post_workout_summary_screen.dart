@@ -10,11 +10,11 @@ import '../../../core/utils/kg_format.dart';
 import '../../../core/widgets/motion/treino_confetti.dart';
 import '../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../core/widgets/motion/treino_success_check.dart';
-import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../checkins/application/check_in_providers.dart';
 import '../../checkins/domain/check_in.dart';
-import '../../checkins/presentation/post_session_check_in_sheet.dart';
+import '../../checkins/presentation/wellbeing_check_in_sheet.dart';
+import '../../checkins/presentation/widgets/wellbeing_mood_row.dart';
 import '../application/post_workout_notifier.dart';
 import '../application/session_highlights.dart';
 import '../application/session_muscle_distribution.dart';
@@ -391,11 +391,18 @@ class _CheckInSlot extends ConsumerWidget {
     // Fecha LOCAL: el que entrena a las 22:00 en Córdoba espera que cuente
     // para HOY, no para el día de UTC.
     final date = checkInDateKey(DateTime.now());
-    final existing = uid.isEmpty
-        ? null
-        : ref.watch(checkInByDateProvider((uid: uid, date: date))).valueOrNull;
+    // Sólo el check-in de ESTA sesión cuenta como "ya registrado". El de otro
+    // entreno del mismo día es otro registro y no se pisa: desde #643 el id del
+    // documento dejó de ser la fecha justamente para que convivan.
+    final dayCheckIns = uid.isEmpty
+        ? const <CheckIn>[]
+        : ref
+                .watch(checkInsForDateProvider((uid: uid, date: date)))
+                .valueOrNull ??
+            const <CheckIn>[];
+    final existing = checkInForSession(dayCheckIns, sessionId);
 
-    Future<void> open(CheckInFeeling? feeling) => showPostSessionCheckInSheet(
+    Future<void> open(CheckInFeeling? feeling) => showWellbeingCheckInSheet(
           context,
           sessionId: sessionId,
           initialFeeling: feeling,
@@ -419,18 +426,7 @@ class _CheckInSlot extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
           if (existing == null) ...[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                for (final feeling in CheckInFeeling.displayOrder)
-                  Flexible(
-                    child: _MoodEmoji(
-                      feeling: feeling,
-                      onTap: () => open(feeling),
-                    ),
-                  ),
-              ],
-            ),
+            WellbeingMoodScale(onSelect: open),
             const SizedBox(height: 8),
             Text(
               l10n.wellbeingCheckInOptional,
@@ -441,124 +437,11 @@ class _CheckInSlot extends ConsumerWidget {
               ),
             ),
           ] else
-            _CheckInRecorded(
+            WellbeingCheckInRecorded(
               checkIn: existing,
               onEdit: () => open(existing.feeling),
             ),
         ],
-      ),
-    );
-  }
-}
-
-/// Estado "ya registrado": el día tiene check-in y el sheet abre precargado.
-///
-/// El id del documento es la fecha, así que un segundo registro del mismo día
-/// PISA al anterior. Mostrarlo en vez de sobrescribir a ciegas es la
-/// diferencia entre un dedup y una pérdida de dato silenciosa.
-class _CheckInRecorded extends StatelessWidget {
-  const _CheckInRecorded({required this.checkIn, required this.onEdit});
-
-  final CheckIn checkIn;
-  final VoidCallback onEdit;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    final l10n = AppL10n.of(context);
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Flexible(
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              checkIn.feeling.emoji,
-              style: const TextStyle(
-                fontSize: 24,
-                fontFamilyFallback: ['Apple Color Emoji'],
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Flexible(
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              l10n.wellbeingSavedLabel,
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 16,
-                color: palette.accent,
-                letterSpacing: 1.2,
-              ),
-            ),
-          ),
-        ),
-        TextButton(
-          onPressed: onEdit,
-          child: Text(
-            l10n.wellbeingEditButton,
-            style: GoogleFonts.barlow(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: palette.textMuted,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _MoodEmoji extends StatelessWidget {
-  const _MoodEmoji({required this.feeling, required this.onTap});
-
-  final CheckInFeeling feeling;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: feelingLabel(AppL10n.of(context), feeling),
-      child: TreinoTappable(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-          child: _MoodGlyph(feeling.emoji),
-        ),
-      ),
-    );
-  }
-}
-
-/// Flexible + FittedBox por glifo: cuando un emoji mide más ancho de lo
-/// esperado (tofu .notdef, font scale grande) la fila escala en vez de
-/// desbordar (#456).
-class _MoodGlyph extends StatelessWidget {
-  const _MoodGlyph(this.emoji);
-
-  final String emoji;
-
-  @override
-  Widget build(BuildContext context) {
-    return ExcludeSemantics(
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Text(
-          emoji,
-          // #456: on the iOS simulator (iPhone 16e / iOS 26.3) these glyphs can
-          // render as tofu "?" — the theme's Barlow families carry no emoji and
-          // the automatic platform fallback doesn't kick in there (likely an
-          // engine/Impeller simulator issue). The explicit fallback pins the
-          // system emoji font; physical-device verification is still pending.
-          style: const TextStyle(
-            fontSize: 28,
-            fontFamilyFallback: ['Apple Color Emoji'],
-          ),
-        ),
       ),
     );
   }

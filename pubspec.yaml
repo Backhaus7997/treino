@@ -1,7 +1,7 @@
 name: treino
 description: "TREINO — fitness app multiplataforma."
 publish_to: 'none'
-version: 0.1.0+14
+version: 0.1.0+16
 
 environment:
   sdk: ^3.5.0
@@ -21,7 +21,7 @@ dependencies:
   firebase_analytics: ^11.3.3
   firebase_app_check: ^0.3.2
   image_picker: ^1.1.2
-  image_cropper: ^9.0.0
+  image_cropper: ^12.2.1
   flutter_riverpod: ^2.5.1
   go_router: ^14.2.0
   google_fonts: ^6.2.1
@@ -40,7 +40,7 @@ dependencies:
   sign_in_with_apple: ^7.0.1
   crypto: ^3.0.3
   characters: ^1.3.0
-  geolocator: ^13.0.0
+  geolocator: ^14.0.2
   http: ^1.2.2
   table_calendar: ^3.2.0
   flutter_map: ^7.0.2
@@ -60,9 +60,25 @@ dependencies:
   shared_preferences: ^2.3.0
   fl_chart: ^1.2.0
   firebase_messaging: ^15.0.0
+  # Companion de Apple Watch (change watch-standalone-client). Su rol es
+  # ACOTADO: entregarle al reloj el refresh token UNA vez, en el pairing.
+  # No es el puente de datos — el reloj habla Firestore por su REST API y
+  # renueva credencial contra securetoken.googleapis.com, todo por HTTP y
+  # sin SDK de Firebase (Locked Decision #9). Firebase en watchOS es
+  # community-supported y Firestore ni figura entre sus productos.
+  # Android/Wear OS NO está soportado en v1: el paquete cubre ambos lados,
+  # pero exige que reloj y teléfono compartan clave de firma, y la firma de
+  # release de Android sigue en debug keys (android/app/build.gradle).
+  watch_connectivity: ^0.2.8
 
 dev_dependencies:
   flutter_test:
+    sdk: flutter
+  # Driver de los tests de `integration_test/` (flujos end-to-end sobre un
+  # dispositivo o emulador real, vía `flutter test integration_test`). Faltaba
+  # declararlo, así que los 5 archivos de esa carpeta no resolvían el import y
+  # `flutter analyze` tiraba 15 issues sobre código que en realidad está bien.
+  integration_test:
     sdk: flutter
   flutter_lints: ^4.0.0
   build_runner: ^2.4.13

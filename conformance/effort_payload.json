@@ -1,0 +1,133 @@
+{
+  "rule": "effort-payload",
+  "source_of_truth": "lib/features/watch/domain/watch_effort.dart",
+  "description": "El diccionario que el reloj le manda al teléfono mientras el atleta entrena: pulso, calorías y el cronómetro de un ejercicio POR TIEMPO. Lo ESCRIBE `EffortSnapshot.context(measuredAt:)` en Swift y lo LEE `WatchEffort.tryParse` en Dart. `given` es lo que el reloj está midiendo; `expect` es el diccionario exacto que tiene que viajar.",
+  "why_this_exists": "Este payload se autodeclaraba contrato —`EffortBroadcastRules.swift` dice textual «⚠️ Es un contrato con el lado Dart»— y no tenía ninguno. Las claves estaban afirmadas DOS veces contra literales escritos a mano: en `ios/watch_tests/main.swift` de un lado y en `test/features/watch/application/watch_effort_notifier_test.dart` del otro. Dos copias del mismo contrato pueden divergir sin poner nada en rojo, que es exactamente la situación contra la que existe `conformance/`. La deuda se cobró al agregar `timerSetNumber`: sin este archivo, agregar una clave de un lado y olvidarla del otro deja al teléfono sin poder ubicar la serie, en silencio.",
+  "inputs": {
+    "bpm": "Pulsaciones, o null si el reloj todavía no midió o el atleta negó el permiso — indistinguibles entre sí, medido en F0.",
+    "kcal": "Calorías activas acumuladas, o null.",
+    "measuredAtMs": "Cuándo lo midió EL RELOJ, en ms desde epoch UTC. No cuándo llegó al teléfono.",
+    "timer": "El ejercicio por tiempo corriendo, o null. Lleva exerciseId, setNumber, totalSeconds y endsAtMs.",
+    "note": "Los ms van en epoch ABSOLUTO por lo mismo que en `duration_timer.json`: rondan 1,8e12, no entran en 32 bits, y en watchOS `Int` ES de 32 bits. Escribirlos como `Int` TRAPEA (commit 3a0840cc) y leerlos como `Int` devuelve nil en silencio."
+  },
+  "cases": [
+    {
+      "name": "cronómetro corriendo sin un solo dato de pulso",
+      "why": "El caso normal de los primeros segundos: el atleta arranca la plancha antes de que llegue la primera muestra de HealthKit. Si el payload se descartara por «vacío», el teléfono no se enteraría NUNCA del cronómetro — y es justo cuando más importa.",
+      "given": {
+        "bpm": null,
+        "kcal": null,
+        "measuredAtMs": 1800000000000,
+        "timer": {
+          "exerciseId": "plancha",
+          "setNumber": 2,
+          "totalSeconds": 60,
+          "endsAtMs": 1800000060000
+        }
+      },
+      "expect": {
+        "kind": "watchEffort",
+        "measuredAtMs": 1800000000000,
+        "timerExerciseId": "plancha",
+        "timerSetNumber": 2,
+        "timerTotalSeconds": 60,
+        "timerEndsAtMs": 1800000060000
+      }
+    },
+    {
+      "name": "el número de serie viaja, y es lo que ubica la cuenta en el teléfono",
+      "why": "Sin `timerSetNumber` el teléfono sabe QUÉ ejercicio se está cronometrando pero no CUÁL de sus series. Con tres series por tiempo en el mismo ejercicio tendría que adivinar, y adivinar por «la próxima sin cargar» falla justo cuando el estado viene desordenado. Es la misma identidad lógica (ejercicio + número de serie) que usa el resto del sistema.",
+      "given": {
+        "bpm": 138,
+        "kcal": 90,
+        "measuredAtMs": 1800000030000,
+        "timer": {
+          "exerciseId": "plancha",
+          "setNumber": 3,
+          "totalSeconds": 45,
+          "endsAtMs": 1800000075000
+        }
+      },
+      "expect": {
+        "kind": "watchEffort",
+        "measuredAtMs": 1800000030000,
+        "bpm": 138,
+        "kcal": 90,
+        "timerExerciseId": "plancha",
+        "timerSetNumber": 3,
+        "timerTotalSeconds": 45,
+        "timerEndsAtMs": 1800000075000
+      }
+    },
+    {
+      "name": "sin cronómetro no viaja ninguna clave de cronómetro",
+      "why": "Las claves ausentes —y no presentes en null— son lo que le dice al teléfono que no hay cuenta que dibujar. Mandarlas en null obligaría al lado Dart a distinguir «ausente» de «nulo», que es una distinción que no necesita.",
+      "given": {
+        "bpm": 142,
+        "kcal": 120,
+        "measuredAtMs": 1800000090000,
+        "timer": null
+      },
+      "expect": {
+        "kind": "watchEffort",
+        "measuredAtMs": 1800000090000,
+        "bpm": 142,
+        "kcal": 120
+      }
+    },
+    {
+      "name": "un kcal de 0 SÍ viaja: es un dato cierto",
+      "why": "Asimetría deliberada con bpm, y está en las dos implementaciones. Cero calorías es verdad —todavía no se quemó nada—; un bpm de 0 no es una medición, es un sensor que no enganchó. Un fixture que use el mismo criterio para los dos borraría esa distinción.",
+      "given": {
+        "bpm": null,
+        "kcal": 0,
+        "measuredAtMs": 1800000005000,
+        "timer": null
+      },
+      "expect": {
+        "kind": "watchEffort",
+        "measuredAtMs": 1800000005000,
+        "kcal": 0
+      }
+    },
+    {
+      "name": "el payload que APAGA el cronómetro: sin cuenta y sin mediciones",
+      "why": "Con el permiso de Salud NEGADO —degradación firmada en D2— no hay bpm ni kcal en todo el entreno. Si el atleta cancela la cuenta en el reloj, esto es lo ÚNICO que viaja, y es lo que le dice al teléfono que deje de contar. Estuvo roto: un guard en `publicarEsfuerzo` descartaba el snapshot vacío antes de llegar a `shouldSend`, así que el apagado no salía nunca y el teléfono se quedaba con una cuenta fantasma hasta que vencía sola. El caso está acá para que el payload que apaga sea parte del contrato y no un efecto colateral.",
+      "given": {
+        "bpm": null,
+        "kcal": null,
+        "measuredAtMs": 1800000120000,
+        "timer": null
+      },
+      "expect": {
+        "kind": "watchEffort",
+        "measuredAtMs": 1800000120000
+      }
+    },
+    {
+      "name": "una serie larga: el instante de fin excede 32 bits por lejos",
+      "why": "1,8e12 ms contra el máximo de Int32 (2,15e9): lo excede por un factor de ~832. Está acá para que las dos implementaciones tengan que tratarlo como 64 bits de verdad.",
+      "given": {
+        "bpm": 150,
+        "kcal": 200,
+        "measuredAtMs": 1800000600000,
+        "timer": {
+          "exerciseId": "remo",
+          "setNumber": 1,
+          "totalSeconds": 600,
+          "endsAtMs": 1800001200000
+        }
+      },
+      "expect": {
+        "kind": "watchEffort",
+        "measuredAtMs": 1800000600000,
+        "bpm": 150,
+        "kcal": 200,
+        "timerExerciseId": "remo",
+        "timerSetNumber": 1,
+        "timerTotalSeconds": 600,
+        "timerEndsAtMs": 1800001200000
+      }
+    }
+  ]
+}

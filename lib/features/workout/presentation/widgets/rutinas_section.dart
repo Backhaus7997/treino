@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
@@ -11,7 +12,6 @@ import '../../../coach/domain/trainer_link.dart';
 import '../../../coach/domain/trainer_link_status.dart';
 import '../../../profile/application/user_providers.dart';
 import '../../../profile/application/user_public_profile_providers.dart';
-import '../../../profile/domain/experience_level.dart' show ExperienceLevelEs;
 import '../../application/assigned_routine_providers.dart';
 import '../../application/routine_providers.dart'
     show routineRepositoryProvider;
@@ -20,6 +20,7 @@ import '../../application/unified_routines_providers.dart';
 import '../../application/user_routines_providers.dart';
 import '../../domain/routine.dart';
 import 'coach_chip.dart';
+import 'routine_meta.dart';
 
 const int _kRoutineCap = 10;
 
@@ -191,7 +192,7 @@ class _CtaButton extends StatelessWidget {
         side: BorderSide(color: palette.accent.withValues(alpha: 0.6)),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
         ),
       ),
     );
@@ -405,12 +406,12 @@ class _RoutineCard extends ConsumerWidget {
 
     return InkWell(
       key: Key('routine_card_${routine.id}'),
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(AppRadius.md),
       onTap: () => context.push('/workout/routine/${routine.id}'),
       child: Container(
         decoration: BoxDecoration(
           color: palette.bgCard,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           // Outline más marcado en la activa para que destaque sin gritar.
           border: Border.all(
             color: isActive ? palette.accent : palette.border,
@@ -459,7 +460,13 @@ class _RoutineCard extends ConsumerWidget {
                   ] else ...[
                     const SizedBox(height: 4),
                     Text(
-                      '${(routine.split ?? l10n.workoutSplitFallback).toUpperCase()} · ${routine.level.displayNameEs.toUpperCase()}',
+                      // #648: la jerga deja de liderar. Antes esta línea era
+                      // '{SPLIT} · {NIVEL}' y el split iba primero y en
+                      // mayúsculas. Ahora comparte fuente con la tarjeta de
+                      // EXPLORAR, que es lo que impide que vuelvan a divergir.
+                      routineMetaSegments(routine, l10n)
+                          .map((s) => s.toUpperCase())
+                          .join(' · '),
                       style: GoogleFonts.barlow(
                         fontWeight: FontWeight.w400,
                         fontSize: 12,
@@ -536,7 +543,7 @@ class _ActivaChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
       decoration: BoxDecoration(
         color: palette.accent.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(9999),
+        borderRadius: BorderRadius.circular(AppRadius.full),
         border: Border.all(color: palette.accent.withValues(alpha: 0.5)),
       ),
       child: Text(
@@ -564,7 +571,7 @@ class _FinalizadoChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
       decoration: BoxDecoration(
         color: palette.highlight.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(9999),
+        borderRadius: BorderRadius.circular(AppRadius.full),
         border: Border.all(color: palette.highlight.withValues(alpha: 0.4)),
       ),
       child: Text(

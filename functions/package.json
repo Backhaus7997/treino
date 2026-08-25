@@ -6,7 +6,8 @@
     "build": "tsc",
     "serve": "npm run build && firebase emulators:start --only functions",
     "test": "jest --forceExit",
-    "test:rules": "jest --forceExit \"(user-public-profiles-rules|trainer-public-profiles-rules|trainer-links-paywall-rules|users-subscription-rules|users-role-create-rules|trainer-links-forge-rules|chat-relationship-rules|post-privacy-rules|post-create-shape-rules|post-photos-storage-rules|measurements-performance-validation-rules|reaction-rules|notification-history-rules|follows-rules|friendships-freeze-rules)\"",
+    "typecheck:scripts": "tsc --noEmit -p tsconfig.scripts.json",
+    "test:rules": "jest --forceExit --runInBand \"[-]rules\\.test\\.ts$\"",
     "test:rules:emulator": "firebase emulators:exec --only firestore,auth,storage --project treino-rules-test \"npm run test:rules\"",
     "lint": "eslint --ext .ts src/",
     "lint:fix": "eslint --ext .ts src/ --fix"
@@ -20,16 +21,16 @@
     "firebase-functions": "^5.0.0"
   },
   "devDependencies": {
-    "@firebase/rules-unit-testing": "^5.0.1",
-    "@types/jest": "^29.5.12",
-    "@types/node": "^20.0.0",
-    "@typescript-eslint/eslint-plugin": "^7.0.0",
-    "@typescript-eslint/parser": "^7.0.0",
+    "@firebase/rules-unit-testing": "^5.0.2",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^26.2.0",
+    "@typescript-eslint/eslint-plugin": "^8.67.0",
+    "@typescript-eslint/parser": "^8.67.0",
     "eslint": "^8.57.0",
     "eslint-config-google": "^0.14.0",
     "firebase-functions-test": "^3.1.0",
-    "jest": "^29.7.0",
-    "ts-jest": "^29.1.4",
+    "jest": "^30.4.2",
+    "ts-jest": "^29.4.12",
     "typescript": "^5.4.0"
   },
   "private": true

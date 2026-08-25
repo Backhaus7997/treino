@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/motion/treino_tappable.dart';
@@ -233,7 +234,7 @@ class _SessionDetailSheetState extends ConsumerState<SessionDetailSheet> {
                         const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: palette.highlight.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(9999),
+                      borderRadius: BorderRadius.circular(AppRadius.full),
                       border: Border.all(color: palette.highlight),
                     ),
                     child: Text(
@@ -302,7 +303,7 @@ class _SessionDetailSheetState extends ConsumerState<SessionDetailSheet> {
                   decoration: BoxDecoration(
                     color: palette.warning.withAlpha(28),
                     border: Border.all(color: palette.warning),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -402,7 +403,7 @@ class _SessionDetailSheetState extends ConsumerState<SessionDetailSheet> {
                 onPressed: _saving ? null : _saveNotes,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: palette.accent,
-                  foregroundColor: palette.bg,
+                  foregroundColor: TreinoButtonTokens.foreground(context),
                   minimumSize: const Size.fromHeight(48),
                   shape: const StadiumBorder(),
                   disabledBackgroundColor:
@@ -414,7 +415,7 @@ class _SessionDetailSheetState extends ConsumerState<SessionDetailSheet> {
                         height: 18,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: palette.bg,
+                          color: TreinoButtonTokens.foreground(context),
                         ),
                       )
                     : Text(
@@ -509,7 +510,8 @@ Future<bool> _localConfirmDialog(
     context: context,
     builder: (ctx) => AlertDialog(
       backgroundColor: palette.bgCard,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg)),
       title: Text(
         title,
         style: GoogleFonts.barlowCondensed(

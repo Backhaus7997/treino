@@ -106,6 +106,92 @@ describe("SCENARIO-540: posts authored by uid are deleted", () => {
   });
 });
 
+// QA-CMP-005b: `posts` DOES have a sub-collection —
+// `posts/{postId}/reactions/{reactorUid}` (firestore.rules:693) — and in
+// Firestore deleting a document does NOT delete its sub-collections. The
+// previous `batch.delete(doc.ref)` therefore left every reaction that OTHER
+// people had left on this user's posts as an orphan whose doc id is a third
+// party's uid. Nobody noticed because the orphans are unreadable from the
+// client (`reactionPostReadable()` does a `get()` on the missing post → deny),
+// but unreadable is not deleted.
+//
+// These assertions read the sub-collection through the Admin SDK (which
+// bypasses rules) and check ABSENCE of the documents — checking that "posts"
+// shows up in `deletedCollections` is what let this hole through review.
+describe("QA-CMP-005b: reactions under a deleted post are deleted too", () => {
+  const uid = "posts-cascade-005b";
+  const reactorA = "reactor-a-005b";
+  const reactorB = "reactor-b-005b";
+  const otherPostId = "post-other-author-005b";
+
+  let docIds: string[] = [];
+
+  const reactionsOf = (postId: string) =>
+    db().collection("posts").doc(postId).collection("reactions");
+
+  beforeEach(async () => {
+    docIds = await seedPosts(uid, 2);
+    for (const id of docIds) {
+      await reactionsOf(id).doc(reactorA).set({ type: "like" });
+      await reactionsOf(id).doc(reactorB).set({ type: "fire" });
+    }
+    // Control — a post by somebody else, with a reaction on it.
+    await db()
+      .collection("posts")
+      .doc(otherPostId)
+      .set({ authorUid: "other-author-005b", authorDisplayName: "Other" });
+    await reactionsOf(otherPostId).doc(reactorA).set({ type: "clap" });
+  });
+
+  afterEach(async () => {
+    for (const id of [...docIds, otherPostId]) {
+      await db()
+        .recursiveDelete(db().collection("posts").doc(id))
+        .catch(() => undefined);
+    }
+  });
+
+  it("no reaction document survives under the deleted posts", async () => {
+    await deletePosts(testApp, uid);
+
+    for (const id of docIds) {
+      for (const reactor of [reactorA, reactorB]) {
+        const snap = await reactionsOf(id).doc(reactor).get();
+        expect(snap.exists).toBe(false);
+      }
+      // Absence of the whole sub-collection, not only of the seeded docs.
+      const left = await reactionsOf(id).get();
+      expect(left.empty).toBe(true);
+    }
+  });
+
+  it("the deleted post has no sub-collection left at all", async () => {
+    await deletePosts(testApp, uid);
+
+    for (const id of docIds) {
+      const collections = await db()
+        .collection("posts")
+        .doc(id)
+        .listCollections();
+      expect(collections).toHaveLength(0);
+    }
+  });
+
+  it("reactions on another author's post are untouched", async () => {
+    await deletePosts(testApp, uid);
+
+    const snap = await reactionsOf(otherPostId).doc(reactorA).get();
+    expect(snap.exists).toBe(true);
+    const parent = await db().collection("posts").doc(otherPostId).get();
+    expect(parent.exists).toBe(true);
+  });
+
+  it("still returns the count of deleted post documents", async () => {
+    const result = await deletePosts(testApp, uid);
+    expect(result.count).toBe(docIds.length);
+  });
+});
+
 describe("SCENARIO-541: no posts authored is a no-op", () => {
   const uid = "posts-cascade-541";
 

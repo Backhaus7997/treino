@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../app/theme/app_palette.dart';
@@ -86,7 +87,7 @@ class _YoutubeThumbCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppRadius.sm),
       child: AspectRatio(
         aspectRatio: 16 / 9,
         child: Material(
@@ -135,7 +136,7 @@ class _VideoPlaceholder extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: palette.bgCard,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           border: Border.all(color: palette.border, width: 1),
         ),
         alignment: Alignment.center,

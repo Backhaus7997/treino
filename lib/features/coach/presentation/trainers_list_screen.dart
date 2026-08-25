@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../core/widgets/treino_segmented_pill.dart';
 import '../../gyms/application/gym_providers.dart';
 import '../../gyms/domain/gym.dart';
 import '../application/trainer_discovery_providers.dart';
@@ -258,7 +260,7 @@ class _ListMapToggle extends StatelessWidget {
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(9999),
+        borderRadius: BorderRadius.circular(AppRadius.full),
         border: Border.all(color: palette.border, width: 1),
       ),
       child: Row(
@@ -331,7 +333,7 @@ class _TogglePill extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
               color: bg,
-              borderRadius: BorderRadius.circular(9999),
+              borderRadius: BorderRadius.circular(AppRadius.full),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -502,41 +504,10 @@ class _ModeTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    final theme = Theme.of(context);
-
-    return Container(
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(9999),
-        border: Border.all(color: palette.border),
-      ),
-      padding: const EdgeInsets.all(4),
-      child: TabBar(
-        dividerColor: Colors.transparent,
-        indicatorSize: TabBarIndicatorSize.tab,
-        indicator: BoxDecoration(
-          color: palette.accent,
-          borderRadius: BorderRadius.circular(9999),
-        ),
-        splashBorderRadius: BorderRadius.circular(9999),
-        labelColor: palette.bg,
-        unselectedLabelColor: palette.textMuted,
-        labelStyle: GoogleFonts.barlowCondensed(
-          fontWeight: FontWeight.w700,
-          fontSize: 13,
-          letterSpacing: 1.2,
-        ),
-        unselectedLabelStyle: theme.textTheme.labelLarge?.copyWith(
-          fontWeight: FontWeight.w700,
-          fontSize: 13,
-          letterSpacing: 1.2,
-        ),
-        tabs: [
-          for (final l in _labels) Tab(text: l, height: 38),
-        ],
-      ),
-    );
+    // El wrapper sobrevive sólo para anclar [_labels] y el comentario de
+    // diseño de arriba. [_ModeTabScope] NO depende de él: se cuelga del
+    // DefaultTabController ancestro, así que inlinearlo también sería válido.
+    return const TreinoSegmentedPill(labels: _labels);
   }
 }
 

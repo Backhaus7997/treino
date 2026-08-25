@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../app/theme/app_motion.dart';
@@ -123,7 +124,7 @@ class _FirebaseStorageVideoPlayerState
         aspectRatio: 16 / 9,
         maxHeight: widget.maxHeight,
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           child: TreinoShimmer(
             child: Container(
               color: palette.bgCard,
@@ -148,7 +149,7 @@ class _FirebaseStorageVideoPlayerState
     // do not overflow the chat list vertically.
     final aspect = c.value.aspectRatio > 0 ? c.value.aspectRatio : 16 / 9;
     return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppRadius.sm),
       child: _CappedAspectRatio(
         aspectRatio: aspect,
         maxHeight: widget.maxHeight,
@@ -258,7 +259,7 @@ class _VideoErrorPlaceholder extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: palette.bgCard,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           border: Border.all(color: palette.border, width: 1),
         ),
         alignment: Alignment.center,

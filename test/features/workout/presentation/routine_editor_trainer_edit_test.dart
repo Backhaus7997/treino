@@ -233,6 +233,10 @@ void main() {
 
     // The form is valid: name is hydrated, split is hydrated, days is empty
     // but in trainer mode days must be non-empty. Add one slot via the CTA.
+    // The CTA lives inside the editor's ListView, below the RESUMEN field
+    // added in #648 — scroll it into the 800x600 test viewport before tapping.
+    await tester.ensureVisible(find.text('Agregar ejercicio'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Agregar ejercicio'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Press de Banca').first);
@@ -348,6 +352,10 @@ void main() {
     await tester.pump();
 
     // Add a slot so the form is valid.
+    // The CTA lives inside the editor's ListView, below the RESUMEN field
+    // added in #648 — scroll it into the 800x600 test viewport before tapping.
+    await tester.ensureVisible(find.text('Agregar ejercicio'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Agregar ejercicio'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Press de Banca').first);
@@ -396,6 +404,10 @@ void main() {
     await tester.enterText(find.byKey(const Key('editor_split_field')), 'PPL');
     await tester.pumpAndSettle();
 
+    // The CTA lives inside the editor's ListView, below the RESUMEN field
+    // added in #648 — scroll it into the 800x600 test viewport before tapping.
+    await tester.ensureVisible(find.text('Agregar ejercicio'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Agregar ejercicio'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Press de Banca').first);

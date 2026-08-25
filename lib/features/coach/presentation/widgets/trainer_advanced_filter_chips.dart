@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../application/trainer_discovery_providers.dart';
@@ -147,7 +148,7 @@ Future<void> showSpecialtyFilterSheet(
     // mostrar las opciones que no entran.
     constraints: BoxConstraints(maxHeight: maxSheetHeight),
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
     ),
     builder: (sheetContext) => SafeArea(
       child: Padding(
@@ -237,7 +238,7 @@ Future<void> showLocationRequiredFilterSheet(
     useRootNavigator: true,
     backgroundColor: palette.bgCard,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
     ),
     builder: (sheetContext) => SafeArea(
       child: Padding(
@@ -303,7 +304,7 @@ Future<void> showLocationRequiredFilterSheet(
                     onPressed: () => _handleActivatePressed(sheetContext, ref),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: palette.accent,
-                      foregroundColor: palette.bg,
+                      foregroundColor: TreinoButtonTokens.foreground(context),
                       minimumSize: const Size.fromHeight(44),
                       shape: const StadiumBorder(),
                     ),
@@ -387,7 +388,7 @@ Future<T?> _showFilterSheet<T>({
     // muchas opciones futuras, no se come la pantalla entera.
     constraints: BoxConstraints(maxHeight: maxSheetHeight),
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
     ),
     builder: (sheetContext) => SafeArea(
       child: Padding(

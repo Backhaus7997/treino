@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/utils/appointment_window.dart';
@@ -89,7 +90,7 @@ class _TrainerAgendaTabState extends ConsumerState<TrainerAgendaTab> {
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: palette.accent,
-                        foregroundColor: palette.bg,
+                        foregroundColor: TreinoButtonTokens.foreground(context),
                         minimumSize: const Size.fromHeight(48),
                         shape: const StadiumBorder(),
                       ),
@@ -167,7 +168,7 @@ class _TrainerAgendaTabState extends ConsumerState<TrainerAgendaTab> {
       isScrollControlled: true,
       backgroundColor: AppPalette.of(context).bgCard,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
       ),
       builder: (_) => const NewSessionSheet(),
     );
@@ -299,7 +300,7 @@ class _TrainerCalendar extends ConsumerWidget {
           fontWeight: FontWeight.w600,
         ),
         selectedTextStyle: GoogleFonts.barlow(
-          color: palette.bg,
+          color: TreinoButtonTokens.foreground(context),
           fontWeight: FontWeight.w700,
         ),
       ),
@@ -317,7 +318,7 @@ class _TrainerCalendar extends ConsumerWidget {
         ),
         formatButtonDecoration: BoxDecoration(
           border: Border.all(color: palette.accent),
-          borderRadius: BorderRadius.circular(9999),
+          borderRadius: BorderRadius.circular(AppRadius.full),
         ),
         titleTextStyle: GoogleFonts.barlowCondensed(
           fontWeight: FontWeight.w700,

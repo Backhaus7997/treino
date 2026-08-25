@@ -11,26 +11,48 @@ final checkInRepositoryProvider = Provider<CheckInRepository>(
   (ref) => CheckInRepository(firestore: ref.watch(firestoreProvider)),
 );
 
-/// Clave de [checkInByDateProvider]: dueño + fecha local `YYYY-MM-DD`.
+/// Clave de [checkInsForDateProvider]: dueño + fecha local `YYYY-MM-DD`.
 typedef CheckInKey = ({String uid, String date});
 
-/// Check-in ya registrado para [CheckInKey.date], o `null` si ese día está en
-/// blanco.
+/// Check-ins registrados para [CheckInKey.date], del más viejo al más nuevo.
+/// Lista vacía si ese día está en blanco.
 ///
-/// Lo consume el resumen post-entreno para no pisar en silencio un registro
-/// que ya existe: si el día ya tiene check-in, la pantalla lo muestra y el
-/// sheet abre precargado en vez de arrancar vacío.
+/// Devuelve una LISTA y no un solo registro porque desde #643 el día ya no es
+/// el id del documento: dos entrenos el mismo día dejan dos registros, y
+/// quedarse con uno solo sería reintroducir por la puerta de atrás el
+/// last-write-wins que la subcolección vino a arreglar.
+///
+/// Cada consumidor elige cuál le corresponde:
+///
+///  * el resumen post-sesión, el suyo — [checkInForSession];
+///  * la tarjeta de Home, el último del día — [latestCheckIn].
 ///
 /// autoDispose: se re-lee al volver a montar la pantalla, sin invalidate
 /// manual desde otros features.
-final checkInByDateProvider =
-    FutureProvider.autoDispose.family<CheckIn?, CheckInKey>((ref, key) async {
-  if (key.uid.isEmpty || key.date.isEmpty) return null;
-  return ref.read(checkInRepositoryProvider).getByDate(key.uid, key.date);
+final checkInsForDateProvider = FutureProvider.autoDispose
+    .family<List<CheckIn>, CheckInKey>((ref, key) async {
+  if (key.uid.isEmpty || key.date.isEmpty) return const [];
+  return ref.read(checkInRepositoryProvider).getForDate(key.uid, key.date);
 });
 
-/// Escribe el check-in del día. Un solo método porque slice 1 sólo captura;
-/// las lecturas agregadas (la curva de tendencia) son de su propio slice.
+/// El check-in que [sessionId] originó, o `null` si esa sesión todavía no
+/// registró nada.
+///
+/// Es lo que hace que un SEGUNDO entreno del mismo día vuelva a ofrecer el
+/// paso en vez de mostrar el registro del primero como si fuera suyo.
+CheckIn? checkInForSession(List<CheckIn> dayCheckIns, String sessionId) {
+  for (final c in dayCheckIns.reversed) {
+    if (c.sessionId == sessionId) return c;
+  }
+  return null;
+}
+
+/// El registro más reciente del día, sin importar de dónde salió. `null` si el
+/// día está en blanco.
+CheckIn? latestCheckIn(List<CheckIn> dayCheckIns) =>
+    dayCheckIns.isEmpty ? null : dayCheckIns.last;
+
+/// Escribe el check-in del día — lo crea o edita uno existente.
 class CheckInNotifier extends AutoDisposeAsyncNotifier<void> {
   /// Guard de reentrancia: el gate del botón depende de que la UI vea el
   /// [AsyncLoading] de abajo, y eso recién ocurre en el próximo frame — dos
@@ -43,8 +65,14 @@ class CheckInNotifier extends AutoDisposeAsyncNotifier<void> {
 
   /// Registra cómo se sintió el usuario.
   ///
+  /// [existing] decide entre crear y editar: si viene un registro ya
+  /// persistido, se ACTUALIZA ese documento y se conserva SU fecha —
+  /// [now] pasa a ser sólo la marca de la edición. Sin [existing] se crea uno
+  /// nuevo, que NUNCA pisa a otro del mismo día: para eso el id dejó de ser la
+  /// fecha.
+  ///
   /// [now] existe sólo para los tests: fija el reloj y, con él, la fecha local
-  /// que va como id del documento. En producción se omite.
+  /// de un registro nuevo. En producción se omite.
   ///
   /// Lanza si no hay usuario autenticado o si Firestore rechaza la escritura —
   /// el caller decide qué mostrar. Nunca traga el error: un registro que el
@@ -55,6 +83,7 @@ class CheckInNotifier extends AutoDisposeAsyncNotifier<void> {
     List<MuscleGroup> painAreas = const [],
     String? note,
     String? sessionId,
+    CheckIn? existing,
     DateTime? now,
   }) async {
     if (_saving) return;
@@ -69,7 +98,9 @@ class CheckInNotifier extends AutoDisposeAsyncNotifier<void> {
       final clock = now ?? DateTime.now();
       final trimmed = note?.trim();
       final checkIn = CheckIn(
-        date: checkInDateKey(clock),
+        // Editar no re-imputa el registro a otro día: la fecha del documento
+        // es la del hecho, no la de la corrección.
+        date: existing?.date ?? checkInDateKey(clock),
         feeling: feeling,
         hasPain: hasPain,
         // Sin dolor no hay zonas: evita que un toggle de "sí" revertido a
@@ -78,11 +109,12 @@ class CheckInNotifier extends AutoDisposeAsyncNotifier<void> {
         note: (trimmed == null || trimmed.isEmpty) ? null : trimmed,
         recordedAt: clock.toUtc(),
         sessionId: sessionId,
+        id: existing?.id,
       );
 
       await ref.read(checkInRepositoryProvider).save(uid, checkIn);
       ref.invalidate(
-        checkInByDateProvider((uid: uid, date: checkIn.date)),
+        checkInsForDateProvider((uid: uid, date: checkIn.date)),
       );
       state = const AsyncData(null);
     } catch (e, st) {

@@ -51,6 +51,7 @@ import '../../workout/presentation/widgets/most_frequent_exercises_list.dart';
 import '../../workout/presentation/widgets/personal_records_list.dart';
 import '../../workout/presentation/widgets/session_exercise_block.dart';
 import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseException;
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 /// Trainer's drill-down view for a specific athlete.
 ///
@@ -232,7 +233,7 @@ class _AthleteDetailBody extends ConsumerWidget {
                         foregroundColor: palette.accent,
                         minimumSize: const Size.fromHeight(48),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(9999),
+                          borderRadius: BorderRadius.circular(AppRadius.full),
                         ),
                       ),
                       icon: Icon(TreinoIcon.chat,
@@ -275,10 +276,10 @@ class _AthleteDetailBody extends ConsumerWidget {
                       context.push('/workout/routine-editor/$athleteId'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: palette.accent,
-                    foregroundColor: palette.bg,
+                    foregroundColor: TreinoButtonTokens.foreground(context),
                     minimumSize: const Size.fromHeight(48),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(9999),
+                      borderRadius: BorderRadius.circular(AppRadius.full),
                     ),
                   ),
                   child: Text(
@@ -437,7 +438,7 @@ class _PlanesSection extends ConsumerWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: palette.border),
       ),
       child: child,
@@ -791,7 +792,7 @@ class _AntropometriaSection extends ConsumerWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: palette.border),
       ),
       child: child,
@@ -1057,7 +1058,7 @@ class _RendimientoSection extends ConsumerWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: palette.border),
       ),
       child: child,
@@ -1188,7 +1189,7 @@ class _CobroSection extends ConsumerWidget {
       isScrollControlled: true,
       backgroundColor: AppPalette.of(context).bgCard,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
       ),
       builder: (_) => _CobroConfigSheet(
         athleteId: athleteId,
@@ -1204,7 +1205,7 @@ class _CobroSection extends ConsumerWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: palette.border),
       ),
       child: child,
@@ -1398,7 +1399,7 @@ class _CobroConfigSheetState extends ConsumerState<_CobroConfigSheet> {
             onPressed: _saving ? null : _save,
             style: ElevatedButton.styleFrom(
               backgroundColor: palette.accent,
-              foregroundColor: palette.bg,
+              foregroundColor: TreinoButtonTokens.foreground(context),
               minimumSize: const Size.fromHeight(48),
               shape: const StadiumBorder(),
               disabledBackgroundColor: palette.accent.withValues(alpha: 0.3),
@@ -1409,7 +1410,7 @@ class _CobroConfigSheetState extends ConsumerState<_CobroConfigSheet> {
                     height: 18,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: palette.bg,
+                      color: TreinoButtonTokens.foreground(context),
                     ),
                   )
                 : Text(
@@ -1479,7 +1480,7 @@ class _SeguimientoSection extends ConsumerWidget {
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: palette.bgCard,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppRadius.md),
             border: Border.all(color: palette.border),
           ),
           child: child,
@@ -1574,7 +1575,7 @@ class _SeguimientoRow extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 border: Border.all(color: color),
-                borderRadius: BorderRadius.circular(9999),
+                borderRadius: BorderRadius.circular(AppRadius.full),
               ),
               child: Text(
                 label,
@@ -1740,7 +1741,7 @@ class _NotaSectionState extends ConsumerState<_NotaSection> {
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: palette.bgCard,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppRadius.md),
             border: Border.all(
               color: _editing ? palette.accent : palette.border,
             ),
@@ -1899,7 +1900,7 @@ class _NotaEditor extends StatelessWidget {
               onPressed: saving ? null : onSave,
               style: FilledButton.styleFrom(
                 backgroundColor: palette.accent,
-                foregroundColor: palette.bg,
+                foregroundColor: TreinoButtonTokens.foreground(context),
                 minimumSize: const Size(0, 40),
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 shape: const StadiumBorder(),
@@ -1909,7 +1910,8 @@ class _NotaEditor extends StatelessWidget {
                       width: 16,
                       height: 16,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: palette.bg),
+                          strokeWidth: 2,
+                          color: TreinoButtonTokens.foreground(context)),
                     )
                   : Text(
                       'Guardar',
@@ -2027,7 +2029,7 @@ class _EntrenamientosSection extends ConsumerWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: palette.border),
       ),
       child: child,
@@ -2388,11 +2390,11 @@ class _PlanCard extends StatelessWidget {
     final l10n = AppL10n.of(context);
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppRadius.sm),
       child: Container(
         decoration: BoxDecoration(
           color: palette.bgCard,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           border: Border.all(color: palette.border, width: 1),
         ),
         padding: const EdgeInsets.all(14),

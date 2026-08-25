@@ -13,6 +13,7 @@
  *   6. Terminate trainer links
  *   7. Cancel future appointments
  *   8. Delete storage avatar
+ *  8d. Delete the athlete's routines (assigned plans + own routines)
  *   9. Delete user docs (users + userPublicProfiles + trainerPublicProfiles)
  *  10. Update audit log with cascade results
  *  11. Delete Auth user (LAST — REQ-ACCDEL-CF-012)
@@ -33,6 +34,7 @@ import { terminateTrainerLinks } from "./cascade/trainer-links";
 import { cancelFutureAppointments } from "./cascade/appointments";
 import { deleteAvatar, deleteAthleteStorage } from "./cascade/storage";
 import { deleteAthleteOwnedData } from "./cascade/athlete-data";
+import { deleteAthleteRoutines } from "./cascade/routines";
 import { deleteUserDocs } from "./cascade/users";
 import {
   DeleteAccountRequest,
@@ -145,6 +147,18 @@ export async function runDeleteAccount(
     deletedCollections.push("athlete-data");
   } catch (err: unknown) {
     errors.push(`athlete-data: ${(err as Error).message ?? String(err)}`);
+  }
+
+  // ── Step 8d: Delete the athlete's routines (QA-CMP-004) ────────────────
+  // `routines where assignedTo == uid` (the plans their trainer built for
+  // them) + `routines where createdBy == uid` (their own). recursiveDelete,
+  // so the `ratings` subcollection goes with the parent. The disposition and
+  // the reason `assignedBy` is NOT swept live in cascade/routines.ts.
+  try {
+    await deleteAthleteRoutines(app, uid);
+    deletedCollections.push("routines");
+  } catch (err: unknown) {
+    errors.push(`routines: ${(err as Error).message ?? String(err)}`);
   }
 
   // ── Step 9: Delete user docs ───────────────────────────────────────────

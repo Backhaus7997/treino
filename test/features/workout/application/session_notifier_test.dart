@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
+import 'package:treino/core/utils/network_timeouts.dart';
 import 'package:treino/features/workout/application/session_init.dart';
 import 'package:treino/features/workout/application/session_notifier.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
@@ -28,7 +29,33 @@ import 'stub_factories.dart';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-class MockSessionRepository extends Mock implements SessionRepository {}
+class MockSessionRepository extends Mock implements SessionRepository {
+  // Los dos streams que SessionNotifier engancha al abrir el entreno para ver
+  // en vivo lo que escribe el RELOJ. Se implementan de verdad —vacios— en vez
+  // de stubearse: ningun test de este archivo mira esa sincronia, y un
+  // `when(...)` por cada sitio donde se crea el mock seria puro ruido. Un
+  // stream vacio nunca emite, asi que el comportamiento que estos tests
+  // ejercitan queda EXACTAMENTE igual que antes de que existieran.
+  //
+  // La sincronia con el reloj se cubre en session_remote_sync_test.dart.
+  /// Lo que emite `watchSetLogs`. Vacío por defecto — un test que quiera
+  /// ejercitar la carrera contra el reloj lo reemplaza.
+  Stream<List<SetLog>> setLogsStream = const Stream<List<SetLog>>.empty();
+
+  @override
+  Stream<List<SetLog>> watchSetLogs({
+    required String uid,
+    required String sessionId,
+  }) =>
+      setLogsStream;
+
+  @override
+  Stream<bool> watchSessionFinished({
+    required String uid,
+    required String sessionId,
+  }) =>
+      const Stream<bool>.empty();
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -37,11 +64,15 @@ ProviderContainer _makeContainer({
   required MockSessionRepository repo,
   required String uid,
   Routine? routine,
+  Duration? ioTimeout,
 }) {
   return ProviderContainer(
     overrides: [
       sessionRepositoryProvider.overrideWithValue(repo),
       currentUidProvider.overrideWithValue(uid),
+      // La cota real es de 15s: un test que la espere de verdad no se corre.
+      if (ioTimeout != null)
+        firestoreReadTimeoutProvider.overrideWithValue(ioTimeout),
       // Analytics is fired post-finishSession; override con fake para evitar
       // que FirebaseAnalytics.instance se invoque sin Firebase init en tests.
       analyticsServiceProvider.overrideWithValue(FakeAnalyticsService()),
@@ -56,6 +87,136 @@ ProviderContainer _makeContainer({
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 void main() {
+  // ── Un día sin ejercicios presentes no puede dar un índice negativo ──────
+  //
+  // Los dos paths de build filtran los slots por `isPresentInWeek` (periodización,
+  // REQ-WPRES-021). Un día cuyos slots estén TODOS ausentes en esa semana deja la
+  // lista vacía, y `day.slots.length - 1` daba -1 como `currentExerciseIndex`.
+  test('un día sin slots presentes en la semana no deja el índice en -1',
+      () async {
+    final repo = MockSessionRepository();
+    // El slot existe solo en la semana 0; la sesión va a ser de la semana 1.
+    final routine = makeRoutine(
+      numWeeks: 2,
+      days: [
+        makeDay(slots: [
+          makeSlot(exerciseId: 'e1', activeWeeks: const [0])
+        ])
+      ],
+    );
+
+    // Va por RETOMAR y no por empezar: `_buildFresh` fija el índice en 0 a mano,
+    // así que el -1 solo puede salir de `_buildResume`, que sí lo calcula.
+    final session = makeSession(id: 's7', weekNumber: 1);
+    when(() => repo.getActive('u1')).thenAnswer((_) async => session);
+    when(() => repo.listSetLogs(uid: 'u1', sessionId: 's7'))
+        .thenAnswer((_) async => <SetLog>[]);
+
+    final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
+    addTearDown(container.dispose);
+
+    const init = ResumeSession(sessionId: 's7');
+    final state = await container.read(sessionNotifierProvider(init).future);
+
+    expect(
+      state.day.slots,
+      isEmpty,
+      reason: 'precondición del test: el filtro de presencia deja el día vacío',
+    );
+    expect(
+      state.currentExerciseIndex,
+      greaterThanOrEqualTo(0),
+      reason: 'un índice negativo se usa para indexar la lista de ejercicios',
+    );
+  });
+
+  // ── El build de la sesión no puede quedarse colgado ──────────────────────
+  //
+  // Medido en el simulador el 2026-08-12: el player quedó en el spinner más de
+  // 2 minutos al retomar, sin una sola excepción en el log. `_buildResume`
+  // esperaba tres lecturas de Firestore SIN cota, y un `get()` que no resuelve
+  // —ni devuelve ni tira— deja el AsyncNotifier en `AsyncLoading` para siempre:
+  // sin error, sin reintento y sin salida.
+  //
+  // El test no reproduce el stall de red (no se pudo provocar a pedido en tres
+  // intentos dirigidos); reproduce lo que el stall PROVOCA, que es lo que hay
+  // que volver imposible: un future que nunca completa.
+  group('SessionNotifier — las lecturas del build están acotadas', () {
+    test('un getActive que nunca resuelve termina en error, no colgado',
+        () async {
+      final repo = MockSessionRepository();
+      final routine = makeRoutine();
+
+      // Nunca completa: es exactamente el `get()` que se queda a medias.
+      when(() => repo.getActive('u1'))
+          .thenAnswer((_) => Completer<Session?>().future);
+
+      final container = _makeContainer(
+        repo: repo,
+        uid: 'u1',
+        routine: routine,
+        ioTimeout: const Duration(milliseconds: 50),
+      );
+      addTearDown(container.dispose);
+
+      const init = ResumeSession(sessionId: 's42');
+      final sub = container.listen(sessionNotifierProvider(init), (_, __) {});
+      addTearDown(sub.close);
+
+      // Se espera con holgura sobre la cota y se MIRA el estado, en vez de
+      // await-ear el future: sin el arreglo ese await no vuelve nunca y el test
+      // moriría por timeout del runner en vez de fallar con un mensaje útil.
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+
+      final estado = container.read(sessionNotifierProvider(init));
+      expect(
+        estado.hasError,
+        isTrue,
+        reason: 'sin cota el estado se queda en AsyncLoading para siempre: el '
+            'atleta ve un spinner infinito sobre un entreno ya empezado, sin '
+            'error que reintentar',
+      );
+      expect(estado.error, isA<TimeoutException>());
+    });
+
+    test('un fetch de rutina que nunca resuelve tampoco cuelga el arranque',
+        () async {
+      final repo = MockSessionRepository();
+
+      when(() => repo.create(
+            uid: any(named: 'uid'),
+            routineId: any(named: 'routineId'),
+            routineName: any(named: 'routineName'),
+            startedAt: any(named: 'startedAt'),
+            dayNumber: any(named: 'dayNumber'),
+            weekNumber: any(named: 'weekNumber'),
+          )).thenAnswer((_) async => makeSession());
+
+      final container = ProviderContainer(
+        overrides: [
+          sessionRepositoryProvider.overrideWithValue(repo),
+          currentUidProvider.overrideWithValue('u1'),
+          analyticsServiceProvider.overrideWithValue(FakeAnalyticsService()),
+          firestoreReadTimeoutProvider
+              .overrideWithValue(const Duration(milliseconds: 50)),
+          routineByIdProvider('r1')
+              .overrideWith((ref) => Completer<Routine?>().future),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      const init = FreshSession(routineId: 'r1', dayNumber: 1);
+      final sub = container.listen(sessionNotifierProvider(init), (_, __) {});
+      addTearDown(sub.close);
+
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+
+      final estado = container.read(sessionNotifierProvider(init));
+      expect(estado.hasError, isTrue);
+      expect(estado.error, isA<TimeoutException>());
+    });
+  });
+
   setUpAll(() {
     registerFallbackValue(makeSession());
     registerFallbackValue(makeSetLog());
@@ -1381,6 +1542,107 @@ void main() {
     });
 
     test(
+        'el snapshot que llega durante el await NO renumera la sobreviviente '
+        'dos veces', () async {
+      final repo = MockSessionRepository();
+      final routine = makeRoutine(
+        days: [
+          makeDay(slots: [makeSlot(exerciseId: 'e1', targetSets: 3)])
+        ],
+      );
+      final session = makeSession();
+
+      when(() => repo.create(
+            uid: any(named: 'uid'),
+            routineId: any(named: 'routineId'),
+            routineName: any(named: 'routineName'),
+            startedAt: any(named: 'startedAt'),
+            dayNumber: any(named: 'dayNumber'),
+            weekNumber: any(named: 'weekNumber'),
+          )).thenAnswer((_) async => session);
+      when(() => repo.addSetLog(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            setLog: any(named: 'setLog'),
+          )).thenAnswer(
+        (inv) async => inv.namedArguments[const Symbol('setLog')] as dynamic,
+      );
+      when(() => repo.deleteSetLog(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            setLogId: any(named: 'setLogId'),
+          )).thenAnswer((_) async {});
+
+      final controller = StreamController<List<SetLog>>.broadcast();
+      repo.setLogsStream = controller.stream;
+
+      // Firestore entrega el snapshot de la PROPIA escritura por compensación
+      // de latencia: llega ANTES de que el `await updateSetLog` resuelva, con la
+      // sobreviviente ya renumerada. Es exactamente lo que pasa corriendo.
+      when(() => repo.updateSetLog(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            setLog: any(named: 'setLog'),
+          )).thenAnswer((_) async {
+        controller.add([
+          makeSetLog(exerciseId: 'e1', setNumber: 1, id: 'l1'),
+          makeSetLog(exerciseId: 'e1', setNumber: 2, id: 'l3'),
+        ]);
+        // Deja correr el listener ANTES de que removeSet siga.
+        await Future<void>.delayed(Duration.zero);
+      });
+
+      final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
+      addTearDown(container.dispose);
+      addTearDown(controller.close);
+
+      final init = FreshSession(routineId: routine.id, dayNumber: 1);
+      // Suscripción viva: el provider es autoDispose y sin listener se descarta
+      // entre lecturas, así que el stream no llegaría a tocar este estado.
+      final sub = container.listen(sessionNotifierProvider(init), (_, __) {});
+      addTearDown(sub.close);
+      await container.read(sessionNotifierProvider(init).future);
+      final notifier = container.read(sessionNotifierProvider(init).notifier);
+      final slot = routine.days.first.slots.first;
+
+      await notifier
+          .logSet(makeSetLog(exerciseId: 'e1', setNumber: 1, id: 'l1'));
+      await notifier
+          .logSet(makeSetLog(exerciseId: 'e1', setNumber: 2, id: 'l2'));
+      await notifier
+          .logSet(makeSetLog(exerciseId: 'e1', setNumber: 3, id: 'l3'));
+
+      final target = container
+          .read(sessionNotifierProvider(init))
+          .value!
+          .setLogs
+          .firstWhere((l) => l.id == 'l2');
+
+      await notifier.removeSet(slot, target);
+
+      final logs = container.read(sessionNotifierProvider(init)).value!.setLogs;
+
+      expect(
+        logs.firstWhere((l) => l.id == 'l3').setNumber,
+        equals(2),
+        reason: 'la sobreviviente se renumera UNA vez: 3 → 2. Con un delta se '
+            'aplicaba dos veces (stream 3→2, map 2→1) y quedaba en 1.',
+      );
+      expect(
+        logs.map((l) => l.setNumber).toSet().length,
+        equals(logs.length),
+        reason: 'dos series del mismo ejercicio con el mismo setNumber no '
+            'existen: la fila 2 se dibujaba sin tildar aunque la serie estaba '
+            'en Firestore, y la 3 se ofrecía para cargar.',
+      );
+      expect(
+        logs.map((l) => l.setNumber).toList()..sort(),
+        equals(<int>[1, 2]),
+        reason: 'numeración densa 1..N después de borrar la del medio',
+      );
+    });
+
+    test(
         '[AD-5 floor invariant][REQ:workout#Session-Local Set Count Drives '
         'Completion Gating] removeSet cannot drop setCountOverride below the '
         'current logged count after the removal completes', () async {
@@ -1599,6 +1861,228 @@ void main() {
           )).called(2);
       final state = container.read(sessionNotifierProvider(init)).value!;
       expect(state.setLogs.any((l) => l.id == target.id), isFalse);
+    });
+  });
+
+  // ── Carrera contra el stream de Firestore ─────────────────────────────────
+
+  group('logSet vs. el stream de sesión', () {
+    /// El teléfono contaba series de MÁS.
+    ///
+    /// `logSet` escribe y después hace `[...setLogs, persisted]`. Esa escritura
+    /// dispara su PROPIO snapshot de Firestore, y desde que el player escucha
+    /// la subcolección —para ver lo que marca el reloj— ese snapshot puede
+    /// llegar ANTES del append. La serie entra dos veces en el estado local.
+    ///
+    /// Se veía como un ejercicio "4/4" con solo 3 series cargadas y el volumen
+    /// inflado al doble. Firestore estaba BIEN; el que contaba mal era el
+    /// teléfono. Detectado por el dueño probando con una rutina de 3
+    /// ejercicios, y confirmado leyendo los documentos reales del emulador.
+    test('el snapshot que llega durante el await NO duplica la serie',
+        () async {
+      final repo = MockSessionRepository();
+      final routine = makeRoutine();
+      final session = makeSession(id: 's42');
+
+      when(() => repo.getActive('u1')).thenAnswer((_) async => session);
+      when(() => repo.listSetLogs(uid: 'u1', sessionId: 's42'))
+          .thenAnswer((_) async => <SetLog>[]);
+
+      final nueva = makeSetLog(exerciseId: 'e1', setNumber: 1, id: 'remoto-1');
+
+      // El stream emite la serie que se está por escribir: es exactamente lo
+      // que hace Firestore cuando el propio `addSetLog` dispara su snapshot.
+      final controller = StreamController<List<SetLog>>.broadcast();
+      repo.setLogsStream = controller.stream;
+
+      when(() => repo.addSetLog(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            setLog: any(named: 'setLog'),
+          )).thenAnswer((_) async {
+        controller.add([nueva]);
+        // Deja correr el listener del stream ANTES de que logSet siga.
+        await Future<void>.delayed(Duration.zero);
+        return nueva;
+      });
+
+      final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
+      addTearDown(container.dispose);
+      addTearDown(controller.close);
+
+      const init = ResumeSession(sessionId: 's42');
+      // Suscripción viva: el provider es autoDispose y sin listener se
+      // descarta entre lecturas, así que `logSet` correría sobre una instancia
+      // recién creada y todavía en loading.
+      final sub = container.listen(sessionNotifierProvider(init), (_, __) {});
+      addTearDown(sub.close);
+      await container.read(sessionNotifierProvider(init).future);
+
+      await container
+          .read(sessionNotifierProvider(init).notifier)
+          .logSet(nueva);
+
+      final state = container.read(sessionNotifierProvider(init)).value!;
+      expect(
+        state.setLogs.length,
+        1,
+        reason:
+            'la serie entró por el stream Y por el append: se contaba doble',
+      );
+    });
+  });
+
+  // ── #645: recortar la sesión al tiempo disponible ─────────────────────────
+
+  group('SessionNotifier.dropExercisesForToday', () {
+    Future<({ProviderContainer container, SessionInit init})> boot({
+      required MockSessionRepository repo,
+      List<RoutineSlot>? slots,
+    }) async {
+      final routine = makeRoutine(
+        days: [
+          makeDay(
+            slots: slots ??
+                [
+                  makeSlot(exerciseId: 'e1', targetSets: 2),
+                  makeSlot(exerciseId: 'e2', targetSets: 2),
+                  makeSlot(exerciseId: 'e3', targetSets: 2),
+                ],
+          )
+        ],
+      );
+      when(() => repo.create(
+            uid: any(named: 'uid'),
+            routineId: any(named: 'routineId'),
+            routineName: any(named: 'routineName'),
+            startedAt: any(named: 'startedAt'),
+            dayNumber: any(named: 'dayNumber'),
+            weekNumber: any(named: 'weekNumber'),
+          )).thenAnswer((_) async => makeSession());
+
+      final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
+      addTearDown(container.dispose);
+      final init = FreshSession(routineId: routine.id, dayNumber: 1);
+      await container.read(sessionNotifierProvider(init).future);
+      return (container: container, init: init);
+    }
+
+    test('deja los ejercicios fuera de hoy sin escribir nada en Firestore',
+        () async {
+      final repo = MockSessionRepository();
+      final booted = await boot(repo: repo);
+      final notifier =
+          booted.container.read(sessionNotifierProvider(booted.init).notifier);
+
+      await notifier.dropExercisesForToday(const ['e2', 'e3']);
+
+      final state =
+          booted.container.read(sessionNotifierProvider(booted.init)).value!;
+      expect(state.droppedExerciseIds, equals(const {'e2', 'e3'}));
+      expect(state.activeExerciseCount, equals(1));
+      verifyNever(() => repo.addSetLog(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            setLog: any(named: 'setLog'),
+          ));
+      verifyNever(() => repo.deleteSetLog(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            setLogId: any(named: 'setLogId'),
+          ));
+    });
+
+    test('NO saca un ejercicio que ya tiene series hechas', () async {
+      final repo = MockSessionRepository();
+      when(() => repo.addSetLog(
+                uid: any(named: 'uid'),
+                sessionId: any(named: 'sessionId'),
+                setLog: any(named: 'setLog'),
+              ))
+          .thenAnswer(
+              (i) async => i.namedArguments[const Symbol('setLog')] as SetLog);
+
+      final booted = await boot(repo: repo);
+      final notifier =
+          booted.container.read(sessionNotifierProvider(booted.init).notifier);
+      await notifier.logSet(makeSetLog(exerciseId: 'e2', setNumber: 1));
+
+      await notifier.dropExercisesForToday(const ['e2', 'e3']);
+
+      final state =
+          booted.container.read(sessionNotifierProvider(booted.init)).value!;
+      expect(state.droppedExerciseIds, equals(const {'e3'}),
+          reason: 'e2 tiene trabajo hecho: sacarlo lo escondería');
+    });
+
+    test('es acumulativo e idempotente — recortar dos veces no rompe nada',
+        () async {
+      final repo = MockSessionRepository();
+      final booted = await boot(repo: repo);
+      final notifier =
+          booted.container.read(sessionNotifierProvider(booted.init).notifier);
+
+      await notifier.dropExercisesForToday(const ['e3']);
+      final first =
+          booted.container.read(sessionNotifierProvider(booted.init)).value!;
+      await notifier.dropExercisesForToday(const ['e3']);
+      final again =
+          booted.container.read(sessionNotifierProvider(booted.init)).value!;
+      expect(identical(first, again), isTrue,
+          reason: 'sin cambio real no se emite estado nuevo');
+
+      await notifier.dropExercisesForToday(const ['e2']);
+      final merged =
+          booted.container.read(sessionNotifierProvider(booted.init)).value!;
+      expect(merged.droppedExerciseIds, equals(const {'e2', 'e3'}));
+    });
+
+    test('mueve el cursor fuera de un ejercicio que acaba de salir', () async {
+      final repo = MockSessionRepository();
+      final booted = await boot(repo: repo);
+      final notifier =
+          booted.container.read(sessionNotifierProvider(booted.init).notifier);
+
+      await notifier.dropExercisesForToday(const ['e1']);
+
+      final state =
+          booted.container.read(sessionNotifierProvider(booted.init)).value!;
+      expect(state.currentExerciseIndex, equals(1),
+          reason: 'e1 salió: el que sigue es e2');
+    });
+
+    test('la rutina persistida no se toca — el día del plan queda igual',
+        () async {
+      final repo = MockSessionRepository();
+      final booted = await boot(repo: repo);
+      final notifier =
+          booted.container.read(sessionNotifierProvider(booted.init).notifier);
+
+      await notifier.dropExercisesForToday(const ['e2', 'e3']);
+
+      final state =
+          booted.container.read(sessionNotifierProvider(booted.init)).value!;
+      expect(
+        state.day.slots.map((s) => s.exerciseId),
+        equals(['e1', 'e2', 'e3']),
+        reason: 'el recorte es de la sesión, no del plan',
+      );
+    });
+
+    test('restoreDroppedExercises devuelve todo a la sesión', () async {
+      final repo = MockSessionRepository();
+      final booted = await boot(repo: repo);
+      final notifier =
+          booted.container.read(sessionNotifierProvider(booted.init).notifier);
+
+      await notifier.dropExercisesForToday(const ['e2', 'e3']);
+      await notifier.restoreDroppedExercises();
+
+      final state =
+          booted.container.read(sessionNotifierProvider(booted.init)).value!;
+      expect(state.droppedExerciseIds, isEmpty);
+      expect(state.activeExerciseCount, equals(3));
+      expect(state.currentExerciseIndex, equals(0));
     });
   });
 }

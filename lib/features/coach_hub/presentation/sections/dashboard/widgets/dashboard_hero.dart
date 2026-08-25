@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_palette.dart';
-import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/utils/argentina_time.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
@@ -84,9 +84,12 @@ class DashboardAlertBanner extends ConsumerWidget {
         vertical: AppSpacing.s14,
       ),
       decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: Border.all(color: palette.border),
+        // Card flotante (revisión): mismo token TreinoCardTokens que welcome
+        // card/pendientes/columna derecha — antes AppRadius.sm (12), quedaba
+        // desalineado del resto de las cards del dashboard (md, 16).
+        color: TreinoCardTokens.background(context),
+        borderRadius: BorderRadius.circular(TreinoCardTokens.borderRadius),
+        border: Border.all(color: TreinoCardTokens.border(context)),
       ),
       child: Row(
         children: [
@@ -162,7 +165,7 @@ class _AlertBannerCta extends StatelessWidget {
             fontWeight: FontWeight.w700,
             fontSize: 12,
             letterSpacing: 0.6,
-            color: palette.bg,
+            color: TreinoButtonTokens.foreground(context),
           ),
         ),
       ),
@@ -231,15 +234,19 @@ class DashboardWelcomeCard extends ConsumerWidget {
       // admite los dos a la vez. Los dos ultimos stops son bgCard, asi que el
       // resto de la card queda identica al color plano anterior.
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: palette.border),
+        // Borde y radio por TreinoCardTokens (migración de la ronda de
+        // revisión) + el glow mint de #341 como fondo. BoxDecoration no admite
+        // `color` y `gradient` a la vez, así que el background del token pasa
+        // a ser los dos últimos stops: fuera del glow se ve idéntico.
+        borderRadius: BorderRadius.circular(TreinoCardTokens.borderRadius),
+        border: Border.all(color: TreinoCardTokens.border(context)),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
             palette.accent.withValues(alpha: 0.12),
-            palette.bgCard,
-            palette.bgCard,
+            TreinoCardTokens.background(context),
+            TreinoCardTokens.background(context),
           ],
           stops: const [0.0, 0.45, 1.0],
         ),
@@ -394,13 +401,13 @@ class _PrimaryQuickAction extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 15, color: palette.bg),
+            Icon(icon, size: 15, color: TreinoButtonTokens.foreground(context)),
             const SizedBox(width: AppSpacing.s8),
             Text(
               label,
               style: TextStyle(
                 fontFamily: AppFonts.barlowCondensed,
-                color: palette.bg,
+                color: TreinoButtonTokens.foreground(context),
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 1.1,
@@ -493,7 +500,27 @@ class DashboardAdherenceRing extends ConsumerWidget {
       height: 72,
       child: Stack(
         alignment: Alignment.center,
+        // Clip.none: el halo (96px) bleedea unos px fuera del box 72x72 a
+        // propósito — no afecta layout (Stack no fuerza tamaño por children),
+        // solo pintura. Mismo criterio "sin blur pesado" de AppBackground/
+        // ChatEmptyPane, a escala del número hero del welcome card.
+        clipBehavior: Clip.none,
         children: [
+          Container(
+            key: const Key('adherence_ring_glow'),
+            width: 96,
+            height: 96,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  palette.accent.withValues(alpha: 0.18),
+                  palette.accent.withValues(alpha: 0),
+                ],
+                stops: const [0.0, 0.85],
+              ),
+            ),
+          ),
           CircularProgressIndicator(
             value: ringValue,
             strokeWidth: 6,
@@ -505,6 +532,7 @@ class DashboardAdherenceRing extends ConsumerWidget {
           Text(
             label,
             style: TextStyle(
+              fontFamily: AppFonts.barlowCondensed,
               color:
                   adherence == null ? palette.textMuted : palette.textPrimary,
               fontSize: 14,

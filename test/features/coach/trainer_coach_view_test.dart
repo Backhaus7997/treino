@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/widgets/treino_segmented_pill.dart';
 import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
@@ -95,6 +96,10 @@ void main() {
       expect(find.text('ALUMNOS'), findsWidgets);
       expect(find.text('AGENDA'), findsWidgets);
       expect(find.text('COMUNIDADES'), findsNothing);
+      // The shared kit component, not just any TabBar: the inline copy this
+      // replaced also satisfied findsOneWidget, so reverting the migration
+      // would otherwise leave the whole suite green (#646).
+      expect(find.byType(TreinoSegmentedPill), findsOneWidget);
       expect(find.byType(TabBar), findsOneWidget);
     });
 

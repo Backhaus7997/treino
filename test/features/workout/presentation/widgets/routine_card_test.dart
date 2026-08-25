@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/workout/domain/routine.dart';
@@ -28,16 +29,28 @@ RoutineSlot _makeSlot(int i) => RoutineSlot(
       restSeconds: 60,
     );
 
-RoutineDay makeDayWithSlots(int slotCount) => RoutineDay(
-      dayNumber: 1,
-      name: 'Day 1',
+RoutineDay makeDayWithSlots(
+  int slotCount, {
+  int dayNumber = 1,
+  int? estimatedMinutes,
+}) =>
+    RoutineDay(
+      dayNumber: dayNumber,
+      name: 'Day $dayNumber',
       slots: List.generate(slotCount, _makeSlot),
+      estimatedMinutes: estimatedMinutes,
     );
 
+// Localizations are required since #639: the metadata caption is built from
+// l10n keys (days/week is a plural, minutes carries a unit), so the card can
+// no longer render under a bare MaterialApp.
 Widget _wrap(Widget w, {List<Override> overrides = const []}) => ProviderScope(
       overrides: overrides,
       child: MaterialApp(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
         home: Scaffold(body: w),
       ),
     );
@@ -59,30 +72,82 @@ void main() {
       expect(find.text('FULL BODY'), findsOneWidget);
     });
 
+    // ── Metadata caption (#639) ──────────────────────────────────────────
+    //
+    // Replaces the old `{LevelEs} · {N} ej.` assertions. That exercise count
+    // summed EVERY day, so a multi-day routine advertised a number no single
+    // session ever matched; the caption now answers the two questions a reader
+    // actually has: how many days a week, and how long a session runs.
+
     testWidgets(
-      'subtitle shows "{LevelEs} · {N} ej." — 2 days (5+3 slots) → "Principiante · 8 ej."',
+      'caption shows level, days per week and the authored session length',
       (tester) async {
         final routine = makeRoutine(
           level: ExperienceLevel.beginner,
-          days: [makeDayWithSlots(5), makeDayWithSlots(3)],
+          days: [
+            makeDayWithSlots(5, estimatedMinutes: 45),
+            makeDayWithSlots(3, dayNumber: 2, estimatedMinutes: 45),
+          ],
         );
         await tester.pumpWidget(_wrap(RoutineCard(routine: routine)));
         await tester.pump();
-        expect(find.text('Principiante · 8 ej.'), findsOneWidget);
+        expect(find.text('Principiante · 2 días/sem · 45 min'), findsOneWidget);
       },
     );
 
-    testWidgets('subtitle for zero-day routine → "{LevelEs} · 0 ej."', (
+    testWidgets('a computed duration is prefixed "~" to read as an estimate', (
       tester,
     ) async {
       final routine = makeRoutine(
-        level: ExperienceLevel.intermediate,
-        days: const [],
+        level: ExperienceLevel.beginner,
+        // No estimatedMinutes anywhere → the figure comes from the slots.
+        days: [makeDayWithSlots(3)],
       );
       await tester.pumpWidget(_wrap(RoutineCard(routine: routine)));
       await tester.pump();
-      expect(find.text('Intermedio · 0 ej.'), findsOneWidget);
+      expect(find.textContaining('· ~'), findsOneWidget);
+      expect(find.textContaining('min'), findsOneWidget);
     });
+
+    testWidgets('one day per week is singular, not "1 días/sem"', (
+      tester,
+    ) async {
+      final routine = makeRoutine(
+        days: [makeDayWithSlots(2, estimatedMinutes: 30)],
+      );
+      await tester.pumpWidget(_wrap(RoutineCard(routine: routine)));
+      await tester.pump();
+      expect(find.textContaining('1 día/sem'), findsOneWidget);
+      expect(find.textContaining('1 días/sem'), findsNothing);
+    });
+
+    testWidgets(
+      'nothing measurable → the duration segment is dropped, never "0 min"',
+      (tester) async {
+        final routine = makeRoutine(
+          level: ExperienceLevel.beginner,
+          days: [makeDayWithSlots(0)], // a day with no slots
+        );
+        await tester.pumpWidget(_wrap(RoutineCard(routine: routine)));
+        await tester.pump();
+        expect(find.text('Principiante · 1 día/sem'), findsOneWidget);
+        expect(find.textContaining('min'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'zero-day routine → level alone, no "0 días/sem"',
+      (tester) async {
+        final routine = makeRoutine(
+          level: ExperienceLevel.intermediate,
+          days: const [],
+        );
+        await tester.pumpWidget(_wrap(RoutineCard(routine: routine)));
+        await tester.pump();
+        expect(find.text('Intermedio'), findsOneWidget);
+        expect(find.textContaining('días/sem'), findsNothing);
+      },
+    );
 
     testWidgets('Icon widget present; no Image widget (imageUrl null)', (
       tester,
@@ -116,6 +181,9 @@ void main() {
         ProviderScope(
           child: MaterialApp.router(
             theme: AppTheme.dark(),
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('es', 'AR'),
             routerConfig: mockRouter,
           ),
         ),
@@ -138,6 +206,9 @@ void main() {
       Widget host(String name, {required bool reserve}) => ProviderScope(
             child: MaterialApp(
               theme: AppTheme.dark(),
+              localizationsDelegates: AppL10n.localizationsDelegates,
+              supportedLocales: AppL10n.supportedLocales,
+              locale: const Locale('es', 'AR'),
               home: Scaffold(
                 body: Center(
                   child: SizedBox(

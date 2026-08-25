@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/utils/kg_format.dart';
@@ -71,7 +72,7 @@ class PostCard extends ConsumerWidget {
     return Container(
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(
           color: palette.accent.withValues(alpha: 0.25),
           width: 1,
@@ -253,7 +254,7 @@ class PostCard extends ConsumerWidget {
       context: context,
       backgroundColor: palette.bgCard,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
       ),
       builder: (sheetContext) => SafeArea(
         child: Column(
@@ -375,7 +376,7 @@ class _PostPhoto extends StatelessWidget {
     final palette = AppPalette.of(context);
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(AppRadius.md),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxHeight: 320),
         child: SizedBox(
@@ -492,7 +493,7 @@ class _RoutineTagChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: palette.accent.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           border: Border.all(
             color: palette.accent.withValues(alpha: 0.35),
             width: 1,

@@ -1,4 +1,7 @@
+import 'dart:ui' show Tristate;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -93,6 +96,51 @@ void main() {
       expect(find.text('INFORMACIÓN PERSONAL'), findsNothing);
     });
 
+    testWidgets(
+        'sub-nav: item seleccionado expone Semantics(button + selected), '
+        'y Enter sobre el item enfocado activa el tab', (tester) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(_harness());
+      // Deja completar la entrada TreinoFadeSlideIn (stagger + fade) de la
+      // sub-nav antes de inspeccionar semantics — a opacidad 0 el subárbol
+      // queda excluido del árbol de semantics.
+      await tester.pumpAndSettle();
+
+      final cuentaSemantics = tester.getSemantics(
+        find.byKey(const Key('ajustes_subnav_cuenta')),
+      );
+      expect(cuentaSemantics.flagsCollection.isButton, isTrue,
+          reason: 'el item de sub-nav debe exponer Semantics(button: true)');
+      expect(cuentaSemantics.flagsCollection.isSelected, Tristate.isTrue,
+          reason: 'Cuenta está seleccionado por default');
+
+      final notifSemantics = tester.getSemantics(
+        find.byKey(const Key('ajustes_subnav_notificaciones')),
+      );
+      expect(notifSemantics.flagsCollection.isButton, isTrue);
+      expect(notifSemantics.flagsCollection.isSelected, isNot(Tristate.isTrue),
+          reason: 'Notificaciones no está seleccionado por default');
+
+      // Foco por teclado: Tab dos veces (Cuenta -> Notificaciones) + Enter
+      // activa el tab enfocado, sin necesidad de tap de mouse.
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      // pumpAndSettle, no pumps sueltos: el cuerpo del tab va dentro de un
+      // TreinoStateSwitcher, que mantiene el hijo SALIENTE en el árbol
+      // mientras dura el cross-fade. Con dos pumps, Cuenta y Notificaciones
+      // conviven un instante y el findsNothing de abajo falla por timing, no
+      // porque el tab no haya cambiado.
+      await tester.pumpAndSettle();
+
+      expect(find.text('NOTIFICACIONES'), findsOneWidget);
+      expect(find.text('INFORMACIÓN PERSONAL'), findsNothing);
+
+      handle.dispose();
+    });
+
     testWidgets('Notificaciones: togglear un canal persiste notificationPrefs',
         (tester) async {
       final repo = _MockUserRepo();
@@ -105,7 +153,8 @@ void main() {
       await tester.pump();
       await tester.pump(); // deja emitir el StreamProvider de prefs
 
-      // Primer checkbox = pago_recibido × EMAIL (default on) → lo apago.
+      // Primer checkbox = nueva_solicitud × EMAIL (default on) → lo apago.
+      // `nueva_solicitud` es una de las dos filas de kEmailBackedTypes.
       await tester.tap(find.byType(Checkbox).first);
       await tester.pump();
 
@@ -113,8 +162,8 @@ void main() {
           .captured
           .single as Map<String, Object?>;
       final prefs = captured['notificationPrefs'] as Map<String, dynamic>;
-      expect((prefs['pago_recibido'] as Map)['email'], false);
-      expect((prefs['pago_recibido'] as Map)['push'], true);
+      expect((prefs['nueva_solicitud'] as Map)['email'], false);
+      expect((prefs['nueva_solicitud'] as Map)['push'], true);
     });
 
     testWidgets(
@@ -210,6 +259,39 @@ void main() {
 
       verify(() => uploader.deleteStored()).called(1);
       verify(() => repo.update('pf1', {'avatarUrl': null})).called(1);
+      expect(find.text('Foto quitada'), findsOneWidget);
+    });
+
+    testWidgets(
+        'QUITAR no miente si el borrado de Storage falla: avisa y no limpia '
+        'avatarUrl', (tester) async {
+      // Regresión de #765 (QA-SEC-009). `deleteStored()` se comía TODAS las
+      // excepciones en un `catch (_) {}` vacío, y como la regla de Storage
+      // denegaba el borrado hasta para el dueño, este camino era el REAL: el
+      // usuario veía "Foto quitada" y el objeto seguía en el bucket.
+      final repo = _MockUserRepo();
+      final uploader = _MockUploader();
+      when(() => uploader.deleteStored())
+          .thenAnswer((_) async => throw Exception('storage denied'));
+      when(() => repo.update(any(), any())).thenAnswer((_) async {});
+
+      await tester.pumpWidget(_harness(
+        profile: _trainer().copyWith(avatarUrl: 'https://cdn/old.jpg'),
+        repo: repo,
+        uploader: uploader,
+      ));
+      await tester.pump();
+
+      await tester.tap(find.text('QUITAR'));
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('Foto quitada'), findsNothing);
+      expect(
+        find.text('No se pudo quitar la foto. Probá de nuevo.'),
+        findsOneWidget,
+      );
+      verifyNever(() => repo.update(any(), any()));
     });
   });
 }

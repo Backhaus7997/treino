@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_motion.dart';
 import '../../../../app/theme/app_palette.dart';
@@ -117,7 +118,7 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
                   height: 4,
                   decoration: BoxDecoration(
                     color: palette.border,
-                    borderRadius: BorderRadius.circular(9999),
+                    borderRadius: BorderRadius.circular(AppRadius.full),
                   ),
                 ),
               ),
@@ -305,15 +306,15 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
                         filled: true,
                         fillColor: palette.bg,
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(AppRadius.sm),
                           borderSide: BorderSide(color: palette.border),
                         ),
                         enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(AppRadius.sm),
                           borderSide: BorderSide(color: palette.border),
                         ),
                         focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(AppRadius.sm),
                           borderSide: BorderSide(
                             color: palette.accent,
                             width: 1.5,
@@ -334,7 +335,8 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
                             : (_recurring ? _submitRecurring : _submitSingle),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: palette.accent,
-                          foregroundColor: palette.bg,
+                          foregroundColor:
+                              TreinoButtonTokens.foreground(context),
                           disabledBackgroundColor: palette.border,
                           minimumSize: const Size.fromHeight(48),
                           shape: const StadiumBorder(),
@@ -344,7 +346,7 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
                                 width: 20,
                                 height: 20,
                                 child: CircularProgressIndicator(
-                                  color: palette.bg,
+                                  color: TreinoButtonTokens.foreground(context),
                                   strokeWidth: 2,
                                 ),
                               )
@@ -531,7 +533,8 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: palette.bgCard,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.lg)),
         title: Text(
           title,
           style: GoogleFonts.barlowCondensed(
@@ -560,7 +563,7 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
             onPressed: () => Navigator.of(ctx).pop(true),
             style: ElevatedButton.styleFrom(
               backgroundColor: palette.accent,
-              foregroundColor: palette.bg,
+              foregroundColor: TreinoButtonTokens.foreground(context),
             ),
             child: Text(
               confirmLabel,
@@ -906,7 +909,9 @@ class _Pill extends StatelessWidget {
                 fontWeight: FontWeight.w700,
                 fontSize: 13,
                 letterSpacing: 0.6,
-                color: selected ? palette.bg : palette.textMuted,
+                color: selected
+                    ? TreinoButtonTokens.foreground(context)
+                    : palette.textMuted,
               ),
             ),
           ),
@@ -980,7 +985,9 @@ class _WeekdayChips extends StatelessWidget {
                     style: GoogleFonts.barlowCondensed(
                       fontWeight: FontWeight.w700,
                       fontSize: 13,
-                      color: isSelected ? palette.bg : palette.textPrimary,
+                      color: isSelected
+                          ? TreinoButtonTokens.foreground(context)
+                          : palette.textPrimary,
                     ),
                   ),
                 ),
@@ -1094,15 +1101,15 @@ class _DurationSectionState extends State<_DurationSection> {
             filled: true,
             fillColor: palette.bg,
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
               borderSide: BorderSide(color: palette.border),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
               borderSide: BorderSide(color: palette.border),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
               borderSide: BorderSide(color: palette.accent, width: 1.5),
             ),
             suffixText: 'min',
@@ -1168,7 +1175,7 @@ class _TappableField extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         decoration: BoxDecoration(
           color: palette.bg,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           border: Border.all(color: palette.border),
         ),
         child: Row(
@@ -1285,15 +1292,15 @@ class _AthleteDropdown extends ConsumerWidget {
         filled: true,
         fillColor: palette.bg,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           borderSide: BorderSide(color: palette.border),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           borderSide: BorderSide(color: palette.border),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           borderSide: BorderSide(color: palette.accent, width: 1.5),
         ),
       ),

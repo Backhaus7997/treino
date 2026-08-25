@@ -4,6 +4,7 @@
   "private": true,
   "description": "Treino workout catalog seed scripts.",
   "scripts": {
+    "test": "node --test \"test/*.test.js\"",
     "seed:exercises": "node seed_workout_catalog.js --exercises",
     "seed:routines": "node seed_workout_catalog.js --routines",
     "seed:all": "node seed_workout_catalog.js --all",
@@ -14,6 +15,6 @@
     "seed:emulator:clear": "FIREBASE_AUTH_EMULATOR_HOST=localhost:9099 FIRESTORE_EMULATOR_HOST=localhost:8080 node seed_emulator_full.js --clear"
   },
   "dependencies": {
-    "firebase-admin": "^12.0.0"
+    "firebase-admin": "^14.3.0"
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../coach/application/trainer_link_providers.dart'
     show trainerLinksStreamProvider;
 import '../../coach/domain/trainer_link_status.dart';
+import '../../../core/utils/argentina_time.dart';
 import '../../workout/application/session_providers.dart'
     show finishedInWindowByUidProvider;
 
@@ -59,7 +60,9 @@ final inactivosProvider =
       .toList();
 
   // Day-truncated stable window boundaries.
-  final now = DateTime.now().toUtc();
+  // Umbral de 14 dias contado en ART (#671): con UTC los atletas entraban
+  // a "Inactivos" ~21h antes de cumplirse.
+  final now = argentinaNow();
   final todayStart = DateTime.utc(now.year, now.month, now.day);
   final from = todayStart.subtract(const Duration(days: 14));
   final to = todayStart.add(const Duration(days: 1));

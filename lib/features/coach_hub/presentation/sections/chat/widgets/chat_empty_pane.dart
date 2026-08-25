@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../../../app/theme/app_palette.dart';
+import '../../../../../../app/theme/tokens/primitives.dart';
 import '../../../../../../core/widgets/treino_icon.dart';
 
 /// Placeholder visual mostrado en el panel derecho cuando el PF no ha
@@ -26,7 +26,8 @@ class ChatEmptyPane extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             'Seleccioná una conversación', // i18n: Fase W2
-            style: GoogleFonts.barlowCondensed(
+            style: TextStyle(
+              fontFamily: AppFonts.barlowCondensed,
               fontWeight: FontWeight.w600,
               fontSize: 18,
               color: palette.textPrimary,
@@ -35,7 +36,8 @@ class ChatEmptyPane extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             'Elegí un alumno a la izquierda para ver el chat.', // i18n: Fase W2
-            style: GoogleFonts.barlow(
+            style: TextStyle(
+              fontFamily: AppFonts.barlow,
               fontWeight: FontWeight.w400,
               fontSize: 13,
               color: palette.textMuted,

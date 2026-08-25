@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../../app/theme/app_palette.dart';
 import '../../../../../core/utils/appointment_window.dart';
@@ -214,7 +215,7 @@ class _Panel extends StatelessWidget {
       decoration: BoxDecoration(
         color: palette.bgCard,
         border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: child,
     );
@@ -277,7 +278,7 @@ class _DayPanelHeader extends StatelessWidget {
           onPressed: onNewSession,
           style: ElevatedButton.styleFrom(
             backgroundColor: palette.accent,
-            foregroundColor: palette.bg,
+            foregroundColor: TreinoButtonTokens.foreground(context),
             minimumSize: const Size(0, 36),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
             shape: const StadiumBorder(),

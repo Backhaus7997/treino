@@ -9,6 +9,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/widgets/motion/treino_count_up.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart'
@@ -139,7 +140,7 @@ class _EstadoCuentaCardState extends State<EstadoCuentaCard> {
       decoration: BoxDecoration(
         color: palette.bgCard,
         border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: TreinoStateSwitcher(
         childKey: ValueKey(pending.isEmpty ? 'empty' : 'pending'),

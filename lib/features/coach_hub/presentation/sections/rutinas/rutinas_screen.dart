@@ -5,9 +5,9 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/motion/treino_tappable.dart';
@@ -56,9 +56,16 @@ class RutinasScreen extends ConsumerWidget {
         children: [
           const TreinoSectionHeader(title: 'Rutinas'), // i18n
           const SizedBox(height: 6),
-          Text(
-            'Elegí un alumno para armarle una rutina.', // i18n
-            style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(1),
+            child: Text(
+              'Elegí un alumno para armarle una rutina.', // i18n
+              style: TextStyle(
+                fontFamily: AppFonts.barlow,
+                color: palette.textMuted,
+                fontSize: 14,
+              ),
+            ),
           ),
           const SizedBox(height: 20),
           TreinoStateSwitcher(
@@ -105,7 +112,10 @@ class RutinasScreen extends ConsumerWidget {
 Widget _muted(AppPalette palette, String text) => Padding(
       padding: const EdgeInsets.symmetric(vertical: 24),
       child: Text(text,
-          style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14)),
+          style: TextStyle(
+              fontFamily: AppFonts.barlow,
+              color: palette.textMuted,
+              fontSize: 14)),
     );
 
 /// Estado simplificado del vínculo para esta lista — a diferencia de
@@ -356,12 +366,14 @@ class _Chip extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected ? palette.accent : Colors.transparent,
           border: Border.all(color: selected ? palette.accent : palette.border),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: selected ? palette.bg : palette.textMuted,
+            color: selected
+                ? TreinoButtonTokens.foreground(context)
+                : palette.textMuted,
             fontSize: 12,
             fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
             letterSpacing: 0.4,
@@ -401,15 +413,15 @@ class _SearchFieldState extends ConsumerState<_SearchField> {
         filled: true,
         fillColor: palette.bgCard,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           borderSide: BorderSide(color: palette.border),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           borderSide: BorderSide(color: palette.border),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           borderSide: BorderSide(color: palette.accent),
         ),
       ),
@@ -439,12 +451,17 @@ class _ViewModeToggle extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(icon,
-                  size: 15, color: selected ? palette.bg : palette.textMuted),
+                  size: 15,
+                  color: selected
+                      ? TreinoButtonTokens.foreground(context)
+                      : palette.textMuted),
               const SizedBox(width: 6),
               Text(
                 label,
                 style: TextStyle(
-                  color: selected ? palette.bg : palette.textMuted,
+                  color: selected
+                      ? TreinoButtonTokens.foreground(context)
+                      : palette.textMuted,
                   fontSize: 13,
                   fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
                 ),
@@ -520,7 +537,7 @@ class _AthleteRowState extends State<_AthleteRow> {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
             color: palette.bgCard,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
             border: Border.all(
                 color: _hovered ? palette.borderHover : palette.border),
           ),
@@ -538,7 +555,8 @@ class _AthleteRowState extends State<_AthleteRow> {
                     Text(
                       widget.name,
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.barlow(
+                      style: TextStyle(
+                          fontFamily: AppFonts.barlow,
                           color: palette.textPrimary,
                           fontSize: 15,
                           fontWeight: FontWeight.w600),
@@ -547,8 +565,10 @@ class _AthleteRowState extends State<_AthleteRow> {
                       Text(
                         gymName,
                         overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.barlow(
-                            color: palette.textMuted, fontSize: 12),
+                        style: TextStyle(
+                            fontFamily: AppFonts.barlow,
+                            color: palette.textMuted,
+                            fontSize: 12),
                       ),
                   ],
                 ),
@@ -668,7 +688,8 @@ class _RutinasCard extends StatelessWidget {
               child: Text(
                 name,
                 overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.barlow(
+                style: TextStyle(
+                  fontFamily: AppFonts.barlow,
                   color: palette.textPrimary,
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -735,7 +756,7 @@ class _EstadoPill extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -778,7 +799,7 @@ class _RoutineCountBadge extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
           color: palette.textMuted.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
         ),
         child: Text(
           '…', // i18n
@@ -799,7 +820,7 @@ class _RoutineCountBadge extends StatelessWidget {
         color: hasRoutines
             ? color.withValues(alpha: 0.15)
             : palette.textMuted.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
       ),
       child: Text(
         label,

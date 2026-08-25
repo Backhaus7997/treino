@@ -160,7 +160,7 @@ describe("resolveFollowNotif — ramas puras", () => {
   it("skip en un create con status inesperado", () => {
     expect(resolveFollowNotif(undefined, edge("blocked"))).toEqual({
       kind: "skip",
-      reason: 'unknown status "blocked"',
+      reason: "unknown status \"blocked\"",
     });
   });
 });

@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../../app/theme/app_palette.dart';
 import '../../../../coach/application/agenda_providers.dart';
@@ -45,7 +46,8 @@ class AvailabilityEditorPanel extends ConsumerWidget {
 
     return Dialog(
       backgroundColor: palette.bgCard,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg)),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 560, maxHeight: 720),
         child: Column(
@@ -125,7 +127,7 @@ class AvailabilityEditorPanel extends ConsumerWidget {
                           side: BorderSide(color: palette.accent),
                           minimumSize: const Size.fromHeight(44),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(9999),
+                            borderRadius: BorderRadius.circular(AppRadius.full),
                           ),
                         ),
                       ),
@@ -193,7 +195,8 @@ class AvailabilityEditorPanel extends ConsumerWidget {
                                 side: BorderSide(color: palette.border),
                                 minimumSize: const Size.fromHeight(40),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(9999),
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadius.full),
                                 ),
                               ),
                             ),
@@ -218,7 +221,8 @@ class AvailabilityEditorPanel extends ConsumerWidget {
                                 side: BorderSide(color: palette.accent),
                                 minimumSize: const Size.fromHeight(40),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(9999),
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadius.full),
                                 ),
                               ),
                             ),
@@ -319,7 +323,8 @@ class _RulesList extends ConsumerWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: palette.bgCard,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.lg)),
         content: Text(
           '¿Eliminar este horario?', // i18n
           style: GoogleFonts.barlow(fontSize: 14, color: palette.textPrimary),
@@ -340,7 +345,7 @@ class _RulesList extends ConsumerWidget {
             onPressed: () => Navigator.of(ctx).pop(true),
             style: ElevatedButton.styleFrom(
               backgroundColor: palette.accent,
-              foregroundColor: palette.bg,
+              foregroundColor: TreinoButtonTokens.foreground(context),
             ),
             child: Text(
               'CONFIRMAR', // i18n
@@ -391,7 +396,7 @@ class _RuleTile extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: palette.bg,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         border: Border.all(color: palette.border, width: 1),
       ),
       child: Row(
@@ -483,7 +488,8 @@ class _OverridesList extends ConsumerWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: palette.bgCard,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.lg)),
         content: Text(
           '¿Eliminar esta excepción?', // i18n
           style: GoogleFonts.barlow(fontSize: 14, color: palette.textPrimary),
@@ -504,7 +510,7 @@ class _OverridesList extends ConsumerWidget {
             onPressed: () => Navigator.of(ctx).pop(true),
             style: ElevatedButton.styleFrom(
               backgroundColor: palette.accent,
-              foregroundColor: palette.bg,
+              foregroundColor: TreinoButtonTokens.foreground(context),
             ),
             child: Text(
               'CONFIRMAR', // i18n
@@ -556,7 +562,7 @@ class _OverrideTile extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: palette.bg,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         border: Border.all(color: palette.border, width: 1),
       ),
       child: Row(
@@ -612,7 +618,7 @@ class _EmptyHint extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: palette.bg,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           border: Border.all(color: palette.border, width: 1),
         ),
         child: Text(
@@ -654,7 +660,7 @@ class _ErrorState extends StatelessWidget {
             style: OutlinedButton.styleFrom(
               side: BorderSide(color: palette.accent),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(9999),
+                borderRadius: BorderRadius.circular(AppRadius.full),
               ),
             ),
             child: Text(

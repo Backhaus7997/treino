@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
@@ -69,7 +70,7 @@ class EstaSemanaCard extends ConsumerWidget {
     return Container(
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: palette.border, width: 1),
       ),
       child: async.when(
@@ -354,7 +355,7 @@ class _InsightsCtaState extends State<_InsightsCta> {
                 fontWeight: FontWeight.w700,
                 fontSize: 13,
                 letterSpacing: 0.8,
-                color: palette.bg,
+                color: TreinoButtonTokens.foreground(context),
               ),
             ),
           ),
@@ -436,7 +437,7 @@ class _ZeroWeekState extends StatelessWidget {
                 foregroundColor: palette.accent,
                 minimumSize: const Size.fromHeight(48),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(9999),
+                  borderRadius: BorderRadius.circular(AppRadius.full),
                 ),
               ),
               child: Text(
@@ -488,7 +489,7 @@ class _CardHeader extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             border: Border.all(color: palette.accent, width: 1),
-            borderRadius: BorderRadius.circular(9999),
+            borderRadius: BorderRadius.circular(AppRadius.full),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -641,7 +642,7 @@ class _DayBar extends StatelessWidget {
           decoration: BoxDecoration(
             color: barColor,
             border: barBorder,
-            borderRadius: BorderRadius.circular(9999),
+            borderRadius: BorderRadius.circular(AppRadius.full),
           ),
         ),
         const SizedBox(height: 8),

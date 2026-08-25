@@ -95,7 +95,7 @@ abstract class AppL10n {
   static const List<Locale> supportedLocales = <Locale>[
     Locale('en'),
     Locale('es'),
-    Locale('es', 'AR'),
+    Locale('es', 'AR')
   ];
 
   /// No description provided for @notFoundTitle.
@@ -122,10 +122,10 @@ abstract class AppL10n {
   /// **'Arrancá tu entrenamiento'**
   String get homeAthleteFirstRunTitle;
 
-  /// Home first-run empty-state body offering both the create-routine and find-trainer paths (finding 6).
+  /// Home first-run empty-state body naming the three onboarding paths: create a routine, explore ready-made plans, find a trainer (#636). Order must match the CTA order in _AthleteFirstRunCard.
   ///
   /// In es_AR, this message translates to:
-  /// **'Creá tu primera rutina o buscá un entrenador para empezar.'**
+  /// **'Creá tu propia rutina, explorá planes ya armados o buscá un entrenador que te guíe.'**
   String get homeAthleteFirstRunBody;
 
   /// Home first-run primary CTA to create a routine (finding 6).
@@ -133,6 +133,12 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'CREAR RUTINA'**
   String get homeAthleteFirstRunCreateCta;
+
+  /// Home first-run secondary CTA to the EXPLORAR page of the Entrenar tab, where ready-made plans live (#636). Wording tracks the tab label (workoutTabExplore), NOT the legacy 'plantillas' deep-link value.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Explorar planes'**
+  String get homeAthleteFirstRunExplorePlansCta;
 
   /// Home first-run secondary CTA to browse trainers (finding 6).
   ///
@@ -260,6 +266,30 @@ abstract class AppL10n {
   /// **'ENTRENÁ. COMPARTÍ. CRECÉ.'**
   String get authSplashTagline;
 
+  /// Brand headline, line 1, LIGHT half (w500). Rendered by splash_screen and welcome_screen from the same keys so the two screens can't drift apart. The trailing space is load-bearing — the light and bold halves are adjacent TextSpans, not separate widgets.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DEJÁ DE '**
+  String get authBrandHeadline1Light;
+
+  /// Brand headline, line 1, BOLD half (w900). This is the punchline of the line — keep the emphasis on the payoff word, not the setup.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'IMPROVISAR.'**
+  String get authBrandHeadline1Bold;
+
+  /// Brand headline, line 2, LIGHT half (w500). Trailing space is load-bearing, same as line 1.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'EMPEZÁ A '**
+  String get authBrandHeadline2Light;
+
+  /// Brand headline, line 2, BOLD half (w900). Deliberately does NOT name a modality: the old copy said 'EL HIERRO', which read as gym-only and excluded the calisthenics catalogue the app actually ships.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PROGRESAR.'**
+  String get authBrandHeadline2Bold;
+
   /// No description provided for @authWelcomeEyebrow.
   ///
   /// In es_AR, this message translates to:
@@ -269,7 +299,7 @@ abstract class AppL10n {
   /// No description provided for @authWelcomeBody.
   ///
   /// In es_AR, this message translates to:
-  /// **'Cargá tu rutina, ejecutá los sets, seguí a tus pibes y encontrá un coach cerca tuyo.'**
+  /// **'Tu rutina, tus series y tus cargas en un solo lugar. Con un coach atrás si lo querés.'**
   String get authWelcomeBody;
 
   /// No description provided for @authWelcomeCta.
@@ -434,11 +464,35 @@ abstract class AppL10n {
   /// **'Si tu email está registrado, te enviamos un link para resetear la contraseña.'**
   String get authForgotSuccess;
 
-  /// No description provided for @authForgotBackToLogin.
+  /// Forgot-password success state: link back to the login screen.
   ///
   /// In es_AR, this message translates to:
   /// **'Volver al login'**
   String get authForgotBackToLogin;
+
+  /// Forgot-password success state: sets the expectation that the mail may be delayed or filtered, before offering the resend action (ux-audit-2026-06-16, MEDIUM · states).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿No te llegó? Puede tardar un minuto. Revisá también la carpeta de spam.'**
+  String get authForgotSpamHint;
+
+  /// Forgot-password success state: resend the reset link. Enabled once the cooldown elapses.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Reenviar el link'**
+  String get authForgotResendCta;
+
+  /// Forgot-password success state: cooldown label shown while the resend action is still disabled.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Podés reenviar en {seconds}s'**
+  String authForgotResendIn(int seconds);
+
+  /// Forgot-password success state: return to the form to correct a mistyped address. Needed because the anti-enumeration success copy hides a typo (ux-audit-2026-06-16).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Usar otra dirección'**
+  String get authForgotEditEmail;
 
   /// No description provided for @authTrainerInquiryDialogTitle.
   ///
@@ -625,6 +679,24 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'PEDIR VÍNCULO'**
   String get coachCtaLabel;
+
+  /// CTA primario del perfil público del PF (#637): abre un chat de pre-consulta SIN vínculo formal. Pasa a ser el camino visible y liviano; PEDIR VÍNCULO queda como el compromiso explícito que viene después.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CONSULTAR'**
+  String get coachInquiryCtaLabel;
+
+  /// Línea de ayuda debajo del par de CTAs. Existe porque el atleta necesita entender por qué hay dos botones: varios entrevistados querían consultar antes de decidir, y hoy el único camino compromete. También explica el botón deshabilitado cuando ya tiene un PF.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Preguntale precio, modalidad y horarios sin comprometerte con nadie.'**
+  String get coachInquiryCtaHelp;
+
+  /// Snackbar cuando falla el getOrCreate del chat de consulta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos abrir la consulta. Probá de nuevo.'**
+  String get coachInquiryCtaError;
 
   /// No description provided for @coachCtaProximamente.
   ///
@@ -1202,6 +1274,18 @@ abstract class AppL10n {
   /// **'¡Terminé mi entreno! 💪'**
   String get workoutPostAutoCompleteText;
 
+  /// Title of the daily wellbeing card on Home, and of the sheet it opens. Present tense on purpose: the daily check-in does not assume a workout happened. Concrete, never abstract — the segment that asked for this feature is the one that tolerates abstraction worst.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿CÓMO TE SENTÍS HOY?'**
+  String get wellbeingDailyTitle;
+
+  /// Subtitle of the daily wellbeing card on Home. Says plainly what the card is for. Must NOT promise any interpretation, advice or diagnosis derived from the answer.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Anotá cómo amanecés, entrenes o no.'**
+  String get wellbeingDailyPrompt;
+
   /// Title of the skippable post-session check-in step, and of the sheet it opens. Asks how the athlete felt — subjective, never a performance metric.
   ///
   /// In es_AR, this message translates to:
@@ -1562,6 +1646,60 @@ abstract class AppL10n {
   /// **'Llegaste al máximo de 10 rutinas activas.'**
   String get workoutSelfEditorCapReached;
 
+  /// Acción del detalle de una plantilla que abre el editor con todo precargado para que el atleta arme su propia versión (#647). Es el punto medio entre usar la plantilla tal cual y arrancar de una pantalla en blanco.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Usar como base'**
+  String get workoutRoutineUseAsBase;
+
+  /// Título del editor en modo SelfCustomizing.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Personalizar rutina'**
+  String get workoutRoutineCustomizeTitle;
+
+  /// Botón de guardado en modo SelfCustomizing. Dice explícitamente que el resultado es una rutina del atleta, no una edición de la plantilla original.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'GUARDAR COMO MÍA'**
+  String get workoutRoutineCustomizeSubmitLabel;
+
+  /// Nombre con el que arranca una copia, para que no queden cinco plantillas indistinguibles en MIS RUTINAS. Es editable antes de guardar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{name} (mi versión)'**
+  String workoutRoutineCopyName(String name);
+
+  /// Left pill of the athlete Entrenar segmented control (page 0 — own routines + session history). Key is semantic, not a copy of the label, so a future copy change does not strand the identifier the way `plantillas*` did (#638).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TU ENTRENO'**
+  String get workoutTabYours;
+
+  /// Right pill of the athlete Entrenar segmented control (page 1 — trainer-built routine catalogue). A VERB on purpose: the left pill already owns the noun 'rutinas' via workoutMisRutinasSectionTitle, and two nouns in one toggle is what made the old 'PLANTILLAS' label test badly (#638). Keep it short — over ~12 chars the TabBar starts scrolling on small screens.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'EXPLORAR'**
+  String get workoutTabExplore;
+
+  /// Empty state of the EXPLORAR catalogue grid when no trainer has published anything yet and no level filter is active (#638).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No hay rutinas todavía.'**
+  String get workoutExploreEmptyAll;
+
+  /// Empty state of the EXPLORAR catalogue grid when a level filter pill is active and nothing matches it (#638).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No hay rutinas para este nivel.'**
+  String get workoutExploreEmptyLevel;
+
+  /// Error state of the EXPLORAR catalogue grid. Paired with plantillasRetryLabel as the retry CTA (#638).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Hubo un error cargando las rutinas.'**
+  String get workoutExploreLoadError;
+
   /// No description provided for @workoutMisRutinasSectionTitle.
   ///
   /// In es_AR, this message translates to:
@@ -1703,7 +1841,7 @@ abstract class AppL10n {
   /// Shown instead of the average when a published template has zero ratings.
   ///
   /// In es_AR, this message translates to:
-  /// **'Todavía nadie calificó esta plantilla. ¡Sé el primero!'**
+  /// **'Todavía nadie calificó esta rutina. ¡Sé el primero!'**
   String get templateRatingsNoneYet;
 
   /// How many people rated the template, next to the average score.
@@ -1751,7 +1889,7 @@ abstract class AppL10n {
   /// Title of the rating bottom sheet when creating a new rating.
   ///
   /// In es_AR, this message translates to:
-  /// **'Calificá esta plantilla'**
+  /// **'Calificá esta rutina'**
   String get templateRatingSheetTitle;
 
   /// Title of the rating bottom sheet when editing an existing rating.
@@ -1763,7 +1901,7 @@ abstract class AppL10n {
   /// Hint of the optional comment field in the template rating sheet, max 500 chars.
   ///
   /// In es_AR, this message translates to:
-  /// **'Contá cómo te fue con esta plantilla (opcional)'**
+  /// **'Contá cómo te fue con esta rutina (opcional)'**
   String get templateRatingSheetCommentHint;
 
   /// Cancel button of the template rating sheet.
@@ -1793,7 +1931,7 @@ abstract class AppL10n {
   /// No description provided for @workoutSplitFallback.
   ///
   /// In es_AR, this message translates to:
-  /// **'Sin split'**
+  /// **'Rutina libre'**
   String get workoutSplitFallback;
 
   /// No description provided for @workoutPickerMuscleFilter.
@@ -3386,6 +3524,24 @@ abstract class AppL10n {
   /// **'Técnica, tempo, RIR…'**
   String get routineEditorNotesHint;
 
+  /// Section label of the plain-language routine summary field (#648). Trainer modes only — the athlete editor never shows it, and firestore.rules does not let an athlete write the field.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'RESUMEN'**
+  String get routineEditorSummaryLabel;
+
+  /// Help line under the RESUMEN label explaining what the field is for. The catalogue leads with jargon (PPL, Bro Split) and 2 of 5 usability participants could not tell what those meant.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Una frase que explique qué es la rutina, para alguien que nunca pisó un gimnasio.'**
+  String get routineEditorSummaryHelp;
+
+  /// Hint of the routine summary field. Verbatim one of the 7 seeded system-template summaries, so its length (78 chars) calibrates the expected answer.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ej: Empujar, tirar y piernas: cada día trabajás un tipo de movimiento distinto.'**
+  String get routineEditorSummaryHint;
+
   /// No description provided for @exerciseNoteFromCoachTag.
   ///
   /// In es_AR, this message translates to:
@@ -4070,6 +4226,18 @@ abstract class AppL10n {
   /// **'No pudimos reanudar el vínculo.'**
   String get coachHubDashboardResumeLinkError;
 
+  /// Coach Hub web dashboard — snackbar when resumeTrainerLink fails with a non-quota precondition (not-found/permission-denied/failed-precondition): the link is no longer valid, retrying won't help (paywall Fase 7, PR4, slice 3, design D-5).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Este vínculo ya no está disponible.'**
+  String get coachHubDashboardResumePrecondition;
+
+  /// Coach Hub web dashboard — snackbar when resumeTrainerLink fails with a network/unknown error, safe to retry (paywall Fase 7, PR4, slice 3, design D-5).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Revisá tu conexión y probá de nuevo.'**
+  String get coachHubDashboardResumeUnavailable;
+
   /// Coach Hub web dashboard — snackbar after accepting a pending link request.
   ///
   /// In es_AR, this message translates to:
@@ -4081,6 +4249,18 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'No pudimos aceptar el vínculo.'**
   String get coachHubDashboardAcceptError;
+
+  /// Coach Hub web dashboard — snackbar when acceptTrainerLink fails with a non-quota precondition (not-found/permission-denied/failed-precondition): the request is no longer valid, retrying won't help (paywall Fase 7, PR4, design D-5).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esta solicitud ya no está disponible.'**
+  String get coachHubDashboardAcceptPrecondition;
+
+  /// Coach Hub web dashboard — snackbar when acceptTrainerLink fails with a network/unknown error, safe to retry (paywall Fase 7, PR4, design D-5).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Revisá tu conexión y probá de nuevo.'**
+  String get coachHubDashboardAcceptUnavailable;
 
   /// Coach Hub web dashboard — snackbar after rejecting a pending link request.
   ///
@@ -4237,6 +4417,24 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Con deuda'**
   String get coachHubAlumnosStatusDebt;
+
+  /// Coach Hub alumnos — status badge for a link blocked by the trainer plan limit (paywall Fase 7 downgrade). NOT the athlete fault: the trainer subscription lapsed.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Bloqueado'**
+  String get coachHubAlumnosStatusBlocked;
+
+  /// Coach Hub web alumnos section — filter chip for athletes blocked by the plan limit.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Bloqueados'**
+  String get coachHubAlumnosFilterBloqueados;
+
+  /// Coach Hub alumnos — tooltip explaining why an athlete is blocked and that the trainer must fix their subscription.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Superaste el límite de tu plan. Este alumno no cuenta y no podés trabajar con él hasta que regularices.'**
+  String get coachHubAlumnosBlockedHint;
 
   /// Coach Hub web alumnos section — status badge for paused athletes.
   ///
@@ -4441,6 +4639,12 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Esta sesión no tiene sets registrados.'**
   String get sessionDetailNoSets;
+
+  /// Snackbar al salir del player porque el reloj cerro el entreno. El reloj escribe en la misma sesion, asi que terminar alla termina aca.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Terminaste este entrenamiento desde el reloj.'**
+  String get sessionFinishedOnWatch;
 
   /// Snackbar shown when logging/updating a set fails in the session player (finding 21). Pair with a retry action.
   ///
@@ -5179,10 +5383,7 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'{vencidos, plural, =1{1 vencido} other{{vencidos} vencidos}} · {solicitudes, plural, =1{1 solicitud} other{{solicitudes} solicitudes}} · {inactivos, plural, =1{1 inactivo} other{{inactivos} inactivos}}'**
   String dashboardAlertBannerSummary(
-    int vencidos,
-    int solicitudes,
-    int inactivos,
-  );
+      int vencidos, int solicitudes, int inactivos);
 
   /// Formatted adherencia percentage value shown in the adherencia ring and KPI tile once the aggregate provider has data.
   ///
@@ -6168,6 +6369,78 @@ abstract class AppL10n {
   /// **'Ver seguidos'**
   String get followListOpenFollowingA11y;
 
+  /// Días por semana en la línea de metadata de la tarjeta de rutina.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{days, plural, =1{1 día/sem} other{{days} días/sem}}'**
+  String routineCardDaysPerWeek(int days);
+
+  /// Duración estimada por sesión en la tarjeta de rutina. El valor ya viene con el prefijo ~ cuando es calculado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{value} min'**
+  String routineCardMinutes(String value);
+
+  /// Título del aviso de sesión recortada en el player (#645). El valor ya viene con el prefijo ~ cuando es calculado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ajustado a {value} min'**
+  String sessionTrimAdjustedTo(String value);
+
+  /// Ejercicios que el atleta dejó fuera de la sesión de hoy para que entrara en su tiempo (#645). La rutina no se modifica.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Fuera de hoy: {names}'**
+  String sessionTrimDroppedList(String names);
+
+  /// Acción que devuelve a la sesión todo lo que se había recortado (#645).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DESHACER'**
+  String get sessionTrimUndo;
+
+  /// Entrada al ajuste de tiempo en el player y título de su hoja (#645).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿CUÁNTO TIEMPO TENÉS HOY?'**
+  String get sessionTimeFitPromptTitle;
+
+  /// Duración estimada de la sesión de hoy antes de recortar (#645). El valor ya viene con el prefijo ~ porque siempre es calculado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esta sesión son {value} min'**
+  String sessionTimeFitCurrent(String value);
+
+  /// Respuesta cuando la sesión completa ya cabe en el tiempo declarado (#645).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Con {value} min ya entrás. No hace falta sacar nada.'**
+  String sessionTimeFitAlreadyFits(String value);
+
+  /// Encabezado de la propuesta de recorte, seguido de los nombres de los ejercicios (#645). La app sugiere; el atleta decide.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Si sacás esto, la sesión queda en {value} min:'**
+  String sessionTimeFitTrimHeadline(String value);
+
+  /// Respuesta cuando ni el recorte más profundo entra en el tiempo declarado (#645).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No llegamos a ese tiempo. Lo más corto posible son {value} min:'**
+  String sessionTimeFitCannotFit(String value);
+
+  /// Respuesta cuando no queda ningún ejercicio recortable (#645).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No hay nada que sacar sin dejar la sesión vacía.'**
+  String get sessionTimeFitNothingToTrim;
+
+  /// Confirma el recorte propuesto. Sólo afecta la sesión de hoy; la rutina no se modifica (#645).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'AJUSTAR HOY'**
+  String get sessionTimeFitApply;
+
   /// Única salida de la card de onboarding de un módulo. Al tocarla se persiste el flag y la card no vuelve.
   ///
   /// In es_AR, this message translates to:
@@ -6429,9 +6702,8 @@ AppL10n lookupAppL10n(Locale locale) {
   }
 
   throw FlutterError(
-    'AppL10n.delegate failed to load unsupported locale "$locale". This is likely '
-    'an issue with the localizations generation tool. Please file an issue '
-    'on GitHub with a reproducible sample app and the gen-l10n configuration '
-    'that was used.',
-  );
+      'AppL10n.delegate failed to load unsupported locale "$locale". This is likely '
+      'an issue with the localizations generation tool. Please file an issue '
+      'on GitHub with a reproducible sample app and the gen-l10n configuration '
+      'that was used.');
 }

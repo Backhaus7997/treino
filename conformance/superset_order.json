@@ -1,0 +1,87 @@
+{
+  "rule": "superset-order",
+  "source_of_truth": "lib/features/workout/domain/superset_order.dart",
+  "description": "Dado un bloque de superserie —sus miembros en orden, con series planificadas y series ya cargadas— cuál es la celda (ejercicio + serie) que toca hacer AHORA. Contrato compartido entre la implementación Dart (teléfono) y la Swift (reloj).",
+  "why_this_exists": "El teléfono recorre la superserie VUELTA por vuelta (1a, 1b, 1c, 2a, 2b, 2c…) porque ese es el estímulo que define una superserie. El reloj la recorría EJERCICIO por ejercicio (1a, 2a, 3a, 1b…) porque su parser ni siquiera leía `supersetGroup`: aplanaba el bloque. Medido en hardware el 2026-08-19 con tres ejercicios de tres series: el atleta veía sólo el ejercicio A en la muñeca y, tras marcar 1a, lo único marcable era 2a. El dato quedaba válido (misma identidad lógica) pero producido en el orden equivocado, y una superserie hecha como tres ejercicios seguidos es OTRO entrenamiento. No es cosmético: corrompe el estímulo en silencio.",
+  "inputs": {
+    "members": "Los miembros del bloque EN ORDEN. Cada uno: exerciseId, plannedSets, loggedSets.",
+    "note": "loggedSets es CANTIDAD de series cargadas, no números de serie. Es lo que el teléfono ya usaba."
+  },
+  "cases": [
+    {
+      "name": "bloque virgen: arranca por el primer miembro, vuelta 1",
+      "given": {
+        "members": [
+          { "exerciseId": "a", "plannedSets": 3, "loggedSets": 0 },
+          { "exerciseId": "b", "plannedSets": 3, "loggedSets": 0 },
+          { "exerciseId": "c", "plannedSets": 3, "loggedSets": 0 }
+        ]
+      },
+      "expect": { "exerciseId": "a", "setNumber": 1, "round": 1, "totalRounds": 3 }
+    },
+    {
+      "name": "el bug reportado: hecha 1a, toca 1b — NUNCA 2a",
+      "given": {
+        "members": [
+          { "exerciseId": "a", "plannedSets": 3, "loggedSets": 1 },
+          { "exerciseId": "b", "plannedSets": 3, "loggedSets": 0 },
+          { "exerciseId": "c", "plannedSets": 3, "loggedSets": 0 }
+        ]
+      },
+      "expect": { "exerciseId": "b", "setNumber": 1, "round": 1, "totalRounds": 3 }
+    },
+    {
+      "name": "cerrada la vuelta 1, abre la vuelta 2 por el primer miembro",
+      "given": {
+        "members": [
+          { "exerciseId": "a", "plannedSets": 3, "loggedSets": 1 },
+          { "exerciseId": "b", "plannedSets": 3, "loggedSets": 1 },
+          { "exerciseId": "c", "plannedSets": 3, "loggedSets": 1 }
+        ]
+      },
+      "expect": { "exerciseId": "a", "setNumber": 2, "round": 2, "totalRounds": 3 }
+    },
+    {
+      "name": "un miembro más corto se saltea en las vueltas que le sobran",
+      "given": {
+        "members": [
+          { "exerciseId": "a", "plannedSets": 3, "loggedSets": 2 },
+          { "exerciseId": "b", "plannedSets": 2, "loggedSets": 2 },
+          { "exerciseId": "c", "plannedSets": 3, "loggedSets": 2 }
+        ]
+      },
+      "expect": { "exerciseId": "a", "setNumber": 3, "round": 3, "totalRounds": 3 }
+    },
+    {
+      "name": "bloque completo: no queda celda",
+      "given": {
+        "members": [
+          { "exerciseId": "a", "plannedSets": 2, "loggedSets": 2 },
+          { "exerciseId": "b", "plannedSets": 2, "loggedSets": 2 }
+        ]
+      },
+      "expect": { "exerciseId": null, "setNumber": null, "round": null, "totalRounds": 2 }
+    },
+    {
+      "name": "estado desordenado: el reloj adelantó a un miembro, se retoma por el atrasado",
+      "given": {
+        "members": [
+          { "exerciseId": "a", "plannedSets": 3, "loggedSets": 3 },
+          { "exerciseId": "b", "plannedSets": 3, "loggedSets": 0 },
+          { "exerciseId": "c", "plannedSets": 3, "loggedSets": 0 }
+        ]
+      },
+      "expect": { "exerciseId": "b", "setNumber": 1, "round": 1, "totalRounds": 3 }
+    },
+    {
+      "name": "las vueltas totales las marca el miembro más largo",
+      "given": {
+        "members": [
+          { "exerciseId": "a", "plannedSets": 4, "loggedSets": 4 },
+          { "exerciseId": "b", "plannedSets": 2, "loggedSets": 2 }
+        ]
+      },
+      "expect": { "exerciseId": null, "setNumber": null, "round": null, "totalRounds": 4 }
+    }
+  ]
+}

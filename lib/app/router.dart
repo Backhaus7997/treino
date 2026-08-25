@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/widgets/treino_bottom_bar.dart';
+import '../features/coach_hub/presentation/sections/facturacion_planes/pricing_screen.dart';
 import '../features/auth/application/auth_providers.dart';
 import '../features/auth/presentation/forgot_password_screen.dart';
 import '../features/auth/presentation/login_screen.dart';
@@ -256,6 +257,23 @@ GoRouter buildRouter({
         pageBuilder: (_, __) => _noAnim(const ProfileUnavailableScreen()),
       ),
 
+      // ─── Paywall — pricing page (paywall Fase 7, PR4) ─────────────────────
+      // El modal de limite (`showPlanLimitPaywall`) se dispara TAMBIEN desde
+      // la app movil: `TrainerDashboardTab` (home del PF) y
+      // `trainer_coach_view` son moviles, y su CTA "VER PLANES" navega aca.
+      // Sin esta ruta el modal se abre bien pero el boton muere contra una
+      // ruta inexistente — el paywall quedaria roto en la mitad del producto.
+      //
+      // El Scaffold lo provee el shell del Coach Hub (ADR-CHW-005), asi que en
+      // movil hay que envolverlo. `PricingRouteScreen` es ese envoltorio y vive
+      // con la pantalla: aporta SafeArea + AppBar con "volver". Montaba un
+      // `Scaffold(body: PricingScreen())` pelado, y sin SafeArea el titulo se
+      // dibujaba debajo de la barra de estado en cualquier telefono con notch,
+      // sin mas salida que el gesto del sistema.
+      GoRoute(
+        path: '/facturacion/planes',
+        builder: (context, state) => const PricingRouteScreen(),
+      ),
       // ─── Session player — TOP-LEVEL ROUTES (outside ShellRoute) ───────────
       // El player es immersive: oculta la bottom bar durante el entrenamiento.
       // Diseño §9.1. Las 3 rutas son auth-gated via authRedirect.
@@ -371,6 +389,22 @@ GoRouter buildRouter({
         path: '/workout/my-routine-editor',
         builder: (context, state) => RoutineEditorScreen(
           mode: SelfCreating(existingRoutineId: state.extra as String?),
+        ),
+      ),
+      GoRoute(
+        // "Usar como base" (#647): open the editor pre-loaded with an existing
+        // routine and save the result as a NEW routine owned by the athlete.
+        //
+        // The source id travels as a PATH param, not as `extra`: unlike
+        // `my-routine-editor` (where a null extra legitimately means "create
+        // from blank"), this route is meaningless without a source, and a path
+        // param makes that non-optional at the type level AND survives a deep
+        // link / process death, which `extra` does not.
+        path: '/workout/customize-routine/:routineId',
+        builder: (context, state) => RoutineEditorScreen(
+          mode: SelfCustomizing(
+            sourceRoutineId: state.pathParameters['routineId']!,
+          ),
         ),
       ),
 

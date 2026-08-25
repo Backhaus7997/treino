@@ -9,6 +9,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../../app/theme/app_palette.dart';
 import '../../../../../core/widgets/motion/treino_state_switcher.dart';
@@ -17,6 +18,7 @@ import '../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../../core/widgets/treino_icon.dart';
 import '../../../../coach/application/agenda_providers.dart';
 import '../../../../coach/domain/appointment.dart';
+import '../../../../coach/domain/wall_clock.dart';
 import '../../../../coach/presentation/agenda_formatters.dart';
 import '../../../../payments/application/billing_providers.dart'
     show athleteBillingProvider;
@@ -396,7 +398,7 @@ class _CobrarLoteBar extends StatelessWidget {
         onPressed: onTap,
         style: ElevatedButton.styleFrom(
           backgroundColor: palette.accent,
-          foregroundColor: palette.bg,
+          foregroundColor: TreinoButtonTokens.foreground(context),
           minimumSize: const Size.fromHeight(48),
           shape: const StadiumBorder(),
         ),
@@ -554,8 +556,9 @@ class AppointmentCard extends ConsumerWidget {
   }
 
   void _openDetail(BuildContext context, WidgetRef ref) {
-    final now = DateTime.now().toUtc();
-    final isPast = appointment.startsAt.isBefore(now);
+    // Wall-clock contra wall-clock (#671): con el instante UTC real un turno
+    // que empieza en menos de 3h se marcaba isPast y perdia el boton Cancelar.
+    final isPast = appointment.startsAt.isBefore(nowWall());
     showDialog<void>(
       context: context,
       builder: (_) => AppointmentDetailDialog(
