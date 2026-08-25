@@ -12,6 +12,8 @@
 /// calendar identity shifts.
 library;
 
+import 'package:treino/core/utils/app_clock.dart';
+
 /// Argentina's fixed UTC offset (UTC-3, no DST).
 const argentinaUtcOffset = Duration(hours: 3);
 
@@ -22,4 +24,7 @@ DateTime toArgentina(DateTime utc) => utc.subtract(argentinaUtcOffset);
 
 /// "Now" in Argentina wall-clock. Derive period keys and day buckets from this,
 /// never `DateTime.now().toUtc()`.
-DateTime argentinaNow() => toArgentina(DateTime.now().toUtc());
+///
+/// Reads the clock through [AppClock] so a test can freeze it — see
+/// `lib/core/utils/app_clock.dart`. In production it is `DateTime.now()`.
+DateTime argentinaNow() => toArgentina(AppClock.now().toUtc());

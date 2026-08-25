@@ -15,7 +15,7 @@ import 'package:flutter_test/flutter_test.dart';
 /// | Clase | Campos | "Ahora" correcto | Cómo mostrar |
 /// |---|---|---|---|
 /// | **Wall-clock ADR-7** | `Appointment.startsAt`, `AvailabilityOverride.date` | `nowWall()` | leer los campos **crudos** |
-/// | **Instante real** | `createdAt`, `paidAt`, `updatedAt`, `finishedAt` | `DateTime.now()` | `.toLocal()` está bien |
+/// | **Instante real** | `createdAt`, `paidAt`, `updatedAt`, `finishedAt` | `AppClock.now()` | `.toLocal()` está bien |
 /// | **Bucket de calendario** | "hoy", bordes de mes/semana, vencimientos | `argentinaNow()` | derivar en ART |
 ///
 /// `lib/core/utils/argentina_time.dart` lo dice textual: *"CALENDAR concepts —
@@ -56,12 +56,30 @@ import 'package:flutter_test/flutter_test.dart';
 /// pendiente de revisar"**, no "exento". Lo que el ratchet impide es que la
 /// próxima pantalla nazca con el mismo defecto sin que nadie lo vea.
 ///
+/// ## El seam: `AppClock.now()` (#761)
+///
+/// `lib/core/utils/app_clock.dart` es el único lugar del repo que llama a
+/// `DateTime.now()` de verdad. En producción es un passthrough — mismo valor,
+/// misma zona horaria, mismo costo. Congelado por un test, devuelve siempre
+/// el mismo instante.
+///
+/// Lo trajo el gate de regresión visual del Coach Hub: sin él, el filtro de
+/// "próximas sesiones" del dashboard (`startsAt.isAfter(now)`) descarta turnos
+/// según la hora a la que corra CI, y el golden pasa o falla según el reloj
+/// del runner. Un golden que cambia porque cambió la fecha no es un gate, es
+/// ruido.
+///
+/// `argentinaNow()` y `nowWall()` ya leen de ahí, así que **la mayoría del
+/// código no cambia**: seguí usando el helper que corresponda por la tabla de
+/// arriba. `AppClock.now()` directo es sólo para el tercer caso —instante
+/// real— donde antes ibas a escribir `DateTime.now()`.
+///
 /// ALCANCE DEL SCANNER (deliberado):
 ///   ✓ DateTime.now()      — el reloj crudo
 ///   ✓ .toLocal()          — la conversión que corre un wall-clock
 ///   ✗ argentinaNow()      — el helper correcto para buckets
 ///   ✗ nowWall()           — el helper correcto para startsAt
-///   ✗ clock.now() de una abstracción inyectada — no existe hoy en el repo
+///   ✗ AppClock.now()      — el seam congelable (core/utils/app_clock.dart)
 void main() {
   group('no_raw_clock_scan — ratchet de deriva de reloj en Coach', () {
     /// `DateTime.now()` crudo y `.toLocal()`. Los helpers correctos
@@ -77,7 +95,14 @@ void main() {
     const allowlistCeiling = 37;
 
     /// Techo de ocurrencias totales. Mismo contrato: sólo baja.
-    const rawClockDebtCeiling = 86;
+    ///
+    /// 86 → 81 con #761: los cinco call-sites de reloj crudo que quedaban en
+    /// el camino de RENDER de las cinco pantallas del gate visual pasaron a
+    /// `AppClock.now()` (dashboard right column, chat list pane, y dos en la
+    /// ficha de alumno; el quinto es el default de `nowWall()`). Bajar el
+    /// techo es obligatorio al migrar: dejarlo en 86 regalaría cupo para
+    /// cinco regresiones nuevas.
+    const rawClockDebtCeiling = 81;
 
     /// Registro de deuda, rutas relativas a `lib/`.
     const allowlist = {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
+import 'package:treino/core/utils/app_clock.dart';
 
 import '../../../../../../app/theme/app_palette.dart';
 import '../../../../../../core/widgets/motion/treino_tappable.dart';
@@ -327,7 +328,7 @@ class _ChatRow extends ConsumerWidget {
   /// Hoy → solo hora `HH:mm`. Esta semana → día abreviado `lun/mar/...`.
   /// Más viejo → `dd/MM`. Sin años porque cabe siempre en ~5 chars.
   String _formatTimestamp(DateTime dt) {
-    final now = DateTime.now();
+    final now = AppClock.now();
     final local = dt.toLocal();
     final isToday = local.year == now.year &&
         local.month == now.month &&
