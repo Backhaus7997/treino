@@ -51,6 +51,7 @@ import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/appointment.dart';
 import 'package:treino/features/coach_hub/application/aggregate_adherence_provider.dart';
 import 'package:treino/features/coach_hub/application/inactivos_provider.dart';
+import 'package:treino/features/coach_hub/presentation/shell/coach_hub_scaffold.dart';
 import 'package:treino/features/measurements/application/measurement_providers.dart';
 import 'package:treino/features/payments/application/payment_providers.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
@@ -320,6 +321,18 @@ void _expectLandedOn(WidgetTester tester, GoRouter router, String route) {
     reason: 'el router dice $landed pero el shell no está en el árbol. '
         'Widgets montados: ${types.join(", ")}',
   );
+
+  // ONSTAGE, no sólo presente. `tester.allWidgets` incluye lo offstage;
+  // `find.byType` —lo que usan los tests— lo saltea. Esa diferencia costó tres
+  // corridas de CI: el chequeo de arriba pasaba, el test de al lado fallaba
+  // con "Found 0 widgets", y los dos decían la verdad sobre el mismo árbol.
+  expect(
+    find.byType(CoachHubScaffold),
+    findsOneWidget,
+    reason: 'el shell está en el árbol pero OFFSTAGE en $landed: la '
+        'transición de ruta no terminó. Un golden sacado acá fotografía la '
+        'pantalla anterior.',
+  );
 }
 
 /// El árbol resolvió la paleta que el test pidió.
@@ -365,8 +378,37 @@ void expectGateNoOverflow(WidgetTester tester) {
 /// vuelve nunca. Con el techo por defecto eso son diez minutos de runner
 /// quemados antes del error. Con 30 s el gate falla rápido y el mensaje —un
 /// timeout de settle— apunta derecho al provider que falta en el seed.
-Future<void> _settle(WidgetTester tester) => tester.pumpAndSettle(
+///
+/// ## Por qué alterna `runAsync` con `pumpAndSettle`
+///
+/// **`pumpAndSettle` avanza el reloj FALSO: drena frames, no futures.** El
+/// árbol del Coach Hub no depende sólo de frames — depende de async REAL: los
+/// streams de los providers, el future de `SharedPreferences`, y la
+/// re-evaluación del redirect de GoRouter que se dispara cuando esos llegan.
+/// Nada de eso avanza porque uno pumpee.
+///
+/// Con la máquina descansada, ese async real alcanza a completar entre pump y
+/// pump y no se nota. Bajo carga, no: la captura sale con el shell todavía
+/// OFFSTAGE y los tests fallan con "Found 0 widgets".
+///
+/// No es hipotético — es el defecto que rompió este gate en CI. La misma
+/// corrida pasaba cuando no había goldens que comparar y fallaba cuando sí,
+/// porque las doce comparaciones de imagen agregan CPU y corren el scheduling
+/// de los cinco archivos que corren en paralelo. Tres corridas de logs para
+/// llegar acá.
+///
+/// `runAsync` deja correr el event loop de verdad; `pumpAndSettle` drena los
+/// frames que eso haya agendado. Tres vueltas cubren la cadena
+/// provider → redirect → pantalla → providers de la pantalla. El resultado
+/// deja de depender de qué tan rápida sea la máquina, que es la única forma de
+/// que un golden signifique algo.
+Future<void> _settle(WidgetTester tester) async {
+  for (var round = 0; round < 3; round++) {
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pumpAndSettle(
       const Duration(milliseconds: 100),
       EnginePhase.sendSemanticsUpdate,
       const Duration(seconds: 30),
     );
+  }
+}
