@@ -90,26 +90,26 @@ npm run seed:emulator:clear
 
 | Email | Password | Name | Gym | Experience |
 |---|---|---|---|---|
-| `martin@emulator.treino` | `Emulator1234!` | Martín López | Megatlon Palermo | intermediate |
-| `sofia@emulator.treino` | `Emulator1234!` | Sofía Ramírez | Megatlon Palermo | beginner |
-| `mateo@emulator.treino` | `Emulator1234!` | Mateo Quiroga | SmartFit Caballito | advanced |
-| `valentina@emulator.treino` | `Emulator1234!` | Valentina Peralta | SmartFit Caballito | intermediate |
+| `martin@emulator.treino` | `Emulator1234!` | Martín López | Hierro Palermo | intermediate |
+| `sofia@emulator.treino` | `Emulator1234!` | Sofía Ramírez | Hierro Palermo | beginner |
+| `mateo@emulator.treino` | `Emulator1234!` | Mateo Quiroga | Cadencia Caballito | advanced |
+| `valentina@emulator.treino` | `Emulator1234!` | Valentina Peralta | Cadencia Caballito | intermediate |
 | `nicolas@emulator.treino` | `Emulator1234!` | Nicolás Fernández | — | beginner |
-| `julieta@emulator.treino` | `Emulator1234!` | Julieta Acosta | Megatlon Palermo | beginner |
-| `tomas@emulator.treino` | `Emulator1234!` | Tomás Benítez | Megatlon Palermo | intermediate |
-| `agustina@emulator.treino` | `Emulator1234!` | Agustina Sosa | Megatlon Palermo | advanced |
-| `franco@emulator.treino` | `Emulator1234!` | Franco Molina | Megatlon Palermo | beginner |
-| `malena@emulator.treino` | `Emulator1234!` | Malena Castro | Megatlon Palermo | intermediate |
-| `ignacio@emulator.treino` | `Emulator1234!` | Ignacio Torres | Megatlon Palermo | advanced |
-| `rocio@emulator.treino` | `Emulator1234!` | Rocío Medina | Megatlon Palermo | beginner |
-| `facundo@emulator.treino` | `Emulator1234!` | Facundo Ríos | Megatlon Palermo | intermediate |
+| `julieta@emulator.treino` | `Emulator1234!` | Julieta Acosta | Hierro Palermo | beginner |
+| `tomas@emulator.treino` | `Emulator1234!` | Tomás Benítez | Hierro Palermo | intermediate |
+| `agustina@emulator.treino` | `Emulator1234!` | Agustina Sosa | Hierro Palermo | advanced |
+| `franco@emulator.treino` | `Emulator1234!` | Franco Molina | Hierro Palermo | beginner |
+| `malena@emulator.treino` | `Emulator1234!` | Malena Castro | Hierro Palermo | intermediate |
+| `ignacio@emulator.treino` | `Emulator1234!` | Ignacio Torres | Hierro Palermo | advanced |
+| `rocio@emulator.treino` | `Emulator1234!` | Rocío Medina | Hierro Palermo | beginner |
+| `facundo@emulator.treino` | `Emulator1234!` | Facundo Ríos | Hierro Palermo | intermediate |
 
 ---
 
 ## What gets seeded
 
 ### Gyms (`gyms/`)
-3 gyms in Buenos Aires (Megatlon Palermo, SmartFit Caballito, Megatlon Nueva Córdoba).
+3 gyms in Buenos Aires (Hierro Palermo, Cadencia Caballito, Hierro Nueva Córdoba).
 
 ### Users + public profiles
 - `users/{uid}` — full `UserProfile` including trainer fields for coaches.
@@ -153,7 +153,7 @@ Streak + `workoutsCount` in `userPublicProfiles` are pre-computed to match.
 81 posts covering all privacy levels, with 27 posts per tier:
 - `public` — 27 posts (visible in home feed for any authenticated user)
 - `friends` — 27 posts; the extra authors are accepted friends of Martín
-- `gym` — 27 posts; 26 belong to Megatlon Palermo and are visible to Martín
+- `gym` — 27 posts; 26 belong to Hierro Palermo and are visible to Martín
 
 Every generated post has a distinct `createdAt`, separated by at least one
 hour. Each tier therefore exceeds the repository page size of 20 and exercises

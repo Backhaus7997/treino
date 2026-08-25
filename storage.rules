@@ -42,11 +42,53 @@ service firebase.storage {
                     && fileName.matches(request.auth.uid + '\\..+');
     }
 
-    // Excel imports: trainers upload Excel plan files under /temp/uploads/{uid}/...
-    // Authenticated users can write to their own folder; reads denied (server-only).
+    // Excel imports — bloque CERRADO en las cuatro operaciones (QA-SEC-015).
+    //
+    // El comentario viejo decía "trainers upload Excel plan files under
+    // /temp/uploads/{uid}/..." y era falso: **nunca hubo un writer en `lib/`**.
+    // No es que se borró — `git log -S "temp/uploads" --all -- lib/` devuelve
+    // cero commits. El bloque entró vestigial en el commit que trajo este
+    // archivo desde el repo viejo (`75581f89`, #106), describiendo una
+    // arquitectura server-side que en TREINO Flutter nunca se implementó.
+    //
+    // El import de planes por Excel es **100% client-side y en memoria**:
+    // `FilePicker.pickFiles(withData: true)` → `file.bytes` →
+    // `PlanImportRepository.parseAndMatch(bytes:)` → `parseExcelBytes()`. Los
+    // bytes del .xlsx no salen del proceso; lo único que viaja a Firebase es
+    // el `ParsedPlan` ya matcheado, como documentos de Firestore.
+    //
+    // Lo que el `write` abierto dejaba hacer, medido contra el emulador
+    // (`docs/security.md` §4.9): cualquier autenticado —incluido un rol
+    // `athlete`, que no tiene nada que hacer acá— subía bytes arbitrarios, de
+    // cualquier tipo y cualquier tamaño, sin ciclo de vida. El prefijo se
+    // llama `temp/` pero no había TTL ni job de limpieza: lo único que barre
+    // `temp/uploads/{uid}/` es el cascade de borrado de cuenta
+    // (`functions/src/cascade/storage.ts:67`), o sea que los bytes vivían
+    // mientras viviera la cuenta.
+    //
+    // Se cierra el camino de escritura entero en vez de acotarlo con
+    // content-type + cap como los otros cinco bloques. Acotar habría
+    // preservado una superficie de escritura que ningún código usa; cerrar la
+    // elimina, y de paso vuelve innecesaria la regla de ciclo de vida del
+    // bucket que pedía #782 — sin escrituras no hay acumulación que expirar.
+    // Si el import alguna vez se mueve a server-side, este bloque se reabre
+    // con el flujo real a la vista, que es mejor que adivinar un cap hoy.
+    //
+    // `get` y `list` van por separado aunque los dos sean `if false`
+    // (`docs/security.md` §3.8 regla 2): `read` a secas esconde que `list` es
+    // un permiso distinto, y fue la causa raíz de QA-SEC-007 y -008.
+    //
+    // NO lleva `allow delete` propio: la regla 3 de §3.8 aplica a los bloques
+    // que dereferencian `request.resource.<algo>` —ahí el delete explota con
+    // "Null value error" y se deniega hasta para el dueño (QA-SEC-009)—. Acá
+    // no queda ni un deref, así que el `write: if false` cubre el delete
+    // denegando por permiso, que es la denegación que queremos. El cascade de
+    // borrado de cuenta no se ve afectado: usa Admin SDK y bypasea estas
+    // reglas por completo (ADR-ACCDEL-013).
     match /temp/uploads/{userId}/{file=**} {
-      allow read: if false;
-      allow write: if request.auth != null && request.auth.uid == userId;
+      allow get: if false;
+      allow list: if false;
+      allow write: if false;
     }
 
     // Custom exercise tutorial videos: a trainer uploads short clips
@@ -183,6 +225,68 @@ service firebase.storage {
                   && request.auth.uid == userId
                   && request.resource.size < 15 * 1024 * 1024
                   && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Feedback del alumno por ejercicio durante la sesión (#628) — la foto
+    // opcional que acompaña un comentario o una MOLESTIA.
+    //
+    // Path: /sessionFeedback/{userId}/{sessionId}/{fileName}
+    //
+    // ⚠️ ESTO ES DATO DE SALUD, no una foto de post. El `get` NO puede ser
+    // `request.auth != null` como en avatars/customExerciseVideos/postPhotos:
+    // acá la foto es "dónde me duele". Se gatea con el MISMO grant de dos
+    // partes que gobierna la sesión en firestore.rules — dueño OR el PF que
+    // el alumno nombró en `session_shares/{userId}` — usando la llamada
+    // cross-service que ya prueba el bloque `chatMedia` de más arriba.
+    //
+    // El dueño va PRIMERO en el `||` para que corte antes de tocar Firestore:
+    // el alumno bajando su propia foto no debe depender de que exista el
+    // grant, ni pagar dos lecturas por objeto.
+    //
+    // La literal `(default)` es obligatoria — las reglas de Storage no tienen
+    // wildcard `$(database)` (misma nota que en chatMedia).
+    //
+    // ⚠️ Este gate NO es el que de verdad protege la foto. La URL que emite
+    // getDownloadURL() lleva `?alt=media&token=` y es una credencial al
+    // portador que NO evalúa estas reglas (docs/security.md §3.1, medido).
+    // Quien custodia la foto es el documento de Firestore donde vive esa URL:
+    // `users/{uid}/sessions/{sid}/exerciseFeedback/{id}`, con el mismo
+    // predicado de dos partes. Este bloque es defensa en profundidad para el
+    // único camino que sí pasa por las reglas: resolver el objeto por `ref()`.
+    //
+    // `list` cerrado INCONDICIONALMENTE, ni siquiera para el dueño. Es el
+    // patrón de postPhotos/chatMedia y no el de avatars/customExerciseVideos,
+    // que tienen `list` abierto y son los leaks confirmados QA-SEC-007 y
+    // QA-SEC-008 (docs/security.md §3.6). Enumerar `sessionFeedback/{uid}/`
+    // publicaría en QUÉ sesiones un alumno reportó dolor sin bajar un solo
+    // byte — el nombre del prefijo ya es el dato sensible.
+    //
+    // `delete` propio explícito, no heredado: docs/security.md §3.8 regla 3 —
+    // todo bloque con `request.resource.<algo>` necesita su `allow delete` o
+    // el borrado falla en silencio (la lección de QA-SEC-009 en avatars).
+    //
+    // Size limit: 15 MB, espejo del guard client-side, igual que postPhotos.
+    match /sessionFeedback/{userId}/{sessionId}/{fileName} {
+      allow get: if request.auth != null
+                 && (
+                      request.auth.uid == userId
+                      || (
+                           firestore.exists(
+                             /databases/(default)/documents/session_shares/$(userId))
+                           && firestore.get(
+                                /databases/(default)/documents/session_shares/$(userId)
+                              ).data.trainerId == request.auth.uid
+                         )
+                    );
+
+      allow list: if false;
+
+      allow write: if request.auth != null
+                  && request.auth.uid == userId
+                  && request.resource.size < 15 * 1024 * 1024
+                  && request.resource.contentType.matches('image/.*');
+
       allow delete: if request.auth != null && request.auth.uid == userId;
     }
 

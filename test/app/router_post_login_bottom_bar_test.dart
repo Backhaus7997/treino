@@ -105,15 +105,13 @@ Rect _barRect(WidgetTester tester) => tester.getRect(
           .first,
     );
 
-/// Rect REAL del pill de gradient: `AnimatedPositioned` no tiene RenderObject
-/// propio, así que `getRect` baja a la caja que efectivamente se pinta, con su
-/// parentData ya aplicada por el `Stack`.
-Rect _pillRect(WidgetTester tester) => tester.getRect(
-      find.descendant(
-        of: find.byType(TreinoBottomBar),
-        matching: find.byType(AnimatedPositioned),
-      ),
-    );
+/// Rect REAL del pill de gradient: el widget que lo posiciona no tiene
+/// RenderObject propio, así que `getRect` baja a la caja que efectivamente se
+/// pinta, con su parentData ya aplicada por el `Stack`. Se lo busca por su key
+/// pública y no por el tipo del posicionador, que es la pieza que cambia
+/// cuando se toca la animación del pill (#734).
+Rect _pillRect(WidgetTester tester) =>
+    tester.getRect(find.byKey(TreinoBottomBar.pillKey));
 
 _Frame? _capture(WidgetTester tester, int n) {
   if (find.byType(TreinoBottomBar).evaluate().isEmpty) return null;
@@ -253,10 +251,11 @@ void main() {
               reason:
                   'los tabs no se reparten el ancho en partes iguales — $f');
         }
-        // El desajuste que sí existe cuando la barra cambia de ancho: el
-        // `AnimatedPositioned` del pill interpola `left`/`width` durante
-        // `AppMotion.slow` mientras el `Row` de `Expanded` se reacomoda de
-        // golpe. Acá se fija que en la transición post-login NO pase.
+        // Acá se fija que en la transición post-login el pill no se despegue.
+        // El desajuste que existía cuando la barra cambiaba de ancho —el pill
+        // interpolando `left`/`width` durante `AppMotion.slow` mientras el
+        // `Row` de `Expanded` se reacomodaba de golpe— se corrigió en #734;
+        // lo cubre `treino_bottom_bar_width_change_test.dart`.
         expect(f.pill.center.dx, closeTo(f.tabs[f.index].center.dx, 0.01),
             reason: 'el pill no está centrado en su tab — $f');
         expect(f.index, 2, reason: 'post-login el tab activo es INICIO — $f');

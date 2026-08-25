@@ -39,11 +39,14 @@ import 'package:treino/l10n/app_l10n.dart';
 import '../../../helpers/fake_analytics_service.dart';
 import '../../../fixtures/exercises.dart';
 
+import '../../../helpers/onboarding_test_helpers.dart';
+
 class _MockRoutineRepository extends Mock implements RoutineRepository {}
 
 class _MockUserRepository extends Mock implements UserRepository {}
 
 UserProfile _profile({String? activeRoutineId}) => UserProfile(
+      onboardingSeen: allSurfacesSeen(),
       uid: 'athlete-1',
       email: 'a1@treino.app',
       displayName: 'A1',

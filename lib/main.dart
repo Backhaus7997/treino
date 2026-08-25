@@ -79,16 +79,31 @@ Future<void> main() async {
     // En release: Play Integrity (Android) y AppAttest (iOS). Estos
     // requieren signed builds y firebase config correcta en Console.
     //
-    // ⚠️ ENFORCEMENT ESTÁ ACTIVO para Cloud Firestore en `treino-dev`
-    // (verificado 2026-07-27). El modo se controla desde Firebase Console,
-    // no desde código, así que este comentario puede quedar desactualizado
-    // otra vez — chequealo en Console → App Check → APIs antes de creerle.
+    // ⚠️ ENFORCEMENT POR API ESTÁ **APAGADO** en `treino-dev` — Firestore e
+    // Identity Toolkit los dos en UNENFORCED. Re-verificado 2026-08-25 contra
+    // las APIs, sin token y con un token deliberadamente inválido: las dos lo
+    // ignoran y siguen de largo (Firestore llega a evaluar reglas, Identity
+    // Toolkit llega a validar credenciales). Esto CORRIGE el "ENFORCEMENT ESTÁ
+    // ACTIVO (verificado 2026-07-27)" que decía acá y que contradecía a
+    // functions/src/mint-watch-credential.ts:103. Ver docs/security.md §4.8.1.
     //
-    // Consecuencia práctica: en un device de dev cuyo debug token NO esté
-    // registrado, TODA escritura a Firestore se rechaza. No falla el login
-    // (Auth no está enforced), falla lo que venga después, y el síntoma no
-    // se parece a App Check — p.ej. crear cuenta muere con "Hubo un problema
-    // creando tu perfil" (AuthService.signUpWithEmail → getOrCreate).
+    // El modo se controla desde Firebase Console, no desde código, así que
+    // esto puede quedar desactualizado otra vez — chequealo en
+    // Console → App Check → APIs antes de creerle.
+    //
+    // ⚠️ OJO, lo de arriba NO aplica a los callables: `enforceAppCheck` en las
+    // opciones de un `onCall` lo aplica la propia función, en su código, y es
+    // independiente de la consola. Medido el 2026-08-25: `deleteAccount` y
+    // `addAlias` rechazan hoy a cualquier cliente sin atestación válida. El
+    // inventario de qué callable exige qué vive en
+    // functions/src/__tests__/appcheck-enforcement.test.ts.
+    //
+    // Consecuencia práctica el día que se vuelva a encender por API: en un
+    // device de dev cuyo debug token NO esté registrado, TODA escritura a
+    // Firestore se rechaza. No falla el login (Auth no está enforced), falla lo
+    // que venga después, y el síntoma no se parece a App Check — p.ej. crear
+    // cuenta muere con "Hubo un problema creando tu perfil"
+    // (AuthService.signUpWithEmail → getOrCreate).
     //
     // Cómo diagnosticarlo sin depender de la consola de `flutter run`:
     //   xcrun simctl spawn <udid> log show --last 10m --style compact \

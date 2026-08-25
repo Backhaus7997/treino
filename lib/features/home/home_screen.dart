@@ -12,6 +12,7 @@ import '../../core/widgets/treino_icon.dart';
 import '../../l10n/app_l10n.dart';
 import '../coach/presentation/trainer_dashboard_tab.dart';
 import '../notifications/presentation/permission_gate.dart';
+import '../onboarding/presentation/onboarding_gate.dart';
 import '../profile/application/user_providers.dart';
 import '../profile/domain/user_role.dart';
 import '../workout/application/assigned_routine_providers.dart';
@@ -59,6 +60,11 @@ class HomeScreen extends ConsumerWidget {
         // REQ-PN-PERM-001: session-scoped permission prompt.
         // Renders SizedBox.shrink() — zero layout impact. ADR-PN-012.
         const PermissionGate(),
+        // Welcome tour, once per surface (#627). Also SizedBox.shrink().
+        // Ordered after PermissionGate for readability only — the actual
+        // sequencing (tour first, prompt second) is enforced by
+        // `onboardingBlocksProvider`, not by Stack order.
+        const OnboardingGate(),
       ],
     );
   }

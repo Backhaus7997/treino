@@ -117,6 +117,46 @@ describe("renderMail: every MailKind produces a complete message", () => {
 });
 
 // ---------------------------------------------------------------------------
+// A dónde apunta el CTA
+//
+// Tres de los cuatro mails no-auth van a ATLETAS, que usan la app móvil. El
+// Coach Hub es el dashboard del ENTRENADOR: mandar ahí a un atleta lo deja
+// mirando una herramienta que no es suya. Por eso el default es la landing y el
+// Coach Hub se pide explícitamente.
+// ---------------------------------------------------------------------------
+describe("destino del CTA", () => {
+  it("por defecto va a la landing, no al Coach Hub", () => {
+    const out = renderMail("appointment-confirmed", { trainerName: "Jose" });
+
+    expect(out.html).toContain("https://gettreino.com");
+    expect(out.html).not.toContain("app.gettreino.com");
+  });
+
+  it("respeta el ctaUrl que pasa el productor", () => {
+    const out = renderMail("link-requested", {
+      athleteName: "Marta",
+      ctaUrl: "https://app.gettreino.com",
+    });
+
+    expect(out.html).toContain("https://app.gettreino.com");
+  });
+
+  // Un CTA que solo vive dentro de un <a> no existe para quien lee en texto.
+  it("la URL del CTA también entra en la parte de texto plano", () => {
+    const out = renderMail("payment-overdue", { trainerName: "Jose" });
+
+    expect(out.text).toContain("https://gettreino.com");
+  });
+
+  it("ningún template apunta a un dominio que no es nuestro", () => {
+    for (const kind of ALL_KINDS) {
+      const out = renderMail(kind, { actionLink: "https://x.test/?oobCode=1" });
+      expect(out.html).not.toContain("treino.app");
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Mails de auth — el link es la razón de ser del mail
 // ---------------------------------------------------------------------------
 describe("plantillas de auth: el action link llega entero", () => {

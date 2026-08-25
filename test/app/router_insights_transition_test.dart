@@ -1,4 +1,4 @@
-// Smoke de navegación de las 5 rutas de insights, que usan
+// Smoke de navegación de las rutas de insights, que usan
 // `pageBuilder: _report(...)` — ahora una CupertinoPageRoute (slide nativo +
 // gesto de swipe-back) con un fade encima. El swipe-back se había perdido
 // cuando _report era un CustomTransitionPage (TREINO Motion PR3); se restauró
@@ -24,6 +24,7 @@ import 'package:treino/features/insights/presentation/insights_screen.dart';
 import 'package:treino/features/insights/presentation/monthly_report_screen.dart';
 import 'package:treino/features/insights/presentation/muscle_distribution_screen.dart';
 import 'package:treino/features/insights/presentation/volume_by_group_screen.dart';
+import 'package:treino/features/insights/presentation/wellbeing_trend_screen.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
@@ -60,7 +61,7 @@ UserProfile _athleteProfile() => UserProfile(
 
 void main() {
   testWidgets(
-      'las 5 rutas de insights montan su pantalla vía la transición _report '
+      'las rutas de insights montan su pantalla vía la transición _report '
       'y el pop reverso no explota', (tester) async {
     final repo = _MockSessionRepository();
     // Sin sesiones: todas las pantallas renderizan su estado vacío estable —
@@ -111,6 +112,7 @@ void main() {
       '/home/insights/muscle-distribution': MuscleDistributionScreen,
       '/home/insights/frequent-exercises': FrequentExercisesScreen,
       '/home/insights/volume-by-group': VolumeByGroupScreen,
+      '/home/insights/wellbeing': WellbeingTrendScreen,
     };
 
     for (final entry in detailRoutes.entries) {

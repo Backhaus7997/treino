@@ -31,6 +31,8 @@ import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/profile/domain/user_session_stats.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
+import '../helpers/onboarding_test_helpers.dart';
+
 class _LoadingAuthNotifier extends AuthNotifier {
   @override
   Future<User?> build() => Completer<User?>().future;
@@ -43,6 +45,10 @@ UserProfile _testProfile() => UserProfile(
       role: UserRole.athlete,
       createdAt: DateTime(2025),
       updatedAt: DateTime(2025),
+      // Este test es sobre la barra, no sobre el onboarding: sin esto el tour
+      // (#627) se monta full-screen sobre /home y los finders de la barra no
+      // encuentran nada. Ver test/helpers/onboarding_test_helpers.dart.
+      onboardingSeen: allSurfacesSeen(),
     );
 
 List<Post> _manyPosts() => List.generate(

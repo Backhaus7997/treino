@@ -1274,6 +1274,72 @@ abstract class AppL10n {
   /// **'¡Terminé mi entreno! 💪'**
   String get workoutPostAutoCompleteText;
 
+  /// Title of the wellbeing trend screen in the Insights hub. Past tense, first person: it is the user's own record, not an assessment of them.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CÓMO ME SENTÍ'**
+  String get wellbeingTrendScreenTitle;
+
+  /// Empty state of the wellbeing trend screen — no check-ins in the selected period. Must not nag or imply the user is failing at anything.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no registraste cómo te sentís. Cuando lo hagas, vas a ver tu propia serie acá.'**
+  String get wellbeingTrendEmptyState;
+
+  /// Shown when the period has exactly one check-in: a single data point is not a curve. Distinct from the empty state on purpose.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Con un solo registro todavía no hay tendencia que mostrar.'**
+  String get wellbeingTrendNeedsMoreData;
+
+  /// Error state of the wellbeing trend screen, paired with the shared retry CTA.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar tu registro. Probá de nuevo.'**
+  String get wellbeingTrendLoadError;
+
+  /// Section heading above the pain counters on the wellbeing trend screen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DOLOR O MOLESTIA'**
+  String get wellbeingTrendPainHeading;
+
+  /// Pain frequency in the selected period. A COUNT, never a verdict — no wording may qualify the number as good or bad.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{painCount} de {total} registros con dolor'**
+  String wellbeingTrendPainCount(int painCount, int total);
+
+  /// Same count for the previous window, so the user can compare their own data with their own data. Stated side by side, never as a qualified difference — no 'better', no 'worse', no trend arrow.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Período anterior: {painCount} de {total}'**
+  String wellbeingTrendPainCountPrevious(int painCount, int total);
+
+  /// Section heading above the per-zone pain counts. Zones use the shared MuscleGroup vocabulary.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ZONAS REGISTRADAS'**
+  String get wellbeingTrendAreasHeading;
+
+  /// Chart tooltip suffix marking a day the user reported pain. A mark, not a judgement.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'con dolor'**
+  String get wellbeingTrendPainMark;
+
+  /// Tile title on InsightsScreen navigating to the wellbeing trend screen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cómo me sentí'**
+  String get insightsTileWellbeingTitle;
+
+  /// Tile subtitle for the wellbeing entry in the stats hub.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu registro de sensación y dolor en el tiempo'**
+  String get insightsTileWellbeingSubtitle;
+
   /// Title of the daily wellbeing card on Home, and of the sheet it opens. Present tense on purpose: the daily check-in does not assume a workout happened. Concrete, never abstract — the segment that asked for this feature is the one that tolerates abstraction worst.
   ///
   /// In es_AR, this message translates to:
@@ -6440,6 +6506,234 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'AJUSTAR HOY'**
   String get sessionTimeFitApply;
+
+  /// Única salida de la card de onboarding de un módulo. Al tocarla se persiste el flag y la card no vuelve.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ENTENDIDO'**
+  String get onboardingCardDismiss;
+
+  /// Card de INICIO para el alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TU RESUMEN DEL DÍA'**
+  String get onboardingCardAthleteHomeTitle;
+
+  /// No description provided for @onboardingCardAthleteHomeBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Acá ves qué te toca entrenar hoy, cómo venís esta semana y tu racha. Si dejaste una sesión a medias, te la ofrece para retomar.'**
+  String get onboardingCardAthleteHomeBody;
+
+  /// Card de ENTRENAR para el alumno. Los tres caminos a una rutina no están explicados en ningún lado de la app.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ACÁ ARRANCA TU ENTRENO'**
+  String get onboardingCardAthleteWorkoutTitle;
+
+  /// No description provided for @onboardingCardAthleteWorkoutBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tenés tres formas de conseguir una rutina:'**
+  String get onboardingCardAthleteWorkoutBody;
+
+  /// No description provided for @onboardingCardAthleteWorkoutBullet1.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'El plan de tu entrenador, ya armado y asignado a vos'**
+  String get onboardingCardAthleteWorkoutBullet1;
+
+  /// No description provided for @onboardingCardAthleteWorkoutBullet2.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Una plantilla de TREINO, lista para usar'**
+  String get onboardingCardAthleteWorkoutBullet2;
+
+  /// No description provided for @onboardingCardAthleteWorkoutBullet3.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu propia rutina, armada ejercicio por ejercicio'**
+  String get onboardingCardAthleteWorkoutBullet3;
+
+  /// Card de FEED para el alumno. RANKINGS es una tab rotulada al lado, no una página escondida.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'LA PARTE SOCIAL'**
+  String get onboardingCardAthleteFeedTitle;
+
+  /// No description provided for @onboardingCardAthleteFeedBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Publicá tus entrenamientos y seguí a tus amigos. Al lado tenés Rankings:'**
+  String get onboardingCardAthleteFeedBody;
+
+  /// No description provided for @onboardingCardAthleteFeedBullet1.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Te compara con la gente de tu gym'**
+  String get onboardingCardAthleteFeedBullet1;
+
+  /// No description provided for @onboardingCardAthleteFeedBullet2.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Es opcional: si no lo activás, ni aparecés ni ves a nadie'**
+  String get onboardingCardAthleteFeedBullet2;
+
+  /// Card de COACH para el alumno. Distingue session_shares (automático) de profile_shares (opt-in manual).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TU ENTRENADOR'**
+  String get onboardingCardAthleteCoachTitle;
+
+  /// No description provided for @onboardingCardAthleteCoachBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Buscá y contratá un entrenador cerca tuyo. Vos controlás qué ve de vos:'**
+  String get onboardingCardAthleteCoachBody;
+
+  /// No description provided for @onboardingCardAthleteCoachBullet1.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tus entrenamientos los ve apenas aceptás el vínculo'**
+  String get onboardingCardAthleteCoachBullet1;
+
+  /// No description provided for @onboardingCardAthleteCoachBullet2.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tus datos personales y medidas, solo si los activás en Perfil › Privacidad'**
+  String get onboardingCardAthleteCoachBullet2;
+
+  /// Card de PERFIL para el alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TU CUENTA'**
+  String get onboardingCardAthleteProfileTitle;
+
+  /// No description provided for @onboardingCardAthleteProfileBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tus datos, tus medidas y tu privacidad. Acá decidís qué comparte tu perfil público y qué ve tu entrenador.'**
+  String get onboardingCardAthleteProfileBody;
+
+  /// Card de INICIO para el entrenador.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TU DÍA'**
+  String get onboardingCardTrainerHomeTitle;
+
+  /// No description provided for @onboardingCardTrainerHomeBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tus próximas sesiones, quién entrenó hoy, la actividad reciente de tus alumnos y lo que tenés por cobrar.'**
+  String get onboardingCardTrainerHomeBody;
+
+  /// Card de ENTRENAR para el entrenador.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TUS PLANTILLAS'**
+  String get onboardingCardTrainerWorkoutTitle;
+
+  /// No description provided for @onboardingCardTrainerWorkoutBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu biblioteca de plantillas propias y el atajo para asignarle un plan a un alumno. El editor completo está en Coach Hub, desde la compu.'**
+  String get onboardingCardTrainerWorkoutBody;
+
+  /// Card de FEED para el entrenador. Ojo: el trainer NO tiene la tab RANKINGS.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'LA COMUNIDAD'**
+  String get onboardingCardTrainerFeedTitle;
+
+  /// No description provided for @onboardingCardTrainerFeedBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'El feed social de TREINO. Podés seguir lo que publican tus alumnos y publicar vos también.'**
+  String get onboardingCardTrainerFeedBody;
+
+  /// Card de COACH para el entrenador. Corrige el modo de falla #1: el PF que espera con el roster vacío.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ALUMNOS Y AGENDA'**
+  String get onboardingCardTrainerCoachTitle;
+
+  /// No description provided for @onboardingCardTrainerCoachBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Acá trabajás con tus alumnos. Lo primero que conviene saber:'**
+  String get onboardingCardTrainerCoachBody;
+
+  /// No description provided for @onboardingCardTrainerCoachBullet1.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'El alumno te manda la solicitud a vos desde su app, no al revés'**
+  String get onboardingCardTrainerCoachBullet1;
+
+  /// No description provided for @onboardingCardTrainerCoachBullet2.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Abrí un alumno para ver su plan, sus series, su progreso y el chat'**
+  String get onboardingCardTrainerCoachBullet2;
+
+  /// No description provided for @onboardingCardTrainerCoachBullet3.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'En AGENDA creás turnos sueltos o series que se repiten'**
+  String get onboardingCardTrainerCoachBullet3;
+
+  /// Card de PERFIL para el entrenador.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TU PERFIL PROFESIONAL'**
+  String get onboardingCardTrainerProfileTitle;
+
+  /// No description provided for @onboardingCardTrainerProfileBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Así te ven los alumnos que te buscan. Desde acá también:'**
+  String get onboardingCardTrainerProfileBody;
+
+  /// No description provided for @onboardingCardTrainerProfileBullet1.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Aceptás las solicitudes entrantes de alumnos nuevos'**
+  String get onboardingCardTrainerProfileBullet1;
+
+  /// No description provided for @onboardingCardTrainerProfileBullet2.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Configurás tu disponibilidad horaria'**
+  String get onboardingCardTrainerProfileBullet2;
+
+  /// Saltea el tour de bienvenida. Visible desde la primera slide.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SALTAR'**
+  String get onboardingTourSkip;
+
+  /// Avanza a la siguiente slide del tour.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SIGUIENTE'**
+  String get onboardingTourNext;
+
+  /// CTA de la última slide; cierra el tour y deja usar la app.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'COMENZAR'**
+  String get onboardingTourFinish;
+
+  /// Etiqueta de lector de pantalla del indicador de progreso. Las barras son decorativas.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Paso {current} de {total}'**
+  String onboardingTourProgress(int current, int total);
+
+  /// CTA de la última slide del onboarding de ejercicios propios. Cierra el modal y devuelve al editor de rutina, donde 'Agregar ejercicio' lleva al alta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CREAR MI EJERCICIO'**
+  String get onboardingCustomExerciseCta;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

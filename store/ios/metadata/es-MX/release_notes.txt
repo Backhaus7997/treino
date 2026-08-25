@@ -1,0 +1,9 @@
+Primera versión pública de TREINO.
+
+- Player de sesión: registrá series, cargas y descansos mientras entrenás.
+- Insights: progresión por ejercicio, volumen semanal y rachas.
+- Coach: encontrá un PF cerca tuyo, vinculate y recibí tu plan en la app.
+- Reporte por ejercicio: contale a tu PF cómo te sentiste, serie por serie.
+- Medidas corporales: peso, altura y más de veinte medidas con su evolución.
+- Rankings por gimnasio, opt-in.
+- Tema claro y oscuro, siguiendo el de tu teléfono.

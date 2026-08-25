@@ -17,6 +17,8 @@ import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../coach/presentation/widgets/exercise_picker_sheet.dart';
+import '../../onboarding/domain/onboarding_surface.dart';
+import '../../onboarding/presentation/custom_exercise_onboarding_gate.dart';
 import '../../profile/application/user_providers.dart'
     show userProfileProvider, userRepositoryProvider;
 import '../../profile/domain/experience_level.dart';
@@ -471,6 +473,24 @@ String? _existingIdFor(RoutineEditorMode mode) => switch (mode) {
       TrainerTemplating(:final existingTemplateId) => existingTemplateId,
     };
 
+/// Which custom-exercise onboarding deck this editor should show.
+///
+/// Keyed off the MODE, not off `userProfileProvider.role`, because the mode is
+/// what the copy is about: `SelfCreating` is someone building their own routine
+/// and gets the "your library" wording even if they happen to be a trainer,
+/// while both trainer modes are building something to assign. Reading the role
+/// instead would show a trainer the assign-to-students deck on a routine they
+/// are writing for themselves.
+OnboardingSurface _onboardingSurfaceFor(RoutineEditorMode mode) =>
+    switch (mode) {
+      SelfCreating() ||
+      SelfCustomizing() =>
+        OnboardingSurface.customExerciseAthleteMobile,
+      TrainerAssigning() ||
+      TrainerTemplating() =>
+        OnboardingSurface.customExerciseTrainerMobile,
+    };
+
 String _titleFor(RoutineEditorMode mode, AppL10n l10n) => switch (mode) {
       TrainerAssigning(existingPlanId: null) => l10n.coachEditorTitle,
       TrainerAssigning() => l10n.coachEditorEditTitle,
@@ -566,6 +586,31 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     final existingId = _existingIdFor(widget.mode);
     if (existingId != null) {
       _loadExistingRoutine(existingId);
+    } else {
+      // Create mode only — `existingId == null` is exactly that for three of
+      // the four variants, so quien entra por deep-link a una rutina que ya
+      // existe nunca recibe el onboarding encima de su plan.
+      //
+      // `SelfCustomizing` es la excepción y hoy queda AFUERA: su id es un
+      // SOURCE, no un destino (ver `_existingIdFor`), así que nunca es null y
+      // esta rama no corre. O sea que el atleta que arranca de una plantilla
+      // —que está armando su propia rutina igual que `SelfCreating`— no ve
+      // este onboarding. Es un gap conocido, no un descuido: incluirlo pide
+      // separar "hidrata de un id" de "edita algo existente", que es un
+      // cambio de #647 y no de este PR. `_onboardingSurfaceFor` ya lo mapea
+      // al deck de atleta para cuando eso pase.
+      //
+      // Post-frame, not here: `initState` has no `Localizations` ancestor
+      // resolved yet and the navigator cannot present mid-frame. In create mode
+      // `_loading` is false, so the editor is fully laid out by then.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        maybeShowCustomExerciseOnboarding(
+          context: context,
+          ref: ref,
+          surface: _onboardingSurfaceFor(widget.mode),
+        );
+      });
     }
   }
 

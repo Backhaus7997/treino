@@ -49,8 +49,24 @@ function esc(value: string | number | undefined): string {
     .replace(/'/g, "&#39;");
 }
 
-/** Fallback CTA target for mails that just send the reader back into the app. */
-const APP_URL = "https://treino.app/coach";
+/**
+ * Landing pública. Destino por defecto de los CTA.
+ *
+ * Es el default —y no el Coach Hub— porque la MAYORÍA de estos mails van a
+ * ATLETAS, que usan la app móvil, no el dashboard web del entrenador. Mandar a
+ * un atleta a `app.gettreino.com` lo deja mirando una herramienta que no es
+ * suya. La landing al menos explica qué es TREINO y cómo bajarla.
+ *
+ * TODO(deep-links): el destino correcto para un atleta es la app, no una web.
+ * Hoy el repo no tiene Universal Links ni App Links configurados (ni
+ * `assetlinks.json`, ni associated domains, ni `autoVerify` en el manifest),
+ * así que no hay forma de abrir la app desde un mail. Cuando eso exista, estos
+ * CTA tienen que apuntar ahí.
+ */
+export const LANDING_URL = "https://gettreino.com";
+
+/** Coach Hub web. Solo para los mails cuyo destinatario ES el entrenador. */
+export const COACH_HUB_URL = "https://app.gettreino.com";
 
 /**
  * Wraps body markup in the branded shell.
@@ -66,7 +82,7 @@ function layout(
   heading: string,
   bodyHtml: string,
   ctaLabel?: string,
-  ctaHref: string = APP_URL,
+  ctaHref: string = LANDING_URL,
 ): string {
   const cta = ctaLabel
     ? [
@@ -194,6 +210,12 @@ function build(
  * @param params - Template values, as persisted on the queue doc.
  */
 export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
+  // Destino del CTA. Los productores pasan `ctaUrl` cuando el destinatario es
+  // el entrenador; el resto cae al landing. Se resuelve una sola vez acá para
+  // que la URL entre TAMBIEN en la parte de texto plano — un CTA que solo vive
+  // dentro de un <a> no existe para quien lee en texto.
+  const ctaUrl = params.ctaUrl ? String(params.ctaUrl) : LANDING_URL;
+
   switch (kind) {
   // ── Auth ─────────────────────────────────────────────────────────────────
   //
@@ -244,6 +266,7 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
         ["Si no podés ir, cancelá con más de 24 horas de anticipación."],
       ],
       "VER MI AGENDA",
+      ctaUrl,
     );
 
     // NOTE: deliberately states no session count and no date range. This mail
@@ -261,6 +284,7 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
         ["Las tenés todas cargadas en tu agenda, con día y horario."],
       ],
       "VER MI AGENDA",
+      ctaUrl,
     );
 
   case "appointment-cancelled":
@@ -279,6 +303,7 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
         ["El horario vuelve a estar disponible en la agenda."],
       ],
       "VER MI AGENDA",
+      ctaUrl,
     );
 
     // Same partial-batch reasoning as `appointment-series-created`.
@@ -291,6 +316,7 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
         ["Revisá tu agenda para ver cómo quedó."],
       ],
       "VER MI AGENDA",
+      ctaUrl,
     );
 
   case "link-requested":
@@ -302,6 +328,7 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
         ["Aceptá la solicitud para empezar a armarle la rutina."],
       ],
       "VER SOLICITUD",
+      ctaUrl,
     );
 
   case "link-accepted":
@@ -313,6 +340,7 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
         ["Ya podés ver las rutinas que te asigne y hablar por el chat."],
       ],
       "IR A MI ENTRENADOR",
+      ctaUrl,
     );
 
   case "payment-overdue":
@@ -325,6 +353,7 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
         ["Coordiná el pago con tu entrenador para seguir entrenando."],
       ],
       "VER MIS PAGOS",
+      ctaUrl,
     );
 
   default: {

@@ -782,6 +782,29 @@
   "volumeByGroupEmptyTarget": "Necesitás una rutina asignada para ver tu volumen objetivo.",
   "workoutRutinasCoachChip": "DE TU COACH",
   "workoutPostAutoCompleteText": "¡Terminé mi entreno! 💪",
+  "wellbeingTrendScreenTitle": "CÓMO ME SENTÍ",
+  "wellbeingTrendEmptyState": "Todavía no registraste cómo te sientes. Cuando lo hagas, verás tu propia serie aquí.",
+  "wellbeingTrendNeedsMoreData": "Con un solo registro todavía no hay tendencia que mostrar.",
+  "wellbeingTrendLoadError": "No pudimos cargar tu registro. Inténtalo de nuevo.",
+  "wellbeingTrendPainHeading": "DOLOR O MOLESTIA",
+  "wellbeingTrendPainCount": "{painCount} de {total} registros con dolor",
+  "@wellbeingTrendPainCount": {
+    "placeholders": {
+      "painCount": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "wellbeingTrendPainCountPrevious": "Período anterior: {painCount} de {total}",
+  "@wellbeingTrendPainCountPrevious": {
+    "placeholders": {
+      "painCount": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "wellbeingTrendAreasHeading": "ZONAS REGISTRADAS",
+  "wellbeingTrendPainMark": "con dolor",
+  "insightsTileWellbeingTitle": "Cómo me sentí",
+  "insightsTileWellbeingSubtitle": "Tu registro de sensación y dolor en el tiempo",
   "wellbeingDailyTitle": "¿CÓMO TE SIENTES HOY?",
   "wellbeingDailyPrompt": "Anota cómo amaneces, entrenes o no.",
   "wellbeingCheckInTitle": "¿CÓMO TE SENTISTE?",
