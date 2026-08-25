@@ -33,7 +33,7 @@
  *      turns this red and forces a deliberate inventory update.
  *   2. The SYNTACTIC INVARIANT (§6): no clause carrying a read verb may ever
  *      be in that set.
- *   3. The SHORT-CIRCUIT ORDER (§7) of the three read clauses that reach
+ *   3. The SHORT-CIRCUIT ORDER (§7) of the four read clauses that reach
  *      paywall-written DATA without ever naming the paywall.
  *
  * WHAT IT DOES **NOT** ASSERT — read this before trusting a green.
@@ -47,12 +47,15 @@
  *   the entitlement sweep writes `trainer_links`
  *     -> syncSessionShareOnTrainerLink (functions/src/sync-session-share.ts)
  *        fires on that write and sets/deletes `session_shares/{athleteId}`
- *     -> and `session_shares` is read by three clauses:
- *        firestore.rules:1471 (sessions), :1485 (setLogs), :1723 (measurements)
+ *     -> and `session_shares` is read by four clauses: the `sessions` doc, its
+ *        `setLogs` sub-collection, its `exerciseFeedback` sub-collection
+ *        (#628) and `measurements`. Line numbers are deliberately NOT quoted
+ *        here — they went stale twice; §7 names the clauses by match path and
+ *        the cross-check at the end of that section proves the list is whole.
  *
  * `session_shares` is deliberately NOT in PAYWALL_TOKENS, and that is a
- * decision, not an oversight. Adding it would paint those three clauses red
- * while all three are correct: in every one of them the OWNER branch comes
+ * decision, not an oversight. Adding it would paint those four clauses red
+ * while all four are correct: in every one of them the OWNER branch comes
  * FIRST and `||` short-circuits, so the athlete reading their own data never
  * reaches the get(). A red that has to be suppressed teaches nothing, and a
  * suppressed assert is worth nothing. §7 pins the fact that actually protects
@@ -626,7 +629,7 @@ describe("firestore.rules — the athlete never loses read access", () => {
 // ---------------------------------------------------------------------------
 // 7. ASSERT 3 — the owner branch short-circuits before session_shares.
 // ---------------------------------------------------------------------------
-// The three read clauses that touch paywall-written data WITHOUT naming the
+// The four read clauses that touch paywall-written data WITHOUT naming the
 // paywall. `session_shares/{athleteId}` is maintained by
 // syncSessionShareOnTrainerLink, which fires on `trainer_links` writes — the
 // same collection the entitlement sweep writes. §6 is blind to this by
@@ -703,7 +706,7 @@ function firstIndexOfAny(haystack: string, needles: readonly string[]): number {
 // character, so a construct the parser mangled fails loudly instead of
 // quietly weakening the assert.
 //
-// NOT SUPPORTED ON PURPOSE: unary `!`. None of the three clauses uses it, and
+// NOT SUPPORTED ON PURPOSE: unary `!`. None of the four clauses uses it, and
 // negation flips which branch short-circuits, so guessing would be worse than
 // failing. `parseBoolExpr` throws when it sees one — teach it before shipping
 // a rule that needs it.
@@ -933,6 +936,18 @@ const SHORT_CIRCUIT_CASES: readonly ShortCircuitCase[] = [
     ownerForms: ["request.auth.uid==uid", "uid==request.auth.uid"],
   },
   {
+    // #628 — el feedback por ejercicio que el alumno escribe DURANTE la
+    // sesión: comentario o molestia, con foto opcional. Es la cláusula más
+    // cara de las cuatro si el short-circuit se rompe, porque el documento no
+    // sólo contiene dato de salud: contiene la URL con token de la foto, que
+    // es una credencial al portador y no pasa por storage.rules
+    // (docs/security.md §3.1). Quien lee el doc, baja la foto.
+    what: "the athlete's own exercise feedback",
+    path: "/users/{uid}/sessions/{sessionId}/exerciseFeedback/{feedbackId}",
+    verbs: "read",
+    ownerForms: ["request.auth.uid==uid", "uid==request.auth.uid"],
+  },
+  {
     what: "the athlete's own measurements",
     path: "/measurements/{measurementId}",
     verbs: "read",
@@ -985,10 +1000,16 @@ describe("firestore.rules — the owner branch short-circuits before session_sha
       expect(analysis.witnesses).toEqual([]);
     });
 
-  it("still names three clauses — the set is not silently shrinking", () => {
+  it("still names four clauses — the set is not silently shrinking", () => {
     // Guards the it.each above against the failure mode where someone deletes
     // a case instead of re-deriving it.
-    expect(SHORT_CIRCUIT_CASES).toHaveLength(3);
+    //
+    // Fueron tres hasta #628, que sumó `exerciseFeedback`. El número se
+    // actualiza A MANO y a propósito: el cross-check de abajo se pone rojo en
+    // cuanto una cláusula de lectura nueva toca session_shares, y subir este
+    // número es el acto deliberado de decir "sí, la miré y el dueño
+    // short-circuitea". Nunca al revés.
+    expect(SHORT_CIRCUIT_CASES).toHaveLength(4);
 
     // And cross-checks the other direction: no OTHER read clause started
     // consulting session_shares without being added here. The session_shares

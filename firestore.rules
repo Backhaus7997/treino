@@ -1791,6 +1791,74 @@ service cloud.firestore {
                             && get(/databases/$(database)/documents/session_shares/$(uid)).data.trainerId == request.auth.uid));
         allow write: if request.auth != null && request.auth.uid == uid;
       }
+
+      // exerciseFeedback sub-collection (#628) — el canal que faltaba:
+      // alumno → PF, EN PALABRAS y anclado a (exerciseId, setNumber). Es la
+      // contraparte simétrica de coach_note.dart (PF → alumno). "chat =
+      // palabras sueltas, setLogs = números, exerciseFeedback = palabras
+      // ancladas al ejercicio".
+      //
+      // Read es el MISMO predicado de dos partes que setLogs — dueño OR PF con
+      // grant vivo en session_shares — y el dueño va PRIMERO para que `||`
+      // corte antes del get(): el alumno leyendo lo suyo nunca depende de un
+      // documento que escribe el pipeline de entitlements. Eso lo pinea
+      // rules-read-isolation.test.ts §7, que ahora nombra CUATRO cláusulas.
+      // Write es owner-only: el PF jamás muta datos del alumno, y este canal
+      // es one-way por diseño (#628, "No entra: hilo de conversación").
+      //
+      // ⚠️ DATO DE SALUD, y por eso el read NO puede ser `request.auth != null`.
+      // `kind: 'discomfort'` es dolor/lesión declarada, y `photoUrl` apunta a
+      // `sessionFeedback/{uid}/{sessionId}/{file}` en Storage. Esa URL de
+      // getDownloadURL() lleva `?alt=media&token=` y es una CREDENCIAL AL
+      // PORTADOR: NO evalúa storage.rules (docs/security.md §3.1, medido
+      // contra el emulador — 200 sin ningún header de auth). O sea que el
+      // gate REAL de la foto es este documento, no el bloque de Storage. Dos
+      // consecuencias que mandan sobre cualquier cambio futuro acá:
+      //   1. el photoUrl NO se denormaliza a ninguna colección más laxa —
+      //      ni userPublicProfiles, ni posts, ni el doc de sesión;
+      //   2. aflojar este read a `request.auth != null` publicaría la foto de
+      //      una lesión a cualquier cuenta autenticada, y ningún test de
+      //      Storage se pondría rojo porque la URL ni siquiera pasa por ahí.
+      //
+      // Validación de forma en create/update (#508 y #447: las reglas sin
+      // validación de tipo se cuelan). Deliberadamente SIN `keys().hasOnly()`
+      // — es el trap de forward-compat de #635: pinear el juego de claves
+      // rompe a los clientes viejos en cuanto el modelo suma un campo.
+      // Se valida el tipo de lo que existe y la única regla de negocio que
+      // importa: "nada de reportes vacíos" (#628).
+      function feedbackShapeOk(d) {
+        return d.exerciseId is string
+            && d.exerciseId.size() > 0
+            && d.exerciseId.size() <= 128
+            && d.exerciseName is string
+            && d.exerciseName.size() <= 200
+            && d.kind in ['comment', 'discomfort']
+            && d.createdAt is timestamp
+            && optNumInRange(d.get('setNumber', null), 1, 99)
+            && optStrMaxLen(d.get('text', null), 2000)
+            && optStrMaxLen(d.get('photoUrl', null), 2000)
+            && optStrMaxLen(d.get('photoPath', null), 512)
+            // Al menos texto O foto, y NO la cadena vacía en ninguno de los
+            // dos: `optStrMaxLen` acepta '' feliz, así que sin esto un reporte
+            // con `text: ''` pasaba y le vibraba el teléfono al PF por nada.
+            && (
+                 (d.get('text', null) is string && d.get('text', null).size() > 0)
+                 || (d.get('photoUrl', null) is string && d.get('photoUrl', null).size() > 0)
+               );
+      }
+
+      match /exerciseFeedback/{feedbackId} {
+        allow read: if request.auth != null
+                    && (request.auth.uid == uid
+                        || (exists(/databases/$(database)/documents/session_shares/$(uid))
+                            && get(/databases/$(database)/documents/session_shares/$(uid)).data.trainerId == request.auth.uid));
+
+        allow create, update: if request.auth != null
+                              && request.auth.uid == uid
+                              && feedbackShapeOk(request.resource.data);
+
+        allow delete: if request.auth != null && request.auth.uid == uid;
+      }
     }
 
     // GYM-PRESENCE check-in sub-collection (Fase 4 Etapa 6, REQ-WRC-004).
