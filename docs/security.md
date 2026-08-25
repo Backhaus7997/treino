@@ -1853,8 +1853,8 @@ exigen `request.auth`:
 
 | Callable | App Check | Estado |
 |---|---|---|
-| `deleteAccount` | `true` | cubierto por el scanner QA-SEC-006 |
-| `addAlias` | `true` | cubierto por el scanner |
+| `deleteAccount` | `true` | atestado — **y rechazando clientes reales, ver más abajo** |
+| `addAlias` | `true` | atestado — se llama desde web, donde nunca puede pasar (§4.10) |
 | `acceptTrainerLink` | **off** | exención **decidida** y comentada (`accept-trainer-link.ts:82`) — el Coach Hub web no activa App Check |
 | `resumeTrainerLink` | **off** | exención decidida y comentada (`resume-trainer-link.ts:77`) |
 | `mintWatchCredential` | **off** | **deuda**, no decisión — el propio archivo lo dice (`mint-watch-credential.ts:115`) |
@@ -1871,11 +1871,111 @@ Es exactamente el defecto que §1.4 midió para `rules.test.js` —un guard que 
 distingue "cambió porque quisimos" de "se rompió"— con el agravante de que acá el
 inventario es manual y el drift es la operación normal. → **QA-SEC-016**.
 
-Contexto que baja la severidad y hay que dejar escrito: según la verificación del
-2026-08-18 que cita `mint-watch-credential.ts:118`, el enforcement de App Check
-está **UNENFORCED a nivel de proyecto** (`firestore.googleapis.com` e
-`identitytoolkit.googleapis.com`), así que hoy el flag no cierra ninguna puerta
-en ningún lado. El ticket es sobre el guard, no sobre una exposición viva.
+**Cerrado en [#805](https://github.com/Backhaus7997/treino/pull/805)**: el scanner
+ya no tiene lista propia. La deriva de `index.ts` por AST —los callables
+desplegados son los símbolos exportados ahí que resuelven a un `onCall`— y las
+tres exenciones pasaron a un registry con motivo, permanencia
+(`decided` / `debt`) y condición de salida obligatoria para las deudas.
+
+#### 4.8.1 El enforcement de App Check, reconciliado (2026-08-25)
+
+Dos lugares del repo decían cosas incompatibles, y este documento repetía la
+lectura equivocada:
+
+| Fuente | Fecha | Qué decía |
+|---|---|---|
+| `lib/main.dart:82-84` | 2026-07-27 | *"ENFORCEMENT ESTÁ ACTIVO para Cloud Firestore"* |
+| `mint-watch-credential.ts:103-106` | 2026-08-18 | `firestore` e `identitytoolkit` → **UNENFORCED** |
+
+Re-medido contra las dos APIs el **2026-08-25**, sin token de App Check y con un
+token deliberadamente inválido. Las dos lo ignoran y siguen de largo:
+
+```
+GET  firestore.googleapis.com/v1/.../documents/exercises
+     → 403 "Missing or insufficient permissions."   ← lo deniegan las REGLAS
+POST identitytoolkit.googleapis.com/v1/accounts:signInWithPassword
+     → 400 INVALID_LOGIN_CREDENTIALS                ← llegó a validar credenciales
+```
+
+Con enforcement activo ninguna de las dos habría llegado tan lejos. **Gana la
+verificación del 2026-08-18: a nivel de proyecto está UNENFORCED.** `main.dart`
+quedó desactualizado y se corrigió en el mismo PR.
+
+**De ahí NO se sigue que "el flag no cierra ninguna puerta en ningún lado".** Esa
+frase vivía acá y era falsa: `enforceAppCheck` lo aplica **la propia función**,
+en su código, y es independiente del enforcement por API de la consola. Medido el
+mismo día, llamando a los cinco callables desplegados sin token de auth — sin
+credencial no se puede borrar ni escribir nada, así que la sonda es inocua:
+
+| Callable | Respuesta | Lectura |
+|---|---|---|
+| `deleteAccount` | `"Unauthenticated"` | cortado en la capa de transporte, el handler **no corre** |
+| `addAlias` | `"Unauthenticated"` | ídem |
+| `acceptTrainerLink` | `"Authentication required."` | llegó al handler → sin enforcement |
+| `resumeTrainerLink` | `"Authentication required."` | ídem |
+| `mintWatchCredential` | `"Authentication required."` | ídem |
+
+`"Caller is not authenticated."` es el mensaje propio de
+`delete-account.ts:222`; el que vuelve es el genérico de `firebase-functions` v2.
+La diferencia es la prueba de que la atestación corta antes.
+
+#### 4.8.2 `deleteAccount` nunca devolvió 200
+
+Consecuencia viva de lo anterior, medida sobre Cloud Logging el 2026-08-25 con
+todo el histórico retenido (desde 2026-05-01):
+
+```
+resource.labels.service_name="deleteaccount" AND httpRequest.status=200
+→ 0 entradas
+```
+
+Los **únicos** tres intentos autenticados que existen fueron rechazados:
+
+```
+2026-08-11T13:12:37Z  401  {"verifications":{"auth":"VALID","app":"INVALID"}}
+2026-08-11T13:12:51Z  401  "AppCheck token was rejected."
+2026-08-11T13:13:05Z  401  FirebaseAppCheckError: Decoding App Check token failed
+ua="com.backhaus.treino/0.1.0 iPhone/17.5 hw/sim"
+```
+
+Tres toques en 28 segundos: alguien apretó ELIMINAR, no pasó nada y reintentó.
+`enforceAppCheck: true` entró en `deleteAccount` el 2026-07-20 (`2bb8d1c7`).
+Apple Guideline 5.1.1(v) exige que el borrado de cuenta funcione.
+
+Ese cliente era un **simulador** (`hw/sim`), no un tester de TestFlight — pero el
+modo de falla no es exclusivo del simulador. Cruzando cada verificación con su
+user-agent sobre `mintWatchCredential`, que recibe tráfico real y no tiene el
+flag puesto:
+
+| Cliente | `app=VALID` | `app=INVALID` | Último |
+|---|---|---|---|
+| iPhone físico (`hw=iPhone17_1`, iOS 26.5.2 / 26.6) | 8 | 2 | 2026-08-21 |
+| Android (`okhttp/3.12.13`) | 1 | **8** | 2026-08-24 |
+| Coach Hub web (`Mozilla/… Windows`) | — | `MISSING` ×13 | 2026-08-20 |
+
+Tres cosas que corrige esta medición:
+
+1. **App Attest no está roto en general.** `mint-watch-credential.ts:96-98`
+   generaliza de más: en un iPhone físico emitió 8 tokens válidos. Lo que falla
+   ahí es intermitente.
+2. **El que está roto es Play Integrity en Android** — 8 de 9 llamadas con token
+   inválido, la más reciente 2026-08-24.
+3. **La web manda `MISSING`, no `INVALID`**, confirmando que
+   `main_coach_hub.dart` no activa App Check (cero referencias a
+   `FirebaseAppCheck`) y que el PR [#704](https://github.com/Backhaus7997/treino/pull/704)
+   acertó al sacar el flag de los dos callables del paywall.
+
+**Cómo repetir la medición** — no hace falta instrumentar nada, `firebase-functions`
+v2 ya loguea la verificación de cada callable:
+
+```
+jsonPayload.message:"Callable request verification"
+```
+
+El campo `jsonPayload.verifications.app` vale `VALID` / `INVALID` / `MISSING`, y
+distingue *"no mandó token"* de *"mandó uno que no se pudo decodificar"* — que es
+justamente la distinción entre la web y el móvil. Es la fuente de la que dependen
+el plan de restore de #704 y la condición de salida de `mintWatchCredential`.
 
 ---
 
@@ -1895,7 +1995,7 @@ Ordenados por lo que me preocuparía primero.
 | **QA-SEC-013** | El gate de rol de Slice C no llegó a las 3 colecciones que publican al PF | `:1111`, `:1816`, `:1826` | Media | [#780](https://github.com/Backhaus7997/treino/issues/780) |
 | **QA-SEC-014** | `appointments` create sin allowlist de campos ni cap de tamaño: un desconocido escribe en la agenda de cualquier PF | `:1858` | Media | [#781](https://github.com/Backhaus7997/treino/issues/781) |
 | **QA-SEC-015** | `temp/uploads` es el único write de Storage sin allowlist de content-type ni cap de tamaño | `storage.rules:19` | Baja | [#782](https://github.com/Backhaus7997/treino/issues/782) |
-| **QA-SEC-016** | El scanner de App Check cubre 2 de los 5 callables desplegados | `appcheck-enforcement.test.ts:18` | Baja | [#783](https://github.com/Backhaus7997/treino/issues/783) |
+| **QA-SEC-016** | El scanner de App Check cubre 2 de los 5 callables desplegados | `appcheck-enforcement.test.ts:18` | Baja | ~~[#783](https://github.com/Backhaus7997/treino/issues/783)~~ cerrado |
 
 ---
 
@@ -2134,12 +2234,32 @@ está decidido es que el guard afirme una propiedad que no verifica. Y una de la
 tres exenciones (`mintWatchCredential`) se declara a sí misma *"deuda, no decisión
 de diseño"*, con un TODO de restauración que nada vigila.
 
-*Arreglo propuesto:* derivar la lista de `index.ts` en vez de escribirla a mano
-—los callables desplegados son exactamente los símbolos `onCall` exportados
-ahí— y convertir las exenciones en entradas explícitas con motivo, de modo que
-agregar un callable sin atestación **y sin exención declarada** ponga el test en
-rojo. Es el mismo patrón que `rules-read-isolation.test.ts` (§1.4) ya usa para
-congelar cláusulas de `firestore.rules`.
+*Arreglado en [#805](https://github.com/Backhaus7997/treino/pull/805):* la lista
+se deriva de `index.ts` por AST —los callables desplegados son exactamente los
+símbolos exportados ahí que resuelven a un `onCall`— y las exenciones son
+entradas explícitas con motivo, de modo que agregar un callable sin atestación
+**y sin exención declarada** pone el test en rojo. Mismo patrón que
+`rules-read-isolation.test.ts` (§1.4) usa para congelar cláusulas de
+`firestore.rules`.
+
+Se usó AST y no regex por dos defectos que el guard viejo tenía y un regex no
+puede evitar: un `// export {...}` comentado parece un export (así viven
+`resolveGymPlace` y los dos callables de auth), y `src.match(/enforceAppCheck:\s*true/)`
+sobre el archivo **entero** le daba el visto bueno al segundo callable con la
+atestación del primero — `auth/request-auth-email.ts` ya exporta dos. Los dos
+casos tienen test.
+
+El registry distingue `decided` de `debt`, y la unión discriminada de TypeScript
+**obliga** a que una deuda traiga condición de salida: una deuda sin condición de
+salida es una decisión disfrazada. También falla si una exención sobrevive a su
+causa —el flag volvió y nadie borró la entrada— para que el registry no crezca
+solo. Y pinea el set desplegado (5 hoy): si la resolución del AST se rompiera, el
+inventario quedaría vacío y todo lo demás pasaría, porque *"cero callables sin
+atestación"* es trivialmente cierto sobre una lista vacía.
+
+Verificado por mutación a mano, no sólo por el caso negativo sintético: sacándole
+`enforceAppCheck: true` a `delete-account.ts:219` cae exactamente un test y
+ninguno más; restaurándolo vuelve a verde. La tabla está en el cuerpo del PR.
 
 ---
 
@@ -2178,6 +2298,14 @@ escritas. Mismo criterio que §1.7.
   anotado acá porque es el mismo patrón que §3.2.1 (`catch (_) {}` que se come
   una denegación y le miente al usuario) y porque, cuando se active App Check en
   web, es lo primero que hay que retestear.
+  **Confirmado por sonda el 2026-08-25** (§4.8.1): `addAlias` devuelve el
+  `"Unauthenticated"` genérico de la capa de transporte, no el
+  `"Authentication required."` de su propio handler — la atestación corta antes
+  de que el handler corra. Y `main_coach_hub.dart` no tiene una sola referencia
+  a `FirebaseAppCheck`, así que desde web el token no es inválido: **no
+  existe**. Su único callable hermano medido desde web
+  (`acceptTrainerLink`, que ya no tiene el flag) registra 13 llamadas con
+  `app=MISSING`, todas de un `Mozilla/… Windows`.
 - **La jerarquía aguanta por default-deny, no por una regla.** Los seis
   `collectionGroup` de §4.3 fallan porque no existe un `match /{path=**}/…`. Es
   correcto y es gratis, pero es una propiedad que se pierde con un `match` nuevo
@@ -2258,7 +2386,7 @@ y se tacha acá con la referencia al PR — nunca se borra. Los hallazgos de
 | QA-SEC-003 | `gyms`: coordenadas sin validar + campos de identidad sin pinear en el update | ~~Cerrado~~ — `firestore.rules:1203`, `rules.test.js` |
 | QA-SEC-004 | — | **nunca asignado** |
 | QA-SEC-005 | — | **nunca asignado** |
-| QA-SEC-006 | App Check obligatorio en los callables desplegados | ~~Cerrado~~ — `appcheck-enforcement.test.ts`. **Su cobertura quedó desactualizada** → QA-SEC-016 |
+| QA-SEC-006 | App Check obligatorio en los callables desplegados | ~~Cerrado~~ — `appcheck-enforcement.test.ts`. Su cobertura quedó desactualizada (→ QA-SEC-016) y se **re-cerró** con inventario derivado de `index.ts` en [#805](https://github.com/Backhaus7997/treino/pull/805) |
 | QA-SEC-007 | `storage:avatars/` — `list` enumera el padrón de uids con avatar | Abierto — [#764](https://github.com/Backhaus7997/treino/issues/764), §3.6 |
 | QA-SEC-008 | `storage:customExerciseVideos/` — `list` exfiltra la videoteca entera de un PF | Abierto — [#763](https://github.com/Backhaus7997/treino/issues/763), §3.6 |
 | QA-SEC-009 | `storage:avatars/` — `delete` denegado hasta para el dueño por null deref | Abierto — [#765](https://github.com/Backhaus7997/treino/issues/765), §3.6 |
@@ -2268,7 +2396,7 @@ y se tacha acá con la referencia al PR — nunca se borra. Los hallazgos de
 | QA-SEC-013 | El gate de rol de trainer no llegó a 3 colecciones | Abierto — [#780](https://github.com/Backhaus7997/treino/issues/780), §4.9 |
 | QA-SEC-014 | `appointments` create sin allowlist ni cap de tamaño | Abierto — [#781](https://github.com/Backhaus7997/treino/issues/781), §4.9 |
 | QA-SEC-015 | `temp/uploads` sin allowlist de content-type ni cap | Abierto — [#782](https://github.com/Backhaus7997/treino/issues/782), §4.9 |
-| QA-SEC-016 | El scanner de App Check cubre 2 de 5 callables | Abierto — [#783](https://github.com/Backhaus7997/treino/issues/783), §4.9 |
+| QA-SEC-016 | El scanner de App Check cubre 2 de 5 callables | ~~Cerrado~~ — [#783](https://github.com/Backhaus7997/treino/issues/783) / [#805](https://github.com/Backhaus7997/treino/pull/805), `appcheck-enforcement.test.ts` + `helpers/appcheck-audit.ts`, §4.8.1 y §4.9 |
 | QA-SEC-100 | Android: `allowBackup` | ~~Cerrado~~ — `test/security/android_manifest_backup_test.dart` |
 
 **Próximo id libre: QA-SEC-017** (y `QA-SEC-1xx`: 101).
