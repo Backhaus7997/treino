@@ -56,6 +56,23 @@ jobs:
       TREINO_VISUAL_GATE: '1'
       TZ: UTC
     steps:
+      # Este workflow COMMITEA y PUSHEA. Sobre la rama default eso sería un bot
+      # escribiendo en `main` sin PR y sin review — y `main` hoy no tiene branch
+      # protection que lo frene (docs/visual-gate.md §9).
+      #
+      # El agujero es concreto: en un `workflow_dispatch` lanzado con el ref por
+      # defecto, `github.head_ref` viene vacío y `github.ref_name` es `main`, así
+      # que el checkout y el `git push origin HEAD` de abajo apuntan a `main`.
+      #
+      # Falla ruidosa y no `if:` a nivel de job: un job "skipped" se lee como
+      # "no hacía falta", y acá hace falta que quien lo lanzó entienda que lo
+      # lanzó mal.
+      - name: Rechazar la regeneración sobre la rama default
+        if: github.ref_name == github.event.repository.default_branch
+        run: |
+          echo "::error::Los goldens se regeneran en una RAMA, nunca sobre '${{ github.ref_name }}'. Este workflow commitea y pushea: sobre la rama default entraría un cambio visual sin PR. Lanzalo desde la rama del cambio (ver docs/visual-gate.md §7)."
+          exit 1
+
       - name: Checkout
         uses: actions/checkout@v7
         with:
